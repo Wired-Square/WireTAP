@@ -45,6 +45,25 @@ if (status) {
   process.exit(1);
 }
 
+// Check that CHANGELOG.md has been updated in a recent commit
+const changelogCommits = runSilent('git log --oneline -10 --follow -- CHANGELOG.md');
+const lastChangelogCommit = changelogCommits.split('\n')[0]?.split(' ')[0];
+
+if (!lastChangelogCommit) {
+  console.error('Error: CHANGELOG.md has never been committed.');
+  console.error('Please update CHANGELOG.md with release notes before releasing.');
+  process.exit(1);
+}
+
+// Check if CHANGELOG.md was updated in the last 5 commits
+const recentCommits = runSilent('git log --oneline -5').split('\n').map(line => line.split(' ')[0]);
+if (!recentCommits.includes(lastChangelogCommit)) {
+  console.error('Error: CHANGELOG.md has not been updated recently.');
+  console.error(`Last CHANGELOG.md update was in commit ${lastChangelogCommit}.`);
+  console.error('Please update CHANGELOG.md with release notes before releasing.');
+  process.exit(1);
+}
+
 // Check we're on main branch
 const branch = runSilent('git branch --show-current');
 if (branch !== 'main') {
