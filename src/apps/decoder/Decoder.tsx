@@ -575,10 +575,12 @@ export default function Decoder() {
       setPlaybackSpeed(speed as PlaybackSpeed);
 
       // Now start watching
+      // Note: reinitialize() already auto-starts the session via the backend,
+      // so we don't need to call start() here. Calling start() with the old
+      // effectiveSessionId (before React re-render) would restart the wrong session.
       setIsWatching(true);
       setWatchFrameCount(0);
       streamCompletedRef.current = false; // Reset flag when starting playback
-      await start();
       setShowIoReaderPickerDialog(false);
     } else {
       // Ingest mode - uses separate session, no real-time display
@@ -586,7 +588,7 @@ export default function Decoder() {
       setIngestSpeed(speed);
       await handleStartIngest(profileId, options);
     }
-  }, [setIoProfile, reinitialize, start, handleStartIngest, setPlaybackSpeed, serialConfig]);
+  }, [setIoProfile, reinitialize, handleStartIngest, setPlaybackSpeed, serialConfig]);
 
   // Handle stopping from the dialog - routes to Watch or Ingest stop
   const handleDialogStopIngest = useCallback(async () => {
