@@ -179,29 +179,38 @@ export function useIOProfileHandlers() {
   };
 
   // Update a field on the profile form
+  // NOTE: We use getState() instead of the dialogPayload from the closure to avoid
+  // stale closure issues when multiple fields are updated in a single event handler.
   const updateProfileField = (field: keyof IOProfile, value: any) => {
+    const currentPayload = useSettingsStore.getState().ui.dialogPayload;
     setDialogPayload({
-      profileForm: { ...dialogPayload.profileForm, [field]: value },
+      profileForm: { ...currentPayload.profileForm, [field]: value },
     });
   };
 
   // Update a connection field
+  // NOTE: We use getState() instead of the dialogPayload from the closure to avoid
+  // stale closure issues when multiple fields are updated in a single event handler.
   const updateConnectionField = (key: string, value: string | boolean) => {
+    const currentPayload = useSettingsStore.getState().ui.dialogPayload;
     setDialogPayload({
       profileForm: {
-        ...dialogPayload.profileForm,
-        connection: { ...dialogPayload.profileForm.connection, [key]: value },
+        ...currentPayload.profileForm,
+        connection: { ...currentPayload.profileForm.connection, [key]: value },
       },
     });
   };
 
   // Update MQTT format settings
+  // NOTE: We use getState() instead of the dialogPayload from the closure to avoid
+  // stale closure issues when multiple fields are updated in a single event handler.
   const updateMqttFormat = (
     format: 'json' | 'savvycan' | 'decode',
     field: 'topic' | 'enabled',
     value: string | boolean
   ) => {
-    const formats = dialogPayload.profileForm.connection.formats || {
+    const currentPayload = useSettingsStore.getState().ui.dialogPayload;
+    const formats = currentPayload.profileForm.connection.formats || {
       json: { topic: '', enabled: false },
       savvycan: { topic: '', enabled: false },
       decode: { topic: '', enabled: false },
@@ -209,9 +218,9 @@ export function useIOProfileHandlers() {
 
     setDialogPayload({
       profileForm: {
-        ...dialogPayload.profileForm,
+        ...currentPayload.profileForm,
         connection: {
-          ...dialogPayload.profileForm.connection,
+          ...currentPayload.profileForm.connection,
           formats: {
             ...formats,
             [format]: {

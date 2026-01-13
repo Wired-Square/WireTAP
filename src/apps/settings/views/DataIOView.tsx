@@ -41,6 +41,8 @@ const getIOKindLabel = (kind: IOProfile["kind"]) => {
       return "PostgreSQL";
     case "gvret_tcp":
       return "GVRET TCP";
+    case "gvret_usb":
+      return "GVRET USB";
     case "csv_file":
       return "CSV File";
     case "serial":
@@ -49,6 +51,8 @@ const getIOKindLabel = (kind: IOProfile["kind"]) => {
       return "slcan";
     case "socketcan":
       return "SocketCAN";
+    case "gs_usb":
+      return "gs_usb";
     default:
       return kind;
   }
@@ -202,6 +206,33 @@ const renderConnectionSummary = (profile: IOProfile) => {
     return (
       <div className="flex flex-wrap gap-2">
         <SummaryBadge label="interface" value={iface} />
+      </div>
+    );
+  }
+
+  if (profile.kind === "gs_usb") {
+    const deviceId = c.device_id || "(not set)";
+    const bitrate = c.bitrate || 500000;
+    const bitrateLabel = bitrate >= 1000000 ? `${bitrate / 1000000}M` : `${bitrate / 1000}k`;
+    const listenOnly = c.listen_only ?? true;
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        <SummaryBadge label="device" value={deviceId} />
+        <SummaryBadge label="bitrate" value={bitrateLabel} />
+        <SummaryBadge label="mode" value={listenOnly ? "listen" : "active"} />
+      </div>
+    );
+  }
+
+  if (profile.kind === "gvret_usb") {
+    const port = c.port || "(not set)";
+    const baudRate = c.baud_rate || "115200";
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        <SummaryBadge label="port" value={port} />
+        <SummaryBadge label="baud" value={baudRate} />
       </div>
     );
   }

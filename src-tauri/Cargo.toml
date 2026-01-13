@@ -41,10 +41,11 @@ rumqttc = "0.24"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
+nusb = { version = "0.2", features = ["tokio"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
-nusb = "0.2"
+nusb = { version = "0.2", features = ["tokio"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 socketcan = "3.3"

@@ -51,7 +51,7 @@ export const CSV_EXTERNAL_ID = "__csv_external__";
 export const INGEST_SESSION_ID = "__ingest__";
 
 // Real-time source types (no speed limiting possible)
-const REALTIME_KINDS = ["gvret_tcp", "serial", "slcan", "socketcan"];
+const REALTIME_KINDS = ["gvret_tcp", "gvret_usb", "serial", "slcan", "socketcan", "gs_usb", "mqtt"];
 
 /** Check if a profile is a real-time source */
 export function isRealtimeProfile(profile: IOProfile): boolean {

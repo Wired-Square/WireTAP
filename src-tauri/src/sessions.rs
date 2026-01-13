@@ -28,7 +28,7 @@ use crate::{
     settings::{self, AppSettings, IOProfile},
 };
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 use crate::io::{GsUsbConfig, GsUsbReader};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -280,8 +280,16 @@ pub async fn create_reader_session(
             ))
         }
         "csv_file" | "csv-file" => {
-            let path = file_path.ok_or_else(|| {
-                "CSV file path is required. Please select a file.".to_string()
+            // Use file_path parameter if provided, otherwise fall back to profile's configured path
+            let profile_file_path = profile
+                .connection
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
+
+            let path = file_path.or(profile_file_path).ok_or_else(|| {
+                "CSV file path is required. Please select a file or configure a path in the profile.".to_string()
             })?;
 
             let options = CsvReaderOptions {
@@ -463,7 +471,7 @@ pub async fn create_reader_session(
         "gs_usb" => {
             // gs_usb (candleLight) support
             // - Linux: Uses SocketCAN (kernel gs_usb driver exposes device as canX interface)
-            // - Windows: Uses direct USB access via nusb
+            // - Windows/macOS: Uses direct USB access via nusb
 
             #[cfg(target_os = "linux")]
             {
@@ -488,7 +496,7 @@ pub async fn create_reader_session(
                 Box::new(SocketIODevice::new(app.clone(), session_id.clone(), config))
             }
 
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
             {
                 let bus = profile
                     .connection
@@ -533,7 +541,7 @@ pub async fn create_reader_session(
                 Box::new(GsUsbReader::new(app.clone(), session_id.clone(), config))
             }
 
-            #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+            #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
             {
                 return Err(
                     "gs_usb is not supported on this platform. \

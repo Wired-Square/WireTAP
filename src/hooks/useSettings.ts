@@ -55,16 +55,16 @@ export function getReaderProtocols(kind: IOProfile['kind'], connection?: Record<
 export function isReaderRealtime(kind: IOProfile['kind']): boolean {
   switch (kind) {
     case 'gvret_tcp':
+    case 'gvret_usb':
     case 'slcan':
     case 'socketcan':
     case 'gs_usb':
     case 'serial':
+    case 'mqtt':
       return true;
     case 'postgres':
     case 'csv_file':
       return false;
-    case 'mqtt':
-      return true; // MQTT is typically realtime
     default:
       return true;
   }

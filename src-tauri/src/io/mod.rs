@@ -20,10 +20,10 @@ mod socketcan;
 // Re-export device implementations
 pub use buffer::BufferReader;
 pub use csv::{parse_csv_file, CsvReader, CsvReaderOptions};
-#[cfg(target_os = "windows")]
-pub use gs_usb::{GsUsbConfig, GsUsbDeviceInfo};
-#[cfg(target_os = "windows")]
-pub use gs_usb::windows::GsUsbReader;
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+pub use gs_usb::GsUsbConfig;
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+pub use gs_usb::nusb_driver::GsUsbReader;
 pub use gvret_tcp::GvretReader;
 pub use gvret_usb::{GvretUsbConfig, GvretUsbReader};
 pub use mqtt::{MqttConfig, MqttReader};

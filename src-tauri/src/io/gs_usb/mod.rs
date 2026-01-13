@@ -9,8 +9,7 @@
 // Platform strategy:
 // - Linux: Devices appear as SocketCAN interfaces via kernel gs_usb driver.
 //          We enumerate devices and help users configure the interface.
-// - Windows: Direct USB access via nusb crate (no kernel driver available).
-// - macOS: Deferred - will add userspace driver later.
+// - Windows/macOS: Direct USB access via nusb crate (no kernel driver available).
 //
 // Supported devices:
 // - CANable (candleLight firmware)
@@ -26,8 +25,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(target_os = "linux")]
 pub mod linux;
 
-#[cfg(target_os = "windows")]
-pub mod windows;
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+pub mod nusb_driver;
 
 // ============================================================================
 // USB Constants
@@ -281,7 +280,51 @@ pub struct GsUsbProbeResult {
 
 /// Common CAN bitrates with pre-calculated timing for 48MHz clock
 /// (CANable uses STM32F042 with 48MHz clock)
+///
+/// Formula: bitrate = 48MHz / (brp * (1 + prop_seg + phase_seg1 + phase_seg2))
+/// With prop_seg=0, phase_seg1=13, phase_seg2=2: 16 time quanta per bit
+/// So: brp = 3_000_000 / bitrate
 pub const COMMON_BITRATES: &[(u32, GsDeviceBittiming)] = &[
+    (
+        10_000,
+        GsDeviceBittiming {
+            prop_seg: 0,
+            phase_seg1: 13,
+            phase_seg2: 2,
+            sjw: 1,
+            brp: 300,
+        },
+    ),
+    (
+        20_000,
+        GsDeviceBittiming {
+            prop_seg: 0,
+            phase_seg1: 13,
+            phase_seg2: 2,
+            sjw: 1,
+            brp: 150,
+        },
+    ),
+    (
+        50_000,
+        GsDeviceBittiming {
+            prop_seg: 0,
+            phase_seg1: 13,
+            phase_seg2: 2,
+            sjw: 1,
+            brp: 60,
+        },
+    ),
+    (
+        100_000,
+        GsDeviceBittiming {
+            prop_seg: 0,
+            phase_seg1: 13,
+            phase_seg2: 2,
+            sjw: 1,
+            brp: 30,
+        },
+    ),
     (
         125_000,
         GsDeviceBittiming {
@@ -310,6 +353,16 @@ pub const COMMON_BITRATES: &[(u32, GsDeviceBittiming)] = &[
             phase_seg2: 2,
             sjw: 1,
             brp: 6,
+        },
+    ),
+    (
+        750_000,
+        GsDeviceBittiming {
+            prop_seg: 0,
+            phase_seg1: 13,
+            phase_seg2: 2,
+            sjw: 1,
+            brp: 4,
         },
     ),
     (
@@ -345,12 +398,12 @@ pub fn list_gs_usb_devices() -> Result<Vec<GsUsbDeviceInfo>, String> {
         linux::list_devices()
     }
 
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
-        windows::list_devices()
+        nusb_driver::list_devices()
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
         Ok(vec![])
     }
@@ -367,18 +420,18 @@ pub fn get_can_setup_command(interface: String, bitrate: u32) -> String {
 }
 
 /// Probe a gs_usb device to get its capabilities.
-/// Currently only implemented for Windows (Linux uses SocketCAN).
+/// Implemented for Windows and macOS (Linux uses SocketCAN).
 #[tauri::command]
 pub fn probe_gs_usb_device(bus: u8, address: u8) -> Result<GsUsbProbeResult, String> {
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
-        windows::probe_device(bus, address)
+        nusb_driver::probe_device(bus, address)
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         let _ = (bus, address);
-        Err("Device probing is only available on Windows. On Linux, use ip link show to check interface status.".to_string())
+        Err("Device probing is only available on Windows/macOS. On Linux, use ip link show to check interface status.".to_string())
     }
 }
 
@@ -424,8 +477,17 @@ mod tests {
 
     #[test]
     fn test_common_bitrates() {
-        assert!(get_bittiming_for_bitrate(500_000).is_some());
+        // All supported bitrates should have timing
+        assert!(get_bittiming_for_bitrate(10_000).is_some());
+        assert!(get_bittiming_for_bitrate(20_000).is_some());
+        assert!(get_bittiming_for_bitrate(50_000).is_some());
+        assert!(get_bittiming_for_bitrate(100_000).is_some());
         assert!(get_bittiming_for_bitrate(125_000).is_some());
+        assert!(get_bittiming_for_bitrate(250_000).is_some());
+        assert!(get_bittiming_for_bitrate(500_000).is_some());
+        assert!(get_bittiming_for_bitrate(750_000).is_some());
+        assert!(get_bittiming_for_bitrate(1_000_000).is_some());
+        // Unsupported bitrate should return None
         assert!(get_bittiming_for_bitrate(123_456).is_none());
     }
 }

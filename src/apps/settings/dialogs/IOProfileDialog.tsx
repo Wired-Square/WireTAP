@@ -19,7 +19,7 @@ import {
 } from "../../../styles";
 import { probeSlcanDevice } from "../../../api/serial";
 import { probeGsUsbDevice } from "../../../api/gs_usb";
-import { isWindows, isLinux } from "../../../utils/platform";
+import { isWindows, isLinux, isMacOS } from "../../../utils/platform";
 
 export type MqttFormatKind = "json" | "savvycan" | "decode";
 export type MqttFormatField = "topic" | "enabled";
@@ -146,19 +146,21 @@ export default function IOProfileDialog({
   // Platform detection state
   const [platformIsWindows, setPlatformIsWindows] = useState(false);
   const [platformIsLinux, setPlatformIsLinux] = useState(false);
+  const [platformIsMacos, setPlatformIsMacos] = useState(false);
 
   useEffect(() => {
     isWindows().then(setPlatformIsWindows);
     isLinux().then(setPlatformIsLinux);
+    isMacOS().then(setPlatformIsMacos);
   }, []);
 
-  // gs_usb device probe state (Windows only)
+  // gs_usb device probe state (Windows/macOS)
   const [gsUsbProbeState, setGsUsbProbeState] = useState<DeviceProbeState>("idle");
   const [gsUsbProbeResult, setGsUsbProbeResult] = useState<DeviceProbeResult | null>(null);
 
-  // Probe gs_usb device (Windows only)
+  // Probe gs_usb device (Windows/macOS - uses nusb userspace driver)
   const probeGsUsb = useCallback(async () => {
-    if (!platformIsWindows) return;
+    if (!platformIsWindows && !platformIsMacos) return;
 
     const bus = parseInt(profileForm.connection.bus || "0", 10);
     const address = parseInt(profileForm.connection.address || "0", 10);
@@ -186,11 +188,11 @@ export default function IOProfileDialog({
       });
       setGsUsbProbeState("error");
     }
-  }, [platformIsWindows, profileForm.connection.bus, profileForm.connection.address]);
+  }, [platformIsWindows, platformIsMacos, profileForm.connection.bus, profileForm.connection.address]);
 
-  // Auto-probe gs_usb device when bus/address changes (Windows only)
+  // Auto-probe gs_usb device when bus/address changes (Windows/macOS)
   useEffect(() => {
-    if (profileForm.kind === "gs_usb" && platformIsWindows && (profileForm.connection.bus || profileForm.connection.address)) {
+    if (profileForm.kind === "gs_usb" && (platformIsWindows || platformIsMacos) && (profileForm.connection.bus || profileForm.connection.address)) {
       const timer = setTimeout(() => {
         probeGsUsb();
       }, 500);
@@ -199,7 +201,7 @@ export default function IOProfileDialog({
       setGsUsbProbeState("idle");
       setGsUsbProbeResult(null);
     }
-  }, [profileForm.kind, platformIsWindows, profileForm.connection.bus, profileForm.connection.address, probeGsUsb]);
+  }, [profileForm.kind, platformIsWindows, platformIsMacos, profileForm.connection.bus, profileForm.connection.address, probeGsUsb]);
 
   // Reset gs_usb probe state when dialog closes or profile type changes
   useEffect(() => {
@@ -245,16 +247,15 @@ export default function IOProfileDialog({
                 onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
               }
             >
-              <option value="mqtt">MQTT</option>
-              <option value="postgres">PostgreSQL</option>
+              <option value="csv_file">CSV File</option>
+              {(platformIsWindows || platformIsMacos) && <option value="gs_usb">gs_usb (candleLight)</option>}
               <option value="gvret_tcp">GVRET TCP</option>
               <option value="gvret_usb">GVRET USB (Serial)</option>
-              <option value="csv_file">CSV File</option>
+              <option value="mqtt">MQTT</option>
+              <option value="postgres">PostgreSQL</option>
               <option value="serial">Serial Port</option>
               <option value="slcan">slcan (CANable, USB-CAN)</option>
-              {/* Platform-specific options */}
               {platformIsLinux && <option value="socketcan">SocketCAN (Linux)</option>}
-              {platformIsWindows && <option value="gs_usb">gs_usb (candleLight)</option>}
             </Select>
           </FormField>
 
@@ -594,9 +595,21 @@ export default function IOProfileDialog({
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
               <h3 className={h3}>CSV File Reader</h3>
 
+              <FormField label="File Path (optional)" variant="default">
+                <Input
+                  variant="default"
+                  value={profileForm.connection.file_path || ""}
+                  onChange={(e) => onUpdateConnectionField("file_path", e.target.value)}
+                  placeholder="/path/to/file.csv"
+                />
+              </FormField>
+
               <div className={alertInfo}>
                 <p className="text-sm text-blue-800 dark:text-blue-200">
-                  CSV files are selected when starting the stream. Supports GVRET/SavvyCAN CSV format.
+                  {profileForm.connection.file_path
+                    ? "This profile will always use the specified file."
+                    : "Leave empty to select a file when starting the stream."}
+                  {" "}Supports GVRET/SavvyCAN CSV format.
                 </p>
               </div>
 
@@ -897,9 +910,14 @@ export default function IOProfileDialog({
                   value={profileForm.connection.bitrate || "500000"}
                   onChange={(e) => onUpdateConnectionField("bitrate", e.target.value)}
                 >
+                  <option value="10000">10 Kbit/s</option>
+                  <option value="20000">20 Kbit/s</option>
+                  <option value="50000">50 Kbit/s</option>
+                  <option value="100000">100 Kbit/s</option>
                   <option value="125000">125 Kbit/s</option>
                   <option value="250000">250 Kbit/s</option>
                   <option value="500000">500 Kbit/s</option>
+                  <option value="750000">750 Kbit/s</option>
                   <option value="1000000">1 Mbit/s</option>
                 </Select>
               </FormField>
@@ -926,8 +944,8 @@ export default function IOProfileDialog({
                 />
               )}
 
-              {/* Windows: Device status indicator */}
-              {platformIsWindows && profileForm.connection.device_id && (
+              {/* Windows/macOS: Device status indicator */}
+              {(platformIsWindows || platformIsMacos) && profileForm.connection.device_id && (
                 <IODeviceStatus
                   state={gsUsbProbeState}
                   result={gsUsbProbeResult}
@@ -944,6 +962,7 @@ export default function IOProfileDialog({
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   Works with CANable, CANable Pro (candleLight firmware), and other gs_usb-compatible devices.
                   {platformIsWindows && " WinUSB driver should install automatically."}
+                  {platformIsMacos && " macOS allows direct USB access - no driver needed."}
                   {platformIsLinux && " On Linux, the kernel gs_usb driver exposes devices as SocketCAN interfaces."}
                 </p>
               </div>
