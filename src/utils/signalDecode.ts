@@ -28,22 +28,30 @@ export type DecodedValue = {
 /**
  * Format a number as byte-separated hex (e.g., "1A 2B 3C").
  * Respects endianness for byte ordering in display.
+ * Uses BigInt for values > 32 bits to avoid precision loss.
  */
 function formatHex(value: number, bitLength: number, endianness: Endianness): string {
-  // Calculate number of bytes needed
   const numBytes = Math.ceil(bitLength / 8);
-
-  // Extract individual bytes
   const bytes: number[] = [];
-  let v = value >>> 0; // Ensure unsigned
-  for (let i = 0; i < numBytes; i++) {
-    bytes.push(v & 0xff);
-    v = v >>> 8;
+
+  if (bitLength > 32) {
+    // Use BigInt for large values to avoid 32-bit truncation
+    let v = BigInt(value) & ((1n << BigInt(bitLength)) - 1n); // Mask to bitLength
+    for (let i = 0; i < numBytes; i++) {
+      bytes.push(Number(v & 0xffn));
+      v = v >> 8n;
+    }
+  } else {
+    // Standard 32-bit path
+    let v = value >>> 0; // Ensure unsigned
+    for (let i = 0; i < numBytes; i++) {
+      bytes.push(v & 0xff);
+      v = v >>> 8;
+    }
   }
 
   // bytes[] is now in little-endian order (LSB first)
   // For big-endian display, reverse to show MSB first
-  // For little-endian display, keep as-is (LSB first)
   if (endianness === "big") {
     bytes.reverse();
   }
