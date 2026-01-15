@@ -2,6 +2,17 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [0.2.31] - 2026-01-15
+
+### Fixed
+
+- **64-bit Signal Decoding**: Fixed signals with bit_length > 32 being truncated due to JavaScript's 32-bit bitwise operator limitation. Now uses BigInt for extraction and formatting of large signals.
+
+### Changed
+
+- **sbrxxx.toml**: Updated Sungrow decoder catalog.
+- **Release Script**: Now runs `cargo check` to update Cargo.lock before committing version bump.
+
 ## [0.2.30] - 2026-01-14
 
 ### Added
