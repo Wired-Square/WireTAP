@@ -10,6 +10,15 @@ A desktop application for CAN bus analysis and signal decoding, built with Tauri
 - **Frame Transmission** - Send CAN frames with repeat/scheduling support
 - **Multi-Protocol Support** - CAN, CAN FD, serial protocols, Modbus
 
+## Documentation
+
+See the [Wiki](../../wiki) for detailed documentation:
+
+- [Installation](../../wiki/Installation) - Download and setup instructions
+- [Getting Started](../../wiki/Home) - Overview and quick start guide
+- [Supported Hardware](../../wiki/Supported-Hardware) - Compatible CAN interfaces
+- [CANable Setup](../../wiki/CANable-Setup) - Firmware flashing guide
+
 ## Supported Hardware
 
 | Device | Protocol | Platform |
