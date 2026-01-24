@@ -4,12 +4,11 @@
 // Provides consistent dark-themed tabbed interface with status display and controls.
 
 import { ReactNode } from 'react';
-import { History } from 'lucide-react';
 import TimeDisplay from './TimeDisplay';
+import ProtocolBadge, { type StreamingStatus } from './ProtocolBadge';
 import {
   bgDarkToolbar,
   borderDarkView,
-  textDarkMuted,
 } from '../styles';
 import {
   dataViewTabClass,
@@ -17,11 +16,8 @@ import {
   tabCountColorClass,
 } from '../styles/buttonStyles';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-export type StreamingStatus = 'stopped' | 'live' | 'paused';
+// Re-export StreamingStatus for backwards compatibility
+export type { StreamingStatus } from './ProtocolBadge';
 
 export interface TabDefinition {
   id: string;
@@ -52,6 +48,8 @@ export interface DataViewTabBarProps {
   protocolLabel: string;
   /** Optional badges to show next to the protocol label (e.g., framing mode, filter) */
   protocolBadges?: ProtocolBadge[];
+  /** Called when the protocol badge is clicked (for future functionality) */
+  onProtocolClick?: () => void;
   /** Streaming status: 'stopped' (red), 'live' (green), or 'paused' (orange) */
   status?: StreamingStatus;
   /** @deprecated Use status instead. Whether data is currently streaming */
@@ -68,25 +66,6 @@ export interface DataViewTabBarProps {
 }
 
 // ============================================================================
-// Status Light Component
-// ============================================================================
-
-function StatusLight({ status }: { status: StreamingStatus }) {
-  const colorClass = status === 'live'
-    ? 'bg-green-500'
-    : status === 'paused'
-    ? 'bg-orange-500'
-    : 'bg-red-500';
-
-  return (
-    <span
-      className={`w-2 h-2 rounded-full ${colorClass}`}
-      title={status === 'live' ? 'Live' : status === 'paused' ? 'Paused' : 'Stopped'}
-    />
-  );
-}
-
-// ============================================================================
 // Component
 // ============================================================================
 
@@ -96,6 +75,7 @@ export default function DataViewTabBar({
   onTabChange,
   protocolLabel,
   protocolBadges,
+  onProtocolClick,
   status,
   isStreaming,
   timestamp,
@@ -103,21 +83,17 @@ export default function DataViewTabBar({
   isRecorded = false,
   controls,
 }: DataViewTabBarProps) {
-  // Support both new status prop and legacy isStreaming prop
-  const effectiveStatus: StreamingStatus = status ?? (isStreaming ? 'live' : 'stopped');
-
   return (
     <div className={`flex-shrink-0 flex items-center border-b ${borderDarkView} ${bgDarkToolbar}`}>
       {/* Protocol badge with status light */}
-      <div
-        className="flex items-center gap-1.5 px-2 py-1 ml-1 rounded bg-gray-700/50"
-        title={isRecorded ? 'Recorded data source' : 'Live data source'}
-      >
-        <StatusLight status={effectiveStatus} />
-        <span className="text-xs font-medium text-gray-300">{protocolLabel}</span>
-        {isRecorded && (
-          <History className={`w-3 h-3 ${textDarkMuted}`} />
-        )}
+      <div className="ml-1">
+        <ProtocolBadge
+          label={protocolLabel}
+          status={status}
+          isStreaming={isStreaming}
+          isRecorded={isRecorded}
+          onClick={onProtocolClick}
+        />
       </div>
 
       {/* Protocol configuration badges (framing, filter, etc.) */}

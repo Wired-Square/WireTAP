@@ -505,7 +505,7 @@ function DiscoveryFramesView({
               tabs={tabs}
               activeTab={activeTab}
               onTabChange={(id) => setActiveTab(id as 'frames' | 'analysis')}
-              protocolLabel={protocol}
+              protocolLabel={protocol.toUpperCase()}
               isStreaming={isStreaming}
               timestamp={timestamp}
               displayTime={displayTime}
@@ -582,7 +582,7 @@ function DiscoveryFramesView({
               tabs={tabs}
               activeTab={activeTab}
               onTabChange={(id) => setActiveTab(id as 'frames' | 'analysis')}
-              protocolLabel={protocol}
+              protocolLabel={protocol.toUpperCase()}
               isStreaming={isStreaming}
               timestamp={timestamp}
               displayTime={displayTime}

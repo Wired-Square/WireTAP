@@ -7,16 +7,12 @@ import { useDecoderStore } from "../../stores/decoderStore";
 import { useIOSession } from '../../hooks/useIOSession';
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { useIngestSession, type StreamEndedPayload } from '../../hooks/useIngestSession';
-import {
-  createAndStartMultiSourceSession,
-  joinMultiSourceSession,
-  useMultiBusState,
-} from '../../stores/sessionStore';
+import { useMultiBusState } from '../../stores/sessionStore';
 import { clearBuffer } from "../../api/buffer";
 import DecoderTopBar from "./views/DecoderTopBar";
 import DecoderFramesView from "./views/DecoderFramesView";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
-import IoReaderPickerDialog, { BUFFER_PROFILE_ID, type IngestOptions } from "../../dialogs/IoReaderPickerDialog";
+import IoReaderPickerDialog, { BUFFER_PROFILE_ID } from "../../dialogs/IoReaderPickerDialog";
 import { getBufferMetadata, type BufferMetadata } from "../../api/buffer";
 import SpeedPickerDialog from "../../dialogs/SpeedPickerDialog";
 import CatalogPickerDialog from "./dialogs/CatalogPickerDialog";
@@ -26,9 +22,8 @@ import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import SelectionSetPickerDialog from "../../dialogs/SelectionSetPickerDialog";
 import FilterDialog from "./dialogs/FilterDialog";
 import { WINDOW_EVENTS, type CatalogSavedPayload, type BufferChangedPayload } from "../../events/registry";
-import { addSelectionSet, updateSelectionSet, markSelectionSetUsed, type SelectionSet } from "../../utils/selectionSets";
-import { markFavoriteUsed, type TimeRangeFavorite } from "../../utils/favorites";
-import { localToUtc } from "../../utils/timeFormat";
+import { useDialogManager } from "../../hooks/useDialogManager";
+import { useDecoderHandlers } from "./hooks/useDecoderHandlers";
 import type { PlaybackSpeed, PlaybackState } from "../../components/TimeController";
 import type { FrameMessage } from "../../types/frame";
 
@@ -36,16 +31,20 @@ export default function Decoder() {
   const { settings } = useSettings();
   const [catalogNotification, setCatalogNotification] = useState<string | null>(null);
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
-  const [showBookmarkPicker, setShowBookmarkPicker] = useState(false);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
-  const [showSaveSelectionSetDialog, setShowSaveSelectionSetDialog] = useState(false);
-  const [showSelectionSetPickerDialog, setShowSelectionSetPickerDialog] = useState(false);
-  const [showFramePickerDialog, setShowFramePickerDialog] = useState(false);
-  const [showIoReaderPickerDialog, setShowIoReaderPickerDialog] = useState(false);
-  const [showSpeedPickerDialog, setShowSpeedPickerDialog] = useState(false);
-  const [showCatalogPickerDialog, setShowCatalogPickerDialog] = useState(false);
-  const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [showTimeRange, setShowTimeRange] = useState(false);
+
+  // Dialog visibility states managed by hook
+  const dialogs = useDialogManager([
+    'bookmarkPicker',
+    'saveSelectionSet',
+    'selectionSetPicker',
+    'framePicker',
+    'ioReaderPicker',
+    'speedPicker',
+    'catalogPicker',
+    'filter',
+  ] as const);
   const [bufferMetadata, setBufferMetadata] = useState<BufferMetadata | null>(null);
 
   // Watch mode state - uses decoder session for real-time display while buffering
@@ -332,6 +331,11 @@ export default function Decoder() {
     updateCurrentTime(timeUs / 1_000_000); // Convert to seconds
   }, [updateCurrentTime]);
 
+  // Handle speed changes from other windows sharing this session
+  const handleSessionSpeedChange = useCallback((speed: number) => {
+    setPlaybackSpeed(speed as PlaybackSpeed);
+  }, [setPlaybackSpeed]);
+
   // State to trigger buffer transition after stream ends
   const [pendingBufferTransition, setPendingBufferTransition] = useState(false);
 
@@ -399,6 +403,7 @@ export default function Decoder() {
     onTimeUpdate: handleTimeUpdate,
     onStreamEnded: handleStreamEnded,
     onStreamComplete: handleStreamComplete,
+    onSpeedChange: handleSessionSpeedChange,
   });
 
   // Extract session state and controls
@@ -438,7 +443,7 @@ export default function Decoder() {
         });
 
         // Close the dialog and transition to buffer replay mode
-        setShowIoReaderPickerDialog(false);
+        dialogs.ioReaderPicker.close();
         setPendingBufferTransition(true);
       }
     }
@@ -458,27 +463,84 @@ export default function Decoder() {
   // Has buffer data available for replay - only relevant when in buffer mode
   const hasBufferData = isBufferMode && (bufferAvailable || (bufferMetadata?.count ?? 0) > 0);
 
-  // Watch mode handlers - uses the decoder session for real-time display while buffering
-  const handleStopWatch = useCallback(async () => {
-    await stop();
-    setIsWatching(false);
-    // The stream-ended event will handle buffer transition
-  }, [stop]);
+  // Use the orchestrator hook for all handlers
+  const handlers = useDecoderHandlers({
+    // Session manager actions
+    reinitialize,
+    start,
+    stop,
+    pause,
+    resume,
+    leave,
+    rejoin,
+    setSpeed,
+    setTimeRange,
+    seek,
 
-  // Detach from shared session without stopping it
-  // Keep the profile selected so user can rejoin
-  const handleDetach = useCallback(async () => {
-    await leave();
-    setIsDetached(true);
-    setIsWatching(false);
-  }, [leave]);
+    // Reader state
+    isPaused,
+    capabilities,
 
-  // Rejoin a session after detaching
-  const handleRejoin = useCallback(async () => {
-    await rejoin();
-    setIsDetached(false);
-    setIsWatching(true);
-  }, [rejoin]);
+    // Store actions (decoder)
+    setIoProfile,
+    setPlaybackSpeed,
+    setStartTime,
+    setEndTime,
+    updateCurrentTime,
+    loadCatalog,
+    clearDecoded,
+    clearUnmatchedFrames,
+    clearFilteredFrames,
+    setActiveSelectionSet,
+    setSelectionSetDirty,
+    applySelectionSet,
+
+    // Store state (decoder)
+    frames,
+    selectedFrames,
+    activeSelectionSetId,
+    selectionSetDirty,
+    startTime,
+    endTime,
+    playbackSpeed,
+    serialConfig,
+
+    // Multi-bus state
+    setMultiBusMode,
+    setMultiBusProfiles: setIoProfiles,
+    profileNamesMap,
+
+    // Ingest session
+    startIngest,
+    stopIngest,
+    isIngesting,
+
+    // Watch state
+    isWatching,
+    setIsWatching,
+    setWatchFrameCount,
+    streamCompletedRef,
+
+    // Detached state
+    setIsDetached,
+
+    // Ingest speed
+    ingestSpeed,
+    setIngestSpeed,
+
+    // Dialog controls
+    closeIoReaderPicker: dialogs.ioReaderPicker.close,
+    openSaveSelectionSet: dialogs.saveSelectionSet.open,
+
+    // Active tab
+    activeTab,
+
+    // Bookmark state
+    setActiveBookmarkId,
+
+    // Settings for default speeds
+    ioProfiles: settings?.io_profiles,
+  });
 
   // Clear watch state when stream ends
   useEffect(() => {
@@ -486,130 +548,6 @@ export default function Decoder() {
       setIsWatching(false);
     }
   }, [isDecoding, isWatching]);
-
-  // Handle starting ingest from the dialog - routes to Watch or Ingest mode based on closeDialog flag
-  const handleDialogStartIngest = useCallback(async (profileId: string, closeDialog: boolean, options: IngestOptions) => {
-    const { speed, startTime, endTime, maxFrames } = options;
-    if (closeDialog) {
-      // Watch mode - uses decoder session for real-time display
-      // reinitialize() uses Rust's atomic check - if other listeners exist,
-      // it won't destroy and will return the existing session instead
-      await reinitialize(profileId, {
-        startTime,
-        endTime,
-        speed,
-        limit: maxFrames,
-        // Framing configuration from catalog
-        framingEncoding: serialConfig?.encoding as "slip" | "modbus_rtu" | "delimiter" | "raw" | undefined,
-        // Frame ID extraction
-        frameIdStartByte: serialConfig?.frame_id_start_byte,
-        frameIdBytes: serialConfig?.frame_id_bytes,
-        frameIdBigEndian: serialConfig?.frame_id_byte_order === 'big',
-        // Source address extraction
-        sourceAddressStartByte: serialConfig?.source_address_start_byte,
-        sourceAddressBytes: serialConfig?.source_address_bytes,
-        sourceAddressBigEndian: serialConfig?.source_address_byte_order === 'big',
-        // Other options
-        minFrameLength: serialConfig?.min_frame_length,
-        emitRawBytes: true, // Emit raw bytes for debugging
-      });
-
-      setIoProfile(profileId);
-      setPlaybackSpeed(speed as PlaybackSpeed);
-      setIsDetached(false); // Reset detached state when starting a new session
-
-      // Now start watching
-      // Note: reinitialize() already auto-starts the session via the backend,
-      // so we don't need to call start() here. Calling start() with the old
-      // effectiveSessionId (before React re-render) would restart the wrong session.
-      setIsWatching(true);
-      setWatchFrameCount(0);
-      streamCompletedRef.current = false; // Reset flag when starting playback
-      setShowIoReaderPickerDialog(false);
-    } else {
-      // Ingest mode - uses separate session, no real-time display
-      // Update the ingest speed state before starting
-      setIngestSpeed(speed);
-      await startIngest({
-        profileId,
-        speed: speed ?? ingestSpeed,
-        startTime,
-        endTime,
-        maxFrames,
-        frameIdStartByte: serialConfig?.frame_id_start_byte,
-        frameIdBytes: serialConfig?.frame_id_bytes,
-        sourceAddressStartByte: serialConfig?.source_address_start_byte,
-        sourceAddressBytes: serialConfig?.source_address_bytes,
-        sourceAddressBigEndian: serialConfig?.source_address_byte_order === 'big',
-        minFrameLength: serialConfig?.min_frame_length,
-      });
-    }
-  }, [setIoProfile, reinitialize, startIngest, setPlaybackSpeed, serialConfig, ingestSpeed]);
-
-  // Handle Watch for multiple profiles (multi-bus mode)
-  // Creates a proper Rust-side merged session that other apps can join
-  const handleDialogStartMultiIngest = useCallback(async (
-    profileIds: string[],
-    closeDialog: boolean,
-    options: IngestOptions
-  ) => {
-    const { speed, busMappings } = options;
-
-    if (closeDialog) {
-      // Watch mode for multiple buses
-      setWatchFrameCount(0);
-
-      const multiSessionId = "decoder-multi";
-
-      try {
-        // Use centralized helper to create multi-source session
-        await createAndStartMultiSourceSession({
-          sessionId: multiSessionId,
-          listenerId: "decoder",
-          profileIds,
-          busMappings,
-          profileNames: profileNamesMap,
-        });
-
-        // Store source profile IDs for UI display
-        setIoProfiles(profileIds);
-        setMultiBusMode(false); // Use useIOSession to connect to the merged session
-
-        // Set the multi-source session as the active profile
-        // This causes singleSession (useIOSession) to connect to the merged session
-        setIoProfile(multiSessionId);
-
-        setPlaybackSpeed(speed as PlaybackSpeed);
-        setIsDetached(false); // Reset detached state when starting a new session
-
-        setIsWatching(true);
-        streamCompletedRef.current = false;
-        setShowIoReaderPickerDialog(false);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error(`Failed to start multi-bus session '${multiSessionId}':`, msg);
-      }
-    }
-    // Ingest mode not supported for multi-bus
-  }, [setIoProfile, setIoProfiles, setMultiBusMode, setPlaybackSpeed, profileNamesMap]);
-
-  // Handle selecting multiple profiles in multi-bus mode
-  // Note: We don't set multiBusMode=true here. Instead, multiBusMode stays false
-  // and we create a Rust-side merged session in handleDialogStartMultiIngest.
-  const handleSelectMultiple = useCallback((profileIds: string[]) => {
-    setIoProfiles(profileIds);
-    // Don't set multiBusMode here - let handleDialogStartMultiIngest handle it
-    setIoProfile(null); // Clear single profile selection
-  }, [setIoProfiles, setIoProfile]);
-
-  // Handle stopping from the dialog - routes to Watch or Ingest stop
-  const handleDialogStopIngest = useCallback(async () => {
-    if (isWatching) {
-      await handleStopWatch();
-    } else if (isIngesting) {
-      await stopIngest();
-    }
-  }, [isWatching, isIngesting, handleStopWatch, stopIngest]);
 
   // Effect to handle auto-transition to buffer replay after stream ends
   useEffect(() => {
@@ -773,149 +711,6 @@ export default function Decoder() {
     [frames]
   );
 
-  // Handle catalog change
-  const handleCatalogChange = async (path: string) => {
-    if (path) {
-      try {
-        await loadCatalog(path);
-      } catch (e) {
-        console.error("Failed to load catalog:", e);
-      }
-    }
-  };
-
-  // Handle IO profile change - only reinitializes for buffer mode
-  // For regular profiles, reinitialize is called from handleDialogStartIngest when user clicks Watch
-  const handleIoProfileChange = async (profileId: string | null) => {
-    setIoProfile(profileId);
-    setIsDetached(false); // Reset detached state when changing profile
-
-    // Handle buffer selection - needs special buffer reader
-    if (profileId === BUFFER_PROFILE_ID) {
-      await reinitialize(undefined, { useBuffer: true, speed: playbackSpeed });
-    } else if (profileId && settings?.io_profiles) {
-      // Set default speed from the selected profile if it has one
-      const profile = settings.io_profiles.find((p) => p.id === profileId);
-      if (profile?.connection?.default_speed) {
-        const defaultSpeed = parseFloat(profile.connection.default_speed) as PlaybackSpeed;
-        setPlaybackSpeed(defaultSpeed);
-      }
-      // Don't reinitialize here - useIOSession will handle joining
-      // and reinitialize is called from handleDialogStartIngest when Watch is clicked
-    }
-  };
-
-  // Handle play/resume button click
-  const handlePlay = async () => {
-    if (isPaused) {
-      await resume();
-    } else {
-      streamCompletedRef.current = false; // Reset flag when starting playback
-      await start();
-    }
-  };
-
-  // Handle stop button click
-  const handleStop = async () => {
-    await stop();
-  };
-
-  // Handle pause button click
-  const handlePause = async () => {
-    await pause();
-  };
-
-  // Handle speed change
-  const handleSpeedChange = async (speed: number) => {
-    setPlaybackSpeed(speed as PlaybackSpeed);
-    await setSpeed(speed);
-  };
-
-  // Handle time range changes
-  const handleStartTimeChange = async (time: string) => {
-    setStartTime(time);
-    setActiveBookmarkId(null); // Clear bookmark when time changes
-    await setTimeRange(localToUtc(time), localToUtc(endTime));
-  };
-
-  const handleEndTimeChange = async (time: string) => {
-    setEndTime(time);
-    setActiveBookmarkId(null); // Clear bookmark when time changes
-    await setTimeRange(localToUtc(startTime), localToUtc(time));
-  };
-
-  // Handle timeline scrubber position change
-  const handleScrub = async (timeUs: number) => {
-    // Update UI immediately for responsiveness
-    updateCurrentTime(timeUs / 1_000_000); // Convert microseconds to seconds
-
-    // If the reader supports seeking, tell it to jump to this position
-    if (capabilities?.supports_seek) {
-      await seek(timeUs);
-    }
-  };
-
-  // Handle loading a bookmark (sets time range and marks bookmark as active)
-  const handleLoadBookmark = async (bookmark: TimeRangeFavorite) => {
-    setStartTime(bookmark.startTime);
-    setEndTime(bookmark.endTime);
-    setActiveBookmarkId(bookmark.id);
-    await setTimeRange(localToUtc(bookmark.startTime), localToUtc(bookmark.endTime));
-    await markFavoriteUsed(bookmark.id);
-  };
-
-  // Selection set handlers
-  const handleSaveSelectionSet = async () => {
-    if (activeSelectionSetId && selectionSetDirty) {
-      // Already working with a set - save immediately
-      // In Decoder, frameIds = all frame IDs from catalog, selectedIds = those that are selected
-      const allFrameIds = Array.from(frames.keys());
-      const selectedIds = Array.from(selectedFrames);
-      await updateSelectionSet(activeSelectionSetId, {
-        frameIds: allFrameIds,
-        selectedIds: selectedIds,
-      });
-      setSelectionSetDirty(false);
-    } else {
-      // No active set - open save dialog
-      setShowSaveSelectionSetDialog(true);
-    }
-  };
-
-  const handleSaveNewSelectionSet = async (name: string) => {
-    // In Decoder, frameIds = all frame IDs from catalog, selectedIds = those that are selected
-    const allFrameIds = Array.from(frames.keys());
-    const selectedIds = Array.from(selectedFrames);
-    const newSet = await addSelectionSet(name, allFrameIds, selectedIds);
-    setActiveSelectionSet(newSet.id);
-    setSelectionSetDirty(false);
-  };
-
-  const handleLoadSelectionSet = async (selectionSet: SelectionSet) => {
-    applySelectionSet(selectionSet);
-    await markSelectionSetUsed(selectionSet.id);
-  };
-
-  const handleClearSelectionSet = () => {
-    setActiveSelectionSet(null);
-    setSelectionSetDirty(false);
-  };
-
-  // Clear handler based on active tab
-  const handleClear = useCallback(() => {
-    switch (activeTab) {
-      case 'signals':
-        clearDecoded();
-        break;
-      case 'unmatched':
-        clearUnmatchedFrames();
-        break;
-      case 'filtered':
-        clearFilteredFrames();
-        break;
-    }
-  }, [activeTab, clearDecoded, clearUnmatchedFrames, clearFilteredFrames]);
-
   // Convert reader state to TimeController state
   const getPlaybackState = (): PlaybackState => {
     if (readerState === "running") return "playing";
@@ -936,11 +731,11 @@ export default function Decoder() {
       <DecoderTopBar
         catalogs={catalogs}
         catalogPath={catalogPath}
-        onCatalogChange={handleCatalogChange}
+        onCatalogChange={handlers.handleCatalogChange}
         defaultCatalogFilename={settings?.default_catalog}
         ioProfiles={settings?.io_profiles || []}
         ioProfile={ioProfile}
-        onIoProfileChange={handleIoProfileChange}
+        onIoProfileChange={handlers.handleIoProfileChange}
         defaultReadProfileId={settings?.default_read_profile}
         bufferMetadata={bufferMetadata}
         multiBusMode={multiBusMode}
@@ -948,26 +743,28 @@ export default function Decoder() {
         speed={playbackSpeed}
         supportsSpeed={capabilities?.supports_speed_control ?? false}
         isStreaming={isDecoding || isIngesting}
-        onStopStream={isDecoding ? handleStopWatch : stopIngest}
+        onStopStream={isDecoding ? handlers.handleStopWatch : stopIngest}
         isStopped={isStopped}
         onResume={start}
         joinerCount={joinerCount}
-        onDetach={handleDetach}
+        onDetach={handlers.handleDetach}
         isDetached={isDetached}
-        onRejoin={handleRejoin}
+        onRejoin={handlers.handleRejoin}
+        supportsTimeRange={capabilities?.supports_time_range ?? false}
+        onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
         frameCount={frameList.length}
         selectedFrameCount={selectedFrames.size}
-        onOpenFramePicker={() => setShowFramePickerDialog(true)}
-        onOpenIoReaderPicker={() => setShowIoReaderPickerDialog(true)}
-        onOpenSpeedPicker={() => setShowSpeedPickerDialog(true)}
-        onOpenCatalogPicker={() => setShowCatalogPickerDialog(true)}
+        onOpenFramePicker={() => dialogs.framePicker.open()}
+        onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
+        onOpenSpeedPicker={() => dialogs.speedPicker.open()}
+        onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
         showRawBytes={showRawBytes}
         onToggleRawBytes={toggleShowRawBytes}
-        onClear={handleClear}
+        onClear={handlers.handleClear}
         viewMode={viewMode}
         onToggleViewMode={toggleViewMode}
         minFrameLength={serialConfig?.min_frame_length ?? 0}
-        onOpenFilterDialog={() => setShowFilterDialog(true)}
+        onOpenFilterDialog={() => dialogs.filter.open()}
         hideUnseen={hideUnseen}
         onToggleHideUnseen={toggleHideUnseen}
         showAsciiGutter={showAsciiGutter}
@@ -994,24 +791,24 @@ export default function Decoder() {
           isReady={isReady}
           playbackState={getPlaybackState()}
           capabilities={capabilities}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onStop={handleStop}
+          onPlay={handlers.handlePlay}
+          onPause={handlers.handlePause}
+          onStop={handlers.handleStop}
           playbackSpeed={playbackSpeed}
-          onSpeedChange={handleSpeedChange}
+          onSpeedChange={handlers.handleSpeedChange}
           hasBufferData={hasBufferData}
           activeBookmarkId={activeBookmarkId}
-          onOpenBookmarkPicker={() => setShowBookmarkPicker(true)}
+          onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
           showTimeRange={showTimeRange}
           onToggleTimeRange={() => setShowTimeRange(!showTimeRange)}
           startTime={startTime}
           endTime={endTime}
-          onStartTimeChange={handleStartTimeChange}
-          onEndTimeChange={handleEndTimeChange}
+          onStartTimeChange={handlers.handleStartTimeChange}
+          onEndTimeChange={handlers.handleEndTimeChange}
           minTimeUs={bufferMetadata?.start_time_us}
           maxTimeUs={bufferMetadata?.end_time_us}
           currentTimeUs={currentTime !== null ? currentTime * 1_000_000 : null}
-          onScrub={handleScrub}
+          onScrub={handlers.handleScrub}
           signalColours={{
             none: settings?.signal_colour_none,
             low: settings?.signal_colour_low,
@@ -1033,8 +830,8 @@ export default function Decoder() {
       </div>
 
       <FramePickerDialog
-        isOpen={showFramePickerDialog}
-        onClose={() => setShowFramePickerDialog(false)}
+        isOpen={dialogs.framePicker.isOpen}
+        onClose={() => dialogs.framePicker.close()}
         frames={frameList}
         selectedFrames={selectedFrames}
         onToggleFrame={toggleFrameSelection}
@@ -1044,19 +841,19 @@ export default function Decoder() {
         onDeselectAll={deselectAllFrames}
         activeSelectionSetId={activeSelectionSetId}
         selectionSetDirty={selectionSetDirty}
-        onSaveSelectionSet={handleSaveSelectionSet}
-        onOpenSelectionSetPicker={() => setShowSelectionSetPickerDialog(true)}
+        onSaveSelectionSet={handlers.handleSaveSelectionSet}
+        onOpenSelectionSetPicker={() => dialogs.selectionSetPicker.open()}
       />
 
       <IoReaderPickerDialog
-        isOpen={showIoReaderPickerDialog}
-        onClose={() => setShowIoReaderPickerDialog(false)}
+        isOpen={dialogs.ioReaderPicker.isOpen}
+        onClose={() => dialogs.ioReaderPicker.close()}
         ioProfiles={settings?.io_profiles || []}
         selectedId={ioProfile}
         selectedIds={multiBusMode ? ioProfiles : []}
         defaultId={settings?.default_read_profile}
-        onSelect={handleIoProfileChange}
-        onSelectMultiple={handleSelectMultiple}
+        onSelect={handlers.handleIoProfileChange}
+        onSelectMultiple={handlers.handleSelectMultiple}
         onImport={(meta) => setBufferMetadata(meta)}
         bufferMetadata={bufferMetadata}
         defaultDir={settings?.dump_dir}
@@ -1065,75 +862,55 @@ export default function Decoder() {
         ingestFrameCount={isIngesting ? ingestFrameCount : watchFrameCount}
         ingestSpeed={ingestSpeed}
         onIngestSpeedChange={(speed) => setIngestSpeed(speed)}
-        onStartIngest={handleDialogStartIngest}
-        onStartMultiIngest={handleDialogStartMultiIngest}
-        onStopIngest={handleDialogStopIngest}
+        onStartIngest={handlers.handleDialogStartIngest}
+        onStartMultiIngest={handlers.handleDialogStartMultiIngest}
+        onStopIngest={handlers.handleDialogStopIngest}
         ingestError={ingestError}
-        onJoinSession={async (profileId, sourceProfileIds) => {
-          // Use centralized helper to join multi-source session
-          await joinMultiSourceSession({
-            sessionId: profileId,
-            listenerId: "decoder",
-            sourceProfileIds,
-          });
-
-          // Update UI state
-          setIoProfile(profileId);
-          setIoProfiles(sourceProfileIds || []);
-          // Always use single-session mode when joining (even for multi-source sessions)
-          setMultiBusMode(false);
-          setIsDetached(false);
-          // Pass profileId explicitly since React state hasn't updated yet
-          // (effectiveSessionId would still have the old value)
-          const sessionName = sourceProfileIds && sourceProfileIds.length > 1
-            ? `Multi-Bus (${sourceProfileIds.length} sources)`
-            : profileId;
-          rejoin(profileId, sessionName);
-          setShowIoReaderPickerDialog(false);
-        }}
+        onJoinSession={handlers.handleJoinSession}
+        onSkip={handlers.handleSkip}
         allowMultiSelect={true}
       />
 
       <SpeedPickerDialog
-        isOpen={showSpeedPickerDialog}
-        onClose={() => setShowSpeedPickerDialog(false)}
+        isOpen={dialogs.speedPicker.isOpen}
+        onClose={() => dialogs.speedPicker.close()}
         speed={playbackSpeed}
-        onSpeedChange={handleSpeedChange}
+        onSpeedChange={handlers.handleSpeedChange}
       />
 
       <CatalogPickerDialog
-        isOpen={showCatalogPickerDialog}
-        onClose={() => setShowCatalogPickerDialog(false)}
+        isOpen={dialogs.catalogPicker.isOpen}
+        onClose={() => dialogs.catalogPicker.close()}
         catalogs={catalogs}
         selectedPath={catalogPath}
         defaultFilename={settings?.default_catalog}
-        onSelect={handleCatalogChange}
+        onSelect={handlers.handleCatalogChange}
       />
 
       <BookmarkEditorDialog
-        isOpen={showBookmarkPicker}
-        onClose={() => setShowBookmarkPicker(false)}
-        onLoad={handleLoadBookmark}
+        isOpen={dialogs.bookmarkPicker.isOpen}
+        onClose={() => dialogs.bookmarkPicker.close()}
+        onLoad={handlers.handleLoadBookmark}
         profileId={ioProfile}
       />
 
       <SaveSelectionSetDialog
-        isOpen={showSaveSelectionSetDialog}
+        isOpen={dialogs.saveSelectionSet.isOpen}
         frameCount={selectedFrames.size}
-        onClose={() => setShowSaveSelectionSetDialog(false)}
-        onSave={handleSaveNewSelectionSet}
+        onClose={() => dialogs.saveSelectionSet.close()}
+        onSave={handlers.handleSaveNewSelectionSet}
       />
 
       <SelectionSetPickerDialog
-        isOpen={showSelectionSetPickerDialog}
-        onClose={() => setShowSelectionSetPickerDialog(false)}
-        onLoad={handleLoadSelectionSet}
-        onClear={handleClearSelectionSet}
+        isOpen={dialogs.selectionSetPicker.isOpen}
+        onClose={() => dialogs.selectionSetPicker.close()}
+        onLoad={handlers.handleLoadSelectionSet}
+        onClear={handlers.handleClearSelectionSet}
       />
 
       <FilterDialog
-        isOpen={showFilterDialog}
-        onClose={() => setShowFilterDialog(false)}
+        isOpen={dialogs.filter.isOpen}
+        onClose={() => dialogs.filter.close()}
         minFrameLength={serialConfig?.min_frame_length ?? 0}
         frameIdFilter={frameIdFilter}
         onSave={(minLength, idFilter) => {

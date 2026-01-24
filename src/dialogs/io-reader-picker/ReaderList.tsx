@@ -1,6 +1,6 @@
 // ui/src/dialogs/io-reader-picker/ReaderList.tsx
 
-import { Bookmark, Wifi, Database, FolderOpen, GitMerge, Radio } from "lucide-react";
+import { Bookmark, Wifi, Database, FolderOpen, GitMerge, Radio, Play } from "lucide-react";
 import type { IOProfile } from "../../hooks/useSettings";
 import type { Session } from "../../stores/sessionStore";
 import type { ActiveSessionInfo } from "../../api/io";
@@ -149,10 +149,23 @@ export default function ReaderList({
     );
   }
 
-  // Filter multi-source sessions to only show running ones
-  const runningMultiSourceSessions = activeMultiSourceSessions.filter(
+  // Filter active sessions to only show running ones
+  const runningSessions = activeMultiSourceSessions.filter(
     (s) => s.state === "running" || s.state === "starting"
   );
+
+  // Separate multi-source sessions from single-profile sessions
+  const runningMultiSourceSessions = runningSessions.filter(
+    (s) => s.deviceType === "multi_source"
+  );
+  const runningRecordedSessions = runningSessions.filter(
+    (s) => s.deviceType !== "multi_source"
+  );
+
+  // Get profile info for single-profile sessions
+  const getProfileForSession = (sessionId: string): IOProfile | null => {
+    return readProfiles.find((p) => p.id === sessionId) || null;
+  };
 
   return (
     <div className="border-b border-slate-200 dark:border-slate-700">
@@ -160,7 +173,7 @@ export default function ReaderList({
         IO Reader
       </div>
 
-      {/* Active Multi-Source Sessions (shareable) */}
+      {/* Active Multi-Bus Sessions (shareable) */}
       {runningMultiSourceSessions.length > 0 && onSelectMultiSourceSession && (
         <div className="border-b border-slate-100 dark:border-slate-700/50">
           <div className="px-4 py-1.5 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
@@ -202,6 +215,58 @@ export default function ReaderList({
                     <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
                       <span className={badgeSmallSuccess}>Live</span>
                       <span>{session.listenerCount} listener{session.listenerCount !== 1 ? "s" : ""}</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Active Recorded Sessions (PostgreSQL, etc.) */}
+      {runningRecordedSessions.length > 0 && onSelectMultiSourceSession && (
+        <div className="border-b border-slate-100 dark:border-slate-700/50">
+          <div className="px-4 py-1.5 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+            <Play className="w-3 h-3" />
+            <span>Active Sessions</span>
+          </div>
+          <div className="px-3 pb-2 space-y-1">
+            {runningRecordedSessions.map((session) => {
+              const isSelected = checkedReaderId === session.sessionId;
+              const profile = getProfileForSession(session.sessionId);
+              const displayName = profile?.name || session.sessionId;
+              const deviceKind = profile?.kind || session.deviceType;
+
+              return (
+                <button
+                  key={session.sessionId}
+                  onClick={() => onSelectMultiSourceSession(session.sessionId)}
+                  className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
+                    isSelected
+                      ? "bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700"
+                      : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-green-300 dark:hover:border-green-600"
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    isSelected
+                      ? "border-green-600 dark:border-green-400"
+                      : "border-slate-300 dark:border-slate-600"
+                  }`}>
+                    {isSelected && (
+                      <div className="w-2 h-2 rounded-full bg-green-600 dark:bg-green-400" />
+                    )}
+                  </div>
+                  <Database className="w-4 h-4 flex-shrink-0 text-green-600 dark:text-green-400" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-900 dark:text-white truncate flex items-center gap-2">
+                      <span>{displayName}</span>
+                      <Radio className="w-3 h-3 text-green-500 animate-pulse" />
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                      <span className={badgeSmallSuccess}>Live</span>
+                      <span>{deviceKind}</span>
+                      <span>· {session.listenerCount} listener{session.listenerCount !== 1 ? "s" : ""}</span>
                     </div>
                   </div>
                 </button>

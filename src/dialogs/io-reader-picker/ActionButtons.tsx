@@ -27,6 +27,8 @@ type Props = {
   /** Called when user wants to start a stopped session */
   onStartClick?: () => void;
   onClose: () => void;
+  /** Called when user wants to continue without selecting a reader */
+  onSkip?: () => void;
   // Multi-select mode
   /** Whether multi-select mode is active */
   multiSelectMode?: boolean;
@@ -52,6 +54,7 @@ export default function ActionButtons({
   onJoinClick,
   onStartClick,
   onClose,
+  onSkip,
   multiSelectMode = false,
   multiSelectCount = 0,
   onMultiWatchClick,
@@ -178,6 +181,14 @@ export default function ActionButtons({
         >
           <Check className="w-4 h-4" />
           <span>OK</span>
+        </button>
+      ) : onSkip ? (
+        // Nothing selected but skip is available
+        <button
+          onClick={onSkip}
+          className={`w-full ${primaryButtonBase}`}
+        >
+          <span>Continue Without Reader</span>
         </button>
       ) : (
         <div className="text-center text-sm text-slate-400 dark:text-slate-500 py-1">

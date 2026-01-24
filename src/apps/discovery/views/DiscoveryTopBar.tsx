@@ -4,7 +4,7 @@ import { Search, ChevronRight, ListFilter, Save, Trash2, Info, Wrench, Download,
 import type { IOProfile } from "../../../types/common";
 import type { BufferMetadata } from "../../../api/buffer";
 import FlexSeparator from "../../../components/FlexSeparator";
-import { ReaderButton, SessionActionButtons } from "../../../components/SessionControls";
+import { IOSessionControls } from "../../../components/SessionControls";
 import { buttonBase, iconButtonBase } from "../../../styles/buttonStyles";
 
 type Props = {
@@ -34,6 +34,18 @@ type Props = {
   isDetached?: boolean;
   /** Called when user wants to rejoin after detaching */
   onRejoin?: () => void;
+  /** Whether the IO source supports time range filtering */
+  supportsTimeRange?: boolean;
+  /** Called to open bookmark picker */
+  onOpenBookmarkPicker?: () => void;
+
+  // Speed control
+  /** Current playback speed */
+  speed?: number;
+  /** Whether the reader supports speed control */
+  supportsSpeed?: boolean;
+  /** Called to open speed picker */
+  onOpenSpeedPicker?: () => void;
 
   // Frame picker
   frameCount: number;
@@ -87,6 +99,11 @@ export default function DiscoveryTopBar({
   serialActiveTab = 'raw',
   showAscii = false,
   onToggleAscii,
+  supportsTimeRange = false,
+  onOpenBookmarkPicker,
+  speed = 1,
+  supportsSpeed = false,
+  onOpenSpeedPicker,
   onOpenIoReaderPicker,
   onSave,
   onExport,
@@ -105,28 +122,28 @@ export default function DiscoveryTopBar({
 
         <FlexSeparator />
 
-        {/* IO Reader Selection */}
-        <ReaderButton
+        {/* IO Session Controls (reader, speed, session actions) */}
+        <IOSessionControls
           ioProfile={ioProfile}
           ioProfiles={ioProfiles}
           multiBusMode={multiBusMode}
           multiBusProfiles={multiBusProfiles}
           bufferMetadata={bufferMetadata}
           defaultReadProfileId={defaultReadProfileId}
-          onClick={onOpenIoReaderPicker}
-          disabled={isStreaming}
-        />
-
-        {/* Session control buttons */}
-        <SessionActionButtons
+          onOpenIoReaderPicker={onOpenIoReaderPicker}
+          speed={speed}
+          supportsSpeed={supportsSpeed}
+          onOpenSpeedPicker={onOpenSpeedPicker}
           isStreaming={isStreaming}
           isStopped={isStopped}
           isDetached={isDetached}
           joinerCount={joinerCount}
+          supportsTimeRange={supportsTimeRange}
           onStop={onStopWatch}
           onResume={onResume}
           onDetach={onDetach}
           onRejoin={onRejoin}
+          onOpenBookmarkPicker={onOpenBookmarkPicker}
         />
 
         {/* Right arrow icon */}

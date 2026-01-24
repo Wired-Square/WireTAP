@@ -244,11 +244,29 @@ impl IODevice for PostgresReader {
         start: Option<String>,
         end: Option<String>,
     ) -> Result<(), String> {
+        eprintln!(
+            "[PostgreSQL:{}] set_time_range called - state: {:?}, start: {:?}, end: {:?}",
+            self.session_id,
+            self.state,
+            start,
+            end
+        );
         if self.state == IOState::Running || self.state == IOState::Paused {
+            eprintln!(
+                "[PostgreSQL:{}] Cannot change time range while streaming (state: {:?})",
+                self.session_id,
+                self.state
+            );
             return Err("Cannot change time range while streaming".to_string());
         }
-        self.options.start = start;
-        self.options.end = end;
+        self.options.start = start.clone();
+        self.options.end = end.clone();
+        eprintln!(
+            "[PostgreSQL:{}] Time range updated - start: {:?}, end: {:?}",
+            self.session_id,
+            start,
+            end
+        );
         Ok(())
     }
 
@@ -258,6 +276,10 @@ impl IODevice for PostgresReader {
 
     fn session_id(&self) -> &str {
         &self.session_id
+    }
+
+    fn device_type(&self) -> &'static str {
+        "postgres"
     }
 }
 

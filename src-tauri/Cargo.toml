@@ -40,14 +40,17 @@ serialport = "4.3"
 reqwest = { version = "0.12", features = ["json"] }
 rumqttc = "0.24"
 
+# MacOS
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
 nusb = { version = "0.2", features = ["tokio"] }
 
+# Windows
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
 nusb = { version = "0.2", features = ["tokio"] }
 
+# Linux
 [target.'cfg(target_os = "linux")'.dependencies]
 socketcan = "3.3"
 # sync-secret-service uses DBus Secret Service (GNOME Keyring, KWallet)

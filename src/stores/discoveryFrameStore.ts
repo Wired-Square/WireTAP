@@ -37,7 +37,7 @@ interface DiscoveryFrameState {
   };
 
   // Actions - Data management
-  addFrames: (newFrames: FrameMessage[], maxBuffer: number, noLimitModeActive: boolean) => void;
+  addFrames: (newFrames: FrameMessage[], maxBuffer: number) => void;
   clearBuffer: () => void;
   clearFramePicker: () => void;
   clearAll: () => void;
@@ -63,20 +63,6 @@ interface DiscoveryFrameState {
   }>, protocol?: string) => void;
 }
 
-// Internal type for noLimitMode updates (passed from UI store)
-type NoLimitModeUpdate = {
-  frameCount: number;
-  bufferLimitApproaching: boolean;
-  bufferLimitReached: boolean;
-};
-
-// Callback to update noLimitMode in UI store
-let noLimitModeCallback: ((update: NoLimitModeUpdate | null) => void) | null = null;
-
-export function setNoLimitModeCallback(callback: ((update: NoLimitModeUpdate | null) => void) | null) {
-  noLimitModeCallback = callback;
-}
-
 export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => ({
   // Initial state
   frames: [],
@@ -87,7 +73,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   bufferMode: { enabled: false, totalFrames: 0 },
 
   // Data management actions
-  addFrames: (newFrames, maxBuffer, noLimitModeActive) => {
+  addFrames: (newFrames, maxBuffer) => {
     pendingFrames.push(...newFrames);
 
     if (flushTimeout === null) {
@@ -139,58 +125,47 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
           stateUpdate.selectedFrames = nextSelectedFrames;
         }
 
-        if (!noLimitModeActive) {
-          let frameInfoChanged = newlyDiscovered.length > 0;
+        // Update frame info map
+        let frameInfoChanged = newlyDiscovered.length > 0;
 
-          if (!frameInfoChanged) {
-            for (const f of framesToProcess) {
-              const current = frameInfoMap.get(f.frame_id);
-              if (current) {
-                const newLen = Math.max(current.len, f.dlc);
-                const lenMismatch = current.lenMismatch || current.len !== f.dlc;
-                if (current.len !== newLen || current.lenMismatch !== lenMismatch) {
-                  frameInfoChanged = true;
-                  break;
-                }
+        if (!frameInfoChanged) {
+          for (const f of framesToProcess) {
+            const current = frameInfoMap.get(f.frame_id);
+            if (current) {
+              const newLen = Math.max(current.len, f.dlc);
+              const lenMismatch = current.lenMismatch || current.len !== f.dlc;
+              if (current.len !== newLen || current.lenMismatch !== lenMismatch) {
+                frameInfoChanged = true;
+                break;
               }
             }
-          }
-
-          if (frameInfoChanged) {
-            const nextFrameInfoMap = new Map(frameInfoMap);
-
-            for (const f of framesToProcess) {
-              const current = nextFrameInfoMap.get(f.frame_id);
-              const newLen = current ? Math.max(current.len, f.dlc) : f.dlc;
-              const newBus = current?.bus ?? f.bus;
-              const newExtended = current?.isExtended ?? f.is_extended;
-              const lenMismatch = current ? current.lenMismatch || current.len !== f.dlc : false;
-              const protocol = current?.protocol ?? f.protocol;
-
-              if (
-                !current ||
-                current.len !== newLen ||
-                current.isExtended !== newExtended ||
-                current.bus !== newBus ||
-                current.lenMismatch !== lenMismatch ||
-                current.protocol !== protocol
-              ) {
-                nextFrameInfoMap.set(f.frame_id, { len: newLen, isExtended: newExtended, bus: newBus, lenMismatch, protocol });
-              }
-            }
-
-            stateUpdate.frameInfoMap = nextFrameInfoMap;
           }
         }
 
-        // Notify UI store about noLimitMode updates if active
-        if (noLimitModeActive && noLimitModeCallback) {
-          // We need to get current frameCount from somewhere - this is passed via callback
-          noLimitModeCallback({
-            frameCount: framesToProcess.length,
-            bufferLimitApproaching: false,
-            bufferLimitReached: false,
-          });
+        if (frameInfoChanged) {
+          const nextFrameInfoMap = new Map(frameInfoMap);
+
+          for (const f of framesToProcess) {
+            const current = nextFrameInfoMap.get(f.frame_id);
+            const newLen = current ? Math.max(current.len, f.dlc) : f.dlc;
+            const newBus = current?.bus ?? f.bus;
+            const newExtended = current?.isExtended ?? f.is_extended;
+            const lenMismatch = current ? current.lenMismatch || current.len !== f.dlc : false;
+            const protocol = current?.protocol ?? f.protocol;
+
+            if (
+              !current ||
+              current.len !== newLen ||
+              current.isExtended !== newExtended ||
+              current.bus !== newBus ||
+              current.lenMismatch !== lenMismatch ||
+              current.protocol !== protocol
+            ) {
+              nextFrameInfoMap.set(f.frame_id, { len: newLen, isExtended: newExtended, bus: newBus, lenMismatch, protocol });
+            }
+          }
+
+          stateUpdate.frameInfoMap = nextFrameInfoMap;
         }
 
         set(stateUpdate);

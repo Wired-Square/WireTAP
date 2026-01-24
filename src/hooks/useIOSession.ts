@@ -65,6 +65,8 @@ export interface UseIOSessionOptions {
   onStreamEnded?: (payload: StreamEndedPayload) => void;
   /** Callback when buffer playback completes naturally (reached end of buffer) */
   onStreamComplete?: () => void;
+  /** Callback when playback speed changes (from any listener on this session) */
+  onSpeedChange?: (speed: number) => void;
 }
 
 export interface UseIOSessionResult {
@@ -92,6 +94,8 @@ export interface UseIOSessionResult {
   joinerCount: number;
   /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
   stoppedExplicitly: boolean;
+  /** Current playback speed (null until set, 1 = realtime, 0 = unlimited) */
+  speed: number | null;
 
   // Actions
   /** Start the reader */
@@ -172,6 +176,7 @@ export function useIOSession(
     onTimeUpdate,
     onStreamEnded,
     onStreamComplete,
+    onSpeedChange,
   } = options;
 
   // Session ID = Profile ID (use sessionId if provided, fall back to profileId for compat)
@@ -215,6 +220,7 @@ export function useIOSession(
     onTimeUpdate,
     onStreamEnded,
     onStreamComplete,
+    onSpeedChange,
   });
   useEffect(() => {
     callbacksRef.current = {
@@ -223,8 +229,9 @@ export function useIOSession(
       onTimeUpdate,
       onStreamEnded,
       onStreamComplete,
+      onSpeedChange,
     };
-  }, [onFrames, onError, onTimeUpdate, onStreamEnded, onStreamComplete]);
+  }, [onFrames, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange]);
 
   // Initialize session on mount
   useEffect(() => {
@@ -278,6 +285,7 @@ export function useIOSession(
           onTimeUpdate: (timeUs) => callbacksRef.current.onTimeUpdate?.(timeUs),
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
           onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
+          onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
         });
         console.log(`[useIOSession:${appName}] registerCallbacks completed`);
 
@@ -440,11 +448,17 @@ export function useIOSession(
 
   const setTimeRange = useCallback(
     async (start?: string, end?: string) => {
-      if (!effectiveSessionId) return;
+      console.log("[useIOSession:setTimeRange] Called with start:", start, "end:", end, "sessionId:", effectiveSessionId);
+      if (!effectiveSessionId) {
+        console.warn("[useIOSession:setTimeRange] No effectiveSessionId, skipping");
+        return;
+      }
       try {
         await setSessionTimeRange(effectiveSessionId, start, end);
+        console.log("[useIOSession:setTimeRange] setSessionTimeRange completed");
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        console.error("[useIOSession:setTimeRange] Error:", msg);
         callbacksRef.current.onError?.(msg);
       }
     },
@@ -541,6 +555,7 @@ export function useIOSession(
           onTimeUpdate: (timeUs) => callbacksRef.current.onTimeUpdate?.(timeUs),
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
           onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
+          onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -585,6 +600,7 @@ export function useIOSession(
         onTimeUpdate: (timeUs) => callbacksRef.current.onTimeUpdate?.(timeUs),
         onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
         onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
+        onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -629,6 +645,7 @@ export function useIOSession(
     bufferCount: session?.buffer?.count ?? 0,
     joinerCount: session?.listenerCount ?? 0,
     stoppedExplicitly: session?.stoppedExplicitly ?? false,
+    speed: session?.speed ?? null,
     start,
     stop,
     leave,

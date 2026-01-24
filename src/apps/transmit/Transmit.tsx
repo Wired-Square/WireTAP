@@ -1,15 +1,16 @@
 // ui/src/apps/transmit/Transmit.tsx
 //
 // Main Transmit app component with tabbed interface for CAN/Serial transmission.
-// Uses useIOSessionManager for session management.
+// Uses useIOSessionManager for session management and useTransmitHandlers for business logic.
 
 import { useEffect, useCallback, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Send, AlertCircle, PlugZap, Unplug } from "lucide-react";
-import { useTransmitStore, type TransmitTab } from "../../stores/transmitStore";
+import { Send, AlertCircle } from "lucide-react";
+import { useTransmitStore } from "../../stores/transmitStore";
 import { useSessionStore } from "../../stores/sessionStore";
-import { useIOSessionManager, type IngestOptions } from "../../hooks/useIOSessionManager";
+import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useSettings, type IOProfile } from "../../hooks/useSettings";
+import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
 import type { TransmitHistoryEvent, SerialTransmitHistoryEvent, RepeatStoppedEvent } from "../../api/transmit";
 import {
   bgDarkView,
@@ -18,6 +19,7 @@ import {
   textDarkMuted,
 } from "../../styles/colourTokens";
 import { dataViewTabClass, tabCountColorClass } from "../../styles/buttonStyles";
+import ProtocolBadge from "../../components/ProtocolBadge";
 import TransmitTopBar from "./views/TransmitTopBar";
 import CanTransmitView from "./views/CanTransmitView";
 import SerialTransmitView from "./views/SerialTransmitView";
@@ -25,53 +27,57 @@ import TransmitQueueView from "./views/TransmitQueueView";
 import TransmitHistoryView from "./views/TransmitHistoryView";
 import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
 
+// ============================================================================
+// Helper: Check if a profile can transmit
+// ============================================================================
+
+function getTransmitStatus(p: IOProfile): { canTransmit: boolean; reason?: string } {
+  // slcan in normal mode can transmit
+  if (p.kind === "slcan") {
+    if (p.connection?.silent_mode) {
+      return { canTransmit: false, reason: "Silent mode enabled" };
+    }
+    return { canTransmit: true };
+  }
+  // gvret_tcp and gvret_usb can transmit
+  if (p.kind === "gvret_tcp" || p.kind === "gvret_usb") {
+    return { canTransmit: true };
+  }
+  // gs_usb can transmit if not in listen-only mode
+  if (p.kind === "gs_usb") {
+    if (p.connection?.listen_only !== false) {
+      return { canTransmit: false, reason: "Listen-only mode" };
+    }
+    return { canTransmit: true };
+  }
+  // socketcan can transmit
+  if (p.kind === "socketcan") {
+    return { canTransmit: true };
+  }
+  // serial ports can transmit serial data
+  if (p.kind === "serial") {
+    return { canTransmit: true };
+  }
+  return { canTransmit: false, reason: "Not a transmit interface" };
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
 export default function Transmit() {
   // Settings for IO profiles
   const { settings } = useSettings();
   const ioProfiles = settings?.io_profiles ?? [];
 
-  // Helper to check if a profile can transmit and why not
-  const getTransmitStatus = useCallback((p: IOProfile): { canTransmit: boolean; reason?: string } => {
-    // slcan in normal mode can transmit
-    if (p.kind === "slcan") {
-      if (p.connection?.silent_mode) {
-        return { canTransmit: false, reason: "Silent mode enabled" };
-      }
-      return { canTransmit: true };
-    }
-    // gvret_tcp and gvret_usb can transmit
-    if (p.kind === "gvret_tcp" || p.kind === "gvret_usb") {
-      return { canTransmit: true };
-    }
-    // gs_usb can transmit if not in listen-only mode
-    if (p.kind === "gs_usb") {
-      if (p.connection?.listen_only !== false) {
-        return { canTransmit: false, reason: "Listen-only mode" };
-      }
-      return { canTransmit: true };
-    }
-    // socketcan can transmit (if not in listen-only mode, but that's configured at system level)
-    if (p.kind === "socketcan") {
-      return { canTransmit: true };
-    }
-    // serial ports can transmit serial data
-    if (p.kind === "serial") {
-      return { canTransmit: true };
-    }
-    return { canTransmit: false, reason: "Not a transmit interface" };
-  }, []);
-
   // Get all CAN/serial profiles that could potentially be used for transmit
-  // Include non-transmittable ones so we can show them as disabled
   const transmitProfiles = useMemo(
     () =>
       ioProfiles.filter((p) => {
-        // Include all CAN-capable real-time interfaces
         if (p.kind === "slcan") return true;
         if (p.kind === "gvret_tcp" || p.kind === "gvret_usb") return true;
         if (p.kind === "gs_usb") return true;
         if (p.kind === "socketcan") return true;
-        // Include serial ports
         if (p.kind === "serial") return true;
         return false;
       }),
@@ -81,7 +87,7 @@ export default function Transmit() {
   // Map of profile ID to transmit status (for passing to dialog)
   const transmitStatusMap = useMemo(
     () => new Map(transmitProfiles.map((p) => [p.id, getTransmitStatus(p)])),
-    [transmitProfiles, getTransmitStatus]
+    [transmitProfiles]
   );
 
   // Store selectors
@@ -94,11 +100,8 @@ export default function Transmit() {
 
   // Store actions
   const loadProfiles = useTransmitStore((s) => s.loadProfiles);
-  const setActiveTab = useTransmitStore((s) => s.setActiveTab);
   const cleanup = useTransmitStore((s) => s.cleanup);
   const clearError = useTransmitStore((s) => s.clearError);
-  const stopAllRepeats = useTransmitStore((s) => s.stopAllRepeats);
-  const stopAllGroupRepeats = useTransmitStore((s) => s.stopAllGroupRepeats);
 
   // Dialog state
   const [showIoPickerDialog, setShowIoPickerDialog] = useState(false);
@@ -139,16 +142,29 @@ export default function Transmit() {
   } = manager;
 
   // Session controls
-  const {
+  const { start, stop, leave, rejoin, reinitialize } = session;
+
+  // Derive connected state
+  const isConnected = sessionReady && (isStreaming || isPaused || isStopped);
+
+  // Compose all handlers using the orchestrator hook
+  const handlers = useTransmitHandlers({
+    multiBusMode,
+    isStreaming,
+    sessionReady,
+    setMultiBusMode,
+    setMultiBusProfiles,
+    setIoProfile,
+    reinitialize,
     start,
     stop,
     leave,
     rejoin,
-    reinitialize,
-  } = session;
-
-  // Derive connected state
-  const isConnected = sessionReady && (isStreaming || isPaused || isStopped);
+    managerDetach,
+    managerRejoin,
+    startMultiBusSession,
+    setShowIoPickerDialog,
+  });
 
   // Load profiles on mount
   useEffect(() => {
@@ -169,7 +185,6 @@ export default function Transmit() {
     // CAN transmit history events
     const unlistenCan = listen<TransmitHistoryEvent>("transmit-history", (event) => {
       const data = event.payload;
-      // Map session_id to profile name (use queue_id as fallback identifier)
       const profileName = ioProfileName ?? data.session_id;
       addHistoryItem({
         timestamp_us: data.timestamp_us,
@@ -212,16 +227,13 @@ export default function Transmit() {
   }, [addHistoryItem, markRepeatStopped, ioProfileName]);
 
   // Set active session for child components (CanTransmitView, etc.)
-  // This allows useActiveSession() to return the correct session
   useEffect(() => {
     const store = useSessionStore.getState();
     if (isConnected && effectiveSessionId) {
       store.setActiveSession(effectiveSessionId);
     } else if (!isConnected && store.activeSessionId === effectiveSessionId) {
-      // Clear only if we were the active session
       store.setActiveSession(null);
     }
-    // Clear active session on unmount if we were the active session
     return () => {
       const currentStore = useSessionStore.getState();
       if (currentStore.activeSessionId === effectiveSessionId) {
@@ -233,141 +245,16 @@ export default function Transmit() {
   // Count active repeats in queue
   const activeRepeats = queue.filter((q) => q.isRepeating).length;
 
-  // Tab click handler
-  const handleTabClick = useCallback(
-    (tab: TransmitTab) => {
-      setActiveTab(tab);
-    },
-    [setActiveTab]
-  );
-
-  // Handle opening IO picker
-  const handleOpenIoPicker = useCallback(() => {
-    setShowIoPickerDialog(true);
-  }, []);
-
-  // Handle starting a session from IO picker (Watch mode)
-  const handleStartSession = useCallback(
-    async (
-      profileId: string,
-      closeDialog: boolean,
-      _options: IngestOptions
-    ) => {
-      try {
-        // Exit multi-bus mode if switching to single profile
-        if (multiBusMode) {
-          setMultiBusMode(false);
-          setMultiBusProfiles([]);
-        }
-
-        // Set the profile - this triggers useIOSession to create/join the session
-        setIoProfile(profileId);
-
-        // Reinitialize to ensure session is started
-        await reinitialize(profileId);
-
-        // Start the session if not already running
-        if (!isStreaming) {
-          await start();
-        }
-
-        if (closeDialog) {
-          setShowIoPickerDialog(false);
-        }
-      } catch (e) {
-        console.error("Failed to create session:", e);
-      }
-    },
-    [multiBusMode, setMultiBusMode, setMultiBusProfiles, setIoProfile, reinitialize, isStreaming, start]
-  );
-
-  // Handle stop - also stop all queue repeats and leave session
-  // For single-handle devices (serial, slcan), we need to leave the session
-  // to release the device so it can be reconnected later.
-  const handleStop = useCallback(async () => {
-    // Stop all active repeats before stopping the session
-    await stopAllRepeats();
-    await stopAllGroupRepeats();
-    await stop();
-    // Leave the session to release single-handle devices (serial, slcan)
-    // This triggers session destruction and profile tracking cleanup
-    await leave();
-  }, [stop, leave, stopAllRepeats, stopAllGroupRepeats]);
-
-  // Handle resume
-  const handleResume = useCallback(async () => {
-    await start();
-  }, [start]);
-
-  // Handle detach (leave session without stopping it)
-  const handleDetach = useCallback(async () => {
-    await managerDetach();
-  }, [managerDetach]);
-
-  // Handle rejoin after detaching
-  const handleRejoin = useCallback(async () => {
-    await managerRejoin();
-  }, [managerRejoin]);
-
-  // Handle joining an existing session from the IO picker dialog
-  const handleJoinSession = useCallback(
-    async (sessionId: string, sourceProfileIds?: string[]) => {
-      try {
-        // Check if this is a multi-source session
-        if (sourceProfileIds && sourceProfileIds.length > 0) {
-          // Multi-source session - join it
-          setMultiBusMode(false); // We're joining, not creating
-          setMultiBusProfiles(sourceProfileIds);
-          setIoProfile(sessionId);
-        } else {
-          // Single profile session
-          if (multiBusMode) {
-            setMultiBusMode(false);
-            setMultiBusProfiles([]);
-          }
-          setIoProfile(sessionId);
-        }
-
-        // Rejoin the session
-        await rejoin(sessionId);
-
-        // Close the dialog
-        setShowIoPickerDialog(false);
-      } catch (e) {
-        console.error("Failed to join session:", e);
-      }
-    },
-    [multiBusMode, setMultiBusMode, setMultiBusProfiles, setIoProfile, rejoin]
-  );
-
-  // Handle starting a multi-source session from IO picker (multi-bus mode)
-  const handleStartMultiIngest = useCallback(
-    async (
-      profileIds: string[],
-      closeDialog: boolean,
-      options: IngestOptions
-    ) => {
-      try {
-        // Use manager's centralized multi-bus session handler
-        await startMultiBusSession(profileIds, options);
-
-        if (closeDialog) {
-          setShowIoPickerDialog(false);
-        }
-      } catch (e) {
-        console.error("Failed to create multi-source session:", e);
-      }
-    },
-    [startMultiBusSession]
-  );
-
   // Render active tab content
   const renderTabContent = () => {
     switch (activeTab) {
-      case "can":
-        return <CanTransmitView />;
-      case "serial":
-        return <SerialTransmitView />;
+      case "frame":
+        // Show Serial view if device supports serial but not CAN, otherwise CAN
+        return capabilities?.can_transmit_serial && !capabilities?.can_transmit ? (
+          <SerialTransmitView />
+        ) : (
+          <CanTransmitView />
+        );
       case "queue":
         return <TransmitQueueView />;
       case "history":
@@ -377,15 +264,12 @@ export default function Transmit() {
     }
   };
 
-  // Current profile ID for display
-  const currentProfileId = ioProfile;
-
   return (
     <div className={`flex flex-col h-full ${bgDarkView}`}>
       {/* Top Bar */}
       <TransmitTopBar
         ioProfiles={transmitProfiles}
-        ioProfile={currentProfileId}
+        ioProfile={ioProfile}
         defaultReadProfileId={settings?.default_read_profile}
         multiBusMode={multiBusMode}
         multiBusProfiles={multiBusProfiles}
@@ -394,11 +278,11 @@ export default function Transmit() {
         isDetached={isDetached}
         joinerCount={joinerCount}
         capabilities={capabilities}
-        onOpenIoPicker={handleOpenIoPicker}
-        onStop={handleStop}
-        onResume={handleResume}
-        onDetach={handleDetach}
-        onRejoin={handleRejoin}
+        onOpenIoPicker={handlers.handleOpenIoPicker}
+        onStop={handlers.handleStop}
+        onResume={handlers.handleResume}
+        onDetach={handlers.handleDetach}
+        onRejoin={handlers.handleRejoin}
         isLoading={isLoading}
         error={transmitError}
       />
@@ -447,28 +331,32 @@ export default function Transmit() {
         <>
           {/* Tab Bar */}
           <div
-            className={`flex items-center gap-1 px-4 ${bgDarkToolbar} border-b ${borderDarkView}`}
+            className={`flex-shrink-0 flex items-center border-b ${borderDarkView} ${bgDarkToolbar}`}
           >
+            {/* Protocol badge with status light */}
+            <div className="ml-1">
+              <ProtocolBadge
+                canTransmit={capabilities?.can_transmit}
+                canTransmitSerial={capabilities?.can_transmit_serial}
+                isStreaming={isStreaming}
+              />
+            </div>
+
+            {/* Tabs */}
             <button
-              onClick={() => handleTabClick("can")}
-              className={dataViewTabClass(activeTab === "can")}
+              onClick={() => handlers.handleTabClick("frame")}
+              className={dataViewTabClass(activeTab === "frame")}
             >
-              CAN
+              Frame
             </button>
             <button
-              onClick={() => handleTabClick("serial")}
-              className={dataViewTabClass(activeTab === "serial")}
-            >
-              Serial
-            </button>
-            <button
-              onClick={() => handleTabClick("queue")}
+              onClick={() => handlers.handleTabClick("queue")}
               className={dataViewTabClass(activeTab === "queue", activeRepeats > 0)}
             >
               Queue
               {queue.length > 0 && (
                 <span
-                  className={`ml-1.5 ${
+                  className={`ml-1.5 text-xs ${
                     activeRepeats > 0
                       ? tabCountColorClass("green")
                       : tabCountColorClass("gray")
@@ -479,41 +367,19 @@ export default function Transmit() {
               )}
             </button>
             <button
-              onClick={() => handleTabClick("history")}
+              onClick={() => handlers.handleTabClick("history")}
               className={dataViewTabClass(activeTab === "history")}
             >
               History
               {history.length > 0 && (
-                <span className={`ml-1.5 ${tabCountColorClass("gray")}`}>
+                <span className={`ml-1.5 text-xs ${tabCountColorClass("gray")}`}>
                   ({history.length})
                 </span>
               )}
             </button>
 
-            {/* Connection status indicator */}
+            {/* Spacer */}
             <div className="flex-1" />
-            {currentProfileId && (
-              <div className="flex items-center gap-2 py-2">
-                {isConnected ? (
-                  <>
-                    <PlugZap size={14} className="text-green-400" />
-                    <span className="text-green-400 text-xs">Connected</span>
-                  </>
-                ) : isDetached ? (
-                  <>
-                    <Unplug size={14} className="text-amber-400" />
-                    <span className="text-amber-400 text-xs">Detached</span>
-                  </>
-                ) : (
-                  <>
-                    <Unplug size={14} className={textDarkMuted} />
-                    <span className={`${textDarkMuted} text-xs`}>
-                      Disconnected
-                    </span>
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Tab Content */}
@@ -524,17 +390,18 @@ export default function Transmit() {
       {/* IO Picker Dialog */}
       <IoReaderPickerDialog
         isOpen={showIoPickerDialog}
-        onClose={() => setShowIoPickerDialog(false)}
+        onClose={handlers.handleCloseIoPicker}
         ioProfiles={transmitProfiles}
-        selectedId={currentProfileId ?? null}
+        selectedId={ioProfile ?? null}
         defaultId={null}
-        onSelect={() => {}} // Selection happens through onStartIngest/onJoinSession
-        onStartIngest={handleStartSession}
-        onStartMultiIngest={handleStartMultiIngest}
-        onJoinSession={handleJoinSession}
+        onSelect={() => {}}
+        onStartIngest={handlers.handleStartSession}
+        onStartMultiIngest={handlers.handleStartMultiIngest}
+        onJoinSession={handlers.handleJoinSession}
         hideBuffers={true}
         allowMultiSelect={true}
         disabledProfiles={transmitStatusMap}
+        onSkip={handlers.handleSkip}
       />
     </div>
   );

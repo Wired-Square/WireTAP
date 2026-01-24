@@ -203,6 +203,8 @@ export interface Session {
   hasQueuedMessages: boolean;
   /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
   stoppedExplicitly: boolean;
+  /** Current playback speed (null until set, 1 = realtime, 0 = unlimited) */
+  speed: number | null;
 }
 
 /** Options for creating a session */
@@ -247,6 +249,7 @@ export interface SessionCallbacks {
   onStreamEnded?: (payload: StreamEndedPayload) => void;
   onStreamComplete?: () => void;
   onStateChange?: (state: IOStateType) => void;
+  onSpeedChange?: (speed: number) => void;
 }
 
 /** Session event listeners - one set per session */
@@ -493,6 +496,16 @@ async function setupSessionEventListeners(
   );
   unlistenFunctions.push(unlistenListenerCount);
 
+  // Speed changes (from Rust backend - when any listener changes speed)
+  const unlistenSpeedChange = await listen<number>(
+    `speed-changed:${sessionId}`,
+    (event) => {
+      updateSession(sessionId, { speed: event.payload });
+      invokeCallbacks(eventListeners, "onSpeedChange", event.payload);
+    }
+  );
+  unlistenFunctions.push(unlistenSpeedChange);
+
   return unlistenFunctions;
 }
 
@@ -678,6 +691,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             createdAt: Date.now(),
             hasQueuedMessages: false,
             stoppedExplicitly: false,
+            speed: null,
           };
           set((s) => ({
             sessions: { ...s.sessions, [sessionId]: errorSession },
@@ -805,6 +819,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         createdAt: existingSession?.createdAt ?? Date.now(),
         hasQueuedMessages: existingSession?.hasQueuedMessages ?? false,
         stoppedExplicitly: existingSession?.stoppedExplicitly ?? false,
+        speed: existingSession?.speed ?? null,
       };
 
       return {
@@ -911,9 +926,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const result = await reinitializeSessionIfSafe(sessionId, listenerId);
 
     if (!result.success) {
-      // Return existing session - can't reinitialize
+      // Can't fully reinitialize (other listeners exist), but we can update the time range
       const existing = get().sessions[sessionId];
       if (existing) {
+        // Apply time range update even when we can't reinitialize
+        if (options?.startTime !== undefined || options?.endTime !== undefined) {
+          console.log(`[sessionStore:reinitializeSession] Can't reinitialize (other listeners), updating time range instead`);
+          await updateReaderTimeRange(sessionId, options.startTime, options.endTime);
+        }
         return existing;
       }
       // If no session exists, create one
@@ -1043,7 +1063,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   setSessionTimeRange: async (sessionId, start, end) => {
+    console.log("[sessionStore:setSessionTimeRange] sessionId:", sessionId, "start:", start, "end:", end);
     await updateReaderTimeRange(sessionId, start, end);
+    console.log("[sessionStore:setSessionTimeRange] completed");
   },
 
   seekSession: async (sessionId, timestampUs) => {

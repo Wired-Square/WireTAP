@@ -3,7 +3,7 @@
 // Shared session control components for top bars.
 // Handles reader display, stop/resume/detach/rejoin controls.
 
-import { Star, FileText, Square, Unplug, Plug, Play, GitMerge } from "lucide-react";
+import { Star, FileText, Square, Unplug, Plug, Play, GitMerge, Bookmark } from "lucide-react";
 import type { IOProfile } from "../types/common";
 import type { BufferMetadata } from "../api/buffer";
 import { BUFFER_PROFILE_ID } from "../dialogs/io-reader-picker/utils";
@@ -100,6 +100,8 @@ export interface SessionActionButtonsProps {
   isDetached?: boolean;
   /** Number of apps connected to this session */
   joinerCount?: number;
+  /** Whether the IO source supports time range filtering (shows bookmark button) */
+  supportsTimeRange?: boolean;
   /** Stop the session */
   onStop?: () => void;
   /** Resume a stopped session */
@@ -108,6 +110,8 @@ export interface SessionActionButtonsProps {
   onDetach?: () => void;
   /** Rejoin after detaching */
   onRejoin?: () => void;
+  /** Open bookmark picker (for time range sources) */
+  onOpenBookmarkPicker?: () => void;
 }
 
 export function SessionActionButtons({
@@ -115,13 +119,27 @@ export function SessionActionButtons({
   isStopped = false,
   isDetached = false,
   joinerCount = 1,
+  supportsTimeRange = false,
   onStop,
   onResume,
   onDetach,
   onRejoin,
+  onOpenBookmarkPicker,
 }: SessionActionButtonsProps) {
   return (
     <>
+      {/* Bookmark button - shown when source supports time range, disabled while streaming */}
+      {supportsTimeRange && onOpenBookmarkPicker && (
+        <button
+          onClick={onOpenBookmarkPicker}
+          disabled={isStreaming}
+          className={buttonBase}
+          title={isStreaming ? "Stop streaming to change time range" : "Load saved time bookmark"}
+        >
+          <Bookmark className="w-3.5 h-3.5" />
+        </button>
+      )}
+
       {/* Stop button - only shown when actively streaming */}
       {isStreaming && onStop && (
         <button
@@ -166,6 +184,130 @@ export function SessionActionButtons({
           <span>Rejoin</span>
         </button>
       )}
+    </>
+  );
+}
+
+// ============================================================================
+// IO Session Controls - combined reader, speed, and session controls
+// ============================================================================
+
+export interface IOSessionControlsProps {
+  // Reader button props
+  /** Current IO profile/session ID */
+  ioProfile: string | null;
+  /** Available IO profiles */
+  ioProfiles: IOProfile[];
+  /** Whether multi-bus mode is active */
+  multiBusMode?: boolean;
+  /** Profile IDs when in multi-bus mode */
+  multiBusProfiles?: string[];
+  /** Buffer metadata (for buffer display name) */
+  bufferMetadata?: BufferMetadata | null;
+  /** Default read profile ID (for star icon) */
+  defaultReadProfileId?: string | null;
+  /** Click handler to open reader picker */
+  onOpenIoReaderPicker: () => void;
+
+  // Speed props
+  /** Current playback speed */
+  speed?: number;
+  /** Whether the reader supports speed control */
+  supportsSpeed?: boolean;
+  /** Click handler to open speed picker */
+  onOpenSpeedPicker?: () => void;
+
+  // Session action props
+  /** Whether the session is actively streaming */
+  isStreaming: boolean;
+  /** Whether the session is stopped but can be resumed */
+  isStopped?: boolean;
+  /** Whether we've detached from the session */
+  isDetached?: boolean;
+  /** Number of apps connected to this session */
+  joinerCount?: number;
+  /** Whether the IO source supports time range filtering */
+  supportsTimeRange?: boolean;
+  /** Stop the session */
+  onStop?: () => void;
+  /** Resume a stopped session */
+  onResume?: () => void;
+  /** Detach from a shared session without stopping */
+  onDetach?: () => void;
+  /** Rejoin after detaching */
+  onRejoin?: () => void;
+  /** Open bookmark picker (for time range sources) */
+  onOpenBookmarkPicker?: () => void;
+}
+
+/**
+ * Combined IO session controls component.
+ * Includes reader button, speed picker button, and session action buttons (stop/resume/detach/rejoin/bookmark).
+ * Use this instead of separate ReaderButton + SessionActionButtons for consistent layout.
+ */
+export function IOSessionControls({
+  // Reader props
+  ioProfile,
+  ioProfiles,
+  multiBusMode = false,
+  multiBusProfiles = [],
+  bufferMetadata,
+  defaultReadProfileId,
+  onOpenIoReaderPicker,
+  // Speed props
+  speed = 1,
+  supportsSpeed = false,
+  onOpenSpeedPicker,
+  // Session action props
+  isStreaming,
+  isStopped = false,
+  isDetached = false,
+  joinerCount = 1,
+  supportsTimeRange = false,
+  onStop,
+  onResume,
+  onDetach,
+  onRejoin,
+  onOpenBookmarkPicker,
+}: IOSessionControlsProps) {
+  return (
+    <>
+      {/* IO Reader Selection */}
+      <ReaderButton
+        ioProfile={ioProfile}
+        ioProfiles={ioProfiles}
+        multiBusMode={multiBusMode}
+        multiBusProfiles={multiBusProfiles}
+        bufferMetadata={bufferMetadata}
+        defaultReadProfileId={defaultReadProfileId}
+        onClick={onOpenIoReaderPicker}
+        disabled={isStreaming}
+      />
+
+      {/* Speed button - only show if reader supports speed */}
+      {supportsSpeed && onOpenSpeedPicker && (
+        <button
+          onClick={onOpenSpeedPicker}
+          className={buttonBase}
+          title="Set playback speed"
+        >
+          <span>{speed === 0 ? "0x" : speed === 1 ? "1x" : `${speed}x`}</span>
+        </button>
+      )}
+
+      {/* Session control buttons (bookmark, stop, resume, detach, rejoin) */}
+      <SessionActionButtons
+        isStreaming={isStreaming}
+        isStopped={isStopped}
+        isDetached={isDetached}
+        joinerCount={joinerCount}
+        supportsTimeRange={supportsTimeRange}
+        onStop={onStop}
+        onResume={onResume}
+        onDetach={onDetach}
+        onRejoin={onRejoin}
+        onOpenBookmarkPicker={onOpenBookmarkPicker}
+      />
     </>
   );
 }

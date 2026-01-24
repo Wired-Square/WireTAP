@@ -10,6 +10,10 @@ import { formatFrameId } from '../utils/frameIds';
 import { normalizeMeta } from '../utils/catalogMeta';
 import type { FrameInfo } from './discoveryFrameStore';
 import { useDiscoveryToolboxStore } from './discoveryToolboxStore';
+import type { PlaybackSpeed } from '../components/TimeController';
+
+// Re-export PlaybackSpeed for backwards compatibility
+export type { PlaybackSpeed };
 
 export type FrameMetadata = {
   name: string;
@@ -18,8 +22,6 @@ export type FrameMetadata = {
   default_interval: number;
   filename: string;
 };
-
-export type PlaybackSpeed = 0 | 1 | 2;
 
 interface DiscoveryUIState {
   // General UI state
@@ -31,15 +33,6 @@ interface DiscoveryUIState {
   // Playback control
   playbackSpeed: PlaybackSpeed;
   currentTime: number | null;
-
-  // No Limit mode state
-  noLimitMode: {
-    active: boolean;
-    frameCount: number;
-    showProgressDialog: boolean;
-    bufferLimitApproaching: boolean;
-    bufferLimitReached: boolean;
-  };
 
   // Time range
   startTime: string;
@@ -78,15 +71,8 @@ interface DiscoveryUIState {
   setIoProfile: (profile: string | null) => void;
 
   // Actions - Playback control
-  setPlaybackSpeed: (speed: PlaybackSpeed, clearBuffer: () => void) => void;
+  setPlaybackSpeed: (speed: PlaybackSpeed) => void;
   updateCurrentTime: (time: number) => void;
-
-  // Actions - No Limit mode
-  setNoLimitActive: (active: boolean) => void;
-  showNoLimitProgressDialog: () => void;
-  hideNoLimitProgressDialog: () => void;
-  resetNoLimitMode: () => void;
-  updateNoLimitFrameCount: (additionalFrames: number) => void;
 
   // Actions - Time range
   setStartTime: (time: string) => void;
@@ -125,13 +111,6 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
   ioProfile: null,
   playbackSpeed: 1,
   currentTime: null,
-  noLimitMode: {
-    active: false,
-    frameCount: 0,
-    showProgressDialog: false,
-    bufferLimitApproaching: false,
-    bufferLimitReached: false,
-  },
   startTime: '',
   endTime: '',
   showErrorDialog: false,
@@ -188,78 +167,11 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
   setIoProfile: (profile) => set({ ioProfile: profile }),
 
   // Playback control
-  setPlaybackSpeed: (speed, clearBuffer) => {
-    const wasNoLimit = get().playbackSpeed === 0;
-    const isNoLimit = speed === 0;
-    if (wasNoLimit && !isNoLimit) {
-      clearBuffer();
-      set({
-        noLimitMode: {
-          active: false,
-          frameCount: 0,
-          showProgressDialog: false,
-          bufferLimitApproaching: false,
-          bufferLimitReached: false,
-        },
-      });
-    }
+  setPlaybackSpeed: (speed) => {
     set({ playbackSpeed: speed });
   },
 
   updateCurrentTime: (time) => set({ currentTime: time }),
-
-  // No Limit mode
-  setNoLimitActive: (active) => {
-    set((state) => ({
-      noLimitMode: { ...state.noLimitMode, active },
-    }));
-  },
-
-  showNoLimitProgressDialog: () => {
-    set((state) => ({
-      noLimitMode: { ...state.noLimitMode, showProgressDialog: true },
-    }));
-  },
-
-  hideNoLimitProgressDialog: () => {
-    set((state) => ({
-      noLimitMode: { ...state.noLimitMode, showProgressDialog: false },
-    }));
-  },
-
-  resetNoLimitMode: () => {
-    set({
-      noLimitMode: {
-        active: false,
-        frameCount: 0,
-        showProgressDialog: false,
-        bufferLimitApproaching: false,
-        bufferLimitReached: false,
-      },
-    });
-  },
-
-  updateNoLimitFrameCount: (additionalFrames) => {
-    const { noLimitMode, maxBuffer } = get();
-    if (!noLimitMode.active) return;
-
-    const newFrameCount = noLimitMode.frameCount + additionalFrames;
-    const bufferLimitApproaching = newFrameCount >= maxBuffer * 0.9;
-    const bufferLimitReached = newFrameCount >= maxBuffer;
-
-    if (bufferLimitApproaching && !noLimitMode.bufferLimitApproaching) {
-      console.log(`[updateNoLimitFrameCount] Buffer limit approaching (90%): ${newFrameCount}/${maxBuffer}`);
-    }
-
-    set({
-      noLimitMode: {
-        ...noLimitMode,
-        frameCount: newFrameCount,
-        bufferLimitApproaching,
-        bufferLimitReached,
-      },
-    });
-  },
 
   // Time range
   setStartTime: (time) => set({ startTime: time }),

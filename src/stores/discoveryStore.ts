@@ -9,7 +9,7 @@
 // - discoverySerialStore.ts - serial bytes, framing
 // - discoveryToolboxStore.ts - analysis tools, knowledge
 
-import { useDiscoveryFrameStore, type FrameInfo, setNoLimitModeCallback } from './discoveryFrameStore';
+import { useDiscoveryFrameStore, type FrameInfo } from './discoveryFrameStore';
 import { useDiscoveryUIStore, type FrameMetadata, type PlaybackSpeed } from './discoveryUIStore';
 import { useDiscoverySerialStore } from './discoverySerialStore';
 import { useDiscoveryToolboxStore } from './discoveryToolboxStore';
@@ -74,13 +74,6 @@ type CombinedDiscoveryState = {
   ioProfile: string | null;
   playbackSpeed: PlaybackSpeed;
   currentTime: number | null;
-  noLimitMode: {
-    active: boolean;
-    frameCount: number;
-    showProgressDialog: boolean;
-    bufferLimitApproaching: boolean;
-    bufferLimitReached: boolean;
-  };
   startTime: string;
   endTime: string;
   showErrorDialog: boolean;
@@ -130,10 +123,6 @@ type CombinedDiscoveryState = {
   setIoProfile: (profile: string | null) => void;
   setPlaybackSpeed: (speed: PlaybackSpeed) => void;
   updateCurrentTime: (time: number) => void;
-  setNoLimitActive: (active: boolean) => void;
-  showNoLimitProgressDialog: () => void;
-  hideNoLimitProgressDialog: () => void;
-  resetNoLimitMode: () => void;
   rebuildFramePickerFromBuffer: () => void;
   setStartTime: (time: string) => void;
   setEndTime: (time: string) => void;
@@ -212,13 +201,6 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
   const serialStore = useDiscoverySerialStore();
   const toolboxStore = useDiscoveryToolboxStore();
 
-  // Set up the noLimitMode callback for frame store to update UI store
-  setNoLimitModeCallback((update) => {
-    if (update) {
-      uiStore.updateNoLimitFrameCount(update.frameCount);
-    }
-  });
-
   // Create wrapper actions that coordinate between stores
   const combinedState: CombinedDiscoveryState = {
     // Frame store state
@@ -236,7 +218,6 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     ioProfile: uiStore.ioProfile,
     playbackSpeed: uiStore.playbackSpeed,
     currentTime: uiStore.currentTime,
-    noLimitMode: uiStore.noLimitMode,
     startTime: uiStore.startTime,
     endTime: uiStore.endTime,
     showErrorDialog: uiStore.showErrorDialog,
@@ -273,7 +254,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
 
     // Frame store actions (with coordination)
     addFrames: (newFrames) => {
-      frameStore.addFrames(newFrames, uiStore.maxBuffer, uiStore.noLimitMode.active);
+      frameStore.addFrames(newFrames, uiStore.maxBuffer);
     },
     clearBuffer: frameStore.clearBuffer,
     clearFramePicker: frameStore.clearFramePicker,
@@ -306,14 +287,8 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     setMaxBuffer: uiStore.setMaxBuffer,
     setRenderBuffer: uiStore.setRenderBuffer,
     setIoProfile: uiStore.setIoProfile,
-    setPlaybackSpeed: (speed) => {
-      uiStore.setPlaybackSpeed(speed, frameStore.clearBuffer);
-    },
+    setPlaybackSpeed: uiStore.setPlaybackSpeed,
     updateCurrentTime: uiStore.updateCurrentTime,
-    setNoLimitActive: uiStore.setNoLimitActive,
-    showNoLimitProgressDialog: uiStore.showNoLimitProgressDialog,
-    hideNoLimitProgressDialog: uiStore.hideNoLimitProgressDialog,
-    resetNoLimitMode: uiStore.resetNoLimitMode,
     setStartTime: uiStore.setStartTime,
     setEndTime: uiStore.setEndTime,
     openSaveDialog: () => {

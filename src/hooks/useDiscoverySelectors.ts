@@ -115,29 +115,6 @@ export function useDiscoverySaveDialog() {
 }
 
 /**
- * No-limit mode state and actions
- */
-export function useDiscoveryNoLimitMode() {
-  const noLimitModeActive = useDiscoveryStore((s) => s.noLimitMode.active);
-  const noLimitModeShowProgressDialog = useDiscoveryStore((s) => s.noLimitMode.showProgressDialog);
-  const noLimitModeBufferLimitReached = useDiscoveryStore((s) => s.noLimitMode.bufferLimitReached);
-  const setNoLimitActive = useDiscoveryStore((s) => s.setNoLimitActive);
-  const showNoLimitProgressDialog = useDiscoveryStore((s) => s.showNoLimitProgressDialog);
-  const hideNoLimitProgressDialog = useDiscoveryStore((s) => s.hideNoLimitProgressDialog);
-  const resetNoLimitMode = useDiscoveryStore((s) => s.resetNoLimitMode);
-
-  return {
-    noLimitModeActive,
-    noLimitModeShowProgressDialog,
-    noLimitModeBufferLimitReached,
-    setNoLimitActive,
-    showNoLimitProgressDialog,
-    hideNoLimitProgressDialog,
-    resetNoLimitMode,
-  };
-}
-
-/**
  * Toolbox state
  */
 export function useDiscoveryToolbox() {

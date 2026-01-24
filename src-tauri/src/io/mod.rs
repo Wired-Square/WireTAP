@@ -363,6 +363,11 @@ fn emit_joiner_count_change(app: &AppHandle, session_id: &str, joiner_count: usi
     emit_to_session(app, "joiner-count-changed", session_id, joiner_count);
 }
 
+/// Emit a speed change event for a session
+fn emit_speed_change(app: &AppHandle, session_id: &str, speed: f64) {
+    emit_to_session(app, "speed-changed", session_id, speed);
+}
+
 /// Global session manager
 static IO_SESSIONS: Lazy<Mutex<HashMap<String, IOSession>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -917,7 +922,12 @@ pub async fn update_session_speed(session_id: &str, speed: f64) -> Result<(), St
         .get_mut(session_id)
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
-    session.device.set_speed(speed)
+    session.device.set_speed(speed)?;
+
+    // Emit speed change event to all listeners
+    emit_speed_change(&session.app, session_id, speed);
+
+    Ok(())
 }
 
 /// Update time range for a reader session
@@ -926,12 +936,25 @@ pub async fn update_session_time_range(
     start: Option<String>,
     end: Option<String>,
 ) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    eprintln!(
+        "[io] update_session_time_range called - session: {}, start: {:?}, end: {:?}",
+        session_id,
+        start,
+        end
+    );
 
-    session.device.set_time_range(start, end)
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions.get_mut(session_id).ok_or_else(|| {
+        let err = format!("Session '{}' not found", session_id);
+        eprintln!("[io] update_session_time_range: {}", err);
+        err
+    })?;
+
+    let result = session.device.set_time_range(start, end);
+    if let Err(ref e) = result {
+        eprintln!("[io] update_session_time_range failed: {}", e);
+    }
+    result
 }
 
 /// Seek to a specific timestamp in microseconds

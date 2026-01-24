@@ -5,7 +5,8 @@
 
 import { Send, Link2, GitMerge } from "lucide-react";
 import type { IOProfile } from "../../../types/common";
-import { ReaderButton, SessionActionButtons } from "../../../components/SessionControls";
+import { IOSessionControls } from "../../../components/SessionControls";
+import FlexSeparator from "../../../components/FlexSeparator";
 import {
   bgDarkToolbar,
   borderDarkView,
@@ -74,24 +75,21 @@ export default function TransmitTopBar({
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-2 ${bgDarkToolbar} border-b ${borderDarkView}`}
+      className={`flex items-center gap-2 px-4 py-2 ${bgDarkToolbar} border-b ${borderDarkView}`}
     >
       {/* Transmit icon */}
-      <Send className="w-5 h-5 text-blue-500 shrink-0" />
+      <Send className="w-5 h-5 text-red-500 shrink-0" />
 
-      {/* IO Reader Selection */}
-      <ReaderButton
+      <FlexSeparator />
+
+      {/* IO Session Controls (reader + session actions) */}
+      <IOSessionControls
         ioProfile={ioProfile}
         ioProfiles={ioProfiles}
         multiBusMode={multiBusMode}
         multiBusProfiles={multiBusProfiles}
         defaultReadProfileId={defaultReadProfileId}
-        onClick={onOpenIoPicker}
-        disabled={isStreaming}
-      />
-
-      {/* Session control buttons */}
-      <SessionActionButtons
+        onOpenIoReaderPicker={onOpenIoPicker}
         isStreaming={isStreaming}
         isStopped={isStopped}
         isDetached={isDetached}
@@ -104,21 +102,11 @@ export default function TransmitTopBar({
 
       {/* Capability badges */}
       {capabilities && (
-        <div className="flex items-center gap-2 ml-2">
+        <div className="flex items-center gap-2">
           {showAsMultiBus && (
             <span className="text-xs px-2 py-0.5 rounded bg-purple-600/30 text-purple-400 flex items-center gap-1">
               <GitMerge size={10} />
               Multi-Source
-            </span>
-          )}
-          {capabilities.can_transmit && (
-            <span className="text-xs px-2 py-0.5 rounded bg-blue-600/30 text-blue-400">
-              CAN
-            </span>
-          )}
-          {capabilities.can_transmit_serial && (
-            <span className="text-xs px-2 py-0.5 rounded bg-purple-600/30 text-purple-400">
-              Serial
             </span>
           )}
           {capabilities.supports_canfd && (

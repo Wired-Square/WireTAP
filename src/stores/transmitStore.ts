@@ -31,7 +31,7 @@ import { CAN_FD_DLC_VALUES } from "../constants";
 // ============================================================================
 
 /** Active tab in the transmit UI */
-export type TransmitTab = "can" | "serial" | "queue" | "history";
+export type TransmitTab = "frame" | "queue" | "history";
 
 /** Re-export CAN_FD_DLC_VALUES for backwards compatibility */
 export { CAN_FD_DLC_VALUES };
@@ -265,7 +265,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
   queue: [],
   history: [],
   activeGroups: new Set(),
-  activeTab: "can",
+  activeTab: "frame",
   isLoading: false,
   error: null,
   canEditor: { ...DEFAULT_CAN_EDITOR },

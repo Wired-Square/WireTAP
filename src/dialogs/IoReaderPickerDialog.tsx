@@ -149,6 +149,8 @@ type Props = {
   allowMultiSelect?: boolean;
   /** Map of profile ID to disabled status with reason (for transmit mode) */
   disabledProfiles?: Map<string, { canTransmit: boolean; reason?: string }>;
+  /** Called when user wants to continue without selecting a reader */
+  onSkip?: () => void;
 };
 
 export default function IoReaderPickerDialog({
@@ -178,6 +180,7 @@ export default function IoReaderPickerDialog({
   hideBuffers = false,
   allowMultiSelect = false,
   disabledProfiles,
+  onSkip,
 }: Props) {
   // Use stable empty array when selectedIds is not provided (avoids re-renders)
   const selectedIds = selectedIdsProp ?? EMPTY_SELECTED_IDS;
@@ -349,7 +352,8 @@ export default function IoReaderPickerDialog({
     return () => clearInterval(intervalId);
   }, [isOpen, buffers]);
 
-  // Fetch active multi-source sessions when dialog opens and periodically refresh
+  // Fetch active joinable sessions when dialog opens and periodically refresh
+  // Includes multi_source sessions AND recorded sessions (like PostgreSQL)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -357,10 +361,14 @@ export default function IoReaderPickerDialog({
       listActiveSessions()
         .then((sessions) => {
           console.log("[IoReaderPickerDialog] All active sessions:", sessions);
-          // Only show multi_source type sessions
-          const multiSourceSessions = sessions.filter((s) => s.deviceType === "multi_source");
-          console.log("[IoReaderPickerDialog] Multi-source sessions:", multiSourceSessions);
-          setActiveMultiSourceSessions(multiSourceSessions);
+          // Show multi_source sessions AND recorded-source sessions (supports_time_range)
+          // This allows apps to join PostgreSQL sessions from other apps
+          const joinableSessions = sessions.filter((s) =>
+            s.deviceType === "multi_source" ||
+            (s.capabilities.supports_time_range && !s.capabilities.is_realtime)
+          );
+          console.log("[IoReaderPickerDialog] Joinable sessions:", joinableSessions);
+          setActiveMultiSourceSessions(joinableSessions);
         })
         .catch(console.error);
     };
@@ -1284,6 +1292,7 @@ export default function IoReaderPickerDialog({
           onJoinClick={handleJoinClick}
           onStartClick={handleStartClick}
           onClose={handleBufferOkClick}
+          onSkip={onSkip}
           multiSelectMode={multiSelectMode}
           multiSelectCount={checkedReaderIds.length}
           onMultiWatchClick={handleMultiWatchClick}
