@@ -11,7 +11,10 @@
 #[cfg(target_os = "linux")]
 mod linux_impl {
     use serde::{Deserialize, Serialize};
-    use socketcan::{CanDataFrame, CanSocket, EmbeddedFrame, ExtendedId, Frame, Id, Socket, StandardId};
+    use socketcan::{
+        CanAnyFrame, CanDataFrame, CanFdFrame, CanFdSocket, EmbeddedFrame, ExtendedId, Frame, Id,
+        Socket, StandardId,
+    };
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         mpsc as std_mpsc,
@@ -48,20 +51,37 @@ mod linux_impl {
     // Utility Functions
     // ============================================================================
 
-    /// Convert a socketcan frame to our FrameMessage format
-    fn convert_socketcan_frame(frame: &socketcan::CanFrame, bus_override: Option<u8>) -> FrameMessage {
-        FrameMessage {
-            protocol: "can".to_string(),
-            timestamp_us: now_us(),
-            frame_id: frame.raw_id() & 0x1FFF_FFFF,
-            bus: bus_override.unwrap_or(0),
-            dlc: frame.len() as u8,
-            bytes: frame.data().to_vec(),
-            is_extended: frame.is_extended(),
-            is_fd: false, // TODO: CAN FD support
-            source_address: None,
-            incomplete: None,
-            direction: None,
+    /// Convert a CanAnyFrame to our FrameMessage format
+    fn convert_any_frame(frame: CanAnyFrame, bus_override: Option<u8>) -> Option<FrameMessage> {
+        match frame {
+            CanAnyFrame::Normal(f) => Some(FrameMessage {
+                protocol: "can".to_string(),
+                timestamp_us: now_us(),
+                frame_id: f.raw_id() & 0x1FFF_FFFF,
+                bus: bus_override.unwrap_or(0),
+                dlc: f.len() as u8,
+                bytes: f.data().to_vec(),
+                is_extended: f.is_extended(),
+                is_fd: false,
+                source_address: None,
+                incomplete: None,
+                direction: None,
+            }),
+            CanAnyFrame::Fd(f) => Some(FrameMessage {
+                protocol: "can".to_string(),
+                timestamp_us: now_us(),
+                frame_id: f.raw_id() & 0x1FFF_FFFF,
+                bus: bus_override.unwrap_or(0),
+                dlc: f.len() as u8,
+                bytes: f.data().to_vec(),
+                is_extended: f.is_extended(),
+                is_fd: true,
+                source_address: None,
+                incomplete: None,
+                direction: None,
+            }),
+            CanAnyFrame::Remote(_) => None, // Skip remote frames
+            CanAnyFrame::Error(_) => None,  // Skip error frames
         }
     }
 
@@ -70,16 +90,16 @@ mod linux_impl {
     // ============================================================================
 
     /// Simple SocketCAN reader/writer for use in multi-source mode.
-    /// Wraps a CanSocket for both reading and writing frames.
+    /// Wraps a CanFdSocket for both reading and writing frames (supports CAN FD).
     pub struct SocketCanReader {
-        socket: CanSocket,
+        socket: CanFdSocket,
     }
 
     impl SocketCanReader {
         /// Create a new SocketCAN reader for the given interface
         pub fn new(interface: &str) -> Result<Self, String> {
             let device = format!("socketcan({})", interface);
-            let socket = CanSocket::open(interface)
+            let socket = CanFdSocket::open(interface)
                 .map_err(|e| io_error(&device, "open", e))?;
 
             // Set read timeout for non-blocking reads
@@ -94,17 +114,24 @@ mod linux_impl {
         pub fn read_frame_timeout(&self, _timeout: Duration) -> Result<Option<FrameMessage>, String> {
             // Note: timeout is already set in constructor, parameter kept for API compatibility
             match self.socket.read_frame() {
-                Ok(frame) => Ok(Some(convert_socketcan_frame(&frame, None))),
+                Ok(frame) => Ok(convert_any_frame(frame, None)),
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(None),
                 Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => Ok(None),
                 Err(e) => Err(format!("Read error: {}", e)),
             }
         }
 
-        /// Write a raw CAN frame (16-byte struct can_frame format)
-        pub fn write_frame(&self, data: &[u8]) -> Result<(), String> {
-            use socketcan::{CanDataFrame, ExtendedId, StandardId, Id};
+        /// Write a CAN frame (classic or FD)
+        pub fn write_frame(&self, data: &[u8], is_fd: bool) -> Result<(), String> {
+            if is_fd {
+                self.write_fd_frame(data)
+            } else {
+                self.write_classic_frame(data)
+            }
+        }
 
+        /// Write a classic CAN frame (16-byte struct can_frame format)
+        fn write_classic_frame(&self, data: &[u8]) -> Result<(), String> {
             if data.len() < 16 {
                 return Err("Frame data too short".to_string());
             }
@@ -137,14 +164,65 @@ mod linux_impl {
 
             Ok(())
         }
+
+        /// Write a CAN FD frame (72-byte struct canfd_frame format)
+        fn write_fd_frame(&self, data: &[u8]) -> Result<(), String> {
+            if data.len() < 72 {
+                return Err("FD frame data too short".to_string());
+            }
+
+            // Parse struct canfd_frame layout: can_id (4), len (1), flags (1), padding (2), data (64)
+            let can_id = u32::from_ne_bytes([data[0], data[1], data[2], data[3]]);
+            let len = data[4] as usize;
+            let frame_data = &data[8..8 + len.min(64)];
+
+            // Check flags in can_id
+            let is_extended = (can_id & 0x8000_0000) != 0; // CAN_EFF_FLAG
+            let raw_id = can_id & 0x1FFF_FFFF;
+
+            // Build the FD frame
+            let frame = if is_extended {
+                let id = ExtendedId::new(raw_id)
+                    .ok_or_else(|| format!("Invalid extended ID: 0x{:08X}", raw_id))?;
+                CanFdFrame::new(Id::Extended(id), frame_data)
+                    .ok_or_else(|| "Failed to create extended FD frame".to_string())?
+            } else {
+                let id = StandardId::new(raw_id as u16)
+                    .ok_or_else(|| format!("Invalid standard ID: 0x{:03X}", raw_id))?;
+                CanFdFrame::new(Id::Standard(id), frame_data)
+                    .ok_or_else(|| "Failed to create standard FD frame".to_string())?
+            };
+
+            self.socket
+                .write_frame(&frame)
+                .map_err(|e| format!("Write error: {}", e))?;
+
+            Ok(())
+        }
     }
 
     // ============================================================================
     // Multi-Source Streaming
     // ============================================================================
 
-    /// Encode a CAN frame for SocketCAN (struct can_frame format, 16 bytes)
-    pub fn encode_frame(frame: &CanTransmitFrame) -> [u8; 16] {
+    /// Encoded frame result - either classic CAN (16 bytes) or CAN FD (72 bytes)
+    pub enum EncodedFrame {
+        Classic([u8; 16]),
+        Fd([u8; 72]),
+    }
+
+    /// Encode a CAN frame for SocketCAN
+    /// Returns Classic (16 bytes) for standard CAN or Fd (72 bytes) for CAN FD
+    pub fn encode_frame(frame: &CanTransmitFrame) -> EncodedFrame {
+        if frame.is_fd {
+            encode_fd_frame(frame)
+        } else {
+            encode_classic_frame(frame)
+        }
+    }
+
+    /// Encode a classic CAN frame (struct can_frame format, 16 bytes)
+    fn encode_classic_frame(frame: &CanTransmitFrame) -> EncodedFrame {
         let mut buf = [0u8; 16];
 
         // can_id with flags
@@ -164,10 +242,35 @@ mod linux_impl {
         let len = frame.data.len().min(8);
         buf[8..8 + len].copy_from_slice(&frame.data[..len]);
 
-        buf
+        EncodedFrame::Classic(buf)
     }
 
-    /// Run SocketCAN source and send frames to merge task
+    /// Encode a CAN FD frame (struct canfd_frame format, 72 bytes)
+    fn encode_fd_frame(frame: &CanTransmitFrame) -> EncodedFrame {
+        let mut buf = [0u8; 72];
+
+        // can_id with flags
+        let mut can_id = frame.frame_id;
+        if frame.is_extended {
+            can_id |= 0x8000_0000; // CAN_EFF_FLAG
+        }
+
+        buf[0..4].copy_from_slice(&can_id.to_ne_bytes());
+        buf[4] = frame.data.len().min(64) as u8; // len
+        // buf[5] = flags (CANFD_BRS, CANFD_ESI) - set BRS if requested
+        if frame.is_brs {
+            buf[5] |= 0x01; // CANFD_BRS
+        }
+        // bytes 6-7 are padding
+
+        // Data (up to 64 bytes)
+        let len = frame.data.len().min(64);
+        buf[8..8 + len].copy_from_slice(&frame.data[..len]);
+
+        EncodedFrame::Fd(buf)
+    }
+
+    /// Run SocketCAN source and send frames to merge task (supports CAN FD)
     pub async fn run_source(
         source_idx: usize,
         interface: String,
@@ -177,8 +280,8 @@ mod linux_impl {
     ) {
         let device = format!("socketcan({})", interface);
 
-        // Open socket
-        let socket = match CanSocket::open(&interface) {
+        // Open FD socket (can read both classic CAN and CAN FD frames)
+        let socket = match CanFdSocket::open(&interface) {
             Ok(s) => s,
             Err(e) => {
                 let _ = tx
@@ -203,7 +306,7 @@ mod linux_impl {
             .await;
 
         eprintln!(
-            "[socketcan] Source {} connected to {}",
+            "[socketcan] Source {} connected to {} (FD capable)",
             source_idx, interface
         );
 
@@ -215,58 +318,18 @@ mod linux_impl {
             while !stop_flag_clone.load(Ordering::Relaxed) {
                 // Check for transmit requests
                 while let Ok(req) = transmit_rx.try_recv() {
-                    let result = (|| {
-                        if req.data.len() < 16 {
-                            return Err("Frame data too short".to_string());
-                        }
-
-                        // Parse struct can_frame
-                        let can_id = u32::from_ne_bytes([req.data[0], req.data[1], req.data[2], req.data[3]]);
-                        let dlc = req.data[4] as usize;
-                        let frame_data = &req.data[8..8 + dlc.min(8)];
-
-                        let is_extended = (can_id & 0x8000_0000) != 0;
-                        let raw_id = can_id & 0x1FFF_FFFF;
-
-                        let frame = if is_extended {
-                            let id = ExtendedId::new(raw_id)
-                                .ok_or_else(|| format!("Invalid extended ID: 0x{:08X}", raw_id))?;
-                            CanDataFrame::new(Id::Extended(id), frame_data)
-                                .ok_or_else(|| "Failed to create extended frame".to_string())?
-                        } else {
-                            let id = StandardId::new(raw_id as u16)
-                                .ok_or_else(|| format!("Invalid standard ID: 0x{:03X}", raw_id))?;
-                            CanDataFrame::new(Id::Standard(id), frame_data)
-                                .ok_or_else(|| "Failed to create standard frame".to_string())?
-                        };
-
-                        socket.write_frame(&frame)
-                            .map_err(|e| format!("Write error: {}", e))
-                    })();
-
+                    let result = transmit_frame(&socket, &req.data);
                     let _ = req.result_tx.send(result);
                 }
 
-                // Read frame
+                // Read frame (CanAnyFrame supports both classic and FD)
                 match socket.read_frame() {
                     Ok(frame) => {
-                        let mut frame_msg = FrameMessage {
-                            protocol: "can".to_string(),
-                            timestamp_us: now_us(),
-                            frame_id: frame.raw_id() & 0x1FFF_FFFF,
-                            bus: 0,
-                            dlc: frame.len() as u8,
-                            bytes: frame.data().to_vec(),
-                            is_extended: frame.is_extended(),
-                            is_fd: false,
-                            source_address: None,
-                            incomplete: None,
-                            direction: None,
-                        };
-
-                        if apply_bus_mapping(&mut frame_msg, &bus_mappings) {
-                            let _ = tx_clone
-                                .blocking_send(SourceMessage::Frames(source_idx, vec![frame_msg]));
+                        if let Some(mut frame_msg) = convert_any_frame(frame, None) {
+                            if apply_bus_mapping(&mut frame_msg, &bus_mappings) {
+                                let _ = tx_clone
+                                    .blocking_send(SourceMessage::Frames(source_idx, vec![frame_msg]));
+                            }
                         }
                     }
                     Err(ref e)
@@ -290,11 +353,68 @@ mod linux_impl {
 
         let _ = blocking_handle.await;
     }
+
+    /// Transmit a frame via SocketCAN (handles both classic and FD)
+    fn transmit_frame(socket: &CanFdSocket, data: &[u8]) -> Result<(), String> {
+        // Determine if this is an FD frame based on data length
+        // Classic CAN: 16 bytes, CAN FD: 72 bytes
+        if data.len() >= 72 {
+            // CAN FD frame
+            let can_id = u32::from_ne_bytes([data[0], data[1], data[2], data[3]]);
+            let len = data[4] as usize;
+            let frame_data = &data[8..8 + len.min(64)];
+
+            let is_extended = (can_id & 0x8000_0000) != 0;
+            let raw_id = can_id & 0x1FFF_FFFF;
+
+            let frame = if is_extended {
+                let id = ExtendedId::new(raw_id)
+                    .ok_or_else(|| format!("Invalid extended ID: 0x{:08X}", raw_id))?;
+                CanFdFrame::new(Id::Extended(id), frame_data)
+                    .ok_or_else(|| "Failed to create extended FD frame".to_string())?
+            } else {
+                let id = StandardId::new(raw_id as u16)
+                    .ok_or_else(|| format!("Invalid standard ID: 0x{:03X}", raw_id))?;
+                CanFdFrame::new(Id::Standard(id), frame_data)
+                    .ok_or_else(|| "Failed to create standard FD frame".to_string())?
+            };
+
+            socket
+                .write_frame(&frame)
+                .map_err(|e| format!("Write error: {}", e))
+        } else if data.len() >= 16 {
+            // Classic CAN frame
+            let can_id = u32::from_ne_bytes([data[0], data[1], data[2], data[3]]);
+            let dlc = data[4] as usize;
+            let frame_data = &data[8..8 + dlc.min(8)];
+
+            let is_extended = (can_id & 0x8000_0000) != 0;
+            let raw_id = can_id & 0x1FFF_FFFF;
+
+            let frame = if is_extended {
+                let id = ExtendedId::new(raw_id)
+                    .ok_or_else(|| format!("Invalid extended ID: 0x{:08X}", raw_id))?;
+                CanDataFrame::new(Id::Extended(id), frame_data)
+                    .ok_or_else(|| "Failed to create extended frame".to_string())?
+            } else {
+                let id = StandardId::new(raw_id as u16)
+                    .ok_or_else(|| format!("Invalid standard ID: 0x{:03X}", raw_id))?;
+                CanDataFrame::new(Id::Standard(id), frame_data)
+                    .ok_or_else(|| "Failed to create standard frame".to_string())?
+            };
+
+            socket
+                .write_frame(&frame)
+                .map_err(|e| format!("Write error: {}", e))
+        } else {
+            Err("Frame data too short".to_string())
+        }
+    }
 }
 
 // Re-export for Linux
 #[cfg(target_os = "linux")]
-pub use linux_impl::{encode_frame, run_source, SocketCanConfig, SocketCanReader};
+pub use linux_impl::{encode_frame, run_source, EncodedFrame, SocketCanConfig, SocketCanReader};
 
 // ============================================================================
 // Non-Linux Stub
@@ -322,9 +442,19 @@ mod stub {
         pub bus_override: Option<u8>,
     }
 
+    /// Encoded frame result - either classic CAN (16 bytes) or CAN FD (72 bytes)
+    pub enum EncodedFrame {
+        Classic([u8; 16]),
+        Fd([u8; 72]),
+    }
+
     /// Stub encode_frame for non-Linux (not actually usable)
-    pub fn encode_frame(_frame: &CanTransmitFrame) -> [u8; 16] {
-        [0u8; 16]
+    pub fn encode_frame(frame: &CanTransmitFrame) -> EncodedFrame {
+        if frame.is_fd {
+            EncodedFrame::Fd([0u8; 72])
+        } else {
+            EncodedFrame::Classic([0u8; 16])
+        }
     }
 
     /// Stub run_source for non-Linux
@@ -346,4 +476,4 @@ mod stub {
 
 #[cfg(not(target_os = "linux"))]
 #[allow(unused_imports)]
-pub use stub::{encode_frame, run_source, SocketCanConfig};
+pub use stub::{encode_frame, run_source, EncodedFrame, SocketCanConfig};

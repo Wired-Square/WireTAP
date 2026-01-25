@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 use super::gvret_common::{emit_stream_ended, encode_gvret_frame, validate_gvret_frame, BusMapping};
 use super::slcan::encode_transmit_frame as encode_slcan_frame;
 #[cfg(target_os = "linux")]
-use super::socketcan::encode_frame as encode_socketcan_frame;
+use super::socketcan::{encode_frame as encode_socketcan_frame, EncodedFrame};
 use super::traits::{get_traits_for_profile_kind, validate_session_traits};
 use super::types::{SourceMessage, TransmitRequest, TransmitSender};
 use super::{
@@ -445,8 +445,11 @@ impl IODevice for MultiSourceReader {
             }
             #[cfg(target_os = "linux")]
             "socketcan" => {
-                // Encode for SocketCAN - raw CAN frame bytes
-                encode_socketcan_frame(&routed_frame)
+                // Encode for SocketCAN - raw CAN frame bytes (classic or FD)
+                match encode_socketcan_frame(&routed_frame) {
+                    EncodedFrame::Classic(buf) => buf.to_vec(),
+                    EncodedFrame::Fd(buf) => buf.to_vec(),
+                }
             }
             _ => {
                 return Err(format!(
