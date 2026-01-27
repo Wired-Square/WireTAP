@@ -24,7 +24,7 @@ use tokio::sync::mpsc;
 
 use crate::buffer_store::{self, BufferType};
 use crate::io::error::IoError;
-use crate::io::gvret_common::{apply_bus_mapping, BusMapping};
+use crate::io::gvret::{apply_bus_mapping, BusMapping};
 use crate::io::types::{SourceMessage, TransmitRequest, TransmitSender};
 use crate::io::{
     emit_frames, emit_to_session, now_us, CanTransmitFrame, FrameMessage, IOCapabilities,

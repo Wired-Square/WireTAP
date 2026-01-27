@@ -10,7 +10,7 @@ use std::sync::{mpsc as std_mpsc, Arc, Mutex};
 use tauri::AppHandle;
 use tokio::sync::mpsc;
 
-use super::gvret_common::{emit_stream_ended, encode_gvret_frame, validate_gvret_frame, BusMapping};
+use super::gvret::{emit_stream_ended, encode_gvret_frame, validate_gvret_frame, BusMapping};
 use super::slcan::encode_transmit_frame as encode_slcan_frame;
 #[cfg(target_os = "linux")]
 use super::socketcan::{encode_frame as encode_socketcan_frame, EncodedFrame};
@@ -21,13 +21,13 @@ use super::{
     IOState, InterfaceTraits, Protocol, TemporalMode, TransmitResult,
 };
 use crate::buffer_store::{self, BufferType, TimestampedByte};
-use crate::serial_framer::{FrameIdConfig, FramingEncoding};
+use super::serial::{FrameIdConfig, FramingEncoding};
 
 // Import interface-specific source runners
-use super::gvret_tcp::run_source as run_gvret_tcp_source;
-use super::gvret_usb::run_source as run_gvret_usb_source;
+use super::gvret::run_gvret_tcp_source;
+use super::gvret::run_gvret_usb_source;
 use super::serial::{run_source as run_serial_source, SerialRawBytesPayload};
-use super::slcan::run_source as run_slcan_source;
+use super::slcan::run_slcan_source;
 #[cfg(target_os = "linux")]
 use super::socketcan::run_source as run_socketcan_source;
 

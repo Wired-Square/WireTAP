@@ -23,7 +23,7 @@ use crate::{
         CanTransmitFrame, TransmitResult,
     },
     profile_tracker,
-    serial_framer::{FrameIdConfig, FramingEncoding},
+    io::serial::{FrameIdConfig, FramingEncoding},
     settings::{self, AppSettings, IOProfile},
 };
 use once_cell::sync::Lazy;
@@ -1013,7 +1013,7 @@ pub async fn probe_device(
     app: tauri::AppHandle,
     profile_id: String,
 ) -> Result<DeviceProbeResult, String> {
-    use crate::io::slcan::probe_slcan_device;
+    use crate::io::slcan::reader::probe_slcan_device;
 
     // Check cache first - if we have a successful probe result, return it immediately
     if let Some(cached) = get_cached_probe(&profile_id) {

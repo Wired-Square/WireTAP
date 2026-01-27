@@ -22,6 +22,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod codec;
+
 #[cfg(target_os = "linux")]
 pub mod linux;
 

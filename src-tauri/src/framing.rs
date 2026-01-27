@@ -6,7 +6,7 @@
 use crate::{
     buffer_store,
     io::FrameMessage,
-    serial_framer::{extract_frame_id, FrameIdConfig, FramingEncoding, SerialFramer},
+    io::serial::{extract_frame_id, FrameIdConfig, FramingEncoding, SerialFramer},
 };
 
 /// Per-interface framing configuration (overrides default for specific bus)

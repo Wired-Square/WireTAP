@@ -1,4 +1,4 @@
-// ui/src-tauri/src/serial_framer.rs
+// ui/src-tauri/src/io/serial/framer.rs
 //
 // Serial framing implementations for SLIP, Modbus RTU, and delimiter-based framing.
 // Ported from ui/src/utils/serialFramer.ts

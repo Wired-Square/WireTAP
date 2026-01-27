@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/slcan.rs
+// ui/src-tauri/src/io/slcan/reader.rs
 //
 // slcan (Serial Line CAN) protocol device for CANable, CANable Pro, and other
 // USB-CAN adapters using the Lawicel/slcan ASCII protocol.
@@ -20,10 +20,11 @@ use std::time::Duration;
 
 use tokio::sync::mpsc;
 
-use super::error::IoError;
-use super::gvret_common::{apply_bus_mapping, BusMapping};
-use super::types::{SourceMessage, TransmitRequest};
-use super::{now_us, serial_utils, CanTransmitFrame, FrameMessage};
+use crate::io::error::IoError;
+use crate::io::gvret::{apply_bus_mapping, BusMapping};
+use crate::io::serial::utils as serial_utils;
+use crate::io::types::{SourceMessage, TransmitRequest};
+use crate::io::{now_us, CanTransmitFrame, FrameMessage};
 
 // ============================================================================
 // Constants

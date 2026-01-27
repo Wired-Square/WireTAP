@@ -7,7 +7,6 @@ mod dbc_export;
 mod framing;
 mod io;
 mod profile_tracker;
-mod serial_framer;
 mod sessions;
 mod settings;
 mod transmit;
@@ -307,9 +306,9 @@ pub fn run() {
             // Backend framing
             framing::apply_framing_to_buffer,
             // Serial port API
-            io::serial::list_serial_ports,
+            io::serial::reader::list_serial_ports,
             // slcan device probing
-            io::slcan::probe_slcan_device,
+            io::slcan::reader::probe_slcan_device,
             // gs_usb device enumeration and setup commands
             io::gs_usb::list_gs_usb_devices,
             io::gs_usb::get_can_setup_command,

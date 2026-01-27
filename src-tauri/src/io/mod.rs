@@ -4,42 +4,48 @@
 // Provides a common interface for different device types (GVRET, PostgreSQL, etc.)
 // with session-based isolation for multiple concurrent connections.
 
-mod buffer;
-mod csv;
+// Core modules
+pub mod codec; // Frame codec trait and implementations
 mod error;
-pub mod gs_usb; // pub for Tauri command access
-mod gvret_common;
-mod gvret_tcp;
-mod gvret_usb;
-mod mqtt;
-mod multi_source;
-mod postgres;
-pub mod serial; // pub for Tauri command access (list_serial_ports)
-mod serial_utils;
-pub mod slcan; // pub for slcan transmit_frame access
-mod socketcan;
-mod timeline_base;
-pub mod traits;
+pub mod traits; // InterfaceTraits validation
 mod types;
 
-// Re-export device implementations
-pub use buffer::{step_frame, BufferReader, StepResult};
-pub use csv::{parse_csv_file, CsvReader, CsvReaderOptions};
+// Timeline readers (buffer, csv, postgres)
+mod timeline;
+
+// Real-time drivers
+pub mod gs_usb; // pub for Tauri command access
+pub mod gvret; // GVRET TCP/USB driver
+mod mqtt;
+mod multi_source;
+pub mod serial; // pub for Tauri command access (list_serial_ports)
+pub mod slcan; // pub for slcan transmit_frame access
+mod socketcan;
+
+// Re-export timeline readers
+pub use timeline::{step_frame, BufferReader, StepResult};
+pub use timeline::{parse_csv_file, CsvReader, CsvReaderOptions};
+pub use timeline::{PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType};
+
+// Re-export codec types
+#[allow(unused_imports)]
+pub use codec::{FrameCodec, GsUsbCodec, SlcanCodec, SocketCanCodec, SocketCanEncodedFrame};
+#[allow(unused_imports)]
+pub use gvret::GvretCodec;
+
+// Re-export driver types
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 #[allow(unused_imports)]
 pub use gs_usb::GsUsbConfig;
-pub use gvret_common::{BusMapping, GvretDeviceInfo};
-pub use gvret_tcp::probe_gvret_tcp;
-pub use gvret_usb::probe_gvret_usb;
+pub use gvret::{BusMapping, GvretDeviceInfo, probe_gvret_tcp, probe_gvret_usb};
 pub use multi_source::{MultiSourceReader, SourceConfig};
-// Error types (exported for external use even if not currently used within this crate)
+pub use mqtt::{MqttConfig, MqttReader};
+pub use serial::{Parity, SerialConfig, SerialFramingConfig, SerialReader};
+
+// Error types
 #[allow(unused_imports)]
 pub use error::IoError;
-// Note: types module exports are used internally by interface modules
-pub use mqtt::{MqttConfig, MqttReader};
-pub use postgres::{PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType};
-pub use serial::{Parity, SerialConfig, SerialFramingConfig, SerialReader};
-// Note: traits module is used directly via crate::io::traits in multi_source.rs
+
 // Note: SlcanConfig, SlcanReader, SocketCanConfig, SocketIODevice are used internally
 // by MultiSourceReader but not exported from mod.rs since all real-time devices now
 // go through MultiSourceReader

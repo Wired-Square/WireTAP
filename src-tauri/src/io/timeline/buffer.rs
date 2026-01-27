@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/buffer_reader.rs
+// ui/src-tauri/src/io/timeline/buffer.rs
 //
 // Buffer Reader - streams CAN data from the shared in-memory buffer.
 // Used for replaying imported CSV files across all apps.
@@ -12,8 +12,8 @@ use std::sync::{
 use std::time::Duration;
 use tauri::AppHandle;
 
-use super::timeline_base::{TimelineControl, TimelineReaderState};
-use super::{emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition};
+use super::base::{TimelineControl, TimelineReaderState};
+use crate::io::{emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition};
 use crate::buffer_store;
 
 /// Sentinel value meaning "no seek requested"

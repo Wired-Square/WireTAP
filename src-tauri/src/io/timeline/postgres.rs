@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/postgres_reader.rs
+// ui/src-tauri/src/io/timeline/postgres.rs
 //
 // PostgreSQL Reader - streams historical CAN data from a PostgreSQL database.
 
@@ -9,8 +9,8 @@ use std::time::Duration;
 use tauri::AppHandle;
 use tokio_postgres::{NoTls, Row};
 
-use super::timeline_base::{TimelineControl, TimelineReaderState};
-use super::{
+use super::base::{TimelineControl, TimelineReaderState};
+use crate::io::{
     emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState,
     PlaybackPosition, StreamEndedPayload,
 };

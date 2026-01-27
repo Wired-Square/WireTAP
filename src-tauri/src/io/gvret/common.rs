@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/gvret_common.rs
+// ui/src-tauri/src/io/gvret/common.rs
 //
 // Shared GVRET protocol utilities for TCP and USB readers.
 //
@@ -17,7 +17,7 @@
 use hex::ToHex;
 use tauri::AppHandle;
 
-use super::{now_us, CanTransmitFrame, FrameMessage, InterfaceTraits, Protocol, StreamEndedPayload, TemporalMode, TransmitResult, emit_to_session};
+use crate::io::{now_us, CanTransmitFrame, FrameMessage, InterfaceTraits, Protocol, StreamEndedPayload, TemporalMode, TransmitResult, emit_to_session};
 use crate::buffer_store::{self, BufferType};
 
 // ============================================================================

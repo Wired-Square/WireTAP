@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/socketcan_reader.rs
+// ui/src-tauri/src/io/socketcan/reader.rs
 //
 // SocketCAN reader for Linux native CAN interfaces.
 // Used with CANable Pro (Candlelight firmware) or native CAN hardware.
@@ -24,7 +24,7 @@ mod linux_impl {
     use tokio::sync::mpsc;
 
     use crate::io::error::IoError;
-    use crate::io::gvret_common::{apply_bus_mapping, BusMapping};
+    use crate::io::gvret::{apply_bus_mapping, BusMapping};
     use crate::io::types::{SourceMessage, TransmitRequest};
     use crate::io::{now_us, CanTransmitFrame, FrameMessage};
 
@@ -429,7 +429,7 @@ mod stub {
     use std::sync::Arc;
     use tokio::sync::mpsc;
 
-    use crate::io::gvret_common::BusMapping;
+    use crate::io::gvret::BusMapping;
     use crate::io::types::SourceMessage;
     use crate::io::CanTransmitFrame;
 

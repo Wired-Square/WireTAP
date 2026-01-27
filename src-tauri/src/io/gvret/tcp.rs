@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/gvret_tcp.rs
+// ui/src-tauri/src/io/gvret/tcp.rs
 //
 // GVRET TCP protocol implementation for streaming CAN data over TCP.
 
@@ -9,12 +9,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 
-use super::error::IoError;
-use super::gvret_common::{
+use crate::io::error::IoError;
+use crate::io::types::{SourceMessage, TransmitRequest};
+use super::common::{
     apply_bus_mappings_gvret, parse_gvret_frames, parse_numbuses_response, BusMapping,
     BINARY_MODE_ENABLE, DEVICE_INFO_PROBE, GVRET_CMD_NUMBUSES, GvretDeviceInfo,
 };
-use super::types::{SourceMessage, TransmitRequest};
 
 // ============================================================================
 // Device Probing

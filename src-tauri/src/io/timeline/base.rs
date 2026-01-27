@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/timeline_base.rs
+// ui/src-tauri/src/io/timeline/base.rs
 //
 // Shared control state for timeline readers (Buffer, CSV, PostgreSQL).
 // These readers share identical pause/resume and speed control patterns.
@@ -7,6 +7,8 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
+
+use crate::io::IOState;
 
 /// Shared control state for timeline playback.
 /// Used by BufferReader, CsvReader, and PostgresReader.
@@ -123,7 +125,7 @@ impl Default for TimelineControl {
 /// and reduces boilerplate in BufferReader, CsvReader, and PostgresReader.
 pub struct TimelineReaderState {
     pub control: TimelineControl,
-    pub state: super::IOState,
+    pub state: IOState,
     pub session_id: String,
     pub task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
 }
@@ -133,7 +135,7 @@ impl TimelineReaderState {
     pub fn new(session_id: String, speed: f64) -> Self {
         Self {
             control: TimelineControl::new(speed),
-            state: super::IOState::Stopped,
+            state: IOState::Stopped,
             session_id,
             task_handle: None,
         }
@@ -141,7 +143,7 @@ impl TimelineReaderState {
 
     /// Check if the reader can start. Returns error if already running.
     pub fn check_can_start(&self) -> Result<(), String> {
-        if self.state == super::IOState::Running || self.state == super::IOState::Paused {
+        if self.state == IOState::Running || self.state == IOState::Paused {
             return Err("Reader is already running".to_string());
         }
         Ok(())
@@ -149,14 +151,14 @@ impl TimelineReaderState {
 
     /// Prepare for starting: reset control flags and set state to Starting.
     pub fn prepare_start(&mut self) {
-        self.state = super::IOState::Starting;
+        self.state = IOState::Starting;
         self.control.reset();
     }
 
     /// Mark as running after task is spawned.
     pub fn mark_running(&mut self, handle: tauri::async_runtime::JoinHandle<()>) {
         self.task_handle = Some(handle);
-        self.state = super::IOState::Running;
+        self.state = IOState::Running;
     }
 
     /// Stop the reader: cancel, await task, set state to Stopped.
@@ -165,26 +167,26 @@ impl TimelineReaderState {
         if let Some(handle) = self.task_handle.take() {
             let _ = handle.await;
         }
-        self.state = super::IOState::Stopped;
+        self.state = IOState::Stopped;
     }
 
     /// Pause playback. Returns error if not running.
     pub fn pause(&mut self) -> Result<(), String> {
-        if self.state != super::IOState::Running {
+        if self.state != IOState::Running {
             return Err("Reader is not running".to_string());
         }
         self.control.pause();
-        self.state = super::IOState::Paused;
+        self.state = IOState::Paused;
         Ok(())
     }
 
     /// Resume playback. Returns error if not paused.
     pub fn resume(&mut self) -> Result<(), String> {
-        if self.state != super::IOState::Paused {
+        if self.state != IOState::Paused {
             return Err("Reader is not paused".to_string());
         }
         self.control.resume();
-        self.state = super::IOState::Running;
+        self.state = IOState::Running;
         Ok(())
     }
 
@@ -205,7 +207,7 @@ impl TimelineReaderState {
     }
 
     /// Get current state.
-    pub fn state(&self) -> super::IOState {
+    pub fn state(&self) -> IOState {
         self.state.clone()
     }
 

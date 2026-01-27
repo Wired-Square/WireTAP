@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/csv_reader.rs
+// ui/src-tauri/src/io/timeline/csv.rs
 //
 // CSV File Reader - streams CAN data from CSV files (GVRET/SavvyCAN format)
 // Format: Time Stamp,ID,Extended,Bus,LEN,D1,D2,D3,D4,D5,D6,D7,D8
@@ -10,8 +10,8 @@ use std::io::{BufRead, BufReader};
 use std::time::Duration;
 use tauri::AppHandle;
 
-use super::timeline_base::{TimelineControl, TimelineReaderState};
-use super::{emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition};
+use super::base::{TimelineControl, TimelineReaderState};
+use crate::io::{emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition};
 
 /// CSV reader options for playback control
 #[derive(Clone, Debug)]

@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/serial_utils.rs
+// ui/src-tauri/src/io/serial/utils.rs
 //
 // Shared utilities for serial port readers.
 // Provides common types and conversion functions for the serialport crate.

@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/gvret_usb.rs
+// ui/src-tauri/src/io/gvret/usb.rs
 //
 // GVRET USB serial protocol implementation for devices like ESP32-RET, M2RET, CANDue
 // and other GVRET-compatible hardware over USB serial.
@@ -12,12 +12,12 @@ use std::sync::{mpsc as std_mpsc, Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-use super::error::IoError;
-use super::gvret_common::{
+use crate::io::error::IoError;
+use crate::io::types::{SourceMessage, TransmitRequest};
+use super::common::{
     apply_bus_mappings_gvret, parse_gvret_frames, parse_numbuses_response, BusMapping,
     BINARY_MODE_ENABLE, DEVICE_INFO_PROBE, GVRET_CMD_NUMBUSES, GvretDeviceInfo,
 };
-use super::types::{SourceMessage, TransmitRequest};
 
 // ============================================================================
 // Configuration
@@ -270,8 +270,8 @@ pub async fn run_source(
 
 #[cfg(test)]
 mod tests {
-    use super::super::gvret_common::{encode_gvret_frame, parse_gvret_frames};
-    use super::super::CanTransmitFrame;
+    use crate::io::gvret::{encode_gvret_frame, parse_gvret_frames};
+    use crate::io::CanTransmitFrame;
 
     #[test]
     fn test_encode_standard_frame() {

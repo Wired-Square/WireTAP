@@ -1,4 +1,4 @@
-// src-tauri/src/io/mqtt.rs
+// ui/src-tauri/src/io/mqtt/reader.rs
 //
 // MQTT Reader - streams CAN frames from an MQTT broker.
 // Supports SavvyCAN JSON format with optional CAN FD.
@@ -23,8 +23,8 @@ use std::sync::{
 use tauri::AppHandle;
 use tokio::time::Duration;
 
-use super::gvret_common::emit_stream_ended;
-use super::{emit_frames, emit_to_session, now_us, FrameMessage, IOCapabilities, IODevice, IOState};
+use crate::io::gvret::emit_stream_ended;
+use crate::io::{emit_frames, emit_to_session, now_us, FrameMessage, IOCapabilities, IODevice, IOState};
 use crate::buffer_store::{self, BufferType};
 
 // ============================================================================

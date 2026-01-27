@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/serial_reader.rs
+// ui/src-tauri/src/io/serial/reader.rs
 //
 // Serial port reader with optional framing support.
 // Can emit raw bytes (serial-raw-bytes) and/or framed messages (frame-message).
@@ -16,17 +16,17 @@ use std::time::Duration;
 use tauri::AppHandle;
 use tokio::sync::mpsc;
 
-use super::gvret_common::{apply_bus_mapping, BusMapping};
-use super::types::{RawByteEntry, SourceMessage, TransmitRequest, TransmitSender};
-use super::{
-    emit_frames, emit_to_session, now_us, serial_utils, IODevice, FrameMessage, IOCapabilities,
-    IOState, StreamEndedPayload, TransmitResult,
+use crate::io::gvret::{apply_bus_mapping, BusMapping};
+use crate::io::types::{RawByteEntry, SourceMessage, TransmitRequest, TransmitSender};
+use crate::io::{
+    emit_frames, emit_to_session, now_us, FrameMessage, IOCapabilities,
+    IODevice, IOState, StreamEndedPayload, TransmitResult,
 };
 
-// Re-export Parity for external use (sessions.rs imports via serial_reader::Parity)
-pub use super::serial_utils::Parity;
+// Re-export Parity for external use
+pub use super::utils::Parity;
 use crate::buffer_store::{self, BufferType, TimestampedByte};
-use crate::serial_framer::{extract_frame_id, FrameIdConfig, FramingEncoding, SerialFramer};
+use super::framer::{extract_frame_id, FrameIdConfig, FramingEncoding, SerialFramer};
 
 // ============================================================================
 // Types and Configuration
@@ -322,9 +322,9 @@ fn run_serial_stream_blocking(
     transmit_rx: std_mpsc::Receiver<TransmitRequest>,
 ) {
     // Convert config to serialport types
-    let data_bits = serial_utils::to_serialport_data_bits(config.data_bits);
-    let stop_bits = serial_utils::to_serialport_stop_bits(config.stop_bits);
-    let parity = serial_utils::to_serialport_parity(&config.parity);
+    let data_bits = super::utils::to_serialport_data_bits(config.data_bits);
+    let stop_bits = super::utils::to_serialport_stop_bits(config.stop_bits);
+    let parity = super::utils::to_serialport_parity(&config.parity);
 
     // Create buffer(s) based on framing configuration:
     // - If framing enabled with emit_raw_bytes: create BOTH a Bytes buffer AND a Frames buffer
@@ -644,9 +644,9 @@ pub async fn run_source(
     tx: mpsc::Sender<SourceMessage>,
 ) {
     // Convert config to serialport types
-    let sp_data_bits = serial_utils::to_serialport_data_bits(data_bits);
-    let sp_stop_bits = serial_utils::to_serialport_stop_bits(stop_bits);
-    let sp_parity = serial_utils::to_serialport_parity(&parity);
+    let sp_data_bits = super::utils::to_serialport_data_bits(data_bits);
+    let sp_stop_bits = super::utils::to_serialport_stop_bits(stop_bits);
+    let sp_parity = super::utils::to_serialport_parity(&parity);
 
     // Open serial port
     let serial_port = match serialport::new(&port_path, baud_rate)
