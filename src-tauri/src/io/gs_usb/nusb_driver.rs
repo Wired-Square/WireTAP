@@ -160,17 +160,13 @@ fn get_device_config_sync(interface: &Interface) -> Result<GsDeviceConfig, Strin
         .wait()
         .map_err(|e| format!("Control transfer failed: {:?}", e))?;
 
-    if data.len() >= GsDeviceConfig::SIZE {
-        let mut buf = [0u8; GsDeviceConfig::SIZE];
-        buf.copy_from_slice(&data[..GsDeviceConfig::SIZE]);
-        Ok(unsafe { std::ptr::read_unaligned(buf.as_ptr() as *const GsDeviceConfig) })
-    } else {
-        Err(format!(
+    GsDeviceConfig::from_bytes(&data).ok_or_else(|| {
+        format!(
             "Incomplete response: got {} bytes, expected {}",
             data.len(),
             GsDeviceConfig::SIZE
-        ))
-    }
+        )
+    })
 }
 
 // ============================================================================
@@ -547,13 +543,7 @@ async fn run_gs_usb_stream(
                     Ok(()) => {
                         let len = completion.actual_len;
                         let data = &completion.buffer[..len];
-                        if len >= GsHostFrame::SIZE {
-                            // Parse the frame
-                            let frame_bytes: [u8; GsHostFrame::SIZE] =
-                                data[..GsHostFrame::SIZE].try_into().unwrap();
-                            let gs_frame: GsHostFrame =
-                                unsafe { std::mem::transmute(frame_bytes) };
-
+                        if let Some(gs_frame) = GsHostFrame::from_bytes(data) {
                             // Only process RX frames (not TX echoes)
                             if gs_frame.is_rx() {
                                 let frame_msg = FrameMessage {
@@ -724,12 +714,7 @@ pub async fn stop_device(interface: &Interface, config: &GsUsbConfig) -> Result<
 
 /// Parse a gs_usb host frame from raw bytes
 pub fn parse_host_frame(data: &[u8]) -> Option<FrameMessage> {
-    if data.len() < GsHostFrame::SIZE {
-        return None;
-    }
-
-    let frame_bytes: [u8; GsHostFrame::SIZE] = data[..GsHostFrame::SIZE].try_into().ok()?;
-    let gs_frame: GsHostFrame = unsafe { std::mem::transmute(frame_bytes) };
+    let gs_frame = GsHostFrame::from_bytes(data)?;
 
     // Only process RX frames (not TX echoes)
     if !gs_frame.is_rx() {
@@ -918,11 +903,7 @@ pub async fn run_source(
                     let len = completion.actual_len;
                     let data = &completion.buffer[..len];
 
-                    if len >= GsHostFrame::SIZE {
-                        let frame_bytes: [u8; GsHostFrame::SIZE] =
-                            data[..GsHostFrame::SIZE].try_into().unwrap();
-                        let gs_frame: GsHostFrame = unsafe { std::mem::transmute(frame_bytes) };
-
+                    if let Some(gs_frame) = GsHostFrame::from_bytes(data) {
                         if gs_frame.is_rx() {
                             let mut frame_msg = FrameMessage {
                                 protocol: "can".to_string(),

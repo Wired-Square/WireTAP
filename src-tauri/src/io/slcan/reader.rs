@@ -477,7 +477,8 @@ pub async fn run_source(
 
     // Initialize slcan
     let init_result: Result<(), String> = (|| {
-        let mut port = serial_port.lock().unwrap();
+        let mut port = serial_port.lock()
+            .map_err(|e| format!("Failed to lock serial port during init: {}", e))?;
         let _ = port.clear(serialport::ClearBuffer::All);
 
         // Wait for device to be ready
@@ -541,20 +542,31 @@ pub async fn run_source(
             // Check for transmit requests (non-blocking)
             if !silent_mode {
                 while let Ok(req) = transmit_rx.try_recv() {
-                    let result = {
-                        let mut port = serial_port_clone.lock().unwrap();
-                        port.write_all(&req.data)
+                    let result = match serial_port_clone.lock() {
+                        Ok(mut port) => port
+                            .write_all(&req.data)
                             .and_then(|_| port.flush())
-                            .map_err(|e| format!("Write error: {}", e))
+                            .map_err(|e| format!("Write error: {}", e)),
+                        Err(e) => {
+                            eprintln!("[slcan] Mutex poisoned in transmit: {}", e);
+                            Err(format!("Port mutex poisoned: {}", e))
+                        }
                     };
                     let _ = req.result_tx.send(result);
                 }
             }
 
             // Read data
-            let read_result = {
-                let mut port = serial_port_clone.lock().unwrap();
-                port.read(&mut read_buf)
+            let read_result = match serial_port_clone.lock() {
+                Ok(mut port) => port.read(&mut read_buf),
+                Err(e) => {
+                    eprintln!("[slcan] Mutex poisoned in read loop: {}", e);
+                    let _ = tx_clone.blocking_send(SourceMessage::Error(
+                        source_idx,
+                        format!("Port mutex poisoned: {}", e),
+                    ));
+                    return;
+                }
             };
 
             match read_result {
@@ -578,6 +590,7 @@ pub async fn run_source(
                         } else if byte.is_ascii() && !byte.is_ascii_control() {
                             line_buf.push(byte as char);
                             if line_buf.len() > 64 {
+                                eprintln!("[slcan] Line buffer exceeded 64 bytes, discarding");
                                 line_buf.clear();
                             }
                         }

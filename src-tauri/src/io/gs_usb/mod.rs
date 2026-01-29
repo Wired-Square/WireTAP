@@ -142,6 +142,26 @@ impl GsHostFrame {
         let len = (self.can_dlc as usize).min(8);
         &self.data[..len]
     }
+
+    /// Safely construct from a byte slice (must be at least 20 bytes).
+    /// Returns None if the slice is too short.
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SIZE {
+            return None;
+        }
+        Some(GsHostFrame {
+            echo_id: u32::from_le_bytes([data[0], data[1], data[2], data[3]]),
+            can_id: u32::from_le_bytes([data[4], data[5], data[6], data[7]]),
+            can_dlc: data[8],
+            channel: data[9],
+            flags: data[10],
+            reserved: data[11],
+            data: [
+                data[12], data[13], data[14], data[15],
+                data[16], data[17], data[18], data[19],
+            ],
+        })
+    }
 }
 
 /// Device configuration response
@@ -158,6 +178,22 @@ pub struct GsDeviceConfig {
 
 impl GsDeviceConfig {
     pub const SIZE: usize = 12;
+
+    /// Safely construct from a byte slice (must be at least 12 bytes).
+    /// Returns None if the slice is too short.
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SIZE {
+            return None;
+        }
+        Some(GsDeviceConfig {
+            reserved1: data[0],
+            reserved2: data[1],
+            reserved3: data[2],
+            icount: data[3],
+            sw_version: u32::from_le_bytes([data[4], data[5], data[6], data[7]]),
+            hw_version: u32::from_le_bytes([data[8], data[9], data[10], data[11]]),
+        })
+    }
 }
 
 /// Bit timing constants (device capabilities)
@@ -501,5 +537,62 @@ mod tests {
         assert!(get_bittiming_for_bitrate(1_000_000).is_some());
         // Unsupported bitrate should return None
         assert!(get_bittiming_for_bitrate(123_456).is_none());
+    }
+
+    #[test]
+    fn test_gs_host_frame_from_bytes() {
+        // Valid 20-byte frame
+        let data: [u8; 20] = [
+            0xFF, 0xFF, 0xFF, 0xFF, // echo_id = 0xFFFFFFFF (RX marker)
+            0x23, 0x01, 0x00, 0x80, // can_id = 0x80000123 (extended)
+            0x04,                   // can_dlc = 4
+            0x00,                   // channel = 0
+            0x00,                   // flags = 0
+            0x00,                   // reserved = 0
+            0x01, 0x02, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00, // data
+        ];
+        let frame = GsHostFrame::from_bytes(&data).expect("should parse valid frame");
+        // Copy packed fields to local variables to avoid unaligned references
+        let echo_id = { frame.echo_id };
+        let can_dlc = { frame.can_dlc };
+        assert_eq!(echo_id, GS_USB_ECHO_ID_RX);
+        assert!(frame.is_rx());
+        assert!(frame.is_extended());
+        assert_eq!(frame.get_can_id(), 0x123);
+        assert_eq!(can_dlc, 4);
+        assert_eq!(frame.get_data(), &[0x01, 0x02, 0x03, 0x04]);
+
+        // Too short - should return None
+        let short_data: [u8; 19] = [0; 19];
+        assert!(GsHostFrame::from_bytes(&short_data).is_none());
+
+        // Empty slice - should return None
+        assert!(GsHostFrame::from_bytes(&[]).is_none());
+    }
+
+    #[test]
+    fn test_gs_device_config_from_bytes() {
+        // Valid 12-byte config
+        let data: [u8; 12] = [
+            0x00, 0x00, 0x00, // reserved 1-3
+            0x02,             // icount = 2 interfaces
+            0x01, 0x02, 0x03, 0x04, // sw_version = 0x04030201
+            0x10, 0x20, 0x30, 0x40, // hw_version = 0x40302010
+        ];
+        let config = GsDeviceConfig::from_bytes(&data).expect("should parse valid config");
+        // Copy packed fields to local variables to avoid unaligned references
+        let icount = { config.icount };
+        let sw_version = { config.sw_version };
+        let hw_version = { config.hw_version };
+        assert_eq!(icount, 2);
+        assert_eq!(sw_version, 0x04030201);
+        assert_eq!(hw_version, 0x40302010);
+
+        // Too short - should return None
+        let short_data: [u8; 11] = [0; 11];
+        assert!(GsDeviceConfig::from_bytes(&short_data).is_none());
+
+        // Empty slice - should return None
+        assert!(GsDeviceConfig::from_bytes(&[]).is_none());
     }
 }

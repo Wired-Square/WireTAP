@@ -550,8 +550,10 @@ export function useIOSession(
       // This persists across re-renders, unlike a ref
       reinitializingSessions.set(targetProfileId, true);
 
-      // Use the stored profile name for display (falls back to profile ID)
-      const targetProfileName = effectiveProfileName;
+      // Use the new profile ID for display when switching profiles, avoiding stale closure.
+      // When newProfileId is provided (profile switching), it's the correct name.
+      // When not provided (same-session reinit), effectiveProfileName is correct.
+      const targetProfileName = newProfileId || effectiveProfileName;
 
       console.log(`[useIOSession:${appName}] reinitialize() - targetProfileId=${targetProfileId}, currentSession=${currentSessionIdRef.current}, profileName=${targetProfileName}`);
 

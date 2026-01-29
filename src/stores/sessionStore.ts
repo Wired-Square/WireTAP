@@ -47,14 +47,15 @@ import type { FrameMessage } from "./discoveryStore";
  * Special profile ID used for buffer replay (imported CSV, etc.)
  * DEPRECATED: Use isBufferProfileId() to detect buffer IDs (e.g., "buffer_1", "buffer_2")
  */
-const BUFFER_PROFILE_ID = "__imported_buffer__";
+export const BUFFER_PROFILE_ID = "__imported_buffer__";
 
 /**
  * Check if a profile ID represents a buffer session.
  * Buffer IDs follow the pattern "buffer_N" (e.g., "buffer_1", "buffer_2")
  * or the legacy "__imported_buffer__".
  */
-export function isBufferProfileId(profileId: string): boolean {
+export function isBufferProfileId(profileId: string | null): boolean {
+  if (!profileId) return false;
   return profileId === BUFFER_PROFILE_ID || /^buffer_\d+$/.test(profileId);
 }
 

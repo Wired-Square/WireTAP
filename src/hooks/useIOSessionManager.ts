@@ -15,9 +15,14 @@ import {
   createAndStartMultiSourceSession,
   joinMultiSourceSession,
   useMultiBusState,
+  isBufferProfileId,
+  BUFFER_PROFILE_ID,
   type CreateMultiSourceOptions,
   type PerInterfaceFramingConfig,
 } from "../stores/sessionStore";
+
+// Re-export for backward compatibility
+export { isBufferProfileId, BUFFER_PROFILE_ID };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../stores/discoveryStore";
@@ -220,22 +225,6 @@ export interface UseIOSessionManagerResult {
   skipReader: () => Promise<void>;
   /** Ref that tracks whether stream has completed (for ignoring stale time updates) */
   streamCompletedRef: React.MutableRefObject<boolean>;
-}
-
-/**
- * Buffer profile ID constant (legacy).
- * DEPRECATED: Use isBufferProfileId() to detect buffer IDs.
- */
-export const BUFFER_PROFILE_ID = "__imported_buffer__";
-
-/**
- * Check if a profile ID represents a buffer session.
- * Buffer IDs follow the pattern "buffer_N" (e.g., "buffer_1", "buffer_2")
- * or the legacy "__imported_buffer__".
- */
-export function isBufferProfileId(profileId: string | null): boolean {
-  if (!profileId) return false;
-  return profileId === BUFFER_PROFILE_ID || /^buffer_\d+$/.test(profileId);
 }
 
 /**
@@ -645,8 +634,9 @@ export function useIOSessionManager(
   useEffect(() => {
     if (!isStreaming && isWatching) {
       setIsWatching(false);
+      resetWatchFrameCount();
     }
-  }, [isStreaming, isWatching]);
+  }, [isStreaming, isWatching, resetWatchFrameCount]);
 
   return {
     // Profile State

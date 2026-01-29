@@ -448,7 +448,9 @@ impl IODevice for MultiSourceReader {
 
         // Wait for all tasks to finish
         for handle in self.task_handles.drain(..) {
-            let _ = handle.await;
+            if let Err(e) = handle.await {
+                eprintln!("[MultiSource] Task panicked during stop: {:?}", e);
+            }
         }
 
         // Recreate the channel so the session can be started again

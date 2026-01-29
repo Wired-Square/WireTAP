@@ -55,7 +55,11 @@ impl FrameCodec for GsUsbCodec {
         }
 
         // Parse echo_id to check if this is RX or TX echo
-        let echo_id = u32::from_le_bytes(raw[0..4].try_into().unwrap());
+        let echo_id = u32::from_le_bytes(
+            raw[0..4]
+                .try_into()
+                .map_err(|_| IoError::protocol("gs_usb", "failed to parse echo_id bytes"))?,
+        );
         if echo_id != consts::RX_ECHO_ID {
             return Err(IoError::protocol(
                 "gs_usb",
@@ -64,7 +68,11 @@ impl FrameCodec for GsUsbCodec {
         }
 
         // Parse can_id
-        let can_id = u32::from_le_bytes(raw[4..8].try_into().unwrap());
+        let can_id = u32::from_le_bytes(
+            raw[4..8]
+                .try_into()
+                .map_err(|_| IoError::protocol("gs_usb", "failed to parse can_id bytes"))?,
+        );
         let is_extended = (can_id & consts::CAN_EFF_FLAG) != 0;
         let frame_id = can_id & consts::CAN_EFF_MASK;
 

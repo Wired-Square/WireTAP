@@ -428,21 +428,6 @@ impl IOCapabilities {
         self
     }
 
-    /// Get the data streams, deriving from legacy fields if not explicitly set
-    pub fn get_data_streams(&self) -> SessionDataStreams {
-        if let Some(ref ds) = self.data_streams {
-            ds.clone()
-        } else {
-            // Derive from legacy fields:
-            // - CAN/GVRET/etc: always frames, never bytes
-            // - Serial with raw bytes: bytes (and maybe frames if framing configured)
-            SessionDataStreams {
-                emits_frames: !self.emits_raw_bytes || self.can_transmit_serial,
-                emits_bytes: self.emits_raw_bytes,
-            }
-        }
-    }
-
     /// Get the interface traits, deriving from legacy fields if not explicitly set
     #[allow(dead_code)]
     pub fn get_traits(&self) -> InterfaceTraits {

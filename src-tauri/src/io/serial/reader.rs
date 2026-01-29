@@ -259,6 +259,10 @@ fn spawn_serial_stream(
     transmit_rx: std_mpsc::Receiver<TransmitRequest>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
+        // Clone for use after panic detection
+        let app_for_panic = app_handle.clone();
+        let session_for_panic = session_id.clone();
+
         // Run blocking serial I/O in a dedicated thread
         let result = tokio::task::spawn_blocking(move || {
             run_serial_stream_blocking(app_handle, session_id, config, cancel_flag, pause_flag, transmit_rx)
@@ -267,6 +271,8 @@ fn spawn_serial_stream(
 
         if let Err(e) = result {
             eprintln!("[Serial] Task panicked: {:?}", e);
+            // Notify frontend that the stream has ended due to panic
+            emit_stream_ended(&app_for_panic, &session_for_panic, "error", "Serial");
         }
     })
 }
@@ -393,19 +399,24 @@ fn run_serial_stream_blocking(
 
         // Process pending transmit requests (non-blocking)
         while let Ok(req) = transmit_rx.try_recv() {
-            let result = {
-                let mut port_guard = port.lock().unwrap();
-                port_guard
+            let result = match port.lock() {
+                Ok(mut port_guard) => port_guard
                     .write_all(&req.data)
                     .and_then(|_| port_guard.flush())
-                    .map_err(|e| format!("Serial write error: {}", e))
+                    .map_err(|e| format!("Serial write error: {}", e)),
+                Err(e) => {
+                    eprintln!("[Serial] Mutex poisoned in transmit: {}", e);
+                    Err(format!("Port mutex poisoned: {}", e))
+                }
             };
             let _ = req.result_tx.try_send(result);
         }
 
         // Handle pause - continue reading to keep port alive but don't emit
         if pause_flag.load(Ordering::Relaxed) {
-            let _ = port.lock().unwrap().read(&mut buf);
+            if let Ok(mut port_guard) = port.lock() {
+                let _ = port_guard.read(&mut buf);
+            }
             pending_bytes.clear();
             pending_frames.clear();
             std::thread::sleep(Duration::from_millis(10));
@@ -413,9 +424,13 @@ fn run_serial_stream_blocking(
         }
 
         // Read bytes
-        let read_result = {
-            let mut port_guard = port.lock().unwrap();
-            port_guard.read(&mut buf)
+        let read_result = match port.lock() {
+            Ok(mut port_guard) => port_guard.read(&mut buf),
+            Err(e) => {
+                eprintln!("[Serial] Mutex poisoned in read loop: {}", e);
+                emit_stream_ended(&app_handle, &session_id, "error", "Serial");
+                return;
+            }
         };
         match read_result {
             Ok(n) if n > 0 => {
@@ -666,19 +681,30 @@ pub async fn run_source(
         while !stop_flag_clone.load(Ordering::SeqCst) {
             // Check for transmit requests (non-blocking)
             while let Ok(req) = transmit_rx.try_recv() {
-                let result = {
-                    let mut port = serial_port_clone.lock().unwrap();
-                    port.write_all(&req.data)
+                let result = match serial_port_clone.lock() {
+                    Ok(mut port) => port
+                        .write_all(&req.data)
                         .and_then(|_| port.flush())
-                        .map_err(|e| format!("Write error: {}", e))
+                        .map_err(|e| format!("Write error: {}", e)),
+                    Err(e) => {
+                        eprintln!("[serial] Mutex poisoned in transmit: {}", e);
+                        Err(format!("Port mutex poisoned: {}", e))
+                    }
                 };
                 let _ = req.result_tx.send(result);
             }
 
             // Read data
-            let read_result = {
-                let mut port = serial_port_clone.lock().unwrap();
-                port.read(&mut buf)
+            let read_result = match serial_port_clone.lock() {
+                Ok(mut port) => port.read(&mut buf),
+                Err(e) => {
+                    eprintln!("[serial] Mutex poisoned in read loop: {}", e);
+                    let _ = tx_clone.blocking_send(SourceMessage::Error(
+                        source_idx,
+                        format!("Port mutex poisoned: {}", e),
+                    ));
+                    return;
+                }
             };
 
             match read_result {

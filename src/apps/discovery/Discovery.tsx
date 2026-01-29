@@ -151,6 +151,8 @@ export default function Discovery() {
   const [showTimeRange] = useState(false);
 
   // Load buffer metadata on mount (in case a CSV was already imported)
+  // Note: Uses setIoProfile directly (not selectProfile) because this runs before
+  // useIOSessionManager is called, and on mount there's no multi-bus state to clear.
   useEffect(() => {
     const loadBufferOnMount = async () => {
       try {
@@ -158,7 +160,6 @@ export default function Discovery() {
         if (meta && meta.count > 0 && meta.buffer_type === 'frames') {
           setBufferMetadata(meta);
           enableBufferMode(meta.count);
-          // Use the actual buffer ID for unique session naming
           setIoProfile(meta.id);
           const frameInfoList = await getBufferFrameInfo();
           setFrameInfoFromBuffer(frameInfoList);
@@ -187,7 +188,8 @@ export default function Discovery() {
 
           if (meta.count > 0 && meta.buffer_type === 'frames') {
             enableBufferMode(meta.count);
-            // Use the actual buffer ID for unique session naming
+            // Note: Uses setIoProfile directly because this runs before useIOSessionManager,
+            // and buffer events from other windows don't involve multi-bus state.
             setIoProfile(meta.id);
             try {
               const frameInfoList = await getBufferFrameInfo();

@@ -224,35 +224,40 @@ export function useDiscoverySessionHandlers({
 
     if (closeDialog) {
       // Watch mode
-      console.log(`[DiscoverySessionHandlers] Watch mode - calling watchSingleSource(${profileId})`);
+      try {
+        console.log(`[DiscoverySessionHandlers] Watch mode - calling watchSingleSource(${profileId})`);
 
-      // Discovery-specific: set source profile ID and sync framing config
-      setSourceProfileId(profileId);
+        // Discovery-specific: set source profile ID and sync framing config
+        setSourceProfileId(profileId);
 
-      // Sync framing config with discovery store
-      if (framingEncoding && framingEncoding !== "raw") {
-        const storeFramingConfig =
-          framingEncoding === "slip"
-            ? { mode: "slip" as const }
-            : framingEncoding === "modbus_rtu"
-            ? { mode: "modbus_rtu" as const, validateCrc: true }
-            : {
-                mode: "raw" as const,
-                delimiter: delimiter ? delimiter.map((b: number) => b.toString(16).toUpperCase().padStart(2, "0")).join("") : "0A",
-                maxLength: maxFrameLength ?? 256,
-              };
-        setFramingConfig(storeFramingConfig);
-      } else {
-        setFramingConfig(null);
+        // Sync framing config with discovery store
+        if (framingEncoding && framingEncoding !== "raw") {
+          const storeFramingConfig =
+            framingEncoding === "slip"
+              ? { mode: "slip" as const }
+              : framingEncoding === "modbus_rtu"
+              ? { mode: "modbus_rtu" as const, validateCrc: true }
+              : {
+                  mode: "raw" as const,
+                  delimiter: delimiter ? delimiter.map((b: number) => b.toString(16).toUpperCase().padStart(2, "0")).join("") : "0A",
+                  maxLength: maxFrameLength ?? 256,
+                };
+          setFramingConfig(storeFramingConfig);
+        } else {
+          setFramingConfig(null);
+        }
+
+        // Manager handles: onBeforeWatch cleanup, reinitialize, multi-bus clear, profile set, speed, watch state
+        await watchSingleSource(profileId, options, {
+          sourceAddressBigEndian: sourceAddressEndianness === "big",
+        });
+
+        closeIoReaderPicker();
+        console.log(`[DiscoverySessionHandlers] Watch mode - complete`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        showError("Watch Error", "Failed to start watch session", msg);
       }
-
-      // Manager handles: onBeforeWatch cleanup, reinitialize, multi-bus clear, profile set, speed, watch state
-      await watchSingleSource(profileId, options, {
-        sourceAddressBigEndian: sourceAddressEndianness === "big",
-      });
-
-      closeIoReaderPicker();
-      console.log(`[DiscoverySessionHandlers] Watch mode - complete`);
     }
     // Ingest mode is handled by useIOSessionManager via startIngest
   }, [
@@ -261,6 +266,7 @@ export function useDiscoverySessionHandlers({
     setFramingConfig,
     watchSingleSource,
     closeIoReaderPicker,
+    showError,
   ]);
 
   // Handle Watch/Ingest for multiple profiles (multi-bus mode)
