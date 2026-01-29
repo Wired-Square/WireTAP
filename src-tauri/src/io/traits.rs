@@ -3,7 +3,6 @@
 // Interface trait validation and session trait inheritance.
 
 use super::{InterfaceTraits, Protocol, TemporalMode};
-use std::collections::HashSet;
 
 /// Result of validating multiple interface traits for a session
 #[derive(Clone, Debug)]
@@ -16,32 +15,12 @@ pub struct SessionTraitsValidation {
     pub session_traits: Option<InterfaceTraits>,
 }
 
-/// Get the compatibility group for a protocol.
-/// Protocols in the same group can coexist in a session.
-/// - Group 0: CAN and CAN-FD (compatible)
-/// - Group 1: Modbus (standalone)
-/// - Group 2: Serial (standalone)
-fn protocol_group(protocol: &Protocol) -> u8 {
-    match protocol {
-        Protocol::Can | Protocol::CanFd => 0,
-        Protocol::Modbus => 1,
-        Protocol::Serial => 2,
-    }
-}
-
-/// Check if two protocol sets are compatible (all in same group)
-pub fn protocols_compatible(a: &[Protocol], b: &[Protocol]) -> bool {
-    // Empty sets are compatible with anything
-    if a.is_empty() || b.is_empty() {
-        return true;
-    }
-
-    // Get unique groups from both sets
-    let groups_a: HashSet<u8> = a.iter().map(protocol_group).collect();
-    let groups_b: HashSet<u8> = b.iter().map(protocol_group).collect();
-
-    // All protocols must be in the same group
-    groups_a.len() == 1 && groups_b.len() == 1 && groups_a == groups_b
+/// Check if two protocol sets are compatible.
+/// All realtime protocol combinations are now valid — SessionDataStreams
+/// handles the distinction between frame and byte data streams.
+#[allow(dead_code)]
+pub fn protocols_compatible(_a: &[Protocol], _b: &[Protocol]) -> bool {
+    true
 }
 
 /// Validate and derive session traits from multiple interface traits.
@@ -96,20 +75,11 @@ pub fn validate_session_traits(interface_traits: &[InterfaceTraits]) -> SessionT
         };
     }
 
-    // Rule 3: Protocols must be compatible
+    // Rule 3: Merge protocols from all interfaces (union).
+    // All realtime protocol combinations are valid — SessionDataStreams
+    // handles the distinction between frame and byte data streams.
     let mut all_protocols: Vec<Protocol> = first.protocols.clone();
-    for (i, traits) in interface_traits.iter().enumerate().skip(1) {
-        if !protocols_compatible(&all_protocols, &traits.protocols) {
-            return SessionTraitsValidation {
-                valid: false,
-                error: Some(format!(
-                    "Interface {} has incompatible protocols {:?} with session protocols {:?}",
-                    i, traits.protocols, all_protocols
-                )),
-                session_traits: None,
-            };
-        }
-        // Merge protocols (union)
+    for traits in interface_traits.iter().skip(1) {
         for p in &traits.protocols {
             if !all_protocols.contains(p) {
                 all_protocols.push(p.clone());
@@ -266,7 +236,8 @@ mod tests {
     }
 
     #[test]
-    fn test_incompatible_protocols_invalid() {
+    fn test_mixed_protocols_valid() {
+        // CAN + Serial is now valid (e.g., CAN bus + serial debug port)
         let traits = vec![
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
@@ -280,23 +251,23 @@ mod tests {
             },
         ];
         let result = validate_session_traits(&traits);
-        assert!(!result.valid);
-        assert!(result.error.unwrap().contains("incompatible protocols"));
+        assert!(result.valid);
+        let session = result.session_traits.unwrap();
+        assert!(session.protocols.contains(&Protocol::Can));
+        assert!(session.protocols.contains(&Protocol::Serial));
     }
 
     #[test]
     fn test_protocol_compatibility() {
-        // CAN and CAN-FD are compatible
+        // All protocol combinations are compatible
         assert!(protocols_compatible(
             &[Protocol::Can],
             &[Protocol::CanFd]
         ));
-        // CAN and Serial are not compatible
-        assert!(!protocols_compatible(
+        assert!(protocols_compatible(
             &[Protocol::Can],
             &[Protocol::Serial]
         ));
-        // Empty is compatible with anything
         assert!(protocols_compatible(&[], &[Protocol::Can]));
     }
 }

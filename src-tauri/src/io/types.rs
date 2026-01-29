@@ -11,11 +11,11 @@ use super::FrameMessage;
 // Source Messages
 // ============================================================================
 
-/// Raw byte entry with timestamp (for serial raw bytes)
+/// Timestamped byte entry for raw byte streams (serial, SPI, etc.)
 #[derive(Clone, Debug)]
-pub struct RawByteEntry {
+pub struct ByteEntry {
     pub byte: u8,
-    pub timestamp_us: i64,
+    pub timestamp_us: u64,
     /// Bus/interface number (from bus mapping)
     pub bus: u8,
 }
@@ -24,8 +24,8 @@ pub struct RawByteEntry {
 pub enum SourceMessage {
     /// Frames from a source (source_index, frames)
     Frames(usize, Vec<FrameMessage>),
-    /// Raw bytes from a serial source (source_index, bytes with timestamps)
-    RawBytes(usize, Vec<RawByteEntry>),
+    /// Raw bytes from a source (source_index, bytes with timestamps)
+    Bytes(usize, Vec<ByteEntry>),
     /// Source ended (source_index, reason)
     Ended(usize, String),
     /// Source error (source_index, error)

@@ -39,6 +39,7 @@ import {
   type MultiSourceInput,
   type BusMapping,
   type PlaybackPosition,
+  type RawBytesPayload,
 } from "../api/io";
 import type { FrameMessage } from "./discoveryStore";
 
@@ -262,6 +263,7 @@ export interface CreateSessionOptions {
 /** Callbacks for a session - stored per listener in the frontend */
 export interface SessionCallbacks {
   onFrames?: (frames: FrameMessage[]) => void;
+  onBytes?: (payload: RawBytesPayload) => void;
   onError?: (error: string) => void;
   onTimeUpdate?: (position: PlaybackPosition) => void;
   onStreamEnded?: (payload: StreamEndedPayload) => void;
@@ -426,9 +428,18 @@ async function setupSessionEventListeners(
   );
   unlistenFunctions.push(unlistenFrames);
 
+  // Raw bytes (serial byte streams)
+  const unlistenBytes = await listen<RawBytesPayload>(
+    `serial-raw-bytes:${sessionId}`,
+    (event) => {
+      invokeCallbacks(eventListeners, "onBytes", event.payload);
+    }
+  );
+  unlistenFunctions.push(unlistenBytes);
+
   // Errors
   const unlistenError = await listen<string>(
-    `can-bytes-error:${sessionId}`,
+    `session-error:${sessionId}`,
     (event) => {
       const error = event.payload;
       // Don't show error dialog for expected/transient errors

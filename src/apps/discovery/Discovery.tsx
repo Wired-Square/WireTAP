@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager } from '../../hooks/useIOSessionManager';
-import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed, type SerialRawBytesPayload } from "../../stores/discoveryStore";
+import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
 import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
@@ -218,6 +218,16 @@ export default function Discovery() {
     incrementBackendFrameCount(receivedFrames.length);
   }, [addFrames, incrementBackendFrameCount, isSerialMode, framingAccepted]);
 
+  const handleBytes = useCallback((payload: import("../../api/io").RawBytesPayload) => {
+    const entries = payload.bytes.map((b) => ({
+      byte: b.byte,
+      timestampUs: b.timestamp_us,
+      bus: b.bus,
+    }));
+    incrementBackendByteCount(entries.length);
+    addSerialBytes(entries);
+  }, [addSerialBytes, incrementBackendByteCount]);
+
   const handleError = useCallback((error: string) => {
     showError("Stream Error", "An error occurred while streaming CAN data.", error);
   }, [showError]);
@@ -339,6 +349,7 @@ export default function Discovery() {
     onBeforeIngestStart: clearBackendBuffer,
     onIngestComplete: handleIngestComplete,
     onFrames: handleFrames,
+    onBytes: handleBytes,
     onError: handleError,
     onTimeUpdate: handleTimeUpdate,
     onSpeedChange: handleSessionSpeedChange,
@@ -536,32 +547,8 @@ export default function Discovery() {
     prevIsSerialModeRef.current = newIsSerialMode;
   }, [ioProfile, capabilities, bufferMetadata, bufferType, framedBufferId, setSerialMode, clearSerialBytes]);
 
-  // Listen for serial-raw-bytes events when in serial mode
-  // Events are scoped by session ID (profile ID), not app name
-  useEffect(() => {
-    if (!isSerialMode || !sessionId) return;
-
-    const setupListener = async () => {
-      const unlisten = await listen<SerialRawBytesPayload>(
-        `serial-raw-bytes:${sessionId}`,
-        (event) => {
-          const entries = event.payload.bytes.map((b) => ({
-            byte: b.byte,
-            timestampUs: b.timestamp_us,
-            bus: b.bus,
-          }));
-          incrementBackendByteCount(entries.length);
-          addSerialBytes(entries);
-        }
-      );
-      return unlisten;
-    };
-
-    const unlistenPromise = setupListener();
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
-  }, [isSerialMode, sessionId, addSerialBytes, incrementBackendByteCount]);
+  // Raw bytes are now routed through sessionStore via the onBytes callback.
+  // No ad-hoc Tauri listener needed here.
 
   const frameList = useMemo(
     () =>

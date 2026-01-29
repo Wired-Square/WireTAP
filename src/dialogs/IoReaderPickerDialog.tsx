@@ -634,7 +634,7 @@ export default function IoReaderPickerDialog({
         `stream-ended:${INGEST_SESSION_ID}`,
         (event) => handleInternalIngestComplete(event.payload)
       );
-      const unlistenError = await listen<string>(`can-bytes-error:${INGEST_SESSION_ID}`, (event) => {
+      const unlistenError = await listen<string>(`session-error:${INGEST_SESSION_ID}`, (event) => {
         setInternalIngestError(event.payload);
       });
       const unlistenFrames = await listen<{ frames: unknown[] } | unknown[]>(`frame-message:${INGEST_SESSION_ID}`, (event) => {

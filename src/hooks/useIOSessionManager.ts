@@ -18,7 +18,7 @@ import {
   type CreateMultiSourceOptions,
   type PerInterfaceFramingConfig,
 } from "../stores/sessionStore";
-import type { BusMapping, PlaybackPosition } from "../api/io";
+import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../stores/discoveryStore";
 import type { StreamEndedPayload, IOCapabilities } from "../api/io";
@@ -71,6 +71,8 @@ export interface UseIOSessionManagerOptions {
   requireFrames?: boolean;
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
+  /** Callback when raw bytes are received (serial byte streams) */
+  onBytes?: (payload: RawBytesPayload) => void;
   /** Callback on error */
   onError?: (error: string) => void;
   /** Callback when playback position updates (timestamp and frame index) */
@@ -303,6 +305,7 @@ export function useIOSessionManager(
     onIngestComplete,
     requireFrames,
     onFrames: onFramesProp,
+    onBytes,
     onError,
     onTimeUpdate,
     onStreamEnded,
@@ -404,6 +407,7 @@ export function useIOSessionManager(
     profileName: ioProfileName,
     requireFrames,
     onFrames: handleFrames,
+    onBytes,
     onError,
     onTimeUpdate,
     onStreamEnded,

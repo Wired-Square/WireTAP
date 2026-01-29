@@ -27,8 +27,8 @@ use crate::io::error::IoError;
 use crate::io::gvret::{apply_bus_mapping, BusMapping};
 use crate::io::types::{SourceMessage, TransmitRequest, TransmitSender};
 use crate::io::{
-    emit_frames, emit_to_session, now_us, CanTransmitFrame, FrameMessage, IOCapabilities,
-    IODevice, IOState, StreamEndedPayload, TransmitResult,
+    emit_frames, emit_stream_ended, emit_to_session, now_us, CanTransmitFrame, FrameMessage,
+    IOCapabilities, IODevice, IOState, TransmitPayload, TransmitResult,
 };
 
 /// Encode a CAN frame into gs_usb GsHostFrame format (20 bytes)
@@ -291,7 +291,14 @@ impl IODevice for GsUsbReader {
         &self.session_id
     }
 
-    fn transmit_frame(&self, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
+    fn transmit(&self, payload: &TransmitPayload) -> Result<TransmitResult, String> {
+        let frame = match payload {
+            TransmitPayload::CanFrame(f) => f,
+            TransmitPayload::RawBytes(_) => {
+                return Err("gs_usb devices do not support raw byte transmission".to_string());
+            }
+        };
+
         if self.config.listen_only {
             return Err(
                 "Cannot transmit in listen-only mode. Disable listen-only in profile settings."
@@ -385,8 +392,8 @@ async fn run_gs_usb_stream(
     let device_info = match device_info {
         Ok(d) => d,
         Err(e) => {
-            emit_to_session(&app_handle, "can-bytes-error", &session_id, e);
-            emit_stream_ended(&app_handle, &session_id, "error");
+            emit_to_session(&app_handle, "session-error", &session_id, e);
+            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
             return;
         }
     };
@@ -396,11 +403,11 @@ async fn run_gs_usb_stream(
         Err(e) => {
             emit_to_session(
                 &app_handle,
-                "can-bytes-error",
+                "session-error",
                 &session_id,
                 IoError::connection(&device_name, e.to_string()).to_string(),
             );
-            emit_stream_ended(&app_handle, &session_id, "error");
+            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
             return;
         }
     };
@@ -410,11 +417,11 @@ async fn run_gs_usb_stream(
         Err(_) => {
             emit_to_session(
                 &app_handle,
-                "can-bytes-error",
+                "session-error",
                 &session_id,
                 IoError::busy(&device_name).to_string(),
             );
-            emit_stream_ended(&app_handle, &session_id, "error");
+            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
             return;
         }
     };
@@ -428,11 +435,11 @@ async fn run_gs_usb_stream(
     if let Err(e) = initialize_device(&interface, &config).await {
         emit_to_session(
             &app_handle,
-            "can-bytes-error",
+            "session-error",
             &session_id,
             IoError::protocol(&device_name, format!("initialize: {}", e)).to_string(),
         );
-        emit_stream_ended(&app_handle, &session_id, "error");
+        emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
         return;
     }
 
@@ -444,11 +451,11 @@ async fn run_gs_usb_stream(
         Err(e) => {
             emit_to_session(
                 &app_handle,
-                "can-bytes-error",
+                "session-error",
                 &session_id,
                 IoError::protocol(&device_name, format!("open bulk IN endpoint: {}", e)).to_string(),
             );
-            emit_stream_ended(&app_handle, &session_id, "error");
+            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
             return;
         }
     };
@@ -605,7 +612,7 @@ async fn run_gs_usb_stream(
     // Stop the device
     let _ = stop_device(&interface, &config).await;
 
-    emit_stream_ended(&app_handle, &session_id, stream_reason);
+    emit_stream_ended(&app_handle, &session_id, stream_reason, "gs_usb");
 }
 
 /// Initialize the gs_usb device
@@ -742,50 +749,6 @@ pub fn parse_host_frame(data: &[u8]) -> Option<FrameMessage> {
         incomplete: None,
         direction: None,
     })
-}
-
-/// Emit stream-ended event
-fn emit_stream_ended(app_handle: &AppHandle, session_id: &str, reason: &str) {
-    let metadata = buffer_store::finalize_buffer();
-
-    let (buffer_id, buffer_type, count, time_range, buffer_available) = match metadata {
-        Some(ref m) => {
-            let type_str = match m.buffer_type {
-                BufferType::Frames => "frames",
-                BufferType::Bytes => "bytes",
-            };
-            (
-                Some(m.id.clone()),
-                Some(type_str.to_string()),
-                m.count,
-                match (m.start_time_us, m.end_time_us) {
-                    (Some(start), Some(end)) => Some((start, end)),
-                    _ => None,
-                },
-                m.count > 0,
-            )
-        }
-        None => (None, None, 0, None, false),
-    };
-
-    emit_to_session(
-        app_handle,
-        "stream-ended",
-        session_id,
-        StreamEndedPayload {
-            reason: reason.to_string(),
-            buffer_available,
-            buffer_id,
-            buffer_type,
-            count,
-            time_range,
-        },
-    );
-
-    eprintln!(
-        "[gs_usb:{}] Stream ended (reason: {}, count: {})",
-        session_id, reason, count
-    );
 }
 
 // ============================================================================

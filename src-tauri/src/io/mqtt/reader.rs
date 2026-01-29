@@ -23,8 +23,7 @@ use std::sync::{
 use tauri::AppHandle;
 use tokio::time::Duration;
 
-use crate::io::gvret::emit_stream_ended;
-use crate::io::{emit_frames, emit_to_session, now_us, FrameMessage, IOCapabilities, IODevice, IOState};
+use crate::io::{emit_frames, emit_stream_ended, emit_to_session, now_us, FrameMessage, IOCapabilities, IODevice, IOState};
 use crate::buffer_store::{self, BufferType};
 
 // ============================================================================
@@ -267,7 +266,7 @@ fn spawn_mqtt_stream(
         if let Err(e) = client.subscribe(&config.topic, QoS::AtMostOnce).await {
             emit_to_session(
                 &app_handle,
-                "can-bytes-error",
+                "session-error",
                 &session_id,
                 format!("Failed to subscribe to {}: {}", config.topic, e),
             );
@@ -333,7 +332,7 @@ fn spawn_mqtt_stream(
                     // Connection error
                     emit_to_session(
                         &app_handle,
-                        "can-bytes-error",
+                        "session-error",
                         &session_id,
                         format!("MQTT error: {}", e),
                     );

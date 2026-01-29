@@ -165,6 +165,15 @@ impl TransmitResult {
     }
 }
 
+/// Unified transmit payload — devices match on the variant they support.
+#[derive(Clone, Debug)]
+pub enum TransmitPayload {
+    /// Transmit a CAN frame (classic or FD)
+    CanFrame(CanTransmitFrame),
+    /// Transmit raw bytes (serial, SPI, etc.)
+    RawBytes(Vec<u8>),
+}
+
 // ============================================================================
 // IO Device Trait and Capabilities
 // ============================================================================
@@ -203,6 +212,19 @@ pub struct InterfaceTraits {
     pub protocols: Vec<Protocol>,
     /// Whether the interface can transmit frames
     pub can_transmit: bool,
+}
+
+/// Declares the data streams a session produces.
+///
+/// This replaces ad-hoc checks like `emits_raw_bytes` with a structured
+/// declaration of what a session will emit. Used by the frontend to decide
+/// which event listeners and views to set up.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SessionDataStreams {
+    /// Whether this session emits framed messages (`frame-message` events)
+    pub emits_frames: bool,
+    /// Whether this session emits raw byte streams (`serial-raw-bytes` events)
+    pub emits_bytes: bool,
 }
 
 /// IO device capabilities - what this device type supports
@@ -247,6 +269,10 @@ pub struct IOCapabilities {
     /// If None, traits are derived from legacy fields for backward compatibility
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traits: Option<InterfaceTraits>,
+    /// Declares which data streams this session produces (frames, bytes, or both).
+    /// If None, derived from `emits_raw_bytes` for backward compatibility.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_streams: Option<SessionDataStreams>,
 }
 
 impl IOCapabilities {
@@ -274,6 +300,10 @@ impl IOCapabilities {
             available_buses: vec![0],
             emits_raw_bytes: false,
             traits: None,
+            data_streams: Some(SessionDataStreams {
+                emits_frames: true,
+                emits_bytes: false,
+            }),
         }
     }
 
@@ -299,6 +329,10 @@ impl IOCapabilities {
             available_buses: vec![],
             emits_raw_bytes: false,
             traits: None,
+            data_streams: Some(SessionDataStreams {
+                emits_frames: true,
+                emits_bytes: false,
+            }),
         }
     }
 
@@ -324,6 +358,7 @@ impl IOCapabilities {
             available_buses: vec![],
             emits_raw_bytes: false, // Set via with_emits_raw_bytes()
             traits: None,
+            data_streams: None, // Derived from emits_raw_bytes via get_data_streams()
         }
     }
 
@@ -363,9 +398,26 @@ impl IOCapabilities {
         self
     }
 
-    /// Set raw bytes emission (for serial sources)
+    /// Set raw bytes emission (for serial sources).
+    /// Also updates `data_streams` to reflect the change.
     pub fn with_emits_raw_bytes(mut self, emits_raw_bytes: bool) -> Self {
         self.emits_raw_bytes = emits_raw_bytes;
+        // Sync data_streams: serial with raw bytes emits bytes;
+        // framing determines whether it also emits frames (handled at session creation)
+        if let Some(ref mut ds) = self.data_streams {
+            ds.emits_bytes = emits_raw_bytes;
+        }
+        self
+    }
+
+    /// Set data streams explicitly
+    pub fn with_data_streams(mut self, emits_frames: bool, emits_bytes: bool) -> Self {
+        self.data_streams = Some(SessionDataStreams {
+            emits_frames,
+            emits_bytes,
+        });
+        // Keep legacy field in sync
+        self.emits_raw_bytes = emits_bytes;
         self
     }
 
@@ -374,6 +426,21 @@ impl IOCapabilities {
     pub fn with_traits(mut self, traits: InterfaceTraits) -> Self {
         self.traits = Some(traits);
         self
+    }
+
+    /// Get the data streams, deriving from legacy fields if not explicitly set
+    pub fn get_data_streams(&self) -> SessionDataStreams {
+        if let Some(ref ds) = self.data_streams {
+            ds.clone()
+        } else {
+            // Derive from legacy fields:
+            // - CAN/GVRET/etc: always frames, never bytes
+            // - Serial with raw bytes: bytes (and maybe frames if framing configured)
+            SessionDataStreams {
+                emits_frames: !self.emits_raw_bytes || self.can_transmit_serial,
+                emits_bytes: self.emits_raw_bytes,
+            }
+        }
     }
 
     /// Get the interface traits, deriving from legacy fields if not explicitly set
@@ -479,16 +546,11 @@ pub trait IODevice: Send + Sync {
         Err("This device does not support reverse playback".to_string())
     }
 
-    /// Transmit a CAN frame (if supported by the device).
-    /// Default implementation returns an error indicating transmission is not supported.
-    fn transmit_frame(&self, _frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
-        Err("This device does not support CAN transmission".to_string())
-    }
-
-    /// Transmit raw serial bytes (if supported by the device).
-    /// Default implementation returns an error indicating transmission is not supported.
-    fn transmit_serial(&self, _bytes: &[u8]) -> Result<TransmitResult, String> {
-        Err("This device does not support serial transmission".to_string())
+    /// Transmit data through the device.
+    /// Devices match on the `TransmitPayload` variant they support and return
+    /// an error for unsupported variants.
+    fn transmit(&self, _payload: &TransmitPayload) -> Result<TransmitResult, String> {
+        Err("This device does not support transmission".to_string())
     }
 
     /// Get current state
@@ -672,6 +734,59 @@ pub fn emit_frames(
         active_listeners,
     };
     emit_to_session(app, "frame-message", session_id, payload);
+}
+
+/// Emit stream-ended event with buffer info.
+///
+/// Finalises the buffer and emits the stream-ended event with metadata.
+/// This is the shared helper used by all IO drivers.
+pub fn emit_stream_ended(
+    app_handle: &AppHandle,
+    session_id: &str,
+    reason: &str,
+    log_prefix: &str,
+) {
+    use crate::buffer_store::{self, BufferType};
+
+    let metadata = buffer_store::finalize_buffer();
+
+    let (buffer_id, buffer_type, count, time_range, buffer_available) = match metadata {
+        Some(ref m) => {
+            let type_str = match m.buffer_type {
+                BufferType::Frames => "frames",
+                BufferType::Bytes => "bytes",
+            };
+            (
+                Some(m.id.clone()),
+                Some(type_str.to_string()),
+                m.count,
+                match (m.start_time_us, m.end_time_us) {
+                    (Some(start), Some(end)) => Some((start, end)),
+                    _ => None,
+                },
+                m.count > 0,
+            )
+        }
+        None => (None, None, 0, None, false),
+    };
+
+    emit_to_session(
+        app_handle,
+        "stream-ended",
+        session_id,
+        StreamEndedPayload {
+            reason: reason.to_string(),
+            buffer_available,
+            buffer_id,
+            buffer_type,
+            count,
+            time_range,
+        },
+    );
+    eprintln!(
+        "[{}:{}] Stream ended (reason: {}, count: {})",
+        log_prefix, session_id, reason, count
+    );
 }
 
 /// Result of creating or joining a session
@@ -1250,11 +1365,8 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
         .collect()
 }
 
-/// Transmit a CAN frame through a session (if supported)
-pub async fn transmit_frame(session_id: &str, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
-    // Only hold the lock long enough to check capabilities and get what we need
-    // The actual transmit may block (e.g., waiting for channel response), so we
-    // need to minimize lock hold time
+/// Transmit a payload through a session (unified)
+pub async fn session_transmit(session_id: &str, payload: &TransmitPayload) -> Result<TransmitResult, String> {
     let sessions = IO_SESSIONS.lock().await;
     let session = sessions
         .get(session_id)
@@ -1262,34 +1374,32 @@ pub async fn transmit_frame(session_id: &str, frame: &CanTransmitFrame) -> Resul
 
     let caps = session.device.capabilities();
 
-    // Check if the reader supports transmission
-    if !caps.can_transmit {
-        return Err("This session does not support transmission".to_string());
+    // Check if the reader supports the requested transmit type
+    match payload {
+        TransmitPayload::CanFrame(_) if !caps.can_transmit => {
+            return Err("This session does not support CAN transmission".to_string());
+        }
+        TransmitPayload::RawBytes(_) if !caps.can_transmit_serial => {
+            return Err("This session does not support serial transmission".to_string());
+        }
+        _ => {}
     }
 
-    // Call transmit_frame - this is sync and may block waiting for result
+    // Call device transmit - this is sync and may block waiting for result
     // For MultiSourceReader, this blocks on recv_timeout(500ms)
     // We call it while holding the lock, but the actual I/O happens in the
     // source reader tasks which don't need the IO_SESSIONS lock
-    session.device.transmit_frame(frame)
+    session.device.transmit(payload)
 }
 
-/// Transmit raw serial bytes through a session
+/// Transmit a CAN frame through a session (convenience wrapper)
+pub async fn transmit_frame(session_id: &str, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
+    session_transmit(session_id, &TransmitPayload::CanFrame(frame.clone())).await
+}
+
+/// Transmit raw serial bytes through a session (convenience wrapper)
 pub async fn transmit_serial(session_id: &str, bytes: &[u8]) -> Result<TransmitResult, String> {
-    let sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    let caps = session.device.capabilities();
-
-    // Check if the reader supports serial transmission
-    if !caps.can_transmit_serial {
-        return Err("This session does not support serial transmission".to_string());
-    }
-
-    // Call transmit_serial - this is sync and may block waiting for result
-    session.device.transmit_serial(bytes)
+    session_transmit(session_id, &TransmitPayload::RawBytes(bytes.to_vec())).await
 }
 
 // ============================================================================

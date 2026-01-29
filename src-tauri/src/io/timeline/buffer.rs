@@ -319,7 +319,7 @@ async fn run_buffer_stream(
     if frames.is_empty() {
         emit_to_session(
             &app_handle,
-            "can-bytes-error",
+            "session-error",
             &session_id,
             "Buffer is empty".to_string(),
         );

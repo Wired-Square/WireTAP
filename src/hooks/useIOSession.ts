@@ -29,6 +29,7 @@ import {
   type CanTransmitFrame,
   type TransmitResult,
   type PlaybackPosition,
+  type RawBytesPayload,
 } from "../api/io";
 import type { FrameMessage } from "../stores/discoveryStore";
 
@@ -63,6 +64,8 @@ export interface UseIOSessionOptions {
   requireFrames?: boolean;
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
+  /** Callback when raw bytes are received (serial byte streams) */
+  onBytes?: (payload: RawBytesPayload) => void;
   /** Callback on error */
   onError?: (error: string) => void;
   /** Callback when playback position updates (timestamp and frame index) */
@@ -178,6 +181,7 @@ export function useIOSession(
     profileId: profileIdOption,
     requireFrames,
     onFrames,
+    onBytes,
     onError,
     onTimeUpdate,
     onStreamEnded,
@@ -222,6 +226,7 @@ export function useIOSession(
   // Store callbacks in refs to keep them current
   const callbacksRef = useRef({
     onFrames,
+    onBytes,
     onError,
     onTimeUpdate,
     onStreamEnded,
@@ -231,13 +236,14 @@ export function useIOSession(
   useEffect(() => {
     callbacksRef.current = {
       onFrames,
+      onBytes,
       onError,
       onTimeUpdate,
       onStreamEnded,
       onStreamComplete,
       onSpeedChange,
     };
-  }, [onFrames, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange]);
+  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange]);
 
   // Initialize session on mount
   useEffect(() => {
@@ -295,6 +301,7 @@ export function useIOSession(
         console.log(`[useIOSession:${appName}] calling registerCallbacks...`);
         registerCallbacks(effectiveSessionId, listenerIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
+          onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
           onError: (error) => callbacksRef.current.onError?.(error),
           onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
@@ -590,6 +597,7 @@ export function useIOSession(
         // Re-register callbacks after reinitialize
         registerCallbacks(targetProfileId, listenerIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
+          onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
           onError: (error) => callbacksRef.current.onError?.(error),
           onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
@@ -640,6 +648,7 @@ export function useIOSession(
       // Re-register callbacks
       registerCallbacks(targetSessionId, listenerIdRef.current, {
         onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
+        onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
         onError: (error) => callbacksRef.current.onError?.(error),
         onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
         onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),

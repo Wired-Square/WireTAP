@@ -36,6 +36,30 @@ export interface InterfaceTraits {
 }
 
 /**
+ * Declares the data streams a session produces.
+ * Used by the frontend to decide which event listeners and views to set up.
+ */
+export interface SessionDataStreams {
+  /** Whether this session emits framed messages (frame-message events) */
+  emits_frames: boolean;
+  /** Whether this session emits raw byte streams (serial-raw-bytes events) */
+  emits_bytes: boolean;
+}
+
+/** A single raw byte with timestamp, as emitted by serial/byte-stream sessions */
+export interface RawByteEntry {
+  byte: number;
+  timestamp_us: number;
+  bus?: number;
+}
+
+/** Payload for raw byte stream events (serial-raw-bytes) */
+export interface RawBytesPayload {
+  bytes: RawByteEntry[];
+  port: string;
+}
+
+/**
  * Get traits from IOCapabilities, deriving from legacy fields if not present.
  */
 export function getTraits(caps: IOCapabilities): InterfaceTraits {
@@ -53,6 +77,20 @@ export function getTraits(caps: IOCapabilities): InterfaceTraits {
     temporal_mode: caps.is_realtime ? "realtime" : "timeline",
     protocols,
     can_transmit: caps.can_transmit || caps.can_transmit_serial,
+  };
+}
+
+/**
+ * Get data streams from IOCapabilities, deriving from legacy fields if not present.
+ */
+export function getDataStreams(caps: IOCapabilities): SessionDataStreams {
+  if (caps.data_streams) {
+    return caps.data_streams;
+  }
+  // Derive from legacy fields
+  return {
+    emits_frames: !caps.emits_raw_bytes || (caps.traits?.protocols ?? []).some((p) => p !== "serial"),
+    emits_bytes: caps.emits_raw_bytes ?? false,
   };
 }
 
@@ -92,6 +130,8 @@ export interface IOCapabilities {
   emits_raw_bytes?: boolean;
   /** Formal interface traits (temporal mode, protocols, transmit) */
   traits?: InterfaceTraits;
+  /** Declares which data streams this session produces */
+  data_streams?: SessionDataStreams;
 }
 
 /**

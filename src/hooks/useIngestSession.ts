@@ -116,7 +116,7 @@ export function useIngestSession({
           (event) => handleComplete(event.payload)
         );
         const unlistenError = await listen<string>(
-          `can-bytes-error:${INGEST_SESSION_ID}`,
+          `session-error:${INGEST_SESSION_ID}`,
           (event) => {
             setIngestError(event.payload);
           }

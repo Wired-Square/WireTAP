@@ -11,8 +11,8 @@ use tokio_postgres::{NoTls, Row};
 
 use super::base::{TimelineControl, TimelineReaderState};
 use crate::io::{
-    emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState,
-    PlaybackPosition, StreamEndedPayload,
+    emit_frames, emit_stream_ended, emit_to_session, FrameMessage, IOCapabilities, IODevice,
+    IOState, PlaybackPosition,
 };
 use crate::buffer_store::{self, BufferType};
 
@@ -220,63 +220,17 @@ fn spawn_postgres_stream(
         {
             emit_to_session(
                 &app_handle,
-                "can-bytes-error",
+                "session-error",
                 &session_id,
                 format!("PostgreSQL error: {}", e),
             );
             // Ensure stream-ended is emitted on error (run_postgres_stream may have already emitted it)
             // Check if streaming flag is still set (indicates stream-ended wasn't emitted yet)
             if buffer_store::is_streaming() {
-                emit_stream_ended(&app_handle, &session_id, "error");
+                emit_stream_ended(&app_handle, &session_id, "error", "PostgreSQL");
             }
         }
     })
-}
-
-/// Helper to emit stream-ended event with buffer info
-fn emit_stream_ended(app_handle: &AppHandle, session_id: &str, reason: &str) {
-    // Finalize the buffer and get metadata
-    let metadata = buffer_store::finalize_buffer();
-
-    let (buffer_id, buffer_type, count, time_range, buffer_available) = match metadata {
-        Some(ref m) => {
-            let type_str = match m.buffer_type {
-                BufferType::Frames => "frames",
-                BufferType::Bytes => "bytes",
-            };
-            (
-                Some(m.id.clone()),
-                Some(type_str.to_string()),
-                m.count,
-                match (m.start_time_us, m.end_time_us) {
-                    (Some(start), Some(end)) => Some((start, end)),
-                    _ => None,
-                },
-                m.count > 0,
-            )
-        }
-        None => (None, None, 0, None, false),
-    };
-
-    emit_to_session(
-        app_handle,
-        "stream-ended",
-        session_id,
-        StreamEndedPayload {
-            reason: reason.to_string(),
-            buffer_available,
-            buffer_id,
-            buffer_type,
-            count,
-            time_range,
-        },
-    );
-    eprintln!(
-        "[PostgreSQL:{}] Stream ended (reason: {}, count: {})",
-        session_id,
-        reason,
-        count
-    );
 }
 
 async fn run_postgres_stream(
@@ -304,7 +258,7 @@ async fn run_postgres_stream(
         Ok(conn) => conn,
         Err(e) => {
             stream_reason = "error";
-            emit_stream_ended(&app_handle, &session_id, stream_reason);
+            emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
             return Err(format!(
                 "Failed to connect to PostgreSQL at {}:{}/{}: {}",
                 config.host, config.port, config.database, e
@@ -332,7 +286,7 @@ async fn run_postgres_stream(
         Ok(tx) => tx,
         Err(e) => {
             stream_reason = "error";
-            emit_stream_ended(&app_handle, &session_id, stream_reason);
+            emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
             return Err(format!("Failed to start transaction: {}", e).into());
         }
     };
@@ -342,7 +296,7 @@ async fn run_postgres_stream(
         Ok(p) => p,
         Err(e) => {
             stream_reason = "error";
-            emit_stream_ended(&app_handle, &session_id, stream_reason);
+            emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
             return Err(format!("Failed to bind query: {}", e).into());
         }
     };
@@ -418,13 +372,13 @@ async fn run_postgres_stream(
     .await
     {
         stream_reason = "error";
-        emit_stream_ended(&app_handle, &session_id, stream_reason);
+        emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
         return Err(e);
     }
 
     if frame_queue.is_empty() {
         eprintln!("[PostgreSQL:{}] No frames to emit", session_id);
-        emit_stream_ended(&app_handle, &session_id, stream_reason);
+        emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
         return Ok(());
     }
 
@@ -690,7 +644,7 @@ async fn run_postgres_stream(
     );
 
     // Emit stream-ended event
-    emit_stream_ended(&app_handle, &session_id, stream_reason);
+    emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
 
     Ok(())
 }

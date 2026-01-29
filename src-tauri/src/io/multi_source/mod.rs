@@ -22,7 +22,7 @@ use super::traits::{get_traits_for_profile_kind, validate_session_traits};
 use super::types::{SourceMessage, TransmitRequest};
 use super::{
     CanTransmitFrame, IOCapabilities, IODevice, IOState, InterfaceTraits, Protocol, TemporalMode,
-    TransmitResult,
+    TransmitPayload, TransmitResult,
 };
 use crate::buffer_store::{self, BufferType};
 
@@ -219,9 +219,125 @@ impl MultiSourceReader {
             emits_raw_bytes: false, // Set via builder below
             // Include the formal session traits
             traits: Some(self.session_traits.clone()),
+            data_streams: None, // Set via builder below
         }
-        // Whether raw bytes are emitted (serial sources without framing or with emit_raw_bytes=true)
         .with_emits_raw_bytes(self.emits_raw_bytes)
+        .with_data_streams(
+            // Emits frames if any source is non-serial, or if any serial source has framing
+            self.sources.iter().any(|s| {
+                s.profile_kind != "serial"
+                    || s.framing_encoding.as_deref().map_or(false, |f| f != "raw")
+            }),
+            self.emits_raw_bytes,
+        )
+    }
+
+    /// Route a CAN frame transmit to the appropriate source based on bus number
+    fn transmit_can_frame(&self, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
+        let route = self.transmit_routes.get(&frame.bus).ok_or_else(|| {
+            format!(
+                "No source configured for bus {} (available: {:?})",
+                frame.bus,
+                self.transmit_routes.keys().collect::<Vec<_>>()
+            )
+        })?;
+
+        // Create a modified frame with the device bus number (reverse the mapping)
+        let mut routed_frame = frame.clone();
+        routed_frame.bus = route.device_bus;
+
+        // Get the transmit channel for this source
+        let channels = self
+            .transmit_channels
+            .lock()
+            .map_err(|e| format!("Failed to lock transmit channels: {}", e))?;
+
+        let tx = channels
+            .get(&route.source_idx)
+            .ok_or_else(|| {
+                format!(
+                    "No transmit channel for source {} (profile '{}') - source may not support transmit or not yet connected",
+                    route.source_idx, route.profile_id
+                )
+            })?
+            .clone();
+        drop(channels); // Release lock before blocking
+
+        // Encode the frame based on the profile kind
+        let data = match route.profile_kind.as_str() {
+            "gvret_tcp" | "gvret_usb" => {
+                if let Err(result) = validate_gvret_frame(&routed_frame) {
+                    return Ok(result);
+                }
+                encode_gvret_frame(&routed_frame)
+            }
+            #[cfg(any(target_os = "windows", target_os = "macos"))]
+            "gs_usb" => encode_gs_usb_frame(&routed_frame, 0).to_vec(),
+            "slcan" => encode_slcan_frame(&routed_frame),
+            #[cfg(target_os = "linux")]
+            "socketcan" => {
+                match encode_socketcan_frame(&routed_frame) {
+                    EncodedFrame::Classic(buf) => buf.to_vec(),
+                    EncodedFrame::Fd(buf) => buf.to_vec(),
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "Unsupported profile kind '{}' for transmission",
+                    route.profile_kind
+                ));
+            }
+        };
+
+        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
+        tx.try_send(TransmitRequest { data, result_tx })
+            .map_err(|e| format!("Failed to queue transmit request: {}", e))?;
+        let result = result_rx
+            .recv_timeout(std::time::Duration::from_millis(500))
+            .map_err(|e| format!("Transmit timeout or channel closed: {}", e))?;
+        result?;
+        Ok(TransmitResult::success())
+    }
+
+    /// Route raw bytes to the first serial source
+    fn transmit_raw_bytes(&self, bytes: &[u8]) -> Result<TransmitResult, String> {
+        if bytes.is_empty() {
+            return Ok(TransmitResult::error("No bytes to transmit".to_string()));
+        }
+
+        let serial_route = self
+            .transmit_routes
+            .values()
+            .find(|route| route.profile_kind == "serial")
+            .ok_or_else(|| "No serial source configured in this session".to_string())?;
+
+        let channels = self
+            .transmit_channels
+            .lock()
+            .map_err(|e| format!("Failed to lock transmit channels: {}", e))?;
+
+        let tx = channels
+            .get(&serial_route.source_idx)
+            .ok_or_else(|| {
+                format!(
+                    "No transmit channel for serial source {} (profile '{}') - source may not be connected",
+                    serial_route.source_idx, serial_route.profile_id
+                )
+            })?
+            .clone();
+        drop(channels); // Release lock before blocking
+
+        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
+        tx.try_send(TransmitRequest {
+            data: bytes.to_vec(),
+            result_tx,
+        })
+        .map_err(|e| format!("Failed to queue serial transmit request: {}", e))?;
+        let result = result_rx
+            .recv_timeout(std::time::Duration::from_millis(500))
+            .map_err(|e| format!("Serial transmit timeout or channel closed: {}", e))?;
+        result?;
+        Ok(TransmitResult::success())
     }
 }
 
@@ -360,136 +476,11 @@ impl IODevice for MultiSourceReader {
         Err("Multi-source sessions do not support time range".to_string())
     }
 
-    fn transmit_frame(&self, frame: &CanTransmitFrame) -> Result<TransmitResult, String> {
-        // Route transmit to the appropriate source based on bus number
-        let route = self.transmit_routes.get(&frame.bus).ok_or_else(|| {
-            format!(
-                "No source configured for bus {} (available: {:?})",
-                frame.bus,
-                self.transmit_routes.keys().collect::<Vec<_>>()
-            )
-        })?;
-
-        // Create a modified frame with the device bus number (reverse the mapping)
-        let mut routed_frame = frame.clone();
-        routed_frame.bus = route.device_bus;
-
-        // Get the transmit channel for this source
-        let channels = self
-            .transmit_channels
-            .lock()
-            .map_err(|e| format!("Failed to lock transmit channels: {}", e))?;
-
-        let tx = channels
-            .get(&route.source_idx)
-            .ok_or_else(|| {
-                format!(
-                    "No transmit channel for source {} (profile '{}') - source may not support transmit or not yet connected",
-                    route.source_idx, route.profile_id
-                )
-            })?
-            .clone();
-        drop(channels); // Release lock before blocking
-
-        // Encode the frame based on the profile kind
-        let data = match route.profile_kind.as_str() {
-            "gvret_tcp" | "gvret_usb" => {
-                // Validate and encode for GVRET protocol
-                if let Err(result) = validate_gvret_frame(&routed_frame) {
-                    return Ok(result);
-                }
-                encode_gvret_frame(&routed_frame)
-            }
-            #[cfg(any(target_os = "windows", target_os = "macos"))]
-            "gs_usb" => {
-                // Encode for gs_usb protocol (20-byte host frame)
-                // Use echo_id = 0, the transmit task will handle incrementing if needed
-                encode_gs_usb_frame(&routed_frame, 0).to_vec()
-            }
-            "slcan" => {
-                // Encode for slcan protocol
-                encode_slcan_frame(&routed_frame)
-            }
-            #[cfg(target_os = "linux")]
-            "socketcan" => {
-                // Encode for SocketCAN - raw CAN frame bytes (classic or FD)
-                match encode_socketcan_frame(&routed_frame) {
-                    EncodedFrame::Classic(buf) => buf.to_vec(),
-                    EncodedFrame::Fd(buf) => buf.to_vec(),
-                }
-            }
-            _ => {
-                return Err(format!(
-                    "Unsupported profile kind '{}' for transmission",
-                    route.profile_kind
-                ));
-            }
-        };
-
-        // Create a sync channel to receive the result
-        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
-
-        // Send the transmit request
-        tx.try_send(TransmitRequest { data, result_tx })
-            .map_err(|e| format!("Failed to queue transmit request: {}", e))?;
-
-        // Wait for the result with a timeout
-        let result = result_rx
-            .recv_timeout(std::time::Duration::from_millis(500))
-            .map_err(|e| format!("Transmit timeout or channel closed: {}", e))?;
-
-        result?;
-
-        Ok(TransmitResult::success())
-    }
-
-    fn transmit_serial(&self, bytes: &[u8]) -> Result<TransmitResult, String> {
-        if bytes.is_empty() {
-            return Ok(TransmitResult::error("No bytes to transmit".to_string()));
+    fn transmit(&self, payload: &TransmitPayload) -> Result<TransmitResult, String> {
+        match payload {
+            TransmitPayload::CanFrame(frame) => self.transmit_can_frame(frame),
+            TransmitPayload::RawBytes(bytes) => self.transmit_raw_bytes(bytes),
         }
-
-        // Find the first serial source in the transmit routes
-        let serial_route = self
-            .transmit_routes
-            .values()
-            .find(|route| route.profile_kind == "serial")
-            .ok_or_else(|| "No serial source configured in this session".to_string())?;
-
-        // Get the transmit channel for this source
-        let channels = self
-            .transmit_channels
-            .lock()
-            .map_err(|e| format!("Failed to lock transmit channels: {}", e))?;
-
-        let tx = channels
-            .get(&serial_route.source_idx)
-            .ok_or_else(|| {
-                format!(
-                    "No transmit channel for serial source {} (profile '{}') - source may not be connected",
-                    serial_route.source_idx, serial_route.profile_id
-                )
-            })?
-            .clone();
-        drop(channels); // Release lock before blocking
-
-        // Create a sync channel to receive the result
-        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
-
-        // Send the raw bytes directly (no encoding needed for serial)
-        tx.try_send(TransmitRequest {
-            data: bytes.to_vec(),
-            result_tx,
-        })
-        .map_err(|e| format!("Failed to queue serial transmit request: {}", e))?;
-
-        // Wait for the result with a timeout
-        let result = result_rx
-            .recv_timeout(std::time::Duration::from_millis(500))
-            .map_err(|e| format!("Serial transmit timeout or channel closed: {}", e))?;
-
-        result?;
-
-        Ok(TransmitResult::success())
     }
 
     fn state(&self) -> IOState {

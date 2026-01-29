@@ -278,7 +278,7 @@ fn spawn_csv_stream(
         {
             emit_to_session(
                 &app_handle,
-                "can-bytes-error",
+                "session-error",
                 &session_id,
                 format!("CSV error: {}", e),
             );

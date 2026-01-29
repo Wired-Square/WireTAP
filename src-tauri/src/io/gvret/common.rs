@@ -15,10 +15,8 @@
 //   - Extended (29-bit): Lower 29 bits, bit 31 = 1 (0x80000000)
 
 use hex::ToHex;
-use tauri::AppHandle;
 
-use crate::io::{now_us, CanTransmitFrame, FrameMessage, InterfaceTraits, Protocol, StreamEndedPayload, TemporalMode, TransmitResult, emit_to_session};
-use crate::buffer_store::{self, BufferType};
+use crate::io::{now_us, CanTransmitFrame, FrameMessage, InterfaceTraits, Protocol, TemporalMode, TransmitResult};
 
 // ============================================================================
 // Constants
@@ -397,59 +395,6 @@ pub fn validate_gvret_frame(frame: &CanTransmitFrame) -> Result<(), TransmitResu
 
 // ============================================================================
 // Stream Helpers
-// ============================================================================
-
-/// Emit stream-ended event with buffer info
-///
-/// Finalizes the buffer and emits the stream-ended event with metadata.
-pub fn emit_stream_ended(
-    app_handle: &AppHandle,
-    session_id: &str,
-    reason: &str,
-    log_prefix: &str,
-) {
-    // Finalize the buffer and get metadata
-    let metadata = buffer_store::finalize_buffer();
-
-    let (buffer_id, buffer_type, count, time_range, buffer_available) = match metadata {
-        Some(ref m) => {
-            let type_str = match m.buffer_type {
-                BufferType::Frames => "frames",
-                BufferType::Bytes => "bytes",
-            };
-            (
-                Some(m.id.clone()),
-                Some(type_str.to_string()),
-                m.count,
-                match (m.start_time_us, m.end_time_us) {
-                    (Some(start), Some(end)) => Some((start, end)),
-                    _ => None,
-                },
-                m.count > 0,
-            )
-        }
-        None => (None, None, 0, None, false),
-    };
-
-    emit_to_session(
-        app_handle,
-        "stream-ended",
-        session_id,
-        StreamEndedPayload {
-            reason: reason.to_string(),
-            buffer_available,
-            buffer_id,
-            buffer_type,
-            count,
-            time_range,
-        },
-    );
-    eprintln!(
-        "[{}:{}] Stream ended (reason: {}, count: {})",
-        log_prefix, session_id, reason, count
-    );
-}
-
 // ============================================================================
 // Tests
 // ============================================================================

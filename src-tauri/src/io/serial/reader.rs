@@ -17,10 +17,10 @@ use tauri::AppHandle;
 use tokio::sync::mpsc;
 
 use crate::io::gvret::{apply_bus_mapping, BusMapping};
-use crate::io::types::{RawByteEntry, SourceMessage, TransmitRequest, TransmitSender};
+use crate::io::types::{ByteEntry, SourceMessage, TransmitRequest, TransmitSender};
 use crate::io::{
-    emit_frames, emit_to_session, now_us, FrameMessage, IOCapabilities,
-    IODevice, IOState, StreamEndedPayload, TransmitResult,
+    emit_frames, emit_stream_ended, emit_to_session, now_us, FrameMessage, IOCapabilities,
+    IODevice, IOState, TransmitPayload, TransmitResult,
 };
 
 // Re-export Parity for external use
@@ -121,7 +121,8 @@ impl SerialReader {
 impl IODevice for SerialReader {
     fn capabilities(&self) -> IOCapabilities {
         // Standalone serial always emits raw bytes (client-side framing)
-        IOCapabilities::realtime_serial().with_emits_raw_bytes(true)
+        IOCapabilities::realtime_serial()
+            .with_data_streams(false, true) // No server-side frames, raw bytes only
     }
 
     async fn start(&mut self) -> Result<(), String> {
@@ -206,7 +207,14 @@ impl IODevice for SerialReader {
         &self.session_id
     }
 
-    fn transmit_serial(&self, bytes: &[u8]) -> Result<TransmitResult, String> {
+    fn transmit(&self, payload: &TransmitPayload) -> Result<TransmitResult, String> {
+        let bytes: &[u8] = match payload {
+            TransmitPayload::RawBytes(b) => b,
+            TransmitPayload::CanFrame(_) => {
+                return Err("Serial devices do not support CAN frame transmission".to_string());
+            }
+        };
+
         if bytes.is_empty() {
             return Ok(TransmitResult::error("No bytes to transmit".to_string()));
         }
@@ -239,52 +247,6 @@ impl IODevice for SerialReader {
 
         Ok(TransmitResult::success())
     }
-}
-
-/// Helper to emit stream-ended event
-fn emit_stream_ended(app_handle: &AppHandle, session_id: &str, reason: &str) {
-    // Finalize the buffer and get metadata
-    let metadata = buffer_store::finalize_buffer();
-
-    let (buffer_id, buffer_type, count, time_range, buffer_available) = match metadata {
-        Some(ref m) => {
-            let type_str = match m.buffer_type {
-                BufferType::Frames => "frames",
-                BufferType::Bytes => "bytes",
-            };
-            (
-                Some(m.id.clone()),
-                Some(type_str.to_string()),
-                m.count,
-                match (m.start_time_us, m.end_time_us) {
-                    (Some(start), Some(end)) => Some((start, end)),
-                    _ => None,
-                },
-                m.count > 0,
-            )
-        }
-        None => (None, None, 0, None, false),
-    };
-
-    emit_to_session(
-        app_handle,
-        "stream-ended",
-        session_id,
-        StreamEndedPayload {
-            reason: reason.to_string(),
-            buffer_available,
-            buffer_id,
-            buffer_type,
-            count,
-            time_range,
-        },
-    );
-    eprintln!(
-        "[Serial:{}] Stream ended (reason: {}, count: {})",
-        session_id,
-        reason,
-        count
-    );
 }
 
 /// Spawn the serial stream task
@@ -372,11 +334,11 @@ fn run_serial_stream_blocking(
         Err(e) => {
             emit_to_session(
                 &app_handle,
-                "can-bytes-error",
+                "session-error",
                 &session_id,
                 format!("Failed to open {}: {}", config.port, e),
             );
-            emit_stream_ended(&app_handle, &session_id, "error");
+            emit_stream_ended(&app_handle, &session_id, "error", "Serial");
             return;
         }
     };
@@ -525,7 +487,7 @@ fn run_serial_stream_blocking(
             Err(e) => {
                 emit_to_session(
                     &app_handle,
-                    "can-bytes-error",
+                    "session-error",
                     &session_id,
                     format!("Read error: {}", e),
                 );
@@ -618,7 +580,7 @@ fn run_serial_stream_blocking(
         emit_frames(&app_handle, &session_id, pending_frames);
     }
 
-    emit_stream_ended(&app_handle, &session_id, stream_reason);
+    emit_stream_ended(&app_handle, &session_id, stream_reason, "Serial");
 }
 
 // ============================================================================
@@ -726,15 +688,15 @@ pub async fn run_source(
 
                     // Emit raw bytes if requested
                     if emit_raw_bytes {
-                        let raw_entries: Vec<RawByteEntry> = read_bytes
+                        let raw_entries: Vec<ByteEntry> = read_bytes
                             .iter()
-                            .map(|&byte| RawByteEntry {
+                            .map(|&byte| ByteEntry {
                                 byte,
-                                timestamp_us: base_ts as i64,
+                                timestamp_us: base_ts,
                                 bus: output_bus,
                             })
                             .collect();
-                        let _ = tx_clone.blocking_send(SourceMessage::RawBytes(source_idx, raw_entries));
+                        let _ = tx_clone.blocking_send(SourceMessage::Bytes(source_idx, raw_entries));
                     }
 
                     // Only process through framer if we have actual framing

@@ -17,7 +17,7 @@ pub use usb::probe_gvret_usb;
 
 // Internal items used by multi_source and other drivers
 pub(crate) use common::{
-    apply_bus_mapping, emit_stream_ended, encode_gvret_frame, validate_gvret_frame,
+    apply_bus_mapping, encode_gvret_frame, validate_gvret_frame,
 };
 // parse_gvret_frames exported for tests
 #[cfg(test)]
