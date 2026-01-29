@@ -250,10 +250,13 @@ impl GsDeviceMode {
 /// gs_usb reader configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GsUsbConfig {
-    /// USB bus number (for device identification)
+    /// USB bus number (for device identification, fallback if serial not available)
     pub bus: u8,
-    /// USB device address (for device identification)
+    /// USB device address (for device identification, fallback if serial not available)
     pub address: u8,
+    /// USB serial number (preferred device identifier - stable across reconnects)
+    #[serde(default)]
+    pub serial: Option<String>,
     /// CAN bitrate in bits/second (e.g., 500000)
     pub bitrate: u32,
     /// Listen-only mode (no ACK, no transmit)
@@ -277,6 +280,7 @@ impl Default for GsUsbConfig {
         Self {
             bus: 0,
             address: 0,
+            serial: None,
             bitrate: 500_000,
             listen_only: true,
             channel: 0,

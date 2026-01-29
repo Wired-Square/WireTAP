@@ -71,6 +71,32 @@ pub fn encode_frame(frame: &CanTransmitFrame, channel: u8) -> Vec<u8> {
 const CONTROL_TIMEOUT: Duration = Duration::from_millis(1000);
 
 // ============================================================================
+// Device Matching
+// ============================================================================
+
+/// Check if a USB device matches by serial number (preferred) or bus:address (fallback).
+/// Returns true if:
+/// - serial is Some and matches the device's serial number, OR
+/// - serial is None and bus:address matches
+fn device_matches(dev: &nusb::DeviceInfo, serial: Option<&str>, bus: u8, address: u8) -> bool {
+    // Must be a gs_usb device
+    if dev.vendor_id() != GS_USB_VID || !GS_USB_PIDS.contains(&dev.product_id()) {
+        return false;
+    }
+
+    // Prefer serial number matching when available
+    if let Some(target_serial) = serial {
+        if let Some(dev_serial) = dev.serial_number() {
+            return dev_serial == target_serial;
+        }
+    }
+
+    // Fall back to bus:address matching
+    let dev_bus = dev.bus_id().parse::<u8>().unwrap_or(0);
+    dev_bus == bus && dev.device_address() == address
+}
+
+// ============================================================================
 // Device Enumeration
 // ============================================================================
 
@@ -109,13 +135,7 @@ pub fn probe_device(bus: u8, address: u8) -> Result<GsUsbProbeResult, IoError> {
     let device_info = nusb::list_devices()
         .wait()
         .map_err(|e| IoError::other(&device, format!("list USB devices: {}", e)))?
-        .find(|dev| {
-            let dev_bus = dev.bus_id().parse::<u8>().unwrap_or(0);
-            dev_bus == bus
-                && dev.device_address() == address
-                && dev.vendor_id() == GS_USB_VID
-                && GS_USB_PIDS.contains(&dev.product_id())
-        })
+        .find(|dev| device_matches(dev, None, bus, address))
         .ok_or_else(|| IoError::not_found(&device))?;
 
     // Open the device (also returns MaybeFuture)
@@ -372,15 +392,10 @@ async fn run_gs_usb_stream(
     let mut total_frames: i64 = 0;
 
     // Find and open device - use .await in async context
+    // Prefer serial number matching when available, fall back to bus:address
     let device_info = match nusb::list_devices().await {
         Ok(mut devices) => devices
-            .find(|dev| {
-                let dev_bus = dev.bus_id().parse::<u8>().unwrap_or(0);
-                dev_bus == config.bus
-                    && dev.device_address() == config.address
-                    && dev.vendor_id() == GS_USB_VID
-                    && GS_USB_PIDS.contains(&dev.product_id())
-            })
+            .find(|dev| device_matches(dev, config.serial.as_deref(), config.bus, config.address))
             .ok_or_else(|| IoError::not_found(&device_name).to_string()),
         Err(e) => Err(IoError::other(&device_name, format!("list devices: {}", e)).to_string()),
     };
@@ -745,6 +760,7 @@ pub async fn run_source(
     source_idx: usize,
     bus: u8,
     address: u8,
+    serial: Option<String>,
     bitrate: u32,
     listen_only: bool,
     channel: u8,
@@ -752,16 +768,10 @@ pub async fn run_source(
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
-    // Find and open device
+    // Find and open device - prefer serial number matching when available
     let device_info = match nusb::list_devices().await {
         Ok(mut devices) => devices
-            .find(|dev| {
-                let dev_bus = dev.bus_id().parse::<u8>().unwrap_or(0);
-                dev_bus == bus
-                    && dev.device_address() == address
-                    && dev.vendor_id() == GS_USB_VID
-                    && GS_USB_PIDS.contains(&dev.product_id())
-            })
+            .find(|dev| device_matches(dev, serial.as_deref(), bus, address))
             .ok_or_else(|| "Device not found".to_string()),
         Err(e) => Err(format!("Failed to list devices: {}", e)),
     };
@@ -804,6 +814,7 @@ pub async fn run_source(
     let config = GsUsbConfig {
         bus,
         address,
+        serial: serial.clone(),
         bitrate,
         listen_only,
         channel,

@@ -1135,6 +1135,10 @@ export default function IOProfileDialog({
                     if (device) {
                       onUpdateConnectionField("bus", String(device.bus));
                       onUpdateConnectionField("address", String(device.address));
+                      // Store serial number for stable device identification across reconnects
+                      if (device.serial) {
+                        onUpdateConnectionField("serial", device.serial);
+                      }
                       if (device.interface_name) {
                         onUpdateConnectionField("interface", device.interface_name);
                       }

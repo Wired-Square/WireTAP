@@ -76,12 +76,19 @@ export async function probeGsUsbDevice(
 
 /**
  * Create a unique device ID for display and selection purposes.
+ * Preference order: interface_name (Linux) > serial number > bus:address
+ * Serial numbers are stable across USB reconnects, unlike bus:address.
  */
 export function createDeviceId(device: GsUsbDeviceInfo): string {
-  // Use interface name on Linux if available, otherwise bus:address
+  // Use interface name on Linux if available (most specific)
   if (device.interface_name) {
     return device.interface_name;
   }
+  // Prefer serial number when available (stable across reconnects)
+  if (device.serial) {
+    return device.serial;
+  }
+  // Fall back to bus:address (may change on reconnect)
   return `${device.bus}:${device.address}`;
 }
 

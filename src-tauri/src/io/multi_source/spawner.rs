@@ -218,6 +218,11 @@ async fn run_gs_usb_reader(
         .get("address")
         .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
         .unwrap_or(0) as u8;
+    let serial = profile
+        .connection
+        .get("serial")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     let bitrate = profile
         .connection
         .get("bitrate")
@@ -238,6 +243,7 @@ async fn run_gs_usb_reader(
         source_idx,
         bus,
         address,
+        serial,
         bitrate,
         listen_only,
         channel,
