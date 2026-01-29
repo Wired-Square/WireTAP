@@ -114,7 +114,7 @@ export default function DiscoveryTopBar({
   const hasFrames = isSerialMode ? (frameCount > 0 || serialBytesCount > 0) : frameCount > 0;
 
   return (
-    <div className={`${bgSurface} ${borderDivider} px-4 py-2`}>
+    <div className={`flex-shrink-0 ${bgSurface} ${borderDivider} px-4 py-2`}>
       <div className="flex flex-wrap items-center gap-2">
         {/* Discovery icon */}
         <Search className={`${iconLg} text-purple-600 dark:text-purple-400 shrink-0`} />

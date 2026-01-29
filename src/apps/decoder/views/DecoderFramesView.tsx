@@ -6,12 +6,12 @@ import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
 import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
 import { badgeDarkPanelInfo, badgeDarkPanelSuccess, badgeDarkPanelDanger, badgeDarkPanelPurple } from "../../../styles/badgeStyles";
-import { bgDarkView, borderDarkView, caption, bgSurface } from "../../../styles";
+import { caption, bgSurface } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId } from "../../../utils/frameIds";
 import { sendHexDataToCalculator } from "../../../utils/windowCommunication";
-import DataViewController, { type TabDefinition, type ProtocolBadge } from "../../../components/DataViewController";
+import AppTabView, { type TabDefinition, type ProtocolBadge } from "../../../components/AppTabView";
 import HeaderFieldFilter from "../../../components/HeaderFieldFilter";
 import type { DecodedFrame, DecodedSignal, DecoderViewMode, UnmatchedFrame, FilteredFrame } from "../../../stores/decoderStore";
 import { MAX_UNMATCHED_FRAMES, MAX_FILTERED_FRAMES } from "../../../stores/decoderStore";
@@ -963,44 +963,48 @@ export default function DecoderFramesView({
   );
 
   return (
-    <div className={`flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border ${borderDarkView}`}>
-      {/* View Controller: Tab Bar + Toolbar + Timeline */}
-      <DataViewController
-        // Tab bar
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        protocolLabel={protocol.toUpperCase()}
-        protocolBadges={protocolBadges}
-        isStreaming={isDecoding && !isPaused}
-        timestamp={timestamp}
-        displayTime={displayTime ?? undefined}
-        isRecorded={false}
-        tabBarControls={tabBarControls}
-
-        // Toolbar - show when we have time range or playback controls
-        showToolbar={showTimeRange || isReady}
-        currentPage={0}
-        totalPages={1}
-        pageSize={-1}
-        onPageChange={() => {}}
-        onPageSizeChange={() => {}}
-        toolbarLeftContent={timeRangeInputs}
-        toolbarCenterContent={playbackControls}
-        hidePagination={true}
-
-        // Timeline
-        showTimeline={showTimeline}
-        minTimeUs={minTimeUs ?? 0}
-        maxTimeUs={maxTimeUs ?? 0}
-        currentTimeUs={currentTimeUs ?? minTimeUs ?? 0}
-        onTimelineScrub={onScrub ?? (() => {})}
-        displayTimeFormat="human"
-        timelineDisabled={!hasBufferData}
-      />
-
-      {/* Frame cards - the main data view */}
-      <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDarkView} p-4 space-y-4`}>
+    <AppTabView
+      // Tab bar
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      protocolLabel={protocol.toUpperCase()}
+      protocolBadges={protocolBadges}
+      isStreaming={isDecoding && !isPaused}
+      timestamp={timestamp}
+      displayTime={displayTime ?? undefined}
+      tabBarControls={tabBarControls}
+      // Toolbar - show when we have time range or playback controls
+      toolbar={
+        showTimeRange || isReady
+          ? {
+              currentPage: 0,
+              totalPages: 1,
+              pageSize: -1,
+              onPageChange: () => {},
+              onPageSizeChange: () => {},
+              leftContent: timeRangeInputs,
+              centerContent: playbackControls,
+              hidePagination: true,
+            }
+          : undefined
+      }
+      // Timeline
+      timeline={
+        showTimeline
+          ? {
+              minTimeUs: minTimeUs ?? 0,
+              maxTimeUs: maxTimeUs ?? 0,
+              currentTimeUs: currentTimeUs ?? minTimeUs ?? 0,
+              onScrub: onScrub ?? (() => {}),
+              displayTimeFormat: "human",
+              disabled: !hasBufferData,
+            }
+          : undefined
+      }
+      // Content area with space-y-4 for card spacing
+      contentArea={{ spaceY: true }}
+    >
         {activeTab === 'signals' ? (
           // Signals tab content
           <>
@@ -1209,7 +1213,6 @@ export default function DecoderFramesView({
             )}
           </div>
         ) : null}
-      </div>
-    </div>
+    </AppTabView>
   );
 }

@@ -6,12 +6,13 @@ import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/time
 import { useDiscoveryStore } from "../../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
 import { getBufferFramesPaginatedFiltered, findBufferOffsetForTimestamp, type BufferMetadata } from "../../../api/buffer";
-import { DiscoveryViewController, FrameDataTable, type TabDefinition, FRAME_PAGE_SIZE_OPTIONS } from "../components";
+import { FrameDataTable, type TabDefinition, FRAME_PAGE_SIZE_OPTIONS } from "../components";
+import AppTabView from "../../../components/AppTabView";
 import { PlaybackControls, type PlaybackState } from "../../../components/PlaybackControls";
 import type { PlaybackSpeed } from "../../../components/TimeController";
 import ChangesResultView from "./tools/ChangesResultView";
 import MessageOrderResultView from "./tools/MessageOrderResultView";
-import { bgDarkView, borderDarkView, textDarkMuted } from "../../../styles";
+import { bgDarkView, textDarkMuted } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import type { IOCapabilities } from "../../../api/io";
 
@@ -589,164 +590,141 @@ function DiscoveryFramesView({
     </div>
   ) : null;
 
-  return (
-    <div className={`flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border ${borderDarkView}`}>
-      {/* Tab Content */}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {activeTab === 'frames' && (
-          <>
-            {/* View Controller: Tab Bar + Toolbar + Timeline */}
-            <DiscoveryViewController
-              // Tab bar
-              tabs={tabs}
-              activeTab={activeTab}
-              onTabChange={(id) => setActiveTab(id as 'frames' | 'filtered' | 'analysis')}
-              protocolLabel={protocol.toUpperCase()}
-              isStreaming={isStreaming}
-              timestamp={timestamp}
-              displayTime={displayTime}
-              isRecorded={isRecorded}
-              tabBarControls={
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={toggleShowBusColumn}
-                    className={`p-1.5 rounded transition-colors ${
-                      showBusColumn
-                        ? 'bg-cyan-600 text-white hover:bg-cyan-500'
-                        : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-gray-200'
-                    }`}
-                    title={showBusColumn ? 'Hide Bus column' : 'Show Bus column'}
-                  >
-                    <Network className={iconSm} />
-                  </button>
-                  <button
-                    onClick={toggleShowAsciiColumn}
-                    className={`p-1.5 rounded transition-colors ${
-                      showAsciiColumn
-                        ? 'bg-yellow-600 text-white hover:bg-yellow-500'
-                        : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-gray-200'
-                    }`}
-                    title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
-                  >
-                    <FileText className={iconSm} />
-                  </button>
-                </div>
-              }
+  // Toolbar and timeline only shown on frames tab
+  const showToolbar = activeTab === 'frames';
+  const showTimeline = activeTab === 'frames' && timelineProps.show;
 
-              // Toolbar
-              showToolbar={true}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              pageSize={renderBuffer}
-              pageSizeOptions={FRAME_PAGE_SIZE_OPTIONS}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={handlePageSizeChange}
-              toolbarLoading={isFiltering || bufferModeLoading}
-              toolbarDisabled={isStreaming}
-              toolbarLeftContent={timeRangeInputs}
-              toolbarCenterContent={
-                onPlay && onPause ? (
-                  <PlaybackControls
-                    playbackState={playbackState}
-                    playbackDirection={playbackDirection}
-                    isReady={bufferMode.enabled}
-                    canPause={capabilities?.can_pause ?? false}
-                    supportsSeek={capabilities?.supports_seek ?? false}
-                    supportsSpeedControl={capabilities?.supports_speed_control ?? false}
-                    supportsReverse={capabilities?.supports_reverse ?? false}
-                    playbackSpeed={playbackSpeed}
-                    minTimeUs={timelineProps.minTimeUs}
-                    maxTimeUs={timelineProps.maxTimeUs}
-                    currentTimeUs={timelineProps.currentTimeUs}
-                    currentFrameIndex={currentFrameIndex}
-                    totalFrames={bufferMode.totalFrames}
-                    onPlay={onPlay}
-                    onPlayBackward={onPlayBackward}
-                    onPause={onPause}
-                    onStepBackward={onStepBackward}
-                    onStepForward={onStepForward}
-                    onScrub={timelineProps.onScrub}
-                    onSpeedChange={onSpeedChange}
-                  />
-                ) : null
-              }
-              hidePagination={isStreaming || isFiltering || bufferModeLoading}
-
-              // Timeline
-              showTimeline={timelineProps.show}
-              minTimeUs={timelineProps.minTimeUs}
-              maxTimeUs={timelineProps.maxTimeUs}
-              currentTimeUs={timelineProps.currentTimeUs}
-              onTimelineScrub={timelineProps.onScrub}
-              displayTimeFormat={displayTimeFormat}
-              streamStartTimeUs={effectiveStartTimeUs}
-              timelineDisabled={timelineProps.disabled}
-            />
-
-            {/* Frame Table */}
-            <FrameDataTable
-              ref={scrollRef}
-              frames={visibleFrames}
-              displayFrameIdFormat={displayFrameIdFormat}
-              formatTime={formatTime}
-              onBookmark={onBookmark}
-              emptyMessage={isStreaming ? 'Waiting for frames...' : 'No frames to display'}
-              showAscii={showAsciiColumn}
-              showBus={showBusColumn}
-              highlightedRowIndex={highlightedRowIndex}
-              onRowClick={onFrameSelect ? handleRowClick : undefined}
-              pageStartIndex={currentPage * (renderBuffer === -1 ? visibleFrames.length : renderBuffer)}
-              framesReversed={framesWereReversed}
-              pageFrameCount={visibleFrames.length}
-            />
-          </>
-        )}
-
-        {activeTab === 'analysis' && (
-          <>
-            {/* Show tab bar for analysis tab too */}
-            <DiscoveryViewController
-              tabs={tabs}
-              activeTab={activeTab}
-              onTabChange={(id) => setActiveTab(id as 'frames' | 'filtered' | 'analysis')}
-              protocolLabel={protocol.toUpperCase()}
-              isStreaming={isStreaming}
-              timestamp={timestamp}
-              displayTime={displayTime}
-              isRecorded={isRecorded}
-
-              // No toolbar or timeline for analysis tab
-              showToolbar={false}
-              currentPage={0}
-              totalPages={1}
-              pageSize={20}
-              onPageChange={() => {}}
-              onPageSizeChange={() => {}}
-              showTimeline={false}
-              minTimeUs={0}
-              maxTimeUs={0}
-              currentTimeUs={0}
-              onTimelineScrub={() => {}}
-              displayTimeFormat={displayTimeFormat}
-            />
-
-            <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDarkView} p-4`}>
-              {toolboxResults.changesResults && (
-                <ChangesResultView />
-              )}
-              {toolboxResults.messageOrderResults && (
-                <MessageOrderResultView />
-              )}
-              {!hasAnalysisResults && (
-                <div className={`${textDarkMuted} text-center py-8`}>
-                  No analysis results. Use the Toolbox to run analysis tools.
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+  // Tab bar controls only shown on frames tab
+  const tabBarControls = activeTab === 'frames' ? (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={toggleShowBusColumn}
+        className={`p-1.5 rounded transition-colors ${
+          showBusColumn
+            ? 'bg-cyan-600 text-white hover:bg-cyan-500'
+            : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-gray-200'
+        }`}
+        title={showBusColumn ? 'Hide Bus column' : 'Show Bus column'}
+      >
+        <Network className={iconSm} />
+      </button>
+      <button
+        onClick={toggleShowAsciiColumn}
+        className={`p-1.5 rounded transition-colors ${
+          showAsciiColumn
+            ? 'bg-yellow-600 text-white hover:bg-yellow-500'
+            : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-gray-200'
+        }`}
+        title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
+      >
+        <FileText className={iconSm} />
+      </button>
     </div>
+  ) : undefined;
+
+  // Playback controls for toolbar center
+  const playbackControls = onPlay && onPause ? (
+    <PlaybackControls
+      playbackState={playbackState}
+      playbackDirection={playbackDirection}
+      isReady={bufferMode.enabled}
+      canPause={capabilities?.can_pause ?? false}
+      supportsSeek={capabilities?.supports_seek ?? false}
+      supportsSpeedControl={capabilities?.supports_speed_control ?? false}
+      supportsReverse={capabilities?.supports_reverse ?? false}
+      playbackSpeed={playbackSpeed}
+      minTimeUs={timelineProps.minTimeUs}
+      maxTimeUs={timelineProps.maxTimeUs}
+      currentTimeUs={timelineProps.currentTimeUs}
+      currentFrameIndex={currentFrameIndex}
+      totalFrames={bufferMode.totalFrames}
+      onPlay={onPlay}
+      onPlayBackward={onPlayBackward}
+      onPause={onPause}
+      onStepBackward={onStepBackward}
+      onStepForward={onStepForward}
+      onScrub={timelineProps.onScrub}
+      onSpeedChange={onSpeedChange}
+    />
+  ) : null;
+
+  return (
+    <AppTabView
+      // Tab bar
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={(id) => setActiveTab(id as 'frames' | 'filtered' | 'analysis')}
+      protocolLabel={protocol.toUpperCase()}
+      isStreaming={isStreaming}
+      timestamp={timestamp}
+      displayTime={displayTime}
+      isRecorded={isRecorded}
+      tabBarControls={tabBarControls}
+      // Toolbar - only for frames tab
+      toolbar={
+        showToolbar
+          ? {
+              currentPage,
+              totalPages,
+              pageSize: renderBuffer,
+              pageSizeOptions: FRAME_PAGE_SIZE_OPTIONS,
+              onPageChange: setCurrentPage,
+              onPageSizeChange: handlePageSizeChange,
+              loading: isFiltering || bufferModeLoading,
+              disabled: isStreaming,
+              leftContent: timeRangeInputs,
+              centerContent: playbackControls,
+              hidePagination: isStreaming || isFiltering || bufferModeLoading,
+            }
+          : undefined
+      }
+      // Timeline - only for frames tab
+      timeline={
+        showTimeline
+          ? {
+              minTimeUs: timelineProps.minTimeUs,
+              maxTimeUs: timelineProps.maxTimeUs,
+              currentTimeUs: timelineProps.currentTimeUs,
+              onScrub: timelineProps.onScrub,
+              displayTimeFormat,
+              streamStartTimeUs: effectiveStartTimeUs,
+              disabled: timelineProps.disabled,
+            }
+          : undefined
+      }
+      // Content area - no wrapper since FrameDataTable handles its own scroll
+      contentArea={{ wrap: false }}
+    >
+      {activeTab === 'frames' && (
+        <FrameDataTable
+          ref={scrollRef}
+          frames={visibleFrames}
+          displayFrameIdFormat={displayFrameIdFormat}
+          formatTime={formatTime}
+          onBookmark={onBookmark}
+          emptyMessage={isStreaming ? 'Waiting for frames...' : 'No frames to display'}
+          showAscii={showAsciiColumn}
+          showBus={showBusColumn}
+          highlightedRowIndex={highlightedRowIndex}
+          onRowClick={onFrameSelect ? handleRowClick : undefined}
+          pageStartIndex={currentPage * (renderBuffer === -1 ? visibleFrames.length : renderBuffer)}
+          framesReversed={framesWereReversed}
+          pageFrameCount={visibleFrames.length}
+        />
+      )}
+
+      {activeTab === 'analysis' && (
+        <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDarkView} p-4`}>
+          {toolboxResults.changesResults && <ChangesResultView />}
+          {toolboxResults.messageOrderResults && <MessageOrderResultView />}
+          {!hasAnalysisResults && (
+            <div className={`${textDarkMuted} text-center py-8`}>
+              No analysis results. Use the Toolbox to run analysis tools.
+            </div>
+          )}
+        </div>
+      )}
+    </AppTabView>
   );
 }
 

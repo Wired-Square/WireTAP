@@ -748,7 +748,7 @@ export default function Decoder() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-900 overflow-hidden">
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-900 overflow-hidden">
       {catalogNotification && (
         <FlashNotification
           message={catalogNotification}

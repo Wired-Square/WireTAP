@@ -137,7 +137,7 @@ export default function DecoderTopBar({
   const isDefaultCatalog = selectedCatalog?.filename === defaultCatalogFilename;
 
   return (
-    <div className={`${bgSurface} ${borderDivider} px-4 py-2`}>
+    <div className={`flex-shrink-0 ${bgSurface} ${borderDivider} px-4 py-2`}>
       <div className="flex flex-wrap items-center gap-2">
         {/* Decoder icon */}
         <Activity className={`${iconLg} text-green-600 dark:text-green-400 shrink-0`} />
