@@ -86,6 +86,7 @@ fn open_or_focus_window(app: &AppHandle, label: &str, url: &str) {
                 .inner_size(config.width, config.height)
                 .min_inner_size(config.min_width, config.min_height)
                 .center()
+                .disable_drag_drop_handler()
                 .build();
         }
     } else {
@@ -95,6 +96,7 @@ fn open_or_focus_window(app: &AppHandle, label: &str, url: &str) {
             .inner_size(config.width, config.height)
             .min_inner_size(config.min_width, config.min_height)
             .center()
+            .disable_drag_drop_handler()
             .build();
     }
 }
@@ -133,6 +135,7 @@ async fn create_main_window(app: AppHandle, label: String) -> Result<(), String>
                 .inner_size(config.width, config.height)
                 .min_inner_size(config.min_width, config.min_height)
                 .center()
+                .disable_drag_drop_handler()
                 .build()
             {
                 eprintln!("[create_main_window] Failed to create window '{}': {}", label_for_window, e);
