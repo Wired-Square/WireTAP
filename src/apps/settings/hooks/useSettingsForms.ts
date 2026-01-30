@@ -14,16 +14,31 @@ export interface BookmarkFormState {
   maxFrames: string;
 }
 
+export interface NewBookmarkFormState {
+  profileId: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  maxFrames: string;
+}
+
 export function useSettingsForms() {
   // Catalog dialog form (used for both duplicate and edit)
   const [catalogName, setCatalogName] = useState('');
   const [catalogFilename, setCatalogFilename] = useState('');
 
-  // Bookmark dialog form
+  // Bookmark dialog form (for editing)
   const [bookmarkName, setBookmarkName] = useState('');
   const [bookmarkStartTime, setBookmarkStartTime] = useState('');
   const [bookmarkEndTime, setBookmarkEndTime] = useState('');
   const [bookmarkMaxFrames, setBookmarkMaxFrames] = useState('');
+
+  // New bookmark dialog form (for creating)
+  const [newBookmarkProfileId, setNewBookmarkProfileId] = useState('');
+  const [newBookmarkName, setNewBookmarkName] = useState('');
+  const [newBookmarkStartTime, setNewBookmarkStartTime] = useState('');
+  const [newBookmarkEndTime, setNewBookmarkEndTime] = useState('');
+  const [newBookmarkMaxFrames, setNewBookmarkMaxFrames] = useState('');
 
   // Reset helpers
   const resetCatalogForm = () => {
@@ -36,6 +51,14 @@ export function useSettingsForms() {
     setBookmarkStartTime('');
     setBookmarkEndTime('');
     setBookmarkMaxFrames('');
+  };
+
+  const resetNewBookmarkForm = () => {
+    setNewBookmarkProfileId('');
+    setNewBookmarkName('');
+    setNewBookmarkStartTime('');
+    setNewBookmarkEndTime('');
+    setNewBookmarkMaxFrames('');
   };
 
   // Initialize catalog form for duplication
@@ -63,6 +86,15 @@ export function useSettingsForms() {
     setBookmarkMaxFrames(maxFrames ? String(maxFrames) : '');
   };
 
+  // Initialize new bookmark form with default profile
+  const initNewBookmarkForm = (defaultProfileId: string) => {
+    setNewBookmarkProfileId(defaultProfileId);
+    setNewBookmarkName('');
+    setNewBookmarkStartTime('');
+    setNewBookmarkEndTime('');
+    setNewBookmarkMaxFrames('');
+  };
+
   return {
     // Catalog form
     catalogName,
@@ -73,7 +105,7 @@ export function useSettingsForms() {
     initDuplicateCatalogForm,
     initEditCatalogForm,
 
-    // Bookmark form
+    // Bookmark form (editing)
     bookmarkName,
     setBookmarkName,
     bookmarkStartTime,
@@ -84,6 +116,20 @@ export function useSettingsForms() {
     setBookmarkMaxFrames,
     resetBookmarkForm,
     initEditBookmarkForm,
+
+    // New bookmark form (creating)
+    newBookmarkProfileId,
+    setNewBookmarkProfileId,
+    newBookmarkName,
+    setNewBookmarkName,
+    newBookmarkStartTime,
+    setNewBookmarkStartTime,
+    newBookmarkEndTime,
+    setNewBookmarkEndTime,
+    newBookmarkMaxFrames,
+    setNewBookmarkMaxFrames,
+    resetNewBookmarkForm,
+    initNewBookmarkForm,
   };
 }
 

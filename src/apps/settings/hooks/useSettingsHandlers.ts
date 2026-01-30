@@ -10,6 +10,7 @@ import {
   useBookmarkHandlers,
   type BookmarkHandlers,
 } from './handlers/useBookmarkHandlers';
+import type { IOProfile } from '../stores/settingsStore';
 
 export interface UseSettingsHandlersParams {
   // Form state from useSettingsForms
@@ -21,6 +22,7 @@ export interface UseSettingsHandlersParams {
   initDuplicateCatalogForm: (name: string, filename: string) => void;
   initEditCatalogForm: (name: string, filename: string) => void;
 
+  // Bookmark form (editing)
   bookmarkName: string;
   bookmarkStartTime: string;
   bookmarkEndTime: string;
@@ -32,6 +34,16 @@ export interface UseSettingsHandlersParams {
     endTime: string,
     maxFrames?: number
   ) => void;
+
+  // New bookmark form (creating)
+  newBookmarkProfileId: string;
+  newBookmarkName: string;
+  newBookmarkStartTime: string;
+  newBookmarkEndTime: string;
+  newBookmarkMaxFrames: string;
+  resetNewBookmarkForm: () => void;
+  initNewBookmarkForm: (defaultProfileId: string) => void;
+  timeRangeCapableProfiles: IOProfile[];
 }
 
 export type SettingsHandlers = IOProfileHandlers & SettingsCatalogHandlers & BookmarkHandlers;
@@ -59,6 +71,14 @@ export function useSettingsHandlers(params: UseSettingsHandlersParams): Settings
     bookmarkMaxFrames: params.bookmarkMaxFrames,
     resetBookmarkForm: params.resetBookmarkForm,
     initEditBookmarkForm: params.initEditBookmarkForm,
+    newBookmarkProfileId: params.newBookmarkProfileId,
+    newBookmarkName: params.newBookmarkName,
+    newBookmarkStartTime: params.newBookmarkStartTime,
+    newBookmarkEndTime: params.newBookmarkEndTime,
+    newBookmarkMaxFrames: params.newBookmarkMaxFrames,
+    resetNewBookmarkForm: params.resetNewBookmarkForm,
+    initNewBookmarkForm: params.initNewBookmarkForm,
+    timeRangeCapableProfiles: params.timeRangeCapableProfiles,
   });
 
   // Spread all handlers into a flat object

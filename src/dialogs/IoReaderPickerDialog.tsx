@@ -815,11 +815,12 @@ export default function IoReaderPickerDialog({
     handleMultiWatchClick();
   };
 
-  // Handle bookmark selection - fills in time range
+  // Handle bookmark selection - fills in time range and max frames
   // Bookmarks are stored in local time format (from microsToDatetimeLocal)
   const handleSelectBookmark = (bookmark: TimeRangeFavorite) => {
     setStartTime(bookmark.startTime);
     setEndTime(bookmark.endTime);
+    setMaxFrames(bookmark.maxFrames !== undefined ? String(bookmark.maxFrames) : "");
     setTimezoneMode("local"); // Bookmarks use local time
   };
 

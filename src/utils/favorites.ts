@@ -59,7 +59,8 @@ export async function addFavorite(
   name: string,
   profileId: string,
   startTime: string,
-  endTime: string
+  endTime: string,
+  maxFrames?: number
 ): Promise<TimeRangeFavorite> {
   const favorites = await getAllFavorites();
 
@@ -70,6 +71,7 @@ export async function addFavorite(
     startTime,
     endTime,
     createdAt: Date.now(),
+    ...(maxFrames !== undefined && { maxFrames }),
   };
 
   favorites.push(newFavorite);

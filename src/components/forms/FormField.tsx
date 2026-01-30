@@ -4,7 +4,7 @@ import { ReactNode } from 'react';
 import { textMedium } from '../../styles';
 
 export interface FormFieldProps {
-  label: string;
+  label: ReactNode;
   required?: boolean;
   variant?: 'default' | 'simple';
   children: ReactNode;

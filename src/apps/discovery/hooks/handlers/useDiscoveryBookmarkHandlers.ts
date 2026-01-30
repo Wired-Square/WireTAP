@@ -26,7 +26,7 @@ export interface UseDiscoveryBookmarkHandlersParams {
 
   // Session actions
   setTimeRange: (start: string, end: string) => Promise<void>;
-  reinitialize: (profileId?: string, options?: { startTime?: string; endTime?: string }) => Promise<void>;
+  reinitialize: (profileId?: string, options?: { startTime?: string; endTime?: string; limit?: number }) => Promise<void>;
 
   // Dialog controls
   openBookmarkDialog: () => void;
@@ -88,7 +88,7 @@ export function useDiscoveryBookmarkHandlers({
         if (isBufferProfileId(ioProfile)) {
           setIoProfile(targetProfile);
         }
-        await reinitialize(targetProfile, { startTime: startUtc, endTime: endUtc });
+        await reinitialize(targetProfile, { startTime: startUtc, endTime: endUtc, limit: bookmark.maxFrames });
         console.log("[Discovery:handleLoadBookmark] Reinitialized with new time range");
       } else if (targetProfile) {
         // Not viewing buffer - just update the time range on current session

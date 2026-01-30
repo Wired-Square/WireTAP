@@ -519,6 +519,7 @@ export default function Decoder() {
     startTime,
     endTime,
     playbackSpeed,
+    ioProfile,
     // Note: serialConfig is read directly from store in session handlers to avoid stale closures
 
     // Ingest session

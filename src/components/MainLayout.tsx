@@ -33,6 +33,7 @@ import {
 } from "../utils/persistence";
 import { getAppVersion, settingsPanelClosed, openSettingsPanel } from "../api";
 import { useSessionStore } from "../stores/sessionStore";
+import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import logo from "../assets/logo.png";
 
 // Lazy load app components for better initial load
@@ -507,11 +508,17 @@ export default function MainLayout() {
         // This is handled by Discovery and Decoder components
       });
 
+      // Navigate to Bookmarks tab in Settings (set before Settings mounts)
+      const unlistenBookmarkManage = await currentWindow.listen("menu-bookmark-manage", () => {
+        useSettingsStore.getState().setSection("bookmarks");
+      });
+
       return () => {
         unlistenPlay();
         unlistenPause();
         unlistenStop();
         unlistenClear();
+        unlistenBookmarkManage();
       };
     };
 

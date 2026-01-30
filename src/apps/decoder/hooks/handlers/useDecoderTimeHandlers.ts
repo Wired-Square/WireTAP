@@ -11,6 +11,10 @@ export interface UseDecoderTimeHandlersParams {
   // Session actions
   setTimeRange: (start?: string, end?: string) => Promise<void>;
   seek: (timeUs: number) => Promise<void>;
+  reinitialize: (profileId?: string, options?: { startTime?: string; endTime?: string; limit?: number }) => Promise<void>;
+
+  // Session state
+  ioProfile: string | null;
 
   // Capabilities
   capabilities: IOCapabilities | null;
@@ -37,6 +41,8 @@ export interface UseDecoderTimeHandlersParams {
 export function useDecoderTimeHandlers({
   setTimeRange,
   seek,
+  reinitialize,
+  ioProfile,
   capabilities,
   setStartTime,
   setEndTime,
@@ -100,10 +106,20 @@ export function useDecoderTimeHandlers({
       setStartTime(bookmark.startTime);
       setEndTime(bookmark.endTime);
       setActiveBookmarkId(bookmark.id);
-      await setTimeRange(localToUtc(bookmark.startTime), localToUtc(bookmark.endTime));
+
+      const startUtc = localToUtc(bookmark.startTime);
+      const endUtc = localToUtc(bookmark.endTime);
+
+      // If bookmark has maxFrames, we need to reinitialize to apply the limit
+      if (bookmark.maxFrames && ioProfile) {
+        await reinitialize(ioProfile, { startTime: startUtc, endTime: endUtc, limit: bookmark.maxFrames });
+      } else {
+        await setTimeRange(startUtc, endUtc);
+      }
+
       await markFavoriteUsed(bookmark.id);
     },
-    [setStartTime, setEndTime, setActiveBookmarkId, setTimeRange]
+    [setStartTime, setEndTime, setActiveBookmarkId, setTimeRange, reinitialize, ioProfile]
   );
 
   return {

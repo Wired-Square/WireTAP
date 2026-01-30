@@ -122,7 +122,8 @@ type DialogName =
   | 'duplicateCatalog'
   | 'editCatalog'
   | 'editBookmark'
-  | 'deleteBookmark';
+  | 'deleteBookmark'
+  | 'createBookmark';
 
 interface DialogPayload {
   editingProfileId: string | null;
@@ -143,6 +144,7 @@ const initialDialogs: Record<DialogName, boolean> = {
   editCatalog: false,
   editBookmark: false,
   deleteBookmark: false,
+  createBookmark: false,
 };
 
 const initialDialogPayload: DialogPayload = {

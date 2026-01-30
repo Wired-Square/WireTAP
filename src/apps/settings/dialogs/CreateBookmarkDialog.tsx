@@ -1,41 +1,48 @@
-// ui/src/apps/settings/dialogs/EditBookmarkDialog.tsx
+// ui/src/apps/settings/dialogs/CreateBookmarkDialog.tsx
 import { useState, useEffect } from "react";
 import Dialog from "../../../components/Dialog";
 import { Input, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
-import { h2 } from "../../../styles";
+import { h2, borderDefault } from "../../../styles";
+import type { IOProfile } from "../stores/settingsStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import TimezoneBadge, {
   type TimezoneMode,
   convertDatetimeLocal,
 } from "../../../components/TimezoneBadge";
 
-type EditBookmarkDialogProps = {
+type CreateBookmarkDialogProps = {
   isOpen: boolean;
+  availableProfiles: IOProfile[];
+  profileId: string;
   name: string;
   startTime: string;
   endTime: string;
   maxFrames: string;
+  onChangeProfileId: (id: string) => void;
   onChangeName: (name: string) => void;
   onChangeStartTime: (time: string) => void;
   onChangeEndTime: (time: string) => void;
   onChangeMaxFrames: (maxFrames: string) => void;
   onCancel: () => void;
-  onSave: () => void;
+  onCreate: () => void;
 };
 
-export default function EditBookmarkDialog({
+export default function CreateBookmarkDialog({
   isOpen,
+  availableProfiles,
+  profileId,
   name,
   startTime,
   endTime,
   maxFrames,
+  onChangeProfileId,
   onChangeName,
   onChangeStartTime,
   onChangeEndTime,
   onChangeMaxFrames,
   onCancel,
-  onSave,
-}: EditBookmarkDialogProps) {
+  onCreate,
+}: CreateBookmarkDialogProps) {
   const [timezoneMode, setTimezoneMode] = useState<TimezoneMode>("default");
   const defaultTz = useSettingsStore((s) => s.display.timezone);
 
@@ -53,12 +60,28 @@ export default function EditBookmarkDialog({
     setTimezoneMode(newMode);
   };
 
+  const isValid = profileId && name.trim() && startTime;
+
   return (
     <Dialog isOpen={isOpen} maxWidth="max-w-md">
       <div className="p-6">
-        <h2 className={`${h2} mb-6`}>Edit Bookmark</h2>
+        <h2 className={`${h2} mb-6`}>New Bookmark</h2>
 
         <div className="space-y-4">
+          <FormField label="Profile" variant="default">
+            <select
+              value={profileId}
+              onChange={(e) => onChangeProfileId(e.target.value)}
+              className={`w-full px-3 py-2 text-sm rounded border ${borderDefault} bg-[var(--bg-surface)] text-[color:var(--text-primary)]`}
+            >
+              {availableProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
           <FormField label="Name" variant="default">
             <Input
               variant="default"
@@ -110,8 +133,8 @@ export default function EditBookmarkDialog({
 
         <div className="flex justify-end gap-3 mt-6">
           <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={onSave} disabled={!name.trim()}>
-            Save
+          <PrimaryButton onClick={onCreate} disabled={!isValid}>
+            Create
           </PrimaryButton>
         </div>
       </div>

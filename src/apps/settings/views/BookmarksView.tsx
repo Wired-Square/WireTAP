@@ -1,16 +1,19 @@
 // ui/src/apps/settings/views/BookmarksView.tsx
-import { Bookmark, Edit2, Trash2 } from "lucide-react";
-import { iconMd, flexRowGap2 } from "../../../styles/spacing";
+import { Bookmark, Edit2, Plus, Trash2 } from "lucide-react";
+import { iconMd, iconSm, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
 import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
+import { PrimaryButton } from "../../../components/forms";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
 import type { IOProfile } from "../stores/settingsStore";
 
 type BookmarksViewProps = {
   bookmarks: TimeRangeFavorite[];
   ioProfiles: IOProfile[];
+  timeRangeCapableProfiles: IOProfile[];
   onEditBookmark: (bookmark: TimeRangeFavorite) => void;
   onDeleteBookmark: (bookmark: TimeRangeFavorite) => void;
+  onNewBookmark?: () => void;
 };
 
 const formatTimeRange = (bookmark: TimeRangeFavorite) => {
@@ -22,8 +25,10 @@ const formatTimeRange = (bookmark: TimeRangeFavorite) => {
 export default function BookmarksView({
   bookmarks,
   ioProfiles,
+  timeRangeCapableProfiles,
   onEditBookmark,
   onDeleteBookmark,
+  onNewBookmark,
 }: BookmarksViewProps) {
   // Group bookmarks by profile
   const bookmarksByProfile = bookmarks.reduce(
@@ -43,10 +48,18 @@ export default function BookmarksView({
     return profile?.name || profileId;
   };
 
+  const canCreate = timeRangeCapableProfiles.length > 0 && onNewBookmark;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Time Range Bookmarks</h2>
+        {canCreate && (
+          <PrimaryButton onClick={onNewBookmark}>
+            <Plus className={iconSm} />
+            New Bookmark
+          </PrimaryButton>
+        )}
       </div>
 
       {bookmarks.length === 0 ? (

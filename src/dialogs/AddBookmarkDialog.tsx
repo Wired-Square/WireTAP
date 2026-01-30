@@ -5,6 +5,11 @@ import Dialog from "../components/Dialog";
 import Input from "../components/forms/Input";
 import { DialogFooter } from "../components/forms/DialogFooter";
 import { labelSmall, helpText } from "../styles";
+import { useSettingsStore } from "../apps/settings/stores/settingsStore";
+import TimezoneBadge, {
+  type TimezoneMode,
+  convertDatetimeLocal,
+} from "../components/TimezoneBadge";
 
 type Props = {
   isOpen: boolean;
@@ -24,6 +29,8 @@ export default function AddBookmarkDialog({
   const [name, setName] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [timezoneMode, setTimezoneMode] = useState<TimezoneMode>("default");
+  const defaultTz = useSettingsStore((s) => s.display.timezone);
 
   // Reset form when dialog opens with new frame
   useEffect(() => {
@@ -31,8 +38,16 @@ export default function AddBookmarkDialog({
       setName(`Frame 0x${frameId.toString(16).toUpperCase()}`);
       setStartTime(frameTime);
       setEndTime("");
+      setTimezoneMode("default");
     }
   }, [isOpen, frameId, frameTime]);
+
+  const handleTimezoneChange = (newMode: TimezoneMode) => {
+    // Convert times to new timezone
+    setStartTime(convertDatetimeLocal(startTime, timezoneMode, newMode, defaultTz));
+    setEndTime(convertDatetimeLocal(endTime, timezoneMode, newMode, defaultTz));
+    setTimezoneMode(newMode);
+  };
 
   const handleSave = () => {
     if (!name.trim() || !startTime) return;
@@ -62,7 +77,10 @@ export default function AddBookmarkDialog({
 
           {/* From time */}
           <div className="space-y-1">
-            <label className={labelSmall}>From</label>
+            <div className="flex items-center gap-2">
+              <label className={labelSmall}>From</label>
+              <TimezoneBadge mode={timezoneMode} onChange={handleTimezoneChange} />
+            </div>
             <Input
               variant="simple"
               type="datetime-local"

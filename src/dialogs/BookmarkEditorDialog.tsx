@@ -1,8 +1,10 @@
 // ui/src/dialogs/BookmarkEditorDialog.tsx
 // Global bookmark editor dialog for managing and loading time range bookmarks
 
-import { useState, useEffect, useMemo } from "react";
-import { Play, Trash2, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Play, Plus, Trash2, X } from "lucide-react";
+import type { IOProfile } from "../apps/settings/stores/settingsStore";
+import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import { Input, SecondaryButton, PrimaryButton, DangerButton } from "../components/forms";
@@ -13,14 +15,10 @@ import {
   deleteFavorite,
   type TimeRangeFavorite,
 } from "../utils/favorites";
-
-/** Get the local timezone abbreviation (e.g., "AEDT", "PST") */
-function getLocalTimezoneAbbr(): string {
-  const formatter = new Intl.DateTimeFormat("en", { timeZoneName: "short" });
-  const parts = formatter.formatToParts(new Date());
-  const tzPart = parts.find((p) => p.type === "timeZoneName");
-  return tzPart?.value || "Local";
-}
+import TimezoneBadge, {
+  type TimezoneMode,
+  convertDatetimeLocal,
+} from "../components/TimezoneBadge";
 
 type Props = {
   isOpen: boolean;
@@ -31,6 +29,16 @@ type Props = {
   onBookmarksChanged?: () => void;
   /** Filter bookmarks to only show those for this profile */
   profileId?: string | null;
+  /** Profiles available for creating new bookmarks (filtered to time-range capable) */
+  availableProfiles?: IOProfile[];
+  /** Called when a new bookmark is created */
+  onCreateBookmark?: (
+    profileId: string,
+    name: string,
+    startTime: string,
+    endTime: string,
+    maxFrames?: number
+  ) => Promise<void>;
 };
 
 export default function BookmarkEditorDialog({
@@ -39,6 +47,8 @@ export default function BookmarkEditorDialog({
   onLoad,
   onBookmarksChanged,
   profileId,
+  availableProfiles,
+  onCreateBookmark,
 }: Props) {
   const [bookmarks, setBookmarks] = useState<TimeRangeFavorite[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -51,8 +61,24 @@ export default function BookmarkEditorDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Memoize timezone abbreviation
-  const localTzAbbr = useMemo(() => getLocalTimezoneAbbr(), []);
+  // Create mode state
+  const [isCreating, setIsCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    profileId: "",
+    name: "",
+    startTime: "",
+    endTime: "",
+    maxFrames: "" as string | number,
+  });
+  const [isCreatingBookmark, setIsCreatingBookmark] = useState(false);
+
+  // Whether we can show the "New" button
+  const canCreate = availableProfiles && availableProfiles.length > 0 && onCreateBookmark;
+
+  // Timezone mode state
+  const [editTimezoneMode, setEditTimezoneMode] = useState<TimezoneMode>("default");
+  const [createTimezoneMode, setCreateTimezoneMode] = useState<TimezoneMode>("default");
+  const defaultTz = useSettingsStore((s) => s.display.timezone);
 
   // Load bookmarks when dialog opens
   useEffect(() => {
@@ -62,6 +88,10 @@ export default function BookmarkEditorDialog({
       // Reset state when closing
       setSelectedId(null);
       setEditForm({ name: "", startTime: "", endTime: "", maxFrames: "" });
+      setIsCreating(false);
+      setCreateForm({ profileId: "", name: "", startTime: "", endTime: "", maxFrames: "" });
+      setEditTimezoneMode("default");
+      setCreateTimezoneMode("default");
     }
   }, [isOpen]);
 
@@ -85,12 +115,33 @@ export default function BookmarkEditorDialog({
 
   const handleSelectBookmark = (bookmark: TimeRangeFavorite) => {
     setSelectedId(bookmark.id);
+    setEditTimezoneMode("default");
     setEditForm({
       name: bookmark.name,
       startTime: bookmark.startTime,
       endTime: bookmark.endTime,
       maxFrames: bookmark.maxFrames ?? "",
     });
+  };
+
+  // Handle timezone mode change for edit form
+  const handleEditTimezoneChange = (newMode: TimezoneMode) => {
+    setEditForm((prev) => ({
+      ...prev,
+      startTime: convertDatetimeLocal(prev.startTime, editTimezoneMode, newMode, defaultTz),
+      endTime: convertDatetimeLocal(prev.endTime, editTimezoneMode, newMode, defaultTz),
+    }));
+    setEditTimezoneMode(newMode);
+  };
+
+  // Handle timezone mode change for create form
+  const handleCreateTimezoneChange = (newMode: TimezoneMode) => {
+    setCreateForm((prev) => ({
+      ...prev,
+      startTime: convertDatetimeLocal(prev.startTime, createTimezoneMode, newMode, defaultTz),
+      endTime: convertDatetimeLocal(prev.endTime, createTimezoneMode, newMode, defaultTz),
+    }));
+    setCreateTimezoneMode(newMode);
   };
 
   const handleSave = async () => {
@@ -136,6 +187,51 @@ export default function BookmarkEditorDialog({
     }
   };
 
+  const handleStartCreate = () => {
+    setSelectedId(null);
+    setIsCreating(true);
+    // Default to first available profile
+    const defaultProfile = availableProfiles?.[0]?.id || "";
+    setCreateForm({
+      profileId: defaultProfile,
+      name: "",
+      startTime: "",
+      endTime: "",
+      maxFrames: "",
+    });
+  };
+
+  const handleCancelCreate = () => {
+    setIsCreating(false);
+    setCreateForm({ profileId: "", name: "", startTime: "", endTime: "", maxFrames: "" });
+  };
+
+  const handleCreate = async () => {
+    if (!onCreateBookmark || !createForm.profileId || !createForm.name.trim() || !createForm.startTime) {
+      return;
+    }
+
+    setIsCreatingBookmark(true);
+    try {
+      const maxFramesValue = createForm.maxFrames === "" ? undefined : Number(createForm.maxFrames);
+      await onCreateBookmark(
+        createForm.profileId,
+        createForm.name.trim(),
+        createForm.startTime,
+        createForm.endTime,
+        maxFramesValue
+      );
+      await loadBookmarks();
+      onBookmarksChanged?.();
+      setIsCreating(false);
+      setCreateForm({ profileId: "", name: "", startTime: "", endTime: "", maxFrames: "" });
+    } catch (err) {
+      console.error("Failed to create bookmark:", err);
+    } finally {
+      setIsCreatingBookmark(false);
+    }
+  };
+
   const selectedBookmark = bookmarks.find((b) => b.id === selectedId);
 
   // Group bookmarks by profile for display (only if not filtering by profile)
@@ -163,7 +259,19 @@ export default function BookmarkEditorDialog({
       <div className="flex flex-col h-[500px]">
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-3 border-b ${borderDefault}`}>
-          <h2 className={h2}>Bookmarks</h2>
+          <div className={flexRowGap2}>
+            <h2 className={h2}>Bookmarks</h2>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={handleStartCreate}
+                className={`p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--status-info-text)] ${hoverLight}`}
+                title="New bookmark"
+              >
+                <Plus className={iconMd} />
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -235,9 +343,98 @@ export default function BookmarkEditorDialog({
             )}
           </div>
 
-          {/* Right: Edit Form */}
+          {/* Right: Edit/Create Form */}
           <div className="w-1/2 p-4">
-            {selectedBookmark ? (
+            {isCreating ? (
+              /* Create Form */
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className={labelSmall}>Profile</label>
+                  <select
+                    value={createForm.profileId}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, profileId: e.target.value }))
+                    }
+                    className={`w-full px-3 py-2 text-sm rounded border ${borderDefault} bg-[var(--bg-surface)] text-[color:var(--text-primary)]`}
+                  >
+                    {availableProfiles?.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className={labelSmall}>Name</label>
+                  <Input
+                    variant="simple"
+                    type="text"
+                    placeholder="Bookmark name"
+                    value={createForm.name}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <label className={labelSmall}>From</label>
+                    <TimezoneBadge mode={createTimezoneMode} onChange={handleCreateTimezoneChange} />
+                  </div>
+                  <Input
+                    variant="simple"
+                    type="datetime-local"
+                    step="1"
+                    value={createForm.startTime}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, startTime: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className={labelSmall}>To</label>
+                  <Input
+                    variant="simple"
+                    type="datetime-local"
+                    step="1"
+                    value={createForm.endTime}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, endTime: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className={labelSmall}>Max Frames</label>
+                  <Input
+                    variant="simple"
+                    type="number"
+                    min={0}
+                    placeholder="No limit"
+                    value={createForm.maxFrames}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, maxFrames: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <SecondaryButton onClick={handleCancelCreate}>
+                    Cancel
+                  </SecondaryButton>
+                  <PrimaryButton
+                    onClick={handleCreate}
+                    disabled={isCreatingBookmark || !createForm.name.trim() || !createForm.startTime}
+                  >
+                    {isCreatingBookmark ? "Creating..." : "Create"}
+                  </PrimaryButton>
+                </div>
+              </div>
+            ) : selectedBookmark ? (
+              /* Edit Form */
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className={labelSmall}>Name</label>
@@ -252,7 +449,10 @@ export default function BookmarkEditorDialog({
                 </div>
 
                 <div className="space-y-1">
-                  <label className={labelSmall}>From ({localTzAbbr})</label>
+                  <div className="flex items-center gap-2">
+                    <label className={labelSmall}>From</label>
+                    <TimezoneBadge mode={editTimezoneMode} onChange={handleEditTimezoneChange} />
+                  </div>
                   <Input
                     variant="simple"
                     type="datetime-local"
@@ -265,7 +465,7 @@ export default function BookmarkEditorDialog({
                 </div>
 
                 <div className="space-y-1">
-                  <label className={labelSmall}>To ({localTzAbbr})</label>
+                  <label className={labelSmall}>To</label>
                   <Input
                     variant="simple"
                     type="datetime-local"
@@ -316,8 +516,9 @@ export default function BookmarkEditorDialog({
                 </div>
               </div>
             ) : (
+              /* Empty state */
               <div className="flex items-center justify-center h-full text-sm text-slate-400">
-                Select a bookmark to edit or load
+                {canCreate ? "Select a bookmark or click + to create one" : "Select a bookmark to edit or load"}
               </div>
             )}
           </div>

@@ -1,7 +1,6 @@
 // ui/src/apps/settings/Settings.tsx
 
 import { useEffect, useState } from 'react';
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { pickDirectory } from '../../api/dialogs';
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
@@ -19,9 +18,11 @@ import EditCatalogDialog from './dialogs/EditCatalogDialog';
 import ConfirmDeleteDialog from '../../dialogs/ConfirmDeleteDialog';
 import DuplicateCatalogDialog from './dialogs/DuplicateCatalogDialog';
 import EditBookmarkDialog from './dialogs/EditBookmarkDialog';
+import CreateBookmarkDialog from './dialogs/CreateBookmarkDialog';
 import { useSettingsStore, type SettingsSection } from './stores/settingsStore';
 import { useSettingsForms } from './hooks/useSettingsForms';
 import { useSettingsHandlers } from './hooks/useSettingsHandlers';
+import { getTimeRangeCapableProfiles } from '../../utils/profileFilters';
 
 export default function Settings() {
   // Form state for dialogs
@@ -82,6 +83,7 @@ export default function Settings() {
   // IO Profiles
   const ioProfiles = useSettingsStore((s) => s.ioProfiles.profiles);
   const defaultReadProfile = useSettingsStore((s) => s.ioProfiles.defaultReadProfile);
+  const timeRangeCapableProfiles = getTimeRangeCapableProfiles(ioProfiles);
 
   // Catalogs
   const catalogs = useSettingsStore((s) => s.catalogs.list);
@@ -109,6 +111,14 @@ export default function Settings() {
     bookmarkMaxFrames: forms.bookmarkMaxFrames,
     resetBookmarkForm: forms.resetBookmarkForm,
     initEditBookmarkForm: forms.initEditBookmarkForm,
+    newBookmarkProfileId: forms.newBookmarkProfileId,
+    newBookmarkName: forms.newBookmarkName,
+    newBookmarkStartTime: forms.newBookmarkStartTime,
+    newBookmarkEndTime: forms.newBookmarkEndTime,
+    newBookmarkMaxFrames: forms.newBookmarkMaxFrames,
+    resetNewBookmarkForm: forms.resetNewBookmarkForm,
+    initNewBookmarkForm: forms.initNewBookmarkForm,
+    timeRangeCapableProfiles,
   });
 
   // Load data on mount
@@ -116,23 +126,6 @@ export default function Settings() {
     loadSettings();
     loadBookmarks();
   }, [loadSettings, loadBookmarks]);
-
-  // Listen for menu command to navigate to Bookmarks
-  useEffect(() => {
-    const currentWindow = getCurrentWebviewWindow();
-
-    const setupListener = async () => {
-      const unlisten = await currentWindow.listen("menu-bookmark-manage", () => {
-        setSection("bookmarks");
-      });
-      return unlisten;
-    };
-
-    const unlistenPromise = setupListener();
-    return () => {
-      unlistenPromise.then((fn) => fn());
-    };
-  }, [setSection]);
 
   // Sidebar items
   const sidebarItems: SideBarItem[] = [
@@ -243,8 +236,10 @@ export default function Settings() {
             <BookmarksView
               bookmarks={bookmarks}
               ioProfiles={ioProfiles}
+              timeRangeCapableProfiles={timeRangeCapableProfiles}
               onEditBookmark={handlers.handleEditBookmark}
               onDeleteBookmark={handlers.handleDeleteBookmark}
+              onNewBookmark={handlers.handleNewBookmark}
             />
           )}
 
@@ -352,6 +347,24 @@ export default function Settings() {
         onChangeMaxFrames={forms.setBookmarkMaxFrames}
         onCancel={handlers.handleCancelEditBookmark}
         onSave={handlers.handleConfirmEditBookmark}
+      />
+
+      {/* Create Bookmark Dialog */}
+      <CreateBookmarkDialog
+        isOpen={dialogs.createBookmark}
+        availableProfiles={timeRangeCapableProfiles}
+        profileId={forms.newBookmarkProfileId}
+        name={forms.newBookmarkName}
+        startTime={forms.newBookmarkStartTime}
+        endTime={forms.newBookmarkEndTime}
+        maxFrames={forms.newBookmarkMaxFrames}
+        onChangeProfileId={forms.setNewBookmarkProfileId}
+        onChangeName={forms.setNewBookmarkName}
+        onChangeStartTime={forms.setNewBookmarkStartTime}
+        onChangeEndTime={forms.setNewBookmarkEndTime}
+        onChangeMaxFrames={forms.setNewBookmarkMaxFrames}
+        onCancel={handlers.handleCancelCreateBookmark}
+        onCreate={handlers.handleConfirmCreateBookmark}
       />
 
       {/* Delete Bookmark Confirmation Dialog */}

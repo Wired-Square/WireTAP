@@ -90,6 +90,7 @@ export interface UseDecoderHandlersParams {
   startTime: string;
   endTime: string;
   playbackSpeed: PlaybackSpeed;
+  ioProfile: string | null;
   // Note: serialConfig is read directly from store via getState() to avoid stale closure issues
 
   // Ingest session
@@ -209,6 +210,8 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
   const timeHandlers = useDecoderTimeHandlers({
     setTimeRange: params.setTimeRange,
     seek: params.seek,
+    reinitialize: params.reinitialize,
+    ioProfile: params.ioProfile,
     capabilities: params.capabilities,
     setStartTime: params.setStartTime,
     setEndTime: params.setEndTime,
