@@ -46,7 +46,7 @@ export default function FilterDialog({
   return (
     <Dialog isOpen={isOpen} maxWidth="max-w-sm">
       <div className="p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
           Frame Filters
         </h2>
 
@@ -60,7 +60,7 @@ export default function FilterDialog({
             value={idFilter}
             onChange={(e) => setIdFilter(e.target.value)}
             placeholder="e.g., 0x100-0x109, 0x151"
-            className={`w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-900 dark:text-white font-mono ${focusRing}`}
+            className={`w-full px-3 py-2 rounded-lg border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-primary)] font-mono ${focusRing}`}
           />
           <p className={caption}>
             Frames with matching IDs will be moved to the Filtered tab.
@@ -79,7 +79,7 @@ export default function FilterDialog({
             max={255}
             value={lengthValue}
             onChange={(e) => setLengthValue(Math.max(0, parseInt(e.target.value) || 0))}
-            className={`w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-900 dark:text-white ${focusRing}`}
+            className={`w-full px-3 py-2 rounded-lg border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-primary)] ${focusRing}`}
           />
           <p className={caption}>
             Frames shorter than this will be filtered out and shown in the Filtered tab.
@@ -96,7 +96,7 @@ export default function FilterDialog({
               <button
                 type="button"
                 onClick={handleClear}
-                className="px-4 py-2 text-sm rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                className="px-4 py-2 text-sm rounded-lg text-[color:var(--text-danger)] hover:bg-[var(--hover-danger-bg)]"
               >
                 Clear All
               </button>

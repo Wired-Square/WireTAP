@@ -51,7 +51,7 @@ export function SecondaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`px-4 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 ${hoverLight} ${disabledState} ${className}`}
+      className={`px-4 py-2 text-sm rounded border border-[color:var(--border-default)] text-[color:var(--text-secondary)] ${hoverLight} ${disabledState} ${className}`}
     >
       {children}
     </button>

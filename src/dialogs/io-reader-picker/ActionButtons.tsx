@@ -94,7 +94,7 @@ export default function ActionButtons({
   return (
     <div className={panelFooter}>
       {isIngesting ? (
-        <div className="flex items-center justify-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+        <div className="flex items-center justify-center gap-2 text-sm text-[color:var(--text-muted)]">
           <Loader2 className={`${iconMd} animate-spin`} />
           <span>Ingesting from {ingestProfileId}...</span>
         </div>
@@ -121,7 +121,7 @@ export default function ActionButtons({
             )}
           </div>
         ) : (
-          <div className="text-center text-sm text-slate-400 dark:text-slate-500 py-1">
+          <div className="text-center text-sm text-[color:var(--text-muted)] py-1">
             Select real-time readers to watch
           </div>
         )
@@ -254,7 +254,7 @@ export default function ActionButtons({
           <span>Continue Without Reader</span>
         </button>
       ) : (
-        <div className="text-center text-sm text-slate-400 dark:text-slate-500 py-1">
+        <div className="text-center text-sm text-[color:var(--text-muted)] py-1">
           Select an IO reader to continue
         </div>
       )}

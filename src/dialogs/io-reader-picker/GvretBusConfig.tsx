@@ -91,8 +91,8 @@ export default function GvretBusConfig({
 
   // Compact wrapper for inline display
   const wrapperClass = compact
-    ? "ml-7 mt-1 mb-2 pl-3 border-l-2 border-cyan-400 dark:border-cyan-600"
-    : "border-t border-slate-200 dark:border-slate-700 px-4 py-3";
+    ? "ml-7 mt-1 mb-2 pl-3 border-l-2 border-[color:var(--text-cyan)]"
+    : "border-t border-[color:var(--border-default)] px-4 py-3";
 
   // Loading state
   if (isLoading) {
@@ -110,7 +110,7 @@ export default function GvretBusConfig({
   if (error) {
     return (
       <div className={wrapperClass}>
-        <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+        <div className="flex items-center gap-2 text-xs text-[color:var(--status-danger-text)]">
           <AlertCircle className={`${iconXs} flex-shrink-0`} />
           <span className="truncate">{error}</span>
         </div>
@@ -141,7 +141,7 @@ export default function GvretBusConfig({
   // Compact mode - inline display below profile button
   if (compact) {
     return (
-      <div className="ml-7 mt-1 mb-2 pl-3 border-l-2 border-cyan-400 dark:border-cyan-600">
+      <div className="ml-7 mt-1 mb-2 pl-3 border-l-2 border-[color:var(--text-cyan)]">
         <div className="space-y-1">
           {busConfig.map((mapping) => {
             const isDuplicate = usedOutputBuses && mapping.enabled && usedOutputBuses.has(mapping.outputBus);
@@ -156,9 +156,9 @@ export default function GvretBusConfig({
                     type="checkbox"
                     checked={mapping.enabled}
                     onChange={() => toggleBus(mapping.deviceBus)}
-                    className="w-3 h-3 rounded border-slate-300 dark:border-slate-600 text-cyan-600 focus:ring-cyan-500 dark:bg-slate-700"
+                    className="w-3 h-3 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)]"
                   />
-                  <span className="text-slate-600 dark:text-slate-400">
+                  <span className="text-[color:var(--text-secondary)]">
                     {BUS_NAMES[mapping.deviceBus] || `Bus ${mapping.deviceBus}`}
                   </span>
                 </label>
@@ -170,7 +170,7 @@ export default function GvretBusConfig({
                     onChange={(e) =>
                       setProtocol(mapping.deviceBus, e.target.value as 'can' | 'canfd')
                     }
-                    className="px-1 py-0.5 rounded border text-xs border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-cyan-500"
+                    className="px-1 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
                   >
                     <option value="can">CAN</option>
                     <option value="canfd">CAN FD</option>
@@ -180,7 +180,7 @@ export default function GvretBusConfig({
                 {/* Output bus selector (only show if enabled and showOutputBus is true) */}
                 {mapping.enabled && showOutputBus && (
                   <div className="flex items-center gap-1">
-                    <span className="text-slate-400 dark:text-slate-500">→</span>
+                    <span className="text-[color:var(--text-muted)]">→</span>
                     <select
                       value={mapping.outputBus}
                       onChange={(e) =>
@@ -188,8 +188,8 @@ export default function GvretBusConfig({
                       }
                       className={`px-1 py-0.5 rounded border text-xs ${
                         isDuplicate
-                          ? "border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
-                          : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                          ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
+                          : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
                       } focus:ring-1 focus:ring-cyan-500`}
                     >
                       {Array.from({ length: 8 }, (_, i) => (
@@ -208,7 +208,7 @@ export default function GvretBusConfig({
           })}
         </div>
         {hasDuplicates && (
-          <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+          <p className="text-[10px] text-[color:var(--text-amber)] mt-1">
             Duplicate bus numbers may cause confusion
           </p>
         )}
@@ -218,10 +218,10 @@ export default function GvretBusConfig({
 
   // Full mode - separate section display
   return (
-    <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3">
+    <div className="border-t border-[color:var(--border-default)] px-4 py-3">
       <div className="flex items-center gap-2 mb-2">
         <Bus className={`${iconMd} text-cyan-500`} />
-        <span className="text-xs font-medium text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+        <span className="text-xs font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
           {profileName ? `${profileName} - ` : ""}CAN Buses ({enabledCount}/{deviceInfo.bus_count} enabled)
         </span>
       </div>
@@ -234,8 +234,8 @@ export default function GvretBusConfig({
               key={mapping.deviceBus}
               className={`flex items-center gap-3 px-2 py-1.5 rounded transition-colors ${
                 mapping.enabled
-                  ? "bg-slate-50 dark:bg-slate-800/50"
-                  : "bg-slate-100/50 dark:bg-slate-900/50 opacity-60"
+                  ? "bg-[var(--bg-surface)]"
+                  : "bg-[var(--hover-bg)]/50 opacity-60"
               }`}
             >
               {/* Enable/disable checkbox */}
@@ -244,7 +244,7 @@ export default function GvretBusConfig({
                   type="checkbox"
                   checked={mapping.enabled}
                   onChange={() => toggleBus(mapping.deviceBus)}
-                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-cyan-600 focus:ring-cyan-500 dark:bg-slate-700"
+                  className="w-4 h-4 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)]"
                 />
                 <span className={sectionHeaderText}>
                   {BUS_NAMES[mapping.deviceBus] || `Bus ${mapping.deviceBus}`}
@@ -254,13 +254,13 @@ export default function GvretBusConfig({
               {/* Protocol selector (only show if enabled and showProtocol is true) */}
               {mapping.enabled && showProtocol && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-slate-500 dark:text-slate-400">Protocol:</span>
+                  <span className="text-[color:var(--text-muted)]">Protocol:</span>
                   <select
                     value={mapping.protocol || 'can'}
                     onChange={(e) =>
                       setProtocol(mapping.deviceBus, e.target.value as 'can' | 'canfd')
                     }
-                    className="px-1.5 py-0.5 rounded border text-xs border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-cyan-500"
+                    className="px-1.5 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
                   >
                     <option value="can">CAN</option>
                     <option value="canfd">CAN FD</option>
@@ -271,7 +271,7 @@ export default function GvretBusConfig({
               {/* Output bus selector (only show if enabled and showOutputBus is true) */}
               {mapping.enabled && showOutputBus && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-slate-500 dark:text-slate-400">→ Output:</span>
+                  <span className="text-[color:var(--text-muted)]">→ Output:</span>
                   <select
                     value={mapping.outputBus}
                     onChange={(e) =>
@@ -279,8 +279,8 @@ export default function GvretBusConfig({
                     }
                     className={`px-1.5 py-0.5 rounded border text-xs ${
                       isDuplicate
-                        ? "border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
-                        : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                        ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
+                        : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
                     } focus:ring-1 focus:ring-cyan-500`}
                   >
                     {Array.from({ length: 8 }, (_, i) => (
@@ -300,12 +300,12 @@ export default function GvretBusConfig({
       </div>
 
       {enabledCount === 0 && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+        <p className="text-xs text-[color:var(--text-amber)] mt-2">
           No buses enabled. Enable at least one bus to capture frames.
         </p>
       )}
       {hasDuplicates && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+        <p className="text-xs text-[color:var(--text-amber)] mt-2">
           Warning: Some output bus numbers conflict with other sources
         </p>
       )}

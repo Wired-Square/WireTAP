@@ -35,7 +35,7 @@ const TextModeView = forwardRef<HTMLTextAreaElement, TextModeViewProps>(
         {/* Line numbers gutter */}
         <div
           ref={lineNumbersRef}
-          className="flex-shrink-0 py-4 pr-3 pl-4 font-mono text-sm text-right text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/50 border-r border-slate-200 dark:border-slate-700 select-none overflow-hidden"
+          className="flex-shrink-0 py-4 pr-3 pl-4 font-mono text-sm text-right text-[color:var(--text-muted)] bg-[var(--bg-surface)] border-r border-[color:var(--border-default)] select-none overflow-hidden"
           style={{ minWidth: `${Math.max(3, String(lineCount).length + 1)}ch` }}
           aria-hidden="true"
         >
@@ -53,7 +53,7 @@ const TextModeView = forwardRef<HTMLTextAreaElement, TextModeViewProps>(
           onChange={(e) => onChangeToml(e.target.value)}
           onScroll={handleScroll}
           disabled={isDisabled}
-          className="flex-1 p-4 font-mono text-sm leading-[1.5rem] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 resize-none focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+          className="flex-1 p-4 font-mono text-sm leading-[1.5rem] bg-[var(--bg-primary)] text-[color:var(--text-primary)] resize-none focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
           placeholder={placeholder || "Open a catalog file to edit..."}
           spellCheck={false}
         />

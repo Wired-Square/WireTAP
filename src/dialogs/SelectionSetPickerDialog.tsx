@@ -130,13 +130,13 @@ export default function SelectionSetPickerDialog({
       <div className="flex flex-col h-[500px]">
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-3 ${borderDivider}`}>
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
             Selection Sets
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className={`p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 ${hoverLight}`}
+            className={`p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] ${hoverLight}`}
           >
             <X className={iconLg} />
           </button>
@@ -145,23 +145,23 @@ export default function SelectionSetPickerDialog({
         {/* Content */}
         <div className="flex flex-1 min-h-0">
           {/* Left: Selection Set List */}
-          <div className="w-1/2 border-r border-slate-200 dark:border-slate-700 overflow-y-auto">
+          <div className="w-1/2 border-r border-[color:var(--border-default)] overflow-y-auto">
             {isLoading ? (
-              <div className="p-4 text-sm text-slate-400">Loading...</div>
+              <div className="p-4 text-sm text-[color:var(--text-muted)]">Loading...</div>
             ) : selectionSets.length === 0 ? (
-              <div className="p-4 text-sm text-slate-400">
+              <div className="p-4 text-sm text-[color:var(--text-muted)]">
                 No selection sets saved yet.
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="divide-y divide-[color:var(--border-default)]">
                 {selectionSets.map((set) => (
                   <button
                     key={set.id}
                     type="button"
                     onClick={() => handleSelectSet(set)}
-                    className={`w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                    className={`w-full text-left px-3 py-2 hover:bg-[var(--hover-bg)] ${
                       selectedId === set.id
-                        ? "bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500"
+                        ? "bg-[var(--status-info-bg)] border-l-2 border-blue-500"
                         : ""
                     }`}
                   >
@@ -191,7 +191,7 @@ export default function SelectionSetPickerDialog({
                     onChange={(e) =>
                       setEditForm((prev) => ({ ...prev, name: e.target.value }))
                     }
-                    className="w-full px-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200"
+                    className="w-full px-3 py-2 text-sm rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)]"
                   />
                 </div>
 
@@ -199,7 +199,7 @@ export default function SelectionSetPickerDialog({
                   <label className={labelSmall}>
                     Frames
                   </label>
-                  <div className={`px-3 py-2 text-sm rounded border border-slate-200 dark:border-slate-700 ${bgSecondary} text-slate-600 dark:text-slate-300`}>
+                  <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
                     {selectedSet.selectedIds?.length ?? selectedSet.frameIds.length}/{selectedSet.frameIds.length} selected
                   </div>
                 </div>
@@ -208,7 +208,7 @@ export default function SelectionSetPickerDialog({
                   <label className={labelSmall}>
                     Created
                   </label>
-                  <div className={`px-3 py-2 text-sm rounded border border-slate-200 dark:border-slate-700 ${bgSecondary} text-slate-600 dark:text-slate-300`}>
+                  <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
                     {formatDate(selectedSet.createdAt)}
                   </div>
                 </div>
@@ -218,7 +218,7 @@ export default function SelectionSetPickerDialog({
                     <label className={labelSmall}>
                       Last Used
                     </label>
-                    <div className={`px-3 py-2 text-sm rounded border border-slate-200 dark:border-slate-700 ${bgSecondary} text-slate-600 dark:text-slate-300`}>
+                    <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
                       {formatDate(selectedSet.lastUsedAt)}
                     </div>
                   </div>
@@ -228,7 +228,7 @@ export default function SelectionSetPickerDialog({
                   <button
                     type="button"
                     onClick={handleDelete}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded text-[color:var(--status-danger-text)] hover:bg-[var(--status-danger-bg)]"
                   >
                     <Trash2 className={iconMd} />
                     Delete
@@ -238,7 +238,7 @@ export default function SelectionSetPickerDialog({
                       type="button"
                       onClick={handleSave}
                       disabled={isSaving}
-                      className={`px-4 py-1.5 text-sm font-medium rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 ${hoverLight} disabled:opacity-50`}
+                      className={`px-4 py-1.5 text-sm font-medium rounded border border-[color:var(--border-default)] text-[color:var(--text-primary)] ${hoverLight} disabled:opacity-50`}
                     >
                       {isSaving ? "Saving..." : "Save"}
                     </button>
@@ -253,7 +253,7 @@ export default function SelectionSetPickerDialog({
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-sm text-slate-400">
+              <div className="flex items-center justify-center h-full text-sm text-[color:var(--text-muted)]">
                 Select a set to edit or load
               </div>
             )}
@@ -262,11 +262,11 @@ export default function SelectionSetPickerDialog({
 
         {/* Footer with Clear button */}
         {onClear && (
-          <div className="flex items-center justify-end px-4 py-3 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-end px-4 py-3 border-t border-[color:var(--border-default)]">
             <button
               type="button"
               onClick={handleClear}
-              className={`px-4 py-1.5 text-sm font-medium rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 ${hoverLight}`}
+              className={`px-4 py-1.5 text-sm font-medium rounded border border-[color:var(--border-default)] text-[color:var(--text-primary)] ${hoverLight}`}
             >
               Clear Selection Set
             </button>

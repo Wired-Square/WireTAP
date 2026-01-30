@@ -3,6 +3,14 @@
 import ColourPicker from "../../../components/ColourPicker";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { textMedium } from "../../../styles";
+import {
+  textPrimary,
+  textSecondary,
+  textTertiary,
+  bgMuted,
+  hoverSubtle,
+} from "../../../styles/colourTokens";
+import type { ThemeMode, ThemeColours } from "../stores/settingsStore";
 
 type DisplayViewProps = {
   displayFrameIdFormat: "hex" | "decimal";
@@ -28,6 +36,12 @@ type DisplayViewProps = {
   binaryUnusedColour: string;
   onChangeBinaryUnusedColour: (val: string) => void;
   onResetBinaryUnusedColour: () => void;
+  // Theme settings
+  themeMode: ThemeMode;
+  onChangeThemeMode: (mode: ThemeMode) => void;
+  themeColours: ThemeColours;
+  onChangeThemeColour: (key: keyof ThemeColours, val: string) => void;
+  onResetThemeColours: () => void;
 };
 
 export default function DisplayView({
@@ -49,11 +63,174 @@ export default function DisplayView({
   binaryUnusedColour,
   onChangeBinaryUnusedColour,
   onResetBinaryUnusedColour,
+  themeMode,
+  onChangeThemeMode,
+  themeColours,
+  onChangeThemeColour,
+  onResetThemeColours,
 }: DisplayViewProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Display</h2>
+        <h2 className={`text-xl font-semibold ${textPrimary}`}>Display</h2>
+      </div>
+
+      {/* Appearance Section */}
+      <div className="space-y-2">
+        <label className={`block ${textMedium}`}>
+          Appearance
+        </label>
+        <div className="flex gap-3">
+          {[
+            { value: "auto", label: "System" },
+            { value: "light", label: "Light" },
+            { value: "dark", label: "Dark" },
+          ].map((opt) => (
+            <label key={opt.value} className={`${flexRowGap2} text-sm ${textPrimary}`}>
+              <input
+                type="radio"
+                name="theme-mode"
+                value={opt.value}
+                checked={themeMode === opt.value}
+                onChange={() => onChangeThemeMode(opt.value as ThemeMode)}
+              />
+              {opt.label}
+            </label>
+          ))}
+        </div>
+        <p className={`text-sm ${textTertiary}`}>
+          Choose light or dark theme, or follow your system preference.
+        </p>
+      </div>
+
+      {/* Theme Colours Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className={`text-sm font-semibold ${textPrimary}`}>Theme Colours</h3>
+          <button
+            type="button"
+            onClick={onResetThemeColours}
+            className={`text-xs px-2 py-1 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
+          >
+            Reset All
+          </button>
+        </div>
+        <p className={`text-sm ${textTertiary}`}>
+          Customise the app's colour scheme.
+        </p>
+
+        <div className="grid grid-cols-2 gap-6">
+          {/* Light Mode Colours */}
+          <div className="space-y-2">
+            <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Light Mode</h4>
+            <div className="space-y-1.5">
+              <ColourPicker
+                label="Background"
+                value={themeColours.bgPrimaryLight}
+                onChange={(val) => onChangeThemeColour("bgPrimaryLight", val)}
+              />
+              <ColourPicker
+                label="Surface"
+                value={themeColours.bgSurfaceLight}
+                onChange={(val) => onChangeThemeColour("bgSurfaceLight", val)}
+              />
+              <ColourPicker
+                label="Text"
+                value={themeColours.textPrimaryLight}
+                onChange={(val) => onChangeThemeColour("textPrimaryLight", val)}
+              />
+              <ColourPicker
+                label="Secondary Text"
+                value={themeColours.textSecondaryLight}
+                onChange={(val) => onChangeThemeColour("textSecondaryLight", val)}
+              />
+              <ColourPicker
+                label="Border"
+                value={themeColours.borderDefaultLight}
+                onChange={(val) => onChangeThemeColour("borderDefaultLight", val)}
+              />
+              <ColourPicker
+                label="Data Background"
+                value={themeColours.dataBgLight}
+                onChange={(val) => onChangeThemeColour("dataBgLight", val)}
+              />
+              <ColourPicker
+                label="Data Text"
+                value={themeColours.dataTextPrimaryLight}
+                onChange={(val) => onChangeThemeColour("dataTextPrimaryLight", val)}
+              />
+            </div>
+          </div>
+
+          {/* Dark Mode Colours */}
+          <div className="space-y-2">
+            <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Dark Mode</h4>
+            <div className="space-y-1.5">
+              <ColourPicker
+                label="Background"
+                value={themeColours.bgPrimaryDark}
+                onChange={(val) => onChangeThemeColour("bgPrimaryDark", val)}
+              />
+              <ColourPicker
+                label="Surface"
+                value={themeColours.bgSurfaceDark}
+                onChange={(val) => onChangeThemeColour("bgSurfaceDark", val)}
+              />
+              <ColourPicker
+                label="Text"
+                value={themeColours.textPrimaryDark}
+                onChange={(val) => onChangeThemeColour("textPrimaryDark", val)}
+              />
+              <ColourPicker
+                label="Secondary Text"
+                value={themeColours.textSecondaryDark}
+                onChange={(val) => onChangeThemeColour("textSecondaryDark", val)}
+              />
+              <ColourPicker
+                label="Border"
+                value={themeColours.borderDefaultDark}
+                onChange={(val) => onChangeThemeColour("borderDefaultDark", val)}
+              />
+              <ColourPicker
+                label="Data Background"
+                value={themeColours.dataBgDark}
+                onChange={(val) => onChangeThemeColour("dataBgDark", val)}
+              />
+              <ColourPicker
+                label="Data Text"
+                value={themeColours.dataTextPrimaryDark}
+                onChange={(val) => onChangeThemeColour("dataTextPrimaryDark", val)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Accent Colours */}
+        <div className="space-y-2 pt-2">
+          <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Accent Colours</h4>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+            <ColourPicker
+              label="Primary"
+              value={themeColours.accentPrimary}
+              onChange={(val) => onChangeThemeColour("accentPrimary", val)}
+            />
+            <ColourPicker
+              label="Success"
+              value={themeColours.accentSuccess}
+              onChange={(val) => onChangeThemeColour("accentSuccess", val)}
+            />
+            <ColourPicker
+              label="Danger"
+              value={themeColours.accentDanger}
+              onChange={(val) => onChangeThemeColour("accentDanger", val)}
+            />
+            <ColourPicker
+              label="Warning"
+              value={themeColours.accentWarning}
+              onChange={(val) => onChangeThemeColour("accentWarning", val)}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -61,7 +238,7 @@ export default function DisplayView({
           Display Frame ID as
         </label>
         <div className="flex gap-3">
-          <label className={`${flexRowGap2} text-sm text-slate-800 dark:text-slate-100`}>
+          <label className={`${flexRowGap2} text-sm ${textPrimary}`}>
             <input
               type="radio"
               name="frame-id-format"
@@ -71,7 +248,7 @@ export default function DisplayView({
             />
             Hex
           </label>
-          <label className={`${flexRowGap2} text-sm text-slate-800 dark:text-slate-100`}>
+          <label className={`${flexRowGap2} text-sm ${textPrimary}`}>
             <input
               type="radio"
               name="frame-id-format"
@@ -82,7 +259,7 @@ export default function DisplayView({
             Decimal
           </label>
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className={`text-sm ${textTertiary}`}>
           Choose how CAN frame IDs are shown in the editor.
         </p>
       </div>
@@ -98,7 +275,7 @@ export default function DisplayView({
             { value: "delta-start", label: "Delta since start" },
             { value: "delta-last", label: "Delta since last message" },
           ].map((opt) => (
-            <label key={opt.value} className="flex items-center gap-2 text-sm text-slate-800 dark:text-slate-100">
+            <label key={opt.value} className={`flex items-center gap-2 text-sm ${textPrimary}`}>
               <input
                 type="radio"
                 name="time-format"
@@ -110,7 +287,7 @@ export default function DisplayView({
             </label>
           ))}
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className={`text-sm ${textTertiary}`}>
           Controls how timestamps are rendered in discovery and other views.
         </p>
       </div>
@@ -124,7 +301,7 @@ export default function DisplayView({
             { value: "local", label: "Local timezone" },
             { value: "utc", label: "UTC" },
           ].map((opt) => (
-            <label key={opt.value} className="flex items-center gap-2 text-sm text-slate-800 dark:text-slate-100">
+            <label key={opt.value} className={`flex items-center gap-2 text-sm ${textPrimary}`}>
               <input
                 type="radio"
                 name="timezone"
@@ -136,14 +313,14 @@ export default function DisplayView({
             </label>
           ))}
         </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className={`text-sm ${textTertiary}`}>
           Default timezone for clock displays. Click the timezone badge in views to temporarily override.
         </p>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Signals</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <h3 className={`text-sm font-semibold ${textPrimary}`}>Signals</h3>
+        <p className={`text-sm ${textTertiary}`}>
           Configure colors for signal confidence indicators.
         </p>
         <div className="space-y-2">
@@ -162,7 +339,7 @@ export default function DisplayView({
               <button
                 type="button"
                 onClick={() => onResetSignalColour(cfg.key)}
-                className="p-2 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
+                className={`p-2 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
                 title="Reset to default"
               >
                 ↺
@@ -173,8 +350,8 @@ export default function DisplayView({
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Binary Display</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <h3 className={`text-sm font-semibold ${textPrimary}`}>Binary Display</h3>
+        <p className={`text-sm ${textTertiary}`}>
           Configure colors for binary bits in the Frame Calculator and bit previews.
         </p>
         <div className="space-y-2">
@@ -187,7 +364,7 @@ export default function DisplayView({
             <button
               type="button"
               onClick={onResetBinaryOneColour}
-              className="p-2 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
+              className={`p-2 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
               title="Reset to default"
             >
               ↺
@@ -202,7 +379,7 @@ export default function DisplayView({
             <button
               type="button"
               onClick={onResetBinaryZeroColour}
-              className="p-2 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
+              className={`p-2 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
               title="Reset to default"
             >
               ↺
@@ -217,7 +394,7 @@ export default function DisplayView({
             <button
               type="button"
               onClick={onResetBinaryUnusedColour}
-              className="p-2 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
+              className={`p-2 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
               title="Reset to default"
             >
               ↺

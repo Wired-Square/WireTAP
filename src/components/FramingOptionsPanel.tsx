@@ -273,7 +273,7 @@ export default function FramingOptionsPanel({
 
       {/* Delimiter options */}
       {currentMode === "delimiter" && (
-        <div className="space-y-2 pl-2 border-l-2 border-blue-300 dark:border-blue-700">
+        <div className="space-y-2 pl-2 border-l-2 border-[color:var(--accent-primary)]">
           <div>
             <label className={`block ${caption} mb-1`}>
               Delimiter (hex)
@@ -284,7 +284,7 @@ export default function FramingOptionsPanel({
               onChange={(e) => handleDelimiterChange(e.target.value)}
               disabled={disabled}
               placeholder="0A or 0D0A"
-              className={`w-full px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-700 dark:text-slate-200 disabled:opacity-50`}
+              className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)] disabled:opacity-50`}
             />
             <div className={`${captionMuted} mt-0.5`}>
               LF=0A, CR=0D, CRLF=0D0A
@@ -301,7 +301,7 @@ export default function FramingOptionsPanel({
               value={maxLength}
               onChange={(e) => handleMaxLengthChange(Number(e.target.value))}
               disabled={disabled}
-              className={`w-full px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-700 dark:text-slate-200 disabled:opacity-50`}
+              className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)] disabled:opacity-50`}
             />
           </div>
         </div>
@@ -309,14 +309,14 @@ export default function FramingOptionsPanel({
 
       {/* Modbus RTU options */}
       {currentMode === "modbus_rtu" && (
-        <div className="pl-2 border-l-2 border-blue-300 dark:border-blue-700">
-          <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+        <div className="pl-2 border-l-2 border-[color:var(--accent-primary)]">
+          <label className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)] cursor-pointer">
             <input
               type="checkbox"
               checked={validateCrc}
               onChange={(e) => handleValidateCrcChange(e.target.checked)}
               disabled={disabled}
-              className="rounded border-slate-300 dark:border-slate-600"
+              className="rounded border-[color:var(--border-default)]"
             />
             <span>Validate CRC-16</span>
           </label>
@@ -325,13 +325,13 @@ export default function FramingOptionsPanel({
 
       {/* Emit raw bytes toggle (when framing is enabled) */}
       {showEmitRawBytes && currentMode !== "raw" && (
-        <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-[color:var(--text-secondary)] cursor-pointer">
           <input
             type="checkbox"
             checked={emitRawBytes}
             onChange={(e) => handleEmitRawBytesChange(e.target.checked)}
             disabled={disabled}
-            className="rounded border-slate-300 dark:border-slate-600"
+            className="rounded border-[color:var(--border-default)]"
           />
           <span>Also capture raw bytes</span>
         </label>

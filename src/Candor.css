@@ -115,6 +115,20 @@ html, body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+
+  /* Theme CSS variables - defaults for light mode */
+  /* These are overridden by useTheme hook based on settings */
+  --bg-primary: #ffffff;
+  --bg-surface: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --border-default: #e2e8f0;
+  --data-bg: #f8fafc;
+  --data-text-primary: #0f172a;
+  --accent-primary: #2563eb;
+  --accent-success: #16a34a;
+  --accent-danger: #dc2626;
+  --accent-warning: #d97706;
 }
 
 .container {
@@ -212,6 +226,226 @@ form button {
 
 .animate-fade-in {
   animation: fade-in 0.2s ease-out;
+}
+
+/* CSS variable defaults - light mode (applied to :root) */
+/* These are overridden by useTheme hook, but provide fallback */
+:root {
+  --bg-primary: #ffffff;
+  --bg-surface: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --border-default: #e2e8f0;
+  --data-bg: #f8fafc;
+  --data-text-primary: #0f172a;
+  /* Alternating table row backgrounds */
+  --table-row-alt: #f8fafc;
+  --table-row-highlight: #dbeafe;
+
+  /* Muted text (hints, disabled states) */
+  --text-muted: #94a3b8;
+
+  /* Hover backgrounds */
+  --hover-bg: #f1f5f9;
+
+  /* Status: Success */
+  --status-success-bg: #dcfce7;
+  --status-success-text: #15803d;
+  --status-success-border: #bbf7d0;
+
+  /* Status: Danger */
+  --status-danger-bg: #fee2e2;
+  --status-danger-text: #b91c1c;
+  --status-danger-border: #fecaca;
+
+  /* Status: Warning */
+  --status-warning-bg: #fef3c7;
+  --status-warning-text: #b45309;
+  --status-warning-border: #fde68a;
+
+  /* Status: Info */
+  --status-info-bg: #dbeafe;
+  --status-info-text: #1d4ed8;
+  --status-info-border: #bfdbfe;
+
+  /* Status: Purple (multi-bus selection) */
+  --status-purple-bg: #f3e8ff;
+  --status-purple-border: #d8b4fe;
+
+  /* Data accent colours */
+  --text-green: #16a34a;
+  --text-purple: #9333ea;
+  --text-orange: #ea580c;
+  --text-cyan: #0891b2;
+  --text-amber: #d97706;
+  --text-yellow: #ca8a04;
+  --text-red: #dc2626;
+  --text-blue: #2563eb;
+
+  /* Tertiary/muted backgrounds */
+  --bg-tertiary: #e2e8f0;
+  --bg-muted: #e2e8f0;
+
+  /* Accent backgrounds */
+  --accent-bg: #eff6ff;
+  --accent-text: #1d4ed8;
+  --border-hover: #94a3b8;
+
+  /* Semantic backgrounds for coloured boxes */
+  --bg-orange: #ffedd5;
+  --bg-red: #fee2e2;
+  --border-red: #fecaca;
+  --bg-purple: #f3e8ff;
+  --border-purple: #e9d5ff;
+  --text-purple-strong: #7c3aed;
+  --bg-blue: #dbeafe;
+  --text-blue-bold: #1e40af;
+  --bg-amber: #fef3c7;
+
+  /* Aliases for semantic info/purple variables */
+  --purple-bg: var(--bg-purple);
+  --purple-text: var(--text-purple);
+  --info-bg: var(--status-info-bg);
+  --info-border: var(--status-info-border);
+  --info-text: var(--status-info-text);
+  --bg-info: var(--status-info-bg);
+  --border-info: var(--status-info-border);
+  --text-info: var(--status-info-text);
+  --status-success: var(--status-success-text);
+  --status-info: var(--status-info-text);
+  --text-danger: var(--status-danger-text);
+  --text-accent: var(--accent-primary);
+  --text-success: var(--text-green);
+  --danger: var(--status-danger-text);
+  --danger-bg-subtle: var(--status-danger-bg);
+  --accent-bg-subtle: var(--accent-bg);
+  --hover-danger-bg: var(--status-danger-bg);
+  --selected-bg: var(--status-info-bg);
+  --selected-text: var(--status-info-text);
+  --accent-blue: var(--text-blue);
+  --accent-purple: var(--text-purple);
+  --accent-secondary: var(--text-purple);
+  --accent-success: var(--text-green);
+  --accent-warning: var(--text-amber);
+  --border-success: var(--status-success-border);
+  --bg-warning: var(--status-warning-bg);
+  --hover-bg-warning: var(--status-warning-bg);
+  --status-success-bg-hover: var(--status-success-bg);
+  --status-warning-bg-hover: var(--status-warning-bg);
+  --status-purple-bg-hover: var(--status-purple-bg);
+}
+
+/* Dark mode CSS variable defaults - applied when .dark class is on html */
+/* These are overridden by useTheme hook, but provide fallback */
+.dark {
+  --bg-primary: #0f172a;
+  --bg-surface: #1e293b;
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --border-default: #334155;
+  --data-bg: #111827;
+  --data-text-primary: #e5e7eb;
+  /* Alternating table row backgrounds */
+  --table-row-alt: rgba(15, 23, 42, 0.4);
+  --table-row-highlight: rgba(51, 65, 85, 0.8);
+
+  /* Muted text (hints, disabled states) */
+  --text-muted: #64748b;
+
+  /* Hover backgrounds */
+  --hover-bg: #334155;
+
+  /* Status: Success */
+  --status-success-bg: rgba(22, 163, 74, 0.3);
+  --status-success-text: #86efac;
+  --status-success-border: #166534;
+
+  /* Status: Danger */
+  --status-danger-bg: rgba(220, 38, 38, 0.3);
+  --status-danger-text: #fca5a5;
+  --status-danger-border: #991b1b;
+
+  /* Status: Warning */
+  --status-warning-bg: rgba(217, 119, 6, 0.3);
+  --status-warning-text: #fcd34d;
+  --status-warning-border: #92400e;
+
+  /* Status: Info */
+  --status-info-bg: rgba(37, 99, 235, 0.3);
+  --status-info-text: #93c5fd;
+  --status-info-border: #1e40af;
+
+  /* Status: Purple (multi-bus selection) */
+  --status-purple-bg: rgba(147, 51, 234, 0.2);
+  --status-purple-border: #7c3aed;
+
+  /* Data accent colours */
+  --text-green: #4ade80;
+  --text-purple: #c084fc;
+  --text-orange: #fb923c;
+  --text-cyan: #22d3ee;
+  --text-amber: #f59e0b;
+  --text-yellow: #facc15;
+  --text-red: #f87171;
+  --text-blue: #60a5fa;
+
+  /* Tertiary/muted backgrounds */
+  --bg-tertiary: #475569;
+  --bg-muted: #475569;
+
+  /* Accent backgrounds */
+  --accent-bg: rgba(37, 99, 235, 0.2);
+  --accent-text: #93c5fd;
+  --border-hover: #64748b;
+
+  /* Semantic backgrounds for coloured boxes */
+  --bg-orange: rgba(234, 88, 12, 0.3);
+  --bg-red: rgba(220, 38, 38, 0.2);
+  --border-red: #991b1b;
+  --bg-purple: rgba(147, 51, 234, 0.2);
+  --border-purple: #7c3aed;
+  --text-purple-strong: #d8b4fe;
+  --bg-blue: rgba(37, 99, 235, 0.3);
+  --text-blue-bold: #bfdbfe;
+  --bg-amber: rgba(217, 119, 6, 0.3);
+
+  /* Aliases for semantic info/purple variables */
+  --purple-bg: var(--bg-purple);
+  --purple-text: var(--text-purple);
+  --info-bg: var(--status-info-bg);
+  --info-border: var(--status-info-border);
+  --info-text: var(--status-info-text);
+  --bg-info: var(--status-info-bg);
+  --border-info: var(--status-info-border);
+  --text-info: var(--status-info-text);
+  --status-success: var(--status-success-text);
+  --status-info: var(--status-info-text);
+  --text-danger: var(--status-danger-text);
+  --text-accent: var(--accent-primary);
+  --text-success: var(--text-green);
+  --danger: var(--status-danger-text);
+  --danger-bg-subtle: var(--status-danger-bg);
+  --accent-bg-subtle: var(--accent-bg);
+  --hover-danger-bg: var(--status-danger-bg);
+  --selected-bg: var(--status-info-bg);
+  --selected-text: var(--status-info-text);
+  --accent-blue: var(--text-blue);
+  --accent-purple: var(--text-purple);
+  --accent-secondary: var(--text-purple);
+  --accent-success: var(--text-green);
+  --accent-warning: var(--text-amber);
+  --border-success: var(--status-success-border);
+  --bg-warning: var(--status-warning-bg);
+  --hover-bg-warning: var(--status-warning-bg);
+  --status-success-bg-hover: var(--status-success-bg);
+  --status-warning-bg-hover: var(--status-warning-bg);
+  --status-purple-bg-hover: var(--status-purple-bg);
+}
+
+/* Utility class for secondary text using CSS variables */
+/* Used in tree views and other places where dark: variants don't work on Windows */
+.tree-secondary-text {
+  color: var(--text-secondary);
 }
 
 @media (prefers-color-scheme: dark) {

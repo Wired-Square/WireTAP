@@ -28,11 +28,11 @@ export default function CatalogsView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Decoder Catalogs</h2>
+        <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Decoder Catalogs</h2>
       </div>
 
       {catalogs.length === 0 ? (
-        <div className="text-center py-12 text-slate-500 dark:text-slate-400">
+        <div className="text-center py-12 text-[color:var(--text-muted)]">
           <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>No catalogs found in decoder directory</p>
           <p className="text-sm mt-2">Add .toml catalog files to {decoderDir || "the decoder directory"}</p>
@@ -46,7 +46,7 @@ export default function CatalogsView({
             >
               <div className="flex-1">
                 <div className="flex items-center gap-3">
-                  <h3 className="font-medium text-slate-900 dark:text-white">{catalog.name}</h3>
+                  <h3 className="font-medium text-[color:var(--text-primary)]">{catalog.name}</h3>
                   <span className={badgeMetadata}>
                     {catalog.filename}
                   </span>
@@ -60,7 +60,7 @@ export default function CatalogsView({
                       className={`${iconMd} ${
                         defaultCatalog === catalog.filename
                           ? "fill-yellow-500 text-yellow-500"
-                          : "text-slate-400 dark:text-slate-500"
+                          : "text-[color:var(--text-muted)]"
                       }`}
                     />
                   </button>
@@ -72,21 +72,21 @@ export default function CatalogsView({
                   className={iconButtonHover}
                   title="Duplicate catalog"
                 >
-                  <Copy className={`${iconMd} text-slate-600 dark:text-slate-400`} />
+                  <Copy className={`${iconMd} text-[color:var(--text-secondary)]`} />
                 </button>
                 <button
                   onClick={() => onEditCatalog(catalog)}
                   className={iconButtonHover}
                   title="Edit catalog name/filename"
                 >
-                  <Edit2 className={`${iconMd} text-slate-600 dark:text-slate-400`} />
+                  <Edit2 className={`${iconMd} text-[color:var(--text-secondary)]`} />
                 </button>
                 <button
                   onClick={() => onDeleteCatalog(catalog)}
                   className={iconButtonHoverDanger}
                   title="Delete catalog"
                 >
-                  <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                  <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                 </button>
               </div>
             </div>

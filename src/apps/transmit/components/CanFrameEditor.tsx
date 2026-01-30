@@ -6,10 +6,10 @@ import { useCallback, useState, useEffect } from "react";
 import { useTransmitStore, CAN_FD_DLC_VALUES } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import {
-  borderDarkView,
-  textDarkInput,
-  bgDarkInput,
-  textDarkMuted,
+  borderDataView,
+  textDataPrimary,
+  bgDataInput,
+  textDataSecondary,
 } from "../../../styles/colourTokens";
 import { toggleChipClass } from "../../../styles/buttonStyles";
 
@@ -129,7 +129,7 @@ export default function CanFrameEditor() {
 
         cells.push(
           <div key={i} className="flex flex-col items-center">
-            <span className={`${textDarkMuted} text-[10px] mb-0.5`}>
+            <span className={`${textDataSecondary} text-[10px] mb-0.5`}>
               {i.toString().padStart(2, "0")}
             </span>
             <input
@@ -139,7 +139,7 @@ export default function CanFrameEditor() {
               onFocus={() => setFocusedByteIndex(i)}
               onBlur={() => setFocusedByteIndex(null)}
               maxLength={2}
-              className={`w-8 h-8 ${bgDarkInput} ${textDarkInput} text-center font-mono text-sm rounded border ${borderDarkView} focus:outline-none focus:border-blue-500 uppercase`}
+              className={`w-8 h-8 ${bgDataInput} ${textDataPrimary} text-center font-mono text-sm rounded border ${borderDataView} focus:outline-none focus:border-blue-500 uppercase`}
             />
           </div>
         );
@@ -168,27 +168,27 @@ export default function CanFrameEditor() {
       <div className="flex items-end gap-4 flex-wrap">
         {/* Frame ID */}
         <div className="flex flex-col">
-          <label className={`${textDarkMuted} text-xs mb-1`}>Frame ID</label>
+          <label className={`${textDataSecondary} text-xs mb-1`}>Frame ID</label>
           <div className="flex items-center">
-            <span className={`${textDarkMuted} text-sm mr-1`}>0x</span>
+            <span className={`${textDataSecondary} text-sm mr-1`}>0x</span>
             <input
               type="text"
               value={canEditor.frameId}
               onChange={handleFrameIdChange}
               maxLength={canEditor.isExtended ? 8 : 3}
               placeholder={canEditor.isExtended ? "12345678" : "123"}
-              className={`w-24 ${bgDarkInput} ${textDarkInput} font-mono text-sm rounded px-2 py-1.5 border ${borderDarkView} focus:outline-none focus:border-blue-500 uppercase`}
+              className={`w-24 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} focus:outline-none focus:border-blue-500 uppercase`}
             />
           </div>
         </div>
 
         {/* DLC */}
         <div className="flex flex-col">
-          <label className={`${textDarkMuted} text-xs mb-1`}>DLC</label>
+          <label className={`${textDataSecondary} text-xs mb-1`}>DLC</label>
           <select
             value={canEditor.dlc}
             onChange={handleDlcChange}
-            className={`w-20 ${bgDarkInput} ${textDarkInput} text-sm rounded px-2 py-1.5 border ${borderDarkView} focus:outline-none focus:border-blue-500`}
+            className={`w-20 ${bgDataInput} ${textDataPrimary} text-sm rounded px-2 py-1.5 border ${borderDataView} focus:outline-none focus:border-blue-500`}
           >
             {dlcValues.map((dlc) => (
               <option key={dlc} value={dlc}>
@@ -201,11 +201,11 @@ export default function CanFrameEditor() {
         {/* Bus (only for multi-bus) */}
         {isMultiBus && (
           <div className="flex flex-col">
-            <label className={`${textDarkMuted} text-xs mb-1`}>Bus</label>
+            <label className={`${textDataSecondary} text-xs mb-1`}>Bus</label>
             <select
               value={canEditor.bus}
               onChange={handleBusChange}
-              className={`w-24 ${bgDarkInput} ${textDarkInput} text-sm rounded px-2 py-1.5 border ${borderDarkView} focus:outline-none focus:border-blue-500`}
+              className={`w-24 ${bgDataInput} ${textDataPrimary} text-sm rounded px-2 py-1.5 border ${borderDataView} focus:outline-none focus:border-blue-500`}
             >
               {availableBuses.map((bus) => (
                 <option key={bus} value={bus}>
@@ -219,7 +219,7 @@ export default function CanFrameEditor() {
 
       {/* Second Row: Flags */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`${textDarkMuted} text-xs mr-2`}>Flags:</span>
+        <span className={`${textDataSecondary} text-xs mr-2`}>Flags:</span>
 
         {supportsExtended && (
           <button
@@ -261,14 +261,14 @@ export default function CanFrameEditor() {
       {/* Third Row: Data Bytes */}
       {canEditor.dlc > 0 && !canEditor.isRtr && (
         <div className="space-y-2">
-          <label className={`${textDarkMuted} text-xs`}>Data Bytes:</label>
+          <label className={`${textDataSecondary} text-xs`}>Data Bytes:</label>
           <div className="space-y-1">{renderDataGrid()}</div>
         </div>
       )}
 
       {/* RTR notice */}
       {canEditor.isRtr && (
-        <div className={`${textDarkMuted} text-xs italic`}>
+        <div className={`${textDataSecondary} text-xs italic`}>
           RTR (Remote Transmission Request) frames have no data payload.
         </div>
       )}

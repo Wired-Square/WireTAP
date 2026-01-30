@@ -366,7 +366,7 @@ export default function FrameCalculator() {
     <div className={`${bgSurface} ${borderDivider} px-4 py-2 space-y-2`}>
       {/* First row: All buttons */}
       <div className="flex flex-wrap items-center gap-2">
-        <Calculator className={`${iconLg} text-teal-600 dark:text-teal-400 shrink-0`} />
+        <Calculator className={`${iconLg} text-[color:var(--accent-primary)] shrink-0`} />
 
         <FlexSeparator />
 
@@ -451,7 +451,7 @@ export default function FrameCalculator() {
         </button>
         <button
           onClick={openHistoryDialog}
-          className={`${buttonBase} ${history.length > 0 ? "text-teal-600 dark:text-teal-400" : ""}`}
+          className={`${buttonBase} ${history.length > 0 ? "text-[color:var(--accent-primary)]" : ""}`}
           title={history.length > 0 ? `Memory (${history.length})` : "Memory empty"}
         >
           M{history.length > 0 && <span className="ml-1 text-xs opacity-70">{history.length}</span>}
@@ -499,7 +499,7 @@ export default function FrameCalculator() {
           type="text"
           value={rawInput}
           onChange={(e) => setRawInput(e.target.value)}
-          className="flex-1 min-w-32 px-3 py-1.5 rounded border bg-slate-900 dark:bg-slate-950 border-slate-300 dark:border-slate-600 font-ubuntu-mono text-base text-teal-400 dark:text-teal-300 tracking-wider uppercase"
+          className="flex-1 min-w-32 px-3 py-1.5 rounded border bg-[var(--data-bg)] border-[color:var(--border-default)] font-ubuntu-mono text-base text-[color:var(--data-text-primary)] tracking-wider uppercase"
           placeholder={
             inputMode === "hex"
               ? "01020304"
@@ -535,13 +535,13 @@ export default function FrameCalculator() {
               return (
                 <div
                   key={g.index}
-                  className={`p-4 rounded-xl border border-slate-200 dark:border-slate-700 ${bgSurface} shadow-sm flex flex-col gap-3`}
+                  className={`p-4 rounded-xl border border-[color:var(--border-default)] ${bgSurface} shadow-sm flex flex-col gap-3`}
                 >
                   {/* Top section: Values */}
                   <div className="min-w-0">
                     {/* Header */}
                     <div className="mb-3">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                      <div className="text-sm font-semibold text-[color:var(--text-primary)]">
                         Group {g.index}
                       </div>
                       <div className={captionMuted}>
@@ -560,7 +560,7 @@ export default function FrameCalculator() {
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
                             title="Copy hex value"
                           >
-                            <Copy className={`${iconXs} text-slate-500 dark:text-slate-400`} />
+                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
                         </div>
                       </div>
@@ -573,7 +573,7 @@ export default function FrameCalculator() {
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
                             title="Copy unsigned value"
                           >
-                            <Copy className={`${iconXs} text-slate-500 dark:text-slate-400`} />
+                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
                         </div>
                       </div>
@@ -586,7 +586,7 @@ export default function FrameCalculator() {
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
                             title="Copy signed (2's complement) value"
                           >
-                            <Copy className={`${iconXs} text-slate-500 dark:text-slate-400`} />
+                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
                         </div>
                       </div>
@@ -599,7 +599,7 @@ export default function FrameCalculator() {
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
                             title="Copy signed (1's complement) value"
                           >
-                            <Copy className={`${iconXs} text-slate-500 dark:text-slate-400`} />
+                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
                         </div>
                       </div>
@@ -612,7 +612,7 @@ export default function FrameCalculator() {
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
                             title="Copy sign-magnitude value"
                           >
-                            <Copy className={`${iconXs} text-slate-500 dark:text-slate-400`} />
+                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
                         </div>
                       </div>
@@ -625,7 +625,7 @@ export default function FrameCalculator() {
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
                             title="Copy text value"
                           >
-                            <Copy className={`${iconXs} text-slate-500 dark:text-slate-400`} />
+                            <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
                         </div>
                       </div>
@@ -633,7 +633,7 @@ export default function FrameCalculator() {
                   </div>
 
                   {/* Bottom section: Bit preview - always below values */}
-                  <div className="flex-shrink-0 pt-2 border-t border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="flex-shrink-0 pt-2 border-t border-[color:var(--border-default)] overflow-hidden">
                     <div className="flex justify-between items-center group mb-2">
                       <span className="text-sm">Binary</span>
                       <button
@@ -641,7 +641,7 @@ export default function FrameCalculator() {
                         className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
                         title="Copy binary"
                       >
-                        <Copy className={`${iconXs} text-slate-500 dark:text-slate-400`} />
+                        <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                       </button>
                     </div>
                     <ScalingByteBits
@@ -691,9 +691,9 @@ export default function FrameCalculator() {
 
             {/* Divider */}
             <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+              <div className="flex-1 h-px bg-[var(--hover-bg)]" />
               <span className={captionMuted}>or custom</span>
-              <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+              <div className="flex-1 h-px bg-[var(--hover-bg)]" />
             </div>
 
             {/* Custom unit selector */}
@@ -726,7 +726,7 @@ export default function FrameCalculator() {
                 type="text"
                 value={dialogInput}
                 onChange={(e) => setDialogInput(e.target.value)}
-                className="w-full px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 font-mono text-sm"
+                className="w-full px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm"
                 placeholder={dialogUnit === "bits" ? "8,8,16,2,2" : "1,1,2,2"}
               />
               <p className={`${caption} mt-1`}>
@@ -752,8 +752,8 @@ export default function FrameCalculator() {
       <Dialog isOpen={showHistoryDialog} maxWidth="max-w-md" onBackdropClick={handleHistoryDialogClose}>
         <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-lg">
-              <History className={`${iconLg} text-teal-600 dark:text-teal-400`} />
+            <div className="p-2 bg-[var(--status-info-bg)] rounded-lg">
+              <History className={`${iconLg} text-[color:var(--accent-primary)]`} />
             </div>
             <h2 className={h2}>Memory</h2>
           </div>
@@ -766,14 +766,14 @@ export default function FrameCalculator() {
                   key={index}
                   className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
                     isCurrentItem
-                      ? "border-teal-500 bg-teal-50 dark:bg-teal-900/20"
-                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                      ? "border-[color:var(--accent-primary)] bg-[var(--status-info-bg)]"
+                      : "border-[color:var(--border-default)] hover:bg-[var(--hover-bg)]"
                   }`}
                 >
-                  <span className="text-xs text-slate-400 dark:text-slate-500 w-6">
+                  <span className="text-xs text-[color:var(--text-muted)] w-6">
                     {index + 1}
                   </span>
-                  <span className="flex-1 font-led text-sm text-teal-600 dark:text-teal-400 uppercase tracking-wider truncate">
+                  <span className="flex-1 font-led text-sm text-[color:var(--accent-primary)] uppercase tracking-wider truncate">
                     {item}
                   </span>
                   <div className="flex items-center gap-1">
@@ -786,14 +786,14 @@ export default function FrameCalculator() {
                     </button>
                     <button
                       onClick={() => handleHistorySetActive(item)}
-                      className={`${iconButtonBase} text-teal-600 dark:text-teal-400`}
+                      className={`${iconButtonBase} text-[color:var(--accent-primary)]`}
                       title="Set as active value"
                     >
                       <ArrowRight className={iconSm} />
                     </button>
                     <button
                       onClick={() => handleHistoryDelete(index)}
-                      className={`${iconButtonBase} text-red-500 dark:text-red-400`}
+                      className={`${iconButtonBase} text-[color:var(--status-danger-text)]`}
                       title="Delete from memory"
                     >
                       <Trash2 className={iconSm} />
@@ -807,7 +807,7 @@ export default function FrameCalculator() {
           <div className="flex justify-between mt-4">
             <button
               onClick={handleHistoryCopyAll}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--status-info-bg)] text-[color:var(--accent-primary)] hover:brightness-95 transition-colors"
               title="Copy all history items"
             >
               <CopyPlus className={iconMd} />
@@ -875,8 +875,8 @@ export default function FrameCalculator() {
       <Dialog isOpen={showScaleDialog} maxWidth="max-w-sm" onBackdropClick={() => setShowScaleDialog(false)}>
         <div className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-lg">
-              <Divide className={`${iconLg} text-teal-600 dark:text-teal-400`} />
+            <div className="p-2 bg-[var(--status-info-bg)] rounded-lg">
+              <Divide className={`${iconLg} text-[color:var(--accent-primary)]`} />
             </div>
             <h2 className={h2}>Scale Calculator</h2>
           </div>
@@ -887,7 +887,7 @@ export default function FrameCalculator() {
               <label className={`block ${sectionHeaderText} mb-1`}>
                 Raw Value (from hex)
               </label>
-              <div className="px-3 py-2 rounded border bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-600 font-mono text-sm">
+              <div className="px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm">
                 {groups.length > 0 ? groups[0].unsigned.toString() : "—"}
               </div>
             </div>
@@ -901,7 +901,7 @@ export default function FrameCalculator() {
                 type="text"
                 value={targetValueInput}
                 onChange={(e) => setTargetValueInput(e.target.value)}
-                className="w-full px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 font-mono text-sm"
+                className="w-full px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm"
                 placeholder="e.g. 92647"
                 autoFocus
               />
@@ -926,20 +926,20 @@ export default function FrameCalculator() {
               const scale = targetValue / Number(rawValue);
 
               return (
-                <div className="p-4 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
-                  <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                <div className="p-4 rounded-lg bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]">
+                  <div className="text-sm text-[color:var(--text-secondary)] mb-1">
                     Scale Factor (DBC)
                   </div>
                   <div className={flexRowGap2}>
-                    <span className="text-2xl font-mono font-semibold text-teal-700 dark:text-teal-300">
+                    <span className="text-2xl font-mono font-semibold text-[color:var(--accent-primary)]">
                       {scale.toPrecision(6)}
                     </span>
                     <button
                       onClick={() => handleCopyValue(scale.toPrecision(6))}
-                      className="p-1.5 rounded hover:bg-teal-100 dark:hover:bg-teal-800 transition-colors"
+                      className="p-1.5 rounded hover:brightness-95 transition-colors"
                       title="Copy scale factor"
                     >
-                      <Copy className={`${iconMd} text-teal-600 dark:text-teal-400`} />
+                      <Copy className={`${iconMd} text-[color:var(--accent-primary)]`} />
                     </button>
                   </div>
                   <div className={`${caption} mt-2 font-mono`}>

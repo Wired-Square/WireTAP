@@ -9,12 +9,12 @@ export default function FrameOrderAnalysis() {
 
   if (!results) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 text-center p-8">
+      <div className="h-full flex flex-col items-center justify-center bg-[var(--bg-surface)] text-center p-8">
         <div className="max-w-md">
-          <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">
+          <h2 className="text-lg font-semibold text-[color:var(--text-secondary)] mb-2">
             No Frame Order Analysis Results
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-[color:var(--text-muted)]">
             Run the Frame Order Analysis tool from Discovery to see results here.
           </p>
         </div>
@@ -24,7 +24,7 @@ export default function FrameOrderAnalysis() {
 
   // Render the existing MessageOrderResultView - not embedded since this is its own panel
   return (
-    <div className="h-full bg-slate-50 dark:bg-slate-900">
+    <div className="h-full bg-[var(--bg-surface)]">
       <MessageOrderResultView />
     </div>
   );

@@ -121,7 +121,7 @@ export default function MuxCaseView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
           Mux Case: {caseValue}
         </h3>
 
@@ -158,7 +158,7 @@ export default function MuxCaseView({
               className={iconButtonHover}
               title="Edit case"
             >
-              <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+              <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
             </button>
           )}
 
@@ -172,7 +172,7 @@ export default function MuxCaseView({
             className={iconButtonHoverDanger}
             title="Delete case"
           >
-            <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+            <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
           </button>
         </div>
       </div>
@@ -180,7 +180,7 @@ export default function MuxCaseView({
       {selectedNode.metadata?.properties?.notes && (
         <div className={`p-3 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>Notes</div>
-          <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.properties.notes)
               ? selectedNode.metadata.properties.notes.join("\n")
               : selectedNode.metadata.properties.notes}
@@ -189,8 +189,8 @@ export default function MuxCaseView({
       )}
 
       <div className="space-y-4">
-        <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
-          <div className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
+        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+          <div className="text-xs font-medium text-[color:var(--text-muted)] mb-2">
             Bit Layout (includes frame signals and this case)
           </div>
           <BitPreview
@@ -206,7 +206,7 @@ export default function MuxCaseView({
             Signals ({caseSignals.length})
           </div>
           {caseSignals.length === 0 ? (
-            <div className="text-sm text-slate-500 dark:text-slate-400">No signals in this case yet.</div>
+            <div className="text-sm text-[color:var(--text-muted)]">No signals in this case yet.</div>
           ) : (
             <div className="space-y-2">
               {caseSignals.map((signal: any, idx: number) => (
@@ -222,11 +222,11 @@ export default function MuxCaseView({
                           start_bit: signal.start_bit || 0,
                           bit_length: signal.bit_length || 8,
                           type: "signal",
-                        }) || "bg-slate-400 dark:bg-slate-600"
+                        }) || "bg-[var(--bg-surface)]"
                       }`}
                     />
                     <div>
-                      <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                      <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
                         <span>⚡</span>
                         {signal.name || `Signal ${idx + 1}`}
                       </div>
@@ -234,7 +234,7 @@ export default function MuxCaseView({
                         Bits {signal.start_bit ?? 0} - {(signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1} ({signal.bit_length ?? 0} bits)
                       </div>
                       {signal.notes && (
-                        <div className="text-xs text-slate-600 dark:text-slate-400 mt-2 italic whitespace-pre-wrap">
+                        <div className="text-xs text-[color:var(--text-muted)] mt-2 italic whitespace-pre-wrap">
                           {Array.isArray(signal.notes) ? signal.notes.join('\n') : signal.notes}
                         </div>
                       )}
@@ -254,7 +254,7 @@ export default function MuxCaseView({
                       className={iconButtonHoverDanger}
                       title="Delete signal"
                     >
-                      <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                      <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
                     </button>
                   )}
                 </div>
@@ -275,7 +275,7 @@ export default function MuxCaseView({
                   className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
                   onClick={() => onSelectNode(child)}
                 >
-                  <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                  <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
                     {child.type === "signal" && <span>⚡</span>}
                     {child.type === "mux" && <span>🔀</span>}
                     {child.key}

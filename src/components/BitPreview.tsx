@@ -138,22 +138,22 @@ export default function BitPreview({
   const { colorByKey, legendEntries } = useMemo(() => {
     // Stick to cool blues/teals so claimed bits share a family of colours (avoid red except for overlaps).
     const signalPalette = [
-      "bg-blue-400 dark:bg-blue-500",
-      "bg-blue-500 dark:bg-blue-600",
-      "bg-blue-600 dark:bg-blue-700",
-      "bg-blue-700 dark:bg-blue-800",
-      "bg-sky-500 dark:bg-sky-600",
-      "bg-sky-600 dark:bg-sky-700",
-      "bg-cyan-500 dark:bg-cyan-600",
-      "bg-cyan-600 dark:bg-cyan-700",
-      "bg-teal-500 dark:bg-teal-600",
-      "bg-teal-600 dark:bg-teal-700",
+      "bg-[var(--signal-blue-1)]",
+      "bg-[var(--signal-blue-2)]",
+      "bg-[var(--signal-blue-3)]",
+      "bg-[var(--signal-blue-4)]",
+      "bg-[var(--signal-sky-1)]",
+      "bg-[var(--signal-sky-2)]",
+      "bg-[var(--signal-cyan-1)]",
+      "bg-[var(--signal-cyan-2)]",
+      "bg-[var(--signal-teal-1)]",
+      "bg-[var(--signal-teal-2)]",
     ];
 
     const muxPalette = [
-      "bg-purple-500 dark:bg-purple-600",
-      "bg-violet-500 dark:bg-violet-600",
-      "bg-fuchsia-500 dark:bg-fuchsia-600",
+      "bg-[var(--signal-purple-1)]",
+      "bg-[var(--signal-violet-1)]",
+      "bg-[var(--signal-fuchsia-1)]",
     ];
 
     const makeKey = (r: BitRange) =>
@@ -281,7 +281,7 @@ export default function BitPreview({
     return (
       <div key={byteIdx} className="flex items-center" style={{ gap: `${scaling.gap}px` }}>
         <div
-          className="font-mono text-slate-500 dark:text-slate-400 shrink-0"
+          className="font-mono text-[color:var(--text-muted)] shrink-0"
           style={{ fontSize: `${scaling.fontSize}px`, width: scaling.bytesPerRow > 1 ? '36px' : '50px' }}
         >
           {scaling.bytesPerRow > 1 ? `${byteIdx}:` : `Byte ${byteIdx}:`}
@@ -339,14 +339,14 @@ export default function BitPreview({
               : undefined;
             const availableClass = binaryZeroColour
               ? ''
-              : 'bg-slate-300 dark:bg-slate-600 border border-slate-400 dark:border-slate-500';
+              : 'bg-[var(--bg-muted)] border border-[color:var(--border-default)]';
 
             const bgColor = isDragSelected
-              ? 'bg-yellow-400 dark:bg-yellow-600'
+              ? 'bg-[var(--status-warning)]'
               : isOverlap
               ? 'bg-red-500'
               : rangeType === 'current'
-              ? 'bg-green-500 dark:bg-green-600'
+              ? 'bg-[var(--status-success)]'
               : rangeColorClass
               ? rangeColorClass
               : availableClass;
@@ -396,7 +396,7 @@ export default function BitPreview({
 
         {scaling.bytesPerRow === 1 && (
           <div
-            className="font-mono text-slate-400 dark:text-slate-500 shrink-0 text-right"
+            className="font-mono text-[color:var(--text-muted)] shrink-0 text-right"
             style={{ fontSize: `${scaling.fontSize}px`, width: '40px' }}
           >
             {startBit}-{endBit - 1}
@@ -431,14 +431,14 @@ export default function BitPreview({
         {hasOverlap && (
           <div className={flexRowGap2}>
             <div className="w-4 h-4 bg-red-500 rounded" />
-            <span className="text-slate-700 dark:text-slate-300">Overlap (error!)</span>
+            <span className="text-[color:var(--text-secondary)]">Overlap (error!)</span>
           </div>
         )}
 
         {interactive && (
           <div className={flexRowGap2}>
-            <div className="w-4 h-4 bg-yellow-400 dark:bg-yellow-600 rounded" />
-            <span className="text-slate-700 dark:text-slate-300">Click and drag to select</span>
+            <div className="w-4 h-4 bg-[var(--status-warning)] rounded" />
+            <span className="text-[color:var(--text-secondary)]">Click and drag to select</span>
           </div>
         )}
 
@@ -447,7 +447,7 @@ export default function BitPreview({
             {legendEntries.map((entry) => (
               <div key={entry.key} className="flex items-center gap-1">
                 <div className={`w-4 h-4 rounded ${entry.className}`} />
-                <span className="text-slate-700 dark:text-slate-300">
+                <span className="text-[color:var(--text-secondary)]">
                   {entry.label}
                 </span>
               </div>

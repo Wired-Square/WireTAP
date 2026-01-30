@@ -8,12 +8,12 @@ import { Play, Square, Trash2, StopCircle, Settings, Users } from "lucide-react"
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import {
-  bgDarkToolbar,
-  borderDarkView,
-  textDarkInput,
-  bgDarkInput,
-  textDarkMuted,
-  hoverDarkRow,
+  bgDataToolbar,
+  borderDataView,
+  textDataPrimary,
+  bgDataInput,
+  textDataSecondary,
+  hoverDataRow,
 } from "../../../styles/colourTokens";
 import {
   buttonBase,
@@ -162,7 +162,7 @@ export default function TransmitQueueView() {
   if (queue.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDarkMuted} text-center`}>
+        <div className={`${textDataSecondary} text-center`}>
           <p className="text-lg font-medium">Queue Empty</p>
           <p className="text-sm mt-2">
             Add frames from the CAN or Serial tab to build a transmit queue.
@@ -179,9 +179,9 @@ export default function TransmitQueueView() {
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div
-        className={`flex items-center gap-3 px-4 py-2 ${bgDarkToolbar} border-b ${borderDarkView}`}
+        className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar} border-b ${borderDataView}`}
       >
-        <span className={`${textDarkMuted} text-sm`}>
+        <span className={`${textDataSecondary} text-sm`}>
           {queue.length} item{queue.length !== 1 ? "s" : ""} in queue
         </span>
 
@@ -212,7 +212,7 @@ export default function TransmitQueueView() {
       <div className="flex-1 overflow-auto">
         <table className="w-full text-sm">
           <thead
-            className={`${bgDarkToolbar} sticky top-0 ${textDarkMuted} text-xs`}
+            className={`${bgDataToolbar} sticky top-0 ${textDataSecondary} text-xs`}
           >
             <tr>
               <th className="text-left px-4 py-2 w-12"></th>
@@ -245,7 +245,7 @@ export default function TransmitQueueView() {
               return (
                 <tr
                   key={item.id}
-                  className={`border-b ${borderDarkView} ${hoverDarkRow} ${
+                  className={`border-b ${borderDataView} ${hoverDataRow} ${
                     !item.enabled ? "opacity-50" : ""
                   } ${isInGroup && isGroupRepeating ? "bg-green-900/20" : ""}`}
                 >
@@ -365,9 +365,9 @@ export default function TransmitQueueView() {
                         }
                         disabled={item.isRepeating || isGroupRepeating}
                         min={1}
-                        className={`w-16 ${bgDarkInput} ${textDarkInput} text-xs rounded px-1.5 py-1 border ${borderDarkView} focus:outline-none focus:border-blue-500 disabled:opacity-50`}
+                        className={`w-16 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} focus:outline-none focus:border-blue-500 disabled:opacity-50`}
                       />
-                      <span className={`${textDarkMuted} text-xs`}>ms</span>
+                      <span className={`${textDataSecondary} text-xs`}>ms</span>
                     </div>
                   </td>
 
@@ -379,7 +379,7 @@ export default function TransmitQueueView() {
                       onChange={(e) => handleGroupChange(item.id, e.target.value)}
                       disabled={item.isRepeating || isGroupRepeating}
                       placeholder="—"
-                      className={`w-20 ${bgDarkInput} ${textDarkInput} text-xs rounded px-1.5 py-1 border ${borderDarkView} focus:outline-none focus:border-blue-500 disabled:opacity-50 placeholder:text-gray-600`}
+                      className={`w-20 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} focus:outline-none focus:border-blue-500 disabled:opacity-50 placeholder:text-gray-600`}
                       title="Group name (items with same group transmit together)"
                     />
                   </td>

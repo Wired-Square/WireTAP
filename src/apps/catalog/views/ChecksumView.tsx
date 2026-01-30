@@ -78,7 +78,7 @@ export default function ChecksumView({
     <div className="space-y-4">
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Checksum Details</h3>
+        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">Checksum Details</h3>
         <div className={flexRowGap2}>
           <button
             onClick={() => {
@@ -94,7 +94,7 @@ export default function ChecksumView({
             className={iconButtonHover}
             title="Edit checksum"
           >
-            <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
           </button>
 
           <button
@@ -111,28 +111,28 @@ export default function ChecksumView({
             className={iconButtonHoverDanger}
             title="Delete checksum"
           >
-            <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+            <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
           </button>
         </div>
       </div>
 
       {/* Algorithm Info Card */}
       {algorithmInfo && (
-        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+        <div className="p-4 bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)] rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-lg">🔐</span>
-            <span className="font-semibold text-purple-900 dark:text-purple-100">{algorithmInfo.name}</span>
-            <span className="px-2 py-0.5 text-xs font-medium bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200 rounded">
+            <span className="font-semibold text-[color:var(--status-info-text)]">{algorithmInfo.name}</span>
+            <span className="px-2 py-0.5 text-xs font-medium bg-[var(--status-info-badge-bg)] text-[color:var(--status-info-badge-text)] rounded">
               {algorithmInfo.outputBytes} byte{algorithmInfo.outputBytes > 1 ? "s" : ""}
             </span>
           </div>
-          <p className="text-sm text-purple-700 dark:text-purple-300">{algorithmInfo.description}</p>
+          <p className="text-sm text-[color:var(--status-info-text)]">{algorithmInfo.description}</p>
         </div>
       )}
 
       {/* Byte Range Visualization */}
-      <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
-        <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Byte Layout</h4>
+      <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+        <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">Byte Layout</h4>
         {(() => {
           // Resolve negative indices for display
           const resolvedStartByte = props.start_byte !== undefined
@@ -158,11 +158,11 @@ export default function ChecksumView({
                   i >= resolvedCalcStart &&
                   i < resolvedCalcEnd;
 
-                let bgClass = "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400";
+                let bgClass = "bg-[var(--bg-tertiary)] text-[color:var(--text-muted)]";
                 if (isChecksumByte) {
                   bgClass = "bg-purple-500 text-white";
                 } else if (isCalcByte) {
-                  bgClass = "bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200";
+                  bgClass = "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]";
                 }
 
                 return (
@@ -178,13 +178,13 @@ export default function ChecksumView({
             </div>
           );
         })()}
-        <div className="flex items-center gap-4 mt-3 text-xs text-slate-600 dark:text-slate-400">
+        <div className="flex items-center gap-4 mt-3 text-xs text-[color:var(--text-muted)]">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded bg-purple-500"></div>
             <span>Checksum location</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded bg-blue-200 dark:bg-blue-800"></div>
+            <div className="w-3 h-3 rounded bg-[var(--status-info-bg)]"></div>
             <span>Calculation range</span>
           </div>
         </div>
@@ -210,7 +210,7 @@ export default function ChecksumView({
             {props.start_byte !== undefined && props.start_byte < 0 ? (
               <>
                 byte {props.start_byte}{" "}
-                <span className="text-slate-500">(→ {resolveByteIndexSync(props.start_byte, frameLength)})</span>
+                <span className="text-[color:var(--text-muted)]">(→ {resolveByteIndexSync(props.start_byte, frameLength)})</span>
               </>
             ) : (
               `byte ${props.start_byte}`
@@ -241,9 +241,9 @@ export default function ChecksumView({
               return (
                 <div className={monoBody}>
                   bytes {props.calc_start_byte}
-                  {hasNegativeStart && <span className="text-slate-500"> (→ {resolvedStart})</span>}
+                  {hasNegativeStart && <span className="text-[color:var(--text-muted)]"> (→ {resolvedStart})</span>}
                   {" "}to {props.calc_end_byte}
-                  {hasNegativeEnd && <span className="text-slate-500"> (→ {resolvedEnd})</span>}
+                  {hasNegativeEnd && <span className="text-[color:var(--text-muted)]"> (→ {resolvedEnd})</span>}
                   {" "}= bytes {resolvedStart} to {resolvedEnd - 1}
                 </div>
               );
@@ -261,7 +261,7 @@ export default function ChecksumView({
         {props.notes && (
           <div className={`p-3 ${bgSecondary} rounded-lg col-span-2`}>
             <div className={labelSmallMuted}>notes</div>
-            <div className="text-sm text-slate-900 dark:text-white">{props.notes}</div>
+            <div className="text-sm text-[color:var(--text-primary)]">{props.notes}</div>
           </div>
         )}
       </div>

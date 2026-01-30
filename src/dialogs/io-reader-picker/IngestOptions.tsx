@@ -60,7 +60,7 @@ export default function IngestOptions({
 
   return (
     <div className={borderDivider}>
-      <div className={`px-4 py-2 bg-slate-50 dark:bg-slate-900/50 ${sectionHeader}`}>
+      <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
         Options
       </div>
       <div className="p-3 space-y-3">
@@ -75,7 +75,7 @@ export default function IngestOptions({
                 <button
                   key={bm.id}
                   onClick={() => onSelectBookmark(bm)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-[var(--status-warning-bg)] text-[color:var(--text-amber)] rounded hover:brightness-95 transition-colors"
                   title={`${bm.startTime} → ${bm.endTime}`}
                 >
                   <Bookmark className={iconXs} />
@@ -92,14 +92,14 @@ export default function IngestOptions({
             {/* Timezone toggle */}
             <div className="flex items-center justify-between">
               <label className={caption}>Time Zone</label>
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 rounded p-0.5">
+              <div className="flex items-center gap-1 bg-[var(--hover-bg)] rounded p-0.5">
                 <button
                   type="button"
                   onClick={() => onTimezoneModeChange("local")}
                   className={`px-2 py-0.5 text-xs rounded transition-colors ${
                     timezoneMode === "local"
-                      ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                      ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)] shadow-sm"
+                      : "text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]"
                   }`}
                 >
                   {localTzAbbr}
@@ -109,8 +109,8 @@ export default function IngestOptions({
                   onClick={() => onTimezoneModeChange("utc")}
                   className={`px-2 py-0.5 text-xs rounded transition-colors flex items-center gap-1 ${
                     timezoneMode === "utc"
-                      ? "bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+                      ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)] shadow-sm"
+                      : "text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]"
                   }`}
                 >
                   <Globe className={iconXs} />
@@ -127,7 +127,7 @@ export default function IngestOptions({
                   type="datetime-local"
                   value={startTime}
                   onChange={(e) => onStartTimeChange(e.target.value)}
-                  className={`w-full px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-700 dark:text-slate-200`}
+                  className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)]`}
                 />
               </div>
               <div>
@@ -138,7 +138,7 @@ export default function IngestOptions({
                   type="datetime-local"
                   value={endTime}
                   onChange={(e) => onEndTimeChange(e.target.value)}
-                  className={`w-full px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-700 dark:text-slate-200`}
+                  className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)]`}
                 />
               </div>
             </div>
@@ -154,7 +154,7 @@ export default function IngestOptions({
             placeholder="No limit"
             value={maxFrames}
             onChange={(e) => onMaxFramesChange(e.target.value)}
-            className={`w-full px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-700 dark:text-slate-200`}
+            className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)]`}
           />
         </div>
 
@@ -167,7 +167,7 @@ export default function IngestOptions({
             <select
               value={selectedSpeed}
               onChange={(e) => onSpeedChange(Number(e.target.value))}
-              className={`w-full px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-700 dark:text-slate-200`}
+              className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)]`}
             >
               {SPEED_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>

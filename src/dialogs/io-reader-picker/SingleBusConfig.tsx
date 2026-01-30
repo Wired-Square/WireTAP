@@ -76,8 +76,8 @@ export default function SingleBusConfig({
 
   // Compact wrapper for inline display
   const wrapperClass = compact
-    ? "ml-7 mt-1 mb-2 pl-3 border-l-2 border-cyan-400 dark:border-cyan-600"
-    : "border-t border-slate-200 dark:border-slate-700 px-4 py-3";
+    ? "ml-7 mt-1 mb-2 pl-3 border-l-2 border-[color:var(--text-cyan)]"
+    : "border-t border-[color:var(--border-default)] px-4 py-3";
 
   // Loading state
   if (isLoading) {
@@ -96,7 +96,7 @@ export default function SingleBusConfig({
     const errorMsg = error || probeResult?.error || "Device not responding";
     return (
       <div className={wrapperClass}>
-        <div className="flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+        <div className="flex items-center gap-2 text-xs text-[color:var(--status-danger-text)]">
           <AlertCircle className={`${iconXs} flex-shrink-0`} />
           <span className="truncate">{errorMsg}</span>
         </div>
@@ -126,18 +126,18 @@ export default function SingleBusConfig({
       <div className={wrapperClass}>
         <div className="flex items-center gap-2 text-xs">
           <CheckCircle2 className={`${iconXs} text-green-500 flex-shrink-0`} />
-          <span className="text-slate-600 dark:text-slate-400">
+          <span className="text-[color:var(--text-secondary)]">
             {probeResult.primaryInfo || "Online"}
           </span>
           {probeResult.secondaryInfo && (
-            <span className="text-slate-400 dark:text-slate-500">
+            <span className="text-[color:var(--text-muted)]">
               ({probeResult.secondaryInfo})
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 mt-1 text-xs">
           <Bus className={`${iconXs} text-slate-400 flex-shrink-0`} />
-          <span className="text-slate-500 dark:text-slate-400">Bus:</span>
+          <span className="text-[color:var(--text-muted)]">Bus:</span>
           <select
             value={effectiveBus}
             onChange={(e) => {
@@ -146,8 +146,8 @@ export default function SingleBusConfig({
             }}
             className={`px-1 py-0.5 rounded border text-xs ${
               isDuplicate
-                ? "border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
-                : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
+                : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
             } focus:ring-1 focus:ring-cyan-500`}
           >
             {Array.from({ length: 8 }, (_, i) => (
@@ -163,14 +163,14 @@ export default function SingleBusConfig({
           {/* Framing selector for serial devices */}
           {isSerial && onFramingChange && (
             <>
-              <span className="text-slate-300 dark:text-slate-600">|</span>
+              <span className="text-[color:var(--text-muted)]">|</span>
               <Layers className={`${iconXs} text-slate-400 flex-shrink-0`} />
               <select
                 value={effectiveFraming}
                 onChange={(e) => {
                   onFramingChange({ ...framingConfig, encoding: e.target.value as FramingEncoding });
                 }}
-                className="px-1 py-0.5 rounded border text-xs border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-cyan-500"
+                className="px-1 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
               >
                 {FRAMING_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -184,7 +184,7 @@ export default function SingleBusConfig({
 
         {/* Framing sub-options */}
         {isSerial && onFramingChange && (showDelimiterOptions || showModbusOptions || showRawBytesOption) && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-slate-600 dark:text-slate-400">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-[color:var(--text-secondary)]">
             {/* Delimiter options */}
             {showDelimiterOptions && (
               <>
@@ -195,7 +195,7 @@ export default function SingleBusConfig({
                     value={framingConfig?.delimiterHex ?? "0A"}
                     onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, delimiterHex: e.target.value })}
                     placeholder="0A"
-                    className="w-12 px-1 py-0.5 rounded border text-xs border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-cyan-500 font-mono"
+                    className="w-12 px-1 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500 font-mono"
                   />
                 </label>
                 <label className="flex items-center gap-1">
@@ -204,7 +204,7 @@ export default function SingleBusConfig({
                     type="number"
                     value={framingConfig?.maxFrameLength ?? 1024}
                     onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, maxFrameLength: parseInt(e.target.value, 10) || 1024 })}
-                    className="w-16 px-1 py-0.5 rounded border text-xs border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-cyan-500"
+                    className="w-16 px-1 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
                   />
                 </label>
               </>
@@ -217,7 +217,7 @@ export default function SingleBusConfig({
                   type="checkbox"
                   checked={framingConfig?.validateCrc ?? true}
                   onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, validateCrc: e.target.checked })}
-                  className="w-3 h-3 rounded border-slate-300 dark:border-slate-600 text-cyan-500 focus:ring-cyan-500"
+                  className="w-3 h-3 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500"
                 />
                 <span>Validate CRC-16</span>
               </label>
@@ -230,7 +230,7 @@ export default function SingleBusConfig({
                   type="checkbox"
                   checked={framingConfig?.emitRawBytes ?? false}
                   onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, emitRawBytes: e.target.checked })}
-                  className="w-3 h-3 rounded border-slate-300 dark:border-slate-600 text-cyan-500 focus:ring-cyan-500"
+                  className="w-3 h-3 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500"
                 />
                 <span>Capture raw bytes</span>
               </label>
@@ -247,7 +247,7 @@ export default function SingleBusConfig({
   const showRawBytesOptionFull = isSerial && effectiveFraming !== "raw";
 
   return (
-    <div className="border-t border-slate-200 dark:border-slate-700 px-4 py-3">
+    <div className="border-t border-[color:var(--border-default)] px-4 py-3">
       <div className="flex items-center justify-between">
         <div className={flexRowGap2}>
           <CheckCircle2 className={`${iconMd} text-green-500`} />
@@ -264,7 +264,7 @@ export default function SingleBusConfig({
 
       <div className="flex items-center gap-2 mt-2 text-sm">
         <Bus className={`${iconMd} text-slate-400`} />
-        <span className="text-slate-600 dark:text-slate-400">Output Bus:</span>
+        <span className="text-[color:var(--text-secondary)]">Output Bus:</span>
         <select
           value={effectiveBus}
           onChange={(e) => {
@@ -273,8 +273,8 @@ export default function SingleBusConfig({
           }}
           className={`px-2 py-1 rounded border text-sm ${
             isDuplicate
-              ? "border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300"
-              : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+              ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
+              : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
           } focus:ring-1 focus:ring-cyan-500`}
         >
           {Array.from({ length: 8 }, (_, i) => (
@@ -295,13 +295,13 @@ export default function SingleBusConfig({
         <>
           <div className="flex items-center gap-2 mt-2 text-sm">
             <Layers className={`${iconMd} text-slate-400`} />
-            <span className="text-slate-600 dark:text-slate-400">Framing:</span>
+            <span className="text-[color:var(--text-secondary)]">Framing:</span>
             <select
               value={effectiveFraming}
               onChange={(e) => {
                 onFramingChange({ ...framingConfig, encoding: e.target.value as FramingEncoding });
               }}
-              className="px-2 py-1 rounded border text-sm border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-cyan-500"
+              className="px-2 py-1 rounded border text-sm border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
             >
               {FRAMING_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -313,7 +313,7 @@ export default function SingleBusConfig({
 
           {/* Framing sub-options */}
           {(showDelimiterOptionsFull || showModbusOptionsFull || showRawBytesOptionFull) && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 ml-6 text-sm text-slate-600 dark:text-slate-400">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 ml-6 text-sm text-[color:var(--text-secondary)]">
               {/* Delimiter options */}
               {showDelimiterOptionsFull && (
                 <>
@@ -324,7 +324,7 @@ export default function SingleBusConfig({
                       value={framingConfig?.delimiterHex ?? "0A"}
                       onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, delimiterHex: e.target.value })}
                       placeholder="0A"
-                      className="w-16 px-2 py-1 rounded border text-sm border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-cyan-500 font-mono"
+                      className="w-16 px-2 py-1 rounded border text-sm border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500 font-mono"
                     />
                   </label>
                   <label className="flex items-center gap-1.5">
@@ -333,7 +333,7 @@ export default function SingleBusConfig({
                       type="number"
                       value={framingConfig?.maxFrameLength ?? 1024}
                       onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, maxFrameLength: parseInt(e.target.value, 10) || 1024 })}
-                      className="w-20 px-2 py-1 rounded border text-sm border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 focus:ring-1 focus:ring-cyan-500"
+                      className="w-20 px-2 py-1 rounded border text-sm border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
                     />
                   </label>
                 </>
@@ -346,7 +346,7 @@ export default function SingleBusConfig({
                     type="checkbox"
                     checked={framingConfig?.validateCrc ?? true}
                     onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, validateCrc: e.target.checked })}
-                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-cyan-500 focus:ring-cyan-500"
+                    className="w-4 h-4 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500"
                   />
                   <span>Validate CRC-16</span>
                 </label>
@@ -359,7 +359,7 @@ export default function SingleBusConfig({
                     type="checkbox"
                     checked={framingConfig?.emitRawBytes ?? false}
                     onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, emitRawBytes: e.target.checked })}
-                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-cyan-500 focus:ring-cyan-500"
+                    className="w-4 h-4 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500"
                   />
                   <span>Capture raw bytes</span>
                 </label>

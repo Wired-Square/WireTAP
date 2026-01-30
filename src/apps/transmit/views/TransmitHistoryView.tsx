@@ -7,10 +7,10 @@ import { Trash2, Check, X, Download } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useSettings } from "../../../hooks/useSettings";
 import {
-  bgDarkToolbar,
-  borderDarkView,
-  textDarkMuted,
-  hoverDarkRow,
+  bgDataToolbar,
+  borderDataView,
+  textDataSecondary,
+  hoverDataRow,
 } from "../../../styles/colourTokens";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { buttonBase } from "../../../styles/buttonStyles";
@@ -162,7 +162,7 @@ export default function TransmitHistoryView() {
   if (history.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDarkMuted} text-center`}>
+        <div className={`${textDataSecondary} text-center`}>
           <p className="text-lg font-medium">No History</p>
           <p className="text-sm mt-2">
             Transmitted packets will appear here.
@@ -176,9 +176,9 @@ export default function TransmitHistoryView() {
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div
-        className={`flex items-center gap-3 px-4 py-2 ${bgDarkToolbar} border-b ${borderDarkView}`}
+        className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar} border-b ${borderDataView}`}
       >
-        <span className={`${textDarkMuted} text-sm`}>
+        <span className={`${textDataSecondary} text-sm`}>
           {stats.total} packet{stats.total !== 1 ? "s" : ""}
           {stats.failed > 0 && (
             <span className="text-red-400 ml-2">
@@ -212,7 +212,7 @@ export default function TransmitHistoryView() {
       <div className="flex-1 overflow-auto">
         <table className="w-full text-sm">
           <thead
-            className={`${bgDarkToolbar} sticky top-0 ${textDarkMuted} text-xs`}
+            className={`${bgDataToolbar} sticky top-0 ${textDataSecondary} text-xs`}
           >
             <tr>
               <th className="text-left px-4 py-2 w-12"></th>
@@ -237,7 +237,7 @@ export default function TransmitHistoryView() {
               return (
                 <tr
                   key={item.id}
-                  className={`border-b ${borderDarkView} ${hoverDarkRow}`}
+                  className={`border-b ${borderDataView} ${hoverDataRow}`}
                 >
                   {/* Status */}
                   <td className="px-4 py-2">

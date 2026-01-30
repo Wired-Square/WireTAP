@@ -121,13 +121,13 @@ export default function MaskBitPicker({
 
       let bgColor: string;
       if (isOutOfRange) {
-        bgColor = 'bg-slate-200 dark:bg-slate-800 opacity-30';
+        bgColor = 'bg-[var(--bg-tertiary)] opacity-30';
       } else if (isDragSelected) {
-        bgColor = 'bg-yellow-400 dark:bg-yellow-500';
+        bgColor = 'bg-[var(--text-yellow)]';
       } else if (isSelected) {
-        bgColor = 'bg-blue-500 dark:bg-blue-600';
+        bgColor = 'bg-[var(--accent-primary)]';
       } else {
-        bgColor = 'bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500';
+        bgColor = 'bg-[var(--bg-tertiary)] hover:bg-[var(--hover-bg)]';
       }
 
       const tooltip = isOutOfRange
@@ -152,7 +152,7 @@ export default function MaskBitPicker({
           onMouseDown={(e) => !isOutOfRange && handleMouseDown(bitIdx, e)}
           onMouseEnter={() => !isOutOfRange && handleMouseEnter(bitIdx)}
         >
-          <span className={`text-[9px] ${isSelected || isDragSelected ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>
+          <span className={`text-[9px] ${isSelected || isDragSelected ? 'text-white' : 'text-[color:var(--text-secondary)]'}`}>
             {bitIdx}
           </span>
         </div>
@@ -187,7 +187,7 @@ export default function MaskBitPicker({
       )}
 
       <div
-        className="inline-block p-3 bg-slate-100 dark:bg-slate-800 rounded-lg"
+        className="inline-block p-3 bg-[var(--bg-surface)] rounded-lg"
         onMouseLeave={() => {
           if (isMouseDown) {
             handleMouseUp();
@@ -207,15 +207,15 @@ export default function MaskBitPicker({
           })}
         </div>
 
-        <div className="mt-3 pt-2 border-t border-slate-300 dark:border-slate-600 space-y-1">
+        <div className="mt-3 pt-2 border-t border-[color:var(--border-default)] space-y-1">
           <div className="flex items-center gap-4 text-xs">
             <div className={flexRowGap2}>
-              <div className="w-3 h-3 bg-blue-500 dark:bg-blue-600 rounded-sm" />
-              <span className="text-slate-600 dark:text-slate-400">Selected</span>
+              <div className="w-3 h-3 bg-[var(--accent-primary)] rounded-sm" />
+              <span className="text-[color:var(--text-muted)]">Selected</span>
             </div>
             <div className={flexRowGap2}>
-              <div className="w-3 h-3 bg-yellow-400 dark:bg-yellow-500 rounded-sm" />
-              <span className="text-slate-600 dark:text-slate-400">Dragging</span>
+              <div className="w-3 h-3 bg-[var(--text-yellow)] rounded-sm" />
+              <span className="text-[color:var(--text-muted)]">Dragging</span>
             </div>
           </div>
 

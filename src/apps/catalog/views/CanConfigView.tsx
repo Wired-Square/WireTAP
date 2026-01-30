@@ -25,14 +25,14 @@ export default function CanConfigView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-            <Network className={`${iconLg} text-green-600 dark:text-green-400`} />
+          <div className="p-2 bg-[var(--status-success-bg)] rounded-lg">
+            <Network className={`${iconLg} text-[color:var(--status-success)]`} />
           </div>
           <div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white">
+            <div className="text-lg font-bold text-[color:var(--text-primary)]">
               CAN Configuration
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-[color:var(--text-muted)]">
               Protocol-level settings for all CAN frames
             </p>
           </div>
@@ -43,7 +43,7 @@ export default function CanConfigView({
             className={iconButtonHover}
             title="Edit configuration"
           >
-            <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
           </button>
         )}
       </div>
@@ -78,8 +78,8 @@ export default function CanConfigView({
       </div>
 
       {/* Info box */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
+      <div className="p-4 bg-[var(--status-info-bg)] rounded-lg border border-[color:var(--status-info-border)]">
+        <p className="text-sm text-[color:var(--status-info)]">
           <strong>Note:</strong> Individual CAN frames inherit these settings.
           Frames can override the interval but will use the default endianness for signal decoding.
         </p>

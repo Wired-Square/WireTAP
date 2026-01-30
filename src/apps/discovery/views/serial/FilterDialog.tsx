@@ -36,8 +36,8 @@ export default function FilterDialog({ isOpen, onClose, minLength: initialMinLen
     <Dialog isOpen={isOpen} maxWidth="max-w-sm">
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Filter Settings</h2>
-          <button onClick={onClose} className={`p-1 ${hoverLight} rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300`}>
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Filter Settings</h2>
+          <button onClick={onClose} className={`p-1 ${hoverLight} rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]`}>
             <X className={iconLg} />
           </button>
         </div>

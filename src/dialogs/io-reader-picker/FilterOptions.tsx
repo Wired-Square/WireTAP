@@ -72,7 +72,7 @@ export default function FilterOptions({
 
   return (
     <div className={borderDivider}>
-      <div className={`px-4 py-2 bg-slate-50 dark:bg-slate-900/50 ${sectionHeader}`}>
+      <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
         Filter
       </div>
       <div className="p-3">

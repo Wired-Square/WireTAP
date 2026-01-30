@@ -76,7 +76,7 @@ export default function CatalogTreePanel({
             {showCanBadge && (
               <button
                 onClick={onEditConfig}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-success-bg)] text-[color:var(--text-green)] hover:bg-[var(--status-success-bg-hover)] transition-colors cursor-pointer"
                 title={canConfig ? `CAN config: ${canConfig.default_endianness} endian${canConfig.frame_id_mask !== undefined ? ', masked' : ''}` : "Configure CAN settings"}
               >
                 <Network className={iconXs} />
@@ -87,7 +87,7 @@ export default function CatalogTreePanel({
             {showModbusBadge && (
               <button
                 onClick={onEditConfig}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-warning-bg)] text-[color:var(--text-amber)] hover:bg-[var(--status-warning-bg-hover)] transition-colors cursor-pointer"
                 title={modbusConfig ? `Modbus config: Addr ${modbusConfig.device_address}, Base ${modbusConfig.register_base}` : "Configure Modbus settings"}
               >
                 <Server className={iconXs} />
@@ -98,7 +98,7 @@ export default function CatalogTreePanel({
             {showSerialBadge && (
               <button
                 onClick={onEditConfig}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] hover:bg-[var(--status-purple-bg-hover)] transition-colors cursor-pointer"
                 title={serialConfig ? `Serial encoding: ${serialConfig.encoding.toUpperCase()}` : "Configure Serial settings"}
               >
                 <Cable className={iconXs} />
@@ -133,7 +133,7 @@ export default function CatalogTreePanel({
                 backgroundColor: filterByNode !== null ? "#2563eb" : undefined,
                 color: filterByNode !== null ? "white" : undefined,
               }}
-              className="p-2 rounded-lg transition-colors hover:opacity-90 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+              className="p-2 rounded-lg transition-colors hover:opacity-90 bg-[var(--bg-surface)] text-[color:var(--text-secondary)]"
             >
               <Filter className={iconMd} />
             </button>
@@ -146,7 +146,7 @@ export default function CatalogTreePanel({
             <select
               value={filterByNode}
               onChange={(e) => setFilterByNode(e.target.value || null)}
-              className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full px-3 py-2 text-sm bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="">All nodes</option>
               <option value="__unknown__">Unknown</option>
@@ -160,9 +160,9 @@ export default function CatalogTreePanel({
         )}
 
         {!catalogPath ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Open a catalog file to view its structure</p>
+          <p className="text-sm text-[color:var(--text-muted)]">Open a catalog file to view its structure</p>
         ) : parsedTree.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">No structure to display</p>
+          <p className="text-sm text-[color:var(--text-muted)]">No structure to display</p>
         ) : (
           <div className="space-y-1">{parsedTree.map((node) => renderTreeNode(node, 0))}</div>
         )}

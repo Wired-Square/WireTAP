@@ -34,25 +34,26 @@ const variantIcons: Record<AlertVariant, typeof Info> = {
   success: CheckCircle,
 };
 
+// Uses CSS variables for cross-platform dark mode support (Windows WebView)
 const iconColors: Record<AlertVariant, string> = {
-  info: 'text-blue-600 dark:text-blue-400',
-  warning: 'text-amber-600 dark:text-amber-400',
-  danger: 'text-red-600 dark:text-red-400',
-  success: 'text-green-600 dark:text-green-400',
+  info: 'text-[color:var(--status-info-text)]',
+  warning: 'text-[color:var(--status-warning-text)]',
+  danger: 'text-[color:var(--status-danger-text)]',
+  success: 'text-[color:var(--status-success-text)]',
 };
 
 const titleColors: Record<AlertVariant, string> = {
-  info: 'text-blue-800 dark:text-blue-200',
-  warning: 'text-amber-800 dark:text-amber-200',
-  danger: 'text-red-800 dark:text-red-200',
-  success: 'text-green-800 dark:text-green-200',
+  info: 'text-[color:var(--status-info-text)]',
+  warning: 'text-[color:var(--status-warning-text)]',
+  danger: 'text-[color:var(--status-danger-text)]',
+  success: 'text-[color:var(--status-success-text)]',
 };
 
 const textColors: Record<AlertVariant, string> = {
-  info: 'text-blue-700 dark:text-blue-300',
-  warning: 'text-amber-700 dark:text-amber-300',
-  danger: 'text-red-700 dark:text-red-300',
-  success: 'text-green-700 dark:text-green-300',
+  info: 'text-[color:var(--status-info-text)]',
+  warning: 'text-[color:var(--status-warning-text)]',
+  danger: 'text-[color:var(--status-danger-text)]',
+  success: 'text-[color:var(--status-success-text)]',
 };
 
 /**

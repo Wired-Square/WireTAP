@@ -31,8 +31,8 @@ export default function ModbusFrameView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <p className="text-sm text-slate-600 dark:text-slate-400">Configure Modbus frame properties</p>
-          <div className="text-lg font-bold text-slate-900 dark:text-white">
+          <p className="text-sm text-[color:var(--text-muted)]">Configure Modbus frame properties</p>
+          <div className="text-lg font-bold text-[color:var(--text-primary)]">
             {selectedNode.key}
           </div>
         </div>
@@ -44,7 +44,7 @@ export default function ModbusFrameView({
                 className={iconButtonHover}
                 title="Edit frame"
               >
-                <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+                <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
               </button>
             )}
             {onDeleteFrame && (
@@ -53,7 +53,7 @@ export default function ModbusFrameView({
                 className={iconButtonHoverDanger}
                 title="Delete frame"
               >
-                <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
               </button>
             )}
           </div>
@@ -75,7 +75,7 @@ export default function ModbusFrameView({
           <div className={labelSmallMuted}>
             Device Address
             {deviceAddressInherited && (
-              <span className="ml-1 text-blue-500 dark:text-blue-400" title="Inherited from default_modbus_device_address">
+              <span className="ml-1 text-[color:var(--text-blue)]" title="Inherited from default_modbus_device_address">
                 (inherited)
               </span>
             )}
@@ -119,7 +119,7 @@ export default function ModbusFrameView({
             <div className={labelSmallMuted}>
               Interval
               {intervalInherited && (
-                <span className="ml-1 text-blue-500 dark:text-blue-400" title="Inherited from default_interval">
+                <span className="ml-1 text-[color:var(--text-blue)]" title="Inherited from default_interval">
                   (inherited)
                 </span>
               )}
@@ -137,7 +137,7 @@ export default function ModbusFrameView({
           <div className={`${labelSmall} mb-2`}>
             Notes
           </div>
-          <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(notes) ? notes.join("\n") : notes}
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function ModbusFrameView({
 
       {/* Signals info */}
       {selectedNode.children && selectedNode.children.length > 0 && (
-        <div className="text-sm text-slate-600 dark:text-slate-400">
+        <div className="text-sm text-[color:var(--text-muted)]">
           This Modbus frame has {selectedNode.children.length} child node(s). Use the tree to navigate.
         </div>
       )}

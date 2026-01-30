@@ -42,7 +42,7 @@ export default function FramePickerDialog({
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
         <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
             Select Frames
           </h2>
           <button

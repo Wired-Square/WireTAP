@@ -18,7 +18,7 @@ export default function MetadataSection({
 }: MetadataSectionProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wide">
+      <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wide">
         Catalog Metadata
       </h3>
 
@@ -31,7 +31,7 @@ export default function MetadataSection({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
             placeholder="My Catalog"
           />
         </div>
@@ -47,10 +47,10 @@ export default function MetadataSection({
               const val = e.target.value;
               setVersion(val === "" ? 0 : parseInt(val));
             }}
-            className={`w-full px-4 py-2 border rounded-lg text-slate-900 dark:text-white ${focusRing} ${
+            className={`w-full px-4 py-2 border rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
               !version || version < 1
-                ? "bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700"
-                : "bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                ? "bg-[var(--status-danger-bg)] border-[color:var(--status-danger-border)]"
+                : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
             }`}
             placeholder="1"
           />

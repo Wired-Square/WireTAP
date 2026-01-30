@@ -1,9 +1,15 @@
 // ui/src/components/ResizableSidebar.tsx
 
 import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { PanelLeftClose, PanelLeft } from "lucide-react";
 import { iconMd } from "../styles/spacing";
-import { hoverLight, bgSurface } from "../styles";
+import {
+  hoverLight,
+  bgPrimary,
+  borderDefault,
+  textSecondary,
+  roundedDefault,
+} from "../styles";
 
 type Props = {
   children: ReactNode;
@@ -82,46 +88,41 @@ export default function ResizableSidebar({
   }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const borderClass = position === "left" ? "border-r" : "border-l";
-  const collapsedWidth = 24; // Width of the collapsed sliver
+  const collapsedWidth = 56; // Match AppSideBar collapsed width (w-14 = 56px)
 
   const handleToggleCollapse = useCallback(() => {
     setIsCollapsed((prev) => !prev);
   }, []);
 
-  // Determine which chevron to show based on position and collapsed state
-  const CollapseIcon = position === "left"
-    ? (isCollapsed ? ChevronRight : ChevronLeft)
-    : (isCollapsed ? ChevronLeft : ChevronRight);
-
   return (
     <aside
       ref={sidebarRef}
       style={{ width: isCollapsed ? collapsedWidth : width }}
-      className={`relative flex flex-col ${bgSurface} ${borderClass} border-slate-200 dark:border-slate-700 transition-[width] duration-200 ${className}`}
+      className={`relative flex flex-col ${bgPrimary} ${borderClass} ${borderDefault} transition-[width] duration-200 ${className}`}
     >
-      {/* Collapsed state - just show expand button */}
-      {isCollapsed ? (
-        <button
-          onClick={handleToggleCollapse}
-          className={`flex-1 flex items-center justify-center ${hoverLight} transition-colors`}
-          title="Expand sidebar"
-        >
-          <CollapseIcon className={`${iconMd} text-slate-500 dark:text-slate-400`} />
-        </button>
-      ) : (
-        <>
-          {children}
+      {/* Header with collapse toggle - matches AppSideBar pattern */}
+      {collapsible && (
+        <div className={`flex ${isCollapsed ? "justify-center" : "justify-end"} p-2 border-b ${borderDefault}`}>
+          <button
+            onClick={handleToggleCollapse}
+            className={`p-1.5 ${roundedDefault} ${hoverLight} ${textSecondary}`}
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {isCollapsed ? (
+              <PanelLeft className={iconMd} />
+            ) : (
+              <PanelLeftClose className={iconMd} />
+            )}
+          </button>
+        </div>
+      )}
 
-          {/* Collapse button - shown at top right when collapsible */}
-          {collapsible && (
-            <button
-              onClick={handleToggleCollapse}
-              className={`absolute top-2 right-2 p-1 rounded ${hoverLight} transition-colors z-20`}
-              title="Collapse sidebar"
-            >
-              <CollapseIcon className={`${iconMd} text-slate-500 dark:text-slate-400`} />
-            </button>
-          )}
+      {/* Content area */}
+      {!isCollapsed && (
+        <>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {children}
+          </div>
 
           {/* Resize handle */}
           <div

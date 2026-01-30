@@ -188,8 +188,8 @@ export default function FrameEditView({
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{title}</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">{subtitle}</p>
+        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2">{title}</h2>
+        <p className="text-sm text-[color:var(--text-muted)]">{subtitle}</p>
       </div>
 
       <div className="space-y-6">
@@ -210,18 +210,18 @@ export default function FrameEditView({
                     onClick={() => handleProtocolChange(handler.type)}
                     className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
                       isSelected
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                        : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                        ? "border-[color:var(--accent-primary)] bg-[var(--accent-bg)]"
+                        : "border-[color:var(--border-default)] hover:border-[color:var(--border-hover)]"
                     }`}
                   >
                     <Icon
                       className={`${iconLg} ${
-                        isSelected ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+                        isSelected ? "text-[color:var(--accent-primary)]" : "text-[color:var(--text-muted)]"
                       }`}
                     />
                     <span
                       className={`font-medium ${
-                        isSelected ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300"
+                        isSelected ? "text-[color:var(--accent-text)]" : "text-[color:var(--text-secondary)]"
                       }`}
                     >
                       {handler.displayName}
@@ -234,8 +234,8 @@ export default function FrameEditView({
         )}
 
         {/* Protocol-Specific Configuration */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+          <h3 className="text-sm font-semibold text-[color:var(--text-secondary)] mb-4 flex items-center gap-2">
             {currentHandler && (
               <>
                 {(() => {
@@ -250,8 +250,8 @@ export default function FrameEditView({
         </div>
 
         {/* Common Frame Fields */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">
+        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+          <h3 className="text-sm font-semibold text-[color:var(--text-secondary)] mb-4">
             Common Properties
           </h3>
 
@@ -268,7 +268,7 @@ export default function FrameEditView({
                 max={fields.protocol === "can" ? 64 : 256}
                 value={fields.base.length}
                 onChange={(e) => handleBaseChange({ length: parseInt(e.target.value) || 0 })}
-                className={`w-full px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+                className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               />
             </div>
 
@@ -280,7 +280,7 @@ export default function FrameEditView({
               <select
                 value={fields.base.transmitter || ""}
                 onChange={(e) => handleBaseChange({ transmitter: e.target.value || undefined })}
-                className={`w-full px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+                className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               >
                 <option value="">None</option>
                 {availablePeers.map((peer) => (
@@ -303,7 +303,7 @@ export default function FrameEditView({
                       type="checkbox"
                       checked={fields.isIntervalInherited ?? false}
                       onChange={(e) => handleInheritanceChange("isIntervalInherited", e.target.checked)}
-                      className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                      className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
                     />
                     Use default ({defaults.interval})
                   </label>
@@ -319,7 +319,7 @@ export default function FrameEditView({
                   })
                 }
                 disabled={fields.isIntervalInherited}
-                className={`w-full px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing} ${
+                className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
                   fields.isIntervalInherited ? "opacity-50 cursor-not-allowed" : ""
                 }`}
                 placeholder="1000"
@@ -349,7 +349,7 @@ export default function FrameEditView({
                     });
                   }
                 }}
-                className={`w-full px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-mono text-sm ${focusRing}`}
+                className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono text-sm ${focusRing}`}
                 placeholder="Add notes about this frame (one per line)"
               />
             </div>

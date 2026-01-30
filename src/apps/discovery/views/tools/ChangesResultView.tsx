@@ -96,11 +96,11 @@ export default function ChangesResultView({ embedded = false }: Props) {
   if (!results) {
     const content = (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-        <GitCompare className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-4" />
-        <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+        <GitCompare className="w-12 h-12 text-[color:var(--text-muted)] mb-4" />
+        <p className="text-sm text-[color:var(--text-secondary)] mb-2">
           No results yet
         </p>
-        <p className="text-xs text-slate-500 dark:text-slate-500">
+        <p className="text-xs text-[color:var(--text-muted)]">
           Select frames in the sidebar and click "Run Analysis" to detect payload patterns.
         </p>
       </div>
@@ -111,7 +111,7 @@ export default function ChangesResultView({ embedded = false }: Props) {
     }
 
     return (
-      <div className={`h-full flex flex-col ${bgSurface} rounded-lg border border-slate-200 dark:border-slate-700`}>
+      <div className={`h-full flex flex-col ${bgSurface} rounded-lg border border-[color:var(--border-default)]`}>
         <Header onExport={() => {}} hasResults={false} />
         {content}
       </div>
@@ -121,13 +121,13 @@ export default function ChangesResultView({ embedded = false }: Props) {
   const mainContent = (
     <>
       {/* Summary Section */}
-      <div className={`px-4 py-3 ${borderDivider} bg-slate-50 dark:bg-slate-900`}>
+      <div className={`px-4 py-3 ${borderDivider} bg-[var(--bg-surface)]`}>
         <div className="flex flex-wrap gap-4 text-xs mb-2">
-          <span className="text-slate-500 dark:text-slate-400">
-            <span className="font-medium text-slate-700 dark:text-slate-200">{results.frameCount.toLocaleString()}</span> frames
+          <span className="text-[color:var(--text-muted)]">
+            <span className="font-medium text-[color:var(--text-primary)]">{results.frameCount.toLocaleString()}</span> frames
           </span>
-          <span className="text-slate-500 dark:text-slate-400">
-            <span className="font-medium text-slate-700 dark:text-slate-200">{results.uniqueFrameIds}</span> unique IDs analyzed
+          <span className="text-[color:var(--text-muted)]">
+            <span className="font-medium text-[color:var(--text-primary)]">{results.uniqueFrameIds}</span> unique IDs analyzed
           </span>
         </div>
 
@@ -135,31 +135,31 @@ export default function ChangesResultView({ embedded = false }: Props) {
         {summary && (summary.identicalCount > 0 || summary.varyingLengthCount > 0 || summary.muxCount > 0 || summary.burstCount > 0 || summary.mirrorGroupCount > 0) && (
           <div className="flex flex-wrap gap-2 text-[10px]">
             {summary.mirrorGroupCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300">
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-pink-100/50 text-pink-600">
                 <GitMerge className={iconXs} />
                 {summary.mirrorGroupCount} mirror group{summary.mirrorGroupCount > 1 ? 's' : ''}
               </span>
             )}
             {summary.identicalCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--hover-bg)] text-[color:var(--text-secondary)]">
                 <Copy className={iconXs} />
                 {summary.identicalCount} identical
               </span>
             )}
             {summary.varyingLengthCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--status-warning-bg)] text-[color:var(--text-yellow)]">
                 <Ruler className={iconXs} />
                 {summary.varyingLengthCount} varying length
               </span>
             )}
             {summary.muxCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-100/50 text-[color:var(--text-orange)]">
                 <Layers className={iconXs} />
                 {summary.muxCount} multiplexed
               </span>
             )}
             {summary.burstCount > 0 && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300">
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-100/50 text-[color:var(--text-cyan)]">
                 {summary.burstCount} burst
               </span>
             )}
@@ -172,7 +172,7 @@ export default function ChangesResultView({ embedded = false }: Props) {
         {/* Mirror Groups Section */}
         {mirrorGroups.length > 0 && (
           <div className="space-y-2">
-            <div className="text-xs font-medium text-pink-600 dark:text-pink-400 flex items-center gap-1.5">
+            <div className="text-xs font-medium text-pink-600 flex items-center gap-1.5">
               <GitMerge className={iconSm} />
               Mirror Frames
             </div>
@@ -203,7 +203,7 @@ export default function ChangesResultView({ embedded = false }: Props) {
   }
 
   return (
-    <div className={`h-full flex flex-col ${bgSurface} rounded-lg border border-slate-200 dark:border-slate-700`}>
+    <div className={`h-full flex flex-col ${bgSurface} rounded-lg border border-[color:var(--border-default)]`}>
       <Header onExport={() => setShowExportDialog(true)} hasResults={true} />
       {mainContent}
     </div>
@@ -222,7 +222,7 @@ type HeaderProps = {
 function Header({ onExport, hasResults = false }: HeaderProps) {
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider}`}>
-      <GitCompare className={`${iconLg} text-purple-600 dark:text-purple-400`} />
+      <GitCompare className={`${iconLg} text-[color:var(--text-purple)]`} />
       <div className="flex-1">
         <h2 className={sectionHeaderText}>
           Payload Changes Analysis
@@ -235,7 +235,7 @@ function Header({ onExport, hasResults = false }: HeaderProps) {
         <button
           type="button"
           onClick={onExport}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] hover:brightness-95 transition-colors"
           title="Export analysis results"
         >
           <Download className={iconSm} />
@@ -256,41 +256,41 @@ type MirrorGroupCardProps = {
 
 function MirrorGroupCard({ group }: MirrorGroupCardProps) {
   return (
-    <div className="p-3 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800/50">
+    <div className="p-3 bg-pink-50/50 rounded-lg border border-pink-300">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1">
             {group.frameIds.map((id, idx) => (
               <span key={id}>
-                <span className="font-mono font-semibold text-sm text-pink-700 dark:text-pink-300">
+                <span className="font-mono font-semibold text-sm text-pink-600">
                   {formatFrameId(id)}
                 </span>
                 {idx < group.frameIds.length - 1 && (
-                  <span className="text-pink-400 dark:text-pink-500 mx-1">↔</span>
+                  <span className="text-pink-500 mx-1">↔</span>
                 )}
               </span>
             ))}
           </div>
-          <span className="text-xs text-pink-500 dark:text-pink-400">
+          <span className="text-xs text-pink-500">
             {group.matchPercentage}% match
           </span>
         </div>
-        <span className="text-[10px] text-pink-500 dark:text-pink-400">
+        <span className="text-[10px] text-pink-500">
           {group.sampleCount} matching pairs
         </span>
       </div>
 
       {/* Sample payload */}
       {group.samplePayload && (
-        <div className="mt-2 text-[10px] text-pink-600 dark:text-pink-300">
-          <span className="text-pink-500 dark:text-pink-400">Sample: </span>
+        <div className="mt-2 text-[10px] text-pink-600">
+          <span className="text-pink-500">Sample: </span>
           <span className="font-mono">
             {group.samplePayload.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ')}
           </span>
         </div>
       )}
 
-      <div className="mt-1.5 text-[10px] text-pink-500 dark:text-pink-400">
+      <div className="mt-1.5 text-[10px] text-pink-500">
         These frame IDs transmit identical payloads that change together
       </div>
     </div>
@@ -313,26 +313,26 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono font-semibold text-sm text-slate-700 dark:text-slate-200">
+          <span className="font-mono font-semibold text-sm text-[color:var(--text-primary)]">
             {formatFrameId(result.frameId)}
           </span>
           <span className={captionMuted}>
             {result.sampleCount} samples
           </span>
           {result.isBurstFrame && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded">
+            <span className="px-1.5 py-0.5 text-[10px] bg-cyan-100/50 text-[color:var(--text-cyan)] rounded">
               Burst
             </span>
           )}
           {result.isMuxFrame && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded flex items-center gap-0.5">
+            <span className="px-1.5 py-0.5 text-[10px] bg-orange-100/50 text-[color:var(--text-orange)] rounded flex items-center gap-0.5">
               <Layers className={iconXs} />
               Mux
             </span>
           )}
           {result.hasVaryingLength && result.lengthRange && (
             <span
-              className="px-1.5 py-0.5 text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded flex items-center gap-0.5"
+              className="px-1.5 py-0.5 text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--text-yellow)] rounded flex items-center gap-0.5"
               title={`Frame length varies from ${result.lengthRange.min} to ${result.lengthRange.max} bytes`}
             >
               <Ruler className={iconXs} />
@@ -341,7 +341,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
           )}
           {result.isIdentical && (
             <span
-              className="px-1.5 py-0.5 text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded flex items-center gap-0.5"
+              className="px-1.5 py-0.5 text-[10px] bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded flex items-center gap-0.5"
               title="All payloads in this frame are identical"
             >
               <Copy className={iconXs} />
@@ -351,31 +351,31 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
         </div>
         <div className="flex items-center gap-2 text-[10px]">
           {counts.staticCount > 0 && (
-            <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1 text-[color:var(--text-muted)]">
               <Minus className={iconXs} />
               {counts.staticCount} static
             </span>
           )}
           {(counts.counterCount > 0 || counts.counter16Count > 0 || counts.counter32Count > 0) && (
-            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+            <span className="flex items-center gap-1 text-[color:var(--text-green)]">
               <RefreshCw className={iconXs} />
               {counts.counterCount + counts.counter16Count + counts.counter32Count} counter
             </span>
           )}
           {(counts.sensorCount > 0 || counts.sensor16Count > 0) && (
-            <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+            <span className="flex items-center gap-1 text-[color:var(--text-purple)]">
               <Thermometer className={iconXs} />
               {counts.sensorCount + counts.sensor16Count} sensor
             </span>
           )}
           {counts.valueCount > 0 && (
-            <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+            <span className="flex items-center gap-1 text-[color:var(--status-info-text)]">
               <Activity className={iconXs} />
               {counts.valueCount} value
             </span>
           )}
           {counts.textCount > 0 && (
-            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+            <span className="flex items-center gap-1 text-[color:var(--text-amber)]">
               <Type className={iconXs} />
               {counts.textCount} text
             </span>
@@ -385,7 +385,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
 
       {/* Mux info line */}
       {result.isMuxFrame && result.muxInfo && (
-        <div className="mb-3 text-[10px] text-orange-600 dark:text-orange-400">
+        <div className="mb-3 text-[10px] text-[color:var(--text-orange)]">
           <span className="font-medium">Mux:</span>{" "}
           {result.muxInfo.isTwoByte ? "byte[0:1]" : `byte[${result.muxInfo.selectorByte}]`}
           , cases: {result.muxInfo.selectorValues.map(v => formatMuxValue(v, result.muxInfo!.isTwoByte)).join(", ")}
@@ -409,7 +409,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
         <>
           {/* Byte visualization (non-mux frames) - with multi-byte patterns inline */}
           <div className="mb-3">
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-1">
+            <div className="text-[10px] text-[color:var(--text-muted)] mb-1">
               Bytes {result.analyzedFromByte}–{result.analyzedToByteExclusive - 1}
             </div>
             <ByteVisualization
@@ -420,13 +420,13 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
 
           {/* Notes */}
           {result.notes.length > 0 && (
-            <div className="border-t border-slate-200 dark:border-slate-700 pt-2">
-              <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+            <div className="border-t border-[color:var(--border-default)] pt-2">
+              <div className="text-[10px] font-medium text-[color:var(--text-muted)] mb-1">
                 Notes
               </div>
               <ul className="space-y-0.5">
                 {result.notes.map((note, idx) => (
-                  <li key={idx} className="text-[10px] text-slate-600 dark:text-slate-300">
+                  <li key={idx} className="text-[10px] text-[color:var(--text-secondary)]">
                     • {note}
                   </li>
                 ))}
@@ -456,12 +456,12 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
   const counts = countByteRoles(caseAnalysis.byteStats, caseAnalysis.multiBytePatterns);
 
   return (
-    <div className={`${bgSurface} rounded border border-slate-200 dark:border-slate-700`}>
+    <div className={`${bgSurface} rounded border border-[color:var(--border-default)]`}>
       {/* Collapsible header */}
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+        className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-[var(--hover-bg)] transition-colors"
       >
         <div className={flexRowGap2}>
           {isExpanded ? (
@@ -469,38 +469,38 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
           ) : (
             <ChevronRight className={`${iconXs} text-slate-400`} />
           )}
-          <span className="text-[10px] font-medium text-orange-600 dark:text-orange-400">
+          <span className="text-[10px] font-medium text-[color:var(--text-orange)]">
             Case {formatMuxValue(caseAnalysis.muxValue, isTwoByte)}
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+          <span className="text-[10px] text-[color:var(--text-muted)]">
             ({caseAnalysis.sampleCount} samples)
           </span>
         </div>
         <div className="flex items-center gap-2 text-[10px]">
           {counts.staticCount > 0 && (
-            <span className="text-slate-500 dark:text-slate-400">{counts.staticCount} static</span>
+            <span className="text-[color:var(--text-muted)]">{counts.staticCount} static</span>
           )}
           {(counts.counterCount > 0 || counts.counter16Count > 0 || counts.counter32Count > 0) && (
-            <span className="text-green-600 dark:text-green-400">{counts.counterCount + counts.counter16Count + counts.counter32Count} counter</span>
+            <span className="text-[color:var(--text-green)]">{counts.counterCount + counts.counter16Count + counts.counter32Count} counter</span>
           )}
           {(counts.sensorCount > 0 || counts.sensor16Count > 0) && (
-            <span className="text-purple-600 dark:text-purple-400">{counts.sensorCount + counts.sensor16Count} sensor</span>
+            <span className="text-[color:var(--text-purple)]">{counts.sensorCount + counts.sensor16Count} sensor</span>
           )}
           {counts.valueCount > 0 && (
-            <span className="text-blue-600 dark:text-blue-400">{counts.valueCount} value</span>
+            <span className="text-[color:var(--status-info-text)]">{counts.valueCount} value</span>
           )}
           {counts.textCount > 0 && (
-            <span className="text-amber-600 dark:text-amber-400">{counts.textCount} text</span>
+            <span className="text-[color:var(--text-amber)]">{counts.textCount} text</span>
           )}
         </div>
       </button>
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-2 pb-2 pt-1 border-t border-slate-100 dark:border-slate-700">
+        <div className="px-2 pb-2 pt-1 border-t border-[color:var(--border-default)]">
           {/* Byte visualization */}
           <div className="mb-2">
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-1">
+            <div className="text-[10px] text-[color:var(--text-muted)] mb-1">
               Bytes {analyzedFromByte}–{analyzedToByteExclusive - 1}
             </div>
             <ByteVisualization
@@ -511,10 +511,10 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
 
           {/* Notes */}
           {caseAnalysis.notes.length > 0 && (
-            <div className="border-t border-slate-100 dark:border-slate-600 pt-1.5 mt-1.5">
+            <div className="border-t border-[color:var(--border-default)] pt-1.5 mt-1.5">
               <ul className="space-y-0.5">
                 {caseAnalysis.notes.map((note, idx) => (
-                  <li key={idx} className="text-[10px] text-slate-600 dark:text-slate-300">
+                  <li key={idx} className="text-[10px] text-[color:var(--text-secondary)]">
                     • {note}
                   </li>
                 ))}
@@ -536,17 +536,17 @@ type ByteChipProps = {
 };
 
 function ByteChip({ byte }: ByteChipProps) {
-  let bgClass = "bg-slate-200 dark:bg-slate-700";
-  let textClass = "text-slate-600 dark:text-slate-300";
+  let bgClass = "bg-[var(--hover-bg)]";
+  let textClass = "text-[color:var(--text-secondary)]";
   let title = `byte[${byte.byteIndex}]: unknown`;
 
   if (byte.role === 'static') {
-    bgClass = "bg-slate-300 dark:bg-slate-600";
-    textClass = "text-slate-700 dark:text-slate-200";
+    bgClass = "bg-[var(--border-default)]";
+    textClass = "text-[color:var(--text-primary)]";
     title = `byte[${byte.byteIndex}]: static = 0x${byte.staticValue!.toString(16).toUpperCase().padStart(2, '0')}`;
   } else if (byte.role === 'counter') {
-    bgClass = "bg-green-100 dark:bg-green-900/30";
-    textClass = "text-green-700 dark:text-green-300";
+    bgClass = "bg-[var(--status-success-bg)]";
+    textClass = "text-[color:var(--status-success-text)]";
     const dir = byte.counterDirection === 'up' ? '↑' : '↓';
     if (byte.isLoopingCounter && byte.loopingRange && byte.loopingModulo) {
       title = `byte[${byte.byteIndex}]: looping counter ${dir} step=${byte.counterStep}, range ${byte.loopingRange.min}–${byte.loopingRange.max} (mod ${byte.loopingModulo})`;
@@ -555,14 +555,14 @@ function ByteChip({ byte }: ByteChipProps) {
       title = `byte[${byte.byteIndex}]: counter ${dir} step=${byte.counterStep}${rollover}`;
     }
   } else if (byte.role === 'sensor') {
-    bgClass = "bg-orange-100 dark:bg-orange-900/30";
-    textClass = "text-orange-700 dark:text-orange-300";
+    bgClass = "bg-orange-100/50";
+    textClass = "text-[color:var(--text-orange)]";
     const trend = byte.sensorTrend === 'increasing' ? '↑' : byte.sensorTrend === 'decreasing' ? '↓' : '↕';
     const strength = byte.trendStrength ? ` (${Math.round(byte.trendStrength * 100)}% trend)` : '';
     title = `byte[${byte.byteIndex}]: sensor ${trend} range ${byte.min}–${byte.max}${strength}`;
   } else if (byte.role === 'value') {
-    bgClass = "bg-blue-100 dark:bg-blue-900/30";
-    textClass = "text-blue-700 dark:text-blue-300";
+    bgClass = "bg-[var(--status-info-bg)]";
+    textClass = "text-[color:var(--status-info-text)]";
     title = `byte[${byte.byteIndex}]: value range ${byte.min}–${byte.max} (${byte.uniqueValues.size} unique)`;
   }
 
@@ -609,30 +609,30 @@ type MultiByteChipProps = {
 };
 
 function MultiByteChip({ pattern }: MultiByteChipProps) {
-  let bgClass = "bg-purple-100 dark:bg-purple-900/30";
-  let textClass = "text-purple-700 dark:text-purple-300";
+  let bgClass = "bg-[var(--status-purple-bg)]";
+  let textClass = "text-[color:var(--text-purple)]";
   let label = '';
   let icon = '';
   let displayText = '';
 
   if (pattern.pattern === 'sensor16') {
-    bgClass = "bg-purple-100 dark:bg-purple-900/30";
-    textClass = "text-purple-700 dark:text-purple-300";
+    bgClass = "bg-[var(--status-purple-bg)]";
+    textClass = "text-[color:var(--text-purple)]";
     label = 'sensor16';
     icon = '⚡';
   } else if (pattern.pattern === 'counter16') {
-    bgClass = "bg-green-100 dark:bg-green-900/30";
-    textClass = "text-green-700 dark:text-green-300";
+    bgClass = "bg-[var(--status-success-bg)]";
+    textClass = "text-[color:var(--status-success-text)]";
     label = 'counter16';
     icon = '↻';
   } else if (pattern.pattern === 'counter32') {
-    bgClass = "bg-green-100 dark:bg-green-900/30";
-    textClass = "text-green-700 dark:text-green-300";
+    bgClass = "bg-[var(--status-success-bg)]";
+    textClass = "text-[color:var(--status-success-text)]";
     label = 'counter32';
     icon = '↻';
   } else if (pattern.pattern === 'text') {
-    bgClass = "bg-amber-100 dark:bg-amber-900/30";
-    textClass = "text-amber-700 dark:text-amber-300";
+    bgClass = "bg-[var(--status-warning-bg)]";
+    textClass = "text-[color:var(--text-amber)]";
     label = 'text';
     icon = 'Aa';
     displayText = pattern.sampleText ? ` "${pattern.sampleText}"` : '';

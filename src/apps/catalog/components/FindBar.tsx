@@ -140,7 +140,7 @@ export default function FindBar() {
   const currentMatch = find.currentIndex + 1;
 
   return (
-    <div className={`flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 ${borderDivider}`}>
+    <div className={`flex items-center gap-2 px-4 py-2 bg-[var(--bg-surface)] ${borderDivider}`}>
       <input
         ref={inputRef}
         type="text"
@@ -148,10 +148,10 @@ export default function FindBar() {
         onChange={(e) => setFindQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Find in catalog..."
-        className={`flex-1 px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white ${focusRing}`}
+        className={`flex-1 px-3 py-1.5 text-sm rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
       />
 
-      <span className="text-sm text-slate-500 dark:text-slate-400 min-w-[60px] text-center">
+      <span className="text-sm text-[color:var(--text-muted)] min-w-[60px] text-center">
         {find.query.trim() ? (matchCount > 0 ? `${currentMatch}/${matchCount}` : "No results") : ""}
       </span>
 

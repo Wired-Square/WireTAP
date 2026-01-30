@@ -150,10 +150,10 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
                 value={meta.filename}
                 onChange={(e) => onChange({ ...meta, filename: e.target.value })}
                 placeholder="my-decoder.toml"
-                className={filenameError ? 'border-amber-500 dark:border-amber-400' : ''}
+                className={filenameError ? 'border-[color:var(--text-amber)]' : ''}
               />
               {filenameError && (
-                <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                <div className="flex items-center gap-1 text-xs text-[color:var(--text-amber)]">
                   <AlertCircle className={iconXs} />
                   {filenameError}
                 </div>

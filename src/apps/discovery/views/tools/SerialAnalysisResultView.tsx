@@ -150,7 +150,7 @@ export default function SerialAnalysisResultView() {
 
   if (!framingResults && !payloadResults) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500">
+      <div className="flex items-center justify-center h-full text-[color:var(--text-muted)]">
         Run Serial Analysis tools to see results
       </div>
     );
@@ -164,13 +164,13 @@ export default function SerialAnalysisResultView() {
     return (
       <div className="h-full overflow-y-auto p-4 pb-8 space-y-6">
         {/* Summary Header */}
-        <div className="flex items-center gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="flex items-center gap-4 p-4 bg-[var(--status-info-bg)] rounded-lg border border-[color:var(--status-info-border)]">
           <Layers className={`${icon2xl} text-blue-500`} />
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
               Framing Detection Results
             </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-sm text-[color:var(--text-muted)] mt-1">
               Analyzed {framingResult.byteCount.toLocaleString()} raw bytes
             </p>
           </div>
@@ -183,10 +183,10 @@ export default function SerialAnalysisResultView() {
               <Info className={iconMd} />
               <span>Summary</span>
             </div>
-            <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+            <ul className="space-y-1 text-sm text-[color:var(--text-secondary)]">
               {framingResult.notes.map((note, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="text-slate-400 dark:text-slate-500 mt-0.5">•</span>
+                  <span className="text-[color:var(--text-muted)] mt-0.5">•</span>
                   <span>{note}</span>
                 </li>
               ))}
@@ -205,8 +205,8 @@ export default function SerialAnalysisResultView() {
           </div>
 
           {framingResult.candidates.length === 0 ? (
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            <div className="p-4 bg-[var(--status-warning-bg)] rounded-lg border border-[color:var(--status-warning-border)]">
+              <p className="text-sm text-[color:var(--status-warning-text)]">
                 No clear framing pattern detected. Try applying framing manually in the Raw Bytes view.
               </p>
             </div>
@@ -222,12 +222,12 @@ export default function SerialAnalysisResultView() {
                       key={idx}
                       className={`p-3 rounded-lg border ${
                         isApplied
-                          ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                          ? "bg-[var(--status-info-bg)] border-[color:var(--status-info-border)]"
                           : idx === 0 && candidate.confidence >= 70
-                            ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                            ? "bg-[var(--status-success-bg)] border-[color:var(--status-success-border)]"
                             : candidate.confidence >= 50
-                              ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
-                              : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                              ? "bg-[var(--status-warning-bg)] border-[color:var(--status-warning-border)]"
+                              : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -239,30 +239,30 @@ export default function SerialAnalysisResultView() {
                                 : candidate.mode.replace('_', ' ')}
                             </span>
                             {!isApplied && idx === 0 && candidate.confidence >= 70 && (
-                              <span className="px-1.5 py-0.5 text-xs bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded">
+                              <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
                                 Best Match
                               </span>
                             )}
                             {isApplied && (
-                              <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
+                              <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
                                 <Check className={iconXs} />
                                 Applied
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                          <div className="text-sm text-[color:var(--text-secondary)] mt-1">
                             <span className={
                               candidate.confidence >= 70
-                                ? "text-green-600 dark:text-green-400 font-medium"
+                                ? "text-[color:var(--text-green)] font-medium"
                                 : candidate.confidence >= 50
-                                  ? "text-yellow-600 dark:text-yellow-400"
+                                  ? "text-[color:var(--text-amber)]"
                                   : ""
                             }>
                               {candidate.confidence}% confidence
                             </span>
-                            <span className="mx-2 text-slate-300 dark:text-slate-600">|</span>
+                            <span className="mx-2 text-[color:var(--text-muted)]">|</span>
                             ~{candidate.estimatedFrameCount.toLocaleString()} frames
-                            <span className="mx-2 text-slate-300 dark:text-slate-600">|</span>
+                            <span className="mx-2 text-[color:var(--text-muted)]">|</span>
                             avg {candidate.avgFrameLength} bytes
                           </div>
                           {candidate.notes.length > 0 && (
@@ -276,8 +276,8 @@ export default function SerialAnalysisResultView() {
                             onClick={() => handleToggleFraming(candidate, idx)}
                             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                               isApplied
-                                ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70"
-                                : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                                ? "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg-strong)]"
+                                : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
                             }`}
                           >
                             {isApplied ? "Applied" : "Apply"}
@@ -301,11 +301,11 @@ export default function SerialAnalysisResultView() {
         </div>
 
         {/* Next Steps */}
-        <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
+        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
           <h4 className={`${sectionHeaderText} mb-2`}>
             Next Steps
           </h4>
-          <ol className="text-sm text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside">
+          <ol className="text-sm text-[color:var(--text-secondary)] space-y-1 list-decimal list-inside">
             <li>Click "Apply" on a framing mode above, or configure manually in the Framing dialog</li>
             <li>Review the framed data in the "Framed Bytes" tab</li>
             <li>Run analysis again to identify ID bytes and checksums</li>
@@ -325,12 +325,12 @@ export default function SerialAnalysisResultView() {
   return (
     <div className="h-full overflow-y-auto p-4 pb-8 space-y-6">
       {/* Summary Header */}
-      <div className="flex items-center gap-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
+      <div className="flex items-center gap-4 p-4 bg-[var(--bg-surface)] rounded-lg">
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
             Frame Structure Analysis
           </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-[color:var(--text-muted)] mt-1">
             Analyzed {analysisResult.frameCount.toLocaleString()} frames
             {analysisResult.hasVaryingLength
               ? ` (${analysisResult.minLength}–${analysisResult.maxLength} bytes)`
@@ -346,10 +346,10 @@ export default function SerialAnalysisResultView() {
             <Info className={iconMd} />
             <span>Summary</span>
           </div>
-          <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+          <ul className="space-y-1 text-sm text-[color:var(--text-secondary)]">
             {analysisResult.notes.map((note, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="text-slate-400 dark:text-slate-500 mt-0.5">•</span>
+                <span className="text-[color:var(--text-muted)] mt-0.5">•</span>
                 <span>{note}</span>
               </li>
             ))}
@@ -368,7 +368,7 @@ export default function SerialAnalysisResultView() {
         </div>
 
         {analysisResult.candidateIdGroups.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400 italic">
+          <p className="text-sm text-[color:var(--text-muted)] italic">
             No clear ID byte patterns detected
           </p>
         ) : (
@@ -383,10 +383,10 @@ export default function SerialAnalysisResultView() {
                     key={idx}
                     className={`p-3 rounded-lg border ${
                       isApplied
-                        ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                        ? "bg-[var(--status-info-bg)] border-[color:var(--status-info-border)]"
                         : idx === 0
-                          ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
-                          : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                          ? "bg-[var(--status-success-bg)] border-[color:var(--status-success-border)]"
+                          : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -397,24 +397,24 @@ export default function SerialAnalysisResultView() {
                             {candidate.length > 1 ? `:${candidate.startByte + candidate.length - 1}` : ""}]
                           </span>
                           {!isApplied && idx === 0 && (
-                            <span className="px-1.5 py-0.5 text-xs bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded">
+                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
                               Best Match
                             </span>
                           )}
                           {isApplied && (
-                            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
+                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
                               <Check className={iconXs} />
                               Applied ({getUniqueIdCount()} unique IDs)
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        <div className="text-sm text-[color:var(--text-secondary)] mt-1">
                           {candidate.uniqueValues.length} distinct values
-                          <span className="mx-2 text-slate-300 dark:text-slate-600">|</span>
+                          <span className="mx-2 text-[color:var(--text-muted)]">|</span>
                           {candidate.confidence.toFixed(0)}% confidence
                         </div>
                         {candidate.notes.length > 0 && (
-                          <div className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                          <div className="text-xs text-[color:var(--text-muted)] mt-1">
                             {candidate.notes.join(" • ")}
                           </div>
                         )}
@@ -424,8 +424,8 @@ export default function SerialAnalysisResultView() {
                           onClick={() => handleToggleId(candidate, idx)}
                           className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                             isApplied
-                              ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70"
-                              : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                              ? "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg-strong)]"
+                              : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
                           }`}
                         >
                           {isApplied ? "Applied" : "Apply"}
@@ -444,17 +444,17 @@ export default function SerialAnalysisResultView() {
                     {candidate.uniqueValues.length <= 20 && (
                       <div className={`mt-2 pt-2 border-t ${
                         isApplied
-                          ? "border-blue-200 dark:border-blue-800"
+                          ? "border-[color:var(--status-info-border)]"
                           : idx === 0
-                            ? "border-green-200 dark:border-green-800"
-                            : "border-slate-200 dark:border-slate-700"
+                            ? "border-[color:var(--status-success-border)]"
+                            : "border-[color:var(--border-default)]"
                       }`}>
                         <div className={`${caption} mb-1`}>Sample values:</div>
                         <div className="flex flex-wrap gap-1">
                           {candidate.uniqueValues.slice(0, 16).map((val, i) => (
                             <span
                               key={i}
-                              className="px-1.5 py-0.5 font-mono text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded"
+                              className="px-1.5 py-0.5 font-mono text-xs bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded"
                             >
                               0x{val.toString(16).toUpperCase().padStart(candidate.length * 2, "0")}
                             </span>
@@ -485,7 +485,7 @@ export default function SerialAnalysisResultView() {
         </div>
 
         {analysisResult.candidateSourceAddresses.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400 italic">
+          <p className="text-sm text-[color:var(--text-muted)] italic">
             No clear source address patterns detected
           </p>
         ) : (
@@ -500,10 +500,10 @@ export default function SerialAnalysisResultView() {
                     key={idx}
                     className={`p-3 rounded-lg border ${
                       isApplied
-                        ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                        ? "bg-[var(--status-info-bg)] border-[color:var(--status-info-border)]"
                         : idx === 0
-                          ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
-                          : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                          ? "bg-[var(--status-purple-bg)] border-[color:var(--status-purple-border)]"
+                          : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -514,24 +514,24 @@ export default function SerialAnalysisResultView() {
                             {candidate.length > 1 ? `:${candidate.startByte + candidate.length - 1}` : ""}]
                           </span>
                           {!isApplied && idx === 0 && (
-                            <span className="px-1.5 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded">
+                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] rounded">
                               Best Match
                             </span>
                           )}
                           {isApplied && (
-                            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
+                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
                               <Check className={iconXs} />
                               Applied
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        <div className="text-sm text-[color:var(--text-secondary)] mt-1">
                           {candidate.uniqueValues.length} distinct addresses
-                          <span className="mx-2 text-slate-300 dark:text-slate-600">|</span>
+                          <span className="mx-2 text-[color:var(--text-muted)]">|</span>
                           {candidate.confidence.toFixed(0)}% confidence
                         </div>
                         {candidate.notes.length > 0 && (
-                          <div className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                          <div className="text-xs text-[color:var(--text-muted)] mt-1">
                             {candidate.notes.join(" • ")}
                           </div>
                         )}
@@ -541,8 +541,8 @@ export default function SerialAnalysisResultView() {
                           onClick={() => handleToggleSourceAddress(candidate, idx)}
                           className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                             isApplied
-                              ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70"
-                              : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                              ? "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg-strong)]"
+                              : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
                           }`}
                         >
                           {isApplied ? "Applied" : "Apply"}
@@ -561,17 +561,17 @@ export default function SerialAnalysisResultView() {
                     {candidate.uniqueValues.length <= 20 && (
                       <div className={`mt-2 pt-2 border-t ${
                         isApplied
-                          ? "border-blue-200 dark:border-blue-800"
+                          ? "border-[color:var(--status-info-border)]"
                           : idx === 0
-                            ? "border-purple-200 dark:border-purple-800"
-                            : "border-slate-200 dark:border-slate-700"
+                            ? "border-[color:var(--status-purple-border)]"
+                            : "border-[color:var(--border-default)]"
                       }`}>
                         <div className={`${caption} mb-1`}>Sample addresses:</div>
                         <div className="flex flex-wrap gap-1">
                           {candidate.uniqueValues.slice(0, 16).map((val, i) => (
                             <span
                               key={i}
-                              className="px-1.5 py-0.5 font-mono text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded"
+                              className="px-1.5 py-0.5 font-mono text-xs bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded"
                             >
                               0x{val.toString(16).toUpperCase().padStart(candidate.length * 2, "0")}
                             </span>
@@ -602,7 +602,7 @@ export default function SerialAnalysisResultView() {
         </div>
 
         {analysisResult.candidateChecksums.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400 italic">
+          <p className="text-sm text-[color:var(--text-muted)] italic">
             No checksum patterns detected
           </p>
         ) : (
@@ -617,12 +617,12 @@ export default function SerialAnalysisResultView() {
                     key={idx}
                     className={`p-3 rounded-lg border ${
                       isApplied
-                        ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                        ? "bg-[var(--status-info-bg)] border-[color:var(--status-info-border)]"
                         : candidate.matchRate >= 95
-                          ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                          ? "bg-[var(--status-success-bg)] border-[color:var(--status-success-border)]"
                           : candidate.matchRate >= 80
-                            ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
-                            : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                            ? "bg-[var(--status-warning-bg)] border-[color:var(--status-warning-border)]"
+                            : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -631,41 +631,41 @@ export default function SerialAnalysisResultView() {
                           <span className={`${textMedium} font-mono`}>
                             {candidate.algorithm}
                           </span>
-                          <span className="text-sm text-slate-600 dark:text-slate-400">
+                          <span className="text-sm text-[color:var(--text-secondary)]">
                             at byte {candidate.position}
                             {candidate.length > 1 ? ` (${candidate.length} bytes)` : ""}
                           </span>
                           {isApplied ? (
-                            <span className="px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded flex items-center gap-1">
+                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
                               <Check className={iconXs} />
                               Applied
                             </span>
                           ) : candidate.matchRate === 100 && (
-                            <span className="px-1.5 py-0.5 text-xs bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded">
+                            <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
                               Perfect Match
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        <div className="text-sm text-[color:var(--text-secondary)] mt-1">
                           <span
                             className={
                               candidate.matchRate >= 95
-                                ? "text-green-600 dark:text-green-400 font-medium"
+                                ? "text-[color:var(--text-green)] font-medium"
                                 : candidate.matchRate >= 80
-                                  ? "text-yellow-600 dark:text-yellow-400"
+                                  ? "text-[color:var(--text-amber)]"
                                   : ""
                             }
                           >
                             {candidate.matchRate.toFixed(1)}% match rate
                           </span>
-                          <span className="mx-2 text-slate-300 dark:text-slate-600">|</span>
+                          <span className="mx-2 text-[color:var(--text-muted)]">|</span>
                           {candidate.matchCount.toLocaleString()} / {candidate.totalCount.toLocaleString()} frames
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                        <div className="text-xs text-[color:var(--text-muted)] mt-1">
                           Calculation range: bytes [{candidate.calcStartByte}:{candidate.calcEndByte})
                         </div>
                         {candidate.notes.length > 0 && (
-                          <div className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                          <div className="text-xs text-[color:var(--text-muted)] mt-1">
                             {candidate.notes.slice(0, 2).join(" • ")}
                           </div>
                         )}
@@ -675,8 +675,8 @@ export default function SerialAnalysisResultView() {
                           onClick={() => handleToggleChecksum(candidate, idx)}
                           className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                             isApplied
-                              ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70"
-                              : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                              ? "bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg-strong)]"
+                              : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
                           }`}
                         >
                           {isApplied ? "Applied" : "Apply"}

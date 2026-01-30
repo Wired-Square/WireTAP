@@ -512,7 +512,7 @@ function FrameCard({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
+      <div className="flex items-center gap-3 text-sm font-semibold text-[color:var(--text-primary)]">
         <span className="font-mono">{renderFrameId(frame.id, frame.isExtended)}</span>
         <span className={caption}>len {frame.len}</span>
         {/* Header field badges - clickable to toggle filter */}
@@ -558,7 +558,7 @@ function FrameCard({
       </div>
       {/* Raw bytes on separate line */}
       {showRawBytes && rawBytes && (
-        <div className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded inline-block">
+        <div className="font-mono text-xs bg-[var(--bg-surface)] px-2 py-0.5 rounded inline-block">
           {rawBytes.map((b, idx) => (
             <span
               key={idx}
@@ -571,7 +571,7 @@ function FrameCard({
           ))}
         </div>
       )}
-      <div className="rounded border border-slate-200 dark:border-slate-700">
+      <div className="rounded border border-[color:var(--border-default)]">
         {(() => {
           // Separate plain signals (no muxValue) from mux signals
           const plainSignals = decodedSignals.filter(s => s.muxValue === undefined);
@@ -602,9 +602,9 @@ function FrameCard({
             const nameColor = getTextColour(baseColour, signalDef);
             const valueColor = getTextColour(baseColour, signalDef);
             const rowBg = isBright
-              ? "bg-white/80 dark:bg-slate-700/80"
+              ? "bg-[var(--table-row-highlight)]"
               : (idx + rowOffset) % 2 === 0
-              ? "bg-slate-50 dark:bg-slate-900/40"
+              ? "bg-[var(--table-row-alt)]"
               : bgSurface;
             const timestampStr = formatSignalTimestamp(decoded.timestamp, displayTimeFormat, startTimeSeconds);
 
@@ -620,7 +620,7 @@ function FrameCard({
                     </span>
                   )}
                   <span
-                    className="text-slate-800 dark:text-slate-100 transition-colors duration-200"
+                    className="text-[color:var(--text-primary)] transition-colors duration-200"
                     style={nameColor ? { color: nameColor } : undefined}
                   >
                     {decoded.name}
@@ -628,7 +628,7 @@ function FrameCard({
                 </div>
                 <div className={flexRowGap2}>
                   <span
-                    className="font-mono transition-colors duration-200 text-slate-600 dark:text-slate-300"
+                    className="font-mono transition-colors duration-200 text-[color:var(--text-secondary)]"
                     style={valueColor ? { color: valueColor } : undefined}
                   >
                     {formatSignalValue(decoded)}
@@ -636,10 +636,10 @@ function FrameCard({
                   {isHex && (
                     <button
                       onClick={() => sendHexDataToCalculator(decoded.value.replace(/\s+/g, ''))}
-                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      className="p-0.5 rounded hover:brightness-90 hover:bg-[var(--bg-surface)] transition-all"
                       title="Send to Frame Calculator"
                     >
-                      <Calculator className={`${iconXs} text-orange-600 dark:text-orange-400`} />
+                      <Calculator className={`${iconXs} text-orange-500`} />
                     </button>
                   )}
                 </div>
@@ -673,12 +673,12 @@ function FrameCard({
                 return (
                   <div key={`mux-${muxValue}`}>
                     {/* Mux value header */}
-                    <div className="px-3 py-1.5 text-xs bg-purple-50 dark:bg-purple-900/20 border-t border-slate-200 dark:border-slate-700 flex items-center gap-2">
-                      <span className="text-purple-600 dark:text-purple-400">🔀</span>
-                      <span className="font-medium text-purple-700 dark:text-purple-300">
+                    <div className="px-3 py-1.5 text-xs bg-purple-600/10 border-t border-[color:var(--border-default)] flex items-center gap-2">
+                      <span className="text-purple-500">🔀</span>
+                      <span className="font-medium text-purple-600">
                         Mux {muxValue}
                       </span>
-                      <span className="text-purple-500 dark:text-purple-400 font-mono">
+                      <span className="text-purple-500 font-mono">
                         (0x{muxValueHex})
                       </span>
                     </div>

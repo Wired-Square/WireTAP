@@ -16,6 +16,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { storeGet, storeSet } from "../api/store";
 import { Settings as SettingsIcon, Search, Activity, FileText, Calculator, Send } from "lucide-react";
 import { icon2xl } from "../styles/spacing";
+import { bgPrimary, textPrimary, textSecondary, textTertiary } from "../styles/colourTokens";
 import "dockview-react/dist/styles/dockview.css";
 import LogoMenu, { type PanelId } from "./LogoMenu";
 import AppTab from "./AppTab";
@@ -53,10 +54,10 @@ const SAVE_DEBOUNCE_MS = 500;
 // Panel loading fallback
 function PanelLoading() {
   return (
-    <div className="flex items-center justify-center h-full bg-slate-900">
+    <div className={`flex items-center justify-center h-full ${bgPrimary}`}>
       <div className="flex flex-col items-center gap-3">
         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-sm text-slate-400">Loading...</span>
+        <span className={`text-sm ${textTertiary}`}>Loading...</span>
       </div>
     </div>
   );
@@ -130,7 +131,7 @@ function Watermark(_props: IWatermarkPanelProps) {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full bg-slate-900">
+    <div className={`flex flex-col items-center justify-center h-full ${bgPrimary}`}>
       <div className="flex flex-col items-center gap-6">
         {/* Logo - twice as big */}
         <div className="w-32 h-32 rounded-3xl bg-white shadow-lg flex items-center justify-center">
@@ -139,18 +140,18 @@ function Watermark(_props: IWatermarkPanelProps) {
 
         {/* Title with version */}
         <div className="relative flex items-baseline justify-center">
-          <h1 className="text-5xl font-semibold text-slate-200 font-ubuntu">
+          <h1 className={`text-5xl font-semibold ${textPrimary} font-ubuntu`}>
             CANdor
           </h1>
           {version && (
-            <span className="absolute left-full ml-3 text-sm text-slate-600 font-ubuntu whitespace-nowrap">
+            <span className={`absolute left-full ml-3 text-sm ${textTertiary} font-ubuntu whitespace-nowrap`}>
               v{version}
             </span>
           )}
         </div>
 
         {/* Byline - closer to title */}
-        <p className="text-lg text-slate-500 font-ubuntu -mt-4">
+        <p className={`text-lg ${textSecondary} font-ubuntu -mt-4`}>
           by Wired Square
         </p>
 
@@ -220,7 +221,7 @@ function WatermarkAppButton({ icon: Icon, label, color, bgColor, onClick }: Wate
       className={`flex flex-col items-center gap-2 p-4 rounded-xl ${bgColor} transition-colors`}
     >
       <Icon className={`${icon2xl} ${color}`} />
-      <span className="text-sm text-slate-300 font-ubuntu">{label}</span>
+      <span className={`text-sm ${textSecondary} font-ubuntu`}>{label}</span>
     </button>
   );
 }
@@ -458,17 +459,17 @@ export default function MainLayout() {
   // Don't render Dockview until we've tried to load the layout
   if (!layoutLoaded) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-900">
+      <div className={`h-screen flex items-center justify-center ${bgPrimary}`}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-slate-400">Loading layout...</span>
+          <span className={`text-sm ${textTertiary}`}>Loading layout...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-900">
+    <div className={`h-screen flex flex-col ${bgPrimary}`}>
       {/* Dockview container fills the screen */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <DockviewReact

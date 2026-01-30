@@ -46,17 +46,17 @@ export default function SelectionHeader({ selectedNode, formatFrameId }: Selecti
 
   return (
     <div className="mb-6">
-      <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-3">
+      <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2 flex items-center gap-3">
         {selectedNode.metadata?.isCopy && (
           <span title={`Copied from ${selectedNode.metadata?.copyFrom}`}>
-            <Link2 className={`${iconXl} text-blue-500 dark:text-blue-400`} />
+            <Link2 className={`${iconXl} text-[color:var(--accent-primary)]`} />
           </span>
         )}
         {idLabel ? (
           <span className={flexRowGap2}>
             <span>{idLabel.primary}</span>
             {idLabel.secondary && (
-              <span className="text-slate-500 dark:text-slate-400 text-lg">({idLabel.secondary})</span>
+              <span className="text-[color:var(--text-muted)] text-lg">({idLabel.secondary})</span>
             )}
           </span>
         ) : (
@@ -64,11 +64,11 @@ export default function SelectionHeader({ selectedNode, formatFrameId }: Selecti
         )}
       </h2>
 
-      <div className={`${flexRowGap2} text-sm text-slate-600 dark:text-slate-400`}>
-        <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">{labelForNodeType(selectedNode.type)}</span>
+      <div className={`${flexRowGap2} text-sm text-[color:var(--text-muted)]`}>
+        <span className="px-2 py-1 bg-[var(--bg-surface)] rounded">{labelForNodeType(selectedNode.type)}</span>
         <span className="font-mono text-xs">{selectedNode.path.join(".")}</span>
         {selectedNode.metadata?.isCopy && (
-          <span className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
+          <span className="text-xs bg-[var(--accent-bg)] text-[color:var(--accent-primary)] px-2 py-1 rounded">
             Copy of {selectedNode.metadata?.copyFrom}
           </span>
         )}

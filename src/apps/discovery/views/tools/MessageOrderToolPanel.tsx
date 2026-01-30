@@ -10,8 +10,8 @@ export default function MessageOrderToolPanel() {
   return (
     <div className="space-y-2 text-xs">
       <div className="space-y-1">
-        <label className="text-slate-500 dark:text-slate-400">
-          Start Message ID <span className="text-slate-400 dark:text-slate-500">(optional)</span>
+        <label className="text-[color:var(--text-muted)]">
+          Start Message ID <span className="text-[color:var(--text-muted)]">(optional)</span>
         </label>
         <input
           type="text"
@@ -28,9 +28,9 @@ export default function MessageOrderToolPanel() {
               }
             }
           }}
-          className={`w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-800 dark:text-slate-100 font-mono`}
+          className={`w-full px-2 py-1 rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-primary)] font-mono`}
         />
-        <p className="text-slate-400 dark:text-slate-500 text-[10px]">
+        <p className="text-[color:var(--text-muted)] text-[10px]">
           Leave empty to auto-detect from gap analysis
         </p>
       </div>

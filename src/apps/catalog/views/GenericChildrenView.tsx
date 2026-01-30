@@ -28,7 +28,7 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
             className={iconButtonHoverDanger}
             title="Delete"
           >
-            <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+            <Trash2 className={`${iconMd} text-[color:var(--text-danger)]`} />
           </button>
         )}
       </div>
@@ -43,13 +43,13 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+                  <div className="font-medium text-[color:var(--text-primary)] mb-1 flex items-center gap-2">
                     {child.type === "signal" && <span>⚡</span>}
                     {child.key}
                   </div>
 
                   {child.type === "value" && child.value !== undefined && (
-                    <div className="font-mono text-xs text-slate-600 dark:text-slate-400 truncate">
+                    <div className="font-mono text-xs text-[color:var(--text-muted)] truncate">
                       {String(child.value)}
                     </div>
                   )}
@@ -68,7 +68,7 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
                   )}
                 </div>
 
-                <div className="text-xs px-2 py-1 bg-white dark:bg-slate-900 rounded text-slate-600 dark:text-slate-400">
+                <div className="text-xs px-2 py-1 bg-[var(--bg-primary)] rounded text-[color:var(--text-muted)]">
                   {child.type === "section" && "table"}
                   {child.type === "table-array" && "array"}
                   {child.type === "signal" && "signal"}
@@ -80,7 +80,7 @@ export default function GenericChildrenView({ selectedNode, onSelectNode, onRequ
           ))}
         </div>
       ) : (
-        <div className="text-sm text-slate-500 dark:text-slate-400">No items</div>
+        <div className="text-sm text-[color:var(--text-muted)]">No items</div>
       )}
     </div>
   );

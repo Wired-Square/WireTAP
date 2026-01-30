@@ -7,7 +7,7 @@ import { Send, Link2, GitMerge } from "lucide-react";
 import { flexRowGap2 } from "../../../styles/spacing";
 import type { IOProfile } from "../../../types/common";
 import AppTopBar from "../../../components/AppTopBar";
-import { textDarkMuted } from "../../../styles/colourTokens";
+import { textDataSecondary } from "../../../styles/colourTokens";
 
 interface Props {
   // IO profiles
@@ -73,7 +73,6 @@ export default function TransmitTopBar({
     <AppTopBar
       icon={Send}
       iconColour="text-red-500"
-      theme="dark"
       ioSession={{
         ioProfile,
         ioProfiles,
@@ -94,7 +93,7 @@ export default function TransmitTopBar({
         <>
           {/* Loading indicator */}
           {isLoading && (
-            <span className={`text-xs ${textDarkMuted}`}>Loading...</span>
+            <span className={`text-xs ${textDataSecondary}`}>Loading...</span>
           )}
 
           {/* Connection error */}

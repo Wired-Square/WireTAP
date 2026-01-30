@@ -80,6 +80,7 @@ export function isReaderRealtime(kind: IOProfile['kind']): boolean {
 export type FrameIdFormat = "hex" | "decimal";
 export type TimeFormat = "delta-last" | "delta-start" | "timestamp" | "human";
 export type DefaultFrameType = "can" | "modbus" | "serial";
+export type ThemeMode = "dark" | "light" | "auto";
 
 export interface AppSettings {
   config_path: string;
@@ -103,6 +104,26 @@ export interface AppSettings {
   binary_zero_colour?: string;
   binary_unused_colour?: string;
   discovery_history_buffer?: number;
+  // Theme settings
+  theme_mode?: ThemeMode;
+  theme_bg_primary_light?: string;
+  theme_bg_surface_light?: string;
+  theme_text_primary_light?: string;
+  theme_text_secondary_light?: string;
+  theme_border_default_light?: string;
+  theme_data_bg_light?: string;
+  theme_data_text_primary_light?: string;
+  theme_bg_primary_dark?: string;
+  theme_bg_surface_dark?: string;
+  theme_text_primary_dark?: string;
+  theme_text_secondary_dark?: string;
+  theme_border_default_dark?: string;
+  theme_data_bg_dark?: string;
+  theme_data_text_primary_dark?: string;
+  theme_accent_primary?: string;
+  theme_accent_success?: string;
+  theme_accent_danger?: string;
+  theme_accent_warning?: string;
 }
 
 /**
@@ -133,6 +154,26 @@ function normalizeSettings(
     binary_zero_colour: settings.binary_zero_colour || "#94a3b8",
     binary_unused_colour: settings.binary_unused_colour || "#64748b",
     discovery_history_buffer: settings.discovery_history_buffer ?? 100000,
+    // Theme settings
+    theme_mode: settings.theme_mode ?? "auto",
+    theme_bg_primary_light: settings.theme_bg_primary_light || "#ffffff",
+    theme_bg_surface_light: settings.theme_bg_surface_light || "#f8fafc",
+    theme_text_primary_light: settings.theme_text_primary_light || "#0f172a",
+    theme_text_secondary_light: settings.theme_text_secondary_light || "#334155",
+    theme_border_default_light: settings.theme_border_default_light || "#e2e8f0",
+    theme_data_bg_light: settings.theme_data_bg_light || "#f8fafc",
+    theme_data_text_primary_light: settings.theme_data_text_primary_light || "#0f172a",
+    theme_bg_primary_dark: settings.theme_bg_primary_dark || "#0f172a",
+    theme_bg_surface_dark: settings.theme_bg_surface_dark || "#1e293b",
+    theme_text_primary_dark: settings.theme_text_primary_dark || "#ffffff",
+    theme_text_secondary_dark: settings.theme_text_secondary_dark || "#cbd5e1",
+    theme_border_default_dark: settings.theme_border_default_dark || "#334155",
+    theme_data_bg_dark: settings.theme_data_bg_dark || "#111827",
+    theme_data_text_primary_dark: settings.theme_data_text_primary_dark || "#e5e7eb",
+    theme_accent_primary: settings.theme_accent_primary || "#2563eb",
+    theme_accent_success: settings.theme_accent_success || "#16a34a",
+    theme_accent_danger: settings.theme_accent_danger || "#dc2626",
+    theme_accent_warning: settings.theme_accent_warning || "#d97706",
   };
 }
 

@@ -42,7 +42,7 @@ export function createRenderTreeNode({
       <div key={nodePath}>
         <div
           className={`flex items-center gap-1 px-2 py-1.5 ${hoverLight} cursor-pointer rounded ${
-            isSelected ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" : ""
+            isSelected ? "bg-[var(--selected-bg)] text-[color:var(--selected-text)]" : ""
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={() => onNodeClick(node)}
@@ -50,7 +50,7 @@ export function createRenderTreeNode({
           {hasChildren ? (
             <button
               type="button"
-              className="p-0.5 -m-0.5 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+              className="p-0.5 -m-0.5 hover:bg-[var(--hover-bg)] rounded"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleExpand(node);
@@ -69,7 +69,7 @@ export function createRenderTreeNode({
           <span className="text-sm truncate flex items-center gap-1.5">
             {isCopy && (
               <span title={`Copied from ${node.metadata?.copyFrom}`}>
-                <Link2 className={`${iconSm} text-blue-500 dark:text-blue-400 flex-shrink-0`} />
+                <Link2 className={`${iconSm} text-[color:var(--accent-blue)] flex-shrink-0`} />
               </span>
             )}
             {node.type === "signal" && "⚡ "}
@@ -96,13 +96,13 @@ export function createRenderTreeNode({
                   <span className="flex items-center gap-1.5">
                     <span>{formatted.primary}</span>
                     {formatted.secondary && (
-                    <span className="text-slate-500 dark:text-slate-400 text-xs">
+                    <span className="tree-secondary-text text-xs">
                         ({formatted.secondary})
                     </span>
                     )}
                   </span>
                   {truncatedNote && (
-                    <span className="text-slate-500 dark:text-slate-400 text-xs italic">
+                    <span className="tree-secondary-text text-xs italic">
                       {truncatedNote}
                     </span>
                   )}
@@ -121,13 +121,13 @@ export function createRenderTreeNode({
                   <span className="flex items-center gap-1">
                     <span>{node.key}</span>
                     {hasStartBit && hasBitLength && (
-                      <span className="text-slate-500 dark:text-slate-400 text-xs">
+                      <span className="tree-secondary-text text-xs">
                         ({node.metadata?.muxStartBit}:{node.metadata?.muxBitLength})
                       </span>
                     )}
                   </span>
                   {truncatedNote && (
-                    <span className="text-slate-500 dark:text-slate-400 text-xs italic">
+                    <span className="tree-secondary-text text-xs italic">
                       {truncatedNote}
                     </span>
                   )}
@@ -143,7 +143,7 @@ export function createRenderTreeNode({
                 <span className="flex flex-col">
                   <span>{node.key}</span>
                   {truncatedNote && (
-                    <span className="text-slate-500 dark:text-slate-400 text-xs italic">
+                    <span className="tree-secondary-text text-xs italic">
                       {truncatedNote}
                     </span>
                   )}
@@ -162,13 +162,13 @@ export function createRenderTreeNode({
                   <span className="flex items-center gap-1">
                     <span>{node.key}</span>
                     {hasStartBit && hasBitLength && (
-                      <span className="text-slate-500 dark:text-slate-400 text-xs">
+                      <span className="tree-secondary-text text-xs">
                         ({node.metadata?.signalStartBit}:{node.metadata?.signalBitLength})
                       </span>
                     )}
                   </span>
                   {truncatedNote && (
-                    <span className="text-slate-500 dark:text-slate-400 text-xs italic">
+                    <span className="tree-secondary-text text-xs italic">
                       {truncatedNote}
                     </span>
                   )}
@@ -188,18 +188,18 @@ export function createRenderTreeNode({
                   <span className="flex items-center gap-1">
                     <span>{node.key}</span>
                     {algorithm && (
-                      <span className="text-purple-600 dark:text-purple-400 text-xs font-medium">
+                      <span className="text-[color:var(--accent-purple)] text-xs font-medium">
                         [{algorithm}]
                       </span>
                     )}
                     {startByte !== undefined && byteLength !== undefined && (
-                      <span className="text-slate-500 dark:text-slate-400 text-xs">
+                      <span className="tree-secondary-text text-xs">
                         (byte {startByte}:{byteLength})
                       </span>
                     )}
                   </span>
                   {truncatedNote && (
-                    <span className="text-slate-500 dark:text-slate-400 text-xs italic">
+                    <span className="tree-secondary-text text-xs italic">
                       {truncatedNote}
                     </span>
                   )}
@@ -215,7 +215,7 @@ export function createRenderTreeNode({
                 <span className="flex flex-col">
                   <span>{node.key}</span>
                   {truncatedNote && (
-                    <span className="text-slate-500 dark:text-slate-400 text-xs italic">
+                    <span className="tree-secondary-text text-xs italic">
                       {truncatedNote}
                     </span>
                   )}
@@ -226,7 +226,7 @@ export function createRenderTreeNode({
             )}
             {node.type === "array" && ` [${node.metadata?.arrayItems?.length || 0}]`}
             {node.type === "value" && node.value !== undefined && (
-              <span className="text-slate-500 dark:text-slate-400 ml-1">
+              <span className="tree-secondary-text ml-1">
                 = {String(node.value).substring(0, 20)}
                 {String(node.value).length > 20 ? "..." : ""}
               </span>

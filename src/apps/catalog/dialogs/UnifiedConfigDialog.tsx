@@ -159,14 +159,14 @@ export default function UnifiedConfigDialog({
       <div className={`${bgSurface} rounded-xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto`}>
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-            <Settings className={`${iconLg} text-blue-600 dark:text-blue-400`} />
+          <div className="p-2 bg-[var(--bg-accent)] rounded-lg">
+            <Settings className={`${iconLg} text-[color:var(--text-accent)]`} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+            <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
               Catalog Configuration
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-[color:var(--text-muted)]">
               Configure catalog metadata and protocol settings
             </p>
           </div>
@@ -183,7 +183,7 @@ export default function UnifiedConfigDialog({
 
           {/* Protocol Configurations */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-[color:var(--text-primary)] uppercase tracking-wide">
               Protocol Configurations
             </h3>
 
@@ -238,8 +238,8 @@ export default function UnifiedConfigDialog({
           </div>
 
           {/* Info box */}
-          <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
-            <p className="text-xs text-slate-600 dark:text-slate-400">
+          <div className="p-3 bg-[var(--bg-surface)] rounded-lg border border-[color:var(--border-default)]">
+            <p className="text-xs text-[color:var(--text-muted)]">
               <strong>Note:</strong> Protocol configurations define default settings for all frames of that type.
               Add a configuration for each protocol you plan to use in this catalog.
             </p>

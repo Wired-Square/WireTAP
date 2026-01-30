@@ -143,7 +143,7 @@ export default function DecoderTopBar({
   return (
     <AppTopBar
       icon={Activity}
-      iconColour="text-green-600 dark:text-green-400"
+      iconColour="text-[color:var(--text-green)]"
       ioSession={{
         ioProfile,
         ioProfiles,
@@ -193,7 +193,7 @@ export default function DecoderTopBar({
           className={buttonBase}
           title="Select Decoder Catalog"
         >
-          <span className="text-slate-400 dark:text-slate-500 italic">No catalog</span>
+          <span className="text-[color:var(--text-muted)] italic">No catalog</span>
         </button>
       )}
 

@@ -185,7 +185,7 @@ export default function CanConfigSection({
   const showWarning = hasFrames && !isConfigured;
 
   return (
-    <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+    <div className="border border-[color:var(--border-default)] rounded-lg overflow-hidden">
       {/* Header */}
       <div
         role="button"
@@ -200,18 +200,18 @@ export default function CanConfigSection({
           ) : (
             <ChevronRight className={`${iconMd} text-slate-500`} />
           )}
-          <div className="p-1.5 bg-green-100 dark:bg-green-900/30 rounded">
-            <Network className={`${iconMd} text-green-600 dark:text-green-400`} />
+          <div className="p-1.5 bg-[var(--bg-green)] rounded">
+            <Network className={`${iconMd} text-[color:var(--text-green)]`} />
           </div>
-          <span className="font-medium text-slate-900 dark:text-white">CAN</span>
+          <span className="font-medium text-[color:var(--text-primary)]">CAN</span>
           {isConfigured && (
-            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+            <span className="flex items-center gap-1 text-xs text-[color:var(--text-green)]">
               <Check className={iconXs} />
               configured
             </span>
           )}
           {showWarning && (
-            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <span className="flex items-center gap-1 text-xs text-[color:var(--text-amber)]">
               <AlertTriangle className={iconXs} />
               frames exist, no config
             </span>
@@ -222,7 +222,7 @@ export default function CanConfigSection({
             <button
               type="button"
               onClick={onRemove}
-              className="px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+              className="px-2 py-1 text-xs text-[color:var(--text-red)] hover:bg-[var(--hover-bg-red)] rounded transition-colors"
             >
               Remove
             </button>
@@ -230,7 +230,7 @@ export default function CanConfigSection({
             <button
               type="button"
               onClick={onAdd}
-              className="px-2 py-1 text-xs text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
+              className="px-2 py-1 text-xs text-[color:var(--text-green)] hover:bg-[var(--hover-bg-green)] rounded transition-colors"
             >
               + Add
             </button>
@@ -240,7 +240,7 @@ export default function CanConfigSection({
 
       {/* Content */}
       {isExpanded && isConfigured && (
-        <div className="p-4 space-y-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="p-4 space-y-4 border-t border-[color:var(--border-default)]">
           {/* Default Byte Order */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
@@ -249,7 +249,7 @@ export default function CanConfigSection({
             <select
               value={defaultEndianness}
               onChange={(e) => setDefaultEndianness(e.target.value as "little" | "big")}
-              className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+              className={`w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
             >
               <option value="little">Little Endian</option>
               <option value="big">Big Endian</option>
@@ -272,7 +272,7 @@ export default function CanConfigSection({
                 const val = e.target.value;
                 setDefaultInterval(val === "" ? undefined : parseInt(val));
               }}
-              className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+              className={`w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               placeholder="1000"
             />
             <p className={`mt-1 ${caption}`}>
@@ -289,7 +289,7 @@ export default function CanConfigSection({
               <button
                 type="button"
                 onClick={() => setShowFrameIdMaskPicker(!showFrameIdMaskPicker)}
-                className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
+                className="flex items-center gap-1 text-xs text-[color:var(--text-green)] hover:text-[color:var(--text-green-hover)]"
               >
                 {showFrameIdMaskPicker ? <ChevronDown className={iconXs} /> : <ChevronRight className={iconXs} />}
                 {showFrameIdMaskPicker ? "Hide" : "Show"} bit picker
@@ -300,7 +300,7 @@ export default function CanConfigSection({
                 type="text"
                 value={frameIdMask}
                 onChange={(e) => setFrameIdMask(e.target.value)}
-                className={`flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-mono ${focusRing}`}
+                className={`flex-1 px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
                 placeholder="0x1FFFFF00"
               />
               <div className="flex items-center gap-1">
@@ -308,7 +308,7 @@ export default function CanConfigSection({
                 <select
                   value={useExtendedId ? "extended" : "standard"}
                   onChange={(e) => setUseExtendedId(e.target.value === "extended")}
-                  className={`w-24 px-1 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-slate-900 dark:text-white ${focusRing}`}
+                  className={`w-24 px-1 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-input)] rounded-lg text-sm text-[color:var(--text-primary)] ${focusRing}`}
                   title="CAN ID type"
                 >
                   <option value="extended">29-bit</option>
@@ -317,7 +317,7 @@ export default function CanConfigSection({
               </div>
             </div>
             {showFrameIdMaskPicker && (
-              <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="mt-3 p-3 bg-[var(--bg-secondary)]/50 rounded-lg border border-[color:var(--border-default)]">
                 <MaskBitPicker
                   mask={parseMaskString(frameIdMask)}
                   shift={0}
@@ -333,7 +333,7 @@ export default function CanConfigSection({
           </div>
 
           {/* Header Fields Section */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+          <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className={textMedium}>
@@ -347,7 +347,7 @@ export default function CanConfigSection({
                 <button
                   type="button"
                   onClick={() => setIsAddingField(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[var(--bg-green)] text-[color:var(--text-green)] rounded-lg hover:bg-[var(--hover-bg-green)] transition-colors"
                 >
                   <Plus className={iconMd} />
                   Add Field
@@ -368,12 +368,12 @@ export default function CanConfigSection({
 
                   return (
                     <div key={index} className="space-y-2">
-                      <div className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-2 p-2 bg-[var(--bg-secondary)]/50 rounded-lg border border-[color:var(--border-default)]">
                         {/* Expand/collapse toggle */}
                         <button
                           type="button"
                           onClick={() => toggleFieldPicker(index)}
-                          className="p-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                          className="p-1 text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
                           title={isFieldExpanded ? "Hide bit picker" : "Show bit picker"}
                         >
                           {isFieldExpanded ? (
@@ -384,7 +384,7 @@ export default function CanConfigSection({
                         </button>
 
                         {/* Field name */}
-                        <span className="w-28 font-medium text-sm text-slate-900 dark:text-white truncate">
+                        <span className="w-28 font-medium text-sm text-[color:var(--text-primary)] truncate">
                           {field.name}
                         </span>
 
@@ -393,7 +393,7 @@ export default function CanConfigSection({
                           type="text"
                           value={field.mask}
                           onChange={(e) => handleUpdateField(index, { mask: e.target.value })}
-                          className="w-28 px-2 py-0.5 bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-28 px-2 py-0.5 bg-[var(--bg-tertiary)] border border-[color:var(--border-input)] rounded text-xs font-mono text-[color:var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-blue-500"
                           title="Mask (hex)"
                         />
 
@@ -406,7 +406,7 @@ export default function CanConfigSection({
                             max={31}
                             value={fieldShift}
                             onChange={(e) => handleUpdateField(index, { shift: parseInt(e.target.value) || 0 })}
-                            className={`w-12 px-1 py-0.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-center`}
+                            className={`w-12 px-1 py-0.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs font-mono text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500 text-center`}
                             title="Right shift (bits)"
                           />
                         </div>
@@ -423,7 +423,7 @@ export default function CanConfigSection({
                         <select
                           value={field.format}
                           onChange={(e) => handleUpdateField(index, { format: e.target.value as HeaderFieldFormat })}
-                          className={`w-16 px-1 py-1 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                          className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                         >
                           <option value="hex">Hex</option>
                           <option value="decimal">Dec</option>
@@ -433,7 +433,7 @@ export default function CanConfigSection({
                         <button
                           type="button"
                           onClick={() => handleRemoveField(index)}
-                          className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                          className="p-1 text-red-500 hover:bg-[var(--hover-bg-red)] rounded transition-colors"
                           title="Remove field"
                         >
                           <Trash2 className={iconMd} />
@@ -442,7 +442,7 @@ export default function CanConfigSection({
 
                       {/* Expanded bit picker */}
                       {isFieldExpanded && (
-                        <div className="ml-8 p-3 bg-slate-100 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <div className="ml-8 p-3 bg-[var(--bg-secondary)] rounded-lg border border-[color:var(--border-default)]">
                           <MaskBitPicker
                             mask={unshiftedMask}
                             shift={fieldShift}
@@ -460,13 +460,13 @@ export default function CanConfigSection({
 
             {/* Add new field form */}
             {isAddingField && (
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <div className="p-3 bg-[var(--bg-green-subtle)] rounded-lg border border-[color:var(--border-green)]">
                 <div className="flex items-center gap-2 mb-3">
                   {/* Field type dropdown */}
                   <select
                     value={newFieldType}
                     onChange={(e) => setNewFieldType(e.target.value as CanFieldType)}
-                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                   >
                     {availableFieldTypes.map((opt) => (
                       <option key={opt.value} value={opt.value} disabled={opt.disabled}>
@@ -481,7 +481,7 @@ export default function CanConfigSection({
                       type="text"
                       value={newFieldCustomName}
                       onChange={(e) => setNewFieldCustomName(e.target.value)}
-                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                       placeholder="Field name"
                       autoFocus
                     />
@@ -491,7 +491,7 @@ export default function CanConfigSection({
                   <select
                     value={newFieldFormat}
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
-                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                   >
                     <option value="hex">Hex</option>
                     <option value="decimal">Dec</option>
@@ -506,7 +506,7 @@ export default function CanConfigSection({
                     <button
                       type="button"
                       onClick={resetAddForm}
-                      className="px-3 py-1 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                      className="px-3 py-1 text-sm text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] rounded transition-colors"
                     >
                       Cancel
                     </button>
@@ -534,7 +534,7 @@ export default function CanConfigSection({
 
       {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
-        <div className={`px-4 py-2 ${caption} border-t border-slate-200 dark:border-slate-700`}>
+        <div className={`px-4 py-2 ${caption} border-t border-[color:var(--border-default)]`}>
           Endianness: {defaultEndianness}
           {defaultInterval !== undefined && ` • Interval: ${defaultInterval}ms`}
           {frameIdMask && ` • Mask: ${frameIdMask}`}

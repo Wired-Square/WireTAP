@@ -12,10 +12,10 @@ export default function EmptySelectionView({
   subtitle = "Select a node from the structure tree to view its content",
 }: EmptySelectionViewProps) {
   return (
-    <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
+    <div className="flex items-center justify-center h-full text-[color:var(--text-muted)]">
       <div className="text-center">
         <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p className="font-medium text-slate-700 dark:text-slate-300">{title}</p>
+        <p className="font-medium text-[color:var(--text-secondary)]">{title}</p>
         <p className="text-sm mt-1">{subtitle}</p>
       </div>
     </div>

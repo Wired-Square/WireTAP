@@ -87,9 +87,12 @@ const getProtocolLabel = (protocol: string) => {
 };
 
 const SummaryBadge = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-slate-200/70 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200">
+  <span
+    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-[var(--bg-primary)]"
+    style={{ color: 'var(--text-secondary)' }}
+  >
     <span className="opacity-70">{label}:</span>
-    <span className="font-mono">{value}</span>
+    <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{value}</span>
   </span>
 );
 
@@ -251,7 +254,7 @@ const renderConnectionSummary = (profile: IOProfile) => {
   // Fallback (should be rare)
   const raw = JSON.stringify(profile.connection ?? {}, null, 0);
   return (
-    <div className="text-xs font-mono text-slate-600 dark:text-slate-400 break-all">
+    <div className="text-xs font-mono break-all" style={{ color: 'var(--text-secondary)' }}>
       {raw.length > 120 ? raw.slice(0, 120) + "…" : raw}
     </div>
   );
@@ -327,8 +330,9 @@ export default function DataIOView({
                       className={`${iconMd} ${
                         defaultReadProfile === profile.id
                           ? "fill-yellow-500 text-yellow-500"
-                          : "text-slate-400 dark:text-slate-500"
+                          : ""
                       }`}
+                      style={defaultReadProfile !== profile.id ? { color: 'var(--text-secondary)', opacity: 0.6 } : undefined}
                     />
                   </button>
                 </div>
@@ -345,21 +349,21 @@ export default function DataIOView({
                   className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title="Duplicate profile"
                 >
-                  <Copy className={`${iconMd} text-slate-600 dark:text-slate-400`} />
+                  <Copy className={iconMd} style={{ color: 'var(--text-secondary)' }} />
                 </button>
                 <button
                   onClick={() => onEditProfile(profile)}
                   className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title="Edit profile"
                 >
-                  <Edit2 className={`${iconMd} text-slate-600 dark:text-slate-400`} />
+                  <Edit2 className={iconMd} style={{ color: 'var(--text-secondary)' }} />
                 </button>
                 <button
                   onClick={() => onDeleteProfile(profile.id)}
                   className={iconButtonHoverDanger}
                   title="Delete profile"
                 >
-                  <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                  <Trash2 className={`${iconMd} text-red-600`} />
                 </button>
               </div>
             </div>

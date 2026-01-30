@@ -160,10 +160,10 @@ export default function ExportCatalogDialog({
     <Dialog isOpen={open} maxWidth="max-w-md" onBackdropClick={onCancel}>
       <div className="p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-            <Download className={`${iconLg} text-orange-600 dark:text-orange-400`} />
+          <div className="p-2 bg-[var(--bg-orange)] rounded-lg">
+            <Download className={`${iconLg} text-[color:var(--text-orange)]`} />
           </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-xl font-bold text-[color:var(--text-primary)]">
             Export Catalog
           </h2>
         </div>
@@ -179,7 +179,7 @@ export default function ExportCatalogDialog({
                 setFormat(e.target.value as CatalogExportFormat);
                 setError(null);
               }}
-              className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
+              className="w-full px-4 py-2 rounded-lg border border-[color:var(--border-default)] bg-[var(--bg-surface)] text-[color:var(--text-primary)]"
             >
               <optgroup label="Data Formats">
                 {FORMAT_OPTIONS.filter(o => FORMAT_INFO[o.value].group === "data").map(opt => (
@@ -194,14 +194,14 @@ export default function ExportCatalogDialog({
             </select>
           </div>
 
-          <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+          <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
             <div className="flex items-start gap-3">
-              <FormatIcon className={`${iconLg} text-slate-500 dark:text-slate-400 mt-0.5`} />
+              <FormatIcon className={`${iconLg} text-[color:var(--text-muted)] mt-0.5`} />
               <div>
-                <div className="font-medium text-slate-900 dark:text-white">
+                <div className="font-medium text-[color:var(--text-primary)]">
                   {formatInfo.name}
                 </div>
-                <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                <div className="text-sm text-[color:var(--text-muted)] mt-1">
                   {formatInfo.description}
                 </div>
               </div>
@@ -221,10 +221,10 @@ export default function ExportCatalogDialog({
                     value="extended"
                     checked={dbcMuxMode === "extended"}
                     onChange={(e) => setDbcMuxMode(e.target.value as DbcMuxMode)}
-                    className="mt-0.5 w-4 h-4 text-orange-600 border-slate-300 dark:border-slate-500 focus:ring-orange-500"
+                    className="mt-0.5 w-4 h-4 text-orange-600 border-[color:var(--border-default)] focus:ring-orange-500"
                   />
                   <div>
-                    <div className="font-medium text-slate-900 dark:text-white text-sm">
+                    <div className="font-medium text-[color:var(--text-primary)] text-sm">
                       Extended (SG_MUL_VAL_)
                     </div>
                     <div className={`${caption} mt-0.5`}>
@@ -239,10 +239,10 @@ export default function ExportCatalogDialog({
                     value="flattened"
                     checked={dbcMuxMode === "flattened"}
                     onChange={(e) => setDbcMuxMode(e.target.value as DbcMuxMode)}
-                    className="mt-0.5 w-4 h-4 text-orange-600 border-slate-300 dark:border-slate-500 focus:ring-orange-500"
+                    className="mt-0.5 w-4 h-4 text-orange-600 border-[color:var(--border-default)] focus:ring-orange-500"
                   />
                   <div>
-                    <div className="font-medium text-slate-900 dark:text-white text-sm">
+                    <div className="font-medium text-[color:var(--text-primary)] text-sm">
                       Flattened (Legacy)
                     </div>
                     <div className={`${caption} mt-0.5`}>
@@ -255,7 +255,7 @@ export default function ExportCatalogDialog({
           )}
 
           {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">
+            <div className="p-3 bg-[var(--bg-red)] border border-[color:var(--border-red)] rounded-lg text-sm text-[color:var(--text-red)]">
               {error}
             </div>
           )}

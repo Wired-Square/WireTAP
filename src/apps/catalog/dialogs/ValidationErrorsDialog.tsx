@@ -27,14 +27,14 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
             <div
               className={`w-12 h-12 rounded-lg flex items-center justify-center ${
                 isValidCatalog
-                  ? "bg-green-100 dark:bg-green-900/30"
-                  : "bg-amber-100 dark:bg-amber-900/30"
+                  ? "bg-[var(--status-success-bg)]"
+                  : "bg-[var(--status-warning-bg)]"
               }`}
             >
               {isValidCatalog ? (
-                <CheckCircle className={`${iconXl} text-green-600 dark:text-green-400`} />
+                <CheckCircle className={`${iconXl} text-[color:var(--text-green)]`} />
               ) : (
-                <AlertTriangle className={`${iconXl} text-amber-600 dark:text-amber-400`} />
+                <AlertTriangle className={`${iconXl} text-[color:var(--text-amber)]`} />
               )}
             </div>
             <div>
@@ -42,7 +42,7 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
                 {isValidCatalog ? "Validation Passed" : "Validation Warnings"}
               </h2>
               {hasErrors && (
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+                <p className="text-sm text-[color:var(--text-muted)]">
                   {errors.length} {errors.length === 1 ? "issue" : "issues"} found
                 </p>
               )}
@@ -50,7 +50,7 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
           >
             <X className={iconLg} />
           </button>
@@ -58,7 +58,7 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
 
         {/* Content */}
         {isValidCatalog ? (
-          <p className="text-slate-700 dark:text-slate-300 mb-6">
+          <p className="text-[color:var(--text-secondary)] mb-6">
             The catalog is valid and ready for use.
           </p>
         ) : (
@@ -67,12 +67,12 @@ export default function ValidationErrorsDialog({ open, errors, isValid, onClose 
               {errors.map((error, idx) => (
                 <div
                   key={idx}
-                  className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3"
+                  className="bg-[var(--status-warning-bg)] border border-[color:var(--status-warning-border)] rounded-lg p-3"
                 >
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className={`${iconMd} text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0`} />
+                    <AlertTriangle className={`${iconMd} text-[color:var(--text-amber)] mt-0.5 flex-shrink-0`} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                      <p className="text-sm text-[color:var(--text-secondary)]">
                         {error.message}
                       </p>
                       <p className={`${caption} mt-1 font-mono`}>

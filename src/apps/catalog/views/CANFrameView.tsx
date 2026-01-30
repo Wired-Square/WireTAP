@@ -78,11 +78,11 @@ export default function CANFrameView({
       {/* Header actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <p className="text-sm text-slate-600 dark:text-slate-400">Configure CAN frame properties</p>
-          <div className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <p className="text-sm text-[color:var(--text-secondary)]">Configure CAN frame properties</p>
+          <div className="text-lg font-bold text-[color:var(--text-primary)] flex items-center gap-2">
             <span>{formattedId.primary}</span>
             {formattedId.secondary && (
-              <span className="text-slate-500 dark:text-slate-400 text-sm">({formattedId.secondary})</span>
+              <span className="text-[color:var(--text-muted)] text-sm">({formattedId.secondary})</span>
             )}
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function CANFrameView({
               className={iconButtonHover}
               title="Edit frame"
             >
-              <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+              <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
             </button>
 
             {/* Pattern A delete */}
@@ -102,7 +102,7 @@ export default function CANFrameView({
               className={iconButtonHoverDanger}
               title="Delete frame"
             >
-              <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+              <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
             </button>
           </div>
         )}
@@ -116,7 +116,7 @@ export default function CANFrameView({
             <div className={`${monoBody} flex items-center gap-2`}>
               <span>{formattedId.primary}</span>
               {formattedId.secondary && (
-                <span className="text-slate-500 dark:text-slate-400 text-xs">({formattedId.secondary})</span>
+                <span className="text-[color:var(--text-muted)] text-xs">({formattedId.secondary})</span>
               )}
             </div>
           </div>
@@ -125,7 +125,7 @@ export default function CANFrameView({
             <div className={labelSmallMuted}>
               Length (DLC) <span className="text-red-500">*</span>
               {selectedNode.metadata?.lengthInherited && (
-                <span className="ml-1 text-blue-500 dark:text-blue-400" title="Inherited from copied ID">
+                <span className="ml-1 text-[color:var(--status-info-text)]" title="Inherited from copied ID">
                   (inherited)
                 </span>
               )}
@@ -139,13 +139,13 @@ export default function CANFrameView({
             <div className={labelSmallMuted}>
               Transmitter
               {selectedNode.metadata?.transmitterInherited && (
-                <span className="ml-1 text-blue-500 dark:text-blue-400" title="Inherited from copied ID">
+                <span className="ml-1 text-[color:var(--status-info-text)]" title="Inherited from copied ID">
                   (inherited)
                 </span>
               )}
             </div>
             <div className={monoBody}>
-              {selectedNode.metadata?.transmitter || <span className="text-slate-400">None</span>}
+              {selectedNode.metadata?.transmitter || <span className="text-[color:var(--text-muted)]">None</span>}
             </div>
           </div>
 
@@ -154,7 +154,7 @@ export default function CANFrameView({
               Interval
               {selectedNode.metadata?.intervalInherited && (
                 <span
-                  className="ml-1 text-blue-500 dark:text-blue-400"
+                  className="ml-1 text-[color:var(--status-info-text)]"
                   title="Inherited from copied ID or default_interval"
                 >
                   (inherited)
@@ -165,7 +165,7 @@ export default function CANFrameView({
               {selectedNode.metadata?.interval !== undefined ? (
                 `${selectedNode.metadata.interval} ms`
               ) : (
-                <span className="text-slate-400">None</span>
+                <span className="text-[color:var(--text-muted)]">None</span>
               )}
             </div>
           </div>
@@ -178,7 +178,7 @@ export default function CANFrameView({
           <div className={`${labelSmall} mb-2`}>
             Notes
           </div>
-          <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.notes)
               ? selectedNode.metadata.notes.join("\n")
               : selectedNode.metadata.notes}
@@ -190,10 +190,10 @@ export default function CANFrameView({
       {!editingId && !editingSignal && (
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+            <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
               Signals ({(selectedNode.metadata?.signals?.length || 0) + (selectedNode.metadata?.muxSignalCount || 0)})
               {selectedNode.metadata?.hasMux && (
-                <span className="ml-2 text-xs font-normal text-purple-600 dark:text-purple-400 inline-flex items-center gap-2">
+                <span className="ml-2 text-xs font-normal text-[color:var(--text-purple)] inline-flex items-center gap-2">
                   {muxLegendColor && <span className={`inline-block w-3 h-3 rounded ${muxLegendColor}`} />}
                   (includes {selectedNode.metadata.muxSignalCount} mux signals)
                 </span>
@@ -259,8 +259,8 @@ export default function CANFrameView({
 
               return (
                 <>
-                  <div className="mb-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                    <div className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-3">
+                  <div className="mb-4 p-4 bg-[var(--bg-surface)] rounded-lg">
+                    <div className="text-xs font-medium text-[color:var(--text-secondary)] mb-3">
                       Byte Layout (LSB first)
                     </div>
                     <BitPreview
@@ -284,11 +284,11 @@ export default function CANFrameView({
                           <div className="flex-1 flex gap-3">
                             <div
                               className={`w-2 h-6 rounded-sm mt-1 ${
-                                signalColor(signal) || "bg-slate-400 dark:bg-slate-600"
+                                signalColor(signal) || "bg-[var(--bg-surface)]"
                               }`}
                             />
                             <div>
-                              <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                              <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
                                 <span>⚡</span>
                                 {signal.name}
                               </div>
@@ -302,7 +302,7 @@ export default function CANFrameView({
                                 {signal.offset !== undefined && <div>Offset: {signal.offset}</div>}
                               </div>
                               {signal.notes && (
-                                <div className="text-xs text-slate-600 dark:text-slate-400 mt-2 italic whitespace-pre-wrap">
+                                <div className="text-xs text-[color:var(--text-secondary)] mt-2 italic whitespace-pre-wrap">
                                   {Array.isArray(signal.notes) ? signal.notes.join('\n') : signal.notes}
                                 </div>
                               )}
@@ -312,10 +312,10 @@ export default function CANFrameView({
                           <div className="flex items-center gap-2 ml-4">
                             <button
                               onClick={() => onEditSignal(idKey, idx, signal, ["frame", "can", idKey])}
-                              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                              className="p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"
                               title="Edit signal"
                             >
-                              <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+                              <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
                             </button>
 
                             {/* Pattern A delete */}
@@ -324,7 +324,7 @@ export default function CANFrameView({
                               className={iconButtonHoverDanger}
                               title="Delete signal"
                             >
-                              <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                              <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
                             </button>
                           </div>
                         </div>

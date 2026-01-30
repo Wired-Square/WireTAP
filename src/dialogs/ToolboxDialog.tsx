@@ -197,17 +197,17 @@ export default function ToolboxDialog({
                   disabled={isDisabled}
                   className={`flex items-start gap-3 w-full p-3 rounded-lg text-left transition-all ${
                     isDisabled
-                      ? "bg-slate-50 dark:bg-slate-900 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                      ? "bg-[var(--bg-surface)] text-[color:var(--text-muted)] cursor-not-allowed"
                       : isActive
-                        ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 ring-2 ring-purple-500"
-                        : "bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 ring-1 ring-slate-200 dark:ring-slate-700 hover:ring-2 hover:ring-purple-400 dark:hover:ring-purple-500"
+                        ? "bg-purple-100 text-[color:var(--text-purple)] ring-2 ring-purple-500"
+                        : "bg-[var(--bg-surface)] text-[color:var(--text-secondary)] ring-1 ring-[color:var(--border-default)] hover:ring-2 hover:ring-purple-400"
                   }`}
                   title={disabledReason ?? tool.label}
                 >
-                  <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-purple-600 dark:text-purple-400" : ""}`} />
+                  <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-[color:var(--text-purple)]" : ""}`} />
                   <div>
                     <div className="font-medium text-sm">{tool.label}</div>
-                    <div className={`text-xs mt-0.5 ${isActive ? "text-purple-600/70 dark:text-purple-400/70" : "text-slate-500 dark:text-slate-400"}`}>
+                    <div className={`text-xs mt-0.5 ${isActive ? "text-[color:var(--text-purple)] opacity-70" : "text-[color:var(--text-muted)]"}`}>
                       {tool.description}
                     </div>
                   </div>
@@ -240,7 +240,7 @@ export default function ToolboxDialog({
                 disabled={effectiveSelectedCount === 0 || isRunning}
                 className={`flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   effectiveSelectedCount === 0 || isRunning
-                    ? "bg-slate-100 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
+                    ? "bg-[var(--bg-surface)] text-[color:var(--text-muted)] cursor-not-allowed"
                     : "bg-purple-600 hover:bg-purple-700 text-white"
                 }`}
               >

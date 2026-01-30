@@ -26,7 +26,7 @@ export default function CANConfigSection({
           type="text"
           value={config.id}
           onChange={(e) => onChange({ ...config, id: e.target.value })}
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-mono ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
           placeholder="0x123"
         />
         <p className={`${caption} mt-1`}>
@@ -41,9 +41,9 @@ export default function CANConfigSection({
           id="extended"
           checked={config.extended ?? false}
           onChange={(e) => onChange({ ...config, extended: e.target.checked || undefined })}
-          className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+          className="w-4 h-4 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-blue-500"
         />
-        <label htmlFor="extended" className="text-sm text-slate-700 dark:text-slate-300">
+        <label htmlFor="extended" className="text-sm text-[color:var(--text-secondary)]">
           Extended ID (29-bit)
         </label>
       </div>
@@ -63,7 +63,7 @@ export default function CANConfigSection({
               bus: e.target.value ? parseInt(e.target.value) : undefined,
             })
           }
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           placeholder="0"
         />
         <p className={`${caption} mt-1`}>
@@ -85,7 +85,7 @@ export default function CANConfigSection({
               copy: e.target.value || undefined,
             })
           }
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-mono ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
           placeholder="0x456"
         />
         <p className={`${caption} mt-1`}>

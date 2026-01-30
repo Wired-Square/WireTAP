@@ -52,14 +52,14 @@ export default function MessageOrderResultView({ embedded = false }: Props) {
 
   if (!results) {
     return (
-      <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-slate-200 dark:border-slate-700`}`}>
+      <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
         {!embedded && <Header onExport={() => {}} hasResults={false} />}
         <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-          <ListOrdered className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-4" />
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+          <ListOrdered className="w-12 h-12 text-[color:var(--text-muted)] mb-4" />
+          <p className="text-sm text-[color:var(--text-secondary)] mb-2">
             No results yet
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-500">
+          <p className="text-xs text-[color:var(--text-muted)]">
             Select frames and click "Run Analysis" to detect message order patterns.
           </p>
         </div>
@@ -68,20 +68,20 @@ export default function MessageOrderResultView({ embedded = false }: Props) {
   }
 
   return (
-    <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-slate-200 dark:border-slate-700`}`}>
+    <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
       {!embedded && <Header onExport={() => setShowExportDialog(true)} hasResults={true} />}
 
       {/* Stats Summary */}
-      <div className={`px-4 py-2 ${borderDivider} bg-slate-50 dark:bg-slate-900`}>
+      <div className={`px-4 py-2 ${borderDivider} bg-[var(--bg-surface)]`}>
         <div className="flex flex-wrap gap-4 text-xs">
-          <span className="text-slate-500 dark:text-slate-400">
-            <span className="font-medium text-slate-700 dark:text-slate-200">{results.totalFramesAnalyzed.toLocaleString()}</span> frames
+          <span className="text-[color:var(--text-muted)]">
+            <span className="font-medium text-[color:var(--text-primary)]">{results.totalFramesAnalyzed.toLocaleString()}</span> frames
           </span>
-          <span className="text-slate-500 dark:text-slate-400">
-            <span className="font-medium text-slate-700 dark:text-slate-200">{results.uniqueFrameIds}</span> unique IDs
+          <span className="text-[color:var(--text-muted)]">
+            <span className="font-medium text-[color:var(--text-primary)]">{results.uniqueFrameIds}</span> unique IDs
           </span>
-          <span className="text-slate-500 dark:text-slate-400">
-            <span className="font-medium text-slate-700 dark:text-slate-200">{formatMs(results.timeSpanMs)}</span> span
+          <span className="text-[color:var(--text-muted)]">
+            <span className="font-medium text-[color:var(--text-primary)]">{formatMs(results.timeSpanMs)}</span> span
           </span>
         </div>
       </div>
@@ -139,7 +139,7 @@ type HeaderProps = {
 function Header({ onExport, hasResults }: HeaderProps) {
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider}`}>
-      <ListOrdered className={`${iconLg} text-purple-600 dark:text-purple-400`} />
+      <ListOrdered className={`${iconLg} text-[color:var(--text-purple)]`} />
       <div className="flex-1">
         <h2 className={sectionHeaderText}>
           Frame Order Analysis
@@ -152,7 +152,7 @@ function Header({ onExport, hasResults }: HeaderProps) {
         <button
           type="button"
           onClick={onExport}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs text-slate-600 dark:text-slate-400 ${hoverLight} transition-colors`}
+          className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs text-[color:var(--text-secondary)] ${hoverLight} transition-colors`}
           title="Export report"
         >
           <Download className={iconSm} />
@@ -177,7 +177,7 @@ function PatternSection({ patterns }: PatternSectionProps) {
       <section>
         <div className="flex items-center gap-2 mb-2">
           <Play className={`${iconMd} text-slate-400`} />
-          <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">Detected Patterns</h3>
+          <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">Detected Patterns</h3>
         </div>
         <p className={captionMuted}>
           No patterns detected. Try selecting a Start Message ID from the candidates below.
@@ -190,7 +190,7 @@ function PatternSection({ patterns }: PatternSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Play className={`${iconMd} text-purple-500`} />
-        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
           Detected Patterns ({patterns.length})
         </h3>
       </div>
@@ -220,18 +220,18 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
             Pattern #{rank}
           </span>
           <span className={captionMuted}>
-            starts with <span className="font-mono text-purple-600 dark:text-purple-400">{formatFrameId(pattern.startId)}</span>
+            starts with <span className="font-mono text-[color:var(--text-purple)]">{formatFrameId(pattern.startId)}</span>
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-slate-500 dark:text-slate-400">
+          <span className="text-[color:var(--text-muted)]">
             {pattern.occurrences}× seen
           </span>
           <span
             className={`font-medium ${
               isHighConfidence
-                ? "text-green-600 dark:text-green-400"
-                : "text-amber-600 dark:text-amber-400"
+                ? "text-[color:var(--text-green)]"
+                : "text-[color:var(--text-amber)]"
             }`}
           >
             {confidencePercent}% consistent
@@ -246,8 +246,8 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
             key={i}
             className={`px-1.5 py-0.5 rounded text-xs font-mono ${
               i === 0
-                ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
-                : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                ? "bg-[var(--badge-purple-bg)] text-[color:var(--badge-purple-text)]"
+                : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)]"
             }`}
           >
             {formatFrameId(id)}
@@ -280,7 +280,7 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Clock className={`${iconMd} text-blue-500`} />
-        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
           Start ID Candidates
         </h3>
         <span className={captionMuted}>
@@ -291,11 +291,11 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Frame ID</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Max Gap</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Avg Gap</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Min Gap</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Count</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Frame ID</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Max Gap</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Avg Gap</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Min Gap</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Count</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -303,28 +303,28 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
             {candidates.map((candidate, idx) => (
               <tr
                 key={candidate.id}
-                className={idx % 2 === 0 ? "" : "bg-slate-100/50 dark:bg-slate-800/50"}
+                className={idx % 2 === 0 ? "" : "bg-[var(--bg-subtle)]"}
               >
-                <td className="px-3 py-2 font-mono text-purple-600 dark:text-purple-400">
+                <td className="px-3 py-2 font-mono text-[color:var(--text-purple)]">
                   {formatFrameId(candidate.id)}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">
+                <td className="px-3 py-2 text-right text-[color:var(--text-secondary)]">
                   {formatMs(candidate.maxGapBeforeMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400">
+                <td className="px-3 py-2 text-right text-[color:var(--text-muted)]">
                   {formatMs(candidate.avgGapBeforeMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400">
+                <td className="px-3 py-2 text-right text-[color:var(--text-muted)]">
                   {formatMs(candidate.minGapBeforeMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-500 dark:text-slate-400">
+                <td className="px-3 py-2 text-right text-[color:var(--text-muted)]">
                   {candidate.occurrences}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <button
                     type="button"
                     onClick={() => onSelect(candidate.id)}
-                    className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                    className="text-xs text-[color:var(--text-purple)] hover:underline"
                   >
                     Use
                   </button>
@@ -355,7 +355,7 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Shuffle className={`${iconMd} text-orange-500`} />
-        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
           Potential Multiplexed Frames ({multiplexed.length})
         </h3>
         <span className={captionMuted}>
@@ -366,23 +366,23 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Frame ID</th>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Selector</th>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Cases</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Mux Period</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Inter-msg</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Frame ID</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Selector</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Cases</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Mux Period</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Inter-msg</th>
             </tr>
           </thead>
           <tbody>
             {multiplexed.map((mux, idx) => (
               <tr
                 key={mux.frameId}
-                className={idx % 2 === 0 ? "" : "bg-slate-100/50 dark:bg-slate-800/50"}
+                className={idx % 2 === 0 ? "" : "bg-[var(--bg-subtle)]"}
               >
-                <td className="px-3 py-2 font-mono text-orange-600 dark:text-orange-400">
+                <td className="px-3 py-2 font-mono text-[color:var(--text-orange)]">
                   {formatFrameId(mux.frameId)}
                 </td>
-                <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                <td className="px-3 py-2 text-[color:var(--text-secondary)]">
                   {mux.selectorByte === -1 ? "byte[0:1]" : `byte[${mux.selectorByte}]`}
                 </td>
                 <td className="px-3 py-2">
@@ -395,7 +395,7 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
                         return (
                           <span
                             key={val}
-                            className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-[10px] font-mono"
+                            className="px-1.5 py-0.5 bg-[var(--badge-orange-bg)] text-[color:var(--badge-orange-text)] rounded text-[10px] font-mono"
                           >
                             {b0}.{b1}
                           </span>
@@ -406,7 +406,7 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
                       mux.selectorValues.map((val) => (
                         <span
                           key={val}
-                          className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-[10px] font-mono"
+                          className="px-1.5 py-0.5 bg-[var(--badge-orange-bg)] text-[color:var(--badge-orange-text)] rounded text-[10px] font-mono"
                         >
                           {val}
                         </span>
@@ -414,10 +414,10 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right text-emerald-600 dark:text-emerald-400 font-medium">
+                <td className="px-3 py-2 text-right text-[color:var(--text-emerald)] font-medium">
                   {formatMs(mux.muxPeriodMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-400 dark:text-slate-500">
+                <td className="px-3 py-2 text-right text-[color:var(--text-tertiary)]">
                   {formatMs(mux.interMessageMs)}
                 </td>
               </tr>
@@ -446,7 +446,7 @@ function BurstSection({ bursts }: BurstSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Zap className={`${iconMd} text-cyan-500`} />
-        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
           Burst/Transaction Frames ({bursts.length})
         </h3>
         <span className={captionMuted}>
@@ -457,21 +457,21 @@ function BurstSection({ bursts }: BurstSectionProps) {
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Frame ID</th>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">DLCs</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Burst Size</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Cycle</th>
-              <th className="text-right px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Intra-burst</th>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Flags</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Frame ID</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">DLCs</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Burst Size</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Cycle</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Intra-burst</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Flags</th>
             </tr>
           </thead>
           <tbody>
             {bursts.map((burst, idx) => (
               <tr
                 key={burst.frameId}
-                className={idx % 2 === 0 ? "" : "bg-slate-100/50 dark:bg-slate-800/50"}
+                className={idx % 2 === 0 ? "" : "bg-[var(--bg-subtle)]"}
               >
-                <td className="px-3 py-2 font-mono text-cyan-600 dark:text-cyan-400">
+                <td className="px-3 py-2 font-mono text-[color:var(--text-cyan)]">
                   {formatFrameId(burst.frameId)}
                 </td>
                 <td className="px-3 py-2">
@@ -479,20 +479,20 @@ function BurstSection({ bursts }: BurstSectionProps) {
                     {burst.dlcVariation.map((dlc) => (
                       <span
                         key={dlc}
-                        className="px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded text-[10px] font-mono"
+                        className="px-1.5 py-0.5 bg-[var(--badge-cyan-bg)] text-[color:var(--badge-cyan-text)] rounded text-[10px] font-mono"
                       >
                         {dlc}
                       </span>
                     ))}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right text-slate-600 dark:text-slate-300">
+                <td className="px-3 py-2 text-right text-[color:var(--text-secondary)]">
                   {burst.burstCount === 1 ? "—" : `~${burst.burstCount}`}
                 </td>
-                <td className="px-3 py-2 text-right text-emerald-600 dark:text-emerald-400 font-medium">
+                <td className="px-3 py-2 text-right text-[color:var(--text-emerald)] font-medium">
                   {formatMs(burst.burstPeriodMs)}
                 </td>
-                <td className="px-3 py-2 text-right text-slate-400 dark:text-slate-500">
+                <td className="px-3 py-2 text-right text-[color:var(--text-tertiary)]">
                   {burst.burstCount > 1 ? formatMs(burst.interMessageMs) : "—"}
                 </td>
                 <td className="px-3 py-2">
@@ -500,7 +500,7 @@ function BurstSection({ bursts }: BurstSectionProps) {
                     {burst.flags.map((flag) => (
                       <span
                         key={flag}
-                        className="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded text-[10px]"
+                        className="px-1.5 py-0.5 bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded text-[10px]"
                       >
                         {flag}
                       </span>
@@ -533,7 +533,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
     <section>
       <div className="flex items-center gap-2 mb-3">
         <GitBranch className={`${iconMd} text-rose-500`} />
-        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
           Multi-Bus Frames ({multiBus.length})
         </h3>
         <span className={captionMuted}>
@@ -544,18 +544,18 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Frame ID</th>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Buses</th>
-              <th className="text-left px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Count per Bus</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Frame ID</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Buses</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Count per Bus</th>
             </tr>
           </thead>
           <tbody>
             {multiBus.map((frame, idx) => (
               <tr
                 key={frame.frameId}
-                className={idx % 2 === 0 ? "" : "bg-slate-100/50 dark:bg-slate-800/50"}
+                className={idx % 2 === 0 ? "" : "bg-[var(--bg-subtle)]"}
               >
-                <td className="px-3 py-2 font-mono text-rose-600 dark:text-rose-400">
+                <td className="px-3 py-2 font-mono text-[color:var(--text-rose)]">
                   {formatFrameId(frame.frameId)}
                 </td>
                 <td className="px-3 py-2">
@@ -563,7 +563,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
                     {frame.buses.map((bus) => (
                       <span
                         key={bus}
-                        className="px-1.5 py-0.5 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded text-[10px] font-mono"
+                        className="px-1.5 py-0.5 bg-[var(--badge-rose-bg)] text-[color:var(--badge-rose-text)] rounded text-[10px] font-mono"
                       >
                         Bus {bus}
                       </span>
@@ -575,7 +575,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
                     {frame.buses.map((bus) => (
                       <span
                         key={bus}
-                        className="px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded text-[10px]"
+                        className="px-1.5 py-0.5 bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded text-[10px]"
                       >
                         {bus}: {frame.countPerBus[bus]}
                       </span>
@@ -610,7 +610,7 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
     <section>
       <div className="flex items-center gap-2 mb-3">
         <Layers className={`${iconMd} text-emerald-500`} />
-        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
           Repetition Period Groups
         </h3>
         <span className={captionMuted}>
@@ -621,10 +621,10 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
         {groups.map((group, idx) => (
           <div
             key={idx}
-            className="p-2 bg-slate-50 dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700"
+            className="p-2 bg-[var(--bg-surface)] rounded border border-[color:var(--border-default)]"
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="text-xs font-medium text-[color:var(--text-emerald)]">
                 ~{formatMs(group.intervalMs)}
               </span>
               <span className={captionMuted}>
@@ -640,10 +640,10 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
                     key={id}
                     className={`px-1 py-0.5 rounded text-[10px] font-mono ${
                       isMux
-                        ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
+                        ? "bg-[var(--badge-orange-bg)] text-[color:var(--badge-orange-text)]"
                         : isBurst
-                        ? "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300"
-                        : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                        ? "bg-[var(--badge-cyan-bg)] text-[color:var(--badge-cyan-text)]"
+                        : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)]"
                     }`}
                     title={isMux ? "Multiplexed frame" : isBurst ? "Burst/transaction frame" : undefined}
                   >

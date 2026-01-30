@@ -40,7 +40,7 @@ export default function SecurePasswordField({
       <label className={`${labelDefault} mb-2`}>
         {label} {optional && <span className="text-slate-500">(optional)</span>}
         {isSecurelyStored && (
-          <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+          <span className="ml-2 inline-flex items-center gap-1 text-xs text-[color:var(--accent-success)]">
             <Shield className={iconXs} />
             Secure
           </span>
@@ -76,14 +76,14 @@ export default function SecurePasswordField({
           placeholder={hasStoredPassword ? "••••••••••••" : placeholder}
           className={`pr-10 ${
             hasStoredPassword
-              ? "border-green-300 dark:border-green-700 placeholder-green-600 dark:placeholder-green-400"
+              ? "border-[color:var(--border-success)] placeholder-[color:var(--accent-success)]"
               : ""
           }`}
         />
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 ${hoverLight} ${roundedDefault} text-slate-400 hover:text-slate-600 dark:hover:text-slate-300`}
+          className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 ${hoverLight} ${roundedDefault} text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]`}
           title={showPassword ? "Hide password" : "Show password"}
         >
           {showPassword ? (
@@ -95,7 +95,7 @@ export default function SecurePasswordField({
       </div>
 
       {hasStoredPassword && (
-        <p className={`mt-1 ${helpText} text-green-600 dark:text-green-400`}>
+        <p className={`mt-1 ${helpText} text-[color:var(--accent-success)]`}>
           Password stored in system keychain. Leave empty to keep current password.
         </p>
       )}

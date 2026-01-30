@@ -47,12 +47,12 @@ export function renderDeltaNode(deltaUs: number): React.ReactNode {
     { className: "inline-flex items-baseline gap-1" },
     React.createElement(
       "span",
-      { className: "text-slate-800 dark:text-slate-100 font-semibold" },
+      { className: "text-[color:var(--text-primary)] font-semibold" },
       `${secondsMs}s`
     ),
     React.createElement(
       "span",
-      { className: "text-[11px] text-slate-500 dark:text-slate-400" },
+      { className: "text-[11px] text-[color:var(--text-muted)]" },
       `${microsRemainder.toString().padStart(3, "0")}µs`
     )
   );

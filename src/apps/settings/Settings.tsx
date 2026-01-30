@@ -6,7 +6,7 @@ import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
 import AppSideBar, { type SideBarItem } from "../../components/AppSideBar";
 import { Cog, MapPin, Cable, BookOpen, Monitor, Bookmark } from "lucide-react";
-import { bgDarkView, borderDarkView } from "../../styles/colourTokens";
+import { bgDataView, borderDataView } from "../../styles/colourTokens";
 import LocationsView from './views/LocationsView';
 import DisplayView from './views/DisplayView';
 import CatalogsView from './views/CatalogsView';
@@ -64,6 +64,13 @@ export default function Settings() {
   const binaryUnusedColour = useSettingsStore((s) => s.display.binaryUnusedColour);
   const setBinaryUnusedColour = useSettingsStore((s) => s.setBinaryUnusedColour);
   const resetBinaryUnusedColour = useSettingsStore((s) => s.resetBinaryUnusedColour);
+
+  // Theme
+  const themeMode = useSettingsStore((s) => s.display.themeMode);
+  const setThemeMode = useSettingsStore((s) => s.setThemeMode);
+  const themeColours = useSettingsStore((s) => s.display.themeColours);
+  const setThemeColour = useSettingsStore((s) => s.setThemeColour);
+  const resetThemeColours = useSettingsStore((s) => s.resetThemeColours);
 
   // General
   const discoveryHistoryBuffer = useSettingsStore((s) => s.general.discoveryHistoryBuffer);
@@ -142,12 +149,12 @@ export default function Settings() {
       topBar={
         <AppTopBar
           icon={Cog}
-          iconColour="text-orange-600 dark:text-orange-400"
+          iconColour="text-[color:var(--accent-warning)]"
         />
       }
     >
       {/* Sidebar + Content in bubble */}
-      <div className={`flex-1 flex min-h-0 rounded-lg border ${borderDarkView} overflow-hidden`}>
+      <div className={`flex-1 flex min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
         <AppSideBar
           items={sidebarItems}
           activeItem={currentSection}
@@ -157,7 +164,7 @@ export default function Settings() {
         />
 
         {/* Content Area */}
-        <main className={`flex-1 min-h-0 overflow-y-auto p-6 ${bgDarkView}`}>
+        <main className={`flex-1 min-h-0 overflow-y-auto p-6 ${bgDataView}`}>
           {/* Locations Section */}
           {currentSection === 'locations' && (
             <LocationsView
@@ -244,6 +251,11 @@ export default function Settings() {
               binaryUnusedColour={binaryUnusedColour}
               onChangeBinaryUnusedColour={setBinaryUnusedColour}
               onResetBinaryUnusedColour={resetBinaryUnusedColour}
+              themeMode={themeMode}
+              onChangeThemeMode={setThemeMode}
+              themeColours={themeColours}
+              onChangeThemeColour={setThemeColour}
+              onResetThemeColours={resetThemeColours}
             />
           )}
         </main>

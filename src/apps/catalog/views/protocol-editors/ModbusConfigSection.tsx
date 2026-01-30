@@ -36,7 +36,7 @@ export default function ModbusConfigSection({
           type="text"
           value={frameKey}
           onChange={(e) => onFrameKeyChange(e.target.value)}
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           placeholder="battery_voltage"
         />
         <p className={`${caption} mt-1`}>
@@ -57,7 +57,7 @@ export default function ModbusConfigSection({
           onChange={(e) =>
             onChange({ ...config, register_number: parseInt(e.target.value) || 0 })
           }
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           placeholder="100"
         />
         <p className={`${caption} mt-1`}>
@@ -77,7 +77,7 @@ export default function ModbusConfigSection({
                 type="checkbox"
                 checked={isDeviceAddressInherited ?? false}
                 onChange={(e) => onDeviceAddressInheritedChange(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-blue-500"
               />
               Use default ({defaultDeviceAddress})
             </label>
@@ -92,7 +92,7 @@ export default function ModbusConfigSection({
             onChange({ ...config, device_address: parseInt(e.target.value) || 1 })
           }
           disabled={isDeviceAddressInherited}
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing} ${
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
             isDeviceAddressInherited ? "opacity-50 cursor-not-allowed" : ""
           }`}
           placeholder="1"
@@ -115,7 +115,7 @@ export default function ModbusConfigSection({
               register_type: e.target.value as ModbusConfig["register_type"],
             })
           }
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
         >
           <option value="holding">Holding Registers (FC 03/06/16)</option>
           <option value="input">Input Registers (FC 04)</option>
@@ -137,7 +137,7 @@ export default function ModbusConfigSection({
               register_base: e.target.value === "" ? undefined : (parseInt(e.target.value) as 0 | 1),
             })
           }
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
         >
           <option value="">
             {defaultRegisterBase !== undefined

@@ -8,11 +8,11 @@ import { useTransmitStore } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import { ioTransmitSerial } from "../../../api/transmit";
 import {
-  bgDarkToolbar,
-  borderDarkView,
-  textDarkInput,
-  bgDarkInput,
-  textDarkMuted,
+  bgDataToolbar,
+  borderDataView,
+  textDataPrimary,
+  bgDataInput,
+  textDataSecondary,
 } from "../../../styles/colourTokens";
 import { buttonBase, toggleChipClass } from "../../../styles/buttonStyles";
 import { flexRowGap2 } from "../../../styles/spacing";
@@ -164,7 +164,7 @@ export default function SerialTransmitView() {
   if (!isConnected) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDarkMuted} text-center`}>
+        <div className={`${textDataSecondary} text-center`}>
           <p className="text-lg font-medium">Not Connected</p>
           <p className="text-sm mt-2">
             Connect to an interface to transmit serial bytes.
@@ -178,7 +178,7 @@ export default function SerialTransmitView() {
   if (!canTransmit) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDarkMuted} text-center`}>
+        <div className={`${textDataSecondary} text-center`}>
           <p className="text-lg font-medium">Serial Not Supported</p>
           <p className="text-sm mt-2">
             This profile does not support serial byte transmission.
@@ -194,10 +194,10 @@ export default function SerialTransmitView() {
   return (
     <div className="flex flex-col h-full overflow-auto">
       {/* Hex Input */}
-      <div className={`p-4 border-b ${borderDarkView}`}>
+      <div className={`p-4 border-b ${borderDataView}`}>
         <div className="space-y-4">
           <div>
-            <label className={`${textDarkMuted} text-xs mb-1 block`}>
+            <label className={`${textDataSecondary} text-xs mb-1 block`}>
               Hex Bytes
             </label>
             <textarea
@@ -205,13 +205,13 @@ export default function SerialTransmitView() {
               onChange={handleHexInputChange}
               placeholder="AA BB CC DD EE FF..."
               rows={4}
-              className={`w-full ${bgDarkInput} ${textDarkInput} font-mono text-sm rounded px-3 py-2 border ${borderDarkView} focus:outline-none focus:border-blue-500 uppercase resize-none`}
+              className={`w-full ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-3 py-2 border ${borderDataView} focus:outline-none focus:border-blue-500 uppercase resize-none`}
             />
           </div>
 
           {/* Framing Mode */}
           <div className="space-y-2">
-            <label className={`${textDarkMuted} text-xs`}>Framing Mode:</label>
+            <label className={`${textDataSecondary} text-xs`}>Framing Mode:</label>
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => handleFramingModeChange("raw")}
@@ -239,7 +239,7 @@ export default function SerialTransmitView() {
           {/* Delimiter input (when delimiter mode selected) */}
           {serialEditor.framingMode === "delimiter" && (
             <div>
-              <label className={`${textDarkMuted} text-xs mb-1 block`}>
+              <label className={`${textDataSecondary} text-xs mb-1 block`}>
                 Delimiter (hex)
               </label>
               <input
@@ -247,9 +247,9 @@ export default function SerialTransmitView() {
                 value={serialEditor.delimiter.map(byteToHex).join(" ")}
                 onChange={handleDelimiterChange}
                 placeholder="0D 0A"
-                className={`w-32 ${bgDarkInput} ${textDarkInput} font-mono text-sm rounded px-2 py-1.5 border ${borderDarkView} focus:outline-none focus:border-blue-500 uppercase`}
+                className={`w-32 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} focus:outline-none focus:border-blue-500 uppercase`}
               />
-              <p className={`${textDarkMuted} text-xs mt-1`}>
+              <p className={`${textDataSecondary} text-xs mt-1`}>
                 Default: 0D 0A (CRLF)
               </p>
             </div>
@@ -259,10 +259,10 @@ export default function SerialTransmitView() {
 
       {/* Preview */}
       {preview && (
-        <div className={`px-4 py-3 ${bgDarkToolbar} border-b ${borderDarkView}`}>
+        <div className={`px-4 py-3 ${bgDataToolbar} border-b ${borderDataView}`}>
           <div className="space-y-1">
             <div className="flex items-center gap-4">
-              <span className={`${textDarkMuted} text-xs`}>Preview:</span>
+              <span className={`${textDataSecondary} text-xs`}>Preview:</span>
               <span className="text-xs text-blue-400">
                 {preview.length} bytes
               </span>
@@ -273,7 +273,7 @@ export default function SerialTransmitView() {
               </code>
             </div>
             <div className={flexRowGap2}>
-              <span className={`${textDarkMuted} text-xs`}>ASCII:</span>
+              <span className={`${textDataSecondary} text-xs`}>ASCII:</span>
               <code className="font-mono text-xs text-gray-500">
                 {preview.ascii}
               </code>
@@ -283,7 +283,7 @@ export default function SerialTransmitView() {
       )}
 
       {/* Actions */}
-      <div className={`flex items-center gap-3 px-4 py-3 ${bgDarkToolbar}`}>
+      <div className={`flex items-center gap-3 px-4 py-3 ${bgDataToolbar}`}>
         <button
           onClick={handleSend}
           disabled={!preview || isSending}

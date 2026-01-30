@@ -37,7 +37,7 @@ export default function ModbusConfigSection({
   const isValid = deviceAddress >= 1 && deviceAddress <= 247;
 
   return (
-    <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+    <div className="border border-[color:var(--border-default)] rounded-lg overflow-hidden">
       {/* Header */}
       <div
         role="button"
@@ -52,18 +52,18 @@ export default function ModbusConfigSection({
           ) : (
             <ChevronRight className={`${iconMd} text-slate-500`} />
           )}
-          <div className="p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded">
-            <Network className={`${iconMd} text-amber-600 dark:text-amber-400`} />
+          <div className="p-1.5 bg-[var(--status-warning-bg)] rounded">
+            <Network className={`${iconMd} text-[color:var(--text-amber)]`} />
           </div>
-          <span className="font-medium text-slate-900 dark:text-white">Modbus</span>
+          <span className="font-medium text-[color:var(--text-primary)]">Modbus</span>
           {isConfigured && (
-            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+            <span className="flex items-center gap-1 text-xs text-[color:var(--text-green)]">
               <Check className={iconXs} />
               configured
             </span>
           )}
           {showWarning && (
-            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <span className="flex items-center gap-1 text-xs text-[color:var(--text-amber)]">
               <AlertTriangle className={iconXs} />
               frames exist, no config
             </span>
@@ -74,7 +74,7 @@ export default function ModbusConfigSection({
             <button
               type="button"
               onClick={onRemove}
-              className="px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+              className="px-2 py-1 text-xs text-[color:var(--text-red)] hover:bg-[var(--status-danger-bg)] rounded transition-colors"
             >
               Remove
             </button>
@@ -82,7 +82,7 @@ export default function ModbusConfigSection({
             <button
               type="button"
               onClick={onAdd}
-              className="px-2 py-1 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 rounded transition-colors"
+              className="px-2 py-1 text-xs text-[color:var(--text-amber)] hover:bg-[var(--status-warning-bg)] rounded transition-colors"
             >
               + Add
             </button>
@@ -92,7 +92,7 @@ export default function ModbusConfigSection({
 
       {/* Content */}
       {isExpanded && isConfigured && (
-        <div className="p-4 space-y-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="p-4 space-y-4 border-t border-[color:var(--border-default)]">
           {/* Device Address */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
@@ -107,10 +107,10 @@ export default function ModbusConfigSection({
                 const val = parseInt(e.target.value);
                 if (!isNaN(val)) setDeviceAddress(val);
               }}
-              className={`w-full px-4 py-2 border rounded-lg text-slate-900 dark:text-white ${focusRing} ${
+              className={`w-full px-4 py-2 border rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
                 !isValid
-                  ? "bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700"
-                  : "bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                  ? "bg-[var(--status-danger-bg)] border-[color:var(--status-danger-border)]"
+                  : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
               }`}
             />
             <p className={`mt-1 ${caption}`}>
@@ -126,7 +126,7 @@ export default function ModbusConfigSection({
             <select
               value={registerBase}
               onChange={(e) => setRegisterBase(parseInt(e.target.value) as 0 | 1)}
-              className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+              className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
             >
               <option value={0}>0-based (register 0 = address 0)</option>
               <option value={1}>1-based (register 1 = address 0)</option>
@@ -140,7 +140,7 @@ export default function ModbusConfigSection({
 
       {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
-        <div className={`px-4 py-2 ${caption} border-t border-slate-200 dark:border-slate-700`}>
+        <div className={`px-4 py-2 ${caption} border-t border-[color:var(--border-default)]`}>
           Address: {deviceAddress} • Base: {registerBase}-based
         </div>
       )}

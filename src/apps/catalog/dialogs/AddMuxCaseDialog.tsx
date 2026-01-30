@@ -57,7 +57,7 @@ export default function AddMuxCaseDialog({
               }}
             />
             {caseError && (
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{caseError.message}</p>
+              <p className="mt-2 text-sm text-[color:var(--danger)]">{caseError.message}</p>
             )}
             <p className={`mt-2 ${caption}`}>
               Enter the case value (e.g., "0", "1", "2" for numeric cases or any string)

@@ -38,7 +38,7 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
         <div className={`${spaceYDefault} ${bodyDefault}`}>
           <div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2">CANdor</p>
+            <p className="text-3xl font-bold text-[color:var(--text-primary)] mb-2">CANdor</p>
             <p className={bodySmall}>Version {version}</p>
           </div>
 

@@ -40,7 +40,7 @@ export default function LocationsView({
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Storage</h2>
+        <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-4">Storage</h2>
 
         {/* Decoder Directory */}
         <div className="mb-6">
@@ -52,7 +52,7 @@ export default function LocationsView({
               type="text"
               value={decoderDir}
               onChange={(e) => onChangeDecoderDir(e.target.value)}
-              className={`flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+              className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               placeholder="Click folder icon to select..."
             />
             <button
@@ -60,16 +60,16 @@ export default function LocationsView({
               className={folderPickerButton}
               title="Browse for directory"
             >
-              <FolderOpen className={`${iconLg} text-slate-600 dark:text-slate-400`} />
+              <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
             </button>
           </div>
           {decoderValidation?.error && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+            <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--text-amber)]">
               <AlertCircle className={iconMd} />
               <span>{decoderValidation.error}</span>
             </div>
           )}
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-sm text-[color:var(--text-muted)]">
             Directory where decoder catalog files (.toml) are stored
           </p>
         </div>
@@ -84,7 +84,7 @@ export default function LocationsView({
               type="text"
               value={dumpDir}
               onChange={(e) => onChangeDumpDir(e.target.value)}
-              className={`flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+              className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               placeholder="Click folder icon to select..."
             />
             <button
@@ -92,16 +92,16 @@ export default function LocationsView({
               className={folderPickerButton}
               title="Browse for directory"
             >
-              <FolderOpen className={`${iconLg} text-slate-600 dark:text-slate-400`} />
+              <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
             </button>
           </div>
           {dumpValidation?.error && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+            <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--text-amber)]">
               <AlertCircle className={iconMd} />
               <span>{dumpValidation.error}</span>
             </div>
           )}
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-sm text-[color:var(--text-muted)]">
             Directory where CAN bus dump files are stored
           </p>
         </div>
@@ -116,7 +116,7 @@ export default function LocationsView({
               type="text"
               value={reportDir}
               onChange={(e) => onChangeReportDir(e.target.value)}
-              className={`flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+              className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               placeholder="Click folder icon to select..."
             />
             <button
@@ -124,27 +124,27 @@ export default function LocationsView({
               className={folderPickerButton}
               title="Browse for directory"
             >
-              <FolderOpen className={`${iconLg} text-slate-600 dark:text-slate-400`} />
+              <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
             </button>
           </div>
           {reportValidation?.error && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+            <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--text-amber)]">
               <AlertCircle className={iconMd} />
               <span>{reportValidation.error}</span>
             </div>
           )}
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-sm text-[color:var(--text-muted)]">
             Default directory for exported analysis reports
           </p>
         </div>
 
         {/* Files */}
         <div>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">Files</h2>
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)] mb-3">Files</h2>
           <div className="space-y-2">
             <div className={textMedium}>Save frame ID format</div>
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <label className="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
                 <input
                   type="radio"
                   name="save-frame-id-format"
@@ -155,7 +155,7 @@ export default function LocationsView({
                 />
                 Hex
               </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <label className="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
                 <input
                   type="radio"
                   name="save-frame-id-format"

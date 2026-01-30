@@ -213,7 +213,7 @@ export default function SignalEditDialog({
                 />
                 <label
                   htmlFor="signal-signed"
-                  className={`${labelSmall} ${isFormatDisabled ? "text-slate-400 dark:text-slate-500" : ""}`}
+                  className={`${labelSmall} ${isFormatDisabled ? "text-[color:var(--text-muted)]" : ""}`}
                 >
                   Signed
                 </label>
@@ -238,7 +238,7 @@ export default function SignalEditDialog({
                     <button
                       type="button"
                       onClick={() => setFields({ ...fields, enum: undefined })}
-                      className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      className="flex items-center gap-1 px-3 py-2 text-sm text-[color:var(--danger)] hover:bg-[var(--danger-bg-subtle)] rounded-lg transition-colors"
                       title="Clear enum values"
                     >
                       <X className={iconMd} />
@@ -308,7 +308,7 @@ export default function SignalEditDialog({
                 </label>
                 <Select
                   variant="default"
-                  className={!fields.endianness ? "text-slate-400 dark:text-slate-500" : ""}
+                  className={!fields.endianness ? "text-[color:var(--text-muted)]" : ""}
                   value={fields.endianness || ""}
                   onChange={(e) => setFields({ ...fields, endianness: e.target.value === "" ? undefined : e.target.value as "little" | "big" })}
                 >

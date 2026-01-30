@@ -12,11 +12,11 @@ import { byteToHex, byteToAscii } from '../../../../utils/byteUtils';
 import { formatHumanUs, formatIsoUs, renderDeltaNode } from '../../../../utils/timeFormat';
 import { PaginationToolbar, TimelineSection, BYTE_PAGE_SIZE_OPTIONS } from '../../components';
 import {
-  bgDarkView,
-  borderDarkView,
-  textDarkMuted,
-  textDarkSubtle,
-  hoverDarkRow,
+  bgDataView,
+  borderDataView,
+  textDataSecondary,
+  textDataTertiary,
+  hoverDataRow,
   textDataGreen,
   textDataYellow,
   textDataCyan,
@@ -310,7 +310,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
 
   // Byte count info for toolbar
   const byteCountInfo = (
-    <span className={`text-xs ${textDarkMuted}`}>
+    <span className={`text-xs ${textDataSecondary}`}>
       {totalBytes.toLocaleString()} bytes
       {isStreaming && (
         <span className={`ml-2 ${textDataGreen} bg-green-900/30 px-1.5 py-0.5 rounded font-medium`}>
@@ -353,28 +353,28 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className={`flex-1 overflow-auto font-mono text-xs ${bgDarkView}`}
+        className={`flex-1 overflow-auto font-mono text-xs ${bgDataView}`}
       >
         {lines.length === 0 ? (
-          <div className={`${textDarkSubtle} text-center py-8`}>
+          <div className={`${textDataTertiary} text-center py-8`}>
             {isLoadingPage ? 'Loading...' : 'Waiting for serial data...'}
           </div>
         ) : (
           <>
             <table className="w-full">
-              <thead className={`sticky top-0 z-10 ${bgDarkView} ${textDarkMuted} shadow-sm`}>
+              <thead className={`sticky top-0 z-10 ${bgDataView} ${textDataSecondary} shadow-sm`}>
                 <tr>
-                  <th className={`text-left px-2 py-1.5 border-b ${borderDarkView}`}>Time</th>
-                  {showBusColumn && <th className={`text-left px-2 py-1.5 border-b ${borderDarkView}`}>Bus</th>}
-                  <th className={`text-left px-2 py-1.5 border-b ${borderDarkView}`}>Hex</th>
-                  {showAsciiColumn && <th className={`text-left px-2 py-1.5 border-b ${borderDarkView}`}>ASCII</th>}
+                  <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Time</th>
+                  {showBusColumn && <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Bus</th>}
+                  <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Hex</th>
+                  {showAsciiColumn && <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>ASCII</th>}
                 </tr>
               </thead>
               <tbody>
                 {lines.map((line, i) => (
-                  <tr key={i} className={hoverDarkRow}>
+                  <tr key={i} className={hoverDataRow}>
                     <td
-                      className={`${textDarkSubtle} px-2 py-0.5 whitespace-nowrap`}
+                      className={`${textDataTertiary} px-2 py-0.5 whitespace-nowrap`}
                       title={line.timestampUs !== null ? formatHumanUs(line.timestampUs) : undefined}
                     >
                       {line.timestamp}

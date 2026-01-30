@@ -74,7 +74,7 @@ export default function SignalView({
     <div className="space-y-4">
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Signal Details</h3>
+        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">Signal Details</h3>
         <div className={flexRowGap2}>
           <button
             onClick={() => {
@@ -90,7 +90,7 @@ export default function SignalView({
             className={iconButtonHover}
             title="Edit signal"
           >
-            <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
           </button>
 
           {/* Pattern A delete */}
@@ -108,7 +108,7 @@ export default function SignalView({
             className={iconButtonHoverDanger}
             title="Delete signal"
           >
-            <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+            <Trash2 className={`${iconMd} text-[color:var(--text-danger)]`} />
           </button>
         </div>
       </div>
@@ -133,8 +133,8 @@ export default function SignalView({
             const frameLength = getFrameByteLengthFromPath(selectedNode.path, parsed);
 
             return (
-              <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Bit Preview</h4>
+              <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+                <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">Bit Preview</h4>
                 <BitPreview
                   numBytes={frameLength}
                   ranges={ranges}
@@ -152,8 +152,8 @@ export default function SignalView({
             const numBytes = endByte - startByte + 1;
 
             return (
-              <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Bit Preview</h4>
+              <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+                <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">Bit Preview</h4>
                 <BitPreview
                   numBytes={numBytes}
                   ranges={[]}
@@ -167,9 +167,9 @@ export default function SignalView({
         })()}
 
       {selectedNode.metadata?.muxCase && (
-        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-lg">
-          <div className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">Mux Case</div>
-          <div className="font-mono text-sm text-purple-900 dark:text-purple-300">{selectedNode.metadata.muxCase}</div>
+        <div className="p-3 bg-[var(--bg-purple)] border-2 border-[color:var(--border-purple)] rounded-lg">
+          <div className="text-xs font-medium text-[color:var(--text-purple)] mb-1">Mux Case</div>
+          <div className="font-mono text-sm text-[color:var(--text-purple-strong)]">{selectedNode.metadata.muxCase}</div>
         </div>
       )}
 
@@ -208,7 +208,7 @@ export default function SignalView({
               <div className={`${flexRowGap2} mb-1`}>
                 <span className={labelSmall}>byte_order</span>
                 {isInherited && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
+                  <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--bg-accent)] text-[color:var(--accent-primary)] rounded">
                     Inherited
                   </span>
                 )}

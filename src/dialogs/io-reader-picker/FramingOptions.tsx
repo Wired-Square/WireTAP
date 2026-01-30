@@ -119,7 +119,7 @@ export default function FramingOptions({
 
   return (
     <div className={borderDivider}>
-      <div className={`px-4 py-2 bg-slate-50 dark:bg-slate-900/50 ${sectionHeader}`}>
+      <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
         Framing
       </div>
       <div className="p-3">

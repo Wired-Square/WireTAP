@@ -44,6 +44,32 @@ export interface SignalColours {
   high: string;
 }
 
+export type ThemeMode = 'dark' | 'light' | 'auto';
+
+export interface ThemeColours {
+  // Light mode
+  bgPrimaryLight: string;
+  bgSurfaceLight: string;
+  textPrimaryLight: string;
+  textSecondaryLight: string;
+  borderDefaultLight: string;
+  dataBgLight: string;
+  dataTextPrimaryLight: string;
+  // Dark mode
+  bgPrimaryDark: string;
+  bgSurfaceDark: string;
+  textPrimaryDark: string;
+  textSecondaryDark: string;
+  borderDefaultDark: string;
+  dataBgDark: string;
+  dataTextPrimaryDark: string;
+  // Accent colours (mode-independent)
+  accentPrimary: string;
+  accentSuccess: string;
+  accentDanger: string;
+  accentWarning: string;
+}
+
 interface AppSettings {
   config_path: string;
   decoder_dir: string;
@@ -66,6 +92,26 @@ interface AppSettings {
   binary_zero_colour?: string;
   binary_unused_colour?: string;
   discovery_history_buffer?: number;
+  // Theme settings
+  theme_mode?: ThemeMode;
+  theme_bg_primary_light?: string;
+  theme_bg_surface_light?: string;
+  theme_text_primary_light?: string;
+  theme_text_secondary_light?: string;
+  theme_border_default_light?: string;
+  theme_data_bg_light?: string;
+  theme_data_text_primary_light?: string;
+  theme_bg_primary_dark?: string;
+  theme_bg_surface_dark?: string;
+  theme_text_primary_dark?: string;
+  theme_text_secondary_dark?: string;
+  theme_border_default_dark?: string;
+  theme_data_bg_dark?: string;
+  theme_data_text_primary_dark?: string;
+  theme_accent_primary?: string;
+  theme_accent_success?: string;
+  theme_accent_danger?: string;
+  theme_accent_warning?: string;
 }
 
 // Dialog types
@@ -117,6 +163,30 @@ const defaultSignalColours: SignalColours = {
   high: '#22c55e',
 };
 
+export const defaultThemeColours: ThemeColours = {
+  // Light mode
+  bgPrimaryLight: '#ffffff',      // white
+  bgSurfaceLight: '#f8fafc',      // slate-50
+  textPrimaryLight: '#0f172a',    // slate-900
+  textSecondaryLight: '#334155',  // slate-700
+  borderDefaultLight: '#e2e8f0',  // slate-200
+  dataBgLight: '#f8fafc',         // slate-50
+  dataTextPrimaryLight: '#0f172a', // slate-900
+  // Dark mode
+  bgPrimaryDark: '#0f172a',       // slate-900
+  bgSurfaceDark: '#1e293b',       // slate-800
+  textPrimaryDark: '#ffffff',     // white
+  textSecondaryDark: '#cbd5e1',   // slate-300
+  borderDefaultDark: '#334155',   // slate-700
+  dataBgDark: '#111827',          // gray-900
+  dataTextPrimaryDark: '#e5e7eb', // gray-200
+  // Accent colours (mode-independent)
+  accentPrimary: '#2563eb',       // blue-600
+  accentSuccess: '#16a34a',       // green-600
+  accentDanger: '#dc2626',        // red-600
+  accentWarning: '#d97706',       // amber-600
+};
+
 // Stable stringify helper for change detection
 function stableStringify(value: any): string {
   if (value === null || value === undefined) return String(value);
@@ -165,6 +235,8 @@ interface SettingsState {
     binaryOneColour: string;
     binaryZeroColour: string;
     binaryUnusedColour: string;
+    themeMode: ThemeMode;
+    themeColours: ThemeColours;
   };
 
   // General settings
@@ -233,6 +305,9 @@ interface SettingsState {
   resetBinaryOneColour: () => void;
   resetBinaryZeroColour: () => void;
   resetBinaryUnusedColour: () => void;
+  setThemeMode: (mode: ThemeMode) => void;
+  setThemeColour: (key: keyof ThemeColours, colour: string) => void;
+  resetThemeColours: () => void;
 
   // Actions - General
   setDiscoveryHistoryBuffer: (buffer: number) => void;
@@ -285,6 +360,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     binaryOneColour: '#14b8a6',
     binaryZeroColour: '#94a3b8',
     binaryUnusedColour: '#64748b',
+    themeMode: 'auto',
+    themeColours: { ...defaultThemeColours },
   },
 
   general: {
@@ -357,6 +434,26 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_unused_colour: settings.binary_unused_colour || '#64748b',
         discovery_history_buffer: settings.discovery_history_buffer ?? 100000,
         default_frame_type: (settings.default_frame_type as DefaultFrameType) ?? 'can',
+        // Theme settings
+        theme_mode: (settings.theme_mode as ThemeMode) ?? 'auto',
+        theme_bg_primary_light: settings.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
+        theme_bg_surface_light: settings.theme_bg_surface_light || defaultThemeColours.bgSurfaceLight,
+        theme_text_primary_light: settings.theme_text_primary_light || defaultThemeColours.textPrimaryLight,
+        theme_text_secondary_light: settings.theme_text_secondary_light || defaultThemeColours.textSecondaryLight,
+        theme_border_default_light: settings.theme_border_default_light || defaultThemeColours.borderDefaultLight,
+        theme_data_bg_light: settings.theme_data_bg_light || defaultThemeColours.dataBgLight,
+        theme_data_text_primary_light: settings.theme_data_text_primary_light || defaultThemeColours.dataTextPrimaryLight,
+        theme_bg_primary_dark: settings.theme_bg_primary_dark || defaultThemeColours.bgPrimaryDark,
+        theme_bg_surface_dark: settings.theme_bg_surface_dark || defaultThemeColours.bgSurfaceDark,
+        theme_text_primary_dark: settings.theme_text_primary_dark || defaultThemeColours.textPrimaryDark,
+        theme_text_secondary_dark: settings.theme_text_secondary_dark || defaultThemeColours.textSecondaryDark,
+        theme_border_default_dark: settings.theme_border_default_dark || defaultThemeColours.borderDefaultDark,
+        theme_data_bg_dark: settings.theme_data_bg_dark || defaultThemeColours.dataBgDark,
+        theme_data_text_primary_dark: settings.theme_data_text_primary_dark || defaultThemeColours.dataTextPrimaryDark,
+        theme_accent_primary: settings.theme_accent_primary || defaultThemeColours.accentPrimary,
+        theme_accent_success: settings.theme_accent_success || defaultThemeColours.accentSuccess,
+        theme_accent_danger: settings.theme_accent_danger || defaultThemeColours.accentDanger,
+        theme_accent_warning: settings.theme_accent_warning || defaultThemeColours.accentWarning,
       };
 
       set({
@@ -394,6 +491,27 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           binaryOneColour: normalized.binary_one_colour || '#14b8a6',
           binaryZeroColour: normalized.binary_zero_colour || '#94a3b8',
           binaryUnusedColour: normalized.binary_unused_colour || '#64748b',
+          themeMode: normalized.theme_mode || 'auto',
+          themeColours: {
+            bgPrimaryLight: normalized.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
+            bgSurfaceLight: normalized.theme_bg_surface_light || defaultThemeColours.bgSurfaceLight,
+            textPrimaryLight: normalized.theme_text_primary_light || defaultThemeColours.textPrimaryLight,
+            textSecondaryLight: normalized.theme_text_secondary_light || defaultThemeColours.textSecondaryLight,
+            borderDefaultLight: normalized.theme_border_default_light || defaultThemeColours.borderDefaultLight,
+            dataBgLight: normalized.theme_data_bg_light || defaultThemeColours.dataBgLight,
+            dataTextPrimaryLight: normalized.theme_data_text_primary_light || defaultThemeColours.dataTextPrimaryLight,
+            bgPrimaryDark: normalized.theme_bg_primary_dark || defaultThemeColours.bgPrimaryDark,
+            bgSurfaceDark: normalized.theme_bg_surface_dark || defaultThemeColours.bgSurfaceDark,
+            textPrimaryDark: normalized.theme_text_primary_dark || defaultThemeColours.textPrimaryDark,
+            textSecondaryDark: normalized.theme_text_secondary_dark || defaultThemeColours.textSecondaryDark,
+            borderDefaultDark: normalized.theme_border_default_dark || defaultThemeColours.borderDefaultDark,
+            dataBgDark: normalized.theme_data_bg_dark || defaultThemeColours.dataBgDark,
+            dataTextPrimaryDark: normalized.theme_data_text_primary_dark || defaultThemeColours.dataTextPrimaryDark,
+            accentPrimary: normalized.theme_accent_primary || defaultThemeColours.accentPrimary,
+            accentSuccess: normalized.theme_accent_success || defaultThemeColours.accentSuccess,
+            accentDanger: normalized.theme_accent_danger || defaultThemeColours.accentDanger,
+            accentWarning: normalized.theme_accent_warning || defaultThemeColours.accentWarning,
+          },
         },
         general: {
           discoveryHistoryBuffer: normalized.discovery_history_buffer ?? 100000,
@@ -461,6 +579,26 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_zero_colour: display.binaryZeroColour,
         binary_unused_colour: display.binaryUnusedColour,
         discovery_history_buffer: general.discoveryHistoryBuffer,
+        // Theme settings
+        theme_mode: display.themeMode,
+        theme_bg_primary_light: display.themeColours.bgPrimaryLight,
+        theme_bg_surface_light: display.themeColours.bgSurfaceLight,
+        theme_text_primary_light: display.themeColours.textPrimaryLight,
+        theme_text_secondary_light: display.themeColours.textSecondaryLight,
+        theme_border_default_light: display.themeColours.borderDefaultLight,
+        theme_data_bg_light: display.themeColours.dataBgLight,
+        theme_data_text_primary_light: display.themeColours.dataTextPrimaryLight,
+        theme_bg_primary_dark: display.themeColours.bgPrimaryDark,
+        theme_bg_surface_dark: display.themeColours.bgSurfaceDark,
+        theme_text_primary_dark: display.themeColours.textPrimaryDark,
+        theme_text_secondary_dark: display.themeColours.textSecondaryDark,
+        theme_border_default_dark: display.themeColours.borderDefaultDark,
+        theme_data_bg_dark: display.themeColours.dataBgDark,
+        theme_data_text_primary_dark: display.themeColours.dataTextPrimaryDark,
+        theme_accent_primary: display.themeColours.accentPrimary,
+        theme_accent_success: display.themeColours.accentSuccess,
+        theme_accent_danger: display.themeColours.accentDanger,
+        theme_accent_warning: display.themeColours.accentWarning,
       };
 
       await saveSettingsApi(settings);
@@ -502,6 +640,26 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       binary_zero_colour: display.binaryZeroColour,
       binary_unused_colour: display.binaryUnusedColour,
       discovery_history_buffer: general.discoveryHistoryBuffer,
+      // Theme settings
+      theme_mode: display.themeMode,
+      theme_bg_primary_light: display.themeColours.bgPrimaryLight,
+      theme_bg_surface_light: display.themeColours.bgSurfaceLight,
+      theme_text_primary_light: display.themeColours.textPrimaryLight,
+      theme_text_secondary_light: display.themeColours.textSecondaryLight,
+      theme_border_default_light: display.themeColours.borderDefaultLight,
+      theme_data_bg_light: display.themeColours.dataBgLight,
+      theme_data_text_primary_light: display.themeColours.dataTextPrimaryLight,
+      theme_bg_primary_dark: display.themeColours.bgPrimaryDark,
+      theme_bg_surface_dark: display.themeColours.bgSurfaceDark,
+      theme_text_primary_dark: display.themeColours.textPrimaryDark,
+      theme_text_secondary_dark: display.themeColours.textSecondaryDark,
+      theme_border_default_dark: display.themeColours.borderDefaultDark,
+      theme_data_bg_dark: display.themeColours.dataBgDark,
+      theme_data_text_primary_dark: display.themeColours.dataTextPrimaryDark,
+      theme_accent_primary: display.themeColours.accentPrimary,
+      theme_accent_success: display.themeColours.accentSuccess,
+      theme_accent_danger: display.themeColours.accentDanger,
+      theme_accent_warning: display.themeColours.accentWarning,
     };
 
     return stableStringify(currentSettings) !== stableStringify(originalSettings);
@@ -752,6 +910,33 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   resetBinaryUnusedColour: () => {
     set((state) => ({
       display: { ...state.display, binaryUnusedColour: '#64748b' },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setThemeMode: (mode) => {
+    set((state) => ({
+      display: { ...state.display, themeMode: mode },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setThemeColour: (key, colour) => {
+    set((state) => ({
+      display: {
+        ...state.display,
+        themeColours: { ...state.display.themeColours, [key]: colour },
+      },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  resetThemeColours: () => {
+    set((state) => ({
+      display: {
+        ...state.display,
+        themeColours: { ...defaultThemeColours },
+      },
     }));
     scheduleSave(get().saveSettings);
   },

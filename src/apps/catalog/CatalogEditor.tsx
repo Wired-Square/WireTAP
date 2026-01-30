@@ -7,7 +7,7 @@ import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { Eye } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
-import { borderDarkView, bgDarkView } from "../../styles/colourTokens";
+import { borderDataView, bgDataView } from "../../styles/colourTokens";
 import CatalogTreePanel from "./layouts/CatalogTreePanel";
 import CatalogToolbar from "./layouts/CatalogToolbar";
 import SelectionHeader from "./layouts/SelectionHeader";
@@ -370,10 +370,10 @@ export default function CatalogEditor() {
       }
     >
       {/* Bubble container */}
-      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDarkView} overflow-hidden`}>
+      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
         {editMode === "ui" && catalogPath && <FindBar />}
 
-        <div className={`flex-1 flex min-h-0 overflow-hidden ${bgDarkView}`}>
+        <div className={`flex-1 flex min-h-0 overflow-hidden ${bgDataView}`}>
         {/* Tree View Panel - Only show in UI mode */}
         {editMode === "ui" && (
           <CatalogTreePanel
@@ -410,9 +410,9 @@ export default function CatalogEditor() {
               />
             </>
           ) : (
-            <div className="flex-1 p-6 overflow-y-auto bg-white dark:bg-slate-900">
+            <div className="flex-1 p-6 overflow-y-auto bg-[var(--bg-primary)]">
               {!catalogPath ? (
-                <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
+                <div className="flex items-center justify-center h-full text-[color:var(--text-muted)]">
                   <div className="text-center">
                     <Eye className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>Open a catalog file to view in UI mode</p>

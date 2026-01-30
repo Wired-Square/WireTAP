@@ -37,7 +37,7 @@ export default function SaveSelectionSetDialog({
   return (
     <Dialog isOpen={isOpen} maxWidth="max-w-md">
       <div className="p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
           Save Selection Set
         </h2>
 

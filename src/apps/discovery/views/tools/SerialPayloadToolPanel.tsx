@@ -10,23 +10,23 @@ type Props = {
 export default function SerialPayloadToolPanel({ framesCount }: Props) {
   return (
     <div className="space-y-3 text-xs">
-      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-2">
-        <p className="text-green-700 dark:text-green-300 font-medium">
+      <div className="bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)] rounded p-2">
+        <p className="text-[color:var(--status-success-text)] font-medium">
           Analyze Frame Structure
         </p>
-        <p className="text-green-600 dark:text-green-400 mt-1">
+        <p className="text-[color:var(--text-green)] mt-1">
           Analyze {framesCount.toLocaleString()} frames to identify payload structure.
         </p>
       </div>
-      <p className="text-slate-500 dark:text-slate-400">
+      <p className="text-[color:var(--text-muted)]">
         Will identify:
       </p>
-      <ul className="text-slate-500 dark:text-slate-400 list-disc list-inside space-y-0.5">
+      <ul className="text-[color:var(--text-muted)] list-disc list-inside space-y-0.5">
         <li>Candidate ID byte positions (frame type identifiers)</li>
         <li>Candidate source address positions</li>
         <li>Candidate checksum positions and algorithms</li>
       </ul>
-      <p className="text-slate-400 dark:text-slate-500 mt-2 italic">
+      <p className="text-[color:var(--text-muted)] mt-2 italic">
         Works best with structured protocol frames.
       </p>
     </div>

@@ -78,10 +78,10 @@ export default function HeaderFieldFilter({
               className={`
                 px-2 py-0.5 text-xs font-mono rounded transition-colors
                 ${isActive
-                  ? "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-700"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-transparent"
+                  ? "bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] border border-[color:var(--status-purple-border)]"
+                  : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-transparent"
                 }
-                hover:bg-purple-200 dark:hover:bg-purple-800/40
+                hover:bg-[var(--status-purple-bg-hover)]
               `}
               title={`${isSelected ? "Hide" : "Show"} ${fieldName} ${option.display}`}
             >
@@ -96,7 +96,7 @@ export default function HeaderFieldFilter({
         {hasSelection && (
           <button
             onClick={onClear}
-            className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            className="p-0.5 text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
             title={`Clear ${fieldName} filter`}
           >
             <X className={iconSm} />

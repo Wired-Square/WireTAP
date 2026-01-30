@@ -54,7 +54,7 @@ export default function IODeviceStatus({
   idleText = "Select a port to check device",
 }: Props) {
   return (
-    <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+    <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--bg-surface)] border border-[color:var(--border-default)]">
       {/* Status indicator */}
       <div className="flex-shrink-0">
         {state === "probing" && (
@@ -67,29 +67,29 @@ export default function IODeviceStatus({
           <CircleX className={`${iconLg} text-red-500`} />
         )}
         {state === "idle" && (
-          <div className="w-5 h-5 rounded-full border-2 border-slate-300 dark:border-slate-600" />
+          <div className="w-5 h-5 rounded-full border-2 border-[color:var(--border-default)]" />
         )}
       </div>
 
       {/* Status text */}
       <div className="flex-1 min-w-0">
         {state === "probing" && (
-          <span className="text-sm text-slate-500 dark:text-slate-400">
+          <span className="text-sm text-[color:var(--text-muted)]">
             {probingText}
           </span>
         )}
         {state === "success" && result && (
           <div>
-            <span className="text-sm font-medium text-green-700 dark:text-green-400">
+            <span className="text-sm font-medium text-[color:var(--text-green)]">
               {successText}
             </span>
             {result.primaryInfo && (
-              <span className="text-sm text-slate-500 dark:text-slate-400 ml-2">
+              <span className="text-sm text-[color:var(--text-muted)] ml-2">
                 {primaryLabel}: {result.primaryInfo}
               </span>
             )}
             {result.secondaryInfo && (
-              <span className="text-sm text-slate-500 dark:text-slate-400 ml-2">
+              <span className="text-sm text-[color:var(--text-muted)] ml-2">
                 {secondaryLabel}: {result.secondaryInfo}
               </span>
             )}
@@ -97,7 +97,7 @@ export default function IODeviceStatus({
         )}
         {state === "error" && result && (
           <div>
-            <span className="text-sm font-medium text-red-700 dark:text-red-400">
+            <span className="text-sm font-medium text-[color:var(--text-red)]">
               {errorText}
             </span>
             {result.error && (
@@ -108,7 +108,7 @@ export default function IODeviceStatus({
           </div>
         )}
         {state === "idle" && (
-          <span className="text-sm text-slate-500 dark:text-slate-400">
+          <span className="text-sm text-[color:var(--text-muted)]">
             {idleText}
           </span>
         )}
@@ -122,7 +122,7 @@ export default function IODeviceStatus({
           className={iconButtonHoverSmall}
           title="Probe device again"
         >
-          <RefreshCw className={`${iconMd} text-slate-500 dark:text-slate-400`} />
+          <RefreshCw className={`${iconMd} text-[color:var(--text-muted)]`} />
         </button>
       )}
     </div>

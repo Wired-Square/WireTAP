@@ -12,7 +12,7 @@ import { PlaybackControls, type PlaybackState } from "../../../components/Playba
 import type { PlaybackSpeed } from "../../../components/TimeController";
 import ChangesResultView from "./tools/ChangesResultView";
 import MessageOrderResultView from "./tools/MessageOrderResultView";
-import { bgDarkView, textDarkMuted } from "../../../styles";
+import { bgDataView, textDataSecondary } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import type { IOCapabilities } from "../../../api/io";
 
@@ -714,11 +714,11 @@ function DiscoveryFramesView({
       )}
 
       {activeTab === 'analysis' && (
-        <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDarkView} p-4`}>
+        <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDataView} p-4`}>
           {toolboxResults.changesResults && <ChangesResultView />}
           {toolboxResults.messageOrderResults && <MessageOrderResultView />}
           {!hasAnalysisResults && (
-            <div className={`${textDarkMuted} text-center py-8`}>
+            <div className={`${textDataSecondary} text-center py-8`}>
               No analysis results. Use the Toolbox to run analysis tools.
             </div>
           )}

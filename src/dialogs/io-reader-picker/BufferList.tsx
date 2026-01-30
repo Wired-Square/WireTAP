@@ -38,14 +38,14 @@ export default function BufferList({
 
   return (
     <div className={borderDivider}>
-      <div className="px-4 py-2 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
+      <div className="px-4 py-2 bg-[var(--bg-surface)] flex items-center justify-between">
         <span className={sectionHeader}>
           Buffers ({buffers.length})
         </span>
         {buffers.length > 1 && hasNonStreamingBuffers && (
           <button
             onClick={onClearAllBuffers}
-            className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+            className="text-xs text-[color:var(--status-danger-text)] hover:brightness-110"
           >
             Clear All
           </button>
@@ -64,20 +64,20 @@ export default function BufferList({
               onKeyDown={(e) => e.key === "Enter" && onSelectBuffer(buffer.id)}
               className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer ${
                 isThisBufferSelected
-                  ? "bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700"
+                  ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
                   : isStreaming
-                  ? "bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700"
-                  : `${bgSurface} border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600`
+                  ? "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)]"
+                  : `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--status-info-text)]`
               }`}
             >
               {isStreaming ? (
-                <Radio className={`${iconMd} flex-shrink-0 text-green-600 dark:text-green-400 animate-pulse`} />
+                <Radio className={`${iconMd} flex-shrink-0 text-[color:var(--text-green)] animate-pulse`} />
               ) : (
                 <FileText
                   className={`${iconMd} flex-shrink-0 ${
                     buffer.buffer_type === "bytes"
-                      ? "text-purple-600 dark:text-purple-400"
-                      : "text-blue-600 dark:text-blue-400"
+                      ? "text-[color:var(--text-purple)]"
+                      : "text-[color:var(--status-info-text)]"
                   }`}
                 />
               )}
@@ -87,24 +87,24 @@ export default function BufferList({
                 </div>
                 <div className={`${caption} flex items-center gap-2`}>
                   {isStreaming && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 font-medium">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] font-medium">
                       Live
                     </span>
                   )}
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-700">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
                     {buffer.id}
                   </span>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] ${
                     isStreaming
-                      ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
-                      : "bg-slate-100 dark:bg-slate-700"
+                      ? "bg-[var(--status-success-bg)] text-[color:var(--status-success-text)]"
+                      : "bg-[var(--hover-bg)]"
                   }`}>
                     {buffer.count.toLocaleString()} {buffer.buffer_type}
                   </span>
                 </div>
               </div>
               {isThisBufferSelected && (
-                <Check className={`${iconMd} text-blue-600 dark:text-blue-400 flex-shrink-0`} />
+                <Check className={`${iconMd} text-[color:var(--status-info-text)] flex-shrink-0`} />
               )}
               {isStreaming && onJoinStreamingBuffer ? (
                 <button
@@ -112,7 +112,7 @@ export default function BufferList({
                     e.stopPropagation();
                     onJoinStreamingBuffer(buffer.id);
                   }}
-                  className="p-1 rounded transition-colors hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
+                  className="p-1 rounded transition-colors hover:bg-[var(--status-success-bg)] text-[color:var(--text-green)] hover:text-[color:var(--status-success-text)]"
                   title="Join streaming session"
                 >
                   <Plug className={iconSm} />
@@ -128,8 +128,8 @@ export default function BufferList({
                   disabled={isStreaming}
                   className={`p-1 rounded transition-colors ${
                     isStreaming
-                      ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
-                      : "hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 dark:hover:text-red-400"
+                      ? "text-[color:var(--text-muted)] cursor-not-allowed"
+                      : "hover:bg-[var(--status-danger-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--status-danger-text)]"
                   }`}
                   title={isStreaming ? "Cannot delete streaming buffer" : "Delete buffer"}
                 >

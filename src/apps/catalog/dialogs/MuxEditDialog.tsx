@@ -84,7 +84,7 @@ export default function MuxEditDialog({
       });
 
       return (
-        <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
           <div className={`${textMedium} mb-3`}>
             Bit Layout Preview ({frameLength} bytes)
           </div>

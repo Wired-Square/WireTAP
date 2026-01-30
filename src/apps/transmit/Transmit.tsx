@@ -13,9 +13,9 @@ import { useSettings, type IOProfile } from "../../hooks/useSettings";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
 import type { TransmitHistoryEvent, SerialTransmitHistoryEvent, RepeatStoppedEvent } from "../../api/transmit";
 import {
-  bgDarkToolbar,
-  borderDarkView,
-  textDarkMuted,
+  bgDataToolbar,
+  borderDataView,
+  textDataSecondary,
 } from "../../styles/colourTokens";
 import { dataViewTabClass, tabCountColorClass } from "../../styles/buttonStyles";
 import ProtocolBadge from "../../components/ProtocolBadge";
@@ -272,7 +272,6 @@ export default function Transmit() {
 
   return (
     <AppLayout
-      theme="dark"
       topBar={
         <TransmitTopBar
           ioProfiles={transmitProfiles}
@@ -296,7 +295,7 @@ export default function Transmit() {
       }
     >
       {/* Bubble container */}
-      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDarkView} overflow-hidden`}>
+      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
         {/* Error Banner */}
         {transmitError && (
           <div
@@ -316,14 +315,14 @@ export default function Transmit() {
       {/* Loading / No Profiles State */}
       {isLoading && profiles.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
-          <div className={`${textDarkMuted} text-sm`}>Loading profiles...</div>
+          <div className={`${textDataSecondary} text-sm`}>Loading profiles...</div>
         </div>
       )}
 
       {!isLoading && transmitProfiles.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-          <Send size={48} className={textDarkMuted} />
-          <div className={`${textDarkMuted} text-center`}>
+          <Send size={48} className={textDataSecondary} />
+          <div className={`${textDataSecondary} text-center`}>
             <p className="text-lg font-medium">No Transmit-Capable Profiles</p>
             <p className="text-sm mt-2">
               Add an IO profile (slcan, GVRET TCP, SocketCAN, or Serial) in
@@ -341,7 +340,7 @@ export default function Transmit() {
         <>
           {/* Tab Bar */}
           <div
-            className={`flex-shrink-0 flex items-center border-b ${borderDarkView} ${bgDarkToolbar}`}
+            className={`flex-shrink-0 flex items-center border-b ${borderDataView} ${bgDataToolbar}`}
           >
             {/* Protocol badge with status light */}
             <div className="ml-1">

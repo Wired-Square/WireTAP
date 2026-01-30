@@ -9,12 +9,7 @@ import { IOSessionControls, type IOSessionControlsProps } from "./SessionControl
 import FlexSeparator from "./FlexSeparator";
 import { buttonBase } from "../styles/buttonStyles";
 import { iconLg, iconSm } from "../styles/spacing";
-import {
-  bgSurface,
-  borderDivider,
-  bgDarkToolbar,
-  borderDarkView,
-} from "../styles/colourTokens";
+import { bgSurface, borderDivider } from "../styles/colourTokens";
 
 /**
  * IO Session section props - passed to IOSessionControls.
@@ -65,10 +60,6 @@ export interface AppTopBarProps {
   // === Right-side Actions ===
   /** Content rendered at the right side of the bar */
   actions?: ReactNode;
-
-  // === Style ===
-  /** Theme variant: 'surface' (light/dark) or 'dark' (always dark) */
-  theme?: "surface" | "dark";
 }
 
 /**
@@ -113,22 +104,18 @@ export default function AppTopBar({
   framePicker,
   children,
   actions,
-  theme = "surface",
 }: AppTopBarProps) {
-  const bgClass = theme === "dark" ? bgDarkToolbar : bgSurface;
-  const borderClass = theme === "dark" ? borderDarkView : borderDivider;
-
   const hasActions = !!actions;
 
   return (
-    <div className={`flex-shrink-0 ${bgClass} ${borderClass} px-4 py-2`}>
+    <div className={`flex-shrink-0 ${bgSurface} ${borderDivider} px-4 py-2`}>
       <div className="flex flex-wrap items-center gap-2">
         {/* Icon */}
         <Icon className={`${iconLg} ${iconColour} shrink-0`} />
 
         {/* Title (if provided) */}
         {title && (
-          <span className="font-semibold text-slate-900 dark:text-white">
+          <span className="font-semibold text-[color:var(--text-primary)]">
             {title}
           </span>
         )}
@@ -166,7 +153,7 @@ export default function AppTopBar({
         {/* Frame Picker (if provided) */}
         {framePicker && (
           <>
-            <ChevronRight className={`${iconSm} text-slate-400 shrink-0`} />
+            <ChevronRight className={`${iconSm} text-[color:var(--text-muted)] shrink-0`} />
             <button
               onClick={framePicker.onOpen}
               disabled={framePicker.disabled}
@@ -178,7 +165,7 @@ export default function AppTopBar({
               }
             >
               <ListFilter className={`${iconSm} flex-shrink-0`} />
-              <span className="text-slate-500 dark:text-slate-400">
+              <span className="text-[color:var(--text-muted)]">
                 {framePicker.selectedCount}/{framePicker.frameCount}
               </span>
             </button>

@@ -28,14 +28,14 @@ export default function SerialConfigView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-            <Cable className={`${iconLg} text-purple-600 dark:text-purple-400`} />
+          <div className="p-2 bg-[var(--purple-bg)] rounded-lg">
+            <Cable className={`${iconLg} text-[color:var(--purple-text)]`} />
           </div>
           <div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white">
+            <div className="text-lg font-bold text-[color:var(--text-primary)]">
               Serial Configuration
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-[color:var(--text-muted)]">
               Protocol-level settings for all serial frames
             </p>
           </div>
@@ -46,7 +46,7 @@ export default function SerialConfigView({
             className={iconButtonHover}
             title="Edit configuration"
           >
-            <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
           </button>
         )}
       </div>
@@ -71,8 +71,8 @@ export default function SerialConfigView({
       </div>
 
       {/* Info box */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
+      <div className="p-4 bg-[var(--info-bg)] rounded-lg border border-[color:var(--info-border)]">
+        <p className="text-sm text-[color:var(--info-text)]">
           <strong>Note:</strong> Individual serial frames inherit this encoding.
           To change the encoding, click the edit button above.
         </p>

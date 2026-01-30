@@ -105,7 +105,7 @@ export default function ByteBits({
 
         return (
           <div key={byteIdx} className={flexRowGap2}>
-            <div className="text-xs font-mono text-slate-500 dark:text-slate-400 w-8 flex items-center shrink-0">
+            <div className="text-xs font-mono text-[color:var(--text-muted)] w-8 flex items-center shrink-0">
               [{displayByteIndex}]
             </div>
 
@@ -143,11 +143,11 @@ export default function ByteBits({
                     onClick={() => canToggle && handleBitToggle(byteIdx, bitInByte)}
                     className={`h-8 w-10 flex items-center justify-center shrink-0 ${
                       !isUsed ? 'opacity-40' : ''
-                    } ${canToggle ? 'cursor-pointer hover:ring-2 hover:ring-blue-400 dark:hover:ring-blue-500 transition-all' : ''}`}
+                    } ${canToggle ? 'cursor-pointer hover:ring-2 hover:ring-[color:var(--accent-primary)] transition-all' : ''}`}
                     style={{ backgroundColor: isUsed ? (bitValue === 1 ? bitColor : zeroColor) : unusedColor }}
                     title={`Bit ${bitIdx}: ${bitValue}${!isUsed ? ' (unused)' : ''}${canToggle ? ' (click to toggle)' : ''}`}
                   >
-                    <span className={`text-xs font-medium ${isUsed ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+                    <span className={`text-xs font-medium ${isUsed ? 'text-white' : 'text-[color:var(--text-muted)]'}`}>
                       {bitIdx}
                     </span>
                   </div>

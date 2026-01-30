@@ -21,7 +21,7 @@ export default function GeneralView({
 }: GeneralViewProps) {
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-slate-900 dark:text-white">General</h2>
+      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">General</h2>
 
       <div className="space-y-2">
         <label className={labelDefault}>Default Frame Type</label>

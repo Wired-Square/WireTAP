@@ -33,8 +33,8 @@ export default function CANFrameEditView({
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{title}</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">{subtitle}</p>
+        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2">{title}</h2>
+        <p className="text-sm text-[color:var(--text-muted)]">{subtitle}</p>
       </div>
 
       <div className="space-y-4">
@@ -47,7 +47,7 @@ export default function CANFrameEditView({
             type="text"
             value={idFields.id}
             onChange={(e) => setIdFields({ ...idFields, id: e.target.value })}
-            className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-mono ${focusRing}`}
+            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
             placeholder="0x123"
           />
         </div>
@@ -63,7 +63,7 @@ export default function CANFrameEditView({
             max="64"
             value={idFields.length}
             onChange={(e) => setIdFields({ ...idFields, length: parseInt(e.target.value) || 0 })}
-            className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           />
         </div>
 
@@ -75,7 +75,7 @@ export default function CANFrameEditView({
           <select
             value={idFields.transmitter || ""}
             onChange={(e) => setIdFields({ ...idFields, transmitter: e.target.value || undefined })}
-            className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           >
             <option value="">None</option>
             {availablePeers.map((peer) => (
@@ -101,7 +101,7 @@ export default function CANFrameEditView({
                 interval: e.target.value ? parseInt(e.target.value) : undefined,
               })
             }
-            className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
             placeholder="1000"
           />
         </div>
@@ -130,7 +130,7 @@ export default function CANFrameEditView({
                 });
               }
             }}
-            className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-mono text-sm ${focusRing}`}
+            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono text-sm ${focusRing}`}
             placeholder="Add notes about this frame (one per line)"
           />
         </div>

@@ -63,7 +63,7 @@ export default function CatalogToolbar({
   return (
     <AppTopBar
       icon={FileText}
-      iconColour="text-blue-600 dark:text-blue-400"
+      iconColour="text-[color:var(--accent-primary)]"
       actions={
         <>
           {/* Settings Button */}

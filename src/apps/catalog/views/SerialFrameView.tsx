@@ -86,8 +86,8 @@ export default function SerialFrameView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <p className="text-sm text-slate-600 dark:text-slate-400">Configure Serial frame properties</p>
-          <div className="text-lg font-bold text-slate-900 dark:text-white">
+          <p className="text-sm text-[color:var(--text-muted)]">Configure Serial frame properties</p>
+          <div className="text-lg font-bold text-[color:var(--text-primary)]">
             {frameId}
           </div>
         </div>
@@ -99,7 +99,7 @@ export default function SerialFrameView({
                 className={iconButtonHover}
                 title="Edit frame"
               >
-                <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+                <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
               </button>
             )}
             {onDeleteFrame && (
@@ -108,7 +108,7 @@ export default function SerialFrameView({
                 className={iconButtonHoverDanger}
                 title="Delete frame"
               >
-                <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
               </button>
             )}
           </div>
@@ -176,7 +176,7 @@ export default function SerialFrameView({
             <div className={labelSmallMuted}>
               Interval
               {intervalInherited && (
-                <span className="ml-1 text-blue-500 dark:text-blue-400" title="Inherited from default_interval">
+                <span className="ml-1 text-[color:var(--text-blue)]" title="Inherited from default_interval">
                   (inherited)
                 </span>
               )}
@@ -206,7 +206,7 @@ export default function SerialFrameView({
           <div className={`${labelSmall} mb-2`}>
             Notes
           </div>
-          <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(notes) ? notes.join("\n") : notes}
           </div>
         </div>
@@ -216,10 +216,10 @@ export default function SerialFrameView({
       {!editingSignal && (
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+            <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
               Signals ({(selectedNode.metadata?.signals?.length || 0) + (selectedNode.metadata?.muxSignalCount || 0)})
               {selectedNode.metadata?.hasMux && (
-                <span className="ml-2 text-xs font-normal text-purple-600 dark:text-purple-400 inline-flex items-center gap-2">
+                <span className="ml-2 text-xs font-normal text-[color:var(--text-purple)] inline-flex items-center gap-2">
                   {muxLegendColor && <span className={`inline-block w-3 h-3 rounded ${muxLegendColor}`} />}
                   (includes {selectedNode.metadata.muxSignalCount} mux signals)
                 </span>
@@ -287,8 +287,8 @@ export default function SerialFrameView({
 
               return (
                 <>
-                  <div className="mb-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                    <div className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-3">
+                  <div className="mb-4 p-4 bg-[var(--bg-surface)] rounded-lg">
+                    <div className="text-xs font-medium text-[color:var(--text-muted)] mb-3">
                       Byte Layout (LSB first)
                     </div>
                     <BitPreview
@@ -312,11 +312,11 @@ export default function SerialFrameView({
                           <div className="flex-1 flex gap-3">
                             <div
                               className={`w-2 h-6 rounded-sm mt-1 ${
-                                signalColor(signal) || "bg-slate-400 dark:bg-slate-600"
+                                signalColor(signal) || "bg-[var(--border-default)]"
                               }`}
                             />
                             <div>
-                              <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                              <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
                                 <span>⚡</span>
                                 {signal.name}
                               </div>
@@ -330,7 +330,7 @@ export default function SerialFrameView({
                                 {signal.offset !== undefined && <div>Offset: {signal.offset}</div>}
                               </div>
                               {signal.notes && (
-                                <div className="text-xs text-slate-600 dark:text-slate-400 mt-2 italic whitespace-pre-wrap">
+                                <div className="text-xs text-[color:var(--text-muted)] mt-2 italic whitespace-pre-wrap">
                                   {Array.isArray(signal.notes) ? signal.notes.join('\n') : signal.notes}
                                 </div>
                               )}
@@ -342,10 +342,10 @@ export default function SerialFrameView({
                               {onEditSignal && (
                                 <button
                                   onClick={() => onEditSignal(idKey, idx, signal, ["frame", "serial", idKey])}
-                                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                                  className="p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"
                                   title="Edit signal"
                                 >
-                                  <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+                                  <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
                                 </button>
                               )}
 
@@ -355,7 +355,7 @@ export default function SerialFrameView({
                                   className={iconButtonHoverDanger}
                                   title="Delete signal"
                                 >
-                                  <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                                  <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                                 </button>
                               )}
                             </div>
@@ -369,7 +369,7 @@ export default function SerialFrameView({
             })()}
 
           {(!selectedNode.metadata?.signals || selectedNode.metadata.signals.length === 0) && (
-            <div className={`text-sm text-slate-500 dark:text-slate-400 p-4 ${bgSecondary} rounded-lg`}>
+            <div className={`text-sm text-[color:var(--text-muted)] p-4 ${bgSecondary} rounded-lg`}>
               No signals defined. Click "+ Add Signal" to create one.
             </div>
           )}

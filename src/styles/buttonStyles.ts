@@ -1,19 +1,20 @@
 // ui/src/styles/buttonStyles.ts
 // Centralized button styles for consistent appearance across the app
+// Uses CSS variables for cross-platform dark mode support (Windows WebView).
 
 /**
  * Base button with text - grey background, used for most toolbar buttons
  * Use for buttons that contain text and/or icons
  */
 export const buttonBase =
-  "flex items-center gap-1 px-2 py-1.5 text-sm rounded transition-colors bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
+  "flex items-center gap-1 px-2 py-1.5 text-sm rounded transition-all bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
 
 /**
  * Icon-only button - grey background, centered icon
  * Use for buttons that contain only an icon (no text)
  */
 export const iconButtonBase =
-  "flex items-center justify-center px-2 py-1.5 rounded transition-colors bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
+  "flex items-center justify-center px-2 py-1.5 rounded transition-all bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
 
 /**
  * Danger/Stop button - red background, icon only
@@ -42,7 +43,7 @@ export const successIconButton =
  * @param activeColor - The color when active (default: purple)
  */
 export function toggleButtonClass(isActive: boolean, activeColor: "purple" | "yellow" | "blue" = "purple"): string {
-  const baseClasses = "flex items-center justify-center px-2 py-1.5 rounded transition-colors shrink-0";
+  const baseClasses = "flex items-center justify-center px-2 py-1.5 rounded transition-all shrink-0";
 
   if (isActive) {
     const colorMap = {
@@ -53,7 +54,7 @@ export function toggleButtonClass(isActive: boolean, activeColor: "purple" | "ye
     return `${baseClasses} ${colorMap[activeColor]}`;
   }
 
-  return `${baseClasses} bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600`;
+  return `${baseClasses} bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95`;
 }
 
 /**
@@ -61,7 +62,7 @@ export function toggleButtonClass(isActive: boolean, activeColor: "purple" | "ye
  * Use for: Start/Resume playback actions
  */
 export const playButtonBase =
-  "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 disabled:bg-slate-200 dark:disabled:bg-slate-700 disabled:text-slate-400 dark:disabled:text-slate-500 disabled:cursor-not-allowed";
+  "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 disabled:bg-[var(--bg-surface)] disabled:text-[color:var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed";
 
 /**
  * Pause button - yellow/amber background
@@ -75,13 +76,13 @@ export const pauseButtonBase =
  * Use for: Stop/Cancel playback actions
  */
 export const stopButtonBase =
-  "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors bg-red-600 text-white hover:bg-red-700 disabled:bg-slate-200 dark:disabled:bg-slate-700 disabled:text-slate-400 dark:disabled:text-slate-500 disabled:cursor-not-allowed";
+  "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors bg-red-600 text-white hover:bg-red-700 disabled:bg-[var(--bg-surface)] disabled:text-[color:var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed";
 
 /**
  * Compact play button - smaller padding for compact layouts
  */
 export const playButtonCompact =
-  "flex items-center gap-2 px-2 py-1 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 disabled:bg-slate-200 dark:disabled:bg-slate-700 disabled:text-slate-400 dark:disabled:text-slate-500 disabled:cursor-not-allowed";
+  "flex items-center gap-2 px-2 py-1 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 disabled:bg-[var(--bg-surface)] disabled:text-[color:var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed";
 
 /**
  * Compact pause button - smaller padding for compact layouts
@@ -93,7 +94,7 @@ export const pauseButtonCompact =
  * Compact stop button - smaller padding for compact layouts
  */
 export const stopButtonCompact =
-  "flex items-center gap-2 px-2 py-1 rounded-lg transition-colors bg-red-600 text-white hover:bg-red-700 disabled:bg-slate-200 dark:disabled:bg-slate-700 disabled:text-slate-400 dark:disabled:text-slate-500 disabled:cursor-not-allowed";
+  "flex items-center gap-2 px-2 py-1 rounded-lg transition-colors bg-red-600 text-white hover:bg-red-700 disabled:bg-[var(--bg-surface)] disabled:text-[color:var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed";
 
 /**
  * Primary action button - blue background
@@ -125,10 +126,10 @@ export function toggleCardClass(isActive: boolean): string {
  * @param isActive - Whether the toggle is currently active
  */
 export function toggleChipClass(isActive: boolean): string {
-  const base = "px-3 py-1.5 text-xs rounded border transition-colors";
+  const base = "px-3 py-1.5 text-xs rounded border transition-all";
   return isActive
-    ? `${base} bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300`
-    : `${base} bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500`;
+    ? `${base} bg-blue-600/20 border-blue-500 text-blue-600`
+    : `${base} bg-[var(--bg-primary)] border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95`;
 }
 
 /**
@@ -136,10 +137,10 @@ export function toggleChipClass(isActive: boolean): string {
  * @param isActive - Whether the option is currently selected
  */
 export function selectionButtonClass(isActive: boolean): string {
-  const base = "px-3 py-2 rounded border text-sm font-medium transition-colors";
+  const base = "px-3 py-2 rounded border text-sm font-medium transition-all";
   return isActive
-    ? `${base} border-teal-500 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-200`
-    : `${base} border-slate-300 dark:border-slate-600 hover:border-teal-400 text-slate-700 dark:text-slate-300`;
+    ? `${base} border-teal-500 bg-teal-600/20 text-teal-600`
+    : `${base} border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:border-teal-400`;
 }
 
 /**
@@ -147,10 +148,10 @@ export function selectionButtonClass(isActive: boolean): string {
  * @param isActive - Whether the option is currently selected
  */
 export function groupButtonClass(isActive: boolean): string {
-  const base = "flex items-center justify-center px-2 py-1.5 text-sm rounded transition-colors shrink-0";
+  const base = "flex items-center justify-center px-2 py-1.5 text-sm rounded transition-all shrink-0";
   return isActive
-    ? `${base} bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white ring-2 ring-blue-500 ring-offset-1 ring-offset-white dark:ring-offset-slate-800`
-    : `${base} bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600`;
+    ? `${base} bg-[var(--bg-surface)] text-[color:var(--text-primary)] ring-2 ring-blue-500 ring-offset-1`
+    : `${base} bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95`;
 }
 
 // =============================================================================
@@ -223,46 +224,47 @@ export const tableIconButtonDark =
  * Use for edit/action buttons in cards and dialogs
  */
 export const iconButtonHover =
-  "p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors";
+  "p-2 rounded-lg transition-all hover:brightness-90 hover:bg-[var(--bg-surface)]";
 
 /**
  * Icon button with danger hover - for delete actions
+ * Uses CSS variables for cross-platform dark mode support
  */
 export const iconButtonHoverDanger =
-  "p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors";
+  "p-2 hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors";
 
 /**
  * Compact icon button with hover - for tight layouts (star buttons, inline actions)
  */
 export const iconButtonHoverCompact =
-  "p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors";
+  "p-1 rounded transition-all hover:brightness-90 hover:bg-[var(--bg-surface)]";
 
 /**
  * Small icon button with hover - p-1.5 variant for intermediate sizing
  */
 export const iconButtonHoverSmall =
-  "p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors";
+  "p-1.5 rounded transition-all hover:brightness-90 hover:bg-[var(--bg-surface)]";
 
 /**
  * Secondary button - gray background for cancel/reset actions
  * Use for: Dialog cancel buttons, reset buttons, secondary actions
  */
 export const secondaryButton =
-  "px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors";
+  "px-6 py-2 bg-[var(--bg-surface)] text-[color:var(--text-secondary)] rounded-lg hover:brightness-95 transition-all";
 
 /**
  * Folder picker button - for directory browse buttons
  * Use for: Directory/file picker buttons in settings
  */
 export const folderPickerButton =
-  "px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-lg transition-colors";
+  "px-4 py-2 bg-[var(--bg-surface)] rounded-lg hover:brightness-95 transition-all";
 
 /**
  * Dialog option button - for multi-choice dialog buttons
  * Use for: Option buttons in picker dialogs
  */
 export const dialogOptionButton =
-  "flex items-center justify-center gap-2 flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors";
+  "flex items-center justify-center gap-2 flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95 transition-all";
 
 // =============================================================================
 // State Utilities

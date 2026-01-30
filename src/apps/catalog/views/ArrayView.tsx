@@ -17,7 +17,7 @@ export default function ArrayView({ selectedNode }: ArrayViewProps) {
       </div>
       <div className={`p-4 ${bgSecondary} rounded-lg`}>
         {items.length === 0 ? (
-          <div className="text-sm text-slate-500 dark:text-slate-400">No items</div>
+          <div className="text-sm text-[color:var(--text-muted)]">No items</div>
         ) : (
           <ul className="space-y-1">
             {items.map((item: any, idx: number) => (

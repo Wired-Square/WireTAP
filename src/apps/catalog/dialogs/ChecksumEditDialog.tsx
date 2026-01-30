@@ -110,11 +110,11 @@ export default function ChecksumEditDialog({
           </div>
 
           {/* Checksum Position */}
-          <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-            <h3 className={`${h3} text-purple-900 dark:text-purple-100 mb-3`}>
+          <div className="p-4 bg-[var(--status-purple-bg)] rounded-lg">
+            <h3 className={`${h3} text-[color:var(--status-purple-text-bold)] mb-3`}>
               Checksum Location
             </h3>
-            <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">
+            <p className="text-xs text-[color:var(--status-purple-text)] mb-3">
               Use negative values for positions from end (-1 = last byte, -2 = second-to-last)
             </p>
             <div className="grid grid-cols-3 gap-3">
@@ -130,7 +130,7 @@ export default function ChecksumEditDialog({
                   />
                 </FormField>
                 {fields.start_byte < 0 && (
-                  <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">
+                  <p className="mt-1 text-xs text-[color:var(--text-purple)]">
                     → byte {resolveByteIndexSync(fields.start_byte, frameLength)}
                   </p>
                 )}
@@ -147,7 +147,7 @@ export default function ChecksumEditDialog({
                   />
                 </FormField>
                 {fields.byte_length !== expectedOutputBytes && (
-                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  <p className="mt-1 text-xs text-[color:var(--text-amber)]">
                     Algorithm output is {expectedOutputBytes} byte{expectedOutputBytes > 1 ? "s" : ""}
                   </p>
                 )}
@@ -169,11 +169,11 @@ export default function ChecksumEditDialog({
           </div>
 
           {/* Calculation Range */}
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <h3 className={`${h3} text-blue-900 dark:text-blue-100 mb-3`}>
+          <div className="p-4 bg-[var(--status-info-bg)] rounded-lg">
+            <h3 className={`${h3} text-[color:var(--status-info-text-bold)] mb-3`}>
               Calculation Range
             </h3>
-            <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+            <p className="text-xs text-[color:var(--status-info-text)] mb-3">
               Which bytes are included in the checksum calculation (end byte is exclusive).
               Use negative values for positions from end.
             </p>
@@ -192,7 +192,7 @@ export default function ChecksumEditDialog({
                   />
                 </FormField>
                 {fields.calc_start_byte < 0 && (
-                  <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                  <p className="mt-1 text-xs text-[color:var(--text-blue)]">
                     → byte {resolveByteIndexSync(fields.calc_start_byte, frameLength)}
                   </p>
                 )}
@@ -211,7 +211,7 @@ export default function ChecksumEditDialog({
                   />
                 </FormField>
                 {fields.calc_end_byte < 0 && (
-                  <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                  <p className="mt-1 text-xs text-[color:var(--text-blue)]">
                     → byte {resolveByteIndexSync(fields.calc_end_byte, frameLength)}
                   </p>
                 )}
@@ -222,7 +222,7 @@ export default function ChecksumEditDialog({
               const resolvedEnd = resolveByteIndexSync(fields.calc_end_byte, frameLength);
               if (resolvedStart >= resolvedEnd) {
                 return (
-                  <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                  <p className="mt-2 text-xs text-[color:var(--text-red)]">
                     End byte must be greater than start byte (resolved: {resolvedStart} to {resolvedEnd})
                   </p>
                 );
@@ -237,7 +237,7 @@ export default function ChecksumEditDialog({
           </div>
 
           {/* Byte Layout Visualization */}
-          <div className="p-4 bg-slate-100 dark:bg-slate-700 rounded-lg">
+          <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
             <h3 className={`${h3} mb-3`}>Byte Layout Preview</h3>
             {(() => {
               const resolvedStartByte = resolveByteIndexSync(fields.start_byte, frameLength);
@@ -252,11 +252,11 @@ export default function ChecksumEditDialog({
                     const isCalcByte =
                       i >= resolvedCalcStart && i < resolvedCalcEnd;
 
-                    let bgClass = "bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-400";
+                    let bgClass = "bg-[var(--bg-muted)] text-[color:var(--text-muted)]";
                     if (isChecksumByte) {
                       bgClass = "bg-purple-500 text-white";
                     } else if (isCalcByte) {
-                      bgClass = "bg-blue-300 dark:bg-blue-700 text-blue-800 dark:text-blue-200";
+                      bgClass = "bg-[var(--bg-blue)] text-[color:var(--text-blue-bold)]";
                     }
 
                     return (
@@ -278,13 +278,13 @@ export default function ChecksumEditDialog({
                 </div>
               );
             })()}
-            <div className="flex items-center gap-4 mt-2 text-xs text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-4 mt-2 text-xs text-[color:var(--text-muted)]">
               <div className="flex items-center gap-1">
                 <div className="w-3 h-3 rounded bg-purple-500"></div>
                 <span>Checksum</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-blue-300 dark:bg-blue-700"></div>
+                <div className="w-3 h-3 rounded bg-[var(--bg-blue)]"></div>
                 <span>Calculation range</span>
               </div>
             </div>
@@ -303,7 +303,7 @@ export default function ChecksumEditDialog({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[color:var(--border-default)]">
           <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
           <PrimaryButton
             onClick={onSave}

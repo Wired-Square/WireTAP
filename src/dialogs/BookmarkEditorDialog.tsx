@@ -167,7 +167,7 @@ export default function BookmarkEditorDialog({
           <button
             type="button"
             onClick={onClose}
-            className={`p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 ${hoverLight}`}
+            className={`p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] ${hoverLight}`}
           >
             <X className={iconLg} />
           </button>
@@ -184,20 +184,20 @@ export default function BookmarkEditorDialog({
                 No bookmarks saved yet.
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="divide-y divide-[color:var(--border-default)]">
                 {Object.entries(bookmarksByProfile).map(([pid, profileBookmarks]) => (
                   <div key={pid}>
                     {!profileId && (
-                      <div className={`px-3 py-2 bg-slate-50 dark:bg-slate-900 ${labelSmall}`}>
+                      <div className={`px-3 py-2 bg-[var(--bg-surface)] ${labelSmall}`}>
                         {pid}
                       </div>
                     )}
                     {profileBookmarks.map((bookmark) => (
                       <div
                         key={bookmark.id}
-                        className={`flex items-center w-full hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                        className={`flex items-center w-full hover:bg-[var(--hover-bg)] ${
                           selectedId === bookmark.id
-                            ? "bg-blue-50 dark:bg-blue-900/30 border-l-2 border-blue-500"
+                            ? "bg-[var(--status-info-bg)] border-l-2 border-[color:var(--status-info-text)]"
                             : ""
                         }`}
                       >
@@ -222,7 +222,7 @@ export default function BookmarkEditorDialog({
                               onClose();
                             }}
                             title="Load bookmark"
-                            className="p-2 mr-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                            className="p-2 mr-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg)]"
                           >
                             <Play className={iconMd} />
                           </button>
@@ -294,7 +294,7 @@ export default function BookmarkEditorDialog({
                 {!profileId && (
                   <div className="space-y-1">
                     <label className={labelSmall}>Profile</label>
-                    <div className={`px-3 py-2 text-sm rounded border ${borderDefault} ${bgSecondary} text-slate-600 dark:text-slate-300`}>
+                    <div className={`px-3 py-2 text-sm rounded border ${borderDefault} ${bgSecondary} text-[color:var(--text-secondary)]`}>
                       {selectedBookmark.profileId}
                     </div>
                   </div>

@@ -30,7 +30,7 @@ export default function DecoderInfoDialog({ isOpen, onClose }: Props) {
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden max-h-[80vh] flex flex-col`}>
         {/* Header */}
         <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider} flex-shrink-0`}>
-          <FileText className={`${iconLg} text-blue-600 dark:text-blue-400`} />
+          <FileText className={`${iconLg} text-[color:var(--status-info-text)]`} />
           <div className="flex-1">
             <h2 className={sectionHeaderText}>
               Decoder Knowledge
@@ -53,32 +53,32 @@ export default function DecoderInfoDialog({ isOpen, onClose }: Props) {
           <MetaSection knowledge={knowledge} />
 
           {/* Stats Summary */}
-          <div className="flex flex-wrap gap-4 text-xs p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
-            <span className="text-slate-500 dark:text-slate-400">
-              <span className="font-medium text-slate-700 dark:text-slate-200">{frameCount}</span> frames
+          <div className="flex flex-wrap gap-4 text-xs p-3 bg-[var(--bg-surface)] rounded-lg">
+            <span className="text-[color:var(--text-muted)]">
+              <span className="font-medium text-[color:var(--text-primary)]">{frameCount}</span> frames
             </span>
             {muxCount > 0 && (
-              <span className="text-orange-500 dark:text-orange-400">
+              <span className="text-[color:var(--text-orange)]">
                 <span className="font-medium">{muxCount}</span> mux
               </span>
             )}
             {burstCount > 0 && (
-              <span className="text-cyan-500 dark:text-cyan-400">
+              <span className="text-[color:var(--text-cyan)]">
                 <span className="font-medium">{burstCount}</span> burst
               </span>
             )}
             {multiBusCount > 0 && (
-              <span className="text-rose-500 dark:text-rose-400">
+              <span className="text-[color:var(--status-danger-text)]">
                 <span className="font-medium">{multiBusCount}</span> multi-bus
               </span>
             )}
             {knowledge.analysisRun && (
-              <span className="text-green-500 dark:text-green-400 ml-auto">
+              <span className="text-[color:var(--text-green)] ml-auto">
                 ✓ Analysis run
               </span>
             )}
             {!knowledge.analysisRun && (
-              <span className="text-amber-500 dark:text-amber-400 ml-auto">
+              <span className="text-[color:var(--text-amber)] ml-auto">
                 Run analysis for more info
               </span>
             )}
@@ -106,30 +106,30 @@ function MetaSection({ knowledge }: MetaSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Layers className={`${iconMd} text-purple-500`} />
-        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <Layers className={`${iconMd} text-[color:var(--text-purple)]`} />
+        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
           Meta (for [meta] section)
         </h3>
       </div>
       <div className={`${cardDefault} ${paddingCardSm} space-y-2`}>
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-500 dark:text-slate-400">default_frame</span>
-          <span className="font-mono text-slate-700 dark:text-slate-200">"{meta.defaultFrame}"</span>
+          <span className="text-[color:var(--text-muted)]">default_frame</span>
+          <span className="font-mono text-[color:var(--text-primary)]">"{meta.defaultFrame}"</span>
         </div>
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-500 dark:text-slate-400">default_endianness</span>
-          <span className="font-mono text-slate-700 dark:text-slate-200">"{meta.defaultEndianness}"</span>
+          <span className="text-[color:var(--text-muted)]">default_endianness</span>
+          <span className="font-mono text-[color:var(--text-primary)]">"{meta.defaultEndianness}"</span>
         </div>
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-500 dark:text-slate-400">default_interval</span>
+          <span className="text-[color:var(--text-muted)]">default_interval</span>
           {meta.defaultInterval !== null ? (
-            <span className="font-mono text-emerald-600 dark:text-emerald-400">{meta.defaultInterval}</span>
+            <span className="font-mono text-[color:var(--text-green)]">{meta.defaultInterval}</span>
           ) : (
-            <span className="text-slate-400 dark:text-slate-500 italic">not determined</span>
+            <span className="text-[color:var(--text-muted)] italic">not determined</span>
           )}
         </div>
         {meta.defaultInterval !== null && (
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 pt-1">
+          <div className="text-[10px] text-[color:var(--text-muted)] pt-1">
             Based on largest repetition period group ({knowledge.intervalGroups.find(g => g.intervalMs === meta.defaultInterval)?.frameIds.length ?? 0} frames)
           </div>
         )}
@@ -153,8 +153,8 @@ function FramesSection({ knowledge }: FramesSectionProps) {
     return (
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <Clock className={`${iconMd} text-slate-400`} />
-          <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+          <Clock className={`${iconMd} text-[color:var(--text-muted)]`} />
+          <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
             Frames
           </h3>
         </div>
@@ -168,8 +168,8 @@ function FramesSection({ knowledge }: FramesSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
-        <Clock className={`${iconMd} text-emerald-500`} />
-        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-300">
+        <Clock className={`${iconMd} text-[color:var(--text-green)]`} />
+        <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
           Frames ({frames.length})
         </h3>
       </div>
@@ -199,21 +199,21 @@ function FrameCard({ frame }: FrameCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className={flexRowGap2}>
-          <span className="font-mono font-semibold text-sm text-slate-700 dark:text-slate-200">
+          <span className="font-mono font-semibold text-sm text-[color:var(--text-primary)]">
             {formatFrameId(frame.frameId)}
           </span>
           <span className={captionMuted}>
             {frame.length} bytes
           </span>
           {frame.isExtended && (
-            <span className="px-1 py-0.5 text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded">
+            <span className="px-1 py-0.5 text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)] rounded">
               EXT
             </span>
           )}
         </div>
         <div className={flexRowGap2}>
           {frame.intervalMs !== undefined && (
-            <span className="text-xs text-emerald-600 dark:text-emerald-400">
+            <span className="text-xs text-[color:var(--text-green)]">
               {formatMs(frame.intervalMs)}
             </span>
           )}
@@ -228,19 +228,19 @@ function FrameCard({ frame }: FrameCardProps) {
       {/* Flags */}
       <div className="flex flex-wrap gap-1 mb-2">
         {frame.mux && (
-          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">
+          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--text-orange)] rounded">
             <Shuffle className={iconXs} />
             {frame.mux.isTwoByte ? "2D Mux" : "Mux"}
           </span>
         )}
         {frame.isBurst && (
-          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded">
+          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-[var(--status-info-bg)] text-[color:var(--text-cyan)] rounded">
             <Zap className={iconXs} />
             Burst
           </span>
         )}
         {frame.isMultiBus && (
-          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded">
+          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-[var(--status-danger-bg)] text-[color:var(--status-danger-text)] rounded">
             <GitBranch className={iconXs} />
             Multi-bus
           </span>
@@ -252,10 +252,10 @@ function FrameCard({ frame }: FrameCardProps) {
 
       {/* Burst Details */}
       {frame.burstInfo && (
-        <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-2">
+        <div className="text-[10px] text-[color:var(--text-muted)] mb-2">
           Burst: ~{frame.burstInfo.burstCount} frames, {formatMs(frame.burstInfo.burstPeriodMs)} cycle
           {frame.burstInfo.flags.length > 0 && (
-            <span className="ml-1 text-cyan-600 dark:text-cyan-400">
+            <span className="ml-1 text-[color:var(--text-cyan)]">
               ({frame.burstInfo.flags.join(", ")})
             </span>
           )}
@@ -264,7 +264,7 @@ function FrameCard({ frame }: FrameCardProps) {
 
       {/* Multi-bus Details */}
       {frame.multiBusInfo && (
-        <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-2">
+        <div className="text-[10px] text-[color:var(--text-muted)] mb-2">
           Seen on buses: {frame.multiBusInfo.buses.map(b => (
             <span key={b} className="ml-1">
               {b} ({frame.multiBusInfo!.countPerBus[b]}×)
@@ -275,8 +275,8 @@ function FrameCard({ frame }: FrameCardProps) {
 
       {/* Signals */}
       {allSignals.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-          <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+        <div className="mt-2 pt-2 border-t border-[color:var(--border-default)]">
+          <div className="text-[10px] font-medium text-[color:var(--text-muted)] mb-1">
             Signals
           </div>
           <div className="space-y-1">
@@ -285,8 +285,8 @@ function FrameCard({ frame }: FrameCardProps) {
                 key={idx}
                 className={`flex items-center justify-between text-[10px] ${
                   signal.source === 'default'
-                    ? 'text-slate-400 dark:text-slate-500 italic'
-                    : 'text-slate-600 dark:text-slate-300'
+                    ? 'text-[color:var(--text-muted)] italic'
+                    : 'text-[color:var(--text-secondary)]'
                 }`}
               >
                 <span className="font-mono">{signal.name}</span>
@@ -302,13 +302,13 @@ function FrameCard({ frame }: FrameCardProps) {
 
       {/* Notes */}
       {frame.notes.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-          <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mb-1">
+        <div className="mt-2 pt-2 border-t border-[color:var(--border-default)]">
+          <div className="text-[10px] font-medium text-[color:var(--text-muted)] mb-1">
             Notes
           </div>
           <ul className="space-y-0.5">
             {frame.notes.map((note, idx) => (
-              <li key={idx} className="text-[10px] text-slate-600 dark:text-slate-300">
+              <li key={idx} className="text-[10px] text-[color:var(--text-secondary)]">
                 • {note}
               </li>
             ))}
@@ -329,9 +329,9 @@ type MuxDetailsProps = {
 
 function MuxDetails({ mux }: MuxDetailsProps) {
   return (
-    <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-2">
+    <div className="text-[10px] text-[color:var(--text-muted)] mb-2">
       <div className="flex items-center gap-2 mb-1">
-        <span className="font-medium text-orange-600 dark:text-orange-400">
+        <span className="font-medium text-[color:var(--text-orange)]">
           {mux.isTwoByte ? "Two-byte mux" : "Mux"} selector:
         </span>
         <span className="font-mono">
@@ -342,17 +342,17 @@ function MuxDetails({ mux }: MuxDetailsProps) {
         </span>
       </div>
       <div className="flex flex-wrap gap-1">
-        <span className="text-slate-400">Cases:</span>
+        <span className="text-[color:var(--text-muted)]">Cases:</span>
         {mux.cases.slice(0, 16).map((c) => (
           <span
             key={c}
-            className="px-1 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded font-mono"
+            className="px-1 py-0.5 bg-[var(--status-warning-bg)] text-[color:var(--text-orange)] rounded font-mono"
           >
             {mux.isTwoByte ? `${Math.floor(c / 256)}.${c % 256}` : c}
           </span>
         ))}
         {mux.cases.length > 16 && (
-          <span className="text-slate-400">+{mux.cases.length - 16} more</span>
+          <span className="text-[color:var(--text-muted)]">+{mux.cases.length - 16} more</span>
         )}
       </div>
     </div>

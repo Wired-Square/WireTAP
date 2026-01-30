@@ -32,7 +32,7 @@ export default function CatalogPickerDialog({
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
         <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
             Select Decoder Catalog
           </h2>
           <button
@@ -44,7 +44,7 @@ export default function CatalogPickerDialog({
         </div>
         <div className="max-h-[50vh] overflow-y-auto">
           {catalogs.length === 0 ? (
-            <div className="p-4 text-sm text-slate-500 dark:text-slate-400">
+            <div className="p-4 text-sm text-[color:var(--text-muted)]">
               No catalogs found. Add TOML catalog files to your decoder directory.
             </div>
           ) : (
@@ -57,7 +57,7 @@ export default function CatalogPickerDialog({
                   key={catalog.path}
                   onClick={() => handleSelect(catalog.path)}
                   className={`w-full px-4 py-2.5 flex items-center gap-3 text-left ${hoverLight} transition-colors ${
-                    isSelected ? "bg-slate-100 dark:bg-slate-700" : ""
+                    isSelected ? "bg-[var(--bg-surface)]" : ""
                   }`}
                 >
                   <div className="flex-1 min-w-0">
@@ -74,7 +74,7 @@ export default function CatalogPickerDialog({
                     </div>
                   </div>
                   {isSelected && (
-                    <Check className={`${iconMd} text-green-600 dark:text-green-400 flex-shrink-0`} />
+                    <Check className={`${iconMd} text-[color:var(--text-success)] flex-shrink-0`} />
                   )}
                 </button>
               );

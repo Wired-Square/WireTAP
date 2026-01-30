@@ -7,9 +7,9 @@ import { Send, Plus, RotateCcw } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import {
-  bgDarkToolbar,
-  borderDarkView,
-  textDarkMuted,
+  bgDataToolbar,
+  borderDataView,
+  textDataSecondary,
 } from "../../../styles/colourTokens";
 import { playButtonBase, buttonBase } from "../../../styles/buttonStyles";
 import { byteToHex } from "../../../utils/byteUtils";
@@ -74,7 +74,7 @@ export default function CanTransmitView() {
   if (!isConnected) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDarkMuted} text-center`}>
+        <div className={`${textDataSecondary} text-center`}>
           <p className="text-lg font-medium">Not Connected</p>
           <p className="text-sm mt-2">
             Connect to an interface to transmit CAN frames.
@@ -88,7 +88,7 @@ export default function CanTransmitView() {
   if (!canTransmit) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDarkMuted} text-center`}>
+        <div className={`${textDataSecondary} text-center`}>
           <p className="text-lg font-medium">CAN Not Supported</p>
           <p className="text-sm mt-2">
             This profile does not support CAN frame transmission.
@@ -101,15 +101,15 @@ export default function CanTransmitView() {
   return (
     <div className="flex flex-col h-full overflow-auto">
       {/* Frame Editor */}
-      <div className={`p-4 border-b ${borderDarkView}`}>
+      <div className={`p-4 border-b ${borderDataView}`}>
         <CanFrameEditor />
       </div>
 
       {/* Frame Preview */}
       {framePreview && (
-        <div className={`px-4 py-3 ${bgDarkToolbar} border-b ${borderDarkView}`}>
+        <div className={`px-4 py-3 ${bgDataToolbar} border-b ${borderDataView}`}>
           <div className="flex items-center gap-4">
-            <span className={`${textDarkMuted} text-xs`}>Preview:</span>
+            <span className={`${textDataSecondary} text-xs`}>Preview:</span>
             <code className="font-mono text-sm text-green-400">
               {framePreview.id}
             </code>
@@ -127,7 +127,7 @@ export default function CanTransmitView() {
       )}
 
       {/* Actions */}
-      <div className={`flex items-center gap-3 px-4 py-3 ${bgDarkToolbar}`}>
+      <div className={`flex items-center gap-3 px-4 py-3 ${bgDataToolbar}`}>
         <button
           onClick={handleSend}
           disabled={!framePreview}

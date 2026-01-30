@@ -114,7 +114,7 @@ export default function DiscoveryTopBar({
   return (
     <AppTopBar
       icon={Search}
-      iconColour="text-purple-600 dark:text-purple-400"
+      iconColour="text-[color:var(--text-purple)]"
       ioSession={{
         ioProfile,
         ioProfiles,
@@ -176,7 +176,7 @@ export default function DiscoveryTopBar({
           <button
             onClick={onInfo}
             disabled={!hasFrames}
-            className={`${iconButtonBase} ${hasFrames ? "text-purple-600 dark:text-purple-400" : ""}`}
+            className={`${iconButtonBase} ${hasFrames ? "text-[color:var(--text-purple)]" : ""}`}
             title="View decoder knowledge"
           >
             <Info className={iconMd} />

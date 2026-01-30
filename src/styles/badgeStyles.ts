@@ -1,5 +1,6 @@
 // ui/src/styles/badgeStyles.ts
 // Centralized badge and status indicator styles
+// Semantic badges use fixed colors; neutral badges use CSS variables.
 
 /**
  * Badge base - common styles for all badge variants
@@ -9,32 +10,32 @@ export const badgeBase = "inline-flex items-center px-2 py-1 rounded text-xs fon
 /**
  * Success badge - green, for completed/active states
  */
-export const badgeSuccess = `${badgeBase} bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300`;
+export const badgeSuccess = `${badgeBase} bg-green-600/20 text-green-600`;
 
 /**
  * Danger badge - red, for errors/critical states
  */
-export const badgeDanger = `${badgeBase} bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300`;
+export const badgeDanger = `${badgeBase} bg-red-600/20 text-red-600`;
 
 /**
  * Warning badge - amber, for warnings/caution states
  */
-export const badgeWarning = `${badgeBase} bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300`;
+export const badgeWarning = `${badgeBase} bg-amber-600/20 text-amber-600`;
 
 /**
  * Info badge - blue, for informational states
  */
-export const badgeInfo = `${badgeBase} bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300`;
+export const badgeInfo = `${badgeBase} bg-blue-600/20 text-blue-600`;
 
 /**
- * Neutral badge - gray, for default/inactive states
+ * Neutral badge - gray, for default/inactive states - uses CSS variable
  */
-export const badgeNeutral = `${badgeBase} bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300`;
+export const badgeNeutral = `${badgeBase} bg-[var(--bg-surface)] text-[color:var(--text-secondary)]`;
 
 /**
  * Purple badge - purple, for special/highlighted states
  */
-export const badgePurple = `${badgeBase} bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300`;
+export const badgePurple = `${badgeBase} bg-purple-600/20 text-purple-600`;
 
 // ============================================================================
 // Small Badges - compact versions for tight UI spaces (e.g., reader lists)
@@ -46,29 +47,29 @@ export const badgePurple = `${badgeBase} bg-purple-100 dark:bg-purple-900/30 tex
 export const badgeSmallBase = "px-1.5 py-0.5 rounded text-[10px] font-medium";
 
 /**
- * Small neutral badge - gray
+ * Small neutral badge - gray - uses CSS variable
  */
-export const badgeSmallNeutral = `${badgeSmallBase} bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400`;
+export const badgeSmallNeutral = `${badgeSmallBase} bg-[var(--bg-surface)] text-[color:var(--text-secondary)]`;
 
 /**
  * Small success badge - green
  */
-export const badgeSmallSuccess = `${badgeSmallBase} bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300`;
+export const badgeSmallSuccess = `${badgeSmallBase} bg-green-600/20 text-green-600`;
 
 /**
  * Small warning badge - amber
  */
-export const badgeSmallWarning = `${badgeSmallBase} bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300`;
+export const badgeSmallWarning = `${badgeSmallBase} bg-amber-600/20 text-amber-600`;
 
 /**
  * Small purple badge - purple
  */
-export const badgeSmallPurple = `${badgeSmallBase} bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300`;
+export const badgeSmallPurple = `${badgeSmallBase} bg-purple-600/20 text-purple-600`;
 
 /**
  * Small info badge - blue, for active/override states
  */
-export const badgeSmallInfo = `${badgeSmallBase} bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300`;
+export const badgeSmallInfo = `${badgeSmallBase} bg-blue-600/20 text-blue-600`;
 
 // ============================================================================
 // Dark Panel Badges - for use in permanently dark panels (e.g., decoder view)
@@ -105,6 +106,6 @@ export const badgeDarkPanelPurple = `${badgeDarkPanelBase} bg-purple-600/30 text
 // ============================================================================
 
 /**
- * Metadata badge - muted gray, for displaying filenames/types
+ * Metadata badge - muted gray, for displaying filenames/types - uses CSS variable
  */
-export const badgeMetadata = "px-2 py-1 text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded";
+export const badgeMetadata = "px-2 py-1 text-xs font-medium bg-[var(--bg-surface)] text-[color:var(--text-secondary)] rounded";

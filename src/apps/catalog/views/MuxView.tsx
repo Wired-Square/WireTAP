@@ -26,7 +26,7 @@ export default function MuxView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Mux Selector</h3>
+        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">Mux Selector</h3>
         <div className={flexRowGap2}>
           <button
             onClick={() => onAddCase(selectedNode.path)}
@@ -40,7 +40,7 @@ export default function MuxView({
             className={iconButtonHover}
             title="Edit mux"
           >
-            <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+            <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
           </button>
 
           {/* Pattern A delete */}
@@ -49,7 +49,7 @@ export default function MuxView({
             className={iconButtonHoverDanger}
             title="Delete mux"
           >
-            <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+            <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
           </button>
         </div>
       </div>
@@ -78,7 +78,7 @@ export default function MuxView({
       {selectedNode.metadata?.properties?.notes && (
         <div className={`p-3 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>Notes</div>
-          <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.properties.notes)
               ? selectedNode.metadata.properties.notes.join("\n")
               : selectedNode.metadata.properties.notes}
@@ -87,9 +87,9 @@ export default function MuxView({
       )}
 
       {selectedNode.metadata?.muxDefaultCase && (
-        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg">
-          <div className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Default Case</div>
-          <div className="font-mono text-sm text-blue-900 dark:text-blue-300">
+        <div className="p-3 bg-[var(--status-info-bg)] border-2 border-[color:var(--status-info-border)] rounded-lg">
+          <div className="text-xs font-medium text-[color:var(--text-blue)] mb-1">Default Case</div>
+          <div className="font-mono text-sm text-[color:var(--text-blue)]">
             {selectedNode.metadata.muxDefaultCase}
           </div>
         </div>
@@ -107,7 +107,7 @@ export default function MuxView({
                 className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
                 onClick={() => onSelectNode(caseNode)}
               >
-                <div className="font-medium text-slate-900 dark:text-white">{caseNode.key}</div>
+                <div className="font-medium text-[color:var(--text-primary)]">{caseNode.key}</div>
               </div>
             ))}
           </div>

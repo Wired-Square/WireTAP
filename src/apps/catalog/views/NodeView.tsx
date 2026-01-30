@@ -139,7 +139,7 @@ export default function NodeView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Node</h3>
+        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">Node</h3>
 
         <div className={flexRowGap2}>
           {onAddCanFrameForNode && (
@@ -165,7 +165,7 @@ export default function NodeView({
               className={iconButtonHover}
               title="Edit node"
             >
-              <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+              <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
             </button>
           )}
 
@@ -175,7 +175,7 @@ export default function NodeView({
               className={iconButtonHoverDanger}
               title="Delete node"
             >
-              <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+              <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
             </button>
           )}
         </div>
@@ -189,7 +189,7 @@ export default function NodeView({
       {selectedNode.metadata?.properties?.notes && (
         <div className={`p-3 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>Notes</div>
-          <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+          <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.properties.notes)
               ? selectedNode.metadata.properties.notes.join("\n")
               : selectedNode.metadata.properties.notes}
@@ -211,7 +211,7 @@ export default function NodeView({
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-slate-900 dark:text-white mb-1 flex items-center gap-2">
+                  <div className="font-medium text-[color:var(--text-primary)] mb-1 flex items-center gap-2">
                     {child.type === "can-frame" && <span>🔖</span>}
                     {child.type === "modbus-frame" && <span>📟</span>}
                     {child.type === "mux" && <span>🔀</span>}
@@ -228,7 +228,7 @@ export default function NodeView({
                   )}
                 </div>
 
-                <div className="text-xs px-2 py-1 bg-white dark:bg-slate-900 rounded text-slate-600 dark:text-slate-400">
+                <div className="text-xs px-2 py-1 bg-[var(--bg-primary)] rounded text-[color:var(--text-muted)]">
                   {child.type}
                 </div>
               </div>
@@ -236,7 +236,7 @@ export default function NodeView({
           ))}
         </div>
       ) : (
-        <div className="text-sm text-slate-500 dark:text-slate-400">No items</div>
+        <div className="text-sm text-[color:var(--text-muted)]">No items</div>
       )}
 
       <div className="space-y-2">
@@ -245,18 +245,18 @@ export default function NodeView({
         </div>
 
         {framesForNode.length === 0 ? (
-          <div className="text-sm text-slate-500 dark:text-slate-400">No CAN frames use this node as transmitter.</div>
+          <div className="text-sm text-[color:var(--text-muted)]">No CAN frames use this node as transmitter.</div>
         ) : (
           framesForNode.map((frame) => (
             <div
               key={frame.id}
-              className={`p-4 ${bgSecondary} rounded-lg border border-slate-200 dark:border-slate-700`}
+              className={`p-4 ${bgSecondary} rounded-lg border border-[color:var(--border-default)]`}
             >
               {(() => {
                 const formatted = formatFrameId(frame.id, displayFrameIdFormat);
                 return (
               <div className="flex items-center justify-between mb-2">
-                <div className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
+                <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
                   <span>🔖</span>
                   <span className={flexRowGap2}>
                     {formatted.primary}
@@ -278,7 +278,7 @@ export default function NodeView({
                     className={iconButtonHover}
                     title="Edit frame"
                   >
-                    <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+                    <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
                   </button>
                   {onRequestDeleteFrame && (
                     <button
@@ -286,7 +286,7 @@ export default function NodeView({
                       className={iconButtonHoverDanger}
                       title="Delete frame"
                     >
-                      <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                      <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                     </button>
                   )}
                 </div>
@@ -317,7 +317,7 @@ export default function NodeView({
                           className={iconButtonHover}
                           title="Edit signal"
                         >
-                          <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+                          <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
                         </button>
                         {onRequestDeleteSignal && (
                           <button
@@ -332,7 +332,7 @@ export default function NodeView({
                             className={iconButtonHoverDanger}
                             title="Delete signal"
                           >
-                            <Trash2 className={`${iconMd} text-red-600 dark:text-red-400`} />
+                            <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                           </button>
                         )}
                       </div>

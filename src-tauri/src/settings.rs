@@ -42,6 +42,52 @@ pub struct AppSettings {
     pub binary_one_colour: String,
     #[serde(default = "default_display_timezone")]
     pub display_timezone: String, // "local" | "utc"
+
+    // Theme settings
+    #[serde(default = "default_theme_mode")]
+    pub theme_mode: String, // "dark" | "light" | "auto"
+
+    // Theme colours - light mode
+    #[serde(default = "default_theme_bg_primary_light")]
+    pub theme_bg_primary_light: String,
+    #[serde(default = "default_theme_bg_surface_light")]
+    pub theme_bg_surface_light: String,
+    #[serde(default = "default_theme_text_primary_light")]
+    pub theme_text_primary_light: String,
+    #[serde(default = "default_theme_text_secondary_light")]
+    pub theme_text_secondary_light: String,
+    #[serde(default = "default_theme_border_default_light")]
+    pub theme_border_default_light: String,
+    #[serde(default = "default_theme_data_bg_light")]
+    pub theme_data_bg_light: String,
+    #[serde(default = "default_theme_data_text_primary_light")]
+    pub theme_data_text_primary_light: String,
+
+    // Theme colours - dark mode
+    #[serde(default = "default_theme_bg_primary_dark")]
+    pub theme_bg_primary_dark: String,
+    #[serde(default = "default_theme_bg_surface_dark")]
+    pub theme_bg_surface_dark: String,
+    #[serde(default = "default_theme_text_primary_dark")]
+    pub theme_text_primary_dark: String,
+    #[serde(default = "default_theme_text_secondary_dark")]
+    pub theme_text_secondary_dark: String,
+    #[serde(default = "default_theme_border_default_dark")]
+    pub theme_border_default_dark: String,
+    #[serde(default = "default_theme_data_bg_dark")]
+    pub theme_data_bg_dark: String,
+    #[serde(default = "default_theme_data_text_primary_dark")]
+    pub theme_data_text_primary_dark: String,
+
+    // Theme colours - accent (mode-independent)
+    #[serde(default = "default_theme_accent_primary")]
+    pub theme_accent_primary: String,
+    #[serde(default = "default_theme_accent_success")]
+    pub theme_accent_success: String,
+    #[serde(default = "default_theme_accent_danger")]
+    pub theme_accent_danger: String,
+    #[serde(default = "default_theme_accent_warning")]
+    pub theme_accent_warning: String,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -72,6 +118,71 @@ fn default_display_timezone() -> String {
     "local".to_string()
 }
 
+// Theme defaults
+fn default_theme_mode() -> String {
+    "auto".to_string()
+}
+
+// Light mode defaults
+fn default_theme_bg_primary_light() -> String {
+    "#ffffff".to_string() // white
+}
+fn default_theme_bg_surface_light() -> String {
+    "#f8fafc".to_string() // slate-50
+}
+fn default_theme_text_primary_light() -> String {
+    "#0f172a".to_string() // slate-900
+}
+fn default_theme_text_secondary_light() -> String {
+    "#334155".to_string() // slate-700
+}
+fn default_theme_border_default_light() -> String {
+    "#e2e8f0".to_string() // slate-200
+}
+fn default_theme_data_bg_light() -> String {
+    "#f8fafc".to_string() // slate-50
+}
+fn default_theme_data_text_primary_light() -> String {
+    "#0f172a".to_string() // slate-900
+}
+
+// Dark mode defaults
+fn default_theme_bg_primary_dark() -> String {
+    "#0f172a".to_string() // slate-900
+}
+fn default_theme_bg_surface_dark() -> String {
+    "#1e293b".to_string() // slate-800
+}
+fn default_theme_text_primary_dark() -> String {
+    "#ffffff".to_string() // white
+}
+fn default_theme_text_secondary_dark() -> String {
+    "#cbd5e1".to_string() // slate-300
+}
+fn default_theme_border_default_dark() -> String {
+    "#334155".to_string() // slate-700
+}
+fn default_theme_data_bg_dark() -> String {
+    "#111827".to_string() // gray-900
+}
+fn default_theme_data_text_primary_dark() -> String {
+    "#e5e7eb".to_string() // gray-200
+}
+
+// Accent colour defaults (mode-independent)
+fn default_theme_accent_primary() -> String {
+    "#2563eb".to_string() // blue-600
+}
+fn default_theme_accent_success() -> String {
+    "#16a34a".to_string() // green-600
+}
+fn default_theme_accent_danger() -> String {
+    "#dc2626".to_string() // red-600
+}
+fn default_theme_accent_warning() -> String {
+    "#d97706".to_string() // amber-600
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         // Get platform-specific documents directory
@@ -99,6 +210,29 @@ impl Default for AppSettings {
             signal_colour_high: default_signal_colour_high(),
             binary_one_colour: default_binary_one_colour(),
             display_timezone: default_display_timezone(),
+            // Theme settings
+            theme_mode: default_theme_mode(),
+            // Light mode
+            theme_bg_primary_light: default_theme_bg_primary_light(),
+            theme_bg_surface_light: default_theme_bg_surface_light(),
+            theme_text_primary_light: default_theme_text_primary_light(),
+            theme_text_secondary_light: default_theme_text_secondary_light(),
+            theme_border_default_light: default_theme_border_default_light(),
+            theme_data_bg_light: default_theme_data_bg_light(),
+            theme_data_text_primary_light: default_theme_data_text_primary_light(),
+            // Dark mode
+            theme_bg_primary_dark: default_theme_bg_primary_dark(),
+            theme_bg_surface_dark: default_theme_bg_surface_dark(),
+            theme_text_primary_dark: default_theme_text_primary_dark(),
+            theme_text_secondary_dark: default_theme_text_secondary_dark(),
+            theme_border_default_dark: default_theme_border_default_dark(),
+            theme_data_bg_dark: default_theme_data_bg_dark(),
+            theme_data_text_primary_dark: default_theme_data_text_primary_dark(),
+            // Accent colours
+            theme_accent_primary: default_theme_accent_primary(),
+            theme_accent_success: default_theme_accent_success(),
+            theme_accent_danger: default_theme_accent_danger(),
+            theme_accent_warning: default_theme_accent_warning(),
         }
     }
 }

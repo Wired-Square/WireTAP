@@ -117,9 +117,9 @@ function FramePicker({
         className="flex items-center gap-1 w-full text-left"
       >
         {isExpanded ? (
-          <ChevronDown className={`${iconSm} text-slate-500`} />
+          <ChevronDown className={`${iconSm} text-[color:var(--text-muted)]`} />
         ) : (
-          <ChevronRight className={`${iconSm} text-slate-500`} />
+          <ChevronRight className={`${iconSm} text-[color:var(--text-muted)]`} />
         )}
         <span className={labelSmall}>
           Frames
@@ -129,7 +129,7 @@ function FramePicker({
         </span>
         <div className="flex items-center gap-1 ml-auto">
           {hasWarnings && (
-            <span title={warningTooltip} className="text-orange-500 dark:text-orange-400">
+            <span title={warningTooltip} className="text-[color:var(--text-orange)]">
               <AlertTriangle className={iconSm} />
             </span>
           )}
@@ -150,8 +150,8 @@ function FramePicker({
                     disabled={!anyFrames}
                     className={`p-1 rounded ${
                       !anyFrames
-                        ? "text-slate-400 cursor-not-allowed"
-                        : `text-green-600 ${hoverLight}`
+                        ? "text-[color:var(--text-muted)] cursor-not-allowed"
+                        : `text-[color:var(--text-green)] ${hoverLight}`
                     }`}
                     title="Select all frames"
                   >
@@ -165,8 +165,8 @@ function FramePicker({
                     disabled={!anyFrames}
                     className={`p-1 rounded ${
                       !anyFrames
-                        ? "text-slate-400 cursor-not-allowed"
-                        : `text-slate-500 dark:text-slate-400 ${hoverLight}`
+                        ? "text-[color:var(--text-muted)] cursor-not-allowed"
+                        : `text-[color:var(--text-muted)] ${hoverLight}`
                     }`}
                     title="Deselect all frames"
                   >
@@ -181,7 +181,7 @@ function FramePicker({
                     disabled={!anyFrames && !activeSelectionSetId}
                     className={`p-1 rounded ${
                       !anyFrames && !activeSelectionSetId
-                        ? "text-slate-400 cursor-not-allowed"
+                        ? "text-[color:var(--text-muted)] cursor-not-allowed"
                         : hoverLight
                     }`}
                     style={{ color: getSaveIconColor() }}
@@ -214,7 +214,7 @@ function FramePicker({
               <div className="flex flex-wrap gap-1">
                 {buses.map((bus) => (
                   <div key={bus} className="flex items-center gap-0.5 text-[10px]">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                    <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[color:var(--border-default)] text-[color:var(--text-secondary)]">
                       Bus {bus}
                     </span>
                     <button
@@ -227,7 +227,7 @@ function FramePicker({
                     <button
                       type="button"
                       onClick={() => onBulkSelect(bus, false)}
-                      className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600"
+                      className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95"
                     >
                       None
                     </button>
@@ -236,8 +236,8 @@ function FramePicker({
               </div>
             </div>
           )}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className={`divide-y divide-slate-200 dark:divide-slate-700 ${noInnerScroll ? "" : "max-h-80 overflow-auto"}`}>
+          <div className="rounded-lg border border-[color:var(--border-default)] overflow-hidden">
+            <div className={`divide-y divide-[color:var(--border-default)] ${noInnerScroll ? "" : "max-h-80 overflow-auto"}`}>
               {sortedFrames.map((f) => (
                 <label
                   key={f.id}
@@ -254,10 +254,10 @@ function FramePicker({
                     className="w-3 h-3"
                   />
                   <span className="font-mono">{formatId(f)}</span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  <span className="text-[10px] text-[color:var(--text-muted)]">
                     [{f.len}]
                   </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                  <span className="text-[10px] text-[color:var(--text-muted)]">
                     {typeof f.bus === "number" ? `bus ${f.bus}` : ""}
                   </span>
                 </label>

@@ -123,17 +123,17 @@ export default function ReaderList({
 
     return (
       <div className={borderDivider}>
-        <div className={`px-4 py-2 bg-slate-50 dark:bg-slate-900/50 ${sectionHeader}`}>
+        <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
           IO Reader
         </div>
         <div className="px-3 py-2">
           <button
             onClick={() => onSelectReader(null)}
-            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)] hover:brightness-95"
           >
             {icon || (
-              <div className="w-4 h-4 rounded-full border-2 border-blue-600 dark:border-blue-400 flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400" />
+              <div className="w-4 h-4 rounded-full border-2 border-[color:var(--status-info-text)] flex items-center justify-center">
+                <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -144,7 +144,7 @@ export default function ReaderList({
                 {subtitle}
               </div>
             </div>
-            <span className="text-xs text-blue-600 dark:text-blue-400">Change</span>
+            <span className="text-xs text-[color:var(--status-info-text)]">Change</span>
           </button>
         </div>
       </div>
@@ -171,13 +171,13 @@ export default function ReaderList({
 
   return (
     <div className={borderDivider}>
-      <div className={`px-4 py-2 bg-slate-50 dark:bg-slate-900/50 ${sectionHeader}`}>
+      <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
         IO Reader
       </div>
 
       {/* Active Multi-Bus Sessions (shareable) */}
       {runningMultiSourceSessions.length > 0 && onSelectMultiSourceSession && (
-        <div className="border-b border-slate-100 dark:border-slate-700/50">
+        <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <GitMerge className={iconXs} />
             <span>Active Multi-Bus Sessions</span>
@@ -195,20 +195,20 @@ export default function ReaderList({
                   onClick={() => onSelectMultiSourceSession(session.sessionId)}
                   className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
                     isSelected
-                      ? "bg-purple-50 dark:bg-purple-900/20 border border-purple-300 dark:border-purple-700"
-                      : `${bgSurface} border border-slate-200 dark:border-slate-700 hover:border-purple-300 dark:hover:border-purple-600`
+                      ? "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)]"
+                      : `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-purple)]`
                   }`}
                 >
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                     isSelected
-                      ? "border-purple-600 dark:border-purple-400"
-                      : "border-slate-300 dark:border-slate-600"
+                      ? "border-[color:var(--text-purple)]"
+                      : "border-[color:var(--border-default)]"
                   }`}>
                     {isSelected && (
-                      <div className="w-2 h-2 rounded-full bg-purple-600 dark:bg-purple-400" />
+                      <div className="w-2 h-2 rounded-full bg-[var(--text-purple)]" />
                     )}
                   </div>
-                  <GitMerge className={`${iconMd} flex-shrink-0 text-purple-600 dark:text-purple-400`} />
+                  <GitMerge className={`${iconMd} flex-shrink-0 text-[color:var(--text-purple)]`} />
                   <div className="flex-1 min-w-0">
                     <div className={`${textMedium} truncate flex items-center gap-2`}>
                       <span>{sourceNames}</span>
@@ -228,7 +228,7 @@ export default function ReaderList({
 
       {/* Active Recorded Sessions (PostgreSQL, etc.) */}
       {runningRecordedSessions.length > 0 && onSelectMultiSourceSession && (
-        <div className="border-b border-slate-100 dark:border-slate-700/50">
+        <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <Play className={iconXs} />
             <span>Active Sessions</span>
@@ -246,20 +246,20 @@ export default function ReaderList({
                   onClick={() => onSelectMultiSourceSession(session.sessionId)}
                   className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
                     isSelected
-                      ? "bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700"
-                      : `${bgSurface} border border-slate-200 dark:border-slate-700 hover:border-green-300 dark:hover:border-green-600`
+                      ? "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)]"
+                      : `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-green)]`
                   }`}
                 >
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                     isSelected
-                      ? "border-green-600 dark:border-green-400"
-                      : "border-slate-300 dark:border-slate-600"
+                      ? "border-[color:var(--text-green)]"
+                      : "border-[color:var(--border-default)]"
                   }`}>
                     {isSelected && (
-                      <div className="w-2 h-2 rounded-full bg-green-600 dark:bg-green-400" />
+                      <div className="w-2 h-2 rounded-full bg-[var(--text-green)]" />
                     )}
                   </div>
-                  <Database className={`${iconMd} flex-shrink-0 text-green-600 dark:text-green-400`} />
+                  <Database className={`${iconMd} flex-shrink-0 text-[color:var(--text-green)]`} />
                   <div className="flex-1 min-w-0">
                     <div className={`${textMedium} truncate flex items-center gap-2`}>
                       <span>{displayName}</span>
@@ -280,7 +280,7 @@ export default function ReaderList({
 
       {/* Real-time Sources */}
       {realtimeProfiles.length > 0 && (
-        <div className="border-b border-slate-100 dark:border-slate-700/50">
+        <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center justify-between`}>
             <div className="flex items-center gap-1.5">
               <Wifi className={iconXs} />
@@ -295,7 +295,7 @@ export default function ReaderList({
           </div>
           {/* Validation error */}
           {validationError && (
-            <div className="mx-3 mb-2 px-3 py-2 text-xs text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2">
+            <div className="mx-3 mb-2 px-3 py-2 text-xs text-[color:var(--status-danger-text)] bg-[var(--status-danger-bg)] border border-[color:var(--status-danger-border)] rounded-lg flex items-center gap-2">
               <AlertCircle className={`${iconMd} flex-shrink-0`} />
               <span>{validationError}</span>
             </div>
@@ -342,7 +342,7 @@ export default function ReaderList({
 
       {/* Recorded Sources */}
       {!hideRecorded && recordedProfiles.length > 0 && (
-        <div className="border-b border-slate-100 dark:border-slate-700/50">
+        <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <Database className={iconXs} />
             <span>Recorded</span>
@@ -377,18 +377,18 @@ export default function ReaderList({
               disabled={isIngesting}
               className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors disabled:opacity-50 ${
                 isCsvSelected
-                  ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700"
-                  : "hover:bg-slate-50 dark:hover:bg-slate-700/50 border border-transparent"
+                  ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
+                  : "hover:bg-[var(--hover-bg)] border border-transparent"
               }`}
             >
               <div
                 className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                   isCsvSelected
-                    ? "border-blue-600 dark:border-blue-400"
-                    : "border-slate-300 dark:border-slate-600"
+                    ? "border-[color:var(--status-info-text)]"
+                    : "border-[color:var(--border-default)]"
                 }`}
               >
-                {isCsvSelected && <div className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400" />}
+                {isCsvSelected && <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />}
               </div>
               <div className="flex-1 min-w-0">
                 <span className={textMedium}>CSV</span>
@@ -400,7 +400,7 @@ export default function ReaderList({
       )}
 
       {readProfiles.length === 0 && !isCsvSelected && (
-        <div className="p-4 text-sm text-slate-500 dark:text-slate-400">
+        <div className="p-4 text-sm text-[color:var(--text-muted)]">
           No IO readers configured. Add one in Settings.
         </div>
       )}
@@ -448,42 +448,42 @@ function ReaderButton({
 
   const getIndicatorColor = () => {
     if (isDisabled) {
-      return "border-slate-200 dark:border-slate-700";
+      return "border-[color:var(--border-default)]";
     }
     if (useCheckbox && isChecked) {
-      return "border-purple-600 dark:border-purple-400 bg-purple-600 dark:bg-purple-400";
+      return "border-[color:var(--text-purple)] bg-[var(--text-purple)]";
     }
     if (liveAndChecked) {
       return isStopped
-        ? "border-amber-600 dark:border-amber-400"
-        : "border-green-600 dark:border-green-400";
+        ? "border-[color:var(--text-amber)]"
+        : "border-[color:var(--text-green)]";
     }
     if (isChecked) {
-      return "border-blue-600 dark:border-blue-400";
+      return "border-[color:var(--status-info-text)]";
     }
-    return "border-slate-300 dark:border-slate-600";
+    return "border-[color:var(--border-default)]";
   };
 
   return (
     <div
       className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
         isDisabled
-          ? "opacity-60 cursor-not-allowed border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
+          ? "opacity-60 cursor-not-allowed border border-[color:var(--border-default)] bg-[var(--bg-surface)]"
           : isIngesting
           ? "opacity-50 cursor-not-allowed"
           : useCheckbox && isChecked
-          ? "bg-purple-50 dark:bg-purple-900/20 border border-purple-300 dark:border-purple-700 cursor-pointer"
+          ? "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)] cursor-pointer"
           : liveAndChecked
           ? isStopped
-            ? "bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 cursor-pointer"
-            : "bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 cursor-pointer"
+            ? "bg-[var(--status-warning-bg)] border border-[color:var(--status-warning-border)] cursor-pointer"
+            : "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)] cursor-pointer"
           : isChecked
-          ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 cursor-pointer"
+          ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)] cursor-pointer"
           : isLive
           ? isStopped
-            ? "bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 cursor-pointer"
-            : "bg-green-50/50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20 cursor-pointer"
-          : "hover:bg-slate-50 dark:hover:bg-slate-700/50 border border-transparent cursor-pointer"
+            ? "bg-[var(--status-warning-bg)]/50 border border-[color:var(--status-warning-border)] hover:bg-[var(--status-warning-bg)] cursor-pointer"
+            : "bg-[var(--status-success-bg)]/50 border border-[color:var(--status-success-border)] hover:bg-[var(--status-success-bg)] cursor-pointer"
+          : "hover:bg-[var(--hover-bg)] border border-transparent cursor-pointer"
       }`}
       onClick={isDisabled || isIngesting ? undefined : () => onSelect(isChecked && !useCheckbox ? null : profile.id)}
       role={isDisabled ? undefined : "button"}
@@ -498,16 +498,16 @@ function ReaderButton({
           <div className={`w-2 h-2 rounded-full ${
             liveAndChecked
               ? isStopped
-                ? "bg-amber-600 dark:bg-amber-400"
-                : "bg-green-600 dark:bg-green-400"
-              : "bg-blue-600 dark:bg-blue-400"
+                ? "bg-[var(--text-amber)]"
+                : "bg-[var(--text-green)]"
+              : "bg-[var(--status-info-text)]"
           }`} />
         ) : null}
       </div>
       <div className="flex-1 min-w-0">
         <div className={flexRowGap2}>
           {isDefault && <Bookmark className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />}
-          <span className={`${textMedium} truncate ${isDisabled ? "!text-slate-400 dark:!text-slate-500" : ""}`}>
+          <span className={`${textMedium} truncate ${isDisabled ? "!text-[color:var(--text-muted)]" : ""}`}>
             {profile.name}
           </span>
           {busNumber !== undefined && (
@@ -525,9 +525,9 @@ function ReaderButton({
             )
           )}
         </div>
-        <div className={`text-xs ${isDisabled ? "text-slate-400 dark:text-slate-600" : "text-slate-500 dark:text-slate-400"}`}>
+        <div className={`text-xs ${isDisabled ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-muted)]"}`}>
           {isDisabled && disabledReason ? (
-            <span>{profile.kind} · <span className="text-slate-400 dark:text-slate-500">{disabledReason}</span></span>
+            <span>{profile.kind} · <span className="text-[color:var(--text-muted)]">{disabledReason}</span></span>
           ) : (
             profile.kind
           )}

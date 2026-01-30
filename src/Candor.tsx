@@ -5,6 +5,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import "./Candor.css";
 import MainLayout from "./components/MainLayout";
 import { useUpdateStore } from "./stores/updateStore";
+import { useTheme } from "./hooks/useTheme";
 
 // Lazy load AboutDialog since it's rarely used
 const AboutDialog = lazy(() => import("./dialogs/AboutDialog"));
@@ -25,6 +26,9 @@ export default function Candor() {
   const [showAbout, setShowAbout] = useState(false);
   const currentWindow = getCurrentWebviewWindow();
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
+
+  // Apply global theme (dark/light mode + CSS variables)
+  useTheme();
 
   // Check for updates on launch
   useEffect(() => {

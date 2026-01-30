@@ -58,7 +58,7 @@ export default function SerialConfigSection({
           type="text"
           value={config.frame_id ?? ""}
           onChange={(e) => onChange({ ...config, frame_id: e.target.value || undefined })}
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           placeholder="status_frame"
         />
         <p className={`${caption} mt-1`}>
@@ -71,7 +71,7 @@ export default function SerialConfigSection({
         <label className={`block ${textMedium} mb-2`}>
           Encoding
         </label>
-        <div className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300">
+        <div className="w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-secondary)]">
           {encodingDisplayName(catalogEncoding)}
         </div>
         <p className={`${caption} mt-1`}>
@@ -92,7 +92,7 @@ export default function SerialConfigSection({
               const delimiter = parseDelimiter(e.target.value);
               onChange({ ...config, delimiter });
             }}
-            className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-mono ${focusRing}`}
+            className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
             placeholder="0x0D, 0x0A"
           />
           <p className={`${caption} mt-1`}>
@@ -116,7 +116,7 @@ export default function SerialConfigSection({
               max_length: e.target.value ? parseInt(e.target.value) : undefined,
             })
           }
-          className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           placeholder="256"
         />
         <p className={`${caption} mt-1`}>

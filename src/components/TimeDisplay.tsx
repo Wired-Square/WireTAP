@@ -113,7 +113,7 @@ export default function TimeDisplay({
         {showTime && (
           <span
             className={`font-mono min-w-[80px] leading-tight ${
-              compact ? 'text-sm text-gray-200' : 'text-slate-900 dark:text-slate-100'
+              compact ? 'text-sm text-[color:var(--text-secondary)]' : 'text-[color:var(--text-primary)]'
             }`}
           >
             {formattedTime}
@@ -122,7 +122,7 @@ export default function TimeDisplay({
         {showDate && formattedDate && (
           <span
             className={`font-mono leading-tight ${
-              compact ? 'text-[10px] text-gray-400' : caption
+              compact ? 'text-[10px] text-[color:var(--text-secondary)]' : caption
             }`}
           >
             {formattedDate}

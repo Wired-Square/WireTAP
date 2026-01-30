@@ -11,11 +11,11 @@ import { sendHexDataToCalculator } from '../../../utils/windowCommunication';
 import { bytesToHex, bytesToAscii } from '../../../utils/byteUtils';
 import { formatHumanUs } from '../../../utils/timeFormat';
 import {
-  bgDarkView,
-  borderDarkView,
-  textDarkMuted,
-  textDarkSubtle,
-  hoverDarkRow,
+  bgDataView,
+  borderDataView,
+  textDataSecondary,
+  textDataTertiary,
+  hoverDataRow,
   textDataGreen,
   textDataYellow,
   textDataOrange,
@@ -174,32 +174,32 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   return (
     <div
       ref={ref || internalRef}
-      className={`flex-1 min-h-0 overflow-auto font-mono text-xs ${bgDarkView}`}
+      className={`flex-1 min-h-0 overflow-auto font-mono text-xs ${bgDataView}`}
       onScroll={handleScroll}
     >
       <table className="w-full">
-        <thead className={`sticky top-0 z-10 ${bgDarkView} ${textDarkMuted}`}>
+        <thead className={`sticky top-0 z-10 ${bgDataView} ${textDataSecondary}`}>
           <tr>
             {onBookmark && (
-              <th className={`px-1 py-1.5 w-6 border-b ${borderDarkView}`}></th>
+              <th className={`px-1 py-1.5 w-6 border-b ${borderDataView}`}></th>
             )}
-            <th className={`text-left px-2 py-1.5 border-b ${borderDarkView}`}>Time</th>
+            <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Time</th>
             {showId && (
-              <th className={`text-right px-2 py-1.5 border-b ${borderDarkView}`}>ID</th>
+              <th className={`text-right px-2 py-1.5 border-b ${borderDataView}`}>ID</th>
             )}
             {showBus && (
-              <th className={`text-center px-2 py-1.5 w-10 border-b ${borderDarkView} ${textDataCyan}`}>Bus</th>
+              <th className={`text-center px-2 py-1.5 w-10 border-b ${borderDataView} ${textDataCyan}`}>Bus</th>
             )}
             {hasSourceAddress && (
-              <th className={`text-right px-2 py-1.5 border-b ${borderDarkView} ${textDataPurple}`}>Source</th>
+              <th className={`text-right px-2 py-1.5 border-b ${borderDataView} ${textDataPurple}`}>Source</th>
             )}
-            <th className={`text-left px-2 py-1.5 w-10 border-b ${borderDarkView}`}>Len</th>
+            <th className={`text-left px-2 py-1.5 w-10 border-b ${borderDataView}`}>Len</th>
             {showCalculator && (
-              <th className={`px-1 py-1.5 w-6 border-b ${borderDarkView}`}></th>
+              <th className={`px-1 py-1.5 w-6 border-b ${borderDataView}`}></th>
             )}
-            <th className={`text-left px-2 py-1.5 border-b ${borderDarkView}`}>Data</th>
+            <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Data</th>
             {showAscii && (
-              <th className={`text-left px-2 py-1.5 border-b ${borderDarkView}`}>ASCII</th>
+              <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>ASCII</th>
             )}
           </tr>
         </thead>
@@ -217,7 +217,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
               <tr
                 ref={isCurrentFrame ? highlightedRowRef : undefined}
                 key={`${frame.timestamp_us}-${frame.frame_id}-${idx}`}
-                className={`${hoverDarkRow} ${frame.incomplete ? 'opacity-60' : ''} ${isCurrentFrame ? 'bg-cyan-900/40 ring-1 ring-cyan-500/50' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
+                className={`${hoverDataRow} ${frame.incomplete ? 'opacity-60' : ''} ${isCurrentFrame ? 'bg-cyan-900/40 ring-1 ring-cyan-500/50' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
                 title={`Frame ${frameIndex}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
                 onClick={onRowClick ? () => onRowClick(idx) : undefined}
               >
@@ -233,7 +233,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                   </td>
                 )}
                 <td
-                  className={`px-2 py-0.5 ${textDarkSubtle}`}
+                  className={`px-2 py-0.5 ${textDataTertiary}`}
                   title={formatHumanUs(frame.timestamp_us)}
                 >
                   {formatTime(frame.timestamp_us, prevFrame?.timestamp_us ?? null)}
@@ -257,7 +257,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                     }
                   </td>
                 )}
-                <td className={`px-2 py-0.5 ${textDarkMuted}`}>{frame.dlc}</td>
+                <td className={`px-2 py-0.5 ${textDataSecondary}`}>{frame.dlc}</td>
                 {showCalculator && (
                   <td className="px-1 py-0.5">
                     <button
@@ -284,7 +284,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
         </tbody>
       </table>
       {frames.length === 0 ? (
-        <div className={`${textDarkSubtle} text-center py-8`}>
+        <div className={`${textDataTertiary} text-center py-8`}>
           {emptyMessage}
         </div>
       ) : (

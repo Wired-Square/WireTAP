@@ -31,14 +31,14 @@ export default function MetaView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-            <FileText className={`${iconLg} text-blue-600 dark:text-blue-400`} />
+          <div className="p-2 bg-[var(--accent-bg)] rounded-lg">
+            <FileText className={`${iconLg} text-[color:var(--accent-text)]`} />
           </div>
           <div>
-            <div className="text-lg font-bold text-slate-900 dark:text-white">
+            <div className="text-lg font-bold text-[color:var(--text-primary)]">
               Catalog Metadata
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-[color:var(--text-muted)]">
               Name, version, and protocol settings
             </p>
           </div>
@@ -48,7 +48,7 @@ export default function MetaView({
           className={iconButtonHover}
           title="Edit metadata and config"
         >
-          <Pencil className={`${iconMd} text-slate-700 dark:text-slate-200`} />
+          <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
         </button>
       </div>
 
@@ -81,14 +81,14 @@ export default function MetaView({
 
         {/* CAN Config */}
         <ProtocolConfigCard
-          icon={<Network className={`${iconMd} text-green-600 dark:text-green-400`} />}
-          iconBg="bg-green-100 dark:bg-green-900/30"
+          icon={<Network className={`${iconMd} text-[color:var(--status-success)]`} />}
+          iconBg="bg-[var(--status-success-bg)]"
           name="CAN"
           isConfigured={!!canConfig}
           hasFrames={hasCanFrames}
         >
           {canConfig && (
-            <div className="text-xs text-slate-600 dark:text-slate-400">
+            <div className="text-xs text-[color:var(--text-muted)]">
               <span>Endianness: {canConfig.default_endianness}</span>
               {canConfig.default_interval !== undefined && (
                 <span> • Interval: {canConfig.default_interval}ms</span>
@@ -105,14 +105,14 @@ export default function MetaView({
 
         {/* Serial Config */}
         <ProtocolConfigCard
-          icon={<Cable className={`${iconMd} text-purple-600 dark:text-purple-400`} />}
-          iconBg="bg-purple-100 dark:bg-purple-900/30"
+          icon={<Cable className={`${iconMd} text-[color:var(--status-info)]`} />}
+          iconBg="bg-[var(--status-info-bg)]"
           name="Serial"
           isConfigured={!!serialConfig}
           hasFrames={hasSerialFrames}
         >
           {serialConfig && (
-            <div className="text-xs text-slate-600 dark:text-slate-400">
+            <div className="text-xs text-[color:var(--text-muted)]">
               <span>Encoding: {serialConfig.encoding?.toUpperCase()}</span>
               {serialConfig.byte_order && (
                 <span> • {serialConfig.byte_order === 'big' ? 'BE' : 'LE'}</span>
@@ -132,14 +132,14 @@ export default function MetaView({
 
         {/* Modbus Config */}
         <ProtocolConfigCard
-          icon={<Network className={`${iconMd} text-amber-600 dark:text-amber-400`} />}
-          iconBg="bg-amber-100 dark:bg-amber-900/30"
+          icon={<Network className={`${iconMd} text-[color:var(--status-warning)]`} />}
+          iconBg="bg-[var(--status-warning-bg)]"
           name="Modbus"
           isConfigured={!!modbusConfig}
           hasFrames={hasModbusFrames}
         >
           {modbusConfig && (
-            <div className="text-xs text-slate-600 dark:text-slate-400">
+            <div className="text-xs text-[color:var(--text-muted)]">
               <span>Address: {modbusConfig.device_address}</span>
               <span> • Base: {modbusConfig.register_base}-based</span>
             </div>
@@ -169,21 +169,21 @@ function ProtocolConfigCard({
   const showWarning = hasFrames && !isConfigured;
 
   return (
-    <div className={`flex items-start gap-3 p-3 ${bgSecondary} rounded-lg border border-slate-200 dark:border-slate-700`}>
+    <div className={`flex items-start gap-3 p-3 ${bgSecondary} rounded-lg border border-[color:var(--border-default)]`}>
       <div className={`p-1.5 ${iconBg} rounded`}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">
         <div className={flexRowGap2}>
-          <span className="font-medium text-sm text-slate-900 dark:text-white">{name}</span>
+          <span className="font-medium text-sm text-[color:var(--text-primary)]">{name}</span>
           {isConfigured && (
-            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+            <span className="flex items-center gap-1 text-xs text-[color:var(--status-success)]">
               <Check className={iconXs} />
               configured
             </span>
           )}
           {showWarning && (
-            <span className="text-xs text-amber-600 dark:text-amber-400">
+            <span className="text-xs text-[color:var(--status-warning)]">
               frames exist, no config
             </span>
           )}

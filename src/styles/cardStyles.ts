@@ -1,5 +1,8 @@
 // ui/src/styles/cardStyles.ts
 // Centralized card, panel, and container styles
+//
+// NOTE: Cards use CSS variables for backgrounds to work correctly on Windows WebView
+// where Tailwind dark: variants in string constants don't get generated.
 
 /**
  * Card base - common border and rounding
@@ -9,20 +12,23 @@ export const cardBase = "rounded-lg border";
 /**
  * Default card - subtle background for content sections
  * Use for: Content panels, form sections
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const cardDefault = `${cardBase} bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700`;
+export const cardDefault = `${cardBase} bg-[var(--bg-surface)] border-[color:var(--border-default)]`;
 
 /**
  * Elevated card - white background with subtle shadow
  * Use for: Floating panels, prominent content
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const cardElevated = `${cardBase} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm`;
+export const cardElevated = `${cardBase} bg-[var(--bg-surface)] border-[color:var(--border-default)] shadow-sm`;
 
 /**
  * Interactive card - hover state for clickable cards
  * Use for: List items, selectable cards
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const cardInteractive = `${cardBase} bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer transition-colors`;
+export const cardInteractive = `${cardBase} bg-[var(--bg-surface)] border-[color:var(--border-default)] hover:brightness-95 cursor-pointer transition-all`;
 
 /**
  * Alert base - common alert box styles
@@ -31,29 +37,34 @@ export const alertBase = "rounded-lg p-4 border";
 
 /**
  * Info alert - blue, for informational messages
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const alertInfo = `${alertBase} bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800`;
+export const alertInfo = `${alertBase} bg-[var(--status-info-bg)] border-[color:var(--status-info-border)]`;
 
 /**
  * Warning alert - amber, for warning messages
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const alertWarning = `${alertBase} bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800`;
+export const alertWarning = `${alertBase} bg-[var(--status-warning-bg)] border-[color:var(--status-warning-border)]`;
 
 /**
  * Danger alert - red, for error messages
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const alertDanger = `${alertBase} bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800`;
+export const alertDanger = `${alertBase} bg-[var(--status-danger-bg)] border-[color:var(--status-danger-border)]`;
 
 /**
  * Success alert - green, for success messages
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const alertSuccess = `${alertBase} bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800`;
+export const alertSuccess = `${alertBase} bg-[var(--status-success-bg)] border-[color:var(--status-success-border)]`;
 
 /**
  * Detail box - for technical details, code blocks
  * Use for: Error details, code previews
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const detailBox = "bg-slate-100 dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700";
+export const detailBox = "bg-[var(--bg-surface)] rounded-lg p-4 border border-[color:var(--border-default)]";
 
 /**
  * Padding sizes for cards
@@ -68,25 +79,29 @@ export const cardPadding = {
 /**
  * Compact error box - red, small text
  * Use for: Inline error messages in forms/dialogs
+ * Note: Uses fixed colours for semantic meaning (errors should always be red)
  */
-export const errorBoxCompact = "p-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded";
+export const errorBoxCompact = "p-2 text-xs text-red-600 bg-red-50 rounded";
 
 /**
  * Panel footer - for action button containers
  * Use for: Bottom section of dialogs/panels with action buttons
+ * Uses CSS variables for cross-platform dark mode support
  */
-export const panelFooter = "p-3 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700";
+export const panelFooter = "p-3 bg-[var(--bg-primary)] border-t border-[color:var(--border-default)]";
 
 /**
  * Expandable row container - for collapsible config sections
  * Use for: Config dialog expandable section headers
+ * Uses CSS variables for cross-platform dark mode support
  */
 export const expandableRowContainer =
-  "w-full flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer";
+  "w-full flex items-center justify-between px-4 py-3 bg-[var(--bg-surface)] hover:brightness-95 transition-all cursor-pointer";
 
 /**
  * Selectable option box - for radio/checkbox option containers
  * Use for: Export dialogs with radio button options
+ * Uses CSS variables for cross-platform dark mode support
  */
 export const selectableOptionBox =
-  "flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors";
+  "flex items-start gap-3 p-3 rounded-lg border border-[color:var(--border-default)] cursor-pointer hover:brightness-95 transition-all";

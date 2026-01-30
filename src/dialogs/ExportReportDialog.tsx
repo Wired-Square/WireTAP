@@ -46,10 +46,10 @@ export default function ExportReportDialog({
   return (
     <Dialog isOpen={open} maxWidth="max-w-md">
       <div className="p-6 space-y-4">
-        <div className="text-lg font-semibold text-slate-900 dark:text-white">
+        <div className="text-lg font-semibold text-[color:var(--text-primary)]">
           {title}
         </div>
-        <div className="text-sm text-slate-600 dark:text-slate-400">
+        <div className="text-sm text-[color:var(--text-secondary)]">
           {description}
         </div>
 

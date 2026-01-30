@@ -10,17 +10,17 @@ export default function ChangesToolPanel() {
   return (
     <div className="space-y-2 text-xs">
       <div className="space-y-1">
-        <label className="text-slate-500 dark:text-slate-400">Max Change Examples</label>
+        <label className="text-[color:var(--text-muted)]">Max Change Examples</label>
         <input
           type="number"
           min={1}
           max={100}
           value={options.maxExamples}
           onChange={(e) => updateOptions({ maxExamples: Math.max(1, Math.min(100, Number(e.target.value) || 30)) })}
-          className={`w-full px-2 py-1 rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-800 dark:text-slate-100`}
+          className={`w-full px-2 py-1 rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-primary)]`}
         />
       </div>
-      <p className="text-slate-400 dark:text-slate-500">
+      <p className="text-[color:var(--text-muted)]">
         Maximum unique payload samples to analyse per frame ID.
       </p>
     </div>

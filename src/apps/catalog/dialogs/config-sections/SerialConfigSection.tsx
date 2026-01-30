@@ -210,7 +210,7 @@ export default function SerialConfigSection({
   }));
 
   return (
-    <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+    <div className="border border-[color:var(--border-default)] rounded-lg overflow-hidden">
       {/* Header */}
       <div
         role="button"
@@ -225,18 +225,18 @@ export default function SerialConfigSection({
           ) : (
             <ChevronRight className={`${iconMd} text-slate-500`} />
           )}
-          <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded">
-            <Cable className={`${iconMd} text-purple-600 dark:text-purple-400`} />
+          <div className="p-1.5 bg-[var(--bg-purple)] rounded">
+            <Cable className={`${iconMd} text-[color:var(--text-purple)]`} />
           </div>
-          <span className="font-medium text-slate-900 dark:text-white">Serial</span>
+          <span className="font-medium text-[color:var(--text-primary)]">Serial</span>
           {isConfigured && (
-            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+            <span className="flex items-center gap-1 text-xs text-[color:var(--text-green)]">
               <Check className={iconXs} />
               configured
             </span>
           )}
           {showWarning && (
-            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <span className="flex items-center gap-1 text-xs text-[color:var(--text-amber)]">
               <AlertTriangle className={iconXs} />
               frames exist, no config
             </span>
@@ -247,7 +247,7 @@ export default function SerialConfigSection({
             <button
               type="button"
               onClick={onRemove}
-              className="px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+              className="px-2 py-1 text-xs text-[color:var(--text-red)] hover:bg-[var(--hover-bg-red)] rounded transition-colors"
             >
               Remove
             </button>
@@ -255,7 +255,7 @@ export default function SerialConfigSection({
             <button
               type="button"
               onClick={onAdd}
-              className="px-2 py-1 text-xs text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded transition-colors"
+              className="px-2 py-1 text-xs text-[color:var(--text-purple)] hover:bg-[var(--hover-bg-purple)] rounded transition-colors"
             >
               + Add
             </button>
@@ -265,7 +265,7 @@ export default function SerialConfigSection({
 
       {/* Content */}
       {isExpanded && isConfigured && (
-        <div className="p-4 space-y-4 border-t border-slate-200 dark:border-slate-700">
+        <div className="p-4 space-y-4 border-t border-[color:var(--border-default)]">
           {/* Encoding and Byte Order row */}
           <div className="grid grid-cols-2 gap-4">
             {/* Encoding */}
@@ -276,7 +276,7 @@ export default function SerialConfigSection({
               <select
                 value={encoding}
                 onChange={(e) => setEncoding(e.target.value as SerialEncoding)}
-                className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+                className={`w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               >
                 {encodingOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -297,7 +297,7 @@ export default function SerialConfigSection({
               <select
                 value={byteOrder}
                 onChange={(e) => setByteOrder(e.target.value as "little" | "big")}
-                className={`w-full px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+                className={`w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               >
                 <option value="big">Big Endian (MSB first)</option>
                 <option value="little">Little Endian (LSB first)</option>
@@ -309,14 +309,14 @@ export default function SerialConfigSection({
           </div>
 
           {/* Header Section */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+          <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
             <h3 className={`${textMedium} mb-3`}>
               Header
             </h3>
 
             {/* Header Length */}
             <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                 Header Length (bytes)
               </label>
               <input
@@ -328,7 +328,7 @@ export default function SerialConfigSection({
                   const val = e.target.value;
                   setHeaderLength(val === "" ? undefined : Math.max(1, Math.min(8, parseInt(val) || 1)));
                 }}
-                className={`w-24 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white ${focusRing}`}
+                className={`w-24 px-3 py-1.5 bg-[var(--bg-secondary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
                 placeholder="2"
               />
               <p className={`mt-1 ${caption}`}>
@@ -338,7 +338,7 @@ export default function SerialConfigSection({
           </div>
 
           {/* Header Fields Section */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+          <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className={textMedium}>
@@ -352,7 +352,7 @@ export default function SerialConfigSection({
                 <button
                   type="button"
                   onClick={() => setIsAddingField(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[var(--bg-purple)] text-[color:var(--text-purple)] rounded-lg hover:bg-[var(--hover-bg-purple)] transition-colors"
                 >
                   <Plus className={iconMd} />
                   Add Field
@@ -365,12 +365,12 @@ export default function SerialConfigSection({
               <div className="space-y-2 mb-3">
                 {headerFields.map((field, index) => (
                   <div key={index} className="space-y-2">
-                    <div className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2 p-2 bg-[var(--bg-secondary)] rounded-lg border border-[color:var(--border-default)]">
                       {/* Expand/collapse toggle */}
                       <button
                         type="button"
                         onClick={() => toggleFieldPicker(index)}
-                        className="p-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                        className="p-1 text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
                         title={expandedFieldPickers[index] ? "Hide bit picker" : "Show bit picker"}
                       >
                         {expandedFieldPickers[index] ? (
@@ -381,12 +381,12 @@ export default function SerialConfigSection({
                       </button>
 
                       {/* Field name */}
-                      <span className="w-28 font-medium text-sm text-slate-900 dark:text-white truncate">
+                      <span className="w-28 font-medium text-sm text-[color:var(--text-primary)] truncate">
                         {field.name}
                       </span>
 
                       {/* Mask value */}
-                      <code className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-xs font-mono text-slate-700 dark:text-slate-300">
+                      <code className="px-2 py-0.5 bg-[var(--bg-tertiary)] rounded text-xs font-mono text-[color:var(--text-secondary)]">
                         {formatMaskHex(field.mask, effectiveHeaderLength)}
                       </code>
 
@@ -402,7 +402,7 @@ export default function SerialConfigSection({
                       <select
                         value={field.endianness}
                         onChange={(e) => handleUpdateField(index, { endianness: e.target.value as "big" | "little" })}
-                        className={`w-16 px-1 py-1 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                        className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                         title="Byte order"
                       >
                         <option value="big">BE</option>
@@ -413,7 +413,7 @@ export default function SerialConfigSection({
                       <select
                         value={field.format}
                         onChange={(e) => handleUpdateField(index, { format: e.target.value as HeaderFieldFormat })}
-                        className={`w-16 px-1 py-1 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                        className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                       >
                         <option value="hex">Hex</option>
                         <option value="decimal">Dec</option>
@@ -423,7 +423,7 @@ export default function SerialConfigSection({
                       <button
                         type="button"
                         onClick={() => handleRemoveField(index)}
-                        className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                        className="p-1 text-red-500 hover:bg-[var(--hover-bg-red)] rounded transition-colors"
                         title="Remove field"
                       >
                         <Trash2 className={iconMd} />
@@ -432,7 +432,7 @@ export default function SerialConfigSection({
 
                     {/* Expanded bit picker */}
                     {expandedFieldPickers[index] && (
-                      <div className="ml-8 p-3 bg-slate-100 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                      <div className="ml-8 p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[color:var(--border-default)]">
                         <MaskBitPicker
                           mask={field.mask}
                           shift={0}
@@ -448,13 +448,13 @@ export default function SerialConfigSection({
 
             {/* Add new field form */}
             {isAddingField && (
-              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+              <div className="p-3 bg-[var(--bg-purple-subtle)] rounded-lg border border-[color:var(--border-purple)]">
                 <div className="flex items-center gap-2 mb-3">
                   {/* Field type dropdown */}
                   <select
                     value={newFieldType}
                     onChange={(e) => setNewFieldType(e.target.value as FieldType)}
-                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                   >
                     {availableFieldTypes.map((opt) => (
                       <option key={opt.value} value={opt.value} disabled={opt.disabled}>
@@ -469,7 +469,7 @@ export default function SerialConfigSection({
                       type="text"
                       value={newFieldCustomName}
                       onChange={(e) => setNewFieldCustomName(e.target.value)}
-                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                       placeholder="Field name"
                       autoFocus
                     />
@@ -479,7 +479,7 @@ export default function SerialConfigSection({
                   <select
                     value={newFieldEndianness}
                     onChange={(e) => setNewFieldEndianness(e.target.value as "big" | "little")}
-                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                     title="Byte order"
                   >
                     <option value="big">BE</option>
@@ -490,7 +490,7 @@ export default function SerialConfigSection({
                   <select
                     value={newFieldFormat}
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
-                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                   >
                     <option value="hex">Hex</option>
                     <option value="decimal">Dec</option>
@@ -505,7 +505,7 @@ export default function SerialConfigSection({
                     <button
                       type="button"
                       onClick={resetAddForm}
-                      className="px-3 py-1 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                      className="px-3 py-1 text-sm text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] rounded transition-colors"
                     >
                       Cancel
                     </button>
@@ -530,7 +530,7 @@ export default function SerialConfigSection({
           </div>
 
           {/* Protocol-Level Checksum Section */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+          <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className={textMedium}>
@@ -544,7 +544,7 @@ export default function SerialConfigSection({
                 <button
                   type="button"
                   onClick={handleAddChecksum}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[var(--bg-purple)] text-[color:var(--text-purple)] rounded-lg hover:bg-[var(--hover-bg-purple)] transition-colors"
                 >
                   <Plus className={iconMd} />
                   Add Checksum
@@ -553,7 +553,7 @@ export default function SerialConfigSection({
                 <button
                   type="button"
                   onClick={handleRemoveChecksum}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-[color:var(--text-red)] hover:bg-[var(--hover-bg-red)] rounded-lg transition-colors"
                 >
                   <Trash2 className={iconMd} />
                   Remove
@@ -562,16 +562,16 @@ export default function SerialConfigSection({
             </div>
 
             {checksum && (
-              <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="p-3 bg-[var(--bg-secondary)] rounded-lg border border-[color:var(--border-default)] space-y-3">
                 {/* Algorithm */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                     Algorithm
                   </label>
                   <select
                     value={checksum.algorithm}
                     onChange={(e) => handleUpdateChecksum({ algorithm: e.target.value as ChecksumAlgorithm })}
-                    className={`w-full px-3 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                   >
                     {CHECKSUM_ALGORITHMS.map((alg) => (
                       <option key={alg.id} value={alg.id}>
@@ -587,14 +587,14 @@ export default function SerialConfigSection({
                 {/* Checksum location */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                       Start Byte
                     </label>
                     <input
                       type="number"
                       value={checksum.start_byte}
                       onChange={(e) => handleUpdateChecksum({ start_byte: parseInt(e.target.value) || 0 })}
-                      className={`w-full px-3 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                       title="Byte position where checksum is stored (-1 = last byte)"
                     />
                     <p className={`mt-0.5 ${caption}`}>
@@ -602,13 +602,13 @@ export default function SerialConfigSection({
                     </p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                       Byte Length
                     </label>
                     <select
                       value={checksum.byte_length}
                       onChange={(e) => handleUpdateChecksum({ byte_length: parseInt(e.target.value) })}
-                      className={`w-full px-3 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                     >
                       <option value={1}>1 byte</option>
                       <option value={2}>2 bytes</option>
@@ -619,26 +619,26 @@ export default function SerialConfigSection({
                 {/* Calculation range */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                       Calc Start Byte
                     </label>
                     <input
                       type="number"
                       value={checksum.calc_start_byte}
                       onChange={(e) => handleUpdateChecksum({ calc_start_byte: parseInt(e.target.value) || 0 })}
-                      className={`w-full px-3 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                       title="First byte included in calculation"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                       Calc End Byte
                     </label>
                     <input
                       type="number"
                       value={checksum.calc_end_byte}
                       onChange={(e) => handleUpdateChecksum({ calc_end_byte: parseInt(e.target.value) || 0 })}
-                      className={`w-full px-3 py-1.5 ${bgSurface} border border-slate-300 dark:border-slate-600 rounded text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
                       title="Last byte (exclusive) included in calculation (-1 = up to checksum)"
                     />
                     <p className={`mt-0.5 ${caption}`}>
@@ -655,9 +655,9 @@ export default function SerialConfigSection({
                       id="checksum-big-endian"
                       checked={checksum.big_endian ?? false}
                       onChange={(e) => handleUpdateChecksum({ big_endian: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-purple-600 focus:ring-purple-500"
+                      className="w-4 h-4 rounded border-[color:var(--border-default)] text-purple-600 focus:ring-purple-500"
                     />
-                    <label htmlFor="checksum-big-endian" className="text-sm text-slate-700 dark:text-slate-300">
+                    <label htmlFor="checksum-big-endian" className="text-sm text-[color:var(--text-secondary)]">
                       Big endian (MSB first)
                     </label>
                   </div>
@@ -676,7 +676,7 @@ export default function SerialConfigSection({
 
       {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
-        <div className={`px-4 py-2 ${caption} border-t border-slate-200 dark:border-slate-700`}>
+        <div className={`px-4 py-2 ${caption} border-t border-[color:var(--border-default)]`}>
           Encoding: {encoding.toUpperCase()} • {byteOrder === 'big' ? 'BE' : 'LE'}
           {headerLength !== undefined && headerLength > 0 && ` • Header: ${headerLength}B`}
           {headerFields.length > 0 && ` • ${headerFields.length} field(s)`}

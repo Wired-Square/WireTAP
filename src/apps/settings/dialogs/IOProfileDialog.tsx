@@ -333,7 +333,7 @@ export default function IOProfileDialog({
             className={iconButtonHover}
             title="Go back without saving"
           >
-            <ArrowLeft className={`${iconLg} text-slate-600 dark:text-slate-400`} />
+            <ArrowLeft className={`${iconLg} text-[color:var(--text-muted)]`} />
           </button>
         </div>
 
@@ -413,12 +413,12 @@ export default function IOProfileDialog({
 
               {/* MQTT Formats */}
               <div className={`border-t ${borderDefault} pt-4 mt-6`}>
-                <h4 className="text-md font-semibold text-slate-900 dark:text-white mb-4">
+                <h4 className="text-md font-semibold text-[color:var(--text-primary)] mb-4">
                   Message Formats
                 </h4>
 
                 {/* JSON */}
-                <div className="mb-4 p-4 bg-slate-100 dark:bg-slate-900/50 rounded-lg">
+                <div className="mb-4 p-4 bg-[var(--bg-surface)] rounded-lg">
                   <div className="flex items-center gap-2 mb-3">
                     <input
                       type="checkbox"
@@ -427,7 +427,7 @@ export default function IOProfileDialog({
                       onChange={(e) =>
                         onUpdateMqttFormat("json", "enabled", e.target.checked)
                       }
-                      className="w-4 h-4 text-blue-600 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500"
+                      className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
                     />
                     <label
                       htmlFor="format-json"
@@ -447,7 +447,7 @@ export default function IOProfileDialog({
                 </div>
 
                 {/* SavvyCAN */}
-                <div className="mb-4 p-4 bg-slate-100 dark:bg-slate-900/50 rounded-lg">
+                <div className="mb-4 p-4 bg-[var(--bg-surface)] rounded-lg">
                   <div className="flex items-center gap-2 mb-3">
                     <input
                       type="checkbox"
@@ -456,7 +456,7 @@ export default function IOProfileDialog({
                       onChange={(e) =>
                         onUpdateMqttFormat("savvycan", "enabled", e.target.checked)
                       }
-                      className="w-4 h-4 text-blue-600 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500"
+                      className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
                     />
                     <label
                       htmlFor="format-savvycan"
@@ -478,7 +478,7 @@ export default function IOProfileDialog({
                 </div>
 
                 {/* Decode */}
-                <div className="mb-4 p-4 bg-slate-100 dark:bg-slate-900/50 rounded-lg">
+                <div className="mb-4 p-4 bg-[var(--bg-surface)] rounded-lg">
                   <div className="flex items-center gap-2 mb-3">
                     <input
                       type="checkbox"
@@ -487,7 +487,7 @@ export default function IOProfileDialog({
                       onChange={(e) =>
                         onUpdateMqttFormat("decode", "enabled", e.target.checked)
                       }
-                      className="w-4 h-4 text-blue-600 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500"
+                      className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
                     />
                     <label
                       htmlFor="format-decode"
@@ -651,7 +651,7 @@ export default function IOProfileDialog({
                   onChange={(e) =>
                     onUpdateConnectionField("tcp_keepalive", e.target.checked)
                   }
-                  className="w-4 h-4 text-blue-600 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
                 />
                 <label
                   htmlFor="tcp-keepalive"
@@ -667,7 +667,7 @@ export default function IOProfileDialog({
                   <h4 className={textMedium}>
                     CAN Interfaces
                     {gvretProbeState === "success" && (
-                      <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                      <span className="ml-2 text-xs text-[color:var(--text-green)]">
                         (device online)
                       </span>
                     )}
@@ -684,7 +684,7 @@ export default function IOProfileDialog({
 
                 {!editingProfileId && (
                   <div className={alertInfo}>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="text-sm text-[color:var(--text-info)]">
                       Save the profile first to probe the device and configure interfaces.
                     </p>
                   </div>
@@ -692,7 +692,7 @@ export default function IOProfileDialog({
 
                 {gvretProbeError && (
                   <div className={alertWarning}>
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <p className="text-sm text-[color:var(--text-amber)]">
                       {gvretProbeError}
                     </p>
                   </div>
@@ -711,7 +711,7 @@ export default function IOProfileDialog({
                 )}
 
                 {editingProfileId && getGvretBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-sm text-[color:var(--text-muted)]">
                     Click "Probe Device" to detect available interfaces.
                   </p>
                 )}
@@ -748,7 +748,7 @@ export default function IOProfileDialog({
               </FormField>
 
               <div className={alertInfo}>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="text-sm text-[color:var(--text-info)]">
                   Works with ESP32-RET, M2RET, CANDue, and other GVRET-compatible hardware over USB serial.
                   Supports multi-bus devices and frame transmission.
                 </p>
@@ -760,7 +760,7 @@ export default function IOProfileDialog({
                   <h4 className={textMedium}>
                     CAN Interfaces
                     {gvretProbeState === "success" && (
-                      <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                      <span className="ml-2 text-xs text-[color:var(--text-green)]">
                         (device online)
                       </span>
                     )}
@@ -777,7 +777,7 @@ export default function IOProfileDialog({
 
                 {!editingProfileId && (
                   <div className={alertInfo}>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="text-sm text-[color:var(--text-info)]">
                       Save the profile first to probe the device and configure interfaces.
                     </p>
                   </div>
@@ -785,7 +785,7 @@ export default function IOProfileDialog({
 
                 {gvretProbeError && (
                   <div className={alertWarning}>
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <p className="text-sm text-[color:var(--text-amber)]">
                       {gvretProbeError}
                     </p>
                   </div>
@@ -804,7 +804,7 @@ export default function IOProfileDialog({
                 )}
 
                 {editingProfileId && getGvretBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-sm text-[color:var(--text-muted)]">
                     Click "Probe Device" to detect available interfaces.
                   </p>
                 )}
@@ -827,7 +827,7 @@ export default function IOProfileDialog({
               </FormField>
 
               <div className={alertInfo}>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="text-sm text-[color:var(--text-info)]">
                   {profileForm.connection.file_path
                     ? "This profile will always use the specified file."
                     : "Leave empty to select a file when starting the stream."}
@@ -996,7 +996,7 @@ export default function IOProfileDialog({
                   id="silent-mode"
                   checked={profileForm.connection.silent_mode !== false}
                   onChange={(e) => onUpdateConnectionField("silent_mode", e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
                 />
                 <label
                   htmlFor="silent-mode"
@@ -1010,11 +1010,11 @@ export default function IOProfileDialog({
               </p>
 
               {/* Advanced Serial Options */}
-              <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+              <div className="border-t border-[color:var(--border-default)] pt-4 mt-4">
                 <button
                   type="button"
                   onClick={() => setSlcanAdvancedOpen(!slcanAdvancedOpen)}
-                  className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                  className="flex items-center gap-2 text-sm font-medium text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] transition-colors"
                 >
                   {slcanAdvancedOpen ? (
                     <ChevronDown className={iconMd} />
@@ -1069,7 +1069,7 @@ export default function IOProfileDialog({
               </div>
 
               <div className={alertInfo}>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="text-sm text-[color:var(--text-info)]">
                   Works with CANable, CANable Pro (slcan firmware), and other USB-CAN adapters
                   using the Lawicel/slcan ASCII protocol.
                 </p>
@@ -1112,11 +1112,11 @@ export default function IOProfileDialog({
               </FormField>
 
               <div className={alertInfo}>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="text-sm text-[color:var(--text-info)]">
                   <strong>Linux only.</strong> Works with CANable Pro (Candlelight firmware),
                   native CAN hardware, or virtual CAN (vcan).
                 </p>
-                <p className="text-sm text-blue-800 dark:text-blue-200 mt-2">
+                <p className="text-sm text-[color:var(--text-info)] mt-2">
                   {profileForm.connection.bitrate
                     ? "CANdor will configure the interface automatically (requires authentication)."
                     : "Leave bitrate empty to use the interface as already configured by the system."}
@@ -1177,9 +1177,9 @@ export default function IOProfileDialog({
                   id="gs_usb_listen_only"
                   checked={profileForm.connection.listen_only !== false}
                   onChange={(e) => onUpdateConnectionField("listen_only", e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
                 />
-                <label htmlFor="gs_usb_listen_only" className="text-sm text-slate-700 dark:text-slate-300">
+                <label htmlFor="gs_usb_listen_only" className="text-sm text-[color:var(--text-secondary)]">
                   Listen-only mode (no ACK, no transmit)
                 </label>
               </div>
@@ -1207,7 +1207,7 @@ export default function IOProfileDialog({
               )}
 
               <div className={alertInfo}>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+                <p className="text-sm text-[color:var(--text-info)]">
                   Works with CANable, CANable Pro (candleLight firmware), and other gs_usb-compatible devices.
                   {platformIsWindows && " WinUSB driver should install automatically."}
                   {platformIsMacos && " macOS allows direct USB access - no driver needed."}

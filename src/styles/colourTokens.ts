@@ -1,187 +1,232 @@
-// ui/src/styles/colorTokens.ts
+// ui/src/styles/colourTokens.ts
 //
-// Centralized color tokens for consistent palette across the app.
-// These map to Tailwind color classes but provide semantic meaning.
+// Centralised colour tokens for consistent palette across the app.
+// Core colours use CSS variables (set by useTheme) for user customisation.
+// Status and accent colours use Tailwind classes for simplicity.
 
 // =============================================================================
-// Semantic Background Colors
+// CSS Variable-based Colours (User Customisable)
 // =============================================================================
+// These use Tailwind arbitrary value syntax to reference CSS variables.
+// The variables are set by useTheme based on user settings.
 
-/** Primary surface (main app background) */
-export const bgPrimary = "bg-white dark:bg-slate-900";
+/** Primary surface (main app background) - uses CSS variable */
+export const bgPrimary = "bg-[var(--bg-primary)]";
 
-/** Surface background (dialogs, panels, elevated cards) */
-export const bgSurface = "bg-white dark:bg-slate-800";
+/** Surface background (dialogs, panels, elevated cards) - uses CSS variable */
+export const bgSurface = "bg-[var(--bg-surface)]";
 
-/** Secondary surface (cards, panels) */
-export const bgSecondary = "bg-slate-50 dark:bg-slate-800";
+/** Primary text (headings, main content) - uses CSS variable */
+export const textPrimary = "text-[color:var(--text-primary)]";
 
-/** Tertiary surface (inputs, nested elements) */
-export const bgTertiary = "bg-slate-100 dark:bg-slate-700";
+/** Secondary text (descriptions, labels) - uses CSS variable */
+export const textSecondary = "text-[color:var(--text-secondary)]";
 
-/** Muted background (disabled, inactive) */
-export const bgMuted = "bg-slate-200 dark:bg-slate-700";
+/** Default border - uses CSS variable */
+export const borderDefault = "border-[color:var(--border-default)]";
 
-// =============================================================================
-// Semantic Text Colors
-// =============================================================================
+/** Data view background - uses CSS variable */
+export const bgDataView = "bg-[var(--data-bg)]";
 
-/** Primary text (headings, main content) */
-export const textPrimary = "text-slate-900 dark:text-white";
-
-/** Secondary text (descriptions, labels) */
-export const textSecondary = "text-slate-700 dark:text-slate-300";
-
-/** Tertiary text (hints, help text) */
-export const textTertiary = "text-slate-500 dark:text-slate-400";
-
-/** Muted text (disabled, placeholder) */
-export const textMuted = "text-slate-400 dark:text-slate-500";
+/** Data view primary text - uses CSS variable */
+export const textDataPrimary = "text-[color:var(--data-text-primary)]";
 
 // =============================================================================
-// Semantic Border Colors
+// Secondary Semantic Colours (CSS variable-based for Windows compatibility)
 // =============================================================================
 
-/** Default border */
-export const borderDefault = "border-slate-200 dark:border-slate-700";
+/** Secondary surface (cards, panels) - uses CSS variable */
+export const bgSecondary = "bg-[var(--bg-surface)]";
 
-/** Strong border (focus, emphasis) */
-export const borderStrong = "border-slate-300 dark:border-slate-600";
+/** Tertiary surface (inputs, nested elements) - uses CSS variable with opacity */
+export const bgTertiary = "bg-[var(--bg-surface)]";
 
-/** Subtle border (dividers) */
-export const borderSubtle = "border-slate-100 dark:border-slate-800";
+/** Muted background (disabled, inactive) - uses CSS variable */
+export const bgMuted = "bg-[var(--bg-surface)]";
 
-/** Bottom border divider (for section separators) */
-export const borderDivider = "border-b border-slate-200 dark:border-slate-700";
+/** Tertiary text (hints, help text) - uses secondary with reduced opacity */
+export const textTertiary = "text-[color:var(--text-secondary)]";
+
+/** Muted text (disabled, placeholder) - uses CSS variable */
+export const textMuted = "text-[color:var(--text-muted)]";
+
+/** Strong border (focus, emphasis) - uses CSS variable */
+export const borderStrong = "border-[color:var(--border-default)]";
+
+/** Subtle border (dividers) - uses CSS variable with opacity */
+export const borderSubtle = "border-[color:var(--border-default)] opacity-50";
+
+/** Bottom border divider (for section separators) - uses CSS variable */
+export const borderDivider = "border-b border-[color:var(--border-default)]";
 
 // =============================================================================
-// Status Colors (backgrounds)
+// Status Colors (backgrounds) - CSS variable based for Windows compatibility
 // =============================================================================
 
 /** Success background */
-export const bgSuccess = "bg-green-100 dark:bg-green-900/30";
+export const bgSuccess = "bg-[var(--status-success-bg)]";
 
 /** Danger/error background */
-export const bgDanger = "bg-red-100 dark:bg-red-900/30";
+export const bgDanger = "bg-[var(--status-danger-bg)]";
 
 /** Warning background */
-export const bgWarning = "bg-amber-100 dark:bg-amber-900/30";
+export const bgWarning = "bg-[var(--status-warning-bg)]";
 
 /** Info background */
-export const bgInfo = "bg-blue-100 dark:bg-blue-900/30";
+export const bgInfo = "bg-[var(--status-info-bg)]";
 
 // =============================================================================
-// Status Colors (text)
+// Status Colors (text) - CSS variable based for Windows compatibility
 // =============================================================================
 
 /** Success text */
-export const textSuccess = "text-green-700 dark:text-green-300";
+export const textSuccess = "text-[color:var(--status-success-text)]";
 
 /** Danger/error text */
-export const textDanger = "text-red-700 dark:text-red-300";
+export const textDanger = "text-[color:var(--status-danger-text)]";
 
 /** Warning text */
-export const textWarning = "text-amber-700 dark:text-amber-300";
+export const textWarning = "text-[color:var(--status-warning-text)]";
 
 /** Info text */
-export const textInfo = "text-blue-700 dark:text-blue-300";
+export const textInfo = "text-[color:var(--status-info-text)]";
 
 // =============================================================================
-// Status Colors (borders)
+// Status Colors (borders) - CSS variable based for Windows compatibility
 // =============================================================================
 
 /** Success border */
-export const borderSuccess = "border-green-200 dark:border-green-800";
+export const borderSuccess = "border-[color:var(--status-success-border)]";
 
 /** Danger/error border */
-export const borderDanger = "border-red-200 dark:border-red-800";
+export const borderDanger = "border-[color:var(--status-danger-border)]";
 
 /** Warning border */
-export const borderWarning = "border-amber-200 dark:border-amber-800";
+export const borderWarning = "border-[color:var(--status-warning-border)]";
 
 /** Info border */
-export const borderInfo = "border-blue-200 dark:border-blue-800";
+export const borderInfo = "border-[color:var(--status-info-border)]";
 
 // =============================================================================
-// Interactive Colors
+// Interactive Colors - Use CSS variables for accent
 // =============================================================================
 
-/** Primary action (buttons, links) */
-export const bgInteractive = "bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500";
+/** Primary action background (buttons) - uses CSS variable */
+export const bgInteractive = "bg-[var(--accent-primary)] hover:brightness-110";
 
-/** Primary action text */
-export const textInteractive = "text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300";
+/** Primary action text - uses CSS variable */
+export const textInteractive = "text-[color:var(--accent-primary)] hover:brightness-110";
 
 /** Focus ring */
 export const focusRing = "focus:ring-2 focus:ring-blue-500 focus:outline-none";
 
 // =============================================================================
-// Toolbar/Dark Theme Colors (for data view toolbars)
+// Data View Colors (CSS variable-based for Windows compatibility)
 // =============================================================================
 
-/** Dark toolbar background */
-export const bgToolbar = "bg-gray-800";
+/** Data view toolbar background - uses CSS variable */
+export const bgDataToolbar = "bg-[var(--bg-surface)]";
 
-/** Dark toolbar text */
-export const textToolbar = "text-gray-200";
+/** Data view border - uses CSS variable */
+export const borderDataView = "border-[color:var(--border-default)]";
 
-/** Dark toolbar border */
-export const borderToolbar = "border-gray-600";
+/** Data view input background - uses CSS variable */
+export const bgDataInput = "bg-[var(--bg-primary)]";
 
-/** Dark toolbar input */
-export const bgToolbarInput = "bg-gray-700";
+/** Data view secondary text - uses CSS variable */
+export const textDataSecondary = "text-[color:var(--text-secondary)]";
+
+/** Data view tertiary text - uses CSS variable with opacity */
+export const textDataTertiary = "text-[color:var(--text-secondary)] opacity-80";
+
+/** Data view muted/decorative text - uses CSS variable with opacity */
+export const textDataMuted = "text-[color:var(--text-secondary)] opacity-60";
+
+/** Data view placeholder text - uses CSS variable with opacity */
+export const textDataPlaceholder = "text-[color:var(--text-secondary)] opacity-60 italic";
 
 // =============================================================================
-// Hover States
+// Hover States - use brightness filter for cross-platform support
 // =============================================================================
 
 /** Light hover (for light backgrounds) */
-export const hoverLight = "hover:bg-slate-100 dark:hover:bg-slate-700";
+export const hoverLight = "hover:brightness-95";
 
 /** Subtle hover (for secondary surfaces) */
-export const hoverSubtle = "hover:bg-slate-200 dark:hover:bg-slate-600";
+export const hoverSubtle = "hover:brightness-90";
+
+/** Data view item hover */
+export const hoverDataItem = "hover:brightness-95";
+
+/** Data view row hover */
+export const hoverDataRow = "hover:brightness-95";
 
 // =============================================================================
-// Dark Data View Colors (for Discovery, Decoder tables)
+// Hover States - CSS variable based for Windows compatibility
 // =============================================================================
 
-/** Dark view container background */
-export const bgDarkView = "bg-gray-900";
+/** Hover background - uses CSS variable */
+export const hoverBg = "hover:bg-[var(--hover-bg)]";
 
-/** Dark view toolbar background */
-export const bgDarkToolbar = "bg-gray-800";
+// =============================================================================
+// Data Accent Colors (for table cells, syntax highlighting)
+// =============================================================================
+// These use CSS variables for Windows WebView compatibility.
 
-/** Dark view border */
-export const borderDarkView = "border-gray-700";
+export const textDataGreen = "text-[color:var(--text-green)]";
+export const textDataYellow = "text-[color:var(--text-yellow)]";
+export const textDataOrange = "text-[color:var(--text-orange)]";
+export const textDataPurple = "text-[color:var(--text-purple)]";
+export const textDataAmber = "text-[color:var(--text-amber)]";
+export const textDataCyan = "text-[color:var(--text-cyan)]";
 
-/** Dark view input background */
-export const bgDarkInput = "bg-gray-700";
+// =============================================================================
+// Legacy Aliases (for backward compatibility during migration)
+// =============================================================================
+// These will be removed once all components are migrated.
 
-/** Dark view input text */
-export const textDarkInput = "text-gray-200";
+/** @deprecated Use bgDataView instead */
+export const bgDarkView = bgDataView;
 
-/** Dark view muted text */
-export const textDarkMuted = "text-gray-300";
+/** @deprecated Use bgDataToolbar instead */
+export const bgDarkToolbar = bgDataToolbar;
 
-/** Dark view subtle text */
-export const textDarkSubtle = "text-gray-400";
+/** @deprecated Use borderDataView instead */
+export const borderDarkView = borderDataView;
 
-/** Dark view decorative elements (arrows, dividers) */
-export const textDarkDecorative = "text-gray-500";
+/** @deprecated Use bgDataInput instead */
+export const bgDarkInput = bgDataInput;
 
-/** Dark view placeholder text */
-export const textDarkPlaceholder = "text-gray-500 italic";
+/** @deprecated Use textDataPrimary instead */
+export const textDarkInput = textDataPrimary;
 
-/** Dark view hover */
-export const hoverDark = "hover:bg-gray-700";
+/** @deprecated Use textDataSecondary instead */
+export const textDarkMuted = textDataSecondary;
 
-/** Dark view row hover */
-export const hoverDarkRow = "hover:bg-gray-800";
+/** @deprecated Use textDataTertiary instead */
+export const textDarkSubtle = textDataTertiary;
 
-// Data colors for table cells
-export const textDataGreen = "text-green-400";
-export const textDataYellow = "text-yellow-400";
-export const textDataOrange = "text-orange-400";
-export const textDataPurple = "text-purple-400";
-export const textDataAmber = "text-amber-500";
-export const textDataCyan = "text-cyan-400";
+/** @deprecated Use textDataMuted instead */
+export const textDarkDecorative = textDataMuted;
+
+/** @deprecated Use textDataPlaceholder instead */
+export const textDarkPlaceholder = textDataPlaceholder;
+
+/** @deprecated Use hoverDataItem instead */
+export const hoverDark = hoverDataItem;
+
+/** @deprecated Use hoverDataRow instead */
+export const hoverDarkRow = hoverDataRow;
+
+// Legacy toolbar tokens (consolidated)
+/** @deprecated Use bgDataToolbar instead */
+export const bgToolbar = bgDataToolbar;
+
+/** @deprecated Use textSecondary instead */
+export const textToolbar = textSecondary;
+
+/** @deprecated Use borderStrong instead */
+export const borderToolbar = borderStrong;
+
+/** @deprecated Use bgTertiary instead */
+export const bgToolbarInput = bgTertiary;

@@ -110,12 +110,12 @@ export default function NewCatalogDialog({
                   >
                     <Icon
                       className={`${iconLg} ${
-                        isSelected ? "text-blue-600 dark:text-blue-400" : "text-slate-500 dark:text-slate-400"
+                        isSelected ? "text-[color:var(--accent-primary)]" : "text-[color:var(--text-muted)]"
                       }`}
                     />
                     <span
                       className={`font-medium ${
-                        isSelected ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300"
+                        isSelected ? "text-[color:var(--accent-primary)]" : "text-[color:var(--text-secondary)]"
                       }`}
                     >
                       {label}
@@ -147,7 +147,7 @@ export default function NewCatalogDialog({
                 const val = e.target.value;
                 setMetaFields({ ...metaFields, version: val === "" ? 0 : parseInt(val) });
               }}
-              className={versionInvalid ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20" : ""}
+              className={versionInvalid ? "border-[color:var(--status-danger-border)] bg-[var(--status-danger-bg)]" : ""}
             />
           </FormField>
 

@@ -47,7 +47,7 @@ export default function ErrorDialog({
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            className="text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
           >
             <X className={iconLg} />
           </button>
@@ -63,7 +63,7 @@ export default function ErrorDialog({
           <div className="mb-4">
             <div className={`${labelSmall} mb-2`}>Technical Details:</div>
             <div className={detailBox}>
-              <pre className="text-xs text-slate-800 dark:text-slate-200 font-mono whitespace-pre-wrap break-words">
+              <pre className="text-xs text-[color:var(--text-primary)] font-mono whitespace-pre-wrap break-words">
                 {details}
               </pre>
             </div>

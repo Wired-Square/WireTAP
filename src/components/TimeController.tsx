@@ -120,7 +120,7 @@ export default function TimeController({
   return (
     <div className={`flex items-center gap-3 ${compact ? "text-sm" : ""}`}>
       {/* Playback controls */}
-      <div className={`${flexRowGap2} border-r border-slate-300 dark:border-slate-600 pr-3`}>
+      <div className={`${flexRowGap2} border-r border-[color:var(--border-default)] pr-3`}>
         {isPaused ? (
           <button
             onClick={onPlay}
@@ -169,7 +169,7 @@ export default function TimeController({
       {/* Current time display */}
       <div className={flexRowGap2}>
         <Clock
-          className={`${compact ? iconMd : iconLg} text-slate-600 dark:text-slate-400 ${
+          className={`${compact ? iconMd : iconLg} text-[color:var(--text-muted)] ${
             isPlaying ? "animate-pulse" : ""
           }`}
         />
@@ -184,9 +184,9 @@ export default function TimeController({
 
       {/* Speed control - only show if supported */}
       {showSpeedControl && (
-        <div className={`${flexRowGap2} border-l border-slate-300 dark:border-slate-600 pl-3`}>
+        <div className={`${flexRowGap2} border-l border-[color:var(--border-default)] pl-3`}>
           <Zap
-            className={`${compact ? iconMd : iconLg} text-orange-600 dark:text-orange-400`}
+            className={`${compact ? iconMd : iconLg} text-[color:var(--text-orange)]`}
           />
           <select
             value={speed}
@@ -196,7 +196,7 @@ export default function TimeController({
             disabled={disabled}
             className={`${
               compact ? "px-2 py-0.5 text-xs" : "px-3 py-1"
-            } rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 ${disabledState}`}
+            } rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${disabledState}`}
           >
             {SPEED_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -209,8 +209,8 @@ export default function TimeController({
 
       {/* Time range inputs - only show if supported */}
       {showTimeRangeInputs && (
-        <div className={`${flexRowGap2} border-l border-slate-300 dark:border-slate-600 pl-3`}>
-          <label className="text-xs text-slate-600 dark:text-slate-400">
+        <div className={`${flexRowGap2} border-l border-[color:var(--border-default)] pl-3`}>
+          <label className="text-xs text-[color:var(--text-muted)]">
             From:
           </label>
           <input
@@ -221,9 +221,9 @@ export default function TimeController({
             disabled={disabled || !isPaused}
             className={`${
               compact ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"
-            } rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 ${disabledState} font-mono`}
+            } rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${disabledState} font-mono`}
           />
-          <label className="text-xs text-slate-600 dark:text-slate-400">
+          <label className="text-xs text-[color:var(--text-muted)]">
             To:
           </label>
           <input
@@ -234,7 +234,7 @@ export default function TimeController({
             disabled={disabled || !isPaused}
             className={`${
               compact ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"
-            } rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 ${disabledState} font-mono`}
+            } rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${disabledState} font-mono`}
           />
         </div>
       )}

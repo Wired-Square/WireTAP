@@ -83,7 +83,7 @@ export default function FilterOptionsPanel({
           value={minLength}
           onChange={(e) => handleMinLengthChange(Number(e.target.value))}
           disabled={disabled}
-          className={`w-full px-2 py-1.5 text-xs rounded border border-slate-300 dark:border-slate-600 ${bgSurface} text-slate-700 dark:text-slate-200 disabled:opacity-50`}
+          className={`w-full px-2 py-1.5 text-xs rounded border-[color:var(--border-default)] border ${bgSurface} text-[color:var(--text-secondary)] disabled:opacity-50`}
         />
         <div className={`${captionMuted} mt-0.5`}>
           {minLength === 0 ? "No filter" : `Discard frames < ${minLength} bytes`}
