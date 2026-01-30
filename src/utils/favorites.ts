@@ -1,15 +1,11 @@
-// Time range favorites persistence using tauri-plugin-store
+// Time range favorites persistence using centralised store manager
+//
+// Uses the Rust-side store manager via IPC for multi-window support.
+// No file locking issues since all windows share the same backend store.
 
-import { Store } from '@tauri-apps/plugin-store';
+import { storeGet, storeSet } from '../api/store';
 
-let favoritesStorePromise: Promise<Store> | null = null;
-
-async function getStore(): Promise<Store> {
-  if (!favoritesStorePromise) {
-    favoritesStorePromise = Store.load('favorites.dat');
-  }
-  return favoritesStorePromise;
-}
+const FAVORITES_KEY = 'favorites.timeRanges';
 
 /**
  * A favorite time range bookmark
@@ -44,8 +40,7 @@ function generateId(): string {
  * Get all favorites
  */
 export async function getAllFavorites(): Promise<TimeRangeFavorite[]> {
-  const store = await getStore();
-  const favorites = await store.get<TimeRangeFavorite[]>('timeRangeFavorites');
+  const favorites = await storeGet<TimeRangeFavorite[]>(FAVORITES_KEY);
   return favorites || [];
 }
 
@@ -66,7 +61,6 @@ export async function addFavorite(
   startTime: string,
   endTime: string
 ): Promise<TimeRangeFavorite> {
-  const store = await getStore();
   const favorites = await getAllFavorites();
 
   const newFavorite: TimeRangeFavorite = {
@@ -79,8 +73,7 @@ export async function addFavorite(
   };
 
   favorites.push(newFavorite);
-  await store.set('timeRangeFavorites', favorites);
-  await store.save();
+  await storeSet(FAVORITES_KEY, favorites);
 
   return newFavorite;
 }
@@ -92,15 +85,13 @@ export async function updateFavorite(
   id: string,
   updates: Partial<Omit<TimeRangeFavorite, 'id' | 'createdAt'>>
 ): Promise<TimeRangeFavorite | null> {
-  const store = await getStore();
   const favorites = await getAllFavorites();
 
   const index = favorites.findIndex(f => f.id === id);
   if (index === -1) return null;
 
   favorites[index] = { ...favorites[index], ...updates };
-  await store.set('timeRangeFavorites', favorites);
-  await store.save();
+  await storeSet(FAVORITES_KEY, favorites);
 
   return favorites[index];
 }
@@ -116,15 +107,13 @@ export async function markFavoriteUsed(id: string): Promise<void> {
  * Delete a favorite
  */
 export async function deleteFavorite(id: string): Promise<boolean> {
-  const store = await getStore();
   const favorites = await getAllFavorites();
 
   const index = favorites.findIndex(f => f.id === id);
   if (index === -1) return false;
 
   favorites.splice(index, 1);
-  await store.set('timeRangeFavorites', favorites);
-  await store.save();
+  await storeSet(FAVORITES_KEY, favorites);
 
   return true;
 }
@@ -133,14 +122,12 @@ export async function deleteFavorite(id: string): Promise<boolean> {
  * Delete all favorites for a specific profile
  */
 export async function deleteFavoritesForProfile(profileId: string): Promise<number> {
-  const store = await getStore();
   const favorites = await getAllFavorites();
 
   const remaining = favorites.filter(f => f.profileId !== profileId);
   const deletedCount = favorites.length - remaining.length;
 
-  await store.set('timeRangeFavorites', remaining);
-  await store.save();
+  await storeSet(FAVORITES_KEY, remaining);
 
   return deletedCount;
 }
@@ -149,7 +136,5 @@ export async function deleteFavoritesForProfile(profileId: string): Promise<numb
  * Clear all favorites
  */
 export async function clearAllFavorites(): Promise<void> {
-  const store = await getStore();
-  await store.set('timeRangeFavorites', []);
-  await store.save();
+  await storeSet(FAVORITES_KEY, []);
 }

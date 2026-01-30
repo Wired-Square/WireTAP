@@ -10,10 +10,10 @@ import {
   DockviewApi,
   SerializedDockview,
 } from "dockview-react";
-import { Store } from "@tauri-apps/plugin-store";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { storeGet, storeSet } from "../api/store";
 import { Settings as SettingsIcon, Search, Activity, FileText, Calculator, Send } from "lucide-react";
 import { icon2xl } from "../styles/spacing";
 import "dockview-react/dist/styles/dockview.css";
@@ -43,18 +43,9 @@ const PayloadAnalysis = lazy(() => import("../apps/analysis/PayloadAnalysis"));
 const FrameOrderAnalysis = lazy(() => import("../apps/analysis/FrameOrderAnalysis"));
 const Settings = lazy(() => import("../apps/settings/Settings"));
 
-// Layout store for persistence
-let layoutStorePromise: Promise<Store> | null = null;
-async function getLayoutStore(): Promise<Store> {
-  if (!layoutStorePromise) {
-    layoutStorePromise = Store.load("layout.dat");
-  }
-  return layoutStorePromise;
-}
-
 // Get layout key for a specific window (per-window persistence)
 function getLayoutKey(windowLabel: string): string {
-  return `dockview.layout.${windowLabel}`;
+  return `layout.${windowLabel}`;
 }
 
 const SAVE_DEBOUNCE_MS = 500;
@@ -261,8 +252,8 @@ export default function MainLayout() {
   useEffect(() => {
     async function loadLayout() {
       try {
-        const store = await getLayoutStore();
-        const layout = await store.get<SerializedDockview>(layoutKey);
+        // Use centralised store API (no file locking issues with multi-window)
+        const layout = await storeGet<SerializedDockview>(layoutKey);
         if (layout) {
           setSavedLayout(layout);
         }
@@ -347,9 +338,8 @@ export default function MainLayout() {
       try {
         const layout = apiRef.current?.toJSON();
         if (layout) {
-          const store = await getLayoutStore();
-          await store.set(layoutKey, layout);
-          await store.save();
+          // Use centralised store API (no file locking issues with multi-window)
+          await storeSet(layoutKey, layout);
         }
       } catch (error) {
         console.error("Failed to save layout:", error);

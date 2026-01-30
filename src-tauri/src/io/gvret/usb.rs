@@ -24,6 +24,7 @@ use super::common::{
 // ============================================================================
 
 /// GVRET USB reader configuration
+#[allow(unused)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GvretUsbConfig {
     /// Serial port path (e.g., "/dev/cu.usbmodem1101", "COM3")

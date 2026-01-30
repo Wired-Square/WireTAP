@@ -48,6 +48,7 @@ const SLCAN_BITRATES: [(u32, &str); 9] = [
 // ============================================================================
 
 /// slcan reader configuration
+#[allow(unused)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SlcanConfig {
     /// Serial port path (e.g., "/dev/cu.usbmodem1101", "COM3")
@@ -78,8 +79,11 @@ pub struct SlcanConfig {
     pub bus_override: Option<u8>,
 }
 
+#[allow(dead_code)]
 fn default_data_bits() -> u8 { 8 }
+#[allow(dead_code)]
 fn default_stop_bits() -> u8 { 1 }
+#[allow(dead_code)]
 fn default_parity() -> String { "none".to_string() }
 
 // ============================================================================

@@ -1,15 +1,11 @@
-// Selection set persistence using tauri-plugin-store
+// Selection set persistence using centralised store manager
+//
+// Uses the Rust-side store manager via IPC for multi-window support.
+// No file locking issues since all windows share the same backend store.
 
-import { Store } from '@tauri-apps/plugin-store';
+import { storeGet, storeSet } from '../api/store';
 
-let selectionSetStorePromise: Promise<Store> | null = null;
-
-async function getStore(): Promise<Store> {
-  if (!selectionSetStorePromise) {
-    selectionSetStorePromise = Store.load('selection-sets.dat');
-  }
-  return selectionSetStorePromise;
-}
+const SELECTION_SETS_KEY = 'selectionSets.all';
 
 /**
  * A saved selection set of frame IDs with their selection state
@@ -40,8 +36,7 @@ function generateId(): string {
  * Get all selection sets
  */
 export async function getAllSelectionSets(): Promise<SelectionSet[]> {
-  const store = await getStore();
-  const sets = await store.get<SelectionSet[]>('selectionSets');
+  const sets = await storeGet<SelectionSet[]>(SELECTION_SETS_KEY);
   return sets || [];
 }
 
@@ -53,7 +48,6 @@ export async function addSelectionSet(
   frameIds: number[],
   selectedIds: number[]
 ): Promise<SelectionSet> {
-  const store = await getStore();
   const sets = await getAllSelectionSets();
 
   const newSet: SelectionSet = {
@@ -65,8 +59,7 @@ export async function addSelectionSet(
   };
 
   sets.push(newSet);
-  await store.set('selectionSets', sets);
-  await store.save();
+  await storeSet(SELECTION_SETS_KEY, sets);
 
   return newSet;
 }
@@ -78,15 +71,13 @@ export async function updateSelectionSet(
   id: string,
   updates: Partial<Omit<SelectionSet, 'id' | 'createdAt'>>
 ): Promise<SelectionSet | null> {
-  const store = await getStore();
   const sets = await getAllSelectionSets();
 
   const index = sets.findIndex(s => s.id === id);
   if (index === -1) return null;
 
   sets[index] = { ...sets[index], ...updates };
-  await store.set('selectionSets', sets);
-  await store.save();
+  await storeSet(SELECTION_SETS_KEY, sets);
 
   return sets[index];
 }
@@ -102,15 +93,13 @@ export async function markSelectionSetUsed(id: string): Promise<void> {
  * Delete a selection set
  */
 export async function deleteSelectionSet(id: string): Promise<boolean> {
-  const store = await getStore();
   const sets = await getAllSelectionSets();
 
   const index = sets.findIndex(s => s.id === id);
   if (index === -1) return false;
 
   sets.splice(index, 1);
-  await store.set('selectionSets', sets);
-  await store.save();
+  await storeSet(SELECTION_SETS_KEY, sets);
 
   return true;
 }
@@ -119,7 +108,5 @@ export async function deleteSelectionSet(id: string): Promise<boolean> {
  * Clear all selection sets
  */
 export async function clearAllSelectionSets(): Promise<void> {
-  const store = await getStore();
-  await store.set('selectionSets', []);
-  await store.save();
+  await storeSet(SELECTION_SETS_KEY, []);
 }

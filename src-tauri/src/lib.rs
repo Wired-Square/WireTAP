@@ -9,6 +9,7 @@ mod io;
 mod profile_tracker;
 mod sessions;
 mod settings;
+mod store_manager;
 mod transmit;
 
 use tauri::{menu::*, AppHandle, Emitter, Manager, WebviewWindowBuilder, WebviewUrl, WindowEvent};
@@ -104,22 +105,40 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-/// Create a new main window with the specified label
+/// Create a new main window with the specified label.
+///
+/// This command spawns window creation in a background task and returns immediately.
+/// On Windows, synchronous window creation can deadlock when called from a Tauri command
+/// that's being awaited by the frontend, because window creation needs the UI thread.
 #[tauri::command]
-fn create_main_window(app: AppHandle, label: String) -> Result<(), String> {
+async fn create_main_window(app: AppHandle, label: String) -> Result<(), String> {
     // Check if window already exists
     if app.get_webview_window(&label).is_some() {
         return Ok(()); // Window already exists
     }
 
-    let config = get_window_config("main");
-    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("/".into()))
-        .title(config.title)
-        .inner_size(config.width, config.height)
-        .min_inner_size(config.min_width, config.min_height)
-        .center()
-        .build()
-        .map_err(|e| e.to_string())?;
+    // Spawn window creation on a background task to avoid blocking.
+    // The run_on_main_thread() runs the closure on the main thread (required for window creation)
+    // but doesn't block the command response.
+    let app_for_spawn = app.clone();
+    tauri::async_runtime::spawn(async move {
+        // Clone again for the closure
+        let app_for_window = app_for_spawn.clone();
+        let label_for_window = label.clone();
+        // Run window creation on the main thread
+        let _ = app_for_spawn.run_on_main_thread(move || {
+            let config = get_window_config("main");
+            if let Err(e) = WebviewWindowBuilder::new(&app_for_window, &label_for_window, WebviewUrl::App("/".into()))
+                .title(config.title)
+                .inner_size(config.width, config.height)
+                .min_inner_size(config.min_width, config.min_height)
+                .center()
+                .build()
+            {
+                eprintln!("[create_main_window] Failed to create window '{}': {}", label_for_window, e);
+            }
+        });
+    });
 
     Ok(())
 }
@@ -133,6 +152,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .setup(|app| {
+            // Initialise the centralised store manager
+            if let Err(e) = store_manager::initialise(app.handle()) {
+                eprintln!("[setup] Failed to initialise store manager: {}", e);
+            }
+
             // Create About/Settings menu items (App submenu on macOS)
             let about_item = MenuItemBuilder::with_id("about", "About CANdor").build(app)?;
             let settings_item = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
@@ -338,6 +362,12 @@ pub fn run() {
             transmit::io_start_repeat_group,
             transmit::io_stop_repeat_group,
             transmit::io_stop_all_group_repeats,
+            // Centralised store API (replaces tauri-plugin-store for multi-window support)
+            store_manager::store_get,
+            store_manager::store_set,
+            store_manager::store_delete,
+            store_manager::store_has,
+            store_manager::store_keys,
         ])
         // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)
         //
