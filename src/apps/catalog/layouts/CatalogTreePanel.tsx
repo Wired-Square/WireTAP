@@ -67,9 +67,37 @@ export default function CatalogTreePanel({
   const showSerialBadge = !!serialConfig || hasSerialFrames;
   const hasAnyBadge = showCanBadge || showModbusBadge || showSerialBadge;
 
+  // Collapsed content - just the action buttons as icons
+  const collapsedContent = catalogPath ? (
+    <>
+      <button
+        onClick={onAddNode}
+        className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        title="Add new node"
+      >
+        <UserPlus className={iconMd} />
+      </button>
+      <button
+        onClick={() => handleAddFrame?.()}
+        className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        title="Add new frame"
+      >
+        <Plus className={iconMd} />
+      </button>
+    </>
+  ) : null;
+
   return (
-    <ResizableSidebar defaultWidth={320} minWidth={200} maxWidth={500} className="overflow-hidden" collapsible>
-      <div className="flex-1 overflow-y-auto p-4">
+    <ResizableSidebar
+      defaultWidth={320}
+      minWidth={200}
+      maxWidth={500}
+      className="overflow-hidden"
+      collapsible
+      collapsedContent={collapsedContent}
+    >
+      {/* Fixed header section */}
+      <div className="flex-shrink-0 p-4 pb-0">
         {/* Protocol badges */}
         {catalogPath && hasAnyBadge && (
           <div className="flex flex-wrap gap-2 mb-4">
@@ -158,7 +186,10 @@ export default function CatalogTreePanel({
             </select>
           </div>
         )}
+      </div>
 
+      {/* Scrollable tree section */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
         {!catalogPath ? (
           <p className="text-sm text-[color:var(--text-muted)]">Open a catalog file to view its structure</p>
         ) : parsedTree.length === 0 ? (

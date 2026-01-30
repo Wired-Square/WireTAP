@@ -19,6 +19,8 @@ type Props = {
   position?: "left" | "right";
   className?: string;
   collapsible?: boolean;
+  /** Content to show when sidebar is collapsed (e.g., icon-only buttons) */
+  collapsedContent?: ReactNode;
 };
 
 export default function ResizableSidebar({
@@ -29,6 +31,7 @@ export default function ResizableSidebar({
   position = "left",
   className = "",
   collapsible = false,
+  collapsedContent,
 }: Props) {
   const [width, setWidth] = useState(defaultWidth);
   const [isResizing, setIsResizing] = useState(false);
@@ -98,7 +101,7 @@ export default function ResizableSidebar({
     <aside
       ref={sidebarRef}
       style={{ width: isCollapsed ? collapsedWidth : width }}
-      className={`relative flex flex-col ${bgPrimary} ${borderClass} ${borderDefault} transition-[width] duration-200 ${className}`}
+      className={`relative flex flex-col ${bgPrimary} ${borderClass} ${borderDefault} ${isResizing ? "" : "transition-[width] duration-200"} ${className}`}
     >
       {/* Header with collapse toggle - matches AppSideBar pattern */}
       {collapsible && (
@@ -118,7 +121,14 @@ export default function ResizableSidebar({
       )}
 
       {/* Content area */}
-      {!isCollapsed && (
+      {isCollapsed ? (
+        // Collapsed content (e.g., icon-only buttons)
+        collapsedContent && (
+          <div className="flex flex-col items-center p-2 gap-2">
+            {collapsedContent}
+          </div>
+        )
+      ) : (
         <>
           <div className="flex-1 flex flex-col overflow-hidden">
             {children}
