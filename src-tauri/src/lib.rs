@@ -12,7 +12,11 @@ mod settings;
 mod store_manager;
 mod transmit;
 
-use tauri::{menu::*, AppHandle, Emitter, Manager, WebviewWindowBuilder, WebviewUrl, WindowEvent};
+use std::sync::Mutex;
+use tauri::{menu::*, AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WebviewUrl, WindowEvent};
+
+// Track which window has the Settings panel open (singleton behavior)
+struct SettingsWindowState(Mutex<Option<String>>);
 
 // Window configuration helper
 struct WindowConfig {
@@ -70,34 +74,47 @@ fn get_window_config(label: &str) -> WindowConfig {
     }
 }
 
-// Open window or focus if already exists (single instance enforcement)
-fn open_or_focus_window(app: &AppHandle, label: &str, url: &str) {
-    if let Some(existing) = app.get_webview_window(label) {
-        // Check if the window is visible. If it was hidden (due to our close workaround),
-        // destroy the old hidden window and create a fresh one.
-        if existing.is_visible().unwrap_or(true) {
-            let _ = existing.set_focus();
-        } else {
-            // Window was hidden - destroy it and create a new one
-            let _ = existing.destroy();
-            let config = get_window_config(label);
-            let _ = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
-                .title(config.title)
-                .inner_size(config.width, config.height)
-                .min_inner_size(config.min_width, config.min_height)
-                .center()
-                .disable_drag_drop_handler()
-                .build();
+// Emit an event to the currently focused window only
+fn emit_to_focused_window<S: serde::Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
+    if let Some(window) = app
+        .webview_windows()
+        .values()
+        .find(|w| w.is_focused().unwrap_or(false))
+    {
+        let _ = app.emit_to(window.label(), event, payload);
+    }
+}
+
+// Open or focus a panel in the currently focused window
+fn open_panel_in_focused_window(app: &AppHandle, panel_id: &str) {
+    emit_to_focused_window(app, "menu-open-panel", panel_id);
+}
+
+// Open Settings panel with singleton behavior (only one instance across all windows)
+fn open_settings_singleton(app: &AppHandle, state: &State<SettingsWindowState>) {
+    let mut settings_window = state.0.lock().unwrap();
+
+    // Check if Settings is already open in a window
+    if let Some(label) = settings_window.as_ref() {
+        if let Some(window) = app.get_webview_window(label) {
+            // Window exists - focus it and tell it to focus Settings panel
+            let _ = window.set_focus();
+            let _ = app.emit_to(label, "menu-focus-panel", "settings");
+            return;
         }
-    } else {
-        let config = get_window_config(label);
-        let _ = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
-            .title(config.title)
-            .inner_size(config.width, config.height)
-            .min_inner_size(config.min_width, config.min_height)
-            .center()
-            .disable_drag_drop_handler()
-            .build();
+        // Window no longer exists - clear tracking
+        *settings_window = None;
+    }
+
+    // Open Settings in focused window and track it
+    if let Some(window) = app
+        .webview_windows()
+        .values()
+        .find(|w| w.is_focused().unwrap_or(false))
+    {
+        let label = window.label().to_string();
+        *settings_window = Some(label.clone());
+        let _ = app.emit_to(&label, "menu-open-panel", "settings");
     }
 }
 
@@ -105,6 +122,21 @@ fn open_or_focus_window(app: &AppHandle, label: &str, url: &str) {
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+/// Clear the Settings panel tracking when the panel is closed.
+/// This allows Settings to be opened in a different window.
+#[tauri::command]
+fn settings_panel_closed(state: State<SettingsWindowState>) {
+    *state.0.lock().unwrap() = None;
+}
+
+/// Open the Settings panel with singleton behavior.
+/// If Settings is already open in another window, focuses that window instead.
+/// Called by frontend (e.g., LogoMenu) to ensure singleton behavior.
+#[tauri::command]
+fn open_settings_panel(app: AppHandle, state: State<SettingsWindowState>) {
+    open_settings_singleton(&app, &state);
 }
 
 /// Create a new main window with the specified label.
@@ -160,15 +192,44 @@ pub fn run() {
                 eprintln!("[setup] Failed to initialise store manager: {}", e);
             }
 
-            // Create About/Settings menu items (App submenu on macOS)
+            // Create About menu item (App submenu on macOS)
             let about_item = MenuItemBuilder::with_id("about", "About CANdor").build(app)?;
-            let settings_item = MenuItemBuilder::with_id("settings", "Settings").build(app)?;
 
             let app_menu = SubmenuBuilder::new(app, "CANdor")
                 .item(&about_item)
-                .item(&settings_item)
                 .separator()
                 .quit()
+                .build()?;
+
+            // Create Apps menu items
+            let discovery_item = MenuItemBuilder::with_id("app-discovery", "Discovery")
+                .accelerator("cmdOrCtrl+1")
+                .build(app)?;
+            let decoder_item = MenuItemBuilder::with_id("app-decoder", "Decoder")
+                .accelerator("cmdOrCtrl+2")
+                .build(app)?;
+            let transmit_item = MenuItemBuilder::with_id("app-transmit", "Transmit")
+                .accelerator("cmdOrCtrl+3")
+                .build(app)?;
+            let catalog_item = MenuItemBuilder::with_id("app-catalog-editor", "Catalog Editor")
+                .accelerator("cmdOrCtrl+4")
+                .build(app)?;
+            let calculator_item = MenuItemBuilder::with_id("app-calculator", "Calculator")
+                .accelerator("cmdOrCtrl+5")
+                .build(app)?;
+            let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
+                .accelerator("cmdOrCtrl+,")
+                .build(app)?;
+
+            let apps_menu = SubmenuBuilder::new(app, "Apps")
+                .item(&discovery_item)
+                .item(&decoder_item)
+                .item(&transmit_item)
+                .separator()
+                .item(&catalog_item)
+                .item(&calculator_item)
+                .separator()
+                .item(&settings_item)
                 .build()?;
 
             // Create View menu items
@@ -203,7 +264,7 @@ pub fn run() {
 
             // Create main menu
             let menu = MenuBuilder::new(app)
-                .items(&[&app_menu, &edit_menu, &view_menu])
+                .items(&[&app_menu, &apps_menu, &edit_menu, &view_menu])
                 .build()?;
 
             app.set_menu(menu)?;
@@ -214,23 +275,22 @@ pub fn run() {
 
                 match event_id {
                     "about" => {
-                        // Emit only to the focused window
-                        if let Some(window) = app
-                            .webview_windows()
-                            .values()
-                            .find(|w| w.is_focused().unwrap_or(false))
-                        {
-                            let _ = app.emit_to(window.label(), "show-about", ());
-                        }
+                        emit_to_focused_window(app, "show-about", ());
                     }
                     // Note: undo, redo, cut, copy, paste, select-all are handled natively
                     // by predefined menu items - no custom handlers needed
                     "find" => {
-                        // Emit event to frontend - the focused window will handle it
-                        let _ = app.emit("menu-find", ());
+                        emit_to_focused_window(app, "menu-find", ());
                     }
+                    // App menu items - open as tabs in focused window
+                    "app-discovery" | "app-decoder" | "app-transmit"
+                    | "app-catalog-editor" | "app-calculator" => {
+                        let panel_id = event_id.strip_prefix("app-").unwrap_or(event_id);
+                        open_panel_in_focused_window(app, panel_id);
+                    }
+                    // Settings - singleton across all windows
                     "settings" => {
-                        open_or_focus_window(app, "settings", "/settings");
+                        open_settings_singleton(app, &app.state::<SettingsWindowState>());
                     }
                     "new-window" => {
                         // Emit event to frontend - it will allocate a stable label and create the window
@@ -264,9 +324,12 @@ pub fn run() {
 
             Ok(())
         })
+        .manage(SettingsWindowState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             greet,
             create_main_window,
+            settings_panel_closed,
+            open_settings_panel,
             catalog::open_catalog,
             catalog::save_catalog,
             catalog::validate_catalog,

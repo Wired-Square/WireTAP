@@ -31,7 +31,7 @@ import {
   removeOpenMainWindow,
   getNextMainWindowNumber,
 } from "../utils/persistence";
-import { getAppVersion } from "../api";
+import { getAppVersion, settingsPanelClosed, openSettingsPanel } from "../api";
 import logo from "../assets/logo.png";
 
 // Lazy load app components for better initial load
@@ -357,7 +357,11 @@ export default function MainLayout() {
       event.api.onDidAddPanel(() => {
         saveLayout();
       });
-      event.api.onDidRemovePanel(() => {
+      event.api.onDidRemovePanel((panel) => {
+        // Notify backend when Settings panel is closed (singleton tracking)
+        if (panel.id === "settings") {
+          settingsPanelClosed();
+        }
         saveLayout();
       });
       event.api.onDidLayoutChange(() => {
@@ -417,16 +421,50 @@ export default function MainLayout() {
   }, [handlePanelClick]);
 
   // Keyboard shortcut for settings (Cmd/Ctrl + , to open settings panel)
+  // Note: This is a fallback - the native menu accelerator handles this too
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === ",") {
         e.preventDefault();
-        handlePanelClick("settings");
+        openSettingsPanel(); // Uses singleton behavior via backend
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Listen for menu commands to open/focus panels
+  useEffect(() => {
+    const currentWindow = getCurrentWebviewWindow();
+
+    const setupListeners = async () => {
+      // Open panel (creates if doesn't exist, focuses if exists)
+      const unlistenOpen = await currentWindow.listen<string>(
+        "menu-open-panel",
+        (event) => {
+          handlePanelClick(event.payload);
+        }
+      );
+
+      // Focus panel (only focuses if exists)
+      const unlistenFocus = await currentWindow.listen<string>(
+        "menu-focus-panel",
+        (event) => {
+          apiRef.current?.getPanel(event.payload)?.focus();
+        }
+      );
+
+      return () => {
+        unlistenOpen();
+        unlistenFocus();
+      };
+    };
+
+    const cleanup = setupListeners();
+    return () => {
+      cleanup.then((fn) => fn());
+    };
   }, [handlePanelClick]);
 
   // Cleanup save timeout on unmount

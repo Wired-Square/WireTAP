@@ -54,3 +54,19 @@ export interface UpdateInfo {
 export async function checkForUpdates(): Promise<UpdateInfo | null> {
   return await invoke<UpdateInfo | null>("check_for_updates");
 }
+
+/**
+ * Notify the backend that the Settings panel has been closed.
+ * This clears the singleton tracking, allowing Settings to be opened in a different window.
+ */
+export async function settingsPanelClosed(): Promise<void> {
+  await invoke("settings_panel_closed");
+}
+
+/**
+ * Open the Settings panel with singleton behavior.
+ * If Settings is already open in another window, focuses that window instead.
+ */
+export async function openSettingsPanel(): Promise<void> {
+  await invoke("open_settings_panel");
+}

@@ -8,6 +8,8 @@ export {
   validateDirectory,
   createDirectory,
   getAppVersion,
+  settingsPanelClosed,
+  openSettingsPanel,
 } from "./settings";
 
 // Catalog API

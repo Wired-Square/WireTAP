@@ -6,6 +6,7 @@ import { iconMd } from "../styles/spacing";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import logo from "../assets/logo.png";
 import { useUpdateStore } from "../stores/updateStore";
+import { openSettingsPanel } from "../api";
 
 export type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "transmit" | "settings";
 
@@ -106,7 +107,12 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
   }, [isOpen]);
 
   const handleItemClick = (panelId: PanelId) => {
-    onPanelClick(panelId);
+    if (panelId === "settings") {
+      // Settings uses singleton behavior via backend
+      openSettingsPanel();
+    } else {
+      onPanelClick(panelId);
+    }
     setIsOpen(false);
   };
 
