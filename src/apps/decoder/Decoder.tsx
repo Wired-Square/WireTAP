@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
 import { useDecoderStore } from "../../stores/decoderStore";
 import { useIOSessionManager } from '../../hooks/useIOSessionManager';
@@ -566,6 +567,27 @@ export default function Decoder() {
     maxTimeUs: bufferMetadata?.end_time_us,
     totalFrames: bufferMetadata?.count,
   });
+
+  // Listen for menu commands (Clear)
+  useEffect(() => {
+    const currentWindow = getCurrentWebviewWindow();
+
+    const setupListeners = async () => {
+      // Clear frames from menu
+      const unlistenClear = await currentWindow.listen("menu-session-clear", () => {
+        handlers.handleClear();
+      });
+
+      return () => {
+        unlistenClear();
+      };
+    };
+
+    const cleanup = setupListeners();
+    return () => {
+      cleanup.then((fn) => fn());
+    };
+  }, [handlers]);
 
   // Note: Watch state is cleared automatically by useIOSessionManager when streaming stops
 

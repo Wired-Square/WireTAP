@@ -32,6 +32,7 @@ import {
   getNextMainWindowNumber,
 } from "../utils/persistence";
 import { getAppVersion, settingsPanelClosed, openSettingsPanel } from "../api";
+import { useSessionStore } from "../stores/sessionStore";
 import logo from "../assets/logo.png";
 
 // Lazy load app components for better initial load
@@ -466,6 +467,59 @@ export default function MainLayout() {
       cleanup.then((fn) => fn());
     };
   }, [handlePanelClick]);
+
+  // Listen for session control menu commands
+  useEffect(() => {
+    const currentWindow = getCurrentWebviewWindow();
+
+    const setupListeners = async () => {
+      const unlistenPlay = await currentWindow.listen("menu-session-play", () => {
+        const { activeSessionId, sessions, startSession, resumeSession } =
+          useSessionStore.getState();
+        if (!activeSessionId) return;
+        const session = sessions[activeSessionId];
+        if (!session) return;
+
+        if (session.ioState === "paused") {
+          resumeSession(activeSessionId);
+        } else if (session.ioState === "stopped") {
+          startSession(activeSessionId);
+        }
+      });
+
+      const unlistenPause = await currentWindow.listen("menu-session-pause", () => {
+        const { activeSessionId, pauseSession } = useSessionStore.getState();
+        if (activeSessionId) {
+          pauseSession(activeSessionId);
+        }
+      });
+
+      const unlistenStop = await currentWindow.listen("menu-session-stop", () => {
+        const { activeSessionId, stopSession } = useSessionStore.getState();
+        if (activeSessionId) {
+          stopSession(activeSessionId);
+        }
+      });
+
+      // Clear frames - broadcast to apps (they handle their own clearing)
+      const unlistenClear = await currentWindow.listen("menu-session-clear", () => {
+        // Apps listen for this event directly and clear their own state
+        // This is handled by Discovery and Decoder components
+      });
+
+      return () => {
+        unlistenPlay();
+        unlistenPause();
+        unlistenStop();
+        unlistenClear();
+      };
+    };
+
+    const cleanup = setupListeners();
+    return () => {
+      cleanup.then((fn) => fn());
+    };
+  }, []);
 
   // Cleanup save timeout on unmount
   useEffect(() => {

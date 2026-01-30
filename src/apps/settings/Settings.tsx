@@ -1,6 +1,7 @@
 // ui/src/apps/settings/Settings.tsx
 
 import { useEffect, useState } from 'react';
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { pickDirectory } from '../../api/dialogs';
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
@@ -115,6 +116,23 @@ export default function Settings() {
     loadSettings();
     loadBookmarks();
   }, [loadSettings, loadBookmarks]);
+
+  // Listen for menu command to navigate to Bookmarks
+  useEffect(() => {
+    const currentWindow = getCurrentWebviewWindow();
+
+    const setupListener = async () => {
+      const unlisten = await currentWindow.listen("menu-bookmark-manage", () => {
+        setSection("bookmarks");
+      });
+      return unlisten;
+    };
+
+    const unlistenPromise = setupListener();
+    return () => {
+      unlistenPromise.then((fn) => fn());
+    };
+  }, [setSection]);
 
   // Sidebar items
   const sidebarItems: SideBarItem[] = [

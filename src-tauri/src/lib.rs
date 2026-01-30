@@ -255,6 +255,41 @@ pub fn run() {
                 .item(&find_item)
                 .build()?;
 
+            // Create Session menu for stream control
+            let session_play_item = MenuItemBuilder::with_id("session-play", "Play")
+                .accelerator("cmdOrCtrl+Return")
+                .build(app)?;
+            let session_pause_item = MenuItemBuilder::with_id("session-pause", "Pause")
+                .accelerator("cmdOrCtrl+.")
+                .build(app)?;
+            let session_stop_item = MenuItemBuilder::with_id("session-stop", "Stop")
+                .accelerator("cmdOrCtrl+Shift+.")
+                .build(app)?;
+            let session_clear_item = MenuItemBuilder::with_id("session-clear", "Clear Frames")
+                .accelerator("cmdOrCtrl+K")
+                .build(app)?;
+
+            let session_menu = SubmenuBuilder::new(app, "Session")
+                .item(&session_play_item)
+                .item(&session_pause_item)
+                .item(&session_stop_item)
+                .separator()
+                .item(&session_clear_item)
+                .build()?;
+
+            // Create Bookmarks menu
+            let bookmark_save_item = MenuItemBuilder::with_id("bookmark-save", "Save Bookmark…")
+                .accelerator("cmdOrCtrl+D")
+                .build(app)?;
+            let bookmark_manage_item =
+                MenuItemBuilder::with_id("bookmark-manage", "Manage Bookmarks…").build(app)?;
+
+            let bookmarks_menu = SubmenuBuilder::new(app, "Bookmarks")
+                .item(&bookmark_save_item)
+                .separator()
+                .item(&bookmark_manage_item)
+                .build()?;
+
             // Create View submenu
             let view_menu = SubmenuBuilder::new(app, "View")
                 .item(&new_window_item)
@@ -264,7 +299,14 @@ pub fn run() {
 
             // Create main menu
             let menu = MenuBuilder::new(app)
-                .items(&[&app_menu, &apps_menu, &edit_menu, &view_menu])
+                .items(&[
+                    &app_menu,
+                    &apps_menu,
+                    &edit_menu,
+                    &session_menu,
+                    &bookmarks_menu,
+                    &view_menu,
+                ])
                 .build()?;
 
             app.set_menu(menu)?;
@@ -295,6 +337,28 @@ pub fn run() {
                     "new-window" => {
                         // Emit event to frontend - it will allocate a stable label and create the window
                         let _ = app.emit("menu-new-window", ());
+                    }
+                    // Session control menu items
+                    "session-play" => {
+                        emit_to_focused_window(app, "menu-session-play", ());
+                    }
+                    "session-pause" => {
+                        emit_to_focused_window(app, "menu-session-pause", ());
+                    }
+                    "session-stop" => {
+                        emit_to_focused_window(app, "menu-session-stop", ());
+                    }
+                    "session-clear" => {
+                        emit_to_focused_window(app, "menu-session-clear", ());
+                    }
+                    // Bookmark menu items
+                    "bookmark-save" => {
+                        emit_to_focused_window(app, "menu-bookmark-save", ());
+                    }
+                    "bookmark-manage" => {
+                        // Open Settings panel and navigate to Bookmarks tab
+                        open_settings_singleton(app, &app.state::<SettingsWindowState>());
+                        emit_to_focused_window(app, "menu-bookmark-manage", ());
                     }
                     _ => {
                         // Unknown menu item - ignore

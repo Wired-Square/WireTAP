@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager } from '../../hooks/useIOSessionManager';
 import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
@@ -716,6 +717,37 @@ export default function Discovery() {
     closeExportDialog: dialogs.export.close,
     closeIoReaderPicker: dialogs.ioReaderPicker.close,
   });
+
+  // Listen for menu commands (Clear, Save Bookmark)
+  useEffect(() => {
+    const currentWindow = getCurrentWebviewWindow();
+
+    const setupListeners = async () => {
+      // Clear frames from menu
+      const unlistenClear = await currentWindow.listen("menu-session-clear", () => {
+        handlers.handleClearDiscoveredFrames();
+      });
+
+      // Save bookmark from menu - open dialog with current time
+      const unlistenBookmark = await currentWindow.listen("menu-bookmark-save", () => {
+        // Use the current playback time if available, otherwise start of range
+        const timeUs = currentTime !== null ? currentTime * 1_000_000 : 0;
+        setBookmarkFrameId(0); // No specific frame
+        setBookmarkFrameTime(new Date(timeUs / 1000).toISOString());
+        dialogs.bookmark.open();
+      });
+
+      return () => {
+        unlistenClear();
+        unlistenBookmark();
+      };
+    };
+
+    const cleanup = setupListeners();
+    return () => {
+      cleanup.then((fn) => fn());
+    };
+  }, [handlers, currentTime, dialogs.bookmark]);
 
   // Handle skip for IoReaderPickerDialog
   const handleSkip = useCallback(async () => {
