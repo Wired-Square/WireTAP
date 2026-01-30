@@ -4,6 +4,37 @@
 import type { CANConfig, ValidationError } from "../types";
 import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
 
+/**
+ * Parse a CAN ID string (hex or decimal) to a number
+ */
+function parseCanId(id: string): number | null {
+  const trimmed = id.trim();
+  const isHex = /^0x[0-9a-fA-F]+$/i.test(trimmed);
+  const isDec = /^\d+$/.test(trimmed);
+  if (isHex) return parseInt(trimmed, 16);
+  if (isDec) return parseInt(trimmed, 10);
+  return null;
+}
+
+/**
+ * Find a frame in allFrames by its numeric ID value (case-insensitive for hex)
+ */
+function findFrameByNumericId(
+  targetId: string,
+  allFrames: Record<string, any>
+): any | undefined {
+  const targetNum = parseCanId(targetId);
+  if (targetNum === null) return undefined;
+
+  for (const key of Object.keys(allFrames)) {
+    const keyNum = parseCanId(key);
+    if (keyNum === targetNum) {
+      return allFrames[key];
+    }
+  }
+  return undefined;
+}
+
 const canHandler: ProtocolHandler<CANConfig> = {
   type: "can",
   displayName: "CAN",
@@ -28,8 +59,9 @@ const canHandler: ProtocolHandler<CANConfig> = {
     const mirrorOf = value.mirror_of;
 
     // Handle copy/inheritance from another CAN frame (metadata only)
-    if (isCopy && copyFrom && allFrames?.[copyFrom]) {
-      const sourceFrame = allFrames[copyFrom];
+    const copySource = isCopy && copyFrom && allFrames ? findFrameByNumericId(copyFrom, allFrames) : undefined;
+    if (copySource) {
+      const sourceFrame = copySource;
       if (length === undefined && sourceFrame.length !== undefined) {
         length = sourceFrame.length;
         lengthInherited = true;
@@ -56,8 +88,9 @@ const canHandler: ProtocolHandler<CANConfig> = {
 
     // Handle mirror inheritance (signals + metadata)
     // Mirror signals override primary signals by bit position
-    if (isMirror && mirrorOf && allFrames?.[mirrorOf]) {
-      const primaryFrame = allFrames[mirrorOf];
+    const mirrorSource = isMirror && mirrorOf && allFrames ? findFrameByNumericId(mirrorOf, allFrames) : undefined;
+    if (mirrorSource) {
+      const primaryFrame = mirrorSource;
       const primarySignals = primaryFrame.signals || primaryFrame.signal || [];
       const mirrorSignals = signals;
 
