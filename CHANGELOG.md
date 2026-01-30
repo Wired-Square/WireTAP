@@ -2,6 +2,23 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [0.3.1] - 2026-01-30
+
+### Changed
+
+- **Standardised App Layout Components**: Created reusable layout components (`AppLayout`, `AppTopBar`, `AppSideBar`) for consistent app structure across all panels. `AppLayout` provides the outer container with theme support (auto or always-dark). `AppTopBar` is a unified top bar with configurable IO session controls, frame picker, and action slots. `AppSideBar` is a collapsible sidebar with icon-only mode when collapsed. All apps (Discovery, Decoder, Transmit, Settings, Catalog Editor, Calculator) now use the "bubble" pattern - content wrapped in a rounded border container. Refactored individual TopBar components (DiscoveryTopBar, DecoderTopBar, TransmitTopBar, CatalogToolbar) to use `AppTopBar` internally. Deleted redundant SettingsTopBar and SettingsSidebar files.
+
+- **Centralised Style Tokens**: Consolidated inline Tailwind classes into reusable style tokens for consistency and maintainability. Typography tokens: `labelSmall`, `sectionHeader`, `caption`, `textMedium`, `captionMuted`, `sectionHeaderText`. Layout tokens: `bgSecondary`, `bgSurface`, `borderDivider`, `hoverLight`, `focusRing`. Button tokens: `iconButtonHover`, `iconButtonHoverCompact`, `iconButtonHoverSmall`, `secondaryButton`, `folderPickerButton`, `dialogOptionButton`. Card tokens: `expandableRowContainer`, `selectableOptionBox`. Badge tokens: `badgeMetadata`. Applied across 100+ files including IO reader picker dialogs, catalog views, settings views, analysis result views, form components, and shared UI components.
+
+### Fixed
+
+- **Dead Code Warnings on Windows**: Silenced spurious compiler warnings for unused config structs (`GvretUsbConfig`, `SlcanConfig`), serde default functions, and the `store_manager::flush` function. These are intentional API surface preserved for future use or serialization.
+
+- **Multi-Window Blank Screen on Windows**: Fixed issue where opening a second window via View → New Window would show a blank white screen on Windows. Two issues caused this: (1) The `tauri-plugin-store` file locking mechanism caused windows to hang waiting for exclusive file access. Replaced the frontend-side tauri-plugin-store with a centralised Rust-side store manager that all windows access via IPC. The store manager caches data in memory, handles concurrent access, and persists changes with debounced atomic writes. (2) Synchronous window creation in `create_main_window` blocked the Tauri command response, deadlocking when the UI thread was needed. Made the command async and spawned window creation via `run_on_main_thread()` so the command returns immediately.
+- **Low Contrast Text on Windows**: Improved text contrast throughout dark data views (Discovery, Decoder, Transmit). Changed `textDarkSubtle` from `text-gray-500` to `text-gray-400`, `textDarkMuted` from `text-gray-400` to `text-gray-300`, fixed TimeDisplay to use explicit light colours in compact mode, and updated Decoder's frame headers, signal timestamps, and empty state messages to use appropriate gray levels. Also converted Discovery and Decoder top bars from `dark:` Tailwind variants to explicit dark colour tokens (`bgDarkToolbar`, `borderDarkView`) for consistent rendering. Added new colour tokens `textDarkDecorative` and `textDarkPlaceholder` for standardised styling. Windows WebView doesn't properly detect system dark mode, causing `dark:` variants to fall back to light mode colours.
+- **IO Picker Buffer Selection in Multi-Bus Mode**: Fixed buffer checkmark incorrectly appearing when readers are selected in multi-bus mode. The BufferList now checks both single-select (`checkedReaderId`) and multi-select (`checkedReaderIds`) state to determine if a buffer is truly selected.
+- **gs_usb Serial Number Device Matching**: gs_usb profiles now use USB serial numbers as the primary device identifier instead of bus:address. USB device addresses are dynamically assigned by Windows and can change on device reset or reconnect. Serial numbers are stable identifiers that persist across reconnections, preventing "device not found" errors when addresses change. Profiles store the serial number when a device is selected; existing profiles continue to work via bus:address fallback.
+
 ## [0.3.0] - 2026-01-29
 
 ### Added
