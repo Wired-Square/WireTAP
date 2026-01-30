@@ -1,11 +1,18 @@
 // ui/src/stores/decoderStore.ts
 
 import { create } from 'zustand';
+import { LRUMap } from '../utils/LRUMap';
 
 /** Maximum number of unmatched frames to keep in buffer */
 export const MAX_UNMATCHED_FRAMES = 1000;
 /** Maximum number of filtered frames to keep in buffer */
 export const MAX_FILTERED_FRAMES = 1000;
+/** Maximum number of decoded frames to keep (per frame ID) */
+const MAX_DECODED_FRAMES = 500;
+/** Maximum number of decoded frames to keep (per source address) */
+const MAX_DECODED_PER_SOURCE = 2000;
+/** Maximum number of unique values to track per header field */
+const MAX_HEADER_FIELD_VALUES = 256;
 import { saveCatalog } from '../api';
 import { buildFramesToml, type SerialFrameConfig } from '../utils/frameExport';
 import { formatFrameId } from '../utils/frameIds';
@@ -330,8 +337,8 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   mirrorSourceMap: new Map(),
   mirrorValidation: new Map(),
   mirrorFuzzWindowMs: 1000, // 1 second - generous to handle batching and varying frame rates
-  decoded: new Map(),
-  decodedPerSource: new Map(),
+  decoded: new LRUMap(MAX_DECODED_FRAMES),
+  decodedPerSource: new LRUMap(MAX_DECODED_PER_SOURCE),
   unmatchedFrames: [],
   filteredFrames: [],
   ioProfile: null,
@@ -574,8 +581,8 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   clearDecoded: () => {
     set({
-      decoded: new Map(),
-      decodedPerSource: new Map(),
+      decoded: new LRUMap(MAX_DECODED_FRAMES),
+      decodedPerSource: new LRUMap(MAX_DECODED_PER_SOURCE),
       unmatchedFrames: [],
       filteredFrames: [],
       seenHeaderFieldValues: new Map(),
@@ -742,12 +749,12 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       muxSelectors: muxResult.selectors.length > 0 ? muxResult.selectors : undefined,
     };
 
-    const next = new Map(decoded);
+    const next = new LRUMap(MAX_DECODED_FRAMES, decoded);
     // Store using masked ID to match catalog frame IDs
     next.set(maskedFrameId, decodedFrame);
 
     // Also store in per-source map if sourceAddress is provided (from backend or extracted from CAN ID)
-    const nextPerSource = new Map(decodedPerSource);
+    const nextPerSource = new LRUMap(MAX_DECODED_PER_SOURCE, decodedPerSource);
     if (effectiveSourceAddress !== undefined) {
       // Use masked ID for consistency with decoded map
       const perSourceKey = `${maskedFrameId}:${effectiveSourceAddress}`;
@@ -766,7 +773,8 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       const existing = fieldMap.get(field.value);
       if (existing) {
         existing.count++;
-      } else {
+      } else if (fieldMap.size < MAX_HEADER_FIELD_VALUES) {
+        // Only add new values if under limit (prevents unbounded growth)
         fieldMap.set(field.value, { display: field.display, count: 1 });
       }
     }
@@ -889,8 +897,8 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     const { frames, decoded, decodedPerSource, protocol, canConfig, serialConfig, unmatchedFrames, filteredFrames, seenHeaderFieldValues, streamStartTimeSeconds } = get();
 
     // Start with current state, will mutate in place then set once at end
-    const nextDecoded = new Map(decoded);
-    const nextDecodedPerSource = new Map(decodedPerSource);
+    const nextDecoded = new LRUMap(MAX_DECODED_FRAMES, decoded);
+    const nextDecodedPerSource = new LRUMap(MAX_DECODED_PER_SOURCE, decodedPerSource);
     const nextSeenValues = new Map(seenHeaderFieldValues);
     let newStreamStartTime = streamStartTimeSeconds;
 
@@ -1030,7 +1038,8 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         const existing = fieldMap.get(field.value);
         if (existing) {
           existing.count++;
-        } else {
+        } else if (fieldMap.size < MAX_HEADER_FIELD_VALUES) {
+          // Only add new values if under limit (prevents unbounded growth)
           fieldMap.set(field.value, { display: field.display, count: 1 });
         }
       }
