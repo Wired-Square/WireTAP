@@ -11,7 +11,7 @@ import DataViewController, {
   type PageSizeOption,
   FRAME_PAGE_SIZE_OPTIONS,
 } from "./DataViewController";
-import { bgDarkView, borderDarkView } from "../styles";
+import { bgDataView, borderDataView } from "../styles";
 
 /**
  * Toolbar configuration for AppTabView.
@@ -149,7 +149,7 @@ export default function AppTabView({
   // Build content area classes
   const contentClasses = [
     "flex-1 min-h-0 overflow-auto overscroll-none rounded-b-lg",
-    bgDarkView,
+    bgDataView,
     contentArea?.className ?? "p-4",
     contentArea?.spaceY ? "space-y-4" : "",
   ]
@@ -158,7 +158,7 @@ export default function AppTabView({
 
   return (
     <div
-      className={`flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border ${borderDarkView}`}
+      className={`flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border ${borderDataView}`}
     >
       {/* View Controller: Tab Bar + Toolbar + Timeline */}
       <DataViewController

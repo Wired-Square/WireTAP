@@ -3,7 +3,7 @@
 // Shared timeline section wrapper for data views (Discovery, Decoder, etc.).
 
 import TimelineScrubber from "./TimelineScrubber";
-import { bgDarkToolbar, borderDarkView } from "../styles";
+import { bgDataToolbar, borderDataView } from "../styles";
 
 interface DataViewTimelineSectionProps {
   /** Whether to show the timeline section */
@@ -39,7 +39,7 @@ export default function DataViewTimelineSection({
   }
 
   return (
-    <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDarkView} ${bgDarkToolbar}`}>
+    <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDataView} ${bgDataToolbar}`}>
       <TimelineScrubber
         minTimeUs={minTimeUs}
         maxTimeUs={maxTimeUs}

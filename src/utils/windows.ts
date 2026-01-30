@@ -115,28 +115,3 @@ export async function openWindow(
 
   return window;
 }
-
-/**
- * Close a window by label
- */
-export async function closeWindow(label: WindowLabel): Promise<void> {
-  const window = await WebviewWindow.getByLabel(label);
-  if (window) {
-    await window.close();
-  }
-}
-
-/**
- * Get current window label
- */
-export function getCurrentWindowLabel(): WindowLabel | null {
-  const currentWindow = WebviewWindow.getCurrent();
-  return (currentWindow?.label as WindowLabel) || null;
-}
-
-/**
- * Check if window is open
- */
-export function isWindowOpen(label: WindowLabel): boolean {
-  return WebviewWindow.getByLabel(label) !== null;
-}

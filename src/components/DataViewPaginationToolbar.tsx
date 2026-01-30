@@ -5,11 +5,11 @@
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import {
-  bgDarkToolbar,
-  borderDarkView,
-  bgDarkInput,
-  textDarkInput,
-  textDarkMuted,
+  bgDataToolbar,
+  borderDataView,
+  bgDataInput,
+  textDataPrimary,
+  textDataSecondary,
   gapDefault,
 } from "../styles";
 import { paginationButtonDark } from "../styles/buttonStyles";
@@ -71,7 +71,7 @@ export default function DataViewPaginationToolbar({
   const showPagination = !hidePagination && totalPages > 1 && pageSize !== -1;
 
   return (
-    <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDarkView} ${bgDarkToolbar} flex items-center ${gapDefault}`}>
+    <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDataView} ${bgDataToolbar} flex items-center ${gapDefault}`}>
       {/* Left content slot */}
       {leftContent}
 
@@ -83,8 +83,8 @@ export default function DataViewPaginationToolbar({
       {/* Loading indicator */}
       {isLoading && (
         <div className="flex items-center gap-1">
-          <Loader2 className={`${iconSm} animate-spin ${textDarkMuted}`} />
-          <span className={`text-xs ${textDarkMuted}`}>Loading...</span>
+          <Loader2 className={`${iconSm} animate-spin ${textDataSecondary}`} />
+          <span className={`text-xs ${textDataSecondary}`}>Loading...</span>
         </div>
       )}
 
@@ -107,7 +107,7 @@ export default function DataViewPaginationToolbar({
           >
             <ChevronLeft className={iconSm} />
           </button>
-          <span className={`text-xs ${textDarkMuted} px-1`}>
+          <span className={`text-xs ${textDataSecondary} px-1`}>
             {currentPage + 1} / {totalPages}
           </span>
           <button
@@ -134,7 +134,7 @@ export default function DataViewPaginationToolbar({
         value={pageSize}
         onChange={(e) => onPageSizeChange(Number(e.target.value))}
         disabled={disabled}
-        className={`text-xs px-2 py-1 rounded border border-gray-600 ${bgDarkInput} ${textDarkInput} disabled:opacity-50`}
+        className={`text-xs px-2 py-1 rounded border border-gray-600 ${bgDataInput} ${textDataPrimary} disabled:opacity-50`}
         title="Rows per page"
       >
         {pageSizeOptions.map((opt) => (

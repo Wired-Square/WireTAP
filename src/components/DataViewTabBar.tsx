@@ -7,8 +7,8 @@ import { ReactNode } from 'react';
 import TimeDisplay from './TimeDisplay';
 import ProtocolBadge, { type StreamingStatus } from './ProtocolBadge';
 import {
-  bgDarkToolbar,
-  borderDarkView,
+  bgDataToolbar,
+  borderDataView,
 } from '../styles';
 import {
   dataViewTabClass,
@@ -84,7 +84,7 @@ export default function DataViewTabBar({
   controls,
 }: DataViewTabBarProps) {
   return (
-    <div className={`flex-shrink-0 flex items-center border-b ${borderDarkView} ${bgDarkToolbar}`}>
+    <div className={`flex-shrink-0 flex items-center border-b ${borderDataView} ${bgDataToolbar}`}>
       {/* Protocol badge with status light */}
       <div className="ml-1">
         <ProtocolBadge

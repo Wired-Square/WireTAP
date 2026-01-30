@@ -3,7 +3,7 @@
 // Uses the Rust-side store manager via IPC for multi-window support.
 // No file locking issues since all windows share the same backend store.
 
-import { storeGet, storeSet, storeDelete } from '../api/store';
+import { storeGet, storeSet } from '../api/store';
 import type { WindowLabel } from './windows';
 
 // Track all open main windows (dashboard + any additional windows)
@@ -94,27 +94,8 @@ export async function loadWindowState(
 }
 
 /**
- * Get list of windows that were open in last session
- */
-export async function getOpenWindowsSession(): Promise<WindowLabel[]> {
-  const session = await storeGet<WindowLabel[]>('windows.openSession');
-  return session || [];
-}
-
-/**
  * Save list of currently open windows for session restore
  */
 export async function saveOpenWindowsSession(labels: WindowLabel[]): Promise<void> {
   await storeSet('windows.openSession', labels);
-}
-
-/**
- * Clear all window persistence data
- */
-export async function clearWindowPersistence(): Promise<void> {
-  // Delete known window keys
-  await storeDelete(MAIN_WINDOWS_KEY);
-  await storeDelete('windows.openSession');
-  // Note: Individual window states would need to be enumerated and deleted
-  // For now, this clears the main tracking keys
 }

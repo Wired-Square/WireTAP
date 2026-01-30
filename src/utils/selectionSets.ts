@@ -103,10 +103,3 @@ export async function deleteSelectionSet(id: string): Promise<boolean> {
 
   return true;
 }
-
-/**
- * Clear all selection sets
- */
-export async function clearAllSelectionSets(): Promise<void> {
-  await storeSet(SELECTION_SETS_KEY, []);
-}

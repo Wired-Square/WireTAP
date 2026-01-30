@@ -131,10 +131,3 @@ export async function deleteFavoritesForProfile(profileId: string): Promise<numb
 
   return deletedCount;
 }
-
-/**
- * Clear all favorites
- */
-export async function clearAllFavorites(): Promise<void> {
-  await storeSet(FAVORITES_KEY, []);
-}

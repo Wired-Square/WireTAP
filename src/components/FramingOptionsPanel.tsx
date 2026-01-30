@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { hexToBytes, bytesToHex } from "../utils/byteUtils";
-import { toggleCardClass, toggleChipClass, bgDarkInput, borderDarkView, textDarkMuted, caption, captionMuted, bgSurface } from "../styles";
+import { toggleCardClass, toggleChipClass, bgDataInput, borderDataView, textDataSecondary, caption, captionMuted, bgSurface } from "../styles";
 
 // Re-export for backwards compatibility (used by other components)
 export { hexToBytes, bytesToHex };
@@ -146,7 +146,7 @@ export default function FramingOptionsPanel({
           className={`${toggleCardClass(currentMode === "slip")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <div className="font-medium">SLIP</div>
-          <div className={`text-xs ${textDarkMuted} mt-0.5`}>RFC 1055 framing with 0xC0 delimiter</div>
+          <div className={`text-xs ${textDataSecondary} mt-0.5`}>RFC 1055 framing with 0xC0 delimiter</div>
         </button>
 
         {/* Delimiter Option */}
@@ -157,29 +157,29 @@ export default function FramingOptionsPanel({
           className={`${toggleCardClass(currentMode === "delimiter")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <div className="font-medium">Delimiter</div>
-          <div className={`text-xs ${textDarkMuted} mt-0.5`}>Split on custom delimiter bytes</div>
+          <div className={`text-xs ${textDataSecondary} mt-0.5`}>Split on custom delimiter bytes</div>
         </button>
         {currentMode === "delimiter" && (
           <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
             <label className="block text-sm">
-              <span className={textDarkMuted}>Delimiter (hex):</span>
+              <span className={textDataSecondary}>Delimiter (hex):</span>
               <input
                 type="text"
                 value={delimiterHex}
                 onChange={(e) => handleDelimiterChange(e.target.value)}
                 disabled={disabled}
-                className={`w-full mt-1 px-3 py-1.5 ${bgDarkInput} border ${borderDarkView} rounded text-white disabled:opacity-50`}
+                className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded text-white disabled:opacity-50`}
                 placeholder="0A or 0D0A"
               />
             </label>
             <label className="block text-sm">
-              <span className={textDarkMuted}>Max frame length:</span>
+              <span className={textDataSecondary}>Max frame length:</span>
               <input
                 type="number"
                 value={maxLength}
                 onChange={(e) => handleMaxLengthChange(Number(e.target.value))}
                 disabled={disabled}
-                className={`w-full mt-1 px-3 py-1.5 ${bgDarkInput} border ${borderDarkView} rounded text-white disabled:opacity-50`}
+                className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded text-white disabled:opacity-50`}
               />
             </label>
           </div>
@@ -193,7 +193,7 @@ export default function FramingOptionsPanel({
           className={`${toggleCardClass(currentMode === "modbus_rtu")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <div className="font-medium">Modbus RTU</div>
-          <div className={`text-xs ${textDarkMuted} mt-0.5`}>CRC-16 validation based framing</div>
+          <div className={`text-xs ${textDataSecondary} mt-0.5`}>CRC-16 validation based framing</div>
         </button>
         {currentMode === "modbus_rtu" && (
           <div className="ml-4 pl-4 border-l-2 border-blue-600 py-2">

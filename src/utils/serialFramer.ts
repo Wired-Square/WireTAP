@@ -58,37 +58,6 @@ export function crc16Modbus(data: Uint8Array): number {
   return crc;
 }
 
-// =============================================================================
-// Utility Functions
-// =============================================================================
-
-/**
- * Parse a hex string delimiter (e.g., "0D0A") to byte array
- */
-export function parseDelimiterHex(hex: string): number[] {
-  const cleaned = hex.replace(/\s+/g, '').replace(/^0x/i, '');
-  const bytes: number[] = [];
-  for (let i = 0; i < cleaned.length; i += 2) {
-    const byte = parseInt(cleaned.slice(i, i + 2), 16);
-    if (!isNaN(byte)) {
-      bytes.push(byte);
-    }
-  }
-  return bytes;
-}
-
-/**
- * Convert hex string to Uint8Array
- */
-export function hexToUint8Array(hex: string): Uint8Array {
-  const cleaned = hex.replace(/\s+/g, '').replace(/^0x/i, '');
-  const bytes = new Uint8Array(Math.floor(cleaned.length / 2));
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
-
 /**
  * Check if two arrays are equal
  */
@@ -482,70 +451,4 @@ export class SerialFramer {
   getConfig(): FramingConfig {
     return this.config;
   }
-}
-
-// =============================================================================
-// Convenience Functions
-// =============================================================================
-
-/**
- * Frame bytes in a single batch (convenience function).
- * Creates a framer, feeds all data, flushes, and returns all frames.
- */
-export function frameBytes(data: Uint8Array, config: FramingConfig): FramedData[] {
-  const framer = new SerialFramer(config);
-  const frames = framer.feed(data);
-  const flushed = framer.flush();
-  if (flushed) {
-    frames.push(flushed);
-  }
-  return frames;
-}
-
-/**
- * SLIP encode data (for transmission)
- */
-export function slipEncode(data: Uint8Array): Uint8Array {
-  const encoded: number[] = [];
-  encoded.push(SLIP_END); // Start with END to flush any line noise
-
-  for (let i = 0; i < data.length; i++) {
-    const byte = data[i];
-    switch (byte) {
-      case SLIP_END:
-        encoded.push(SLIP_ESC, SLIP_ESC_END);
-        break;
-      case SLIP_ESC:
-        encoded.push(SLIP_ESC, SLIP_ESC_ESC);
-        break;
-      default:
-        encoded.push(byte);
-    }
-  }
-
-  encoded.push(SLIP_END);
-  return new Uint8Array(encoded);
-}
-
-/**
- * Calculate and append CRC-16 Modbus to data
- */
-export function appendModbusCrc(data: Uint8Array): Uint8Array {
-  const crc = crc16Modbus(data);
-  const result = new Uint8Array(data.length + 2);
-  result.set(data);
-  result[data.length] = crc & 0xFF;        // Low byte first (little-endian)
-  result[data.length + 1] = (crc >> 8) & 0xFF;
-  return result;
-}
-
-/**
- * Validate Modbus RTU frame CRC
- */
-export function validateModbusCrc(frame: Uint8Array): boolean {
-  if (frame.length < 4) return false;
-  const dataWithoutCrc = frame.slice(0, -2);
-  const crc = crc16Modbus(dataWithoutCrc);
-  const receivedCrc = frame[frame.length - 2] | (frame[frame.length - 1] << 8);
-  return crc === receivedCrc;
 }

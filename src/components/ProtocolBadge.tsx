@@ -5,7 +5,7 @@
 
 import { History } from "lucide-react";
 import { iconXs } from "../styles/spacing";
-import { textDarkMuted } from "../styles";
+import { textDataSecondary } from "../styles";
 
 // ============================================================================
 // Types
@@ -87,7 +87,7 @@ export default function ProtocolBadge({
     >
       <StatusLight status={effectiveStatus} />
       <span className="text-xs font-medium text-gray-300">{effectiveLabel}</span>
-      {isRecorded && <History className={`${iconXs} ${textDarkMuted}`} />}
+      {isRecorded && <History className={`${iconXs} ${textDataSecondary}`} />}
     </button>
   );
 }
