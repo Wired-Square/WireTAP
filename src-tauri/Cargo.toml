@@ -1,6 +1,6 @@
 [package]
 name = "candor-ui"
-version = "0.3.1"
+version = "0.3.2"
 description = "Desktop UI for CANdor. CAN bus analysis and decoding toolkit."
 authors = ["Alex Ferrara"]
 edition = "2021"

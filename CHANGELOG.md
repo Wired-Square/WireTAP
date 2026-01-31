@@ -2,6 +2,109 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [0.3.2] - 2026-01-31
+
+### Added
+
+- **Mirror Frames in Catalog Editor**: CAN frames can now reference a primary frame using `mirror_of` to inherit all signals. Mirror signals override primary signals by bit position, allowing exact duplicates or frames with minor signal differences (e.g., Sungrow protocol). Features include:
+  - Purple Layers icon in tree view for mirror frames
+  - Mirror badge in selection header
+  - "Mirror Of" input field in CAN config (mutually exclusive with "Copy From")
+  - Inherited signals shown with Layers icon indicator in frame view
+  - Byte layout visualisation with signal colours
+  - DBC export generates complete signal definitions for each mirror frame
+- **Mirror Frame Validation in Decoder**: Live validation comparing inherited signal bytes between mirror frames and their source frames. Features include:
+  - Frame-level validation badge (Match/Mismatch/Pending) on mirror frame cards
+  - Per-signal validation indicators showing which inherited signals match or mismatch
+  - Dynamic fuzz window based on frame interval (2× the frame's interval or default_interval)
+  - Hysteresis to prevent flickering (requires 3 consecutive mismatches before showing Mismatch)
+  - Support for multiple mirrors referencing the same source frame
+  - Wire timestamps used for accurate timing comparison
+- **Global Theme System**: User-configurable theme mode (System/Light/Dark) in Settings → Display. The theme applies globally across all windows and apps, replacing the previous per-app dark mode forcing. System mode follows the OS preference and updates automatically when the OS theme changes.
+- **Customisable Theme Colours**: User-configurable colour scheme via CSS custom properties. Settings → Display now includes colour pickers for light mode, dark mode, and accent colours. Changes apply instantly across all windows without restart. Includes "Reset to Defaults" to restore the original colour scheme.
+- **Apps Menu**: New menu bar item with keyboard shortcuts to open apps as tabs in the focused window:
+  - Discovery (⌘1), Decoder (⌘2), Transmit (⌘3), Catalog Editor (⌘4), Calculator (⌘5), Settings (⌘,)
+  - Settings is a singleton — opening it from any window focuses the existing instance if one is already open
+  - Apps open as Dockview tabs rather than separate windows
+- **Session Menu**: New menu bar item for controlling IO sessions with focused-panel awareness:
+  - Source info item showing the current profile name (disabled, displays "No source selected" when empty)
+  - Select Source (⌘I) opens the IO picker dialog for the focused app
+  - Playback controls: Play (⌘↵), Pause (⌘.), Stop (⌘⇧.) - control frame delivery for the focused app
+  - Session controls: Detach Session (disconnect from shared session), Stop Session (stop for all apps)
+  - Clear Frames (⌘K) clears the focused app's frame buffer
+  - Menu items dynamically enable/disable based on session state and capabilities (e.g., Pause disabled for realtime sources)
+  - Controls target the focused panel (Decoder, Discovery, or Transmit) rather than a global session
+- **Bookmarks Menu**: New menu bar item for managing time range bookmarks:
+  - Save Bookmark (⌘D) opens the bookmark dialog in Discovery with the current time
+  - Manage Bookmarks opens Settings and navigates to the Bookmarks tab
+  - Jump to Bookmark submenu shows available bookmarks for the focused app's IO profile
+- **Jump to Bookmark While Streaming**: Bookmarks can now be loaded while a session is actively streaming. The session manager automatically stops the current stream, clears app state, and reinitializes with the bookmark's time range. The bookmark button in the toolbar is no longer disabled during streaming. Current playback speed is preserved when jumping to a bookmark.
+- **Manual Bookmark Creation**: Bookmarks can now be created manually with custom start/end times:
+  - New "+" button in the Bookmarks dialog header to create bookmarks from any window
+  - New "New Bookmark" button in Settings → Bookmarks tab
+  - Profile selector dropdown (filtered to time-range capable profiles like PostgreSQL)
+  - Full datetime input fields for specifying custom time ranges
+  - Clickable timezone badge to switch between Default, Local, and UTC timezones
+- **Transmit Queue Recovery**: Transmit queue items now survive session disconnect/reconnect cycles:
+  - Sessions with queued messages are preserved (marked as disconnected) instead of being deleted
+  - Queue items automatically work again when the same profile reconnects
+  - Visual warning indicator (amber alert icon) shows when a queue item's session is disconnected
+  - New "link" button to reassign orphaned queue items to the currently active session
+  - Replaced the Interface column with an editable Bus dropdown for CAN items
+  - Replaced the enable/disable cogwheel icon with a simpler checkbox
+  - Group play button now appears on the first enabled item, so groups remain controllable when items are disabled
+- **Meaningful Bus Labels in Transmit**: The Bus column in Queue and History tabs now shows the source profile name instead of generic "Multi-Bus (2 sources)" when in multi-bus mode. Format is `outputBus: ProfileName` (e.g., "0: Sungrow Goulburn"), making it clear which physical interface each frame is transmitted through.
+
+### Changed
+
+- **Global Error Dialog Expansion**: Refactored error handling to use the global error dialog consistently across the app:
+  - Renamed `showIOError` → `showAppError` (and related: `ioErrorDialog` → `appErrorDialog`, `useIOErrorDialog` → `useAppErrorDialog`) to reflect broader usage beyond IO errors
+  - Replaced 4 native `alert()` calls in IO profile handlers with styled error dialogs
+  - Added user-facing error dialogs for previously silent failures in: selection set picker, bookmark editor, Decoder session/catalog handlers, and Transmit session handlers
+  - All errors now show consistently styled dialogs with title, message, and technical details
+
+- **Dead Code Cleanup**: Removed unused code across the frontend codebase:
+  - Deleted unused selector hook files (`useDecoderSelectors.ts`, `useDiscoverySelectors.ts`)
+  - Removed unused utility functions from `windows.ts`, `persistence.ts`, `favorites.ts`, `selectionSets.ts`, and `serialFramer.ts`
+  - Migrated 7 component files from deprecated style tokens to their modern equivalents (`bgDarkView` → `bgDataView`, etc.)
+  - Removed 15 deprecated legacy aliases from `colourTokens.ts`
+
+- **Unified Sidebar Styling**: Consolidated visual appearance of Settings sidebar (`AppSideBar`) and Catalog Editor sidebar (`ResizableSidebar`). Both now use the same header pattern with `PanelLeft`/`PanelLeftClose` icons, matching collapsed width (56px), and identical styling tokens (`bgPrimary`, `borderDefault`, `hoverLight`, `textSecondary`).
+- **Comprehensive CSS Variable Migration**: Replaced ~1,100 Tailwind `dark:` variant patterns across 116 files with CSS custom properties for Windows WebView compatibility:
+  - **Style tokens**: `typography.ts`, `colourTokens.ts`, `buttonStyles.ts`, `inputStyles.ts`, `badgeStyles.ts`, `cardStyles.ts` - all migrated to CSS variables
+  - **Candor.css**: Added 60+ CSS variables including status colours (success, danger, warning, info, purple with bg/text/border variants), data accent colours (green, purple, orange, cyan, amber, yellow, red, blue), tertiary backgrounds, accent backgrounds, and semantic aliases
+  - **IO reader picker**: All dialogs (`ReaderList`, `BufferList`, `ActionButtons`, `GvretBusConfig`, `SingleBusConfig`, `FramingOptions`, `FilterOptions`) now use CSS variables for selection states, borders, and status colours
+  - **Catalog views**: All frame/signal/node/mux views and dialogs migrated
+  - **Discovery tools**: Analysis panels and result views (`ChangesResultView`, `MessageOrderResultView`, `SerialAnalysisResultView`) migrated
+  - **Settings**: All views and components including `IOProfileDialog`, `LocationsView`, `CatalogsView`, `BookmarksView`
+  - **Shared components**: `TimeController`, `TimelineScrubber`, `HeaderFieldFilter`, `MaskBitPicker`, `ByteBits`, `FramingOptionsPanel`
+- **Removed Theme Prop from Layout Components**: `AppLayout` and `AppTopBar` no longer accept a `theme` prop. All apps now follow the global theme setting instead of forcing dark mode individually.
+- **Catalog Editor Sidebar Layout**: Action buttons (+node, +frame, filter) and protocol badges now stay fixed at the top while the tree scrolls independently. When the sidebar is collapsed, the +node and +frame buttons remain visible as icon-only buttons.
+- **Decoder Toolbar Cleanup**: Removed the "rows per page" dropdown from Decoder's toolbar. Decoder shows all selected frames with their decoded signals and doesn't use pagination, so the dropdown was non-functional.
+
+### Fixed
+
+- **Settings Panel Fails to Open on Windows Startup**: Fixed Settings panel not responding to clicks immediately after launching the app on Windows. On startup, `is_focused()` returns false for all windows due to a WebView2 timing issue. Added fallback to the dashboard window when no focused window is found.
+- **About Dialog Opening on All Windows**: Fixed the About dialog appearing on every open window when triggered from the menu. Now uses targeted event emission (`emit_to`) to show the dialog only on the focused window.
+- **Tab Dragging in Secondary Windows on Windows**: Fixed Dockview tab dragging not working in secondary windows (main-1, main-2, etc.) on Windows. Dynamically created windows were missing the `disable_drag_drop_handler()` call that the dashboard window has via `dragDropEnabled: false` in tauri.conf.json. Without this, Tauri's native file drag-drop handler intercepts HTML5 drag events, breaking Dockview's tab reordering.
+- **Decoder Memory Leak in Long Sessions**: Fixed unbounded memory growth in the Decoder that could cause WebView OOM and blank UI during long CAN monitoring sessions. The `decoded`, `decodedPerSource`, and `seenHeaderFieldValues` maps now use LRU eviction to cap memory usage at ~1-2MB regardless of session length. Limits: 500 decoded frames, 2000 per-source entries, 256 header field values per field.
+- **Catalog Editor Sidebar Resize Lag**: Fixed significant lag when resizing the sidebar by disabling the CSS width transition during active drag operations. The smooth transition now only applies when collapsing/expanding the sidebar.
+- **Missing Favourites After Store Migration**: Fixed time range bookmarks and selection sets not appearing after the multi-window store manager migration. The previous commit changed the storage file and key names (`favorites.dat`/`timeRangeFavorites` → `ui-state.json`/`favorites.timeRanges`) without migrating existing data. Added automatic migration on app startup that detects old store files and transfers data to the new format.
+
+- **Dark Mode Styling on Windows WebView**: Fixed widespread dark mode styling issues on Windows where Tailwind `dark:` variants in style token string constants weren't being applied. Windows WebView doesn't detect system dark mode, so classes defined in `.ts` files weren't being generated by Tailwind JIT. Migrated all style tokens to CSS custom properties with fallback defaults in `Candor.css` for both light and dark modes. This affects Settings, Catalog Editor, dialogs, forms, buttons, badges, and all other components using centralised style tokens.
+- **Discovery Time Display Contrast**: Fixed low contrast time text in Discovery's data view header in light mode. The `TimeDisplay` component now uses CSS variables for both compact and full-size modes, ensuring proper contrast in both themes.
+- **Decoder Signal Row Styling**: Fixed bright white alternating rows in Decoder's signal list on dark mode (Windows). Added `--table-row-alt` and `--table-row-highlight` CSS variables for alternating table rows and change flash effects. Light mode now shows a subtle blue flash (`#dbeafe`) when signal values change, providing visible feedback that was previously invisible.
+- **Catalog Editor Mirror Frame Case Sensitivity**: Fixed `mirror_of` and `copy` lookups requiring exact case match for hex frame IDs. Now `mirror_of = "0x1a5"` correctly matches a frame defined as `[frame.can.0x1A5]` by comparing numeric values instead of string keys.
+- **Bookmark Max Frames Not Applied**: Fixed bookmark `maxFrames` limit not being applied when loading bookmarks. Discovery and Decoder now pass the bookmark's `maxFrames` to `reinitialize` so the frame limit is honoured when fetching data from time-range sources like PostgreSQL. Also fixed the IO picker dialog not populating the Max Frames field when selecting a bookmark.
+- **Session Errors Not Displayed in Decoder**: Fixed IO session errors (e.g., "Access is denied" when SLCAN port is unavailable) not being shown to the user in Decoder. Errors were logged to console but not displayed. The root cause was a race condition: errors emitted before frontend listeners registered were silently dropped. Fixed by storing startup errors in Rust backend and returning them when the first listener registers. Centralised error handling in `sessionStore` now shows a global error dialog for session errors across all apps (Decoder, Discovery, Transmit).
+- **Decoder Unmatched/Filtered Tabs Dark on Light Theme (Windows)**: Fixed hardcoded dark theme colours (`bg-gray-800`, `text-gray-*`) in Decoder Unmatched/Filtered tabs, Discovery serial dialogs, toggle buttons, and style utilities that ignored the user's theme on Windows. Replaced with CSS variable tokens (`bgDataView`, `textDataPrimary`, `textMuted`, etc.) for proper light/dark mode support.
+- **Decoder Badge Colours on Windows Light Mode**: Fixed hardcoded dark-mode colours in Decoder badges ("Mirror of", "Match/Mismatch", header field badges) that had poor contrast on Windows in light mode. The "Dark Panel Badges" in `badgeStyles.ts` used fixed Tailwind colours (`text-blue-400`, `text-cyan-400`, etc.) designed for dark backgrounds. Replaced with CSS variables (`--status-info-*`, `--status-success-*`, `--status-cyan-*`, `--status-purple-*`) that adapt to the current theme.
+- **Blurry Text on Windows**: Fixed blurry/fuzzy text rendering on Windows. Added `SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)` call at startup to enable proper Per-Monitor V2 DPI awareness for WebView2. Also changed font stack to use system fonts (Segoe UI on Windows, San Francisco on macOS) for optimal platform-native rendering.
+- **Discovery Infinite Loop After PostgreSQL Session End**: Fixed "Maximum update depth exceeded" React error when ending a PostgreSQL session after changing bookmarks. The buffer fetch effect was triggering when `bufferMetadata` became null (due to buffer deletion) but buffer mode was still enabled, causing repeated fetch attempts on a non-existent buffer. Added guard to only fetch when a valid buffer ID exists.
+- **Buffer Switch During Bookmark Jump**: Fixed a race condition where jumping to a bookmark while streaming could cause the PostgreSQL session to be destroyed before it started. The buffer-switching effect in Discovery now uses `streamEndedReason === "complete"` instead of `stoppedExplicitly` to determine when to switch to buffer mode, ensuring explicit stops (like bookmark jumps) don't trigger unwanted buffer switches.
+- **Discovery Playback Controls Missing for PostgreSQL Sessions**: Fixed playback controls (play/pause/step buttons) not appearing in Discovery's toolbar during PostgreSQL ingest sessions. The `PlaybackControls` component's `isReady` prop was tied to buffer mode, but PostgreSQL direct ingest doesn't use buffer mode. Now shows controls when `isRecorded` is true. Also fixed the frame counter showing "/ 0" when the total frame count is unknown.
+- **Decoder "No catalog" on Windows with Favourite Decoder**: Fixed the Decoder toolbar showing "No catalog" on Windows even when a favourite decoder was loaded and signals were displayed. The path comparison used to find the selected catalog in the list failed on Windows because Rust returns paths with backslashes (`C:\Users\...`) while the frontend constructs paths with forward slashes. Normalised path separators before comparing. Also fixed the same issue in Catalog Editor.
+
 ## [0.3.1] - 2026-01-30
 
 ### Changed
