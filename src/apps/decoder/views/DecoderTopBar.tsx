@@ -129,7 +129,10 @@ export default function DecoderTopBar({
   onToggleAsciiGutter,
   frameIdFilter = '',
 }: Props) {
-  const selectedCatalog = catalogs.find((c) => c.path === catalogPath);
+  // Normalise path separators for cross-platform comparison (Windows uses backslashes)
+  const normalisePath = (p: string) => p.replace(/\\/g, '/');
+  const normalisedCatalogPath = catalogPath ? normalisePath(catalogPath) : null;
+  const selectedCatalog = catalogs.find((c) => normalisePath(c.path) === normalisedCatalogPath);
   const hasCatalog = !!selectedCatalog;
   const catalogName = selectedCatalog?.name || "No catalog";
   const isDefaultCatalog = selectedCatalog?.filename === defaultCatalogFilename;
