@@ -386,7 +386,8 @@ function DiscoveryFramesView({
 
   // Fetch initial page when buffer mode becomes enabled, buffer changes, or when page/pageSize/selection changes
   useEffect(() => {
-    if (bufferMode.enabled && !isStreaming) {
+    // Only fetch when buffer mode is enabled AND we have a valid buffer to fetch from
+    if (bufferMode.enabled && !isStreaming && bufferMetadata?.id) {
       const pageSize = renderBuffer === -1 ? 1000 : renderBuffer; // Cap "All" at 1000 in buffer mode
       // Convert Set to Array for the API call (empty array = all frames)
       const selectedIds = Array.from(selectedFrames);
