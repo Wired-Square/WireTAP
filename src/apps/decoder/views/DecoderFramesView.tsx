@@ -678,8 +678,8 @@ function FrameCard({
                   {signalDef?._inherited && (
                     <span
                       className={`${caption} italic flex items-center gap-1 ${
-                        signalMismatch === true ? 'text-red-400' :
-                        signalMismatch === false ? 'text-green-400' : 'text-cyan-500'
+                        signalMismatch === true ? 'text-[color:var(--status-danger-text)]' :
+                        signalMismatch === false ? 'text-[color:var(--status-success-text)]' : 'text-[color:var(--status-cyan-text)]'
                       }`}
                       title={
                         signalMismatch === true ? `Mismatch with source frame ${frame.mirrorOf}` :

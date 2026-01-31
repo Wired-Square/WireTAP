@@ -72,39 +72,40 @@ export const badgeSmallPurple = `${badgeSmallBase} bg-purple-600/20 text-purple-
 export const badgeSmallInfo = `${badgeSmallBase} bg-blue-600/20 text-blue-600`;
 
 // ============================================================================
-// Dark Panel Badges - for use in permanently dark panels (e.g., decoder view)
-// These use transparent backgrounds that work well on dark backgrounds
+// Data Panel Badges - for use in data views (e.g., decoder view)
+// These use CSS variables for proper light/dark theme support on Windows.
+// Note: Named "DarkPanel" for historical reasons but now theme-aware.
 // ============================================================================
 
 /**
- * Base for dark panel badges - monospace font, smaller padding
+ * Base for data panel badges - monospace font, smaller padding
  */
 export const badgeDarkPanelBase = "text-xs font-mono px-1.5 py-0.5 rounded flex items-center gap-1";
 
 /**
- * Dark panel info badge - blue, for source addresses
+ * Data panel info badge - blue, for source addresses
  */
-export const badgeDarkPanelInfo = `${badgeDarkPanelBase} bg-blue-600/30 text-blue-400`;
+export const badgeDarkPanelInfo = `${badgeDarkPanelBase} bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]`;
 
 /**
- * Dark panel success badge - green, for valid checksums
+ * Data panel success badge - green, for valid checksums
  */
-export const badgeDarkPanelSuccess = `${badgeDarkPanelBase} bg-green-600/30 text-green-400`;
+export const badgeDarkPanelSuccess = `${badgeDarkPanelBase} bg-[var(--status-success-bg)] text-[color:var(--status-success-text)]`;
 
 /**
- * Dark panel danger badge - red, for invalid checksums
+ * Data panel danger badge - red, for invalid checksums
  */
-export const badgeDarkPanelDanger = `${badgeDarkPanelBase} bg-red-600/30 text-red-400`;
+export const badgeDarkPanelDanger = `${badgeDarkPanelBase} bg-[var(--status-danger-bg)] text-[color:var(--status-danger-text)]`;
 
 /**
- * Dark panel purple badge - purple, for custom header fields
+ * Data panel purple badge - purple, for custom header fields
  */
-export const badgeDarkPanelPurple = `${badgeDarkPanelBase} bg-purple-600/30 text-purple-400`;
+export const badgeDarkPanelPurple = `${badgeDarkPanelBase} bg-[var(--status-purple-bg)] text-[color:var(--status-purple-text)]`;
 
 /**
- * Dark panel cyan badge - cyan, for mirror frame indicators
+ * Data panel cyan badge - cyan, for mirror frame indicators
  */
-export const badgeDarkPanelCyan = `${badgeDarkPanelBase} bg-cyan-600/30 text-cyan-400`;
+export const badgeDarkPanelCyan = `${badgeDarkPanelBase} bg-[var(--status-cyan-bg)] text-[color:var(--status-cyan-text)]`;
 
 // ============================================================================
 // Metadata Badges - for filenames, types, and metadata display

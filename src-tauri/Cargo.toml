@@ -49,6 +49,7 @@ nusb = { version = "0.2", features = ["tokio"] }
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
 nusb = { version = "0.2", features = ["tokio"] }
+windows-sys = { version = "0.59", features = ["Win32_UI_HiDpi"] }
 
 # Linux
 [target.'cfg(target_os = "linux")'.dependencies]

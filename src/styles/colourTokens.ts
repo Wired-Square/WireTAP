@@ -107,6 +107,24 @@ export const borderWarning = "border-[color:var(--status-warning-border)]";
 /** Info border */
 export const borderInfo = "border-[color:var(--status-info-border)]";
 
+/** Purple background */
+export const bgPurple = "bg-[var(--status-purple-bg)]";
+
+/** Purple text */
+export const textPurple = "text-[color:var(--status-purple-text)]";
+
+/** Purple border */
+export const borderPurple = "border-[color:var(--status-purple-border)]";
+
+/** Cyan background */
+export const bgCyan = "bg-[var(--status-cyan-bg)]";
+
+/** Cyan text */
+export const textCyan = "text-[color:var(--status-cyan-text)]";
+
+/** Cyan border */
+export const borderCyan = "border-[color:var(--status-cyan-border)]";
+
 // =============================================================================
 // Interactive Colors - Use CSS variables for accent
 // =============================================================================

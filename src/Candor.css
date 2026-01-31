@@ -102,7 +102,7 @@ html, body {
   filter: drop-shadow(0 0 2em #61dafb);
 }
 :root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Ubuntu', Roboto, sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
@@ -110,10 +110,6 @@ html, body {
   color: #0f0f0f;
   background-color: #f6f6f6;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
 
   /* Theme CSS variables - defaults for light mode */
@@ -268,9 +264,15 @@ form button {
   --status-info-text: #1d4ed8;
   --status-info-border: #bfdbfe;
 
-  /* Status: Purple (multi-bus selection) */
+  /* Status: Purple */
   --status-purple-bg: #f3e8ff;
+  --status-purple-text: #7c3aed;
   --status-purple-border: #d8b4fe;
+
+  /* Status: Cyan (mirror frames) */
+  --status-cyan-bg: #cffafe;
+  --status-cyan-text: #0e7490;
+  --status-cyan-border: #a5f3fc;
 
   /* Data accent colours */
   --text-green: #16a34a;
@@ -390,9 +392,15 @@ form button {
   --status-info-text: #93c5fd;
   --status-info-border: #1e40af;
 
-  /* Status: Purple (multi-bus selection) */
+  /* Status: Purple */
   --status-purple-bg: rgba(147, 51, 234, 0.2);
+  --status-purple-text: #c084fc;
   --status-purple-border: #7c3aed;
+
+  /* Status: Cyan (mirror frames) */
+  --status-cyan-bg: rgba(6, 182, 212, 0.3);
+  --status-cyan-text: #22d3ee;
+  --status-cyan-border: #0891b2;
 
   /* Data accent colours */
   --text-green: #4ade80;
