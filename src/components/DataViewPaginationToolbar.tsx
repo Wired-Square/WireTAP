@@ -34,6 +34,8 @@ interface DataViewPaginationToolbarProps {
   centerContent?: React.ReactNode;
   /** Hide pagination buttons (still shows page size selector) */
   hidePagination?: boolean;
+  /** Hide page size selector (use when pagination is not applicable at all) */
+  hidePageSize?: boolean;
 }
 
 /** Standard page size options for frame-based views */
@@ -67,6 +69,7 @@ export default function DataViewPaginationToolbar({
   leftContent,
   centerContent,
   hidePagination = false,
+  hidePageSize = false,
 }: DataViewPaginationToolbarProps) {
   const showPagination = !hidePagination && totalPages > 1 && pageSize !== -1;
 
@@ -130,19 +133,21 @@ export default function DataViewPaginationToolbar({
       )}
 
       {/* Page size selector - at the extreme right */}
-      <select
-        value={pageSize}
-        onChange={(e) => onPageSizeChange(Number(e.target.value))}
-        disabled={disabled}
-        className={`text-xs px-2 py-1 rounded border border-gray-600 ${bgDataInput} ${textDataPrimary} disabled:opacity-50`}
-        title="Rows per page"
-      >
-        {pageSizeOptions.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      {!hidePageSize && (
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSizeChange(Number(e.target.value))}
+          disabled={disabled}
+          className={`text-xs px-2 py-1 rounded border border-gray-600 ${bgDataInput} ${textDataPrimary} disabled:opacity-50`}
+          title="Rows per page"
+        >
+          {pageSizeOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

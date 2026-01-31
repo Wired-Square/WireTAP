@@ -28,6 +28,7 @@ interface ToolbarConfig {
   leftContent?: ReactNode;
   centerContent?: ReactNode;
   hidePagination?: boolean;
+  hidePageSize?: boolean;
 }
 
 /**
@@ -187,6 +188,7 @@ export default function AppTabView({
         toolbarLeftContent={toolbar?.leftContent}
         toolbarCenterContent={toolbar?.centerContent}
         hidePagination={toolbar?.hidePagination}
+        hidePageSize={toolbar?.hidePageSize}
         // Timeline
         showTimeline={timeline !== undefined}
         minTimeUs={timeline?.minTimeUs ?? 0}

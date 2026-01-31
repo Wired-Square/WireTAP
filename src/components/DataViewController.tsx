@@ -42,6 +42,8 @@ interface DataViewControllerProps {
   toolbarCenterContent?: React.ReactNode;
   /** Hide pagination buttons but still show page size selector */
   hidePagination?: boolean;
+  /** Hide page size selector (use when pagination is not applicable at all) */
+  hidePageSize?: boolean;
 
   // Timeline props
   showTimeline: boolean;
@@ -90,6 +92,7 @@ export default function DataViewController({
   toolbarLeftContent,
   toolbarCenterContent,
   hidePagination = false,
+  hidePageSize = false,
 
   // Timeline
   showTimeline,
@@ -132,6 +135,7 @@ export default function DataViewController({
           leftContent={toolbarLeftContent}
           centerContent={toolbarCenterContent}
           hidePagination={hidePagination}
+          hidePageSize={hidePageSize}
         />
       )}
 

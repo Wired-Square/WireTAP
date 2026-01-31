@@ -1054,6 +1054,7 @@ export default function DecoderFramesView({
               leftContent: timeRangeInputs,
               centerContent: playbackControls,
               hidePagination: true,
+              hidePageSize: true,
             }
           : undefined
       }
