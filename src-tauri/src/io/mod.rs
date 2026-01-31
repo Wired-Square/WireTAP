@@ -636,6 +636,35 @@ static IO_SESSIONS: Lazy<Mutex<HashMap<String, IOSession>>> =
 /// Uses RwLock (not async Mutex) so it can be checked synchronously in emit_to_session
 static CLOSING_SESSIONS: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
+/// Startup errors for sessions (errors that occurred before any listener registered).
+/// Uses RwLock (not async Mutex) so it can be set synchronously from emit_to_session.
+/// The error is retrieved and cleared when the first listener registers.
+static STARTUP_ERRORS: Lazy<RwLock<HashMap<String, String>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Store a startup error for a session (called when error occurs with no listeners)
+pub fn store_startup_error(session_id: &str, error: String) {
+    if let Ok(mut errors) = STARTUP_ERRORS.write() {
+        eprintln!("[reader] Storing startup error for session '{}': {}", session_id, error);
+        errors.insert(session_id.to_string(), error);
+    }
+}
+
+/// Take (retrieve and remove) the startup error for a session
+pub fn take_startup_error(session_id: &str) -> Option<String> {
+    if let Ok(mut errors) = STARTUP_ERRORS.write() {
+        errors.remove(session_id)
+    } else {
+        None
+    }
+}
+
+/// Clear any startup error for a session (called on session destroy)
+fn clear_startup_error(session_id: &str) {
+    if let Ok(mut errors) = STARTUP_ERRORS.write() {
+        errors.remove(session_id);
+    }
+}
+
 /// Mark a session as closing (sync version for use in window event handler)
 /// This prevents further events from being emitted to the closing window.
 /// Returns true if this is the first time marking as closing, false if already closing.
@@ -703,6 +732,20 @@ pub fn emit_to_session<S: Serialize + Clone>(
 
     let scoped_event = format!("{}:{}", event, session_id);
     let _ = app.emit(&scoped_event, payload);
+}
+
+/// Emit a session error event and store it for later retrieval.
+///
+/// This is the preferred way to emit errors - it both:
+/// 1. Emits the error as a Tauri event (for listeners that are already set up)
+/// 2. Stores the error so it can be returned when a listener registers
+///
+/// This solves the race condition where errors occur before frontend listeners are set up.
+pub fn emit_session_error(app: &AppHandle, session_id: &str, error: String) {
+    // Store the error for later retrieval (in case no listeners are set up yet)
+    store_startup_error(session_id, error.clone());
+    // Also emit the event (in case listeners ARE set up)
+    emit_to_session(app, "session-error", session_id, error);
 }
 
 /// Emit frames to a session with active listener filtering.
@@ -1307,6 +1350,8 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
     }
     // Clear the closing flag now that the session is fully destroyed
     clear_session_closing(session_id);
+    // Clear any stored startup error
+    clear_startup_error(session_id);
     Ok(())
 }
 
@@ -1415,6 +1460,8 @@ pub struct RegisterListenerResult {
     pub is_owner: bool,
     /// Total number of listeners
     pub listener_count: usize,
+    /// Error that occurred before this listener registered (one-shot, cleared after return)
+    pub startup_error: Option<String>,
 }
 
 /// Register a listener for a session.
@@ -1475,6 +1522,12 @@ pub async fn register_listener(session_id: &str, listener_id: &str) -> Result<Re
         None => (None, None),
     };
 
+    // Retrieve any startup error (one-shot: cleared after retrieval)
+    let startup_error = take_startup_error(session_id);
+    if let Some(ref err) = startup_error {
+        eprintln!("[reader] Returning startup error for session '{}': {}", session_id, err);
+    }
+
     Ok(RegisterListenerResult {
         capabilities: session.device.capabilities(),
         state: session.device.state(),
@@ -1482,6 +1535,7 @@ pub async fn register_listener(session_id: &str, listener_id: &str) -> Result<Re
         buffer_type,
         is_owner,
         listener_count: session.listeners.len(),
+        startup_error,
     })
 }
 

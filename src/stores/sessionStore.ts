@@ -100,6 +100,9 @@ let flushTimeoutId: ReturnType<typeof setTimeout> | null = null;
 /** Getter for event listeners - set after store is created */
 let getEventListeners: (() => Record<string, SessionEventListeners>) | null = null;
 
+/** Getter for showIOError - set after store is created */
+let getGlobalShowIOError: (() => ((title: string, message: string, details?: string) => void) | null) | null = null;
+
 /** Flush all pending frames to their callbacks */
 function flushPendingFrames() {
   flushTimeoutId = null;
@@ -395,6 +398,19 @@ export interface SessionStore {
   getSessionForProfile: (profileId: string) => Session | undefined;
   /** Get sessions for Transmit dropdown (connected + disconnected with queue) */
   getTransmitDropdownSessions: () => Session[];
+
+  // ---- Global IO Error Dialog ----
+  /** Global IO error dialog state (shown for session errors) */
+  ioErrorDialog: {
+    isOpen: boolean;
+    title: string;
+    message: string;
+    details: string | null;
+  };
+  /** Show the global IO error dialog */
+  showIOError: (title: string, message: string, details?: string) => void;
+  /** Close the global IO error dialog */
+  closeIOError: () => void;
 }
 
 // ============================================================================
@@ -454,6 +470,14 @@ async function setupSessionEventListeners(
         error === "No IO profile configured" || error.includes("not found");
       if (!isExpectedError) {
         invokeCallbacks(eventListeners, "onError", error);
+        // Show global error dialog
+        // Note: showIOError will be called after store is created
+        if (typeof getGlobalShowIOError === "function") {
+          const showIOError = getGlobalShowIOError();
+          if (showIOError) {
+            showIOError("Stream Error", "An error occurred while streaming.", error);
+          }
+        }
       }
       updateSession(sessionId, {
         ioState: "error",
@@ -576,6 +600,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   multiBusProfiles: [],
   sourceProfileId: null,
   outputBusToSource: new Map(),
+  ioErrorDialog: {
+    isOpen: false,
+    title: "",
+    message: "",
+    details: null,
+  },
 
   // ---- Session Lifecycle ----
   openSession: async (profileId, profileName, listenerId, options = {}) => {
@@ -592,6 +622,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // Register this listener with Rust backend
       try {
         const result = await registerSessionListener(sessionId, listenerId);
+
+        // Handle startup error (error that occurred before listener registered)
+        if (result.startup_error) {
+          get().showIOError("Stream Error", "An error occurred while starting the session.", result.startup_error);
+        }
 
         // Add listener to heartbeat tracking
         const eventListeners = get()._eventListeners[sessionId];
@@ -655,6 +690,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         const regResult = await registerSessionListener(sessionId, listenerId);
         isOwner = regResult.is_owner;
         listenerCount = regResult.listener_count;
+        // Handle startup error (error that occurred before listener registered)
+        if (regResult.startup_error) {
+          get().showIOError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
+        }
       } catch {
         // Ignore - we already joined
       }
@@ -699,6 +738,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           const regResult = await registerSessionListener(sessionId, listenerId);
           isOwner = regResult.is_owner;
           listenerCount = regResult.listener_count;
+          // Handle startup error (error that occurred before listener registered)
+          if (regResult.startup_error) {
+            get().showIOError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
+          }
         } catch {
           // Ignore
         }
@@ -720,6 +763,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             const regResult = await registerSessionListener(sessionId, listenerId);
             isOwner = regResult.is_owner;
             listenerCount = regResult.listener_count;
+            // Handle startup error (error that occurred before listener registered)
+            if (regResult.startup_error) {
+              get().showIOError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
+            }
           } catch {
             // Ignore
           }
@@ -1299,10 +1346,34 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           s.capabilities?.can_transmit === true) ||
         (s.lifecycleState === "disconnected" && s.hasQueuedMessages))
     ),
+
+  // ---- Global IO Error Dialog ----
+  showIOError: (title, message, details) =>
+    set({
+      ioErrorDialog: {
+        isOpen: true,
+        title,
+        message,
+        details: details ?? null,
+      },
+    }),
+
+  closeIOError: () =>
+    set({
+      ioErrorDialog: {
+        isOpen: false,
+        title: "",
+        message: "",
+        details: null,
+      },
+    }),
 }));
 
 // Initialize the event listeners getter for frame throttling
 getEventListeners = () => useSessionStore.getState()._eventListeners;
+
+// Initialize the showIOError getter for error handling
+getGlobalShowIOError = () => useSessionStore.getState().showIOError;
 
 // ============================================================================
 // Convenience Hooks
@@ -1352,6 +1423,17 @@ export function useTransmitDropdownSessions(): Session[] {
       )
     )
   );
+}
+
+/** Hook for global IO error dialog state and actions */
+export function useIOErrorDialog() {
+  const isOpen = useSessionStore((s) => s.ioErrorDialog.isOpen);
+  const title = useSessionStore((s) => s.ioErrorDialog.title);
+  const message = useSessionStore((s) => s.ioErrorDialog.message);
+  const details = useSessionStore((s) => s.ioErrorDialog.details);
+  const closeIOError = useSessionStore((s) => s.closeIOError);
+
+  return { isOpen, title, message, details, closeIOError };
 }
 
 /** Source info for a bus in multi-bus mode */
@@ -1549,7 +1631,11 @@ export async function createAndStartMultiSourceSession(
   });
 
   // Register this listener with the session
-  await registerSessionListener(sessionId, listenerId);
+  const regResult = await registerSessionListener(sessionId, listenerId);
+  // Handle startup error (error that occurred before listener registered)
+  if (regResult.startup_error) {
+    useSessionStore.getState().showIOError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
+  }
 
   return {
     sessionId,
@@ -1586,7 +1672,11 @@ export async function joinMultiSourceSession(
   const joinResult = await joinReaderSession(sessionId);
 
   // Register this listener with the session
-  await registerSessionListener(sessionId, listenerId);
+  const regResult = await registerSessionListener(sessionId, listenerId);
+  // Handle startup error (error that occurred before listener registered)
+  if (regResult.startup_error) {
+    useSessionStore.getState().showIOError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
+  }
 
   return {
     sessionId,

@@ -12,7 +12,7 @@ use super::types::{SourceConfig, TransmitChannels};
 use crate::buffer_store::{self, TimestampedByte};
 use crate::io::serial::SerialRawBytesPayload;
 use crate::io::types::SourceMessage;
-use crate::io::{emit_frames, emit_stream_ended, emit_to_session, FrameMessage};
+use crate::io::{emit_frames, emit_session_error, emit_stream_ended, emit_to_session, FrameMessage};
 
 /// Main merge task that spawns sub-readers and combines their frames/bytes
 pub(super) async fn run_merge_task(
@@ -150,7 +150,7 @@ pub(super) async fn run_merge_task(
                     if let Ok(mut channels) = transmit_channels.lock() {
                         channels.remove(&source_idx);
                     }
-                    emit_to_session(&app, "session-error", &session_id, error);
+                    emit_session_error(&app, &session_id, error);
                     active_sources = active_sources.saturating_sub(1);
                 }
                 SourceMessage::TransmitReady(source_idx, tx_sender) => {

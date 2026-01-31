@@ -627,6 +627,8 @@ export interface RegisterListenerResult {
   is_owner: boolean;
   /** Total number of listeners */
   listener_count: number;
+  /** Error that occurred before this listener registered (one-shot, cleared after return) */
+  startup_error: string | null;
 }
 
 /**

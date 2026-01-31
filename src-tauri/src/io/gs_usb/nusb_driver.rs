@@ -27,7 +27,7 @@ use crate::io::error::IoError;
 use crate::io::gvret::{apply_bus_mapping, BusMapping};
 use crate::io::types::{SourceMessage, TransmitRequest, TransmitSender};
 use crate::io::{
-    emit_frames, emit_stream_ended, emit_to_session, now_us, CanTransmitFrame, FrameMessage,
+    emit_frames, emit_session_error, emit_stream_ended, now_us, CanTransmitFrame, FrameMessage,
     IOCapabilities, IODevice, IOState, TransmitPayload, TransmitResult,
 };
 
@@ -403,7 +403,7 @@ async fn run_gs_usb_stream(
     let device_info = match device_info {
         Ok(d) => d,
         Err(e) => {
-            emit_to_session(&app_handle, "session-error", &session_id, e);
+            emit_session_error(&app_handle, &session_id, e);
             emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
             return;
         }
@@ -412,12 +412,7 @@ async fn run_gs_usb_stream(
     let usb_device = match device_info.open().await {
         Ok(d) => d,
         Err(e) => {
-            emit_to_session(
-                &app_handle,
-                "session-error",
-                &session_id,
-                IoError::connection(&device_name, e.to_string()).to_string(),
-            );
+            emit_session_error(&app_handle, &session_id, IoError::connection(&device_name, e.to_string()).to_string());
             emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
             return;
         }
@@ -426,12 +421,7 @@ async fn run_gs_usb_stream(
     let interface = match usb_device.claim_interface(0).await {
         Ok(i) => i,
         Err(_) => {
-            emit_to_session(
-                &app_handle,
-                "session-error",
-                &session_id,
-                IoError::busy(&device_name).to_string(),
-            );
+            emit_session_error(&app_handle, &session_id, IoError::busy(&device_name).to_string());
             emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
             return;
         }
@@ -444,12 +434,7 @@ async fn run_gs_usb_stream(
 
     // Initialize device
     if let Err(e) = initialize_device(&interface, &config).await {
-        emit_to_session(
-            &app_handle,
-            "session-error",
-            &session_id,
-            IoError::protocol(&device_name, format!("initialize: {}", e)).to_string(),
-        );
+        emit_session_error(&app_handle, &session_id, IoError::protocol(&device_name, format!("initialize: {}", e)).to_string());
         emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
         return;
     }
@@ -460,12 +445,7 @@ async fn run_gs_usb_stream(
     let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(0x81) {
         Ok(ep) => ep,
         Err(e) => {
-            emit_to_session(
-                &app_handle,
-                "session-error",
-                &session_id,
-                IoError::protocol(&device_name, format!("open bulk IN endpoint: {}", e)).to_string(),
-            );
+            emit_session_error(&app_handle, &session_id, IoError::protocol(&device_name, format!("open bulk IN endpoint: {}", e)).to_string());
             emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
             return;
         }

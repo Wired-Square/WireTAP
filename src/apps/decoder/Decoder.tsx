@@ -317,6 +317,8 @@ export default function Decoder() {
     }
   }, [flushPendingFrames]);
 
+  // Error handling - errors are shown globally via sessionStore's IO error dialog
+  // This callback is kept for logging but UI display is handled centrally
   const handleError = useCallback((error: string) => {
     console.error("Decoder stream error:", error);
   }, []);

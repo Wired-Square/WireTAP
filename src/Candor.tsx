@@ -6,6 +6,8 @@ import "./Candor.css";
 import MainLayout from "./components/MainLayout";
 import { useUpdateStore } from "./stores/updateStore";
 import { useTheme } from "./hooks/useTheme";
+import { useIOErrorDialog } from "./stores/sessionStore";
+import ErrorDialog from "./dialogs/ErrorDialog";
 
 // Lazy load AboutDialog since it's rarely used
 const AboutDialog = lazy(() => import("./dialogs/AboutDialog"));
@@ -26,6 +28,9 @@ export default function Candor() {
   const [showAbout, setShowAbout] = useState(false);
   const currentWindow = getCurrentWebviewWindow();
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
+
+  // Global IO error dialog state
+  const { isOpen: ioErrorOpen, title: ioErrorTitle, message: ioErrorMessage, details: ioErrorDetails, closeIOError } = useIOErrorDialog();
 
   // Apply global theme (dark/light mode + CSS variables)
   useTheme();
@@ -53,6 +58,14 @@ export default function Candor() {
       <Suspense fallback={<LoadingFallback />}>
         <MainLayout />
       </Suspense>
+      {/* Global IO error dialog - shown for session errors across all apps */}
+      <ErrorDialog
+        isOpen={ioErrorOpen}
+        title={ioErrorTitle}
+        message={ioErrorMessage}
+        details={ioErrorDetails ?? undefined}
+        onClose={closeIOError}
+      />
     </>
   );
 }
