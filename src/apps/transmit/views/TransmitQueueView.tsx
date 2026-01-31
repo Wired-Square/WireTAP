@@ -4,9 +4,9 @@
 // Supports individual item repeat and group repeat (multiple items in sequence).
 
 import { useCallback, useMemo } from "react";
-import { Play, Square, Trash2, StopCircle, Settings, Users } from "lucide-react";
-import { useTransmitStore } from "../../../stores/transmitStore";
-import { useActiveSession } from "../../../stores/sessionStore";
+import { Play, Square, Trash2, StopCircle, Users, AlertCircle, Link } from "lucide-react";
+import { useTransmitStore, GVRET_BUSES } from "../../../stores/transmitStore";
+import { useActiveSession, useSessionStore } from "../../../stores/sessionStore";
 import {
   bgDataToolbar,
   borderDataView,
@@ -21,7 +21,9 @@ import {
   playButtonCompact,
   stopButtonCompact,
   paginationButtonDark,
+  iconButtonHoverCompact,
 } from "../../../styles/buttonStyles";
+import { toolbarSelect } from "../../../styles/inputStyles";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { byteToHex } from "../../../utils/byteUtils";
 
@@ -30,6 +32,7 @@ export default function TransmitQueueView() {
   const queue = useTransmitStore((s) => s.queue);
   const activeSession = useActiveSession();
   const activeGroups = useTransmitStore((s) => s.activeGroups);
+  const sessions = useSessionStore((s) => s.sessions);
 
   // Store actions
   const removeFromQueue = useTransmitStore((s) => s.removeFromQueue);
@@ -39,17 +42,21 @@ export default function TransmitQueueView() {
   const stopAllRepeats = useTransmitStore((s) => s.stopAllRepeats);
   const updateQueueInterval = useTransmitStore((s) => s.updateQueueInterval);
   const toggleQueueEnabled = useTransmitStore((s) => s.toggleQueueEnabled);
+  const updateQueueItemBus = useTransmitStore((s) => s.updateQueueItemBus);
+  const updateQueueItemSession = useTransmitStore((s) => s.updateQueueItemSession);
   const setItemGroup = useTransmitStore((s) => s.setItemGroup);
   const startGroupRepeat = useTransmitStore((s) => s.startGroupRepeat);
   const stopGroupRepeat = useTransmitStore((s) => s.stopGroupRepeat);
   const stopAllGroupRepeats = useTransmitStore((s) => s.stopAllGroupRepeats);
 
 
-  // Compute first item index for each group (for showing group controls)
-  const firstItemInGroup = useMemo(() => {
-    const result = new Map<string, string>(); // groupName -> first item id
+  // Compute first enabled item in each group (for showing group controls)
+  // The play button appears on the first enabled item, so groups remain controllable
+  // even if the first item is disabled
+  const firstEnabledInGroup = useMemo(() => {
+    const result = new Map<string, string>(); // groupName -> first enabled item id
     for (const item of queue) {
-      if (item.groupName && !result.has(item.groupName)) {
+      if (item.groupName && item.enabled && !result.has(item.groupName)) {
         result.set(item.groupName, item.id);
       }
     }
@@ -216,7 +223,7 @@ export default function TransmitQueueView() {
           >
             <tr>
               <th className="text-left px-4 py-2 w-12"></th>
-              <th className="text-left px-4 py-2">Interface</th>
+              <th className="text-left px-4 py-2 w-28">Bus</th>
               <th className="text-left px-4 py-2 w-16">Type</th>
               <th className="text-left px-4 py-2">Frame / Data</th>
               <th className="text-left px-4 py-2 w-24">Interval</th>
@@ -232,28 +239,31 @@ export default function TransmitQueueView() {
               // Group state
               const isInGroup = Boolean(item.groupName);
               const isGroupRepeating = item.groupName ? activeGroups.has(item.groupName) : false;
-              const isFirstInGroup = item.groupName ? firstItemInGroup.get(item.groupName) === item.id : false;
+              const isFirstEnabledInGroup = item.groupName ? firstEnabledInGroup.get(item.groupName) === item.id : false;
+
+              // Check item's session state (not active session)
+              const itemSession = sessions[item.profileId];
+              const isOrphaned = !itemSession || itemSession.lifecycleState === "disconnected";
+              const isItemSessionConnected = itemSession?.lifecycleState === "connected";
 
               // All repeat requires IO session with transmit capability
               // For CAN items, check can_transmit; for serial items, check can_transmit_serial
-              const hasCanTransmit = Boolean(activeSession?.capabilities?.can_transmit);
-              const hasSerialTransmit = Boolean(activeSession?.capabilities?.can_transmit_serial);
+              const hasCanTransmit = isItemSessionConnected && Boolean(itemSession?.capabilities?.can_transmit);
+              const hasSerialTransmit = isItemSessionConnected && Boolean(itemSession?.capabilities?.can_transmit_serial);
               const hasIOSession = item.type === "serial" ? hasSerialTransmit : hasCanTransmit;
               const canStartIndividual = !isInGroup && item.enabled && !item.isRepeating && hasIOSession;
-              const canStartGroup = isInGroup && isFirstInGroup && item.enabled && !isGroupRepeating && hasCanTransmit;
+              const canStartGroup = isInGroup && isFirstEnabledInGroup && item.enabled && !isGroupRepeating && hasCanTransmit;
 
               return (
                 <tr
                   key={item.id}
-                  className={`border-b ${borderDataView} ${hoverDataRow} ${
-                    !item.enabled ? "opacity-50" : ""
-                  } ${isInGroup && isGroupRepeating ? "bg-green-900/20" : ""}`}
+                  className={`border-b ${borderDataView} ${hoverDataRow} ${isInGroup && isGroupRepeating ? "bg-green-900/20" : ""}`}
                 >
                   {/* Play/Stop */}
                   <td className="px-4 py-2">
                     {isInGroup ? (
                       // Grouped item: show group play/stop on first item only
-                      isFirstInGroup ? (
+                      isFirstEnabledInGroup ? (
                         isGroupRepeating ? (
                           <button
                             onClick={() => handleToggleGroupRepeat(item.groupName!)}
@@ -309,9 +319,33 @@ export default function TransmitQueueView() {
                     )}
                   </td>
 
-                  {/* Interface */}
+                  {/* Bus */}
                   <td className="px-4 py-2">
-                    <span className="text-gray-300">{item.profileName}</span>
+                    <div className="flex items-center gap-1.5">
+                      {isOrphaned && (
+                        <span className="text-amber-500" title="Session disconnected">
+                          <AlertCircle size={12} />
+                        </span>
+                      )}
+                      {item.type === "can" && item.canFrame ? (
+                        <select
+                          value={item.canFrame.bus}
+                          onChange={(e) =>
+                            updateQueueItemBus(item.id, parseInt(e.target.value))
+                          }
+                          disabled={item.isRepeating || isGroupRepeating}
+                          className={`${toolbarSelect} w-16`}
+                        >
+                          {GVRET_BUSES.map((b) => (
+                            <option key={b.value} value={b.value}>
+                              {b.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={textDataSecondary}>Serial</span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Type */}
@@ -334,11 +368,6 @@ export default function TransmitQueueView() {
                         <code className="font-mono text-green-400">
                           {formatted.id}
                         </code>
-                      )}
-                      {formatted.bus !== null && formatted.bus !== undefined && (
-                        <span className="text-xs text-amber-400">
-                          Bus {formatted.bus}
-                        </span>
                       )}
                       <code className="font-mono text-gray-400 text-xs">
                         {formatted.details}
@@ -386,17 +415,30 @@ export default function TransmitQueueView() {
 
                   {/* Actions */}
                   <td className="px-4 py-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => toggleQueueEnabled(item.id)}
-                        className={paginationButtonDark}
-                        title={item.enabled ? "Disable" : "Enable"}
-                      >
-                        <Settings
-                          size={14}
-                          className={item.enabled ? "" : "text-gray-600"}
-                        />
-                      </button>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={item.enabled}
+                        onChange={() => toggleQueueEnabled(item.id)}
+                        disabled={item.isRepeating || isGroupRepeating}
+                        className="h-3.5 w-3.5 rounded border-gray-600 bg-transparent accent-blue-500 cursor-pointer disabled:cursor-not-allowed"
+                        title={item.enabled ? "Disable item" : "Enable item"}
+                      />
+                      {isOrphaned && activeSession && (
+                        <button
+                          onClick={() =>
+                            updateQueueItemSession(
+                              item.id,
+                              activeSession.profileId,
+                              activeSession.profileName
+                            )
+                          }
+                          className={iconButtonHoverCompact}
+                          title={`Assign to ${activeSession.profileName}`}
+                        >
+                          <Link size={14} />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleRemove(item.id)}
                         disabled={item.isRepeating}

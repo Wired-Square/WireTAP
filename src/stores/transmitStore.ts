@@ -212,6 +212,14 @@ export interface TransmitState {
   updateQueueInterval: (queueId: string, intervalMs: number) => void;
   /** Toggle queue item enabled state */
   toggleQueueEnabled: (queueId: string) => void;
+  /** Update queue item bus (CAN only) */
+  updateQueueItemBus: (queueId: string, bus: number) => void;
+  /** Reassign queue item to a different session */
+  updateQueueItemSession: (
+    queueId: string,
+    profileId: string,
+    profileName: string
+  ) => void;
   /** Set group name for a queue item */
   setItemGroup: (queueId: string, groupName: string | undefined) => void;
   /** Get all unique group names in the queue */
@@ -457,6 +465,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     };
 
     set({ queue: [...state.queue, item] });
+    useSessionStore.getState().setHasQueuedMessages(session.profileId, true);
   },
 
   addSerialToQueue: () => {
@@ -511,6 +520,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     };
 
     set({ queue: [...state.queue, item] });
+    useSessionStore.getState().setHasQueuedMessages(session.profileId, true);
   },
 
   removeFromQueue: (queueId) => {
@@ -523,10 +533,23 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
 
     set({ queue: state.queue.filter((q) => q.id !== queueId) });
+
+    // Update hasQueuedMessages flag if no items remain for this profile
+    if (item) {
+      const remainingForProfile = get().queue.filter(
+        (q) => q.profileId === item.profileId
+      );
+      if (remainingForProfile.length === 0) {
+        useSessionStore.getState().setHasQueuedMessages(item.profileId, false);
+      }
+    }
   },
 
   clearQueue: async () => {
     const state = get();
+
+    // Collect unique profile IDs before clearing
+    const profileIds = new Set(state.queue.map((q) => q.profileId));
 
     // Stop all repeats
     for (const item of state.queue) {
@@ -536,6 +559,12 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
 
     set({ queue: [] });
+
+    // Clear hasQueuedMessages flag for all affected profiles
+    const { setHasQueuedMessages } = useSessionStore.getState();
+    for (const profileId of profileIds) {
+      setHasQueuedMessages(profileId, false);
+    }
   },
 
   startRepeat: async (queueId) => {
@@ -688,6 +717,43 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
           : q
       ),
     });
+  },
+
+  updateQueueItemBus: (queueId, bus) => {
+    const state = get();
+    set({
+      queue: state.queue.map((q) =>
+        q.id === queueId && q.type === "can" && q.canFrame
+          ? { ...q, canFrame: { ...q.canFrame, bus } }
+          : q
+      ),
+    });
+  },
+
+  updateQueueItemSession: (queueId, profileId, profileName) => {
+    const state = get();
+    const item = state.queue.find((q) => q.id === queueId);
+    const oldProfileId = item?.profileId;
+
+    set({
+      queue: state.queue.map((q) =>
+        q.id === queueId ? { ...q, profileId, profileName } : q
+      ),
+    });
+
+    // Update hasQueuedMessages flags
+    const { setHasQueuedMessages } = useSessionStore.getState();
+    setHasQueuedMessages(profileId, true);
+
+    // Check if old profile still has items
+    if (oldProfileId && oldProfileId !== profileId) {
+      const remainingForOld = state.queue.filter(
+        (q) => q.id !== queueId && q.profileId === oldProfileId
+      );
+      if (remainingForOld.length === 0) {
+        setHasQueuedMessages(oldProfileId, false);
+      }
+    }
   },
 
   // Group Actions

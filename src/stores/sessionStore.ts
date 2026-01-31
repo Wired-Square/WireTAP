@@ -900,17 +900,43 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           // handles the backend cleanup including stopping the session when no listeners remain.
           // Calling leaveReaderSession would double-decrement joiner_count.
 
-          // Remove from local store only
-          set((s) => {
-            const { [sessionId]: _, ...remainingSessions } = s.sessions;
-            const { [sessionId]: __, ...remainingListeners } = s._eventListeners;
-            return {
-              sessions: remainingSessions,
-              _eventListeners: remainingListeners,
-              activeSessionId: s.activeSessionId === sessionId ? null : s.activeSessionId,
-            };
-          });
-          console.log(`[sessionStore:leaveSession] Session removed from store`);
+          const session = get().sessions[sessionId];
+
+          // If session has queued messages, preserve it as disconnected instead of removing
+          if (session?.hasQueuedMessages) {
+            set((s) => {
+              const { [sessionId]: __, ...remainingListeners } = s._eventListeners;
+              return {
+                sessions: {
+                  ...s.sessions,
+                  [sessionId]: {
+                    ...s.sessions[sessionId],
+                    lifecycleState: "disconnected",
+                    listenerCount: 0,
+                  },
+                },
+                _eventListeners: remainingListeners,
+                activeSessionId:
+                  s.activeSessionId === sessionId ? null : s.activeSessionId,
+              };
+            });
+            console.log(
+              `[sessionStore:leaveSession] Session preserved (has queued messages)`
+            );
+          } else {
+            // Remove from local store only
+            set((s) => {
+              const { [sessionId]: _, ...remainingSessions } = s.sessions;
+              const { [sessionId]: __, ...remainingListeners } = s._eventListeners;
+              return {
+                sessions: remainingSessions,
+                _eventListeners: remainingListeners,
+                activeSessionId:
+                  s.activeSessionId === sessionId ? null : s.activeSessionId,
+              };
+            });
+            console.log(`[sessionStore:leaveSession] Session removed from store`);
+          }
         } else {
           // Update listener count
           console.log(`[sessionStore:leaveSession] Other callbacks remain, updating listener count`);
