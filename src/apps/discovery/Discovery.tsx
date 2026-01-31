@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { invoke } from "@tauri-apps/api/core";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager } from '../../hooks/useIOSessionManager';
+import { useFocusStore } from '../../stores/focusStore';
 import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
@@ -37,6 +39,9 @@ import { useDialogManager } from "../../hooks/useDialogManager";
 
 export default function Discovery() {
   const { settings } = useSettings();
+
+  // Track if this panel is focused (for menu state reporting)
+  const isFocused = useFocusStore((s) => s.focusedPanelId === "discovery");
 
   // Zustand store selectors
   const frames = useDiscoveryStore((state) => state.frames);
@@ -372,6 +377,8 @@ export default function Discovery() {
     setSourceProfileId,
     // Session
     session,
+    // Profile name (for menu display)
+    ioProfileName,
     // Derived state
     isStreaming,
     isPaused,
@@ -718,27 +725,71 @@ export default function Discovery() {
     closeIoReaderPicker: dialogs.ioReaderPicker.close,
   });
 
-  // Listen for menu commands (Clear, Save Bookmark)
+  // Report session state to menu when this panel is focused
+  useEffect(() => {
+    if (isFocused) {
+      invoke("update_menu_session_state", {
+        profileName: ioProfileName ?? null,
+        isStreaming,
+        isPaused,
+      });
+    }
+  }, [isFocused, ioProfileName, isStreaming, isPaused]);
+
+  // Listen for session control menu commands
   useEffect(() => {
     const currentWindow = getCurrentWebviewWindow();
 
     const setupListeners = async () => {
-      // Clear frames from menu
-      const unlistenClear = await currentWindow.listen("menu-session-clear", () => {
-        handlers.handleClearDiscoveredFrames();
-      });
+      // Session control events from menu (only respond when targeted)
+      const unlistenControl = await currentWindow.listen<{ action: string; targetPanelId: string | null }>(
+        "session-control",
+        (event) => {
+          const { action, targetPanelId } = event.payload;
+          if (targetPanelId !== "discovery") return;
 
-      // Save bookmark from menu - open dialog with current time
-      const unlistenBookmark = await currentWindow.listen("menu-bookmark-save", () => {
-        // Use the current playback time if available, otherwise start of range
-        const timeUs = currentTime !== null ? currentTime * 1_000_000 : 0;
-        setBookmarkFrameId(0); // No specific frame
-        setBookmarkFrameTime(new Date(timeUs / 1000).toISOString());
-        dialogs.bookmark.open();
-      });
+          switch (action) {
+            case "play":
+              if (isPaused) {
+                resume();
+              } else if (isStopped && sessionReady) {
+                start();
+              }
+              break;
+            case "pause":
+              if (isStreaming && !isPaused) {
+                pause();
+              }
+              break;
+            case "stop":
+              if (isStreaming) {
+                stopWatch();
+              }
+              break;
+            case "clear":
+              handlers.handleClearDiscoveredFrames();
+              break;
+            case "picker":
+              dialogs.ioReaderPicker.open();
+              break;
+          }
+        }
+      );
+
+      // Save bookmark from menu - open dialog with current time (Discovery only)
+      const unlistenBookmark = await currentWindow.listen<{ targetPanelId: string | null } | undefined>(
+        "menu-bookmark-save",
+        () => {
+          // Bookmark save is Discovery-specific, always respond
+          const timeUs = currentTime !== null ? currentTime * 1_000_000 : 0;
+          setBookmarkFrameId(0); // No specific frame
+          setBookmarkFrameTime(new Date(timeUs / 1000).toISOString());
+          dialogs.bookmark.open();
+        }
+      );
 
       return () => {
-        unlistenClear();
+        unlistenControl();
         unlistenBookmark();
       };
     };
@@ -747,7 +798,7 @@ export default function Discovery() {
     return () => {
       cleanup.then((fn) => fn());
     };
-  }, [handlers, currentTime, dialogs.bookmark]);
+  }, [isPaused, isStopped, isStreaming, sessionReady, resume, start, pause, stopWatch, handlers, currentTime, dialogs]);
 
   // Handle skip for IoReaderPickerDialog
   const handleSkip = useCallback(async () => {

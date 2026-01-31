@@ -13,10 +13,20 @@ mod store_manager;
 mod transmit;
 
 use std::sync::Mutex;
-use tauri::{menu::*, AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WebviewUrl, WindowEvent};
+use tauri::{menu::*, AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WebviewUrl, WindowEvent, Wry};
 
 // Track which window has the Settings panel open (singleton behavior)
 struct SettingsWindowState(Mutex<Option<String>>);
+
+// Store references to dynamic menu items that need to be updated at runtime
+struct SessionMenuItems {
+    source: MenuItem<Wry>,
+    play: MenuItem<Wry>,
+    pause: MenuItem<Wry>,
+    stop: MenuItem<Wry>,
+}
+
+struct SessionMenuState(Mutex<Option<SessionMenuItems>>);
 
 // Window configuration helper
 struct WindowConfig {
@@ -139,6 +149,34 @@ fn open_settings_panel(app: AppHandle, state: State<SettingsWindowState>) {
     open_settings_singleton(&app, &state);
 }
 
+/// Update the Session menu state based on the focused app's session.
+/// Called by the frontend when panel focus or session state changes.
+#[tauri::command]
+fn update_menu_session_state(
+    state: State<SessionMenuState>,
+    profile_name: Option<String>,
+    is_streaming: bool,
+    is_paused: bool,
+) {
+    if let Some(items) = state.0.lock().unwrap().as_ref() {
+        // Update source info item text
+        let text = profile_name
+            .as_ref()
+            .map(|n| format!("Source: {}", n))
+            .unwrap_or_else(|| "No source selected".to_string());
+        let _ = items.source.set_text(&text);
+
+        // Update Play enabled state (enabled when stopped or paused)
+        let _ = items.play.set_enabled(!is_streaming || is_paused);
+
+        // Update Pause enabled state (enabled when streaming and not paused)
+        let _ = items.pause.set_enabled(is_streaming && !is_paused);
+
+        // Update Stop enabled state (enabled when streaming)
+        let _ = items.stop.set_enabled(is_streaming);
+    }
+}
+
 /// Create a new main window with the specified label.
 ///
 /// This command spawns window creation in a background task and returns immediately.
@@ -256,6 +294,12 @@ pub fn run() {
                 .build()?;
 
             // Create Session menu for stream control
+            let session_source_item = MenuItemBuilder::with_id("session-source", "No source selected")
+                .enabled(false)
+                .build(app)?;
+            let session_picker_item = MenuItemBuilder::with_id("session-picker", "Select Source…")
+                .accelerator("cmdOrCtrl+I")
+                .build(app)?;
             let session_play_item = MenuItemBuilder::with_id("session-play", "Play")
                 .accelerator("cmdOrCtrl+Return")
                 .build(app)?;
@@ -270,6 +314,9 @@ pub fn run() {
                 .build(app)?;
 
             let session_menu = SubmenuBuilder::new(app, "Session")
+                .item(&session_source_item)
+                .item(&session_picker_item)
+                .separator()
                 .item(&session_play_item)
                 .item(&session_pause_item)
                 .item(&session_stop_item)
@@ -311,6 +358,15 @@ pub fn run() {
 
             app.set_menu(menu)?;
 
+            // Store session menu items for dynamic updates
+            let session_menu_items = SessionMenuItems {
+                source: session_source_item,
+                play: session_play_item,
+                pause: session_pause_item,
+                stop: session_stop_item,
+            };
+            *app.state::<SessionMenuState>().0.lock().unwrap() = Some(session_menu_items);
+
             // Handle menu events
             app.on_menu_event(|app, event| {
                 let event_id = event.id().as_ref();
@@ -339,6 +395,9 @@ pub fn run() {
                         let _ = app.emit("menu-new-window", ());
                     }
                     // Session control menu items
+                    "session-picker" => {
+                        emit_to_focused_window(app, "menu-session-picker", ());
+                    }
                     "session-play" => {
                         emit_to_focused_window(app, "menu-session-play", ());
                     }
@@ -389,11 +448,13 @@ pub fn run() {
             Ok(())
         })
         .manage(SettingsWindowState(Mutex::new(None)))
+        .manage(SessionMenuState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             greet,
             create_main_window,
             settings_panel_closed,
             open_settings_panel,
+            update_menu_session_state,
             catalog::open_catalog,
             catalog::save_catalog,
             catalog::validate_catalog,

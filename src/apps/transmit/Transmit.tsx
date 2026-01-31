@@ -5,10 +5,13 @@
 
 import { useEffect, useCallback, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { invoke } from "@tauri-apps/api/core";
 import { Send, AlertCircle } from "lucide-react";
 import { useTransmitStore } from "../../stores/transmitStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
+import { useFocusStore } from "../../stores/focusStore";
 import { useSettings, type IOProfile } from "../../hooks/useSettings";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
 import type { TransmitHistoryEvent, SerialTransmitHistoryEvent, RepeatStoppedEvent } from "../../api/transmit";
@@ -69,6 +72,9 @@ export default function Transmit() {
   // Settings for IO profiles
   const { settings } = useSettings();
   const ioProfiles = settings?.io_profiles ?? [];
+
+  // Track if this panel is focused (for menu state reporting)
+  const isFocused = useFocusStore((s) => s.focusedPanelId === "transmit");
 
   // Get all CAN/serial profiles that could potentially be used for transmit
   const transmitProfiles = useMemo(
@@ -177,6 +183,58 @@ export default function Transmit() {
       cleanup();
     };
   }, [cleanup]);
+
+  // Report session state to menu when this panel is focused
+  useEffect(() => {
+    if (isFocused) {
+      invoke("update_menu_session_state", {
+        profileName: ioProfileName ?? null,
+        isStreaming,
+        isPaused,
+      });
+    }
+  }, [isFocused, ioProfileName, isStreaming, isPaused]);
+
+  // Listen for session control menu commands
+  useEffect(() => {
+    const currentWindow = getCurrentWebviewWindow();
+
+    const setupListeners = async () => {
+      const unlistenControl = await currentWindow.listen<{ action: string; targetPanelId: string | null }>(
+        "session-control",
+        (event) => {
+          const { action, targetPanelId } = event.payload;
+          if (targetPanelId !== "transmit") return;
+
+          switch (action) {
+            case "play":
+              if (isStopped && sessionReady) {
+                start();
+              }
+              break;
+            case "stop":
+              if (isStreaming || isPaused) {
+                stop();
+              }
+              break;
+            case "picker":
+              setShowIoPickerDialog(true);
+              break;
+            // Note: Transmit doesn't use pause/clear
+          }
+        }
+      );
+
+      return () => {
+        unlistenControl();
+      };
+    };
+
+    const cleanup = setupListeners();
+    return () => {
+      cleanup.then((fn) => fn());
+    };
+  }, [isStopped, isStreaming, isPaused, sessionReady, start, stop, setShowIoPickerDialog]);
 
   // Listen for transmit history events from repeat transmissions
   const addHistoryItem = useTransmitStore((s) => s.addHistoryItem);

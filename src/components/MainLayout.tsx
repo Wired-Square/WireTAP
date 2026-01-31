@@ -32,8 +32,8 @@ import {
   getNextMainWindowNumber,
 } from "../utils/persistence";
 import { getAppVersion, settingsPanelClosed, openSettingsPanel } from "../api";
-import { useSessionStore } from "../stores/sessionStore";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
+import { useFocusStore } from "../stores/focusStore";
 import logo from "../assets/logo.png";
 
 // Lazy load app components for better initial load
@@ -246,6 +246,7 @@ export default function MainLayout() {
   const [savedLayout, setSavedLayout] = useState<SerializedDockview | null>(null);
   const [layoutLoaded, setLayoutLoaded] = useState(false);
 
+
   // Get window label once (doesn't change during component lifetime)
   const windowLabel = getCurrentWebviewWindow().label;
   const isDynamicWindow = windowLabel.startsWith("main-");
@@ -370,27 +371,36 @@ export default function MainLayout() {
         saveLayout();
       });
 
+      // Track focused panel in store (used for session-control targeting)
+      event.api.onDidActivePanelChange((panel) => {
+        useFocusStore.getState().setFocusedPanelId(panel?.id ?? null);
+      });
+
       // Try to restore saved layout
       if (savedLayout) {
         try {
           event.api.fromJSON(savedLayout);
-          return;
         } catch (error) {
           console.error("Failed to restore layout, using default:", error);
         }
       }
 
       // Dynamic windows show the watermark instead of default panel
-      if (isDynamicWindow) {
+      if (!savedLayout && isDynamicWindow) {
         return;
       }
 
       // No saved layout or restore failed - open Discovery panel by default
-      event.api.addPanel({
-        id: "discovery",
-        component: "discovery",
-        title: panelTitles.discovery,
-      });
+      if (!savedLayout) {
+        event.api.addPanel({
+          id: "discovery",
+          component: "discovery",
+          title: panelTitles.discovery,
+        });
+      }
+
+      // Set initial active panel in store
+      useFocusStore.getState().setFocusedPanelId(event.api.activePanel?.id ?? null);
     },
     [saveLayout, savedLayout, isDynamicWindow]
   );
@@ -470,42 +480,38 @@ export default function MainLayout() {
   }, [handlePanelClick]);
 
   // Listen for session control menu commands
+  // These are re-emitted as session-control events with the target panel ID
   useEffect(() => {
     const currentWindow = getCurrentWebviewWindow();
 
     const setupListeners = async () => {
-      const unlistenPlay = await currentWindow.listen("menu-session-play", () => {
-        const { activeSessionId, sessions, startSession, resumeSession } =
-          useSessionStore.getState();
-        if (!activeSessionId) return;
-        const session = sessions[activeSessionId];
-        if (!session) return;
+      // Helper to emit session-control with current active panel from store
+      const emitSessionControl = (action: string) => {
+        const targetPanelId = useFocusStore.getState().focusedPanelId;
+        currentWindow.emit("session-control", { action, targetPanelId });
+      };
 
-        if (session.ioState === "paused") {
-          resumeSession(activeSessionId);
-        } else if (session.ioState === "stopped") {
-          startSession(activeSessionId);
-        }
+      // Session control events - emit to focused app
+      const unlistenPlay = await currentWindow.listen("menu-session-play", () => {
+        emitSessionControl("play");
       });
 
       const unlistenPause = await currentWindow.listen("menu-session-pause", () => {
-        const { activeSessionId, pauseSession } = useSessionStore.getState();
-        if (activeSessionId) {
-          pauseSession(activeSessionId);
-        }
+        emitSessionControl("pause");
       });
 
       const unlistenStop = await currentWindow.listen("menu-session-stop", () => {
-        const { activeSessionId, stopSession } = useSessionStore.getState();
-        if (activeSessionId) {
-          stopSession(activeSessionId);
-        }
+        emitSessionControl("stop");
       });
 
-      // Clear frames - broadcast to apps (they handle their own clearing)
+      // Clear frames - emit to focused app
       const unlistenClear = await currentWindow.listen("menu-session-clear", () => {
-        // Apps listen for this event directly and clear their own state
-        // This is handled by Discovery and Decoder components
+        emitSessionControl("clear");
+      });
+
+      // Picker shortcut - emit to focused app to open its IO picker
+      const unlistenPicker = await currentWindow.listen("menu-session-picker", () => {
+        emitSessionControl("picker");
       });
 
       // Navigate to Bookmarks tab in Settings (set before Settings mounts)
@@ -518,6 +524,7 @@ export default function MainLayout() {
         unlistenPause();
         unlistenStop();
         unlistenClear();
+        unlistenPicker();
         unlistenBookmarkManage();
       };
     };

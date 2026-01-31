@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { invoke } from "@tauri-apps/api/core";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
 import { useDecoderStore } from "../../stores/decoderStore";
 import { useIOSessionManager } from '../../hooks/useIOSessionManager';
+import { useFocusStore } from '../../stores/focusStore';
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { clearBuffer } from "../../api/buffer";
 import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
@@ -34,6 +36,9 @@ export default function Decoder() {
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [showTimeRange, setShowTimeRange] = useState(false);
+
+  // Track if this panel is focused (for menu state reporting)
+  const isFocused = useFocusStore((s) => s.focusedPanelId === "decoder");
 
   // Dialog visibility states managed by hook
   const dialogs = useDialogManager([
@@ -420,6 +425,8 @@ export default function Decoder() {
     multiBusProfiles: ioProfiles,
     // Session
     session,
+    // Profile name (for menu display)
+    ioProfileName,
     // Derived state
     isStreaming,
     isPaused,
@@ -569,18 +576,59 @@ export default function Decoder() {
     totalFrames: bufferMetadata?.count,
   });
 
-  // Listen for menu commands (Clear)
+  // Report session state to menu when this panel is focused
+  useEffect(() => {
+    if (isFocused) {
+      invoke("update_menu_session_state", {
+        profileName: ioProfileName ?? null,
+        isStreaming,
+        isPaused,
+      });
+    }
+  }, [isFocused, ioProfileName, isStreaming, isPaused]);
+
+  // Listen for session control menu commands
   useEffect(() => {
     const currentWindow = getCurrentWebviewWindow();
 
     const setupListeners = async () => {
-      // Clear frames from menu
-      const unlistenClear = await currentWindow.listen("menu-session-clear", () => {
-        handlers.handleClear();
-      });
+      // Session control events from menu (only respond when targeted)
+      const unlistenControl = await currentWindow.listen<{ action: string; targetPanelId: string | null }>(
+        "session-control",
+        (event) => {
+          const { action, targetPanelId } = event.payload;
+          if (targetPanelId !== "decoder") return;
+
+          switch (action) {
+            case "play":
+              if (isPaused) {
+                resume();
+              } else if (isStopped && isReady) {
+                start();
+              }
+              break;
+            case "pause":
+              if (isStreaming && !isPaused) {
+                pause();
+              }
+              break;
+            case "stop":
+              if (isStreaming) {
+                stopWatch();
+              }
+              break;
+            case "clear":
+              handlers.handleClear();
+              break;
+            case "picker":
+              dialogs.ioReaderPicker.open();
+              break;
+          }
+        }
+      );
 
       return () => {
-        unlistenClear();
+        unlistenControl();
       };
     };
 
@@ -588,7 +636,7 @@ export default function Decoder() {
     return () => {
       cleanup.then((fn) => fn());
     };
-  }, [handlers]);
+  }, [isPaused, isStopped, isStreaming, isReady, resume, start, pause, stopWatch, handlers, dialogs]);
 
   // Note: Watch state is cleared automatically by useIOSessionManager when streaming stops
 
