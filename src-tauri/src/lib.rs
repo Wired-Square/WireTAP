@@ -129,12 +129,18 @@ fn open_settings_singleton(app: &AppHandle, state: &State<SettingsWindowState>) 
     }
 
     // Open Settings in focused window and track it
-    if let Some(window) = app
+    let target_window = app
         .webview_windows()
         .values()
         .find(|w| w.is_focused().unwrap_or(false))
-    {
-        let label = window.label().to_string();
+        .map(|w| w.label().to_string())
+        // Fallback to dashboard window if no window reports as focused (Windows startup race)
+        .or_else(|| {
+            app.get_webview_window("dashboard")
+                .map(|w| w.label().to_string())
+        });
+
+    if let Some(label) = target_window {
         *settings_window = Some(label.clone());
         let _ = app.emit_to(&label, "menu-open-panel", "settings");
     }
