@@ -628,7 +628,7 @@ function DiscoveryFramesView({
     <PlaybackControls
       playbackState={playbackState}
       playbackDirection={playbackDirection}
-      isReady={bufferMode.enabled}
+      isReady={bufferMode.enabled || isRecorded}
       canPause={capabilities?.can_pause ?? false}
       supportsSeek={capabilities?.supports_seek ?? false}
       supportsSpeedControl={capabilities?.supports_speed_control ?? false}
@@ -638,7 +638,7 @@ function DiscoveryFramesView({
       maxTimeUs={timelineProps.maxTimeUs}
       currentTimeUs={timelineProps.currentTimeUs}
       currentFrameIndex={currentFrameIndex}
-      totalFrames={bufferMode.totalFrames}
+      totalFrames={bufferMode.enabled ? bufferMode.totalFrames : undefined}
       onPlay={onPlay}
       onPlayBackward={onPlayBackward}
       onPause={onPause}
