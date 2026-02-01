@@ -43,6 +43,8 @@ CREATE INDEX IF NOT EXISTS idx_can_frame_ts
   ON public.can_frame (ts DESC);
 CREATE INDEX IF NOT EXISTS idx_can_frame_id_ts
   ON public.can_frame (id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_can_frame_id_extended_ts
+  ON public.can_frame (id, extended, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_can_frame_id_ts_row_id_desc
   ON public.can_frame (id, ts DESC, row_id DESC);
 CREATE INDEX IF NOT EXISTS idx_can_frame_iface_ts

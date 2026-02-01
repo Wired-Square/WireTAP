@@ -108,7 +108,8 @@ export type QueryResult = ByteChangeResult[] | FrameChangeResult[] | MirrorValid
 /** Query parameters */
 export interface QueryParams {
   frameId: number;
-  isExtended: boolean;
+  /** Extended frame filter: true = extended only, false = standard only, null = no filter (both) */
+  isExtended: boolean | null;
   byteIndex: number;
   // Mirror validation params
   mirrorFrameId: number;
@@ -174,8 +175,9 @@ export interface QueuedQuery {
 }
 
 /** Format frame ID with leading zeros (3 digits for standard, 8 for extended) */
-function formatFrameId(frameId: number, isExtended: boolean): string {
-  const hexDigits = isExtended ? 8 : 3;
+function formatFrameId(frameId: number, isExtended: boolean | null): string {
+  // When isExtended is null (no filter), default to standard display (3 digits)
+  const hexDigits = isExtended === true ? 8 : 3;
   return `0x${frameId.toString(16).toUpperCase().padStart(hexDigits, "0")}`;
 }
 
@@ -287,7 +289,7 @@ interface QueryState {
 
 const initialQueryParams: QueryParams = {
   frameId: 0,
-  isExtended: false,
+  isExtended: null, // No filter by default (query both standard and extended)
   byteIndex: 0,
   mirrorFrameId: 0,
   sourceFrameId: 0,

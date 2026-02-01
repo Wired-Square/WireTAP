@@ -237,9 +237,10 @@ export default function QueryBuilderPanel({
   );
 
   // Handle extended ID toggle
+  // Unchecked = null (no filter, query both), Checked = true (extended only)
   const handleExtendedChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      updateQueryParams({ isExtended: e.target.checked });
+      updateQueryParams({ isExtended: e.target.checked ? true : null });
     },
     [updateQueryParams]
   );
@@ -399,8 +400,12 @@ export default function QueryBuilderPanel({
   // Generate SQL query preview
   const sqlPreview = useMemo(() => {
     const frameId = queryParams.frameId;
-    const isExtended = queryParams.isExtended ? 1 : 0;
     const byteIndex = queryParams.byteIndex;
+
+    // Extended filter: only include if explicitly set (not null)
+    const extendedClause = queryParams.isExtended !== null
+      ? ` AND extended = ${queryParams.isExtended}`
+      : "";
 
     // Format time bounds if selected
     let timeConditions = "";
@@ -417,7 +422,7 @@ export default function QueryBuilderPanel({
     get_byte_safe(data_bytes, ${byteIndex}) as curr_byte,
     LAG(get_byte_safe(data_bytes, ${byteIndex})) OVER (ORDER BY ts) as prev_byte
   FROM can_frame
-  WHERE id = ${frameId} AND extended = (${isExtended} != 0)${timeConditions}
+  WHERE id = ${frameId}${extendedClause}${timeConditions}
   ORDER BY ts
 )
 SELECT
@@ -436,7 +441,7 @@ LIMIT ${limitOverride.toLocaleString()}`;
   SELECT ts, data_bytes,
     LAG(data_bytes) OVER (ORDER BY ts) as prev_data
   FROM can_frame
-  WHERE id = ${frameId} AND extended = (${isExtended} != 0)${timeConditions}
+  WHERE id = ${frameId}${extendedClause}${timeConditions}
   ORDER BY ts
 )
 SELECT
@@ -453,11 +458,11 @@ LIMIT ${limitOverride.toLocaleString()}`;
       const { mirrorFrameId, sourceFrameId, toleranceMs } = queryParams;
       return `WITH mirror_frames AS (
   SELECT ts, data_bytes FROM can_frame
-  WHERE id = ${mirrorFrameId} AND extended = (${isExtended} != 0)${timeConditions}
+  WHERE id = ${mirrorFrameId}${extendedClause}${timeConditions}
 ),
 source_frames AS (
   SELECT ts, data_bytes FROM can_frame
-  WHERE id = ${sourceFrameId} AND extended = (${isExtended} != 0)${timeConditions}
+  WHERE id = ${sourceFrameId}${extendedClause}${timeConditions}
 )
 SELECT
   (EXTRACT(EPOCH FROM m.ts) * 1000000)::float8 as mirror_ts,
@@ -552,7 +557,7 @@ LIMIT ${limitOverride.toLocaleString()}`;
                     <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
                       <input
                         type="checkbox"
-                        checked={queryParams.isExtended}
+                        checked={queryParams.isExtended === true}
                         onChange={handleExtendedChange}
                         disabled={disabled}
                         className="disabled:cursor-not-allowed"
@@ -678,7 +683,7 @@ LIMIT ${limitOverride.toLocaleString()}`;
                   <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
                     <input
                       type="checkbox"
-                      checked={queryParams.isExtended}
+                      checked={queryParams.isExtended === true}
                       onChange={handleExtendedChange}
                       disabled={disabled}
                       className="disabled:cursor-not-allowed"
@@ -837,13 +842,6 @@ LIMIT ${limitOverride.toLocaleString()}`;
           <ListPlus className={iconSm} />
           Add to Queue
         </button>
-
-        {/* No profile selected message */}
-        {disabled && (
-          <p className={`text-xs ${textSecondary} text-center`}>
-            Select a PostgreSQL profile to run queries
-          </p>
-        )}
       </div>
     </div>
   );

@@ -276,13 +276,14 @@ fn get_profile_password(profile: &IOProfile) -> Option<String> {
 /// Query for byte changes in a specific frame
 ///
 /// Returns a list of timestamps where the specified byte changed value.
+/// If `is_extended` is None, queries both standard and extended frames.
 #[tauri::command]
 pub async fn db_query_byte_changes(
     app: AppHandle,
     profile_id: String,
     frame_id: u32,
     byte_index: u8,
-    is_extended: bool,
+    is_extended: Option<bool>,
     start_time: Option<String>,
     end_time: Option<String>,
     limit: Option<u32>,
@@ -292,7 +293,7 @@ pub async fn db_query_byte_changes(
     let result_limit = limit.unwrap_or(10000);
     let query_id = query_id.unwrap_or_else(|| format!("byte_changes_{}", query_start.elapsed().as_nanos()));
 
-    println!("[dbquery] db_query_byte_changes called with profile_id='{}', frame_id={}, byte_index={}, is_extended={}, limit={}",
+    println!("[dbquery] db_query_byte_changes called with profile_id='{}', frame_id={}, byte_index={}, is_extended={:?}, limit={}",
         profile_id, frame_id, byte_index, is_extended, result_limit);
 
     // Load settings to get profile
@@ -346,35 +347,46 @@ pub async fn db_query_byte_changes(
     // This avoids fetching all rows and comparing in Rust
     let frame_id_i32 = frame_id as i32;
     let byte_index_i32 = byte_index as i32;
-    // Convert bool to i32 for PostgreSQL compatibility (some schemas use integer for extended)
-    let is_extended_int: i32 = if is_extended { 1 } else { 0 };
 
     // Build the base query that extracts and compares the specific byte in SQL
-    // Use explicit type casts to help tokio-postgres type inference
-    let mut query = String::from(
+    // Parameter indices are dynamic based on whether extended filter is included
+    let mut param_idx = 1;
+    let frame_id_param = param_idx;
+    param_idx += 1;
+
+    let mut query = format!(
         r#"
         WITH ordered_frames AS (
             SELECT
                 ts,
-                public.get_byte_safe(data_bytes, $3::int4) as curr_byte,
-                LAG(public.get_byte_safe(data_bytes, $3::int4)) OVER (ORDER BY ts) as prev_byte
+                public.get_byte_safe(data_bytes, ${}::int4) as curr_byte,
+                LAG(public.get_byte_safe(data_bytes, ${}::int4)) OVER (ORDER BY ts) as prev_byte
             FROM public.can_frame
-            WHERE id = $1::int4 AND extended = ($2::int4 != 0)
-        "#
+            WHERE id = ${}::int4"#,
+        param_idx, param_idx, frame_id_param
     );
+    let _byte_index_param = param_idx;
+    param_idx += 1;
 
-    // Add time range conditions to the CTE
-    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32, &is_extended_int, &byte_index_i32];
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32, &byte_index_i32];
+
+    // Only add extended filter if specified
+    let is_extended_bool: bool;
+    if let Some(ext) = is_extended {
+        is_extended_bool = ext;
+        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        param_idx += 1;
+        params.push(&is_extended_bool);
+    }
 
     // Use explicit text cast to help PostgreSQL type inference for timestamp conversion
     if let Some(ref start) = start_time {
-        let idx = params.len() + 1;
-        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", idx));
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        param_idx += 1;
         params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
     }
     if let Some(ref end) = end_time {
-        let idx = params.len() + 1;
-        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", idx));
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
         params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
     }
 
@@ -398,8 +410,8 @@ pub async fn db_query_byte_changes(
     ));
 
     println!("[dbquery] Executing query:\n{}", query);
-    println!("[dbquery] Query params: frame_id={}, is_extended={} (int={}), byte_index={}, start_time={:?}, end_time={:?}",
-        frame_id_i32, is_extended, is_extended_int, byte_index_i32, start_time, end_time);
+    println!("[dbquery] Query params: frame_id={}, byte_index={}, is_extended={:?}, start_time={:?}, end_time={:?}",
+        frame_id_i32, byte_index_i32, is_extended, start_time, end_time);
 
     let rows = client
         .query(&query, &params)
@@ -424,7 +436,7 @@ pub async fn db_query_byte_changes(
     }
 
     let execution_time_ms = query_start.elapsed().as_millis() as u64;
-    println!("[dbquery] byte_changes: frame=0x{:X} byte={} ext={} | {} changes, {}ms",
+    println!("[dbquery] byte_changes: frame=0x{:X} byte={} ext={:?} | {} changes, {}ms",
         frame_id, byte_index, is_extended, results.len(), execution_time_ms);
 
     unregister_query(&query_id).await;
@@ -442,12 +454,13 @@ pub async fn db_query_byte_changes(
 /// Query for frame payload changes
 ///
 /// Returns a list of timestamps where any byte in the frame's payload changed.
+/// If `is_extended` is None, queries both standard and extended frames.
 #[tauri::command]
 pub async fn db_query_frame_changes(
     app: AppHandle,
     profile_id: String,
     frame_id: u32,
-    is_extended: bool,
+    is_extended: Option<bool>,
     start_time: Option<String>,
     end_time: Option<String>,
     limit: Option<u32>,
@@ -457,7 +470,7 @@ pub async fn db_query_frame_changes(
     let result_limit = limit.unwrap_or(10000);
     let query_id = query_id.unwrap_or_else(|| format!("frame_changes_{}", query_start.elapsed().as_nanos()));
 
-    println!("[dbquery] db_query_frame_changes called with profile_id='{}', frame_id={}, is_extended={}, limit={}",
+    println!("[dbquery] db_query_frame_changes called with profile_id='{}', frame_id={}, is_extended={:?}, limit={}",
         profile_id, frame_id, is_extended, result_limit);
 
     // Load settings to get profile
@@ -508,11 +521,13 @@ pub async fn db_query_frame_changes(
     // Build query - filter frame changes in SQL for efficiency
     // Only return rows where the payload differs from the previous frame
     let frame_id_i32 = frame_id as i32;
-    // Convert bool to i32 for PostgreSQL compatibility (some schemas use integer for extended)
-    let is_extended_int: i32 = if is_extended { 1 } else { 0 };
 
-    // Use explicit type casts to help tokio-postgres type inference
-    let mut query = String::from(
+    // Build query with dynamic parameter indices
+    let mut param_idx = 1;
+    let frame_id_param = param_idx;
+    param_idx += 1;
+
+    let mut query = format!(
         r#"
         WITH ordered_frames AS (
             SELECT
@@ -520,21 +535,29 @@ pub async fn db_query_frame_changes(
                 data_bytes,
                 LAG(data_bytes) OVER (ORDER BY ts) as prev_data
             FROM public.can_frame
-            WHERE id = $1::int4 AND extended = ($2::int4 != 0)
-        "#
+            WHERE id = ${}::int4"#,
+        frame_id_param
     );
 
-    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32, &is_extended_int];
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32];
+
+    // Only add extended filter if specified
+    let is_extended_bool: bool;
+    if let Some(ext) = is_extended {
+        is_extended_bool = ext;
+        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        param_idx += 1;
+        params.push(&is_extended_bool);
+    }
 
     // Use explicit text cast to help PostgreSQL type inference for timestamp conversion
     if let Some(ref start) = start_time {
-        let idx = params.len() + 1;
-        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", idx));
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        param_idx += 1;
         params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
     }
     if let Some(ref end) = end_time {
-        let idx = params.len() + 1;
-        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", idx));
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
         params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
     }
 
@@ -557,8 +580,8 @@ pub async fn db_query_frame_changes(
     ));
 
     println!("[dbquery] Executing query:\n{}", query);
-    println!("[dbquery] Query params: frame_id={}, is_extended={} (int={}), start_time={:?}, end_time={:?}",
-        frame_id_i32, is_extended, is_extended_int, start_time, end_time);
+    println!("[dbquery] Query params: frame_id={}, is_extended={:?}, start_time={:?}, end_time={:?}",
+        frame_id_i32, is_extended, start_time, end_time);
 
     let rows = client
         .query(&query, &params)
@@ -596,7 +619,7 @@ pub async fn db_query_frame_changes(
     }
 
     let execution_time_ms = query_start.elapsed().as_millis() as u64;
-    println!("[dbquery] frame_changes: frame=0x{:X} ext={} | {} changes, {}ms",
+    println!("[dbquery] frame_changes: frame=0x{:X} ext={:?} | {} changes, {}ms",
         frame_id, is_extended, results.len(), execution_time_ms);
 
     unregister_query(&query_id).await;
@@ -615,13 +638,14 @@ pub async fn db_query_frame_changes(
 ///
 /// Compares payloads between mirror and source frames at matching timestamps
 /// (within tolerance). Returns timestamps where payloads differ.
+/// If `is_extended` is None, queries both standard and extended frames.
 #[tauri::command]
 pub async fn db_query_mirror_validation(
     app: AppHandle,
     profile_id: String,
     mirror_frame_id: u32,
     source_frame_id: u32,
-    is_extended: bool,
+    is_extended: Option<bool>,
     tolerance_ms: u32,
     start_time: Option<String>,
     end_time: Option<String>,
@@ -632,8 +656,8 @@ pub async fn db_query_mirror_validation(
     let result_limit = limit.unwrap_or(10000);
     let query_id = query_id.unwrap_or_else(|| format!("mirror_validation_{}", query_start.elapsed().as_nanos()));
 
-    println!("[dbquery] db_query_mirror_validation called with profile_id='{}', mirror=0x{:X}, source=0x{:X}, tolerance={}ms, limit={}",
-        profile_id, mirror_frame_id, source_frame_id, tolerance_ms, result_limit);
+    println!("[dbquery] db_query_mirror_validation called with profile_id='{}', mirror=0x{:X}, source=0x{:X}, is_extended={:?}, tolerance={}ms, limit={}",
+        profile_id, mirror_frame_id, source_frame_id, is_extended, tolerance_ms, result_limit);
 
     // Load settings to get profile
     let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
@@ -669,55 +693,83 @@ pub async fn db_query_mirror_validation(
     // Build query - join mirror and source frames by timestamp proximity
     let mirror_id_i32 = mirror_frame_id as i32;
     let source_id_i32 = source_frame_id as i32;
-    let is_extended_int: i32 = if is_extended { 1 } else { 0 };
     let tolerance_ms_i32 = tolerance_ms as i32;
 
-    let mut query = String::from(
+    // Build query with dynamic parameter indices
+    let mut param_idx = 1;
+    let mirror_id_param = param_idx;
+    param_idx += 1;
+    let source_id_param = param_idx;
+    param_idx += 1;
+    let tolerance_param = param_idx;
+    param_idx += 1;
+
+    let mut query = format!(
         r#"
         WITH mirror_frames AS (
             SELECT ts, data_bytes
             FROM public.can_frame
-            WHERE id = $1::int4 AND extended = ($3::int4 != 0)
-        "#
+            WHERE id = ${}::int4"#,
+        mirror_id_param
     );
 
     let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![
         &mirror_id_i32,
         &source_id_i32,
-        &is_extended_int,
         &tolerance_ms_i32,
     ];
 
+    // Only add extended filter if specified
+    let is_extended_bool: bool;
+    let extended_param: usize;
+    if let Some(ext) = is_extended {
+        is_extended_bool = ext;
+        extended_param = param_idx;
+        query.push_str(&format!(" AND extended = ${}::bool", extended_param));
+        param_idx += 1;
+        params.push(&is_extended_bool);
+    } else {
+        extended_param = 0; // Not used
+    }
+
+    // Track time param indices for reuse in source_frames CTE
+    let mut start_time_param = 0;
+    let mut end_time_param = 0;
+
     // Add time bounds to mirror_frames CTE
     if let Some(ref start) = start_time {
-        let idx = params.len() + 1;
-        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", idx));
+        start_time_param = param_idx;
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", start_time_param));
+        param_idx += 1;
         params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
     }
     if let Some(ref end) = end_time {
-        let idx = params.len() + 1;
-        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", idx));
+        end_time_param = param_idx;
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", end_time_param));
         params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
     }
 
-    query.push_str(
+    query.push_str(&format!(
         r#"
         ),
         source_frames AS (
             SELECT ts, data_bytes
             FROM public.can_frame
-            WHERE id = $2::int4 AND extended = ($3::int4 != 0)
-        "#
-    );
+            WHERE id = ${}::int4"#,
+        source_id_param
+    ));
 
-    // Add same time bounds to source_frames CTE
-    if let Some(ref start) = start_time {
-        let idx = params.iter().position(|p| std::ptr::eq(*p, start as &(dyn tokio_postgres::types::ToSql + Sync))).unwrap() + 1;
-        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", idx));
+    // Add extended filter to source_frames if specified
+    if is_extended.is_some() {
+        query.push_str(&format!(" AND extended = ${}::bool", extended_param));
     }
-    if let Some(ref end) = end_time {
-        let idx = params.iter().position(|p| std::ptr::eq(*p, end as &(dyn tokio_postgres::types::ToSql + Sync))).unwrap() + 1;
-        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", idx));
+
+    // Add same time bounds to source_frames CTE (reuse same param indices)
+    if start_time.is_some() {
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", start_time_param));
+    }
+    if end_time.is_some() {
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", end_time_param));
     }
 
     query.push_str(&format!(
@@ -730,11 +782,12 @@ pub async fn db_query_mirror_validation(
             s.data_bytes as source_payload
         FROM mirror_frames m
         JOIN source_frames s
-            ON ABS(EXTRACT(EPOCH FROM (m.ts - s.ts)) * 1000) < $4::int4
+            ON ABS(EXTRACT(EPOCH FROM (m.ts - s.ts)) * 1000) < ${}::int4
         WHERE m.data_bytes IS DISTINCT FROM s.data_bytes
         ORDER BY m.ts
         LIMIT {}
         "#,
+        tolerance_param,
         result_limit
     ));
 
@@ -777,8 +830,8 @@ pub async fn db_query_mirror_validation(
     }
 
     let execution_time_ms = query_start.elapsed().as_millis() as u64;
-    println!("[dbquery] mirror_validation: mirror=0x{:X} source=0x{:X} | {} mismatches, {}ms",
-        mirror_frame_id, source_frame_id, results.len(), execution_time_ms);
+    println!("[dbquery] mirror_validation: mirror=0x{:X} source=0x{:X} ext={:?} | {} mismatches, {}ms",
+        mirror_frame_id, source_frame_id, is_extended, results.len(), execution_time_ms);
 
     unregister_query(&query_id).await;
 
