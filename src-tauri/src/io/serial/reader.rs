@@ -298,16 +298,16 @@ fn run_serial_stream_blocking(
     // - If framing enabled with emit_raw_bytes: create BOTH a Bytes buffer AND a Frames buffer
     // - If framing enabled without emit_raw_bytes: create only a Frames buffer
     // - If no framing: create only a Bytes buffer
-    let buffer_name = config.display_name.clone().unwrap_or_else(|| format!("Serial {}", config.port));
     let emit_raw = config.framing.as_ref().map(|f| f.emit_raw_bytes).unwrap_or(true);
 
     // Create bytes buffer ID (Some if we're storing bytes, None otherwise)
+    // Buffer names use session ID (UI prefixes with "Bytes:" or "Frames:" based on type)
     let bytes_buffer_id: Option<String> = if config.framing.is_none() || emit_raw {
         // Create bytes buffer - active if no framing, inactive if framing is enabled
         let id = if config.framing.is_none() {
-            buffer_store::create_buffer(BufferType::Bytes, format!("Bytes: {}", buffer_name))
+            buffer_store::create_buffer(BufferType::Bytes, session_id.clone())
         } else {
-            buffer_store::create_buffer_inactive(BufferType::Bytes, format!("Bytes: {}", buffer_name))
+            buffer_store::create_buffer_inactive(BufferType::Bytes, session_id.clone())
         };
         // Assign buffer ownership to this session
         let _ = buffer_store::set_buffer_owner(&id, &session_id);
@@ -319,7 +319,7 @@ fn run_serial_stream_blocking(
     // Create frames buffer ID (Some if framing is enabled, None otherwise)
     let frames_buffer_id: Option<String> = if config.framing.is_some() {
         // Frames buffer is always active when framing is enabled
-        let id = buffer_store::create_buffer(BufferType::Frames, format!("Frames: {}", buffer_name));
+        let id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
         // Assign buffer ownership to this session
         let _ = buffer_store::set_buffer_owner(&id, &session_id);
         Some(id)

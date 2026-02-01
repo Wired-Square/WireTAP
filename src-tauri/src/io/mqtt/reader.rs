@@ -232,15 +232,9 @@ fn spawn_mqtt_stream(
     config: MqttConfig,
     cancel_flag: Arc<AtomicBool>,
 ) -> tauri::async_runtime::JoinHandle<()> {
-    let source = format!("mqtt://{}:{}", config.host, config.port);
-
     tauri::async_runtime::spawn(async move {
-        // Create a frame buffer for this MQTT session
-        let buffer_name = config
-            .display_name
-            .clone()
-            .unwrap_or_else(|| format!("MQTT {}", source));
-        let buffer_id = buffer_store::create_buffer(BufferType::Frames, buffer_name);
+        // Create a frame buffer for this MQTT session (named after session ID)
+        let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
         // Assign buffer ownership to this session
         let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
 

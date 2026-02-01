@@ -1425,6 +1425,8 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
         // Stop the reader before destroying
         let _ = session.device.stop().await;
     }
+    // Orphan any buffers owned by this session so they remain available
+    crate::buffer_store::orphan_buffers_for_session(session_id);
     // Clear the closing flag now that the session is fully destroyed
     clear_session_closing(session_id);
     // Clear any stored startup error

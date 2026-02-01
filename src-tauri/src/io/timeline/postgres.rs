@@ -275,9 +275,8 @@ async fn run_postgres_stream(
     // This makes the old buffer selectable in "Orphaned Buffers" while creating a fresh one
     buffer_store::orphan_buffers_for_session(&session_id);
 
-    // Create a new frame buffer for this PostgreSQL session
-    let buffer_name = format!("PostgreSQL {}:{}/{}", config.host, config.port, config.database);
-    let buffer_id = buffer_store::create_buffer(BufferType::Frames, buffer_name);
+    // Create a new frame buffer for this PostgreSQL session (named after session ID)
+    let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
     // Assign buffer ownership to this session
     let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
 

@@ -382,12 +382,12 @@ impl IODevice for MultiSourceReader {
 
         // Create appropriate buffer(s) for this multi-source session
         // We may need both a Frames buffer (for CAN, framed serial) and a Bytes buffer (for raw serial)
-        let buffer_name = format!("Multi-Source {}", self.session_id);
+        // Buffer names use session ID (UI prefixes with "Frames:" or "Bytes:" based on type)
         let mut bytes_buffer_id: Option<String> = None;
 
         if has_framing {
             // Create a frames buffer as active (for frame operations)
-            let buffer_id = buffer_store::create_buffer(BufferType::Frames, buffer_name.clone());
+            let buffer_id = buffer_store::create_buffer(BufferType::Frames, self.session_id.clone());
             // Assign buffer ownership to this session
             let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
         }
@@ -397,14 +397,14 @@ impl IODevice for MultiSourceReader {
                 // Create a bytes buffer in addition to frames buffer (not as active)
                 let bytes_id = buffer_store::create_buffer_inactive(
                     BufferType::Bytes,
-                    format!("{} (bytes)", buffer_name),
+                    self.session_id.clone(),
                 );
                 // Assign buffer ownership to this session
                 let _ = buffer_store::set_buffer_owner(&bytes_id, &self.session_id);
                 bytes_buffer_id = Some(bytes_id);
             } else {
                 // Only raw bytes - create a bytes buffer as active
-                let buffer_id = buffer_store::create_buffer(BufferType::Bytes, buffer_name.clone());
+                let buffer_id = buffer_store::create_buffer(BufferType::Bytes, self.session_id.clone());
                 // Assign buffer ownership to this session
                 let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
             }

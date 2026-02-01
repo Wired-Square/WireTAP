@@ -380,11 +380,8 @@ async fn run_gs_usb_stream(
     cancel_flag: Arc<AtomicBool>,
     transmit_rx: Option<std_mpsc::Receiver<TransmitRequest>>,
 ) {
-    let buffer_name = config
-        .display_name
-        .clone()
-        .unwrap_or_else(|| format!("gs_usb {}:{}", config.bus, config.address));
-    let buffer_id = buffer_store::create_buffer(BufferType::Frames, buffer_name);
+    // Buffer named after session ID (UI prefixes with "Frames:")
+    let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
     // Assign buffer ownership to this session
     let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
     let device_name = format!("gs_usb({}:{})", config.bus, config.address);
