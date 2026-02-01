@@ -4,7 +4,7 @@
 // Shows available buses with toggles to enable/disable and optional bus remapping.
 // Also supports protocol selection when used in profile settings.
 
-import { Loader2, AlertCircle, Bus } from "lucide-react";
+import { Loader2, AlertCircle, Bus, Lock } from "lucide-react";
 import { iconMd, iconXs } from "../../styles/spacing";
 import { caption, sectionHeaderText } from "../../styles/typography";
 import type { GvretDeviceInfo, BusMapping } from "../../api/io";
@@ -45,6 +45,8 @@ interface GvretBusConfigProps {
   showOutputBus?: boolean;
   /** Show protocol selector (default: false) - set to true for settings mode */
   showProtocol?: boolean;
+  /** Whether config is locked (source is in use by multiple sessions) */
+  configLocked?: boolean;
 }
 
 export default function GvretBusConfig({
@@ -58,6 +60,7 @@ export default function GvretBusConfig({
   usedOutputBuses,
   showOutputBus = true,
   showProtocol = false,
+  configLocked = false,
 }: GvretBusConfigProps) {
   // Toggle a bus enabled/disabled
   const toggleBus = (deviceBus: number) => {
@@ -151,14 +154,15 @@ export default function GvretBusConfig({
                 className="flex items-center gap-2 text-xs"
               >
                 {/* Enable/disable checkbox */}
-                <label className="flex items-center gap-1.5 cursor-pointer">
+                <label className={`flex items-center gap-1.5 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
                   <input
                     type="checkbox"
                     checked={mapping.enabled}
                     onChange={() => toggleBus(mapping.deviceBus)}
-                    className="w-3 h-3 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)]"
+                    disabled={configLocked}
+                    className="w-3 h-3 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)] disabled:cursor-not-allowed"
                   />
-                  <span className="text-[color:var(--text-secondary)]">
+                  <span className={configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-secondary)]"}>
                     {BUS_NAMES[mapping.deviceBus] || `Bus ${mapping.deviceBus}`}
                   </span>
                 </label>
@@ -170,7 +174,12 @@ export default function GvretBusConfig({
                     onChange={(e) =>
                       setProtocol(mapping.deviceBus, e.target.value as 'can' | 'canfd')
                     }
-                    className="px-1 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
+                    disabled={configLocked}
+                    className={`px-1 py-0.5 rounded border text-xs ${
+                      configLocked
+                        ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                        : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
+                    } focus:ring-1 focus:ring-cyan-500`}
                   >
                     <option value="can">CAN</option>
                     <option value="canfd">CAN FD</option>
@@ -186,8 +195,11 @@ export default function GvretBusConfig({
                       onChange={(e) =>
                         setOutputBus(mapping.deviceBus, parseInt(e.target.value, 10))
                       }
+                      disabled={configLocked}
                       className={`px-1 py-0.5 rounded border text-xs ${
-                        isDuplicate
+                        configLocked
+                          ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                          : isDuplicate
                           ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
                           : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
                       } focus:ring-1 focus:ring-cyan-500`}
@@ -198,8 +210,13 @@ export default function GvretBusConfig({
                         </option>
                       ))}
                     </select>
-                    {isDuplicate && (
+                    {isDuplicate && !configLocked && (
                       <span className="text-amber-500" title="Another source uses this bus number">⚠</span>
+                    )}
+                    {configLocked && (
+                      <span className="text-[color:var(--text-amber)]" title="Config locked - source in use by multiple sessions">
+                        <Lock className={iconXs} />
+                      </span>
                     )}
                   </div>
                 )}
@@ -239,14 +256,15 @@ export default function GvretBusConfig({
               }`}
             >
               {/* Enable/disable checkbox */}
-              <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+              <label className={`flex items-center gap-2 flex-1 min-w-0 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
                   checked={mapping.enabled}
                   onChange={() => toggleBus(mapping.deviceBus)}
-                  className="w-4 h-4 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)]"
+                  disabled={configLocked}
+                  className="w-4 h-4 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)] disabled:cursor-not-allowed"
                 />
-                <span className={sectionHeaderText}>
+                <span className={configLocked ? "text-sm font-medium text-[color:var(--text-muted)]" : sectionHeaderText}>
                   {BUS_NAMES[mapping.deviceBus] || `Bus ${mapping.deviceBus}`}
                 </span>
               </label>
@@ -254,13 +272,18 @@ export default function GvretBusConfig({
               {/* Protocol selector (only show if enabled and showProtocol is true) */}
               {mapping.enabled && showProtocol && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-[color:var(--text-muted)]">Protocol:</span>
+                  <span className={configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-muted)]"}>Protocol:</span>
                   <select
                     value={mapping.protocol || 'can'}
                     onChange={(e) =>
                       setProtocol(mapping.deviceBus, e.target.value as 'can' | 'canfd')
                     }
-                    className="px-1.5 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
+                    disabled={configLocked}
+                    className={`px-1.5 py-0.5 rounded border text-xs ${
+                      configLocked
+                        ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                        : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
+                    } focus:ring-1 focus:ring-cyan-500`}
                   >
                     <option value="can">CAN</option>
                     <option value="canfd">CAN FD</option>
@@ -277,8 +300,11 @@ export default function GvretBusConfig({
                     onChange={(e) =>
                       setOutputBus(mapping.deviceBus, parseInt(e.target.value, 10))
                     }
+                    disabled={configLocked}
                     className={`px-1.5 py-0.5 rounded border text-xs ${
-                      isDuplicate
+                      configLocked
+                        ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                        : isDuplicate
                         ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
                         : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
                     } focus:ring-1 focus:ring-cyan-500`}
@@ -289,8 +315,13 @@ export default function GvretBusConfig({
                       </option>
                     ))}
                   </select>
-                  {isDuplicate && (
+                  {isDuplicate && !configLocked && (
                     <span className="text-amber-500" title="Another source uses this bus number">⚠</span>
+                  )}
+                  {configLocked && (
+                    <span className="text-[color:var(--text-amber)]" title="Config locked - source in use by multiple sessions">
+                      <Lock className={iconXs} />
+                    </span>
                   )}
                 </div>
               )}
@@ -299,12 +330,17 @@ export default function GvretBusConfig({
         })}
       </div>
 
-      {enabledCount === 0 && (
+      {configLocked && (
+        <p className="text-xs text-[color:var(--text-amber)] mt-2">
+          Configuration locked — this source is in use by multiple sessions.
+        </p>
+      )}
+      {enabledCount === 0 && !configLocked && (
         <p className="text-xs text-[color:var(--text-amber)] mt-2">
           No buses enabled. Enable at least one bus to capture frames.
         </p>
       )}
-      {hasDuplicates && (
+      {hasDuplicates && !configLocked && (
         <p className="text-xs text-[color:var(--text-amber)] mt-2">
           Warning: Some output bus numbers conflict with other sources
         </p>

@@ -63,8 +63,13 @@ export function ReaderButton({
     displayName = `Multi-Bus (${multiBusProfiles.length})`;
   } else if (isBufferProfile) {
     displayName = `Buffer: ${bufferMetadata?.name || "Buffer"}`;
+  } else if (selectedProfile) {
+    displayName = selectedProfile.name;
+  } else if (ioProfile) {
+    // No matching profile - show the session ID (e.g., "postgres_8852db")
+    displayName = ioProfile;
   } else {
-    displayName = selectedProfile?.name || "No reader";
+    displayName = "No reader";
   }
 
   const isDefaultReader = !isBufferProfile && !showAsMultiBus && selectedProfile?.id === defaultReadProfileId;

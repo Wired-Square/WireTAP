@@ -4,7 +4,7 @@
 // Shows device status (online/offline) and allows setting a bus number override.
 // For serial devices, also shows framing configuration.
 
-import { Loader2, AlertCircle, CheckCircle2, Bus, Layers } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Bus, Layers, Lock } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { caption, sectionHeaderText } from "../../styles/typography";
 import type { DeviceProbeResult, FramingEncoding } from "../../api/io";
@@ -54,6 +54,8 @@ interface SingleBusConfigProps {
   framingConfig?: InterfaceFramingConfig;
   /** Called when framing config changes */
   onFramingChange?: (config: InterfaceFramingConfig) => void;
+  /** Whether config is locked (source is in use by multiple sessions) */
+  configLocked?: boolean;
 }
 
 export default function SingleBusConfig({
@@ -68,6 +70,7 @@ export default function SingleBusConfig({
   profileKind,
   framingConfig,
   onFramingChange,
+  configLocked = false,
 }: SingleBusConfigProps) {
   const effectiveBus = busOverride ?? 0;
   const isDuplicate = usedBuses && usedBuses.has(effectiveBus);
@@ -144,8 +147,11 @@ export default function SingleBusConfig({
               const val = parseInt(e.target.value, 10);
               onBusOverrideChange(val === 0 ? undefined : val);
             }}
+            disabled={configLocked}
             className={`px-1 py-0.5 rounded border text-xs ${
-              isDuplicate
+              configLocked
+                ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                : isDuplicate
                 ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
                 : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
             } focus:ring-1 focus:ring-cyan-500`}
@@ -156,8 +162,13 @@ export default function SingleBusConfig({
               </option>
             ))}
           </select>
-          {isDuplicate && (
+          {isDuplicate && !configLocked && (
             <span className="text-amber-500" title="Another source uses this bus number">⚠</span>
+          )}
+          {configLocked && (
+            <span className="text-[color:var(--text-amber)]" title="Config locked - source in use by multiple sessions">
+              <Lock className={iconXs} />
+            </span>
           )}
 
           {/* Framing selector for serial devices */}
@@ -170,7 +181,12 @@ export default function SingleBusConfig({
                 onChange={(e) => {
                   onFramingChange({ ...framingConfig, encoding: e.target.value as FramingEncoding });
                 }}
-                className="px-1 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
+                disabled={configLocked}
+                className={`px-1 py-0.5 rounded border text-xs ${
+                  configLocked
+                    ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                    : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
+                } focus:ring-1 focus:ring-cyan-500`}
               >
                 {FRAMING_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -188,23 +204,33 @@ export default function SingleBusConfig({
             {/* Delimiter options */}
             {showDelimiterOptions && (
               <>
-                <label className="flex items-center gap-1">
+                <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)]" : ""}`}>
                   <span>Delimiter:</span>
                   <input
                     type="text"
                     value={framingConfig?.delimiterHex ?? "0A"}
                     onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, delimiterHex: e.target.value })}
                     placeholder="0A"
-                    className="w-12 px-1 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500 font-mono"
+                    disabled={configLocked}
+                    className={`w-12 px-1 py-0.5 rounded border text-xs font-mono ${
+                      configLocked
+                        ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                        : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
+                    } focus:ring-1 focus:ring-cyan-500`}
                   />
                 </label>
-                <label className="flex items-center gap-1">
+                <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)]" : ""}`}>
                   <span>Max:</span>
                   <input
                     type="number"
                     value={framingConfig?.maxFrameLength ?? 1024}
                     onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, maxFrameLength: parseInt(e.target.value, 10) || 1024 })}
-                    className="w-16 px-1 py-0.5 rounded border text-xs border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
+                    disabled={configLocked}
+                    className={`w-16 px-1 py-0.5 rounded border text-xs ${
+                      configLocked
+                        ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                        : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
+                    } focus:ring-1 focus:ring-cyan-500`}
                   />
                 </label>
               </>
@@ -212,12 +238,13 @@ export default function SingleBusConfig({
 
             {/* Modbus RTU options */}
             {showModbusOptions && (
-              <label className="flex items-center gap-1 cursor-pointer">
+              <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)] cursor-not-allowed" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
                   checked={framingConfig?.validateCrc ?? true}
                   onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, validateCrc: e.target.checked })}
-                  className="w-3 h-3 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500"
+                  disabled={configLocked}
+                  className="w-3 h-3 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500 disabled:cursor-not-allowed"
                 />
                 <span>Validate CRC-16</span>
               </label>
@@ -225,12 +252,13 @@ export default function SingleBusConfig({
 
             {/* Raw bytes option (for any framing mode except raw) */}
             {showRawBytesOption && (
-              <label className="flex items-center gap-1 cursor-pointer">
+              <label className={`flex items-center gap-1 ${configLocked ? "text-[color:var(--text-muted)] cursor-not-allowed" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
                   checked={framingConfig?.emitRawBytes ?? false}
                   onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, emitRawBytes: e.target.checked })}
-                  className="w-3 h-3 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500"
+                  disabled={configLocked}
+                  className="w-3 h-3 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500 disabled:cursor-not-allowed"
                 />
                 <span>Capture raw bytes</span>
               </label>
@@ -271,8 +299,11 @@ export default function SingleBusConfig({
             const val = parseInt(e.target.value, 10);
             onBusOverrideChange(val === 0 ? undefined : val);
           }}
+          disabled={configLocked}
           className={`px-2 py-1 rounded border text-sm ${
-            isDuplicate
+            configLocked
+              ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+              : isDuplicate
               ? "border-[color:var(--text-amber)] bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]"
               : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
           } focus:ring-1 focus:ring-cyan-500`}
@@ -283,9 +314,14 @@ export default function SingleBusConfig({
             </option>
           ))}
         </select>
-        {isDuplicate && (
+        {isDuplicate && !configLocked && (
           <span className="text-amber-500 text-sm" title="Another source uses this bus number">
             ⚠ Duplicate
+          </span>
+        )}
+        {configLocked && (
+          <span className="flex items-center gap-1 text-[color:var(--text-amber)]" title="Config locked - source in use by multiple sessions">
+            <Lock className={iconXs} />
           </span>
         )}
       </div>
@@ -301,7 +337,12 @@ export default function SingleBusConfig({
               onChange={(e) => {
                 onFramingChange({ ...framingConfig, encoding: e.target.value as FramingEncoding });
               }}
-              className="px-2 py-1 rounded border text-sm border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
+              disabled={configLocked}
+              className={`px-2 py-1 rounded border text-sm ${
+                configLocked
+                  ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                  : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
+              } focus:ring-1 focus:ring-cyan-500`}
             >
               {FRAMING_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -313,7 +354,7 @@ export default function SingleBusConfig({
 
           {/* Framing sub-options */}
           {(showDelimiterOptionsFull || showModbusOptionsFull || showRawBytesOptionFull) && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 ml-6 text-sm text-[color:var(--text-secondary)]">
+            <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 ml-6 text-sm ${configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-secondary)]"}`}>
               {/* Delimiter options */}
               {showDelimiterOptionsFull && (
                 <>
@@ -324,7 +365,12 @@ export default function SingleBusConfig({
                       value={framingConfig?.delimiterHex ?? "0A"}
                       onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, delimiterHex: e.target.value })}
                       placeholder="0A"
-                      className="w-16 px-2 py-1 rounded border text-sm border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500 font-mono"
+                      disabled={configLocked}
+                      className={`w-16 px-2 py-1 rounded border text-sm font-mono ${
+                        configLocked
+                          ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                          : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
+                      } focus:ring-1 focus:ring-cyan-500`}
                     />
                   </label>
                   <label className="flex items-center gap-1.5">
@@ -333,7 +379,12 @@ export default function SingleBusConfig({
                       type="number"
                       value={framingConfig?.maxFrameLength ?? 1024}
                       onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, maxFrameLength: parseInt(e.target.value, 10) || 1024 })}
-                      className="w-20 px-2 py-1 rounded border text-sm border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)] focus:ring-1 focus:ring-cyan-500"
+                      disabled={configLocked}
+                      className={`w-20 px-2 py-1 rounded border text-sm ${
+                        configLocked
+                          ? "border-[color:var(--border-default)] bg-[var(--hover-bg)] text-[color:var(--text-muted)] cursor-not-allowed"
+                          : "border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-secondary)]"
+                      } focus:ring-1 focus:ring-cyan-500`}
                     />
                   </label>
                 </>
@@ -341,12 +392,13 @@ export default function SingleBusConfig({
 
               {/* Modbus RTU options */}
               {showModbusOptionsFull && (
-                <label className="flex items-center gap-1.5 cursor-pointer">
+                <label className={`flex items-center gap-1.5 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
                   <input
                     type="checkbox"
                     checked={framingConfig?.validateCrc ?? true}
                     onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, validateCrc: e.target.checked })}
-                    className="w-4 h-4 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500"
+                    disabled={configLocked}
+                    className="w-4 h-4 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500 disabled:cursor-not-allowed"
                   />
                   <span>Validate CRC-16</span>
                 </label>
@@ -354,12 +406,13 @@ export default function SingleBusConfig({
 
               {/* Raw bytes option (for any framing mode except raw) */}
               {showRawBytesOptionFull && (
-                <label className="flex items-center gap-1.5 cursor-pointer">
+                <label className={`flex items-center gap-1.5 ${configLocked ? "cursor-not-allowed" : "cursor-pointer"}`}>
                   <input
                     type="checkbox"
                     checked={framingConfig?.emitRawBytes ?? false}
                     onChange={(e) => onFramingChange({ ...framingConfig, encoding: effectiveFraming, emitRawBytes: e.target.checked })}
-                    className="w-4 h-4 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500"
+                    disabled={configLocked}
+                    className="w-4 h-4 rounded border-[color:var(--border-default)] text-cyan-500 focus:ring-cyan-500 disabled:cursor-not-allowed"
                   />
                   <span>Capture raw bytes</span>
                 </label>
@@ -370,7 +423,9 @@ export default function SingleBusConfig({
       )}
 
       <p className={`${caption} mt-2`}>
-        {isSerial
+        {configLocked
+          ? "Configuration locked — this source is in use by multiple sessions."
+          : isSerial
           ? "Configure bus number and framing for this serial device."
           : "Frames from this device will be tagged with the selected bus number."}
       </p>

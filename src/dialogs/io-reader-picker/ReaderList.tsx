@@ -1,9 +1,9 @@
 // ui/src/dialogs/io-reader-picker/ReaderList.tsx
 
-import { Bookmark, Wifi, Database, FolderOpen, GitMerge, Radio, Play } from "lucide-react";
+import { Bookmark, Wifi, Database, FolderOpen, GitMerge, Radio, Play, Lock } from "lucide-react";
 import type { IOProfile } from "../../hooks/useSettings";
 import type { Session } from "../../stores/sessionStore";
-import type { ActiveSessionInfo } from "../../api/io";
+import type { ActiveSessionInfo, ProfileUsageInfo } from "../../api/io";
 import { CSV_EXTERNAL_ID, isRealtimeProfile, isMultiSourceCapable } from "./utils";
 import { badgeSmallNeutral, badgeSmallSuccess, badgeSmallWarning, badgeSmallPurple } from "../../styles/badgeStyles";
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
@@ -48,6 +48,8 @@ type Props = {
   validationError?: string | null;
   /** Allow multi-select mode (default: true for real-time CAN interfaces) */
   allowMultiSelect?: boolean;
+  /** Profile usage info - which sessions are using each profile */
+  profileUsage?: Map<string, ProfileUsageInfo>;
 };
 
 export default function ReaderList({
@@ -68,6 +70,7 @@ export default function ReaderList({
   hideRecorded = false,
   validationError,
   allowMultiSelect = true,
+  profileUsage,
 }: Props) {
   // All profiles are read profiles now (mode field removed), separate by type
   const readProfiles = ioProfiles;
@@ -108,11 +111,23 @@ export default function ReaderList({
       displayName = "CSV";
       subtitle = "Import from file";
     } else if (checkedMultiSourceSession) {
-      // Multi-source session selected
-      const sourceCount = checkedMultiSourceSession.multiSourceConfigs?.length || 0;
-      displayName = `Multi-Bus Session (${sourceCount} sources)`;
-      subtitle = checkedMultiSourceSession.sessionId;
-      icon = <GitMerge className={`${iconMd} text-purple-500`} />;
+      // Active session selected - show session ID as name, sources with bus mappings below
+      displayName = checkedMultiSourceSession.sessionId;
+      const sourceDetails = checkedMultiSourceSession.multiSourceConfigs
+        ?.map((c) => {
+          const name = c.displayName || c.profileId;
+          const enabledMappings = c.busMappings.filter((m) => m.enabled);
+          if (enabledMappings.length === 0) {
+            return name;
+          }
+          const mappingStr = enabledMappings
+            .map((m) => `${m.deviceBus}→${m.outputBus}`)
+            .join(", ");
+          return `${name} (${mappingStr})`;
+        })
+        .join(" + ") || "";
+      subtitle = sourceDetails ? `└─ ${sourceDetails}` : "";
+      icon = <GitMerge className={`${iconMd} text-[color:var(--text-purple)]`} />;
     } else if (checkedProfile) {
       displayName = checkedProfile.name;
       subtitle = checkedProfile.kind;
@@ -120,6 +135,21 @@ export default function ReaderList({
       displayName = "Unknown";
       subtitle = checkedReaderId;
     }
+
+    // Use purple styling for active sessions, blue for profiles
+    const isActiveSession = checkedMultiSourceSession !== null;
+    const bgClass = isActiveSession
+      ? "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)]"
+      : "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]";
+    const indicatorClass = isActiveSession
+      ? "border-[color:var(--text-purple)]"
+      : "border-[color:var(--status-info-text)]";
+    const dotClass = isActiveSession
+      ? "bg-[var(--text-purple)]"
+      : "bg-[var(--status-info-text)]";
+    const changeClass = isActiveSession
+      ? "text-[color:var(--text-purple)]"
+      : "text-[color:var(--status-info-text)]";
 
     return (
       <div className={borderDivider}>
@@ -129,44 +159,88 @@ export default function ReaderList({
         <div className="px-3 py-2">
           <button
             onClick={() => onSelectReader(null)}
-            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)] hover:brightness-95"
+            className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors hover:brightness-95 ${bgClass}`}
           >
             {icon || (
-              <div className="w-4 h-4 rounded-full border-2 border-[color:var(--status-info-text)] flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${indicatorClass}`}>
+                <div className={`w-2 h-2 rounded-full ${dotClass}`} />
               </div>
             )}
             <div className="flex-1 min-w-0">
               <span className={`${textMedium} truncate`}>
                 {displayName}
               </span>
-              <div className={caption}>
+              <div className={`${caption} text-[color:var(--text-muted)]`}>
                 {subtitle}
               </div>
             </div>
-            <span className="text-xs text-[color:var(--status-info-text)]">Change</span>
+            <span className={`text-xs ${changeClass}`}>Change</span>
           </button>
         </div>
       </div>
     );
   }
 
-  // Filter active sessions to only show running ones
+  // Filter active sessions to only show running ones (all types combined)
   const runningSessions = activeMultiSourceSessions.filter(
     (s) => s.state === "running" || s.state === "starting"
-  );
-
-  // Separate multi-source sessions from single-profile sessions
-  const runningMultiSourceSessions = runningSessions.filter(
-    (s) => s.deviceType === "multi_source"
-  );
-  const runningRecordedSessions = runningSessions.filter(
-    (s) => s.deviceType !== "multi_source"
   );
 
   // Get profile info for single-profile sessions
   const getProfileForSession = (sessionId: string): IOProfile | null => {
     return readProfiles.find((p) => p.id === sessionId) || null;
+  };
+
+  // Get display info for a session
+  const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
+    const isMultiSource = session.deviceType === "multi_source";
+    // Always use session ID as the primary display name
+    const displayName = session.sessionId;
+
+    if (isMultiSource) {
+      // Multi-source session: show sources with bus mappings
+      const sourceDetails = session.multiSourceConfigs
+        ?.map((c) => {
+          const name = c.displayName || c.profileId;
+          const enabledMappings = c.busMappings.filter((m) => m.enabled);
+          if (enabledMappings.length === 0) {
+            return name;
+          }
+          const mappingStr = enabledMappings
+            .map((m) => `${m.deviceBus}→${m.outputBus}`)
+            .join(", ");
+          return `${name} (${mappingStr})`;
+        })
+        .join(" + ") || "";
+
+      return {
+        displayName,
+        subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
+        sourceDetails,
+        icon: GitMerge,
+        iconColour: "text-[color:var(--text-purple)]",
+        bgSelected: "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)]",
+        bgHover: `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-purple)]`,
+        indicatorColour: "border-[color:var(--text-purple)]",
+        dotColour: "bg-[var(--text-purple)]",
+      };
+    } else {
+      // Single-source session (e.g., PostgreSQL)
+      const profile = getProfileForSession(session.sessionId);
+      const profileName = profile?.name || session.deviceType;
+      const deviceKind = profile?.kind || session.deviceType;
+      return {
+        displayName,
+        subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
+        sourceDetails: `${profileName} (${deviceKind})`,
+        icon: Database,
+        iconColour: "text-[color:var(--text-green)]",
+        bgSelected: "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)]",
+        bgHover: `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-green)]`,
+        indicatorColour: "border-[color:var(--text-green)]",
+        dotColour: "bg-[var(--text-green)]",
+      };
+    }
   };
 
   return (
@@ -175,101 +249,60 @@ export default function ReaderList({
         IO Reader
       </div>
 
-      {/* Active Multi-Bus Sessions (shareable) */}
-      {runningMultiSourceSessions.length > 0 && onSelectMultiSourceSession && (
-        <div className="border-b border-[color:var(--border-default)]">
-          <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
-            <GitMerge className={iconXs} />
-            <span>Active Multi-Bus Sessions</span>
-          </div>
-          <div className="px-3 pb-2 space-y-1">
-            {runningMultiSourceSessions.map((session) => {
-              const isSelected = checkedReaderId === session.sessionId;
-              const sourceNames = session.multiSourceConfigs
-                ?.map((c) => c.displayName || c.profileId)
-                .join(" + ") || session.sessionId;
-
-              return (
-                <button
-                  key={session.sessionId}
-                  onClick={() => onSelectMultiSourceSession(session.sessionId)}
-                  className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
-                    isSelected
-                      ? "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)]"
-                      : `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-purple)]`
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                    isSelected
-                      ? "border-[color:var(--text-purple)]"
-                      : "border-[color:var(--border-default)]"
-                  }`}>
-                    {isSelected && (
-                      <div className="w-2 h-2 rounded-full bg-[var(--text-purple)]" />
-                    )}
-                  </div>
-                  <GitMerge className={`${iconMd} flex-shrink-0 text-[color:var(--text-purple)]`} />
-                  <div className="flex-1 min-w-0">
-                    <div className={`${textMedium} truncate flex items-center gap-2`}>
-                      <span>{sourceNames}</span>
-                      <Radio className={`${iconXs} text-green-500 animate-pulse`} />
-                    </div>
-                    <div className={`${caption} flex items-center gap-2`}>
-                      <span className={badgeSmallSuccess}>Live</span>
-                      <span>{session.listenerCount} listener{session.listenerCount !== 1 ? "s" : ""}</span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Active Recorded Sessions (PostgreSQL, etc.) */}
-      {runningRecordedSessions.length > 0 && onSelectMultiSourceSession && (
+      {/* Active Sessions (all types combined - join existing) */}
+      {runningSessions.length > 0 && onSelectMultiSourceSession && (
         <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <Play className={iconXs} />
             <span>Active Sessions</span>
+            <span className={badgeSmallSuccess}>{runningSessions.length}</span>
           </div>
           <div className="px-3 pb-2 space-y-1">
-            {runningRecordedSessions.map((session) => {
+            {runningSessions.map((session) => {
               const isSelected = checkedReaderId === session.sessionId;
-              const profile = getProfileForSession(session.sessionId);
-              const displayName = profile?.name || session.sessionId;
-              const deviceKind = profile?.kind || session.deviceType;
+              const info = getSessionDisplayInfo(session);
+              const IconComponent = info.icon;
 
               return (
                 <button
                   key={session.sessionId}
                   onClick={() => onSelectMultiSourceSession(session.sessionId)}
                   className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
-                    isSelected
-                      ? "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)]"
-                      : `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-green)]`
+                    isSelected ? info.bgSelected : info.bgHover
                   }`}
                 >
                   <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                    isSelected
-                      ? "border-[color:var(--text-green)]"
-                      : "border-[color:var(--border-default)]"
+                    isSelected ? info.indicatorColour : "border-[color:var(--border-default)]"
                   }`}>
                     {isSelected && (
-                      <div className="w-2 h-2 rounded-full bg-[var(--text-green)]" />
+                      <div className={`w-2 h-2 rounded-full ${info.dotColour}`} />
                     )}
                   </div>
-                  <Database className={`${iconMd} flex-shrink-0 text-[color:var(--text-green)]`} />
+                  <IconComponent className={`${iconMd} flex-shrink-0 ${info.iconColour}`} />
                   <div className="flex-1 min-w-0">
                     <div className={`${textMedium} truncate flex items-center gap-2`}>
-                      <span>{displayName}</span>
+                      <span>{info.displayName}</span>
                       <Radio className={`${iconXs} text-green-500 animate-pulse`} />
                     </div>
                     <div className={`${caption} flex items-center gap-2`}>
                       <span className={badgeSmallSuccess}>Live</span>
-                      <span>{deviceKind}</span>
-                      <span>· {session.listenerCount} listener{session.listenerCount !== 1 ? "s" : ""}</span>
+                      <span>{info.subtitle}</span>
+                      {/* Show buffer info if available */}
+                      {session.bufferId && (
+                        <>
+                          <span className="text-[color:var(--text-muted)]">·</span>
+                          <span className="text-[color:var(--text-cyan)]">
+                            {session.bufferFrameCount?.toLocaleString() ?? "?"} frames
+                          </span>
+                        </>
+                      )}
                     </div>
+                    {/* Show source details with bus mappings */}
+                    {info.sourceDetails && (
+                      <div className={`${caption} text-[color:var(--text-muted)] truncate mt-0.5`}>
+                        └─ {info.sourceDetails}
+                      </div>
+                    )}
                   </div>
                 </button>
               );
@@ -316,6 +349,9 @@ export default function ReaderList({
                 ? () => onToggleReader(profile.id)
                 : onSelectReader;
 
+              // Get usage info for this profile
+              const usage = profileUsage?.get(profile.id);
+
               return (
                 <div key={profile.id}>
                   <ReaderButton
@@ -330,6 +366,7 @@ export default function ReaderList({
                     busNumber={getBusNumber(profile)}
                     isDisabled={isDisabled}
                     disabledReason={disabledReason}
+                    usageInfo={usage}
                   />
                   {/* Render extra content (e.g., bus config) inline below selected profile */}
                   {isProfileChecked && renderProfileExtra?.(profile.id)}
@@ -358,6 +395,7 @@ export default function ReaderList({
                 isLive={isProfileLive?.(profile.id) ?? false}
                 sessionState={getSessionForProfile?.(profile.id)?.ioState}
                 onSelect={onSelectReader}
+                usageInfo={profileUsage?.get(profile.id)}
               />
             ))}
           </div>
@@ -421,6 +459,7 @@ function ReaderButton({
   busNumber,
   isDisabled = false,
   disabledReason,
+  usageInfo,
 }: {
   profile: IOProfile;
   isChecked: boolean;
@@ -433,6 +472,7 @@ function ReaderButton({
   busNumber?: number;
   isDisabled?: boolean;
   disabledReason?: string;
+  usageInfo?: ProfileUsageInfo;
 }) {
   // Determine badge text and colors based on session state
   const isStopped = sessionState === "stopped";
@@ -528,6 +568,20 @@ function ReaderButton({
         <div className={`text-xs ${isDisabled ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-muted)]"}`}>
           {isDisabled && disabledReason ? (
             <span>{profile.kind} · <span className="text-[color:var(--text-muted)]">{disabledReason}</span></span>
+          ) : usageInfo && usageInfo.sessionCount > 0 ? (
+            <span className="flex items-center gap-1">
+              <span>{profile.kind}</span>
+              <span className="text-[color:var(--text-muted)]">·</span>
+              {usageInfo.configLocked && (
+                <span title="Config locked (in use by multiple sessions)">
+                  <Lock className={`${iconXs} text-[color:var(--text-amber)]`} />
+                </span>
+              )}
+              <span className="text-[color:var(--text-purple)]">
+                in use: {usageInfo.sessionIds.slice(0, 2).join(", ")}
+                {usageInfo.sessionCount > 2 && ` +${usageInfo.sessionCount - 2}`}
+              </span>
+            </span>
           ) : (
             profile.kind
           )}

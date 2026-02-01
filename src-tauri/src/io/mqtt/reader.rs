@@ -240,7 +240,9 @@ fn spawn_mqtt_stream(
             .display_name
             .clone()
             .unwrap_or_else(|| format!("MQTT {}", source));
-        let _buffer_id = buffer_store::create_buffer(BufferType::Frames, buffer_name);
+        let buffer_id = buffer_store::create_buffer(BufferType::Frames, buffer_name);
+        // Assign buffer ownership to this session
+        let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
 
         #[allow(unused_assignments)]
         let mut stream_reason = "disconnected";

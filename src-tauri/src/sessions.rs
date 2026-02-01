@@ -9,7 +9,7 @@ use crate::{
     io::{
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
         get_session_listeners, join_session, leave_session, list_sessions, pause_session,
-        register_listener, reinitialize_session_if_safe, resume_session,
+        reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
         seek_session, set_listener_active, start_session, stop_session, transmit_frame, unregister_listener,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IODevice, IOState,
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, BufferReader, step_frame, StepResult,
@@ -34,6 +34,14 @@ use std::sync::Mutex;
 /// Multi-source sessions can use multiple profiles, so we store a Vec.
 /// Used to unregister profile usage when a session is destroyed.
 static SESSION_PROFILES: Lazy<Mutex<HashMap<String, Vec<String>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Map of profile_id -> session_ids for tracking which sessions use each profile.
+/// This is the reverse of SESSION_PROFILES and is used to:
+/// 1. Show "(in use: sessionId)" indicator in IO picker
+/// 2. Lock reconfiguration when profile is in 2+ sessions
+/// 3. Prevent parallel sessions from exclusive-access devices
+static PROFILE_SESSIONS: Lazy<Mutex<HashMap<String, std::collections::HashSet<String>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// Cache of successful probe results by profile_id.
@@ -67,27 +75,95 @@ pub fn clear_probe_cache(profile_id: &str) {
 /// Track that a session is using a specific profile.
 /// For multi-source sessions, call this multiple times or use register_session_profiles.
 fn register_session_profile(session_id: &str, profile_id: &str) {
+    // Update SESSION_PROFILES (session -> profiles)
     if let Ok(mut map) = SESSION_PROFILES.lock() {
         let profiles = map.entry(session_id.to_string()).or_insert_with(Vec::new);
         if !profiles.contains(&profile_id.to_string()) {
             profiles.push(profile_id.to_string());
         }
     }
+
+    // Update PROFILE_SESSIONS (profile -> sessions)
+    if let Ok(mut map) = PROFILE_SESSIONS.lock() {
+        let sessions = map
+            .entry(profile_id.to_string())
+            .or_insert_with(std::collections::HashSet::new);
+        sessions.insert(session_id.to_string());
+    }
 }
 
 /// Track that a session is using multiple profiles (for multi-source sessions).
 fn register_session_profiles(session_id: &str, profile_ids: &[String]) {
+    // Update SESSION_PROFILES (session -> profiles)
     if let Ok(mut map) = SESSION_PROFILES.lock() {
         map.insert(session_id.to_string(), profile_ids.to_vec());
+    }
+
+    // Update PROFILE_SESSIONS (profile -> sessions)
+    if let Ok(mut map) = PROFILE_SESSIONS.lock() {
+        for profile_id in profile_ids {
+            let sessions = map
+                .entry(profile_id.clone())
+                .or_insert_with(std::collections::HashSet::new);
+            sessions.insert(session_id.to_string());
+        }
     }
 }
 
 /// Get and remove all profile_ids for a session (called during destroy).
 /// Returns all profiles that were registered for this session.
+/// Also cleans up the reverse mapping (PROFILE_SESSIONS).
 fn take_session_profiles(session_id: &str) -> Vec<String> {
-    SESSION_PROFILES.lock().ok()
+    let profile_ids = SESSION_PROFILES
+        .lock()
+        .ok()
         .and_then(|mut map| map.remove(session_id))
+        .unwrap_or_default();
+
+    // Clean up reverse mapping
+    if let Ok(mut map) = PROFILE_SESSIONS.lock() {
+        for profile_id in &profile_ids {
+            if let Some(sessions) = map.get_mut(profile_id) {
+                sessions.remove(session_id);
+                // Remove the entry if no sessions remain
+                if sessions.is_empty() {
+                    map.remove(profile_id);
+                }
+            }
+        }
+    }
+
+    profile_ids
+}
+
+/// Get all profile IDs for a session (without removing them).
+/// Used for listing active sessions with their source profiles.
+pub fn get_session_profile_ids(session_id: &str) -> Vec<String> {
+    SESSION_PROFILES
+        .lock()
+        .ok()
+        .and_then(|map| map.get(session_id).cloned())
         .unwrap_or_default()
+}
+
+/// Get all session IDs that are using a specific profile.
+/// Used to show "(in use: sessionId)" in the IO picker.
+pub fn get_sessions_for_profile(profile_id: &str) -> Vec<String> {
+    PROFILE_SESSIONS
+        .lock()
+        .ok()
+        .and_then(|map| map.get(profile_id).map(|s| s.iter().cloned().collect()))
+        .unwrap_or_default()
+}
+
+/// Get the count of sessions using a specific profile.
+/// Used to determine if reconfiguration should be locked (locked if >= 2).
+pub fn get_session_count_for_profile(profile_id: &str) -> usize {
+    PROFILE_SESSIONS
+        .lock()
+        .ok()
+        .and_then(|map| map.get(profile_id).map(|s| s.len()))
+        .unwrap_or(0)
 }
 
 /// Clean up profile tracking for a destroyed session.
@@ -745,6 +821,19 @@ pub async fn update_reader_time_range(
     update_session_time_range(&session_id, start, end).await
 }
 
+/// Reconfigure a running session with new time range.
+/// This stops the current stream, orphans the old buffer, creates a new buffer,
+/// and starts streaming with the new time range - all while keeping the session alive.
+/// Other apps joined to this session remain connected.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn reconfigure_reader_session(
+    session_id: String,
+    start: Option<String>,
+    end: Option<String>,
+) -> Result<(), String> {
+    reconfigure_session(&session_id, start, end).await
+}
+
 /// Seek to a specific timestamp in microseconds
 #[tauri::command(rename_all = "snake_case")]
 pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Result<(), String> {
@@ -765,6 +854,9 @@ pub async fn destroy_reader_session(session_id: String) -> Result<(), String> {
     for profile_id in profile_ids {
         profile_tracker::unregister_usage_by_session(&profile_id, &session_id);
     }
+
+    // Orphan any buffers owned by this session
+    buffer_store::orphan_buffers_for_session(&session_id);
 
     destroy_session(&session_id).await
 }
@@ -1483,4 +1575,55 @@ pub async fn create_multi_source_session(
     }
 
     Ok(result.capabilities)
+}
+
+// ============================================================================
+// Profile-to-Session Mapping Commands
+// ============================================================================
+
+/// Get all session IDs that are using a specific profile.
+/// Used by the IO picker to show "(in use: sessionId)" indicator.
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_profile_sessions(profile_id: String) -> Vec<String> {
+    get_sessions_for_profile(&profile_id)
+}
+
+/// Get the count of sessions using a specific profile.
+/// Used by the IO picker to determine if reconfiguration should be locked.
+/// Returns >= 2 if reconfiguration should be locked.
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_profile_session_count(profile_id: String) -> usize {
+    get_session_count_for_profile(&profile_id)
+}
+
+/// Response type for profile usage query
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct ProfileUsageInfo {
+    /// Profile ID
+    pub profile_id: String,
+    /// Session IDs using this profile
+    pub session_ids: Vec<String>,
+    /// Number of sessions using this profile
+    pub session_count: usize,
+    /// Whether reconfiguration is locked (2+ sessions)
+    pub config_locked: bool,
+}
+
+/// Get usage info for multiple profiles at once.
+/// More efficient than calling get_profile_sessions for each profile.
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_profiles_usage(profile_ids: Vec<String>) -> Vec<ProfileUsageInfo> {
+    profile_ids
+        .into_iter()
+        .map(|profile_id| {
+            let session_ids = get_sessions_for_profile(&profile_id);
+            let session_count = session_ids.len();
+            ProfileUsageInfo {
+                profile_id,
+                session_ids,
+                session_count,
+                config_locked: session_count >= 2,
+            }
+        })
+        .collect()
 }

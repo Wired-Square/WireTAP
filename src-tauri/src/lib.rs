@@ -586,6 +586,7 @@ pub fn run() {
             sessions::resume_reader_session,
             sessions::update_reader_speed,
             sessions::update_reader_time_range,
+            sessions::reconfigure_reader_session,
             sessions::seek_reader_session,
             sessions::update_reader_direction,
             sessions::destroy_reader_session,
@@ -603,6 +604,10 @@ pub fn run() {
             sessions::probe_device,
             sessions::create_multi_source_session,
             sessions::list_active_sessions,
+            // Profile-to-session mapping API
+            sessions::get_profile_sessions,
+            sessions::get_profile_session_count,
+            sessions::get_profiles_usage,
             io::get_active_listeners,
             // Buffer / CSV Import API
             buffers::import_csv_to_buffer,
@@ -627,6 +632,8 @@ pub fn run() {
             buffers::get_buffer_bytes_count,
             buffers::get_buffer_bytes_paginated_by_id,
             buffers::find_buffer_bytes_offset_for_timestamp,
+            // Session-aware buffer API
+            buffers::list_orphaned_buffers,
             // Backend framing
             framing::apply_framing_to_buffer,
             // Serial port API

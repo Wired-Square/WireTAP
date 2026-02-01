@@ -18,7 +18,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { pickCsvToOpen } from "../api/dialogs";
 import {
   importCsvToBuffer,
-  listBuffers,
+  listOrphanedBuffers,
   deleteBuffer,
   setActiveBuffer,
   clearBuffer,
@@ -35,12 +35,14 @@ import {
   probeDevice,
   createDefaultBusMappings,
   listActiveSessions,
+  getProfilesUsage,
   type StreamEndedPayload,
   type GvretDeviceInfo,
   type BusMapping,
   type ActiveSessionInfo,
   type DeviceProbeResult,
   type Protocol,
+  type ProfileUsageInfo,
 } from '../api/io';
 import { getAllFavorites, type TimeRangeFavorite } from "../utils/favorites";
 import type { TimeBounds } from "../components/TimeBoundsInput";
@@ -257,6 +259,9 @@ export default function IoReaderPickerDialog({
   // Active multi-source sessions (for sharing between apps)
   const [activeMultiSourceSessions, setActiveMultiSourceSessions] = useState<ActiveSessionInfo[]>([]);
 
+  // Profile usage info - which sessions are using each profile
+  const [profileUsage, setProfileUsage] = useState<Map<string, ProfileUsageInfo>>(new Map());
+
   // Use external state if provided, otherwise use internal state
   const useExternalState = onStartIngest !== undefined;
   const isIngesting = useExternalState ? (externalIsIngesting ?? false) : internalIsIngesting;
@@ -282,11 +287,11 @@ export default function IoReaderPickerDialog({
     return activeMultiSourceSessions.find((s) => s.sessionId === checkedReaderId) || null;
   }, [checkedReaderId, activeMultiSourceSessions]);
 
-  // Is the checked profile currently live (has an active session)?
-  // Also consider multi-source sessions as "live"
-  const isCheckedProfileLive = checkedReaderId
-    ? isProfileInUse(checkedReaderId) || checkedMultiSourceSession !== null
-    : false;
+  // Is the checked selection an active session that can be joined?
+  // This is ONLY true when the user explicitly selects an Active Session from the list.
+  // For profiles (IO Sources), being "in use" is informational only - users can always
+  // start new sessions. The Join button only appears for explicitly selected sessions.
+  const isCheckedProfileLive = checkedMultiSourceSession !== null;
 
   // Get the session for the checked profile (if any) to check its state
   const checkedProfileSession = checkedReaderId ? getSessionForProfile(checkedReaderId) : undefined;
@@ -310,7 +315,7 @@ export default function IoReaderPickerDialog({
     if (isOpen) {
       getAllFavorites().then(setBookmarks).catch(console.error);
       // Load all buffers from the registry and initialize selected buffer
-      listBuffers().then((loadedBuffers) => {
+      listOrphanedBuffers().then((loadedBuffers) => {
         setBuffers(loadedBuffers);
         // If a specific buffer is selected (e.g., "buffer_1"), use that
         // Otherwise if legacy buffer ID is selected, use the most recent buffer
@@ -377,7 +382,7 @@ export default function IoReaderPickerDialog({
     const pollInterval = hasStreamingBuffer ? 500 : 2000;
 
     const intervalId = setInterval(() => {
-      listBuffers().then(setBuffers).catch(console.error);
+      listOrphanedBuffers().then(setBuffers).catch(console.error);
     }, pollInterval);
 
     return () => clearInterval(intervalId);
@@ -385,23 +390,36 @@ export default function IoReaderPickerDialog({
 
   // Fetch active joinable sessions when dialog opens and periodically refresh
   // Includes multi_source sessions AND recorded sessions (like PostgreSQL)
+  // Also fetches profile usage info for showing "(in use)" indicators
   useEffect(() => {
     if (!isOpen) return;
 
-    const fetchSessions = () => {
-      listActiveSessions()
-        .then((sessions) => {
-          console.log("[IoReaderPickerDialog] All active sessions:", sessions);
-          // Show multi_source sessions AND recorded-source sessions (supports_time_range)
-          // This allows apps to join PostgreSQL sessions from other apps
-          const joinableSessions = sessions.filter((s) =>
-            s.deviceType === "multi_source" ||
-            (s.capabilities.supports_time_range && !s.capabilities.is_realtime)
-          );
-          console.log("[IoReaderPickerDialog] Joinable sessions:", joinableSessions);
-          setActiveMultiSourceSessions(joinableSessions);
-        })
-        .catch(console.error);
+    const fetchSessions = async () => {
+      try {
+        const sessions = await listActiveSessions();
+        console.log("[IoReaderPickerDialog] All active sessions:", sessions);
+        // Show multi_source sessions AND recorded-source sessions (supports_time_range)
+        // This allows apps to join PostgreSQL sessions from other apps
+        const joinableSessions = sessions.filter((s) =>
+          s.deviceType === "multi_source" ||
+          (s.capabilities.supports_time_range && !s.capabilities.is_realtime)
+        );
+        console.log("[IoReaderPickerDialog] Joinable sessions:", joinableSessions);
+        setActiveMultiSourceSessions(joinableSessions);
+
+        // Fetch profile usage info for all profiles
+        const profileIds = ioProfiles.map((p) => p.id);
+        if (profileIds.length > 0) {
+          const usageList = await getProfilesUsage(profileIds);
+          const usageMap = new Map<string, ProfileUsageInfo>();
+          for (const usage of usageList) {
+            usageMap.set(usage.profileId, usage);
+          }
+          setProfileUsage(usageMap);
+        }
+      } catch (err) {
+        console.error("[IoReaderPickerDialog] Error fetching sessions:", err);
+      }
     };
 
     // Fetch immediately
@@ -411,7 +429,7 @@ export default function IoReaderPickerDialog({
     const intervalId = setInterval(fetchSessions, 2000);
 
     return () => clearInterval(intervalId);
-  }, [isOpen]);
+  }, [isOpen, ioProfiles]);
 
   // Filter bookmarks for the checked profile
   const profileBookmarks = useMemo(() => {
@@ -608,7 +626,7 @@ export default function IoReaderPickerDialog({
 
       if (payload.buffer_available && payload.count > 0) {
         // Refresh the buffer list
-        const allBuffers = await listBuffers();
+        const allBuffers = await listOrphanedBuffers();
         setBuffers(allBuffers);
 
         // Get the specific buffer that was created (if we have its ID)
@@ -1034,7 +1052,7 @@ export default function IoReaderPickerDialog({
       const metadata = await importCsvToBuffer(filePath);
 
       // Refresh buffer list
-      const allBuffers = await listBuffers();
+      const allBuffers = await listOrphanedBuffers();
       setBuffers(allBuffers);
 
       onImport?.(metadata);
@@ -1063,7 +1081,7 @@ export default function IoReaderPickerDialog({
       await deleteBuffer(bufferId);
 
       // Refresh buffer list
-      const allBuffers = await listBuffers();
+      const allBuffers = await listOrphanedBuffers();
       setBuffers(allBuffers);
 
       // If no buffers left and buffer was selected, clear selection
@@ -1116,23 +1134,8 @@ export default function IoReaderPickerDialog({
     }
   };
 
-  // Get all sessions to find streaming buffer owners
-  const allSessions = useSessionStore((s) => s.getAllSessions);
-
-  // Select a specific buffer
+  // Select a specific orphaned buffer
   const handleSelectBuffer = async (bufferId: string) => {
-    // Check if this buffer is currently streaming
-    const buffer = buffers.find(b => b.id === bufferId);
-    if (buffer?.is_streaming && onJoinSession) {
-      // Find the session that owns this buffer to get its profile ID
-      const sessions = allSessions();
-      const ownerSession = sessions.find(s => s.buffer?.id === bufferId);
-      if (ownerSession) {
-        onJoinSession(ownerSession.profileId);
-      }
-      return;
-    }
-
     try {
       await setActiveBuffer(bufferId);
       setCheckedReaderId(null);
@@ -1190,15 +1193,6 @@ export default function IoReaderPickerDialog({
               onSelectBuffer={handleSelectBuffer}
               onDeleteBuffer={handleDeleteBuffer}
               onClearAllBuffers={handleClearAllBuffers}
-              onJoinStreamingBuffer={(bufferId) => {
-                // Find the session that owns this buffer and join it
-                const sessions = allSessions();
-                const ownerSession = sessions.find(s => s.buffer?.id === bufferId);
-                if (ownerSession && onJoinSession) {
-                  onJoinSession(ownerSession.profileId);
-                  onClose();
-                }
-              }}
             />
           )}
 
@@ -1231,6 +1225,9 @@ export default function IoReaderPickerDialog({
               const probeResult = deviceProbeResultMap.get(profileId) || null;
               const isLoading = deviceProbeLoadingMap.get(profileId) || false;
               const isGvret = profile.kind === "gvret_tcp" || profile.kind === "gvret_usb";
+              // Check if config is locked for this profile (in use by 2+ sessions)
+              const usageInfo = profileUsage.get(profileId);
+              const configLocked = usageInfo?.configLocked ?? false;
 
               // Collect output buses used by OTHER profiles for duplicate detection
               const usedOutputBuses = new Set<number>();
@@ -1275,6 +1272,7 @@ export default function IoReaderPickerDialog({
                     }}
                     compact
                     usedOutputBuses={usedOutputBuses}
+                    configLocked={configLocked}
                   />
                 );
               }
@@ -1308,6 +1306,7 @@ export default function IoReaderPickerDialog({
                   onFramingChange={(config) => {
                     setFramingConfigMap((prev) => new Map(prev).set(profileId, config));
                   }}
+                  configLocked={configLocked}
                 />
               );
             }}
@@ -1316,11 +1315,12 @@ export default function IoReaderPickerDialog({
             disabledProfiles={disabledProfiles}
             hideExternal={hideBuffers}
             hideRecorded={hideBuffers}
+            profileUsage={profileUsage}
           />
 
-          {/* Show ingest options - even for live sessions so user can modify and apply changes */}
-          {/* Hide in connect mode since we're just selecting a database, not streaming */}
-          {mode !== "connect" && (checkedReaderId || isMultiBusMode) && (
+          {/* Show ingest options when creating a new session */}
+          {/* Hide when: connect mode, joining an existing session, or nothing selected */}
+          {mode !== "connect" && (checkedReaderId || isMultiBusMode) && !checkedMultiSourceSession && (
             <>
               <IngestOptions
                 checkedReaderId={checkedReaderId}
@@ -1383,7 +1383,8 @@ export default function IoReaderPickerDialog({
           multiSelectCount={checkedReaderIds.length}
           onMultiWatchClick={handleMultiWatchClick}
           onRelease={listenerId && isCheckedProfileLive ? handleRelease : undefined}
-          onRestartClick={isCheckedProfileLive && !isCheckedProfileStopped ? handleRestartClick : undefined}
+          // Only show Restart for profiles, not for selecting existing sessions
+          onRestartClick={isCheckedProfileLive && !isCheckedProfileStopped && !checkedMultiSourceSession ? handleRestartClick : undefined}
           isMultiSourceLive={isMultiSourceLive}
           onMultiRestartClick={isMultiSourceLive ? handleMultiRestartClick : undefined}
           onConnectClick={checkedReaderId && onConnect ? () => {

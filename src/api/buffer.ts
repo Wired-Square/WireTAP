@@ -31,6 +31,12 @@ export interface BufferMetadata {
   created_at: number;
   /** Whether this buffer is actively receiving data (is the streaming target) */
   is_streaming: boolean;
+  /**
+   * Session ID that owns this buffer (null = orphaned, available for standalone use).
+   * Buffers with an owning session are only accessible through that session.
+   * When a session is destroyed, the buffer is orphaned.
+   */
+  owning_session_id: string | null;
 }
 
 /**
@@ -213,6 +219,15 @@ export async function createBufferReaderSession(
  */
 export async function listBuffers(): Promise<BufferMetadata[]> {
   return invoke("list_buffers");
+}
+
+/**
+ * List only orphaned buffers (no owning session).
+ * These are buffers available for standalone selection in the IO picker.
+ * Includes CSV imports and buffers from destroyed sessions.
+ */
+export async function listOrphanedBuffers(): Promise<BufferMetadata[]> {
+  return invoke("list_orphaned_buffers");
 }
 
 /**

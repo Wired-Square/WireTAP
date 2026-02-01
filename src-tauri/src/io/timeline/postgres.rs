@@ -203,6 +203,37 @@ impl IODevice for PostgresReader {
     fn device_type(&self) -> &'static str {
         "postgres"
     }
+
+    async fn reconfigure(
+        &mut self,
+        start: Option<String>,
+        end: Option<String>,
+    ) -> Result<(), String> {
+        let session_id = self.reader_state.session_id.clone();
+        eprintln!(
+            "[PostgreSQL:{}] reconfigure called - start: {:?}, end: {:?}",
+            session_id, start, end
+        );
+
+        // Stop the current stream (this cancels and awaits the task)
+        self.reader_state.stop().await;
+        eprintln!("[PostgreSQL:{}] Stream stopped for reconfigure", session_id);
+
+        // Update the time range options
+        self.options.start = start.clone();
+        self.options.end = end.clone();
+        eprintln!(
+            "[PostgreSQL:{}] Time range updated - start: {:?}, end: {:?}",
+            session_id, start, end
+        );
+
+        // Start a new stream (this will orphan old buffer and create new one)
+        // The start() method handles buffer creation via spawn_postgres_stream
+        self.start().await?;
+        eprintln!("[PostgreSQL:{}] Reconfigure complete - new stream started", session_id);
+
+        Ok(())
+    }
 }
 
 /// Spawn a PostgreSQL reader task with scoped events and pause support.
@@ -240,9 +271,15 @@ async fn run_postgres_stream(
     options: PostgresReaderOptions,
     control: TimelineControl,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Orphan any existing buffer owned by this session (e.g., from a previous bookmark jump)
+    // This makes the old buffer selectable in "Orphaned Buffers" while creating a fresh one
+    buffer_store::orphan_buffers_for_session(&session_id);
+
     // Create a new frame buffer for this PostgreSQL session
     let buffer_name = format!("PostgreSQL {}:{}/{}", config.host, config.port, config.database);
-    let _buffer_id = buffer_store::create_buffer(BufferType::Frames, buffer_name);
+    let buffer_id = buffer_store::create_buffer(BufferType::Frames, buffer_name);
+    // Assign buffer ownership to this session
+    let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
 
     // Track stream end reason
     let mut stream_reason = "complete";

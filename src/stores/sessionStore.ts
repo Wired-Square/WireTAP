@@ -268,6 +268,12 @@ export interface CreateSessionOptions {
   skipAutoStart?: boolean;
 }
 
+/** Payload for session-reconfigured event */
+export interface SessionReconfiguredPayload {
+  start: string | null;
+  end: string | null;
+}
+
 /** Callbacks for a session - stored per listener in the frontend */
 export interface SessionCallbacks {
   onFrames?: (frames: FrameMessage[]) => void;
@@ -278,6 +284,8 @@ export interface SessionCallbacks {
   onStreamComplete?: () => void;
   onStateChange?: (state: IOStateType) => void;
   onSpeedChange?: (speed: number) => void;
+  /** Called when session is reconfigured (e.g., bookmark jump) - apps should clear state */
+  onReconfigure?: (payload: SessionReconfiguredPayload) => void;
 }
 
 /** Session event listeners - one set per session */
@@ -550,6 +558,16 @@ async function setupSessionEventListeners(
   );
   unlistenFunctions.push(unlistenStateChange);
 
+  // Session reconfigured (e.g., bookmark jump) - apps should clear their state
+  const unlistenReconfigured = await listen<SessionReconfiguredPayload>(
+    `session-reconfigured:${sessionId}`,
+    (event) => {
+      console.log(`[sessionStore] Session '${sessionId}' reconfigured:`, event.payload);
+      invokeCallbacks(eventListeners, "onReconfigure", event.payload);
+    }
+  );
+  unlistenFunctions.push(unlistenReconfigured);
+
   // Listener count changes (from Rust backend)
   const unlistenListenerCount = await listen<number>(
     `joiner-count-changed:${sessionId}`,
@@ -614,8 +632,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     console.log(`[sessionStore:openSession] Called with profileId=${profileId}, profileName=${profileName}, listenerId=${listenerId}`);
     console.log(`[sessionStore:openSession] Options: ${JSON.stringify(options)}`);
 
-    // SIMPLIFIED MODEL: Session ID = Profile ID
-    const sessionId = profileId;
+    // Session ID can be explicitly provided (for recorded sources that need unique IDs)
+    // or defaults to profile ID (for realtime sources that share sessions)
+    const sessionId = options.sessionId ?? profileId;
 
     // Step 1: Check if we already have this session in our store
     const existingSession = get().sessions[sessionId];
@@ -1084,8 +1103,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         return existing;
       }
       // If no session exists, create one
+      // Pass sessionId via options so openSession uses it instead of defaulting to profileId
       console.log(`[sessionStore:reinitializeSession] No existing session, calling openSession`);
-      return get().openSession(profileId, profileName, listenerId, options);
+      return get().openSession(profileId, profileName, listenerId, { ...options, sessionId });
     }
 
     // Clean up local event listeners but keep session in store
@@ -1116,8 +1136,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     });
 
     // Create new session - this will update the existing entry in the store
-    console.log(`[sessionStore:reinitializeSession] Success, calling openSession for profileId=${profileId}`);
-    const result2 = await get().openSession(profileId, profileName, listenerId, options);
+    // Pass sessionId via options so openSession uses it instead of defaulting to profileId
+    console.log(`[sessionStore:reinitializeSession] Success, calling openSession for profileId=${profileId}, sessionId=${sessionId}`);
+    const result2 = await get().openSession(profileId, profileName, listenerId, { ...options, sessionId });
     console.log(`[sessionStore:reinitializeSession] openSession complete, result.id=${result2?.id}`);
     return result2;
   },

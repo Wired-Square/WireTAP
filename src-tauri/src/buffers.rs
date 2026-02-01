@@ -263,3 +263,15 @@ pub async fn find_buffer_bytes_offset_for_timestamp(
     // Use buffer_store's efficient in-place binary search (no data copy)
     Ok(buffer_store::find_buffer_bytes_offset_for_timestamp(target_time_us))
 }
+
+// ============================================================================
+// Session-Aware Buffer Commands
+// ============================================================================
+
+/// List only orphaned buffers (no owning session).
+/// These are buffers available for standalone selection in the IO picker.
+/// Includes CSV imports and buffers from destroyed sessions.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_orphaned_buffers() -> Vec<BufferMetadata> {
+    buffer_store::list_orphaned_buffers()
+}

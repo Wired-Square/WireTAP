@@ -57,6 +57,11 @@ pub struct BufferMetadata {
     /// Whether this buffer is actively receiving data (is the streaming target)
     #[serde(default)]
     pub is_streaming: bool,
+    /// Session ID that owns this buffer (None = orphaned, available for standalone use)
+    /// Buffers with an owning session are only accessible through that session.
+    /// When a session is destroyed, the buffer is orphaned (owning_session_id = None).
+    #[serde(default)]
+    pub owning_session_id: Option<String>,
 }
 
 // ============================================================================
@@ -148,6 +153,7 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
         end_time_us: None,
         created_at,
         is_streaming: false, // Will be set to true when streaming_id matches
+        owning_session_id: None, // Will be set when assigned to a session
     };
 
     let data = match buffer_type {
@@ -297,6 +303,91 @@ pub fn set_active_buffer(buffer_id: &str) -> Result<(), String> {
     } else {
         Err(format!("Buffer '{}' not found", buffer_id))
     }
+}
+
+// ============================================================================
+// Public API - Session Ownership
+// ============================================================================
+
+/// Assign a buffer to a session.
+/// The buffer will only be accessible through this session until orphaned.
+pub fn set_buffer_owner(buffer_id: &str, session_id: &str) -> Result<(), String> {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
+        buffer.metadata.owning_session_id = Some(session_id.to_string());
+        eprintln!(
+            "[BufferStore] Assigned buffer '{}' to session '{}'",
+            buffer_id, session_id
+        );
+        Ok(())
+    } else {
+        Err(format!("Buffer '{}' not found", buffer_id))
+    }
+}
+
+/// Orphan a buffer (remove session ownership).
+/// The buffer becomes available for standalone use.
+pub fn orphan_buffer(buffer_id: &str) -> Result<(), String> {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
+        let old_owner = buffer.metadata.owning_session_id.take();
+        eprintln!(
+            "[BufferStore] Orphaned buffer '{}' (was owned by {:?})",
+            buffer_id, old_owner
+        );
+        Ok(())
+    } else {
+        Err(format!("Buffer '{}' not found", buffer_id))
+    }
+}
+
+/// Orphan all buffers owned by a specific session.
+/// Called when a session is destroyed.
+pub fn orphan_buffers_for_session(session_id: &str) {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    let mut orphaned_count = 0;
+
+    for buffer in registry.buffers.values_mut() {
+        if buffer.metadata.owning_session_id.as_deref() == Some(session_id) {
+            buffer.metadata.owning_session_id = None;
+            orphaned_count += 1;
+        }
+    }
+
+    if orphaned_count > 0 {
+        eprintln!(
+            "[BufferStore] Orphaned {} buffer(s) for destroyed session '{}'",
+            orphaned_count, session_id
+        );
+    }
+}
+
+/// Get the buffer ID owned by a session (if any).
+pub fn get_buffer_for_session(session_id: &str) -> Option<String> {
+    let registry = BUFFER_REGISTRY.read().unwrap();
+    registry
+        .buffers
+        .values()
+        .find(|b| b.metadata.owning_session_id.as_deref() == Some(session_id))
+        .map(|b| b.metadata.id.clone())
+}
+
+/// List only orphaned buffers (no owning session).
+/// These are available for standalone selection.
+pub fn list_orphaned_buffers() -> Vec<BufferMetadata> {
+    let registry = BUFFER_REGISTRY.read().unwrap();
+    let streaming_id = registry.streaming_id.as_deref();
+
+    registry
+        .buffers
+        .values()
+        .filter(|b| b.metadata.owning_session_id.is_none())
+        .map(|b| {
+            let mut meta = b.metadata.clone();
+            meta.is_streaming = Some(meta.id.as_str()) == streaming_id;
+            meta
+        })
+        .collect()
 }
 
 // ============================================================================

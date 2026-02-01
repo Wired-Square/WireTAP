@@ -76,6 +76,8 @@ export interface UseIOSessionOptions {
   onStreamComplete?: () => void;
   /** Callback when playback speed changes (from any listener on this session) */
   onSpeedChange?: (speed: number) => void;
+  /** Callback when session is reconfigured (e.g., bookmark jump) - apps should clear their state */
+  onReconfigure?: () => void;
 }
 
 export interface UseIOSessionResult {
@@ -154,6 +156,8 @@ export interface UseIOSessionResult {
       busOverride?: number;
       // Skip auto-starting playback sources (for connect-only mode)
       skipAutoStart?: boolean;
+      // Override session ID (for recorded sources that need unique IDs per instance)
+      sessionIdOverride?: string;
     }
   ) => Promise<void>;
   /** Switch to buffer replay mode (after stream ends with buffer data) */
@@ -191,6 +195,7 @@ export function useIOSession(
     onStreamEnded,
     onStreamComplete,
     onSpeedChange,
+    onReconfigure,
   } = options;
 
   // Session ID = Profile ID (use sessionId if provided, fall back to profileId for compat)
@@ -236,6 +241,7 @@ export function useIOSession(
     onStreamEnded,
     onStreamComplete,
     onSpeedChange,
+    onReconfigure,
   });
   useEffect(() => {
     callbacksRef.current = {
@@ -246,8 +252,9 @@ export function useIOSession(
       onStreamEnded,
       onStreamComplete,
       onSpeedChange,
+      onReconfigure,
     };
-  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange]);
+  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure]);
 
   // Initialize session on mount
   useEffect(() => {
@@ -311,6 +318,7 @@ export function useIOSession(
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
           onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
           onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
+          onReconfigure: () => callbacksRef.current.onReconfigure?.(),
         });
         console.log(`[useIOSession:${appName}] registerCallbacks completed`);
 
@@ -545,27 +553,32 @@ export function useIOSession(
         emitRawBytes?: boolean;
         busOverride?: number;
         skipAutoStart?: boolean;
+        sessionIdOverride?: string;
       }
     ) => {
       // For reinitialize, use new profile ID if provided, else current
       const targetProfileId = newProfileId || effectiveSessionId;
       if (!targetProfileId) return;
 
+      // Session ID can be overridden (for recorded sources that need unique IDs per instance)
+      // Profile ID stays targetProfileId for looking up profile configuration
+      const targetSessionId = opts?.sessionIdOverride || targetProfileId;
+
       // Mark as reinitializing in module-level map to prevent effect from running concurrently
       // This persists across re-renders, unlike a ref
-      reinitializingSessions.set(targetProfileId, true);
+      reinitializingSessions.set(targetSessionId, true);
 
       // Use the new profile ID for display when switching profiles, avoiding stale closure.
       // When newProfileId is provided (profile switching), it's the correct name.
       // When not provided (same-session reinit), effectiveProfileName is correct.
       const targetProfileName = newProfileId || effectiveProfileName;
 
-      console.log(`[useIOSession:${appName}] reinitialize() - targetProfileId=${targetProfileId}, currentSession=${currentSessionIdRef.current}, profileName=${targetProfileName}`);
+      console.log(`[useIOSession:${appName}] reinitialize() - targetSessionId=${targetSessionId}, targetProfileId=${targetProfileId}, currentSession=${currentSessionIdRef.current}, profileName=${targetProfileName}`);
 
       try {
         // If switching to a different session, leave the old one first
         const oldSessionId = currentSessionIdRef.current;
-        if (oldSessionId && oldSessionId !== targetProfileId) {
+        if (oldSessionId && oldSessionId !== targetSessionId) {
           console.log(`[useIOSession:${appName}] reinitialize() - switching sessions, leaving old session '${oldSessionId}'`);
           // Clear callbacks for old session
           clearCallbacks(oldSessionId, listenerIdRef.current);
@@ -577,7 +590,7 @@ export function useIOSession(
         // The backend doesn't auto-start playback sources (postgres, csv) - that happens in openSession
         // unless skipAutoStart is set
         await reinitializeSession(
-          targetProfileId,
+          targetSessionId,
           listenerIdRef.current,
           targetProfileId,
           targetProfileName,
@@ -598,13 +611,13 @@ export function useIOSession(
           }
         );
 
-        // Update current session ref
-        console.log(`[useIOSession:${appName}] reinitialize() - updating currentSessionIdRef from '${currentSessionIdRef.current}' to '${targetProfileId}'`);
-        currentSessionIdRef.current = targetProfileId;
+        // Update current session ref with the actual session ID (may differ from profile ID)
+        console.log(`[useIOSession:${appName}] reinitialize() - updating currentSessionIdRef from '${currentSessionIdRef.current}' to '${targetSessionId}'`);
+        currentSessionIdRef.current = targetSessionId;
         console.log(`[useIOSession:${appName}] reinitialize() - currentSessionIdRef is now '${currentSessionIdRef.current}'`);
 
         // Re-register callbacks after reinitialize
-        registerCallbacks(targetProfileId, listenerIdRef.current, {
+        registerCallbacks(targetSessionId, listenerIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
           onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
           onError: (error) => callbacksRef.current.onError?.(error),
@@ -612,6 +625,7 @@ export function useIOSession(
           onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
           onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
           onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
+          onReconfigure: () => callbacksRef.current.onReconfigure?.(),
         });
 
         // Mark setup as complete for the new session
@@ -620,7 +634,7 @@ export function useIOSession(
         const msg = e instanceof Error ? e.message : String(e);
         callbacksRef.current.onError?.(msg);
       } finally {
-        reinitializingSessions.delete(targetProfileId);
+        reinitializingSessions.delete(targetSessionId);
       }
     },
     [appName, effectiveSessionId, effectiveProfileName, reinitializeSession, registerCallbacks, clearCallbacks, leaveSession]
@@ -663,6 +677,7 @@ export function useIOSession(
         onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
         onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
         onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
+          onReconfigure: () => callbacksRef.current.onReconfigure?.(),
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

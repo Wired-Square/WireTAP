@@ -436,6 +436,8 @@ export default function Decoder() {
     // Multi-bus state
     multiBusMode,
     multiBusProfiles: ioProfiles,
+    // Source profile ID (for bookmark lookups - preserved when session ID differs)
+    sourceProfileId,
     // Session
     session,
     // Profile name (for menu display)
@@ -606,11 +608,13 @@ export default function Decoder() {
   }, [isFocused, ioProfileName, isStreaming, isPaused, capabilities, joinerCount]);
 
   // Report bookmarks to menu when focused or profile changes
+  // Use sourceProfileId for lookups (falls back to ioProfile for realtime sources where session ID = profile ID)
+  const bookmarkProfileId = sourceProfileId || ioProfile;
   useEffect(() => {
     const updateBookmarksMenu = async () => {
       if (isFocused) {
-        if (ioProfile && !isBufferProfileId(ioProfile)) {
-          const bookmarks = await getFavoritesForProfile(ioProfile);
+        if (bookmarkProfileId && !isBufferProfileId(bookmarkProfileId)) {
+          const bookmarks = await getFavoritesForProfile(bookmarkProfileId);
           await invoke("update_bookmarks_menu", {
             bookmarks: bookmarks.map((b) => ({ id: b.id, name: b.name })),
           });
@@ -621,7 +625,7 @@ export default function Decoder() {
       }
     };
     updateBookmarksMenu();
-  }, [isFocused, ioProfile]);
+  }, [isFocused, bookmarkProfileId]);
 
   // Listen for session control menu commands
   useEffect(() => {
@@ -673,9 +677,9 @@ export default function Decoder() {
               dialogs.ioReaderPicker.open();
               break;
             case "jump-to-bookmark":
-              // Jump to bookmark from menu
-              if (bookmarkId && ioProfile) {
-                const bookmarks = await getFavoritesForProfile(ioProfile);
+              // Jump to bookmark from menu (use sourceProfileId for recorded sources)
+              if (bookmarkId && bookmarkProfileId) {
+                const bookmarks = await getFavoritesForProfile(bookmarkProfileId);
                 const bookmark = bookmarks.find((b) => b.id === bookmarkId);
                 if (bookmark) {
                   await jumpToBookmark(bookmark);
@@ -1073,7 +1077,7 @@ export default function Decoder() {
         isOpen={dialogs.bookmarkPicker.isOpen}
         onClose={() => dialogs.bookmarkPicker.close()}
         onLoad={handlers.handleLoadBookmark}
-        profileId={ioProfile}
+        profileId={bookmarkProfileId}
       />
 
       <SaveSelectionSetDialog

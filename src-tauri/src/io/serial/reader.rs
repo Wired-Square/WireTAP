@@ -309,6 +309,8 @@ fn run_serial_stream_blocking(
         } else {
             buffer_store::create_buffer_inactive(BufferType::Bytes, format!("Bytes: {}", buffer_name))
         };
+        // Assign buffer ownership to this session
+        let _ = buffer_store::set_buffer_owner(&id, &session_id);
         Some(id)
     } else {
         None
@@ -318,6 +320,8 @@ fn run_serial_stream_blocking(
     let frames_buffer_id: Option<String> = if config.framing.is_some() {
         // Frames buffer is always active when framing is enabled
         let id = buffer_store::create_buffer(BufferType::Frames, format!("Frames: {}", buffer_name));
+        // Assign buffer ownership to this session
+        let _ = buffer_store::set_buffer_owner(&id, &session_id);
         Some(id)
     } else {
         None

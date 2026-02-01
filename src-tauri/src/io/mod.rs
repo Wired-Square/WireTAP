@@ -59,6 +59,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
 
+use crate::{buffer_store, sessions};
+
 // ============================================================================
 // Shared Types (used by multiple readers)
 // ============================================================================
@@ -555,6 +557,19 @@ pub trait IODevice: Send + Sync {
     /// Default implementation returns None.
     fn multi_source_configs(&self) -> Option<Vec<multi_source::SourceConfig>> {
         None
+    }
+
+    /// Reconfigure a running session with new time range.
+    /// This stops the current stream, orphans the old buffer, creates a new buffer,
+    /// and starts streaming with the new time range - all while keeping the session alive.
+    /// Other apps joined to this session remain connected.
+    /// Default implementation returns an error.
+    async fn reconfigure(
+        &mut self,
+        _start: Option<String>,
+        _end: Option<String>,
+    ) -> Result<(), String> {
+        Err("This device does not support reconfiguration".to_string())
     }
 }
 
@@ -1333,6 +1348,56 @@ pub async fn update_session_time_range(
     result
 }
 
+/// Reconfigure a running session with new time range.
+/// This stops the current stream, orphans the old buffer, creates a new buffer,
+/// and starts streaming with the new time range - all while keeping the session alive.
+/// Other apps joined to this session remain connected.
+pub async fn reconfigure_session(
+    session_id: &str,
+    start: Option<String>,
+    end: Option<String>,
+) -> Result<(), String> {
+    eprintln!(
+        "[io] reconfigure_session called - session: {}, start: {:?}, end: {:?}",
+        session_id, start, end
+    );
+
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions.get_mut(session_id).ok_or_else(|| {
+        let err = format!("Session '{}' not found", session_id);
+        eprintln!("[io] reconfigure_session: {}", err);
+        err
+    })?;
+
+    let result = session.device.reconfigure(start.clone(), end.clone()).await;
+    if let Err(ref e) = result {
+        eprintln!("[io] reconfigure_session failed: {}", e);
+    } else {
+        // Emit state change event so frontend updates
+        // During reconfigure, session goes: Running -> Stopped -> Running internally
+        // Emit Stopped -> Running to ensure frontend shows correct streaming state
+        let state_after = session.device.state();
+        eprintln!(
+            "[io] reconfigure_session completed successfully - final state: {:?}",
+            state_after
+        );
+        // Force emit Stopped -> current to ensure UI updates to streaming state
+        emit_state_change(&session.app, session_id, &IOState::Stopped, &state_after);
+
+        // Emit session-reconfigured event so apps know to clear their frame lists and reset state
+        emit_to_session(
+            &session.app,
+            "session-reconfigured",
+            session_id,
+            serde_json::json!({
+                "start": start,
+                "end": end,
+            }),
+        );
+    }
+    result
+}
+
 /// Seek to a specific timestamp in microseconds
 pub async fn seek_session(session_id: &str, timestamp_us: i64) -> Result<(), String> {
     let mut sessions = IO_SESSIONS.lock().await;
@@ -1389,6 +1454,18 @@ pub struct ActiveSessionInfo {
     pub listener_count: usize,
     /// For multi-source sessions: the source configurations
     pub multi_source_configs: Option<Vec<multi_source::SourceConfig>>,
+    /// Profile IDs feeding this session (populated from SESSION_PROFILES in sessions.rs)
+    #[serde(default)]
+    pub source_profile_ids: Vec<String>,
+    /// Buffer ID owned by this session (if any)
+    #[serde(default)]
+    pub buffer_id: Option<String>,
+    /// Frame count in the owned buffer
+    #[serde(default)]
+    pub buffer_frame_count: Option<usize>,
+    /// Whether the session is actively streaming data
+    #[serde(default)]
+    pub is_streaming: bool,
 }
 
 /// List all active sessions
@@ -1396,13 +1473,31 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
     let sessions = IO_SESSIONS.lock().await;
     sessions
         .iter()
-        .map(|(session_id, session)| ActiveSessionInfo {
-            session_id: session_id.clone(),
-            device_type: session.device.device_type().to_string(),
-            state: session.device.state(),
-            capabilities: session.device.capabilities(),
-            listener_count: session.listeners.len(),
-            multi_source_configs: session.device.multi_source_configs(),
+        .map(|(session_id, session)| {
+            // Get source profile IDs from the session tracking
+            let source_profile_ids = sessions::get_session_profile_ids(session_id);
+
+            // Get buffer info if this session owns a buffer
+            let buffer_id = buffer_store::get_buffer_for_session(session_id);
+            let buffer_frame_count = buffer_id
+                .as_ref()
+                .map(|id| buffer_store::get_buffer_count(id));
+
+            // Check if session is actively streaming (running state)
+            let is_streaming = matches!(session.device.state(), IOState::Running);
+
+            ActiveSessionInfo {
+                session_id: session_id.clone(),
+                device_type: session.device.device_type().to_string(),
+                state: session.device.state(),
+                capabilities: session.device.capabilities(),
+                listener_count: session.listeners.len(),
+                multi_source_configs: session.device.multi_source_configs(),
+                source_profile_ids,
+                buffer_id,
+                buffer_frame_count,
+                is_streaming,
+            }
         })
         .collect()
 }

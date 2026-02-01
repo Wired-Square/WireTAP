@@ -392,6 +392,24 @@ export async function updateReaderTimeRange(
 }
 
 /**
+ * Reconfigure a running session with new time range.
+ * This stops the current stream, orphans the old buffer, creates a new buffer,
+ * and starts streaming with the new time range - all while keeping the session alive.
+ * Other apps joined to this session remain connected.
+ */
+export async function reconfigureReaderSession(
+  sessionId: string,
+  start?: string,
+  end?: string
+): Promise<void> {
+  return invoke("reconfigure_reader_session", {
+    session_id: sessionId,
+    start,
+    end,
+  });
+}
+
+/**
  * Destroy a reader session.
  * Stops the reader if running and cleans up resources.
  */
@@ -969,6 +987,14 @@ export interface ActiveSessionInfo {
   listenerCount: number;
   /** For multi-source sessions: the source configurations */
   multiSourceConfigs: MultiSourceInput[] | null;
+  /** Profile IDs feeding this session */
+  sourceProfileIds: string[];
+  /** Buffer ID owned by this session (if any) */
+  bufferId: string | null;
+  /** Frame count in the owned buffer */
+  bufferFrameCount: number | null;
+  /** Whether the session is actively streaming data */
+  isStreaming: boolean;
 }
 
 /**
@@ -993,6 +1019,10 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
         traits?: InterfaceTraits;
       }>;
     }> | null;
+    source_profile_ids: string[];
+    buffer_id: string | null;
+    buffer_frame_count: number | null;
+    is_streaming: boolean;
   }> = await invoke("list_active_sessions");
 
   return raw.map((s) => ({
@@ -1012,5 +1042,65 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
         traits: m.traits,
       })),
     })) ?? null,
+    sourceProfileIds: s.source_profile_ids ?? [],
+    bufferId: s.buffer_id ?? null,
+    bufferFrameCount: s.buffer_frame_count ?? null,
+    isStreaming: s.is_streaming ?? false,
+  }));
+}
+
+// ============================================================================
+// Profile-to-Session Mapping API
+// ============================================================================
+
+/**
+ * Info about which sessions are using a profile.
+ */
+export interface ProfileUsageInfo {
+  /** Profile ID */
+  profileId: string;
+  /** Session IDs using this profile */
+  sessionIds: string[];
+  /** Number of sessions using this profile */
+  sessionCount: number;
+  /** Whether reconfiguration is locked (2+ sessions) */
+  configLocked: boolean;
+}
+
+/**
+ * Get all session IDs that are using a specific profile.
+ * Used to show "(in use: sessionId)" indicator in the IO picker.
+ */
+export async function getProfileSessions(profileId: string): Promise<string[]> {
+  return invoke("get_profile_sessions", { profile_id: profileId });
+}
+
+/**
+ * Get the count of sessions using a specific profile.
+ * Used to determine if reconfiguration should be locked (locked if >= 2).
+ */
+export async function getProfileSessionCount(profileId: string): Promise<number> {
+  return invoke("get_profile_session_count", { profile_id: profileId });
+}
+
+/**
+ * Get usage info for multiple profiles at once.
+ * More efficient than calling getProfileSessions for each profile.
+ */
+export async function getProfilesUsage(
+  profileIds: string[]
+): Promise<ProfileUsageInfo[]> {
+  const raw: Array<{
+    profile_id: string;
+    session_ids: string[];
+    session_count: number;
+    config_locked: boolean;
+  }> = await invoke("get_profiles_usage", { profile_ids: profileIds });
+
+  return raw.map((p) => ({
+    profileId: p.profile_id,
+    sessionIds: p.session_ids,
+    sessionCount: p.session_count,
+    configLocked: p.config_locked,
   }));
 }

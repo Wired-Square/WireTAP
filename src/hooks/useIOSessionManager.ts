@@ -27,9 +27,21 @@ export { isBufferProfileId, BUFFER_PROFILE_ID };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../stores/discoveryStore";
-import { setSessionListenerActive, type StreamEndedPayload, type IOCapabilities } from "../api/io";
+import { setSessionListenerActive, reconfigureReaderSession, type StreamEndedPayload, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
+import { isRealtimeProfile } from "../dialogs/io-reader-picker/utils";
+
+/**
+ * Generate a unique session ID for recorded sources.
+ * Pattern: {sourceType}_{shortId}
+ * Examples: postgres_a7f3c9, csv_b9c2d4
+ */
+function generateRecordedSessionId(profileKind: string | undefined): string {
+  const sourceType = profileKind?.replace(/[_-]/g, "") || "session";
+  const shortId = Math.random().toString(16).slice(2, 8);
+  return `${sourceType}_${shortId}`;
+}
 
 /** Reason for session reconfiguration */
 export type SessionReconfigurationReason = "bookmark" | "time_range_change";
@@ -424,6 +436,20 @@ export function useIOSessionManager(
   ingestCompleteRef.current = onIngestComplete;
 
   // ---- IO Session ----
+  // Handler for when session is reconfigured externally (e.g., another app jumped to a bookmark)
+  // This resets frame counts and calls cleanup so the UI clears its state
+  const handleReconfigure = useCallback(() => {
+    console.log(`[IOSessionManager:${appName}] Session reconfigured externally - clearing state`);
+    // Call the same cleanup as before watch
+    onBeforeWatch?.();
+    // Reset frame count
+    setWatchFrameCount(0);
+    // Reset stream completed flag
+    if (streamCompletedRef) {
+      streamCompletedRef.current = false;
+    }
+  }, [appName, onBeforeWatch, streamCompletedRef]);
+
   const sessionOptions: UseIOSessionOptions = {
     appName,
     sessionId: effectiveSessionId,
@@ -436,6 +462,7 @@ export function useIOSessionManager(
     onStreamEnded,
     onStreamComplete,
     onSpeedChange,
+    onReconfigure: handleReconfigure,
   };
 
   const session = useIOSession(sessionOptions);
@@ -572,6 +599,13 @@ export function useIOSessionManager(
   ) => {
     onBeforeWatch?.();
 
+    // For recorded sources (postgres, csv), generate a unique session ID so multiple
+    // apps can watch the same profile independently with separate buffers.
+    // Real-time sources continue to use profile ID as session ID (shared session).
+    const profile = ioProfiles.find((p) => p.id === profileId);
+    const isRecorded = profile ? !isRealtimeProfile(profile) : false;
+    const sessionId = isRecorded ? generateRecordedSessionId(profile?.kind) : profileId;
+
     // Reinitialize with the provided options merged with any extra reinitialize options
     await session.reinitialize(profileId, {
       startTime: opts.startTime,
@@ -590,13 +624,15 @@ export function useIOSessionManager(
       minFrameLength: opts.minFrameLength,
       emitRawBytes: opts.emitRawBytes,
       busOverride: opts.busOverride,
+      // For recorded sources, use unique session ID so multiple apps can have independent streams
+      sessionIdOverride: isRecorded ? sessionId : undefined,
       ...reinitializeOptions,
     });
 
     // Ensure listener is ACTIVE so we receive frames
     // (connectOnly sets listener inactive, so we need to reactivate it)
     try {
-      await setSessionListenerActive(profileId, appName, true);
+      await setSessionListenerActive(sessionId, appName, true);
     } catch {
       // Ignore - may fail if session doesn't exist yet
     }
@@ -605,8 +641,10 @@ export function useIOSessionManager(
     setMultiBusMode(false);
     setMultiBusProfiles([]);
 
-    // Set profile and speed
-    setIoProfile(profileId);
+    // Set profile (use session ID so callbacks are registered correctly)
+    // Also track the source profile ID for bookmark lookups
+    setIoProfile(sessionId);
+    setSourceProfileId(profileId);
     if (opts.speed !== undefined) {
       setPlaybackSpeedProp?.(opts.speed);
     }
@@ -615,7 +653,7 @@ export function useIOSessionManager(
     setIsWatching(true);
     resetWatchFrameCount();
     streamCompletedRef.current = false;
-  }, [session, appName, onBeforeWatch, setMultiBusMode, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
+  }, [session, appName, ioProfiles, onBeforeWatch, setMultiBusMode, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
 
   // Watch multiple sources: start multi-bus session, set speed, start watching
   const watchMultiSource = useCallback(async (
@@ -699,57 +737,91 @@ export function useIOSessionManager(
       }
 
       // Determine target profile (bookmark's profile or current)
-      const targetProfile = bookmark.profileId || sourceProfileId || ioProfile;
-      if (!targetProfile) {
+      const targetProfileId = bookmark.profileId || sourceProfileId || ioProfile;
+      if (!targetProfileId) {
         console.warn("[IOSessionManager:jumpToBookmark] No profile available");
         return;
       }
 
-      console.log(`[IOSessionManager:jumpToBookmark] Jumping to bookmark "${bookmark.name}"`);
+      // For recorded sources:
+      // - If jumping to a bookmark for the same profile we're already watching, reuse the session ID
+      //   (other apps stay connected, buffer is finalized and new one created)
+      // - If switching to a different profile, generate a unique session ID
+      const targetProfile = ioProfiles.find((p) => p.id === targetProfileId);
+      const isRecorded = targetProfile ? !isRealtimeProfile(targetProfile) : false;
+      const isSameProfile = sourceProfileId === targetProfileId;
 
-      // Step 1: Stop current stream if streaming
-      if (isWatching) {
-        console.log("[IOSessionManager:jumpToBookmark] Stopping current watch...");
-        await session.stop();
-        setIsWatching(false);
+      let sessionId: string;
+      if (isSameProfile && ioProfile) {
+        // Same profile - reuse current session ID (keeps other listeners connected)
+        sessionId = ioProfile;
+      } else if (isRecorded) {
+        // Different profile or no existing session - generate unique ID for recorded sources
+        sessionId = generateRecordedSessionId(targetProfile?.kind);
+      } else {
+        // Realtime source - use profile ID
+        sessionId = targetProfileId;
       }
 
-      // Step 2: Run cleanup callback (same as onBeforeWatch)
+      console.log(`[IOSessionManager:jumpToBookmark] Jumping to bookmark "${bookmark.name}" (session: ${sessionId}, profile: ${targetProfileId}, sameProfile: ${isSameProfile}, isRecorded: ${isRecorded})`);
+
+      // Step 1: Run cleanup callback (same as onBeforeWatch)
       onBeforeWatch?.();
 
-      // Step 3: Clear multi-bus state
+      // Step 2: Clear multi-bus state
       setMultiBusMode(false);
       setMultiBusProfiles([]);
 
-      // Step 4: Reinitialize with bookmark time range
-      // Use provided speed, or current session speed, or default to realtime (1)
-      const effectiveSpeed = opts?.speed ?? session.speed ?? 1;
-      await session.reinitialize(targetProfile, {
-        startTime: startUtc,
-        endTime: endUtc || undefined,
-        speed: effectiveSpeed,
-        limit: bookmark.maxFrames,
-        framingEncoding: opts?.framingEncoding,
-        delimiter: opts?.delimiter,
-        maxFrameLength: opts?.maxFrameLength,
-        frameIdStartByte: opts?.frameIdStartByte,
-        frameIdBytes: opts?.frameIdBytes,
-        frameIdBigEndian: opts?.frameIdStartByte !== undefined ? true : undefined,
-        sourceAddressStartByte: opts?.sourceAddressStartByte,
-        sourceAddressBytes: opts?.sourceAddressBytes,
-        sourceAddressBigEndian: opts?.sourceAddressEndianness === "big",
-        minFrameLength: opts?.minFrameLength,
-        emitRawBytes: opts?.emitRawBytes,
-        busOverride: opts?.busOverride,
-      });
+      // Step 3: Either reconfigure existing session or reinitialize
+      if (isSameProfile && ioProfile && isRecorded) {
+        // Same profile, recorded source - use reconfigure to keep session alive
+        // This stops the stream, orphans old buffer, creates new buffer, and restarts
+        // Other apps joined to this session stay connected
+        console.log("[IOSessionManager:jumpToBookmark] Using reconfigure (same profile, session stays alive)");
+        await reconfigureReaderSession(sessionId, startUtc, endUtc || undefined);
+      } else {
+        // Different profile or realtime source - full reinitialize
+        console.log("[IOSessionManager:jumpToBookmark] Using reinitialize (different profile or realtime)");
 
-      // Step 5: Update manager state
-      setIoProfile(targetProfile);
+        // Stop current stream if watching
+        if (isWatching) {
+          console.log("[IOSessionManager:jumpToBookmark] Stopping current watch...");
+          await session.stop();
+          setIsWatching(false);
+        }
+
+        // Reinitialize with bookmark time range
+        const effectiveSpeed = opts?.speed ?? session.speed ?? 1;
+        await session.reinitialize(targetProfileId, {
+          startTime: startUtc,
+          endTime: endUtc || undefined,
+          speed: effectiveSpeed,
+          limit: bookmark.maxFrames,
+          framingEncoding: opts?.framingEncoding,
+          delimiter: opts?.delimiter,
+          maxFrameLength: opts?.maxFrameLength,
+          frameIdStartByte: opts?.frameIdStartByte,
+          frameIdBytes: opts?.frameIdBytes,
+          frameIdBigEndian: opts?.frameIdStartByte !== undefined ? true : undefined,
+          sourceAddressStartByte: opts?.sourceAddressStartByte,
+          sourceAddressBytes: opts?.sourceAddressBytes,
+          sourceAddressBigEndian: opts?.sourceAddressEndianness === "big",
+          minFrameLength: opts?.minFrameLength,
+          emitRawBytes: opts?.emitRawBytes,
+          busOverride: opts?.busOverride,
+          // Pass session ID override when it differs from profile ID (recorded sources use unique session IDs)
+          sessionIdOverride: sessionId !== targetProfileId ? sessionId : undefined,
+        });
+      }
+
+      // Step 4: Update manager state (use session ID so callbacks are registered correctly)
+      setIoProfile(sessionId);
+      setSourceProfileId(targetProfileId);
       if (opts?.speed !== undefined) {
         setPlaybackSpeedProp?.(opts.speed);
       }
 
-      // Step 6: Start watching
+      // Step 5: Mark as watching and reset state
       setIsWatching(true);
       resetWatchFrameCount();
       streamCompletedRef.current = false;
