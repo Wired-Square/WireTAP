@@ -135,6 +135,32 @@ export async function getBufferFramesPaginatedFiltered(
 }
 
 /**
+ * Response for tail buffer frames
+ */
+export interface TailResponse {
+  frames: BufferFrame[];
+  total_filtered_count: number;
+  buffer_end_time_us: number | null;
+}
+
+/**
+ * Get the most recent N frames from the active buffer, optionally filtered by frame IDs.
+ * Used for "tail mode" during streaming - shows latest frames without frontend accumulation.
+ *
+ * @param limit - Maximum number of frames to return
+ * @param selectedIds - Array of frame IDs to filter by (empty = all frames)
+ */
+export async function getBufferFramesTail(
+  limit: number,
+  selectedIds: number[]
+): Promise<TailResponse> {
+  return invoke("get_buffer_frames_tail", {
+    limit,
+    selected_ids: selectedIds,
+  });
+}
+
+/**
  * Get a page of frames from a specific buffer by ID.
  * Use this to fetch frames from a derived buffer (e.g., framing results).
  *

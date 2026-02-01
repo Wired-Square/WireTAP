@@ -132,13 +132,12 @@ export default function DataViewPaginationToolbar({
         </div>
       )}
 
-      {/* Page size selector - at the extreme right */}
+      {/* Page size selector - at the extreme right, never disabled (only pagination buttons are) */}
       {!hidePageSize && (
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          disabled={disabled}
-          className={`text-xs px-2 py-1 rounded border border-gray-600 ${bgDataInput} ${textDataPrimary} disabled:opacity-50`}
+          className={`text-xs px-2 py-1 rounded border border-gray-600 ${bgDataInput} ${textDataPrimary}`}
           title="Rows per page"
         >
           {pageSizeOptions.map((opt) => (

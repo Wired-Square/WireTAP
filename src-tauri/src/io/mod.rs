@@ -66,7 +66,7 @@ use crate::{buffer_store, sessions};
 // ============================================================================
 
 /// Parsed frame message - the main data structure emitted by all readers
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FrameMessage {
     pub protocol: String, // e.g., "can", "modbus", "serial"
     /// Host UNIX timestamp in microseconds.

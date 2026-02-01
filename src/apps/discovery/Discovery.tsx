@@ -919,6 +919,7 @@ export default function Discovery() {
         ) : (
           <DiscoveryFramesView
             frames={frames}
+            bufferId={bufferMetadata?.id ?? null}
             protocol={protocolLabel}
             displayFrameIdFormat={displayFrameIdFormat}
             displayTimeFormat={displayTimeFormat}

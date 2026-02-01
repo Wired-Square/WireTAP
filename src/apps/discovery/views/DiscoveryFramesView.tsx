@@ -15,9 +15,13 @@ import MessageOrderResultView from "./tools/MessageOrderResultView";
 import { bgDataView, textDataSecondary, bgSurface, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import type { IOCapabilities } from "../../../api/io";
+import { useBufferFrameView } from "../../../hooks/useBufferFrameView";
 
 type Props = {
-  frames: FrameMessage[];
+  /** @deprecated Use bufferId prop instead for buffer-first mode */
+  frames?: FrameMessage[];
+  /** Buffer ID for buffer-first mode (recommended) */
+  bufferId?: string | null;
   protocol: string;
   displayFrameIdFormat: "hex" | "decimal";
   displayTimeFormat: "delta-last" | "delta-start" | "timestamp" | "human";
@@ -69,7 +73,8 @@ type Props = {
 };
 
 function DiscoveryFramesView({
-  frames,
+  frames = [],
+  bufferId,
   protocol,
   displayFrameIdFormat,
   displayTimeFormat,
@@ -108,6 +113,20 @@ function DiscoveryFramesView({
   const selectedFrames = useDiscoveryStore((s) => s.selectedFrames);
   const bufferMode = useDiscoveryStore((s) => s.bufferMode);
   const toolboxResults = useDiscoveryStore((s) => s.toolbox);
+
+  // Use buffer-first hook when bufferId is available
+  // This provides a unified interface for streaming (tail poll) and stopped (pagination)
+  const effectiveBufferId = bufferId ?? bufferMetadata?.id ?? null;
+  const useBufferFirstMode = effectiveBufferId !== null;
+
+  const bufferFrameView = useBufferFrameView({
+    bufferId: effectiveBufferId,
+    isStreaming,
+    selectedFrames,
+    pageSize: renderBuffer === -1 ? 1000 : renderBuffer,
+    tailSize: renderBuffer === -1 ? 100 : Math.max(renderBuffer, 50),
+    pollIntervalMs: 200,
+  });
 
   // Tab state for CAN frames view - stored in UI store so analysis can switch to it
   const activeTab = useDiscoveryUIStore((s) => s.framesViewActiveTab);
@@ -398,22 +417,61 @@ function DiscoveryFramesView({
   // Determine which result to use based on mode
   let visibleFrames: (FrameMessage & { hexBytes: string[] })[];
   let filteredCount: number;
+  let effectiveCurrentPage: number;
+  let effectiveTotalPages: number;
+  let isBufferFirstLoading = false;
 
-  if (bufferMode.enabled && !isStreaming) {
-    // Buffer mode: use frames fetched from backend (filtered by selection)
+  // Keep stable reference to hook's setCurrentPage
+  const hookSetCurrentPageRef = useRef(bufferFrameView.setCurrentPage);
+  useEffect(() => {
+    hookSetCurrentPageRef.current = bufferFrameView.setCurrentPage;
+  }, [bufferFrameView.setCurrentPage]);
+
+  // Use stable callbacks for page changes to avoid infinite loops in useEffect dependencies
+  const setCurrentPageStable = useCallback((page: number) => {
+    if (useBufferFirstMode) {
+      hookSetCurrentPageRef.current(page);
+    } else {
+      setCurrentPage(page);
+    }
+  }, [useBufferFirstMode]);
+
+  if (useBufferFirstMode) {
+    // Buffer-first mode: use the hook for everything
+    visibleFrames = bufferFrameView.frames;
+    filteredCount = bufferFrameView.totalCount;
+    effectiveCurrentPage = bufferFrameView.currentPage;
+    effectiveTotalPages = bufferFrameView.totalPages;
+    isBufferFirstLoading = bufferFrameView.isLoading;
+  } else if (bufferMode.enabled && !isStreaming) {
+    // Legacy buffer mode: use frames fetched from backend (filtered by selection)
     visibleFrames = bufferModeFrames;
-    filteredCount = bufferModeTotalCount; // This reflects the filtered count from backend
+    filteredCount = bufferModeTotalCount;
+    effectiveCurrentPage = currentPage;
+    const pageSize = renderBuffer === -1 ? Math.max(1, filteredCount) : renderBuffer;
+    effectiveTotalPages = filteredCount > 0 && pageSize > 0 ? Math.ceil(filteredCount / pageSize) : 1;
   } else if (isStreaming) {
     // Streaming mode
     const result = streamingResult ?? { visibleFrames: [], filteredCount: -1 };
     visibleFrames = result.visibleFrames;
     filteredCount = result.filteredCount;
+    effectiveCurrentPage = currentPage;
+    effectiveTotalPages = 1;
   } else {
     // Stopped mode: use deferred result
     const result = deferredResult ?? { visibleFrames: [], filteredCount: 0 };
     visibleFrames = result.visibleFrames;
     filteredCount = result.filteredCount;
+    effectiveCurrentPage = currentPage;
+    const pageSize = renderBuffer === -1 ? Math.max(1, filteredCount) : renderBuffer;
+    effectiveTotalPages = filteredCount > 0 && pageSize > 0 ? Math.ceil(filteredCount / pageSize) : 1;
   }
+
+  // Use refs to avoid infinite loops in useEffect when using effectiveCurrentPage
+  const effectiveCurrentPageRef = useRef(effectiveCurrentPage);
+  useEffect(() => {
+    effectiveCurrentPageRef.current = effectiveCurrentPage;
+  }, [effectiveCurrentPage]);
 
   // Ensure frames are always sorted by timestamp ascending (oldest at top)
   // regardless of playback direction. Track if we reversed for index mapping.
@@ -430,7 +488,7 @@ function DiscoveryFramesView({
 
   // Calculate pagination values (only meaningful when not streaming)
   const pageSize = renderBuffer === -1 ? Math.max(1, filteredCount) : renderBuffer;
-  const totalPages = filteredCount > 0 && pageSize > 0 ? Math.ceil(filteredCount / pageSize) : 1;
+  const totalPages = useBufferFirstMode ? effectiveTotalPages : (filteredCount > 0 && pageSize > 0 ? Math.ceil(filteredCount / pageSize) : 1);
 
   // Clamp current page to valid range when frames change
   const validPage = Math.min(currentPage, Math.max(0, totalPages - 1));
@@ -477,14 +535,40 @@ function DiscoveryFramesView({
   // Handle page size change - reset to page 0
   const handlePageSizeChange = useCallback((size: number) => {
     setRenderBuffer(size);
-    setCurrentPage(0);
-  }, [setRenderBuffer]);
+    // Reset page using the stable callback
+    setCurrentPageStable(0);
+  }, [setRenderBuffer, setCurrentPageStable]);
+
+  // Keep stable reference to hook's navigateToTimestamp
+  const hookNavigateToTimestampRef = useRef(bufferFrameView.navigateToTimestamp);
+  useEffect(() => {
+    hookNavigateToTimestampRef.current = bufferFrameView.navigateToTimestamp;
+  }, [bufferFrameView.navigateToTimestamp]);
+
+  // Handle timeline scrub - use hook's navigateToTimestamp in buffer-first mode
+  const handleBufferFirstScrub = useCallback(async (timeUs: number) => {
+    await hookNavigateToTimestampRef.current(timeUs);
+    onScrub?.(timeUs);
+  }, [onScrub]);
 
   // Compute timeline props based on mode
   const timelineProps = useMemo(() => {
-    // Buffer mode: use buffer metadata for time range (both stopped and streaming)
+    // Buffer-first mode: use hook's time range
+    if (useBufferFirstMode && bufferFrameView.timeRange) {
+      const currentPos = isStreaming
+        ? (currentTimeUs ?? bufferFrameView.timeRange.startUs)
+        : (visibleFrames.length > 0 ? visibleFrames[0].timestamp_us : bufferFrameView.timeRange.startUs);
+      return {
+        show: true,
+        minTimeUs: bufferFrameView.timeRange.startUs,
+        maxTimeUs: bufferFrameView.timeRange.endUs,
+        currentTimeUs: currentPos,
+        onScrub: handleBufferFirstScrub,
+        disabled: false,
+      };
+    }
+    // Legacy buffer mode: use buffer metadata for time range
     if (bufferMode.enabled && bufferMetadata?.start_time_us != null && bufferMetadata?.end_time_us != null) {
-      // When streaming, use the live currentTimeUs; when stopped, use first visible frame or start
       const currentPos = isStreaming
         ? (currentTimeUs ?? bufferMetadata.start_time_us)
         : (bufferModeFrames.length > 0 ? bufferModeFrames[0].timestamp_us : bufferMetadata.start_time_us);
@@ -509,30 +593,30 @@ function DiscoveryFramesView({
       };
     }
     return { show: false, minTimeUs: 0, maxTimeUs: 0, currentTimeUs: 0, onScrub: () => {}, disabled: true };
-  }, [bufferMode.enabled, isStreaming, bufferMetadata, bufferModeFrames, frames, currentTimeUs, handleBufferScrub, handleNormalScrub]);
+  }, [useBufferFirstMode, bufferFrameView.timeRange, bufferMode.enabled, isStreaming, bufferMetadata, bufferModeFrames, frames, currentTimeUs, visibleFrames, handleBufferFirstScrub, handleBufferScrub, handleNormalScrub]);
 
   // Auto-navigate to the page containing the current frame during playback
   useEffect(() => {
     if (currentFrameIndex == null || isStreaming || renderBuffer === -1) return;
 
-    const effectivePageSize = renderBuffer;
-    const pageStart = currentPage * effectivePageSize;
-    const pageEnd = pageStart + effectivePageSize - 1;
+    const pageSizeForCalc = renderBuffer;
+    const pageStart = effectiveCurrentPageRef.current * pageSizeForCalc;
+    const pageEnd = pageStart + pageSizeForCalc - 1;
 
     // If current frame is not on this page, navigate to the correct page
     if (currentFrameIndex < pageStart || currentFrameIndex > pageEnd) {
-      const targetPage = Math.floor(currentFrameIndex / effectivePageSize);
-      setCurrentPage(targetPage);
+      const targetPage = Math.floor(currentFrameIndex / pageSizeForCalc);
+      setCurrentPageStable(targetPage);
     }
-  }, [currentFrameIndex, currentPage, renderBuffer, isStreaming]);
+  }, [currentFrameIndex, setCurrentPageStable, renderBuffer, isStreaming]);
 
   // Calculate which row to highlight based on current frame index
   // Returns the index within visibleFrames, or null if current frame is not visible
   const highlightedRowIndex = useMemo(() => {
     if (currentFrameIndex == null || visibleFrames.length === 0) return null;
 
-    const effectivePageSize = renderBuffer === -1 ? visibleFrames.length : renderBuffer;
-    const pageStart = currentPage * effectivePageSize;
+    const pageSizeForCalc = renderBuffer === -1 ? visibleFrames.length : renderBuffer;
+    const pageStart = effectiveCurrentPage * pageSizeForCalc;
     const pageEnd = pageStart + visibleFrames.length - 1;
 
     // Check if current frame is on this page
@@ -665,17 +749,17 @@ function DiscoveryFramesView({
       toolbar={
         showToolbar
           ? {
-              currentPage,
-              totalPages,
+              currentPage: effectiveCurrentPage,
+              totalPages: effectiveTotalPages,
               pageSize: renderBuffer,
               pageSizeOptions: FRAME_PAGE_SIZE_OPTIONS,
-              onPageChange: setCurrentPage,
+              onPageChange: setCurrentPageStable,
               onPageSizeChange: handlePageSizeChange,
-              loading: isFiltering || bufferModeLoading,
+              loading: isFiltering || bufferModeLoading || isBufferFirstLoading,
               disabled: isStreaming,
               leftContent: timeRangeInputs,
               centerContent: playbackControls,
-              hidePagination: isStreaming || isFiltering || bufferModeLoading,
+              hidePagination: isStreaming || isFiltering || bufferModeLoading || isBufferFirstLoading,
             }
           : undefined
       }
@@ -708,7 +792,7 @@ function DiscoveryFramesView({
           showBus={showBusColumn}
           highlightedRowIndex={highlightedRowIndex}
           onRowClick={onFrameSelect ? handleRowClick : undefined}
-          pageStartIndex={currentPage * (renderBuffer === -1 ? visibleFrames.length : renderBuffer)}
+          pageStartIndex={effectiveCurrentPage * (renderBuffer === -1 ? visibleFrames.length : renderBuffer)}
           framesReversed={framesWereReversed}
           pageFrameCount={visibleFrames.length}
         />

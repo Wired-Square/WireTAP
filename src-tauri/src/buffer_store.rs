@@ -542,6 +542,74 @@ pub fn get_buffer_frames_paginated_filtered(
     (Vec::new(), 0)
 }
 
+/// Response from tail fetch operation
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct TailResponse {
+    pub frames: Vec<FrameMessage>,
+    pub total_filtered_count: usize,
+    pub buffer_end_time_us: Option<u64>,
+}
+
+/// Get the most recent N frames from a buffer, optionally filtered by frame IDs.
+/// Returns the frames in chronological order (oldest first) for display.
+pub fn get_buffer_frames_tail(
+    id: &str,
+    limit: usize,
+    selected_ids: &std::collections::HashSet<u32>,
+) -> TailResponse {
+    let registry = BUFFER_REGISTRY.read().unwrap();
+
+    if let Some(buffer) = registry.buffers.get(id) {
+        if let BufferData::Frames(frames) = &buffer.data {
+            let buffer_end_time_us = buffer.metadata.end_time_us;
+
+            // If no selection filter, return last N frames directly
+            if selected_ids.is_empty() {
+                let total = frames.len();
+                let start = total.saturating_sub(limit);
+                let result = frames[start..].to_vec();
+                return TailResponse {
+                    frames: result,
+                    total_filtered_count: total,
+                    buffer_end_time_us,
+                };
+            }
+
+            // Filter frames by selected IDs, then take last N
+            // For efficiency, iterate backwards and collect up to limit matches
+            let mut result: Vec<FrameMessage> = Vec::with_capacity(limit);
+            let mut total_filtered = 0usize;
+
+            for frame in frames.iter().rev() {
+                if selected_ids.contains(&frame.frame_id) {
+                    total_filtered += 1;
+                    if result.len() < limit {
+                        result.push(frame.clone());
+                    }
+                }
+            }
+
+            // We collected in reverse order, so reverse to get chronological order
+            result.reverse();
+
+            // Count remaining filtered frames we didn't collect
+            // (We already counted all matching frames in total_filtered)
+
+            return TailResponse {
+                frames: result,
+                total_filtered_count: total_filtered,
+                buffer_end_time_us,
+            };
+        }
+    }
+
+    TailResponse {
+        frames: Vec::new(),
+        total_filtered_count: 0,
+        buffer_end_time_us: None,
+    }
+}
+
 /// Frame info extracted from a buffer
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct BufferFrameInfo {

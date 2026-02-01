@@ -4,7 +4,7 @@
 // Handles CSV import, buffer CRUD, pagination, and multi-buffer registry.
 
 use crate::{
-    buffer_store::{self, BufferMetadata, BufferFrameInfo, TimestampedByte},
+    buffer_store::{self, BufferMetadata, BufferFrameInfo, TimestampedByte, TailResponse},
     io::{self, FrameMessage},
 };
 
@@ -107,6 +107,20 @@ pub async fn get_buffer_frames_paginated_filtered(
         offset,
         limit,
     })
+}
+
+/// Get the most recent N frames from the active buffer, optionally filtered by frame IDs.
+/// Used for "tail mode" during streaming - shows latest frames without frontend accumulation.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_buffer_frames_tail(
+    limit: usize,
+    selected_ids: Vec<u32>,
+) -> Result<TailResponse, String> {
+    let buffer_id = buffer_store::get_active_buffer_id()
+        .ok_or_else(|| "No active buffer".to_string())?;
+
+    let selected_set: std::collections::HashSet<u32> = selected_ids.into_iter().collect();
+    Ok(buffer_store::get_buffer_frames_tail(&buffer_id, limit, &selected_set))
 }
 
 /// Get unique frame IDs and their metadata from the buffer

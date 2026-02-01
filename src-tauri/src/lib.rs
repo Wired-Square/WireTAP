@@ -617,6 +617,7 @@ pub fn run() {
             buffers::get_buffer_frames_paginated,
             buffers::get_buffer_frames_paginated_filtered,
             buffers::get_buffer_frames_paginated_by_id,
+            buffers::get_buffer_frames_tail,
             buffers::get_buffer_frame_info,
             buffers::find_buffer_offset_for_timestamp,
             // Multi-buffer registry API
