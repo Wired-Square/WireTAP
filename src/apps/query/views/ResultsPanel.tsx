@@ -3,7 +3,7 @@
 // Results display panel. Shows query results in a timeline view with
 // click-to-ingest functionality. Supports grouped results by query.
 
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect } from "react";
 import { PlayCircle, Download, AlertCircle, Database, Bookmark, FileDown } from "lucide-react";
 import {
   QUERY_TYPE_INFO,
@@ -75,11 +75,9 @@ export default function ResultsPanel({
 
   // Reset page when query changes
   const queryId = selectedQuery?.id;
-  const [lastQueryId, setLastQueryId] = useState<string | null>(null);
-  if (queryId !== lastQueryId) {
-    setLastQueryId(queryId ?? null);
+  useEffect(() => {
     setCurrentPage(0);
-  }
+  }, [queryId]);
 
   // Format timestamp for display (short form: date + time with milliseconds)
   const formatTimestamp = useCallback((timestampUs: number) => {
