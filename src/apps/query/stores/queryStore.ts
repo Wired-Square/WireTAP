@@ -4,10 +4,22 @@
 // results display, and query queue.
 
 import { create } from "zustand";
-import { queryByteChanges, queryFrameChanges, queryMirrorValidation, cancelQuery } from "../../../api/dbquery";
+import {
+  queryByteChanges,
+  queryFrameChanges,
+  queryMirrorValidation,
+  cancelQuery,
+  queryActivity,
+  cancelBackend,
+  terminateBackend,
+  type DatabaseActivity,
+  type DatabaseActivityResult,
+} from "../../../api/dbquery";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { ParsedCatalog } from "../../../utils/catalogParser";
+
+export type { DatabaseActivity, DatabaseActivityResult };
 
 /** Available query types */
 export type QueryType =
@@ -233,6 +245,15 @@ interface QueryState {
   parsedCatalog: ParsedCatalog | null;
   selectedSignal: SelectedSignal | null;
 
+  // Database activity state (Stats tab)
+  activity: {
+    queries: DatabaseActivity[];
+    sessions: DatabaseActivity[];
+    isLoading: boolean;
+    error: string | null;
+    lastRefresh: number | null;
+  };
+
   // Actions
   setIoProfile: (profile: string | null) => void;
   setQueryType: (type: QueryType) => void;
@@ -257,6 +278,11 @@ interface QueryState {
   setCatalogPath: (path: string | null) => void;
   setParsedCatalog: (catalog: ParsedCatalog | null) => void;
   setSelectedSignal: (signal: SelectedSignal | null) => void;
+
+  // Activity actions (Stats tab)
+  refreshActivity: (profileId: string) => Promise<void>;
+  cancelRunningQuery: (profileId: string, pid: number) => Promise<boolean>;
+  terminateSession: (profileId: string, pid: number) => Promise<boolean>;
 }
 
 const initialQueryParams: QueryParams = {
@@ -294,6 +320,15 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   catalogPath: null,
   parsedCatalog: null,
   selectedSignal: null,
+
+  // Activity state (Stats tab)
+  activity: {
+    queries: [],
+    sessions: [],
+    isLoading: false,
+    error: null,
+    lastRefresh: null,
+  },
 
   // Actions
   setIoProfile: (profile) => set({ ioProfile: profile }),
@@ -561,6 +596,62 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       }));
     } else {
       set({ selectedSignal: null });
+    }
+  },
+
+  // Activity actions (Stats tab)
+  refreshActivity: async (profileId: string) => {
+    set((state) => ({
+      activity: { ...state.activity, isLoading: true, error: null },
+    }));
+
+    try {
+      const result = await queryActivity(profileId);
+      set({
+        activity: {
+          queries: result.queries,
+          sessions: result.sessions,
+          isLoading: false,
+          error: null,
+          lastRefresh: Date.now(),
+        },
+      });
+    } catch (e) {
+      set((state) => ({
+        activity: {
+          ...state.activity,
+          isLoading: false,
+          error: e instanceof Error ? e.message : String(e),
+        },
+      }));
+    }
+  },
+
+  cancelRunningQuery: async (profileId: string, pid: number) => {
+    try {
+      const success = await cancelBackend(profileId, pid);
+      if (success) {
+        // Refresh activity to show updated state
+        setTimeout(() => get().refreshActivity(profileId), 500);
+      }
+      return success;
+    } catch (e) {
+      console.error("Failed to cancel query:", e);
+      return false;
+    }
+  },
+
+  terminateSession: async (profileId: string, pid: number) => {
+    try {
+      const success = await terminateBackend(profileId, pid);
+      if (success) {
+        // Refresh activity to show updated state
+        setTimeout(() => get().refreshActivity(profileId), 500);
+      }
+      return success;
+    } catch (e) {
+      console.error("Failed to terminate session:", e);
+      return false;
     }
   },
 }));

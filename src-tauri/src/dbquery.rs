@@ -155,6 +155,40 @@ pub struct MirrorValidationQueryResult {
     pub stats: QueryStats,
 }
 
+/// A running query or session from pg_stat_activity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseActivity {
+    /// Process ID (pid) of the backend
+    pub pid: i32,
+    /// Database name
+    pub database: Option<String>,
+    /// Username
+    pub username: Option<String>,
+    /// Application name (e.g., "CANdor Query")
+    pub application_name: Option<String>,
+    /// Client address
+    pub client_addr: Option<String>,
+    /// Current state (active, idle, idle in transaction, etc.)
+    pub state: Option<String>,
+    /// Current query text (truncated)
+    pub query: Option<String>,
+    /// When the query started (ISO 8601)
+    pub query_start: Option<String>,
+    /// How long the query has been running in seconds
+    pub duration_secs: Option<f64>,
+    /// Whether this is a query we can cancel (our own connection)
+    pub is_cancellable: bool,
+}
+
+/// Result of querying database activity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseActivityResult {
+    /// Active queries running on the database
+    pub queries: Vec<DatabaseActivity>,
+    /// Active sessions connected to the database
+    pub sessions: Vec<DatabaseActivity>,
+}
+
 /// Build PostgreSQL connection string from profile
 fn build_connection_string(profile: &IOProfile, password: Option<String>) -> String {
     let conn = &profile.connection;
@@ -756,4 +790,202 @@ pub async fn db_query_mirror_validation(
         },
         results,
     })
+}
+
+/// Query pg_stat_activity for running queries and active sessions
+///
+/// Returns information about queries currently running on the database
+/// and all active sessions (connections).
+#[tauri::command]
+pub async fn db_query_activity(
+    app: AppHandle,
+    profile_id: String,
+) -> Result<DatabaseActivityResult, String> {
+    println!("[dbquery] db_query_activity called for profile '{}'", profile_id);
+
+    // Load settings to get profile
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    // Get password and connect
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Get the database name from the profile for filtering
+    let database_name = profile.connection.get("database")
+        .and_then(|v| v.as_str())
+        .unwrap_or("candor");
+
+    // Query pg_stat_activity for this database
+    // We filter to the specific database and show both active queries and idle sessions
+    let query = r#"
+        SELECT
+            pid,
+            datname as database,
+            usename as username,
+            application_name,
+            client_addr::text,
+            state,
+            LEFT(query, 500) as query,
+            query_start::text,
+            EXTRACT(EPOCH FROM (now() - query_start))::float8 as duration_secs,
+            pg_backend_pid() = pid as is_own_connection
+        FROM pg_stat_activity
+        WHERE datname = $1
+          AND pid != pg_backend_pid()
+        ORDER BY
+            CASE WHEN state = 'active' THEN 0 ELSE 1 END,
+            query_start DESC NULLS LAST
+    "#;
+
+    let rows = client
+        .query(query, &[&database_name])
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    let mut queries = Vec::new();
+    let mut sessions = Vec::new();
+
+    for row in &rows {
+        let state: Option<String> = row.get("state");
+        let is_active = state.as_deref() == Some("active");
+
+        let activity = DatabaseActivity {
+            pid: row.get("pid"),
+            database: row.get("database"),
+            username: row.get("username"),
+            application_name: row.get("application_name"),
+            client_addr: row.get("client_addr"),
+            state: state.clone(),
+            query: row.get("query"),
+            query_start: row.get("query_start"),
+            duration_secs: row.get("duration_secs"),
+            // Users can cancel any query in the same database they have access to
+            is_cancellable: is_active,
+        };
+
+        if is_active {
+            queries.push(activity);
+        } else {
+            sessions.push(activity);
+        }
+    }
+
+    println!("[dbquery] Found {} active queries, {} idle sessions for database '{}'",
+        queries.len(), sessions.len(), database_name);
+
+    Ok(DatabaseActivityResult { queries, sessions })
+}
+
+/// Cancel a running query by backend PID using pg_cancel_backend
+///
+/// This sends a SIGINT to the backend process, which will cancel the current query
+/// but keep the connection alive.
+#[tauri::command]
+pub async fn db_cancel_backend(
+    app: AppHandle,
+    profile_id: String,
+    pid: i32,
+) -> Result<bool, String> {
+    println!("[dbquery] db_cancel_backend called for pid {} on profile '{}'", pid, profile_id);
+
+    // Load settings to get profile
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    // Get password and connect
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Use pg_cancel_backend to cancel the query
+    // This is safer than pg_terminate_backend as it only cancels the current query
+    let row = client
+        .query_one("SELECT pg_cancel_backend($1)", &[&pid])
+        .await
+        .map_err(|e| format!("Failed to cancel backend: {}", e))?;
+
+    let cancelled: bool = row.get(0);
+    println!("[dbquery] pg_cancel_backend({}) returned: {}", pid, cancelled);
+
+    Ok(cancelled)
+}
+
+/// Terminate a backend session by PID using pg_terminate_backend
+///
+/// This terminates the entire connection, not just the current query.
+/// Use with caution.
+#[tauri::command]
+pub async fn db_terminate_backend(
+    app: AppHandle,
+    profile_id: String,
+    pid: i32,
+) -> Result<bool, String> {
+    println!("[dbquery] db_terminate_backend called for pid {} on profile '{}'", pid, profile_id);
+
+    // Load settings to get profile
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    // Get password and connect
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Use pg_terminate_backend to terminate the connection
+    let row = client
+        .query_one("SELECT pg_terminate_backend($1)", &[&pid])
+        .await
+        .map_err(|e| format!("Failed to terminate backend: {}", e))?;
+
+    let terminated: bool = row.get(0);
+    println!("[dbquery] pg_terminate_backend({}) returned: {}", pid, terminated);
+
+    Ok(terminated)
 }

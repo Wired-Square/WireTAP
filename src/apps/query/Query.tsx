@@ -21,6 +21,7 @@ import QueryTopBar from "./views/QueryTopBar";
 import QueryBuilderPanel from "./views/QueryBuilderPanel";
 import QueuePanel from "./views/QueuePanel";
 import ResultsPanel from "./views/ResultsPanel";
+import StatsPanel from "./views/StatsPanel";
 import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
 import ErrorDialog from "../../dialogs/ErrorDialog";
 import CatalogPickerDialog from "../decoder/dialogs/CatalogPickerDialog";
@@ -326,6 +327,7 @@ export default function Query() {
         count: selectedQueryResultCount > 0 ? selectedQueryResultCount : undefined,
         countColor: "green" as const,
       },
+      { id: "stats", label: "Stats" },
     ],
     [queueCount, pendingCount, selectedQueryResultCount]
   );
@@ -394,6 +396,7 @@ export default function Query() {
             onBookmark={handleBookmarkQuery}
           />
         )}
+        {activeTab === "stats" && <StatsPanel profileId={ioProfile} />}
       </AppTabView>
 
       {/* IO Reader Picker Dialog - connect mode for database selection */}
