@@ -6,6 +6,16 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Session Manager App**: New visual session management app with Node-RED style interface showing IO sessions as interactive nodes. Features include:
+  - Source nodes (left): IO profiles feeding sessions, colour-coded by type (purple for realtime, green for recorded)
+  - Session nodes (centre): Show session state (running/stopped/paused), listener count, buffer info, and device type
+  - Listener nodes (right): Apps connected to each session
+  - Animated edges showing active data flow between sources, sessions, and listeners
+  - Pan/zoom canvas with minimap and controls
+  - Detail panel showing selected node info with session control actions (start/stop/pause/destroy)
+  - Auto-refresh with 2-second interval (toggleable)
+  - Available from the dashboard launcher and logo menu
+- **Stopped Sessions Now Joinable**: Sessions in "stopped" state now appear in the IO picker's Active Sessions list. Previously only "running" or "starting" sessions were shown. Stopped sessions display an amber "Stopped" badge instead of the green "Live" badge.
 - **Query App in Dashboard Launcher**: Query app now appears in the dashboard launcher screen alongside other apps. Added global launcher button styles (`launcherButton`, `launcherButtonLabel`, `launcherGrid`) in `buttonStyles.ts` for consistent, responsive app launcher buttons.
 - **Buffer-First Frame Display**: Discovery app now uses a buffer-first approach for frame display, improving UI responsiveness with large frame counts. Features include:
   - Backend tail fetch API (`get_buffer_frames_tail`) for efficient latest-N-frames retrieval

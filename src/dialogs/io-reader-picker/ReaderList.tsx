@@ -181,9 +181,9 @@ export default function ReaderList({
     );
   }
 
-  // Filter active sessions to only show running ones (all types combined)
-  const runningSessions = activeMultiSourceSessions.filter(
-    (s) => s.state === "running" || s.state === "starting"
+  // Filter active sessions to show joinable ones (running, starting, or stopped)
+  const joinableSessions = activeMultiSourceSessions.filter(
+    (s) => s.state === "running" || s.state === "starting" || s.state === "stopped"
   );
 
   // Get profile info for single-profile sessions
@@ -250,15 +250,15 @@ export default function ReaderList({
       </div>
 
       {/* Active Sessions (all types combined - join existing) */}
-      {runningSessions.length > 0 && onSelectMultiSourceSession && (
+      {joinableSessions.length > 0 && onSelectMultiSourceSession && (
         <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <Play className={iconXs} />
             <span>Active Sessions</span>
-            <span className={badgeSmallSuccess}>{runningSessions.length}</span>
+            <span className={badgeSmallSuccess}>{joinableSessions.length}</span>
           </div>
           <div className="px-3 pb-2 space-y-1">
-            {runningSessions.map((session) => {
+            {joinableSessions.map((session) => {
               const isSelected = checkedReaderId === session.sessionId;
               const info = getSessionDisplayInfo(session);
               const IconComponent = info.icon;
@@ -282,10 +282,16 @@ export default function ReaderList({
                   <div className="flex-1 min-w-0">
                     <div className={`${textMedium} truncate flex items-center gap-2`}>
                       <span>{info.displayName}</span>
-                      <Radio className={`${iconXs} text-green-500 animate-pulse`} />
+                      {session.state !== "stopped" && (
+                        <Radio className={`${iconXs} text-green-500 animate-pulse`} />
+                      )}
                     </div>
                     <div className={`${caption} flex items-center gap-2`}>
-                      <span className={badgeSmallSuccess}>Live</span>
+                      {session.state === "stopped" ? (
+                        <span className={badgeSmallWarning}>Stopped</span>
+                      ) : (
+                        <span className={badgeSmallSuccess}>Live</span>
+                      )}
                       <span>{info.subtitle}</span>
                       {/* Show buffer info if available */}
                       {session.bufferId && (
