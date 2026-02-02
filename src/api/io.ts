@@ -365,6 +365,38 @@ export async function resumeReaderSession(sessionId: string): Promise<IOState> {
 }
 
 /**
+ * Suspend a reader session - stops streaming, finalizes buffer, session stays alive.
+ * The buffer remains owned by the session and all joined apps can view it.
+ * Use `resumeReaderSessionFresh` to start streaming again with a new buffer.
+ * Returns the confirmed state after the operation.
+ */
+export async function suspendReaderSession(sessionId: string): Promise<IOState> {
+  return invoke("suspend_reader_session", { session_id: sessionId });
+}
+
+/**
+ * Resume a suspended session with a fresh buffer.
+ * The old buffer is orphaned (becomes available for standalone viewing).
+ * A new buffer is created for the session and streaming starts.
+ * Returns the confirmed state after the operation.
+ */
+export async function resumeReaderSessionFresh(sessionId: string): Promise<IOState> {
+  return invoke("resume_reader_session_fresh", { session_id: sessionId });
+}
+
+/**
+ * Copy a buffer for an app that is detaching from a session.
+ * Creates an orphaned copy of the buffer that can be used standalone.
+ * Returns the new buffer ID.
+ */
+export async function copyBufferForDetach(
+  bufferId: string,
+  newName: string
+): Promise<string> {
+  return invoke("copy_buffer_for_detach", { buffer_id: bufferId, new_name: newName });
+}
+
+/**
  * Update playback speed for a reader session.
  * Only works for readers that support speed control (e.g., PostgreSQL).
  */
@@ -523,6 +555,33 @@ export interface StreamEndedPayload {
   count: number;
   /** Time range of captured data [first_us, last_us] or null if empty */
   time_range: [number, number] | null;
+  /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
+  owning_session_id: string;
+}
+
+/**
+ * Payload sent when a session is suspended (stopped with buffer available).
+ * Event name: session-suspended:{sessionId}
+ */
+export interface SessionSuspendedPayload {
+  /** ID of the session's buffer */
+  buffer_id: string | null;
+  /** Number of items in the buffer */
+  buffer_count: number;
+  /** Buffer type: "frames" or "bytes" */
+  buffer_type: "frames" | "bytes" | null;
+}
+
+/**
+ * Payload sent when a session is resuming with a new buffer.
+ * Apps should clear their frame lists when receiving this event.
+ * Event name: session-resuming:{sessionId}
+ */
+export interface SessionResumingPayload {
+  /** ID of the new buffer being created */
+  new_buffer_id: string;
+  /** ID of the old buffer that was orphaned (available for standalone viewing) */
+  orphaned_buffer_id: string | null;
 }
 
 /**
@@ -562,6 +621,21 @@ export async function transitionToBufferReader(
   speed?: number
 ): Promise<IOCapabilities> {
   return invoke("transition_to_buffer_reader", { session_id: sessionId, speed });
+}
+
+/**
+ * Switch a session to buffer replay mode without destroying it.
+ * This swaps the session's reader to a BufferReader that reads from the session's
+ * owned buffer. All listeners stay connected and can replay the captured data.
+ * Use this after ingest completes to enable playback controls.
+ * @param sessionId The session ID
+ * @param speed Initial playback speed (default: 1.0)
+ */
+export async function switchSessionToBufferReplay(
+  sessionId: string,
+  speed?: number
+): Promise<IOCapabilities> {
+  return invoke("switch_session_to_buffer_replay", { session_id: sessionId, speed });
 }
 
 // ============================================================================

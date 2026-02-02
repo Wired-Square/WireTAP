@@ -16,6 +16,8 @@ import {
   stopReaderSession,
   pauseReaderSession,
   resumeReaderSession,
+  suspendReaderSession,
+  resumeReaderSessionFresh,
   updateReaderSpeed,
   updateReaderTimeRange,
   destroyReaderSession,
@@ -31,6 +33,8 @@ import {
   type IOCapabilities,
   type IOStateType,
   type StreamEndedPayload,
+  type SessionSuspendedPayload,
+  type SessionResumingPayload,
   type StateChangePayload,
   type CanTransmitFrame,
   type TransmitResult,
@@ -219,6 +223,8 @@ export interface Session {
     id: string | null;
     type: "frames" | "bytes" | null;
     count: number;
+    /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
+    owningSessionId: string | null;
   };
   /** Timestamp when session was created/joined */
   createdAt: number;
@@ -286,6 +292,10 @@ export interface SessionCallbacks {
   onSpeedChange?: (speed: number) => void;
   /** Called when session is reconfigured (e.g., bookmark jump) - apps should clear state */
   onReconfigure?: (payload: SessionReconfiguredPayload) => void;
+  /** Called when session is suspended (stopped with buffer available) */
+  onSuspended?: (payload: SessionSuspendedPayload) => void;
+  /** Called when session is resuming with a new buffer - apps should clear their frame lists */
+  onResuming?: (payload: SessionResumingPayload) => void;
 }
 
 /** Session event listeners - one set per session */
@@ -353,6 +363,10 @@ export interface SessionStore {
   pauseSession: (sessionId: string) => Promise<void>;
   /** Resume streaming on a session */
   resumeSession: (sessionId: string) => Promise<void>;
+  /** Suspend a session - stops streaming, finalizes buffer, session stays alive */
+  suspendSession: (sessionId: string) => Promise<void>;
+  /** Resume a suspended session with a fresh buffer (orphans old buffer) */
+  resumeSessionFresh: (sessionId: string) => Promise<void>;
   /** Update playback speed */
   setSessionSpeed: (sessionId: string, speed: number) => Promise<void>;
   /** Update time range */
@@ -533,6 +547,7 @@ async function setupSessionEventListeners(
           id: payload.buffer_id,
           type: payload.buffer_type,
           count: payload.count,
+          owningSessionId: payload.owning_session_id,
         },
       });
       invokeCallbacks(eventListeners, "onStreamEnded", payload);
@@ -586,6 +601,49 @@ async function setupSessionEventListeners(
     }
   );
   unlistenFunctions.push(unlistenSpeedChange);
+
+  // Session suspended (stopped with buffer available, session stays alive)
+  const unlistenSuspended = await listen<SessionSuspendedPayload>(
+    `session-suspended:${sessionId}`,
+    (event) => {
+      const payload = event.payload;
+      updateSession(sessionId, {
+        ioState: "stopped",
+        buffer: {
+          available: payload.buffer_count > 0,
+          id: payload.buffer_id,
+          type: payload.buffer_type,
+          count: payload.buffer_count,
+          owningSessionId: sessionId,
+        },
+      });
+      invokeCallbacks(eventListeners, "onSuspended", payload);
+    }
+  );
+  unlistenFunctions.push(unlistenSuspended);
+
+  // Session resuming (new buffer being created, apps should clear state)
+  const unlistenResuming = await listen<SessionResumingPayload>(
+    `session-resuming:${sessionId}`,
+    (event) => {
+      console.log(`[sessionStore] Session '${sessionId}' resuming with new buffer:`, event.payload);
+      // Clear buffer state since we're starting fresh
+      updateSession(sessionId, {
+        ioState: "starting",
+        stoppedExplicitly: false,
+        streamEndedReason: null,
+        buffer: {
+          available: false,
+          id: event.payload.new_buffer_id,
+          type: null,
+          count: 0,
+          owningSessionId: sessionId,
+        },
+      });
+      invokeCallbacks(eventListeners, "onResuming", event.payload);
+    }
+  );
+  unlistenFunctions.push(unlistenResuming);
 
   return unlistenFunctions;
 }
@@ -803,7 +861,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             errorMessage: msg,
             isOwner: false,
             listenerCount: 0,
-            buffer: { available: false, id: null, type: null, count: 0 },
+            buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null },
             createdAt: Date.now(),
             hasQueuedMessages: false,
             stoppedExplicitly: false,
@@ -938,6 +996,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           id: bufferId,
           type: bufferType,
           count: 0,
+          owningSessionId: null,
         },
         createdAt: existingSession?.createdAt ?? Date.now(),
         hasQueuedMessages: existingSession?.hasQueuedMessages ?? false,
@@ -1255,6 +1314,44 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }));
   },
 
+  suspendSession: async (sessionId) => {
+    const confirmedState = await suspendReaderSession(sessionId);
+    set((s) => ({
+      sessions: {
+        ...s.sessions,
+        [sessionId]: {
+          ...s.sessions[sessionId],
+          ioState: getStateType(confirmedState),
+        },
+      },
+    }));
+  },
+
+  resumeSessionFresh: async (sessionId) => {
+    // Clear stopped flags before resuming
+    set((s) => ({
+      sessions: {
+        ...s.sessions,
+        [sessionId]: {
+          ...s.sessions[sessionId],
+          stoppedExplicitly: false,
+          streamEndedReason: null,
+        },
+      },
+    }));
+
+    const confirmedState = await resumeReaderSessionFresh(sessionId);
+    set((s) => ({
+      sessions: {
+        ...s.sessions,
+        [sessionId]: {
+          ...s.sessions[sessionId],
+          ioState: getStateType(confirmedState),
+        },
+      },
+    }));
+  },
+
   setSessionSpeed: async (sessionId, speed) => {
     await updateReaderSpeed(sessionId, speed);
   },
@@ -1278,7 +1375,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           ...s.sessions[sessionId],
           capabilities,
           ioState: "stopped",
-          buffer: { available: false, id: null, type: null, count: 0 },
+          buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null },
         },
       },
     }));

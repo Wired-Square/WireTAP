@@ -484,6 +484,28 @@ pub struct StreamEndedPayload {
     pub count: usize,
     /// Time range of buffered data (first_us, last_us)
     pub time_range: Option<(u64, u64)>,
+    /// Session ID that owns this buffer (for detecting ingest/cross-app buffers)
+    pub owning_session_id: String,
+}
+
+/// Payload emitted when a session is suspended (stopped with buffer available)
+#[derive(Clone, Debug, Serialize)]
+pub struct SessionSuspendedPayload {
+    /// ID of the session's buffer
+    pub buffer_id: Option<String>,
+    /// Number of items in the buffer
+    pub buffer_count: usize,
+    /// Buffer type: "frames" or "bytes"
+    pub buffer_type: Option<String>,
+}
+
+/// Payload emitted when a session is resuming with a new buffer
+#[derive(Clone, Debug, Serialize)]
+pub struct SessionResumingPayload {
+    /// ID of the new buffer being created
+    pub new_buffer_id: String,
+    /// ID of the old buffer that was orphaned (available for standalone viewing)
+    pub orphaned_buffer_id: Option<String>,
 }
 
 /// Payload emitted when session state changes
@@ -824,6 +846,7 @@ pub fn emit_stream_ended(
             buffer_type,
             count,
             time_range,
+            owning_session_id: session_id.to_string(),
         },
     );
     eprintln!(
@@ -1256,6 +1279,131 @@ pub async fn stop_session(session_id: &str) -> Result<IOState, String> {
     Ok(current)
 }
 
+/// Suspend a reader session - stops streaming, finalizes buffer, session stays alive.
+/// The buffer remains owned by the session and all joined apps can view it.
+/// Use `resume_session_fresh` to start streaming again with a new buffer.
+/// Returns the confirmed state after the operation.
+pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    let previous = session.device.state();
+
+    // Idempotency: if already stopped, return success
+    if matches!(previous, IOState::Stopped) {
+        return Ok(previous);
+    }
+
+    // Stop the device
+    session.device.stop().await?;
+
+    // Finalize the buffer but DON'T orphan it - session still owns it
+    let metadata = buffer_store::finalize_buffer();
+
+    // Emit session-suspended event with buffer info
+    let (buffer_id, buffer_count, buffer_type) = match metadata {
+        Some(ref m) => {
+            let type_str = match m.buffer_type {
+                buffer_store::BufferType::Frames => "frames",
+                buffer_store::BufferType::Bytes => "bytes",
+            };
+            (Some(m.id.clone()), m.count, Some(type_str.to_string()))
+        }
+        None => (None, 0, None),
+    };
+
+    emit_to_session(
+        &session.app,
+        "session-suspended",
+        session_id,
+        SessionSuspendedPayload {
+            buffer_id,
+            buffer_count,
+            buffer_type,
+        },
+    );
+
+    let current = session.device.state();
+    if previous != current {
+        emit_state_change(&session.app, session_id, &previous, &current);
+    }
+
+    eprintln!(
+        "[reader] suspend_session('{}') - buffer finalized, session stays alive",
+        session_id
+    );
+
+    Ok(current)
+}
+
+/// Resume a suspended session with a fresh buffer.
+/// The old buffer is orphaned (becomes available for standalone viewing).
+/// A new buffer is created for the session and streaming starts.
+/// Returns the confirmed state after the operation.
+pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    let previous = session.device.state();
+
+    // Must be stopped to resume with new buffer
+    if !matches!(previous, IOState::Stopped) {
+        return Err(format!(
+            "Session must be stopped to resume with new buffer (current: {:?})",
+            previous
+        ));
+    }
+
+    // Get the current buffer ID before orphaning
+    let old_buffer_id = buffer_store::get_buffer_for_session(session_id);
+
+    // Orphan the old buffer (makes it standalone, data preserved)
+    buffer_store::orphan_buffers_for_session(session_id);
+
+    // Create a new buffer for the session
+    let timestamp = chrono::Local::now().format("%H%M%S").to_string();
+    let buffer_name = format!("{}-{}", session_id, timestamp);
+    let new_buffer_id = buffer_store::create_buffer(buffer_store::BufferType::Frames, buffer_name);
+
+    // Assign the new buffer to this session
+    if let Err(e) = buffer_store::set_buffer_owner(&new_buffer_id, session_id) {
+        eprintln!(
+            "[reader] resume_session_fresh - failed to set buffer owner: {}",
+            e
+        );
+    }
+
+    // Emit session-resuming event so apps clear their frame lists
+    emit_to_session(
+        &session.app,
+        "session-resuming",
+        session_id,
+        SessionResumingPayload {
+            new_buffer_id: new_buffer_id.clone(),
+            orphaned_buffer_id: old_buffer_id,
+        },
+    );
+
+    // Start the device
+    session.device.start().await?;
+
+    let current = session.device.state();
+    if previous != current {
+        emit_state_change(&session.app, session_id, &previous, &current);
+    }
+
+    eprintln!(
+        "[reader] resume_session_fresh('{}') - old buffer orphaned, new buffer '{}' created",
+        session_id, new_buffer_id
+    );
+
+    Ok(current)
+}
+
 /// Pause a reader session
 /// Returns the confirmed state after the operation.
 pub async fn pause_session(session_id: &str) -> Result<IOState, String> {
@@ -1416,6 +1564,50 @@ pub async fn update_session_direction(session_id: &str, reverse: bool) -> Result
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
     session.device.set_direction(reverse)
+}
+
+/// Switch a session to buffer replay mode.
+/// This replaces the session's reader with a BufferReader that reads from the session's
+/// owned buffer. The session stays alive and all listeners remain connected.
+/// Use this after ingest completes to enable playback without destroying the session.
+pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
+    // Get the session's owned buffer
+    let buffer_id = crate::buffer_store::get_buffer_for_session(session_id)
+        .ok_or_else(|| format!("No buffer found for session '{}'", session_id))?;
+
+    eprintln!(
+        "[io] switch_to_buffer_replay: session='{}', buffer='{}', speed={}",
+        session_id, buffer_id, speed
+    );
+
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    // Stop the current reader
+    let _ = session.device.stop().await;
+
+    // Create a new BufferReader that reads from the session's buffer
+    let new_reader = BufferReader::new_with_buffer(
+        app.clone(),
+        session_id.to_string(),
+        buffer_id,
+        speed,
+    );
+
+    // Get capabilities before replacing
+    let capabilities = new_reader.capabilities();
+
+    // Replace the device
+    session.device = Box::new(new_reader);
+
+    eprintln!(
+        "[io] switch_to_buffer_replay: session='{}' now in buffer replay mode",
+        session_id
+    );
+
+    Ok(capabilities)
 }
 
 /// Destroy a reader session

@@ -36,6 +36,8 @@ export interface UseDiscoverySessionHandlersParams {
   // Manager session switching methods
   watchSingleSource: (profileId: string, options: ManagerIngestOptions, reinitializeOptions?: Record<string, unknown>) => Promise<void>;
   watchMultiSource: (profileIds: string[], options: ManagerIngestOptions) => Promise<void>;
+  ingestSingleSource: (profileId: string, options: ManagerIngestOptions) => Promise<void>;
+  ingestMultiSource: (profileIds: string[], options: ManagerIngestOptions) => Promise<void>;
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
   selectMultipleProfiles: (profileIds: string[]) => void;
@@ -86,6 +88,8 @@ export function useDiscoverySessionHandlers({
   resume,
   watchSingleSource,
   watchMultiSource,
+  ingestSingleSource,
+  ingestMultiSource,
   stopWatch,
   selectProfile,
   selectMultipleProfiles,
@@ -258,13 +262,29 @@ export function useDiscoverySessionHandlers({
         const msg = e instanceof Error ? e.message : String(e);
         showError("Watch Error", "Failed to start watch session", msg);
       }
+    } else {
+      // Ingest mode - fast ingest without rendering, auto-transitions to buffer reader
+      try {
+        console.log(`[DiscoverySessionHandlers] Ingest mode - calling ingestSingleSource(${profileId})`);
+
+        // Discovery-specific: set source profile ID
+        setSourceProfileId(profileId);
+
+        // Manager handles: pre-ingest cleanup, session creation with speed=0, frame counting, auto-transition
+        await ingestSingleSource(profileId, options);
+
+        console.log(`[DiscoverySessionHandlers] Ingest mode - started`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        showError("Ingest Error", "Failed to start ingest", msg);
+      }
     }
-    // Ingest mode is handled by useIOSessionManager via startIngest
   }, [
     setSerialConfig,
     setSourceProfileId,
     setFramingConfig,
     watchSingleSource,
+    ingestSingleSource,
     closeIoReaderPicker,
     showError,
   ]);
@@ -276,6 +296,7 @@ export function useDiscoverySessionHandlers({
     options: IngestOptions
   ) => {
     if (closeDialog) {
+      // Watch mode
       // Note: cleanup is handled by manager's onBeforeMultiWatch callback
       try {
         // Manager handles: onBeforeMultiWatch cleanup, startMultiBusSession, speed, watch state
@@ -287,9 +308,24 @@ export function useDiscoverySessionHandlers({
         const msg = e instanceof Error ? e.message : String(e);
         showError("Multi-Bus Error", "Failed to start multi-bus session", msg);
       }
+    } else {
+      // Ingest mode - fast ingest without rendering
+      try {
+        console.log(`[DiscoverySessionHandlers] Multi-source ingest mode - calling ingestMultiSource`);
+
+        // Manager handles: pre-ingest cleanup, session creation with speed=0, frame counting, auto-transition
+        await ingestMultiSource(profileIds, options);
+
+        setShowBusColumn(true);
+        console.log(`[DiscoverySessionHandlers] Multi-source ingest mode - started`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        showError("Multi-Bus Ingest Error", "Failed to start multi-bus ingest", msg);
+      }
     }
   }, [
     watchMultiSource,
+    ingestMultiSource,
     setShowBusColumn,
     closeIoReaderPicker,
     showError,

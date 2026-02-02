@@ -52,8 +52,19 @@ export const BUFFER_PROFILE_ID = "__imported_buffer__";
 // Special ID for CSV external source
 export const CSV_EXTERNAL_ID = "__csv_external__";
 
-// Session ID for ingest operations (exported for use by parent components)
+// Legacy session ID for ingest operations - DEPRECATED
+// Use generateIngestSessionId() instead for unique session IDs
 export const INGEST_SESSION_ID = "__ingest__";
+
+/**
+ * Generate a unique session ID for ingest operations.
+ * Pattern: ingest_{shortId}
+ * Examples: ingest_a7f3c9, ingest_b2c4d6
+ */
+export function generateIngestSessionId(): string {
+  const shortId = Math.random().toString(16).slice(2, 8);
+  return `ingest_${shortId}`;
+}
 
 // Real-time source types (no speed limiting possible)
 const REALTIME_KINDS = ["gvret_tcp", "gvret_usb", "serial", "slcan", "socketcan", "gs_usb", "mqtt"];

@@ -59,7 +59,7 @@ import SingleBusConfig from "./io-reader-picker/SingleBusConfig";
 import {
   localToIsoWithOffset,
   CSV_EXTERNAL_ID,
-  INGEST_SESSION_ID,
+  generateIngestSessionId,
   isRealtimeProfile,
   validateProfileSelection,
 } from "./io-reader-picker";
@@ -219,6 +219,7 @@ export default function IoReaderPickerDialog({
   const [internalIngestProfileId, setInternalIngestProfileId] = useState<string | null>(null);
   const [internalIngestFrameCount, setInternalIngestFrameCount] = useState(0);
   const [internalIngestError, setInternalIngestError] = useState<string | null>(null);
+  const internalIngestSessionIdRef = useRef<string | null>(null);
   const unlistenRefs = useRef<Array<() => void>>([]);
 
   // Currently checked IO reader (for single-select / non-multi-source-capable profiles)
@@ -617,11 +618,15 @@ export default function IoReaderPickerDialog({
       unlistenRefs.current.forEach((unlisten) => unlisten());
       unlistenRefs.current = [];
 
-      // Destroy the ingest session
-      try {
-        await destroyReaderSession(INGEST_SESSION_ID);
-      } catch (e) {
-        console.error("Failed to destroy ingest session:", e);
+      // Destroy the ingest session using the tracked session ID
+      const sessionId = internalIngestSessionIdRef.current;
+      if (sessionId) {
+        try {
+          await destroyReaderSession(sessionId);
+        } catch (e) {
+          console.error("Failed to destroy ingest session:", e);
+        }
+        internalIngestSessionIdRef.current = null;
       }
 
       if (payload.buffer_available && payload.count > 0) {
@@ -653,19 +658,23 @@ export default function IoReaderPickerDialog({
     setInternalIngestError(null);
     setInternalIngestFrameCount(0);
 
+    // Generate unique session ID for this ingest
+    const sessionId = generateIngestSessionId();
+    internalIngestSessionIdRef.current = sessionId;
+
     try {
       // Clear existing buffer first
       await clearBuffer();
 
       // Set up event listeners for this session
       const unlistenStreamEnded = await listen<StreamEndedPayload>(
-        `stream-ended:${INGEST_SESSION_ID}`,
+        `stream-ended:${sessionId}`,
         (event) => handleInternalIngestComplete(event.payload)
       );
-      const unlistenError = await listen<string>(`session-error:${INGEST_SESSION_ID}`, (event) => {
+      const unlistenError = await listen<string>(`session-error:${sessionId}`, (event) => {
         setInternalIngestError(event.payload);
       });
-      const unlistenFrames = await listen<{ frames: unknown[] } | unknown[]>(`frame-message:${INGEST_SESSION_ID}`, (event) => {
+      const unlistenFrames = await listen<{ frames: unknown[] } | unknown[]>(`frame-message:${sessionId}`, (event) => {
         // Handle both legacy array format and new FrameBatchPayload format
         const frames = Array.isArray(event.payload) ? event.payload : event.payload.frames;
         setInternalIngestFrameCount((prev) => prev + frames.length);
@@ -675,7 +684,7 @@ export default function IoReaderPickerDialog({
 
       // Create and start the reader session with all options
       await createIOSession({
-        sessionId: INGEST_SESSION_ID,
+        sessionId,
         profileId,
         speed: options.speed,
         startTime: options.startTime,
@@ -690,16 +699,17 @@ export default function IoReaderPickerDialog({
 
       // Apply speed setting
       if (options.speed > 0) {
-        await updateReaderSpeed(INGEST_SESSION_ID, options.speed);
+        await updateReaderSpeed(sessionId, options.speed);
       }
 
-      await startReaderSession(INGEST_SESSION_ID);
+      await startReaderSession(sessionId);
 
       setInternalIsIngesting(true);
       setInternalIngestProfileId(profileId);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setInternalIngestError(msg);
+      internalIngestSessionIdRef.current = null;
       // Cleanup on error
       unlistenRefs.current.forEach((unlisten) => unlisten());
       unlistenRefs.current = [];
@@ -855,14 +865,17 @@ export default function IoReaderPickerDialog({
     if (useExternalState) {
       onStopIngest?.();
     } else {
+      const sessionId = internalIngestSessionIdRef.current;
+      if (!sessionId) return;
       try {
-        await stopReaderSession(INGEST_SESSION_ID);
+        await stopReaderSession(sessionId);
         // The stream-ended event will handle the rest
       } catch (e) {
         console.error("Failed to stop ingest:", e);
         // Force cleanup
         setInternalIsIngesting(false);
         setInternalIngestProfileId(null);
+        internalIngestSessionIdRef.current = null;
         unlistenRefs.current.forEach((unlisten) => unlisten());
         unlistenRefs.current = [];
       }

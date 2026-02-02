@@ -26,6 +26,8 @@ import {
   type IOCapabilities,
   type IOStateType,
   type StreamEndedPayload,
+  type SessionSuspendedPayload,
+  type SessionResumingPayload,
   type CanTransmitFrame,
   type TransmitResult,
   type PlaybackPosition,
@@ -78,6 +80,10 @@ export interface UseIOSessionOptions {
   onSpeedChange?: (speed: number) => void;
   /** Callback when session is reconfigured (e.g., bookmark jump) - apps should clear their state */
   onReconfigure?: () => void;
+  /** Callback when session is suspended (stopped with buffer available) */
+  onSuspended?: (payload: SessionSuspendedPayload) => void;
+  /** Callback when session is resuming with a new buffer - apps should clear their frame lists */
+  onResuming?: (payload: SessionResumingPayload) => void;
 }
 
 export interface UseIOSessionResult {
@@ -101,6 +107,8 @@ export interface UseIOSessionResult {
   bufferType: "frames" | "bytes" | null;
   /** Number of items in the buffer - frames or bytes depending on type (set after stream ends) */
   bufferCount: number;
+  /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
+  bufferOwningSessionId: string | null;
   /** Number of apps connected to this session (for showing Detach vs Stop) */
   joinerCount: number;
   /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
@@ -121,6 +129,10 @@ export interface UseIOSessionResult {
   pause: () => Promise<void>;
   /** Resume the reader from pause */
   resume: () => Promise<void>;
+  /** Suspend the session - stops streaming, finalizes buffer, session stays alive */
+  suspend: () => Promise<void>;
+  /** Resume a suspended session with a fresh buffer (orphans old buffer) */
+  resumeFresh: () => Promise<void>;
   /** Update playback speed (only if capabilities.supports_speed_control) */
   setSpeed: (speed: number) => Promise<void>;
   /** Update time range (only when stopped, if capabilities.supports_time_range) */
@@ -196,6 +208,8 @@ export function useIOSession(
     onStreamComplete,
     onSpeedChange,
     onReconfigure,
+    onSuspended,
+    onResuming,
   } = options;
 
   // Session ID = Profile ID (use sessionId if provided, fall back to profileId for compat)
@@ -212,6 +226,8 @@ export function useIOSession(
   const stopSession = useSessionStore((s) => s.stopSession);
   const pauseSession = useSessionStore((s) => s.pauseSession);
   const resumeSession = useSessionStore((s) => s.resumeSession);
+  const suspendSession = useSessionStore((s) => s.suspendSession);
+  const resumeSessionFresh = useSessionStore((s) => s.resumeSessionFresh);
   const leaveSession = useSessionStore((s) => s.leaveSession);
   const setSessionSpeed = useSessionStore((s) => s.setSessionSpeed);
   const setSessionTimeRange = useSessionStore((s) => s.setSessionTimeRange);
@@ -242,6 +258,8 @@ export function useIOSession(
     onStreamComplete,
     onSpeedChange,
     onReconfigure,
+    onSuspended,
+    onResuming,
   });
   useEffect(() => {
     callbacksRef.current = {
@@ -253,8 +271,10 @@ export function useIOSession(
       onStreamComplete,
       onSpeedChange,
       onReconfigure,
+      onSuspended,
+      onResuming,
     };
-  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure]);
+  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onResuming]);
 
   // Initialize session on mount
   useEffect(() => {
@@ -319,6 +339,8 @@ export function useIOSession(
           onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
           onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
           onReconfigure: () => callbacksRef.current.onReconfigure?.(),
+          onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
+          onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
         });
         console.log(`[useIOSession:${appName}] registerCallbacks completed`);
 
@@ -485,6 +507,26 @@ export function useIOSession(
     }
   }, [effectiveSessionId, resumeSession]);
 
+  const suspend = useCallback(async () => {
+    if (!effectiveSessionId) return;
+    try {
+      await suspendSession(effectiveSessionId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      callbacksRef.current.onError?.(msg);
+    }
+  }, [effectiveSessionId, suspendSession]);
+
+  const resumeFresh = useCallback(async () => {
+    if (!effectiveSessionId) return;
+    try {
+      await resumeSessionFresh(effectiveSessionId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      callbacksRef.current.onError?.(msg);
+    }
+  }, [effectiveSessionId, resumeSessionFresh]);
+
   const setSpeed = useCallback(
     async (speed: number) => {
       if (!effectiveSessionId) return;
@@ -626,6 +668,8 @@ export function useIOSession(
           onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
           onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
           onReconfigure: () => callbacksRef.current.onReconfigure?.(),
+          onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
+          onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
         });
 
         // Mark setup as complete for the new session
@@ -677,7 +721,9 @@ export function useIOSession(
         onStreamEnded: (payload) => callbacksRef.current.onStreamEnded?.(payload),
         onStreamComplete: () => callbacksRef.current.onStreamComplete?.(),
         onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
-          onReconfigure: () => callbacksRef.current.onReconfigure?.(),
+        onReconfigure: () => callbacksRef.current.onReconfigure?.(),
+        onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
+        onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -720,6 +766,7 @@ export function useIOSession(
     bufferId: session?.buffer?.id ?? null,
     bufferType: session?.buffer?.type ?? null,
     bufferCount: session?.buffer?.count ?? 0,
+    bufferOwningSessionId: session?.buffer?.owningSessionId ?? null,
     joinerCount: session?.listenerCount ?? 0,
     stoppedExplicitly: session?.stoppedExplicitly ?? false,
     streamEndedReason: session?.streamEndedReason ?? null,
@@ -729,6 +776,8 @@ export function useIOSession(
     leave,
     pause,
     resume,
+    suspend,
+    resumeFresh,
     setSpeed,
     setTimeRange,
     seek,

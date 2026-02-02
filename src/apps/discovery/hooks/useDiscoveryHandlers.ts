@@ -88,6 +88,8 @@ export interface UseDiscoveryHandlersParams {
   // Manager session switching methods
   watchSingleSource: (profileId: string, options: ManagerIngestOptions, reinitializeOptions?: Record<string, unknown>) => Promise<void>;
   watchMultiSource: (profileIds: string[], options: ManagerIngestOptions) => Promise<void>;
+  ingestSingleSource: (profileId: string, options: ManagerIngestOptions) => Promise<void>;
+  ingestMultiSource: (profileIds: string[], options: ManagerIngestOptions) => Promise<void>;
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
   selectMultipleProfiles: (profileIds: string[]) => void;
@@ -174,6 +176,8 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     resume: params.resume,
     watchSingleSource: params.watchSingleSource,
     watchMultiSource: params.watchMultiSource,
+    ingestSingleSource: params.ingestSingleSource,
+    ingestMultiSource: params.ingestMultiSource,
     stopWatch: params.stopWatch,
     selectProfile: params.selectProfile,
     selectMultipleProfiles: params.selectMultipleProfiles,

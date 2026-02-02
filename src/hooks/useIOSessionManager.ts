@@ -10,7 +10,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useIOSession, type UseIOSessionOptions, type UseIOSessionResult } from "./useIOSession";
-import { useIngestSession, type StreamEndedPayload as IngestStreamEndedPayload } from "./useIngestSession";
+import type { StreamEndedPayload as IngestStreamEndedPayload } from "../api/io";
 import {
   createAndStartMultiSourceSession,
   joinMultiSourceSession,
@@ -27,10 +27,10 @@ export { isBufferProfileId, BUFFER_PROFILE_ID };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../stores/discoveryStore";
-import { setSessionListenerActive, reconfigureReaderSession, type StreamEndedPayload, type IOCapabilities } from "../api/io";
+import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, type StreamEndedPayload, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
-import { isRealtimeProfile } from "../dialogs/io-reader-picker/utils";
+import { isRealtimeProfile, generateIngestSessionId } from "../dialogs/io-reader-picker/utils";
 
 /**
  * Generate a unique session ID for recorded sources.
@@ -78,6 +78,8 @@ export interface IngestOptions {
   busMappings?: Map<string, BusMapping[]>;
   /** Per-interface framing config (for serial profiles in multi-bus mode) */
   perInterfaceFraming?: Map<string, PerInterfaceFramingConfig>;
+  /** Override session ID (for ingest mode where we need to set refs before async work) */
+  sessionIdOverride?: string;
 }
 
 /** Store interface for apps that manage ioProfile in their store */
@@ -202,17 +204,17 @@ export interface UseIOSessionManagerResult {
   /** Set watching state */
   setIsWatching: (watching: boolean) => void;
 
-  // ---- Ingest State (if enableIngest is true) ----
-  /** Whether ingesting */
+  // ---- Ingest State (unified with session) ----
+  /** Whether ingesting (fast ingest without rendering) */
   isIngesting: boolean;
-  /** Ingest profile ID */
+  /** Ingest session ID */
   ingestProfileId: string | null;
   /** Ingest frame count */
   ingestFrameCount: number;
   /** Ingest error */
   ingestError: string | null;
-  /** Start ingest */
-  startIngest: (options: {
+  /** Start ingest (legacy signature for backwards compatibility) */
+  startIngest: (params: {
     profileId: string;
     speed?: number;
     startTime?: string;
@@ -229,6 +231,10 @@ export interface UseIOSessionManagerResult {
   stopIngest: () => Promise<void>;
   /** Clear ingest error */
   clearIngestError: () => void;
+  /** Ingest from a single source (fast ingest, auto-transitions to buffer reader) */
+  ingestSingleSource: (profileId: string, options: IngestOptions) => Promise<void>;
+  /** Ingest from multiple sources (fast multi-bus ingest, auto-transitions to buffer reader) */
+  ingestMultiSource: (profileIds: string[], options: IngestOptions) => Promise<void>;
 
   // ---- Multi-Bus Session Handlers ----
   /** Start a multi-bus session */
@@ -249,6 +255,12 @@ export interface UseIOSessionManagerResult {
   watchMultiSource: (profileIds: string[], options: IngestOptions) => Promise<void>;
   /** Stop watching (stop session, clear watch state) */
   stopWatch: () => Promise<void>;
+  /** Suspend the session - stops streaming, finalizes buffer, session stays alive */
+  suspendSession: () => Promise<void>;
+  /** Resume a suspended session with a fresh buffer (orphans old buffer) */
+  resumeWithNewBuffer: () => Promise<void>;
+  /** Detach from session with a copy of the buffer */
+  detachWithBufferCopy: () => Promise<void>;
   /** Connect to a profile without streaming (creates session in stopped state, for Query app) */
   connectOnly: (profileId: string, options?: IngestOptions) => Promise<void>;
   /** Select a profile (clear multi-bus, set profile, set default speed) */
@@ -332,7 +344,7 @@ export function useIOSessionManager(
     ioProfiles,
     store,
     initialProfileId = null,
-    enableIngest = false,
+    enableIngest: _enableIngest = false, // Deprecated - ingest is now always available
     onBeforeIngestStart,
     onIngestComplete,
     requireFrames,
@@ -373,6 +385,12 @@ export function useIOSessionManager(
   const [watchFrameCount, setWatchFrameCount] = useState(0);
   const [isWatching, setIsWatching] = useState(false);
 
+  // ---- Ingest State (unified with session) ----
+  const [isIngesting, setIsIngesting] = useState(false);
+  const [ingestSessionId, setIngestSessionId] = useState<string | null>(null);
+  const [ingestFrameCount, setIngestFrameCount] = useState(0);
+  const [ingestError, setIngestError] = useState<string | null>(null);
+
   // ---- Multi-Session ID State ----
   // Generated dynamically when starting a multi-source session to avoid collisions
   // between multiple windows of the same app type
@@ -402,38 +420,40 @@ export function useIOSessionManager(
     return new Map(ioProfiles.map((p) => [p.id, p.name]));
   }, [ioProfiles]);
 
-  // ---- Watch Frame Counting ----
+  // ---- Watch/Ingest Frame Counting ----
   const isWatchingRef = useRef(isWatching);
+  const isIngestingRef = useRef(isIngesting);
+  const ingestSessionIdRef = useRef(ingestSessionId);
   useEffect(() => {
     isWatchingRef.current = isWatching;
   }, [isWatching]);
+  useEffect(() => {
+    isIngestingRef.current = isIngesting;
+  }, [isIngesting]);
+  useEffect(() => {
+    ingestSessionIdRef.current = ingestSessionId;
+  }, [ingestSessionId]);
 
-  // Wrap onFrames to count watch frames
+  // Wrap onFrames to count frames and optionally suppress delivery during ingest
   const handleFrames = useCallback((frames: FrameMessage[]) => {
+    if (isIngestingRef.current) {
+      // During ingest: count frames but DON'T deliver to app (no rendering)
+      setIngestFrameCount((prev) => prev + frames.length);
+      return; // Don't call onFramesProp
+    }
     if (isWatchingRef.current) {
       setWatchFrameCount((prev) => prev + frames.length);
     }
     onFramesProp?.(frames);
   }, [onFramesProp]);
 
-  // ---- Ingest Session ----
-  const ingestCompleteRef = useRef<((payload: IngestStreamEndedPayload) => Promise<void>) | undefined>(undefined);
-
-  const ingestSession = useIngestSession(
-    enableIngest
-      ? {
-          onComplete: async (payload) => {
-            if (ingestCompleteRef.current) {
-              await ingestCompleteRef.current(payload);
-            }
-          },
-          onBeforeStart: onBeforeIngestStart,
-        }
-      : { onComplete: async () => {} } // Disabled (async to match type)
-  );
-
-  // Set up ingest complete ref
-  ingestCompleteRef.current = onIngestComplete;
+  // ---- Ingest Callbacks ----
+  const onIngestCompleteRef = useRef(onIngestComplete);
+  const onBeforeIngestStartRef = useRef(onBeforeIngestStart);
+  useEffect(() => {
+    onIngestCompleteRef.current = onIngestComplete;
+    onBeforeIngestStartRef.current = onBeforeIngestStart;
+  }, [onIngestComplete, onBeforeIngestStart]);
 
   // ---- IO Session ----
   // Handler for when session is reconfigured externally (e.g., another app jumped to a bookmark)
@@ -450,6 +470,46 @@ export function useIOSessionManager(
     }
   }, [appName, onBeforeWatch, streamCompletedRef]);
 
+  // Handle stream-ended with auto-transition for ingest mode
+  const handleStreamEndedWithIngest = useCallback(async (payload: StreamEndedPayload) => {
+    console.log(`[IOSessionManager:${appName}] Stream ended, isIngesting=${isIngestingRef.current}, payload:`, payload);
+
+    if (isIngestingRef.current && payload.buffer_available) {
+      // Ingest completed with buffer available - switch to buffer replay mode
+      console.log(`[IOSessionManager:${appName}] Ingest complete - switching to buffer replay mode`);
+
+      const sessionId = ingestSessionIdRef.current;
+      if (sessionId) {
+        try {
+          // Switch session to buffer replay mode (keeps session alive, swaps reader)
+          await switchSessionToBufferReplay(sessionId, 1.0);
+          console.log(`[IOSessionManager:${appName}] Session '${sessionId}' now in buffer replay mode`);
+        } catch (e) {
+          console.error(`[IOSessionManager:${appName}] Failed to switch to buffer replay:`, e);
+          setIngestError(e instanceof Error ? e.message : String(e));
+        }
+      }
+
+      setIsIngesting(false);
+
+      // Call app's ingest complete callback
+      // App should: enableBufferMode(count), load frame info for display
+      if (onIngestCompleteRef.current) {
+        await onIngestCompleteRef.current(payload);
+      }
+    } else if (isIngestingRef.current) {
+      // Ingest ended without buffer (error or empty)
+      console.log(`[IOSessionManager:${appName}] Ingest ended without buffer`);
+      setIsIngesting(false);
+      if (onIngestCompleteRef.current) {
+        await onIngestCompleteRef.current(payload);
+      }
+    }
+
+    // Always call the app's onStreamEnded callback
+    onStreamEnded?.(payload);
+  }, [appName, onStreamEnded]);
+
   const sessionOptions: UseIOSessionOptions = {
     appName,
     sessionId: effectiveSessionId,
@@ -459,7 +519,7 @@ export function useIOSessionManager(
     onBytes,
     onError,
     onTimeUpdate,
-    onStreamEnded,
+    onStreamEnded: handleStreamEndedWithIngest,
     onStreamComplete,
     onSpeedChange,
     onReconfigure: handleReconfigure,
@@ -479,11 +539,41 @@ export function useIOSessionManager(
   const joinerCount = session.joinerCount;
 
   // ---- Handlers ----
+  // Detach from session with a copy of the buffer
+  // After detaching, the app views the copied buffer (standalone, not detached state)
   const handleDetach = useCallback(async () => {
-    await session.leave();
-    setIsDetached(true);
-    setIsWatching(false);
-  }, [session]);
+    const bufferId = session.bufferId;
+
+    // If there's a buffer, copy it and switch to it
+    if (bufferId) {
+      // Import the copy function
+      const { copyBufferForDetach } = await import("../api/io");
+
+      // Create a copy of the buffer for this app
+      const copyName = `${ioProfileName || "detached"}-${Date.now()}`;
+      const copiedBufferId = await copyBufferForDetach(bufferId, copyName);
+
+      // Leave the session (others keep streaming)
+      await session.leave();
+
+      // Clear multi-bus state
+      setMultiBusMode(false);
+      setMultiBusProfiles([]);
+
+      // Switch to the copied buffer
+      setIoProfile(copiedBufferId);
+      setIsWatching(false);
+
+      // Explicitly set isDetached=false - we're viewing a standalone buffer, not detached from a session
+      // This ensures the IO picker shows the buffer, not "Rejoin"
+      setIsDetached(false);
+    } else {
+      // No buffer - just leave and set detached
+      await session.leave();
+      setIsDetached(true);
+      setIsWatching(false);
+    }
+  }, [session, ioProfileName, setMultiBusMode, setMultiBusProfiles, setIoProfile]);
 
   const handleRejoin = useCallback(async () => {
     await session.rejoin();
@@ -513,12 +603,13 @@ export function useIOSessionManager(
       sourceAddressStartByte,
       sourceAddressBytes,
       sourceAddressEndianness,
+      sessionIdOverride,
     } = opts;
 
-    // Generate unique session ID to avoid collisions between windows
-    const sessionId = busMappings
+    // Use provided session ID or generate one to avoid collisions between windows
+    const sessionId = sessionIdOverride ?? (busMappings
       ? generateMultiSessionId(busMappings, profileNamesMap)
-      : `session_${Math.random().toString(16).slice(2, 8)}`;
+      : `session_${Math.random().toString(16).slice(2, 8)}`);
 
     const createOptions: CreateMultiSourceOptions = {
       sessionId,
@@ -681,6 +772,191 @@ export function useIOSessionManager(
     await session.stop();
     setIsWatching(false);
   }, [session]);
+
+  // Suspend session: stop streaming, finalize buffer, session stays alive
+  const suspendSession = useCallback(async () => {
+    await session.suspend();
+    setIsWatching(false);
+  }, [session]);
+
+  // Resume a suspended session with a fresh buffer (orphans old buffer)
+  const resumeWithNewBuffer = useCallback(async () => {
+    // Clear app state before resuming
+    onBeforeWatch?.();
+
+    await session.resumeFresh();
+    setIsWatching(true);
+    resetWatchFrameCount();
+    streamCompletedRef.current = false;
+  }, [session, onBeforeWatch, resetWatchFrameCount]);
+
+  // Detach from session with a copy of the buffer
+  const detachWithBufferCopy = useCallback(async () => {
+    const bufferId = session.bufferId;
+    if (!bufferId) {
+      console.warn("[IOSessionManager] Cannot detach - no buffer available");
+      return;
+    }
+
+    // Import the copy function
+    const { copyBufferForDetach } = await import("../api/io");
+
+    // Create a copy of the buffer for this app
+    const copyName = `${ioProfileName}-detached-${Date.now()}`;
+    const copiedBufferId = await copyBufferForDetach(bufferId, copyName);
+
+    // Leave the session (others keep streaming)
+    await session.leave();
+
+    // Clear multi-bus state - we're now viewing a standalone buffer
+    setMultiBusMode(false);
+    setMultiBusProfiles([]);
+
+    // Set isDetached=false - we're viewing a buffer, not in detached state
+    // This ensures the IO picker shows the buffer, not "Rejoin"
+    setIsDetached(false);
+    setIsWatching(false);
+
+    // Switch to the copied buffer
+    await session.reinitialize(copiedBufferId, { useBuffer: true });
+  }, [session, ioProfileName, setMultiBusMode, setMultiBusProfiles]);
+
+  // Ingest a single source: fast ingest without rendering, auto-transitions to buffer reader
+  // Apps join the session but frames are counted only (not rendered) until ingest completes.
+  // After stream ends, session transitions to buffer reader for playback.
+  const ingestSingleSource = useCallback(async (
+    profileId: string,
+    opts: IngestOptions
+  ) => {
+    // Pre-ingest cleanup
+    if (onBeforeIngestStartRef.current) {
+      await onBeforeIngestStartRef.current();
+    }
+
+    // Clear any previous ingest state
+    setIngestError(null);
+    setIngestFrameCount(0);
+
+    // Generate unique session ID for this ingest
+    const sessionId = generateIngestSessionId();
+    console.log(`[IOSessionManager:${appName}] Starting ingest with session ID: ${sessionId}`);
+
+    // IMPORTANT: Set refs SYNCHRONOUSLY before reinitialize
+    // With speed=0, the stream can complete DURING reinitialize, before React re-renders.
+    // The stream-ended handler checks these refs, so they must be set first.
+    isIngestingRef.current = true;
+    ingestSessionIdRef.current = sessionId;
+
+    try {
+      // Reinitialize with speed=0 (max speed) for fast ingestion
+      await session.reinitialize(profileId, {
+        startTime: opts.startTime,
+        endTime: opts.endTime,
+        speed: 0, // Max speed - no pacing
+        limit: opts.maxFrames,
+        framingEncoding: opts.framingEncoding,
+        delimiter: opts.delimiter,
+        maxFrameLength: opts.maxFrameLength,
+        frameIdStartByte: opts.frameIdStartByte,
+        frameIdBytes: opts.frameIdBytes,
+        frameIdBigEndian: opts.frameIdStartByte !== undefined ? true : undefined,
+        sourceAddressStartByte: opts.sourceAddressStartByte,
+        sourceAddressBytes: opts.sourceAddressBytes,
+        sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
+        minFrameLength: opts.minFrameLength,
+        emitRawBytes: opts.emitRawBytes,
+        busOverride: opts.busOverride,
+        sessionIdOverride: sessionId,
+      });
+
+      // Clear multi-bus state when ingesting from a single source
+      setMultiBusMode(false);
+      setMultiBusProfiles([]);
+
+      // Update state - set profile to session ID so callbacks work
+      setIoProfile(sessionId);
+      setSourceProfileId(profileId);
+      setIngestSessionId(sessionId);
+
+      // Set ingesting mode - handleFrames will count but not deliver frames
+      setIsIngesting(true);
+      setIsWatching(false);
+      streamCompletedRef.current = false;
+
+      console.log(`[IOSessionManager:${appName}] Ingest started for session: ${sessionId}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[IOSessionManager:${appName}] Failed to start ingest:`, msg);
+      // Reset refs on error
+      isIngestingRef.current = false;
+      ingestSessionIdRef.current = null;
+      setIngestError(msg);
+      setIsIngesting(false);
+    }
+  }, [session, appName, setMultiBusMode, setMultiBusProfiles, setIoProfile, setSourceProfileId, streamCompletedRef]);
+
+  // Ingest multiple sources: fast multi-bus ingest without rendering
+  const ingestMultiSource = useCallback(async (
+    profileIds: string[],
+    opts: IngestOptions
+  ) => {
+    // Pre-ingest cleanup
+    if (onBeforeIngestStartRef.current) {
+      await onBeforeIngestStartRef.current();
+    }
+
+    // Clear any previous ingest state
+    setIngestError(null);
+    setIngestFrameCount(0);
+
+    // Generate session ID for multi-source ingest
+    const sessionId = generateIngestSessionId();
+
+    // IMPORTANT: Set refs SYNCHRONOUSLY before starting session
+    // With speed=0, the stream can complete DURING session creation.
+    isIngestingRef.current = true;
+    ingestSessionIdRef.current = sessionId;
+
+    try {
+      // Start multi-bus session with our session ID
+      // Override speed to 0 for max speed ingestion
+      await startMultiBusSession(profileIds, {
+        ...opts,
+        speed: 0, // Max speed - no pacing
+        sessionIdOverride: sessionId,
+      });
+
+      // Store the session ID
+      setIngestSessionId(sessionId);
+
+      // Set ingesting mode - handleFrames will count but not deliver frames
+      setIsIngesting(true);
+      setIsWatching(false);
+      streamCompletedRef.current = false;
+
+      console.log(`[IOSessionManager:${appName}] Multi-source ingest started with session: ${sessionId}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[IOSessionManager:${appName}] Failed to start multi-source ingest:`, msg);
+      // Reset refs on error
+      isIngestingRef.current = false;
+      ingestSessionIdRef.current = null;
+      setIngestError(msg);
+      setIsIngesting(false);
+    }
+  }, [appName, startMultiBusSession, streamCompletedRef]);
+
+  // Stop ingest: stop session, clear ingest state
+  const stopIngest = useCallback(async () => {
+    console.log(`[IOSessionManager:${appName}] Stopping ingest`);
+    await session.stop();
+    // Note: handleStreamEndedWithIngest will handle the state cleanup and transition
+  }, [appName, session]);
+
+  // Clear ingest error
+  const clearIngestError = useCallback(() => {
+    setIngestError(null);
+  }, []);
 
   // Connect only: create session without streaming (for Query app)
   // Creates/joins the session with skipAutoStart to prevent auto-starting playback sources.
@@ -947,14 +1223,31 @@ export function useIOSessionManager(
     isWatching,
     setIsWatching,
 
-    // Ingest State
-    isIngesting: enableIngest ? ingestSession.isIngesting : false,
-    ingestProfileId: enableIngest ? ingestSession.ingestProfileId : null,
-    ingestFrameCount: enableIngest ? ingestSession.ingestFrameCount : 0,
-    ingestError: enableIngest ? ingestSession.ingestError : null,
-    startIngest: enableIngest ? ingestSession.startIngest : async () => {},
-    stopIngest: enableIngest ? ingestSession.stopIngest : async () => {},
-    clearIngestError: enableIngest ? ingestSession.clearIngestError : () => {},
+    // Ingest State (unified with session)
+    isIngesting,
+    ingestProfileId: ingestSessionId,
+    ingestFrameCount,
+    ingestError,
+    // Legacy startIngest wrapper for backwards compatibility
+    startIngest: async (params) => {
+      const { profileId, ...opts } = params;
+      await ingestSingleSource(profileId, {
+        maxFrames: opts.maxFrames,
+        startTime: opts.startTime,
+        endTime: opts.endTime,
+        frameIdStartByte: opts.frameIdStartByte,
+        frameIdBytes: opts.frameIdBytes,
+        sourceAddressStartByte: opts.sourceAddressStartByte,
+        sourceAddressBytes: opts.sourceAddressBytes,
+        sourceAddressEndianness: opts.sourceAddressBigEndian ? "big" : "little",
+        minFrameLength: opts.minFrameLength,
+      });
+    },
+    stopIngest,
+    clearIngestError,
+    // New ingest methods
+    ingestSingleSource,
+    ingestMultiSource,
 
     // Multi-Bus Handlers
     startMultiBusSession,
@@ -964,6 +1257,9 @@ export function useIOSessionManager(
     watchSingleSource,
     watchMultiSource,
     stopWatch,
+    suspendSession,
+    resumeWithNewBuffer,
+    detachWithBufferCopy,
     connectOnly,
     selectProfile,
     selectMultipleProfiles,

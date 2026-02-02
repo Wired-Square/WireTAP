@@ -10,7 +10,8 @@ use crate::{
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
         get_session_listeners, join_session, leave_session, list_sessions, pause_session,
         reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
-        seek_session, set_listener_active, start_session, stop_session, transmit_frame, unregister_listener,
+        resume_session_fresh, seek_session, set_listener_active, start_session, stop_session,
+        suspend_session, switch_to_buffer_replay, transmit_frame, unregister_listener,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IODevice, IOState,
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, BufferReader, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
@@ -805,6 +806,30 @@ pub async fn resume_reader_session(session_id: String) -> Result<IOState, String
     resume_session(&session_id).await
 }
 
+/// Suspend a reader session - stops streaming, finalizes buffer, session stays alive.
+/// The buffer remains owned by the session and all joined apps can view it.
+/// Use `resume_reader_session_fresh` to start streaming again with a new buffer.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn suspend_reader_session(session_id: String) -> Result<IOState, String> {
+    suspend_session(&session_id).await
+}
+
+/// Resume a suspended session with a fresh buffer.
+/// The old buffer is orphaned (becomes available for standalone viewing).
+/// A new buffer is created for the session and streaming starts.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn resume_reader_session_fresh(session_id: String) -> Result<IOState, String> {
+    resume_session_fresh(&session_id).await
+}
+
+/// Copy a buffer for an app that is detaching from a session.
+/// Creates an orphaned copy of the buffer that can be used standalone.
+/// Returns the new buffer ID.
+#[tauri::command(rename_all = "snake_case")]
+pub fn copy_buffer_for_detach(buffer_id: String, new_name: String) -> Result<String, String> {
+    buffer_store::copy_buffer(&buffer_id, new_name)
+}
+
 /// Update playback speed for a reader session
 #[tauri::command(rename_all = "snake_case")]
 pub async fn update_reader_speed(session_id: String, speed: f64) -> Result<(), String> {
@@ -908,6 +933,19 @@ pub async fn transition_to_buffer_reader(
 
     let result = create_session(app, session_id, Box::new(reader), None, None).await;
     Ok(result.capabilities)
+}
+
+/// Switch a session to buffer replay mode without destroying it.
+/// This swaps the session's reader to a BufferReader that reads from the session's
+/// owned buffer. All listeners stay connected and can replay the captured data.
+/// Use this after ingest completes to enable playback controls.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn switch_session_to_buffer_replay(
+    app: tauri::AppHandle,
+    session_id: String,
+    speed: Option<f64>,
+) -> Result<IOCapabilities, String> {
+    switch_to_buffer_replay(&app, &session_id, speed.unwrap_or(1.0)).await
 }
 
 /// Step one frame forward or backward in the buffer.

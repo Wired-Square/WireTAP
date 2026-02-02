@@ -1,6 +1,19 @@
 // src/hooks/useIngestSession.ts
 //
-// Shared hook for ingest session management.
+// @deprecated This hook is deprecated in favor of the ingest methods in useIOSessionManager.
+// Ingest is now integrated with the main session system:
+// - Uses unique session IDs like `ingest_{shortId}` instead of `__ingest__`
+// - Apps join the session immediately but don't render frames during ingest
+// - Auto-transitions to buffer reader when stream ends
+// - Apps then have full playback controls on the ingested data
+//
+// Migration:
+// - Use `ingestSingleSource()` or `ingestMultiSource()` from useIOSessionManager
+// - The `startIngest()` wrapper provides backwards compatibility
+//
+// This file is kept for reference only and will be removed in a future version.
+//
+// DEPRECATED - Shared hook for ingest session management.
 // Handles event listener setup/cleanup, session lifecycle, and error handling.
 // Apps provide their own completion handler for app-specific logic.
 
@@ -58,6 +71,10 @@ export interface UseIngestSessionResult {
   clearIngestError: () => void;
 }
 
+/**
+ * @deprecated Use ingestSingleSource/ingestMultiSource from useIOSessionManager instead.
+ * This hook is kept for backwards compatibility only.
+ */
 export function useIngestSession({
   onComplete,
   onBeforeStart,

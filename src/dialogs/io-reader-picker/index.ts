@@ -22,6 +22,7 @@ export {
   BUFFER_PROFILE_ID,
   CSV_EXTERNAL_ID,
   INGEST_SESSION_ID,
+  generateIngestSessionId,
   isRealtimeProfile,
   isMultiSourceCapable,
   validateProfileSelection,

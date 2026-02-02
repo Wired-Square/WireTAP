@@ -584,6 +584,9 @@ pub fn run() {
             sessions::stop_reader_session,
             sessions::pause_reader_session,
             sessions::resume_reader_session,
+            sessions::suspend_reader_session,
+            sessions::resume_reader_session_fresh,
+            sessions::copy_buffer_for_detach,
             sessions::update_reader_speed,
             sessions::update_reader_time_range,
             sessions::reconfigure_reader_session,
@@ -592,6 +595,7 @@ pub fn run() {
             sessions::destroy_reader_session,
             sessions::create_buffer_reader_session,
             sessions::transition_to_buffer_reader,
+            sessions::switch_session_to_buffer_replay,
             sessions::step_buffer_frame,
             sessions::session_transmit_frame,
             // Listener registration API

@@ -390,6 +390,68 @@ pub fn list_orphaned_buffers() -> Vec<BufferMetadata> {
         .collect()
 }
 
+/// Create a copy of a buffer for an app that is detaching.
+/// The copy is orphaned (no owning session) and available for standalone use.
+/// Returns the new buffer ID.
+pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, String> {
+    // First, read the source buffer data
+    let (source_type, cloned_data, source_metadata) = {
+        let registry = BUFFER_REGISTRY.read().unwrap();
+        let source = registry
+            .buffers
+            .get(source_buffer_id)
+            .ok_or_else(|| format!("Buffer '{}' not found", source_buffer_id))?;
+
+        let cloned = match &source.data {
+            BufferData::Frames(frames) => BufferData::Frames(frames.clone()),
+            BufferData::Bytes(bytes) => BufferData::Bytes(bytes.clone()),
+        };
+
+        (source.metadata.buffer_type.clone(), cloned, source.metadata.clone())
+    };
+
+    // Now create the new buffer with write lock
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+
+    let id = format!("buffer_{}", registry.next_id);
+    registry.next_id += 1;
+
+    let created_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let count = match &cloned_data {
+        BufferData::Frames(f) => f.len(),
+        BufferData::Bytes(b) => b.len(),
+    };
+
+    let metadata = BufferMetadata {
+        id: id.clone(),
+        buffer_type: source_type,
+        name: new_name.clone(),
+        count,
+        start_time_us: source_metadata.start_time_us,
+        end_time_us: source_metadata.end_time_us,
+        created_at,
+        is_streaming: false,
+        owning_session_id: None, // Orphaned - available for standalone use
+    };
+
+    let buffer = NamedBuffer {
+        metadata,
+        data: cloned_data,
+    };
+    registry.buffers.insert(id.clone(), buffer);
+
+    eprintln!(
+        "[BufferStore] Copied buffer '{}' -> '{}' ('{}', {} items)",
+        source_buffer_id, id, new_name, count
+    );
+
+    Ok(id)
+}
+
 // ============================================================================
 // Public API - Data Access (Frame Buffers)
 // ============================================================================

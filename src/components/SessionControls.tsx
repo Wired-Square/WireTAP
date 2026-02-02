@@ -55,14 +55,15 @@ export function ReaderButton({
   // Show as multi-bus if either:
   // 1. multiBusMode is true (creating multi-bus session), OR
   // 2. multiBusProfiles has entries (joined an existing multi-source session)
-  const showAsMultiBus = multiBusMode || multiBusProfiles.length > 0;
+  // BUT: never show as multi-bus when viewing a buffer (buffer takes precedence)
+  const showAsMultiBus = !isBufferProfile && (multiBusMode || multiBusProfiles.length > 0);
 
-  // Determine display name
+  // Determine display name (buffer takes precedence over multi-bus)
   let displayName: string;
-  if (showAsMultiBus) {
-    displayName = `Multi-Bus (${multiBusProfiles.length})`;
-  } else if (isBufferProfile) {
+  if (isBufferProfile) {
     displayName = `Buffer: ${bufferMetadata?.name || "Buffer"}`;
+  } else if (showAsMultiBus) {
+    displayName = `Multi-Bus (${multiBusProfiles.length})`;
   } else if (selectedProfile) {
     displayName = selectedProfile.name;
   } else if (ioProfile) {

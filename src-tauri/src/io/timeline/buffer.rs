@@ -49,6 +49,19 @@ impl BufferReader {
             buffer_id,
         }
     }
+
+    /// Create a BufferReader that reads from a specific buffer by ID.
+    /// Use this when the session_id doesn't match the buffer_N pattern
+    /// (e.g., for ingest sessions like "ingest_a7f3c9" that own a buffer).
+    pub fn new_with_buffer(app: AppHandle, session_id: String, buffer_id: String, speed: f64) -> Self {
+        Self {
+            app,
+            reader_state: TimelineReaderState::new(session_id, speed),
+            seek_target_us: Arc::new(AtomicI64::new(NO_SEEK)),
+            completed_flag: Arc::new(AtomicBool::new(false)),
+            buffer_id: Some(buffer_id),
+        }
+    }
 }
 
 #[async_trait]

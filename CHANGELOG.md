@@ -2,6 +2,95 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Buffer-First Frame Display**: Discovery app now uses a buffer-first approach for frame display, improving UI responsiveness with large frame counts. Features include:
+  - Backend tail fetch API (`get_buffer_frames_tail`) for efficient latest-N-frames retrieval
+  - `useBufferFrameView` hook provides unified interface for streaming (tail poll) and stopped (pagination) modes
+  - Eliminates large frontend frame arrays that caused O(n) useMemo iterations on every batch
+  - Seamless transition between streaming and pagination without complex mode switching
+- **Query App Default Catalog**: Query app now auto-loads the starred/default catalog on mount, matching the behaviour of Decoder and CatalogEditor. Centralised catalog path resolution into shared `catalogUtils.ts` utility.
+- **Catalog Extended ID and CAN FD Defaults**: Catalog-level defaults for extended CAN IDs (29-bit) and CAN FD frames. Features include:
+  - `default_extended` in `[meta.can]` section (default: false = 11-bit standard IDs)
+  - `default_fd` in `[meta.can]` section (default: false = classic CAN)
+  - Frame-level `extended` and `fd` overrides that inherit from catalog defaults
+  - Auto-detection of extended IDs from frame ID value (> 0x7FF) when no default is set
+  - CAN Config View displays new defaults
+  - CAN Frame View shows Extended ID and CAN FD cards with "(inherited)" badges
+  - Query app auto-populates Extended ID toggle when selecting frames from catalog
+- **Query App (WIP)**: New app for querying PostgreSQL data sources to answer analytical questions about CAN bus history. This is a first attempt at the feature. Features include:
+  - Tab-based UI with Query, Queue, and Results tabs
+  - Byte change tracking: find when specific bytes in a frame changed value
+  - Frame change detection: find when any byte in a frame changed
+  - Configurable context window for ingesting frames around detected events
+  - "Connect" mode in IO picker for database-only sessions (no streaming until ingest)
+  - PostgreSQL protocol badge showing connection status
+  - Results can be clicked to ingest surrounding frames into other apps (Decoder, Discovery)
+  - Session system integration allows sharing ingested data with other apps
+  - **Query Queue**: Sequential query execution with status indicators (pending, running, completed, error). Multiple queries can be queued and run automatically one after another. Queue items can be deleted (running queries are cancelled on the database server).
+  - **Query Result Limit**: Configurable maximum results per query (100-100,000). Default can be set in Settings → General, with per-query override in the Query Builder.
+  - **SQL Preview**: Read-only SQL query preview at the bottom of Query Builder for debugging and copying queries.
+  - **Paginated Results**: Results panel now supports pagination with configurable page sizes (50, 100, 250, 500, 1000, or All).
+  - **Frame ID Formatting**: Frame IDs displayed with leading zeros (3 digits for standard, 8 for extended frames).
+  - **Frame Change Details**: Frame change results now show which byte indices changed (e.g., "bytes 0, 3, 7") instead of just the count.
+  - **Time Bounds from Favourites**: Queries can be bounded to a saved favourite's time range for focused analysis.
+- **Reusable TimeBoundsInput Component**: New unified component for time bounds input with optional bookmark pre-fill. Features include:
+  - Bookmark dropdown that pre-fills start time, end time, and max frames fields
+  - Timezone toggle (local/UTC) with automatic time conversion
+  - All fields remain editable after bookmark selection
+  - Dropdown retains bookmark name until fields are manually modified
+  - `showBookmarks` prop to hide dropdown where bookmark selection doesn't apply
+  - Used in Query app (QueryBuilderPanel), IO Reader Picker (IngestOptions), BookmarkEditorDialog, AddBookmarkDialog, and Settings bookmark dialogs (EditBookmarkDialog, CreateBookmarkDialog)
+  - **Mirror Validation Query**: Compare mirror frames against their source frames to find timestamp mismatches. Supports catalog-based mirror frame selection (shows source frame info) or manual frame ID entry. Results show side-by-side payload comparison with mismatched bytes highlighted.
+  - **Catalog Integration**: When a decoder catalog is selected, query builder shows frame/signal pickers instead of manual ID entry. Signal selection auto-populates byte index for byte change queries.
+  - **Query Cancellation**: Running queries can be cancelled by removing them from the queue. Sends PostgreSQL cancel request to terminate the query on the server.
+  - **Running Query Status**: Session status logging now shows running database queries with type, profile, and elapsed time.
+  - **Stats Tab**: New Statistics/Maintenance tab showing database activity. View running queries on the database with ability to cancel them. View connected sessions with ability to terminate. Auto-refresh options (5s, 10s, 30s) for monitoring long-running queries.
+- **Serial Max Frame Length**: Catalog-level `max_frame_length` setting for serial protocols. Acts as a safety limit for malformed framing (default: 64 bytes). Configurable in Settings → Serial Protocol.
+- **candor-server Application Name**: PostgreSQL connections from candor-server now identify as "candor-server" in pg_stat_activity, making them easier to identify in the Query app Stats tab.
+- **candor-server Disk Cache**: SQLite-based disk cache for PostgreSQL outage resilience. When the database is unavailable, frames are cached locally and recovered when connectivity is restored. Features include:
+  - Automatic fallback to disk when PostgreSQL connection fails
+  - Strict temporal ordering: cached frames drain completely before new frames
+  - Graceful shutdown: remaining queue flushes to disk if DB unavailable
+  - Startup recovery: detects and drains cached frames from previous sessions
+  - Configurable cache path (`--pg-cache-path`, `PG_CACHE_PATH` env, or TOML `cache_path`)
+  - Configurable max size (`--pg-cache-max-mb`, default 1GB)
+  - Cache metrics in stats output: `cached=N cache_recovered=N cache_pending=N`
+  - Auto-cleanup: cache file deleted after successful drain
+  - Proactive queue overflow protection: flush queue to disk at configurable threshold (`--pg-queue-flush-pct`, default 50%) to prevent frame loss during cache recovery
+- **Session Reconfiguration for Bookmark Jumps**: PostgreSQL sessions now stay alive when jumping between bookmarks. When an app changes time range via bookmark, the session reconfigures in-place rather than being destroyed and recreated. Benefits include:
+  - Other apps joined to the session remain connected and receive the new frames
+  - Old buffers are finalised and orphaned; new buffers created for the new time range
+  - All apps clear their state and reset frame counts when any app reconfigures the session
+  - New `session-reconfigured` event notifies listeners of time range changes
+  - New `reconfigure_reader_session` Tauri command and `reconfigureReaderSession` API
+
+### Changed
+
+- **Discovery Error Dialog Migration**: Discovery app now uses the global error dialog (`appErrorDialog` in `sessionStore`) instead of its own local error state. This consolidates error handling across all apps and removes duplicate `ErrorDialog` render from Discovery.
+- **IO Picker Buffer Section**: Renamed "Orphaned Buffers" to "Buffers" in the IO Reader Picker dialog for clarity.
+- **Buffer Naming**: Buffers are now named after their session ID (e.g., "postgres_5a5282") instead of device-specific descriptions (e.g., "PostgreSQL 10.0.50.1:5432/candor"). The IO picker displays buffers as "Frames: {session_id}" or "Bytes: {session_id}".
+- **Serial Frame Editor**: Simplified per-frame settings - removed encoding display (already set at catalog level) and max_length (moved to catalog level)
+- **Catalog Editor**: Renamed "Endianness" to "Byte Order" in UI labels for consistency
+- **Query App Extended Filter**: The `extended` filter is now optional. When no catalog is selected, queries search both standard and extended frames by default. Check the "Extended" checkbox to filter for extended frames only. When a catalog is selected, the extended setting from the catalog is used.
+- **PostgreSQL Schema**: Added composite index `(id, extended, ts DESC)` on `can_frame` table for efficient filtering when extended is specified
+- **candor-server Code Style**: Fixed pylint warnings including line length, import order, and added docstrings. Score improved from 8.39 to 9.03.
+
+### Fixed
+
+- **IO Picker Controls After Detach**: Fixed IO picker showing "Rejoin" button and "Multi-Bus" indicator after detaching from a session with a buffer copy. When an app detaches and receives a buffer copy, the controls now correctly show the buffer instead of session-related actions. Changes include:
+  - `handleDetach` now explicitly sets `isDetached=false` when detaching with a buffer
+  - `detachWithBufferCopy` now clears `multiBusMode` and `multiBusProfiles` state
+  - `ReaderButton` now prioritises buffer display over multi-bus indicators
+- **Menu Session Picker Opens in All Windows**: Fixed session picker dialog opening in all windows when the same app (e.g., Discovery) was open in multiple windows. Now only the focused window responds to menu commands. Added `windowLabel` to session-control events to scope them to the originating window.
+- **Query App Menu Integration**: Query app now responds to the Select Source menu command (Cmd+I) to open the IO picker.
+- **Session Buffers Not Orphaned on Destroy**: Fixed buffers disappearing when sessions were destroyed. Buffers owned by a session are now orphaned (ownership cleared) when the session is destroyed, making them available for replay in the IO picker's Buffers section.
+- **Serial Frame ID Validation**: Frame identifiers now accept hex values (`0xFDE2`), decimal numbers, and standard identifiers. Previously only alphanumeric identifiers starting with a letter were allowed.
+- **PostgreSQL Query Serialization**: Fixed boolean and timestamp parameter serialization errors in database queries by using explicit type casts
+- **Query App Results Tab Crash**: Fixed infinite re-render loop when clicking Results tab with no results. Changed from setState-during-render pattern to useEffect for page reset on query change.
+
 ## [0.3.2] - 2026-01-31
 
 ### Added

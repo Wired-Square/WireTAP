@@ -52,5 +52,7 @@ export interface LoadHexDataPayload {
 export interface BufferChangedPayload {
   /** Null if buffer was cleared */
   metadata: BufferMetadata | null;
-  timestamp: number;
+  /** What triggered this change: "ingested", "streamed", "imported", "cleared" */
+  action?: "ingested" | "streamed" | "imported" | "cleared";
+  timestamp?: number;
 }
