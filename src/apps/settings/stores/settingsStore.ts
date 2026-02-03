@@ -93,6 +93,7 @@ interface AppSettings {
   binary_unused_colour?: string;
   discovery_history_buffer?: number;
   query_result_limit?: number;
+  session_manager_stats_interval?: number;
   // Theme settings
   theme_mode?: ThemeMode;
   theme_bg_primary_light?: string;
@@ -247,6 +248,7 @@ interface SettingsState {
     discoveryHistoryBuffer: number;
     defaultFrameType: DefaultFrameType;
     queryResultLimit: number;
+    sessionManagerStatsInterval: number;
   };
 
   // UI state
@@ -317,6 +319,7 @@ interface SettingsState {
   setDiscoveryHistoryBuffer: (buffer: number) => void;
   setDefaultFrameType: (type: DefaultFrameType) => void;
   setQueryResultLimit: (limit: number) => void;
+  setSessionManagerStatsInterval: (interval: number) => void;
 }
 
 // Auto-save debounce
@@ -373,6 +376,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     discoveryHistoryBuffer: 100000,
     defaultFrameType: 'can',
     queryResultLimit: 10000,
+    sessionManagerStatsInterval: 60,
   },
 
   ui: {
@@ -440,6 +444,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_unused_colour: settings.binary_unused_colour || '#64748b',
         discovery_history_buffer: settings.discovery_history_buffer ?? 100000,
         query_result_limit: settings.query_result_limit ?? 10000,
+        session_manager_stats_interval: settings.session_manager_stats_interval ?? 60,
         default_frame_type: (settings.default_frame_type as DefaultFrameType) ?? 'can',
         // Theme settings
         theme_mode: (settings.theme_mode as ThemeMode) ?? 'auto',
@@ -524,6 +529,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           discoveryHistoryBuffer: normalized.discovery_history_buffer ?? 100000,
           defaultFrameType: normalized.default_frame_type ?? 'can',
           queryResultLimit: normalized.query_result_limit ?? 10000,
+          sessionManagerStatsInterval: normalized.session_manager_stats_interval ?? 60,
         },
         originalSettings: normalized,
       });
@@ -588,6 +594,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_unused_colour: display.binaryUnusedColour,
         discovery_history_buffer: general.discoveryHistoryBuffer,
         query_result_limit: general.queryResultLimit,
+        session_manager_stats_interval: general.sessionManagerStatsInterval,
         // Theme settings
         theme_mode: display.themeMode,
         theme_bg_primary_light: display.themeColours.bgPrimaryLight,
@@ -650,6 +657,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       binary_unused_colour: display.binaryUnusedColour,
       discovery_history_buffer: general.discoveryHistoryBuffer,
       query_result_limit: general.queryResultLimit,
+      session_manager_stats_interval: general.sessionManagerStatsInterval,
       // Theme settings
       theme_mode: display.themeMode,
       theme_bg_primary_light: display.themeColours.bgPrimaryLight,
@@ -969,6 +977,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setQueryResultLimit: (limit) => {
     set((state) => ({
       general: { ...state.general, queryResultLimit: limit },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setSessionManagerStatsInterval: (interval) => {
+    set((state) => ({
+      general: { ...state.general, sessionManagerStatsInterval: interval },
     }));
     scheduleSave(get().saveSettings);
   },

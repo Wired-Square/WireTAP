@@ -71,6 +71,11 @@ export const badgeSmallPurple = `${badgeSmallBase} bg-purple-600/20 text-purple-
  */
 export const badgeSmallInfo = `${badgeSmallBase} bg-blue-600/20 text-blue-600`;
 
+/**
+ * Small danger badge - red, for errors/critical states
+ */
+export const badgeSmallDanger = `${badgeSmallBase} bg-red-600/20 text-red-600`;
+
 // ============================================================================
 // Data Panel Badges - for use in data views (e.g., decoder view)
 // These use CSS variables for proper light/dark theme support on Windows.
