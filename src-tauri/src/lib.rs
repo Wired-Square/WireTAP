@@ -266,6 +266,11 @@ async fn create_main_window(app: AppHandle, label: String) -> Result<(), String>
         let label_for_window = label.clone();
         // Run window creation on the main thread
         let _ = app_for_spawn.run_on_main_thread(move || {
+            // Check again inside the spawned closure - another task may have created
+            // the window between the initial check and now (race condition)
+            if app_for_window.get_webview_window(&label_for_window).is_some() {
+                return; // Window already created by another call
+            }
             let config = get_window_config("main");
             if let Err(e) = WebviewWindowBuilder::new(&app_for_window, &label_for_window, WebviewUrl::App("/".into()))
                 .title(config.title)
@@ -597,6 +602,7 @@ pub fn run() {
             sessions::create_buffer_reader_session,
             sessions::transition_to_buffer_reader,
             sessions::switch_session_to_buffer_replay,
+            sessions::resume_session_to_live,
             sessions::step_buffer_frame,
             sessions::session_transmit_frame,
             // Listener registration API

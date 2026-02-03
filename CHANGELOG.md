@@ -6,6 +6,23 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Session Stop/Buffer Playback Flow**: Live sessions can now be stopped to enter buffer playback mode, then resumed back to live capture. The flow is:
+  - **Stop**: Switches session to BufferReader for timeline playback (scrub, pause, step)
+  - **Buffer Playback**: Timeline controls appear for reviewing captured frames
+  - **Resume**: Orphans old buffer and starts fresh live capture with a new buffer
+  - Sessions remain alive through all transitions - apps stay connected without needing to rejoin
+  - Resume button appears in both realtime stopped mode and buffer playback mode
+  - All apps listening to a session clear their frames when any app resumes to live
+- **Buffer Sessions in IO Picker**: Buffer replay sessions now appear in the Active Sessions list with:
+  - Play icon with cyan styling to distinguish from live sessions
+  - "Playing" badge (blue) when actively playing buffer
+  - "Paused" badge (blue) when buffer playback is paused
+  - Original profile name shown as "(buffer replay)" subtitle
+  - Paused sessions are now joinable (previously filtered out)
+- **Centralised IO Picker Handlers**: New `useIOPickerHandlers` hook provides consistent IO picker behaviour across apps:
+  - Uses `isStreaming` (session is running) rather than `isWatching` (app initiated watch)
+  - Ensures dialog state updates correctly even when joined to another app's session
+  - Discovery now uses this hook for consistent behaviour with Decoder
 - **Session Manager Log Tab**: Session Manager app now has Visual and Log tabs. The Log tab provides development debugging with:
   - Timestamped session lifecycle events (created, destroyed, state changes)
   - Stream events (ended, complete, error, suspended, resuming)
@@ -84,9 +101,15 @@ All notable changes to CANdor will be documented in this file.
   - All apps clear their state and reset frame counts when any app reconfigures the session
   - New `session-reconfigured` event notifies listeners of time range changes
   - New `reconfigure_reader_session` Tauri command and `reconfigureReaderSession` API
+- **Session Manager Stats Interval**: Configurable interval for Session Manager statistics refresh in Settings → General (default 60 seconds, 0 to disable).
 
 ### Changed
 
+- **Simplified Session Controls**: Replaced the complex detach/rejoin pattern with a single "Leave" action:
+  - Stop no longer auto-leaves the session (session stays alive for resume)
+  - Sessions are destroyed when the last listener leaves via heartbeat cleanup
+  - ReaderButton now displays session ID and status dot (green=running, yellow=paused, amber=stopped)
+  - Multi-source session IDs use data-type prefixes: `f_` for frames, `b_` for bytes, `t_` for timeline/recorded
 - **Discovery Error Dialog Migration**: Discovery app now uses the global error dialog (`appErrorDialog` in `sessionStore`) instead of its own local error state. This consolidates error handling across all apps and removes duplicate `ErrorDialog` render from Discovery.
 - **IO Picker Buffer Section**: Renamed "Orphaned Buffers" to "Buffers" in the IO Reader Picker dialog for clarity.
 - **Buffer Naming**: Buffers are now named after their session ID (e.g., "postgres_5a5282") instead of device-specific descriptions (e.g., "PostgreSQL 10.0.50.1:5432/candor"). The IO picker displays buffers as "Frames: {session_id}" or "Bytes: {session_id}".
@@ -98,6 +121,7 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Window Creation Race Condition**: Fixed race condition where multiple concurrent calls to create the main window could result in duplicate window creation attempts.
 - **IO Picker Controls After Detach**: Fixed IO picker showing "Rejoin" button and "Multi-Bus" indicator after detaching from a session with a buffer copy. The session shape now distinguishes between:
   - **Play**: Actively streaming, appending to buffer
   - **Stop**: Session alive, buffer finalised but owned by session
