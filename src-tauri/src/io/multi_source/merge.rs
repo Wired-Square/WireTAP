@@ -12,7 +12,7 @@ use super::types::{SourceConfig, TransmitChannels};
 use crate::buffer_store::{self, TimestampedByte};
 use crate::io::serial::SerialRawBytesPayload;
 use crate::io::types::SourceMessage;
-use crate::io::{emit_frames, emit_session_error, emit_stream_ended, emit_to_session, FrameMessage};
+use crate::io::{emit_device_connected, emit_frames, emit_session_error, emit_stream_ended, emit_to_session, FrameMessage};
 
 /// Main merge task that spawns sub-readers and combines their frames/bytes
 pub(super) async fn run_merge_task(
@@ -161,6 +161,13 @@ pub(super) async fn run_merge_task(
                     if let Ok(mut channels) = transmit_channels.lock() {
                         channels.insert(source_idx, tx_sender);
                     }
+                }
+                SourceMessage::Connected(source_idx, device_type, address, bus_number) => {
+                    eprintln!(
+                        "[MultiSourceReader] Source {} connected: {} at {}",
+                        source_idx, device_type, address
+                    );
+                    emit_device_connected(&app, &session_id, &device_type, &address, bus_number);
                 }
             },
             Ok(None) => {

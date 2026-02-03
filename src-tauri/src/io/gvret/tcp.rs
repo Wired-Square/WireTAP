@@ -202,6 +202,12 @@ pub async fn run_source(
         source_idx, host, port
     );
 
+    // Emit device-connected event
+    let address = format!("{}:{}", host, port);
+    let _ = tx
+        .send(SourceMessage::Connected(source_idx, "gvret_tcp".to_string(), address, None))
+        .await;
+
     // Wrap write_half in Arc<Mutex> so it can be shared with transmit handling
     let write_half = Arc::new(tokio::sync::Mutex::new(write_half));
     let write_half_for_transmit = write_half.clone();

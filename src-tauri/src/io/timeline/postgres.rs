@@ -11,8 +11,8 @@ use tokio_postgres::{NoTls, Row};
 
 use super::base::{TimelineControl, TimelineReaderState};
 use crate::io::{
-    emit_frames, emit_stream_ended, emit_to_session, FrameMessage, IOCapabilities, IODevice,
-    IOState, PlaybackPosition,
+    emit_frames, emit_stream_ended, emit_to_session, emit_buffer_orphaned, emit_buffer_created,
+    FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition,
 };
 use crate::buffer_store::{self, BufferType};
 
@@ -273,10 +273,12 @@ async fn run_postgres_stream(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Orphan any existing buffer owned by this session (e.g., from a previous bookmark jump)
     // This makes the old buffer selectable in "Orphaned Buffers" while creating a fresh one
-    buffer_store::orphan_buffers_for_session(&session_id);
+    let orphaned = buffer_store::orphan_buffers_for_session(&session_id);
+    emit_buffer_orphaned(&app_handle, &session_id, orphaned);
 
     // Create a new frame buffer for this PostgreSQL session (named after session ID)
     let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
+    emit_buffer_created(&app_handle, &session_id, &buffer_id, &session_id, "frames");
     // Assign buffer ownership to this session
     let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
 

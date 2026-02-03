@@ -23,7 +23,7 @@ use std::sync::{
 use tauri::AppHandle;
 use tokio::time::Duration;
 
-use crate::io::{emit_frames, emit_stream_ended, emit_to_session, now_us, FrameMessage, IOCapabilities, IODevice, IOState};
+use crate::io::{emit_device_connected, emit_frames, emit_stream_ended, emit_to_session, now_us, FrameMessage, IOCapabilities, IODevice, IOState};
 use crate::buffer_store::{self, BufferType};
 
 // ============================================================================
@@ -275,6 +275,10 @@ fn spawn_mqtt_stream(
             "[MQTT:{}] Connected to {}:{}, subscribed to '{}'",
             session_id, config.host, config.port, config.topic
         );
+
+        // Emit device-connected event
+        let address = format!("{}:{}", config.host, config.port);
+        emit_device_connected(&app_handle, &session_id, "mqtt", &address, None);
 
         // Process incoming messages
         loop {

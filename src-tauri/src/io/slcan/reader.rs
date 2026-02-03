@@ -533,6 +533,11 @@ pub async fn run_source(
         source_idx, port_path, bitrate, silent_mode
     );
 
+    // Emit device-connected event
+    let _ = tx
+        .send(SourceMessage::Connected(source_idx, "slcan".to_string(), port_path.clone(), None))
+        .await;
+
     // Read loop (blocking)
     let tx_clone = tx.clone();
     let stop_flag_clone = stop_flag.clone();

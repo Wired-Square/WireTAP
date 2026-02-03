@@ -390,6 +390,11 @@ mod linux_impl {
             source_idx, interface
         );
 
+        // Emit device-connected event
+        let _ = tx
+            .send(SourceMessage::Connected(source_idx, "socketcan".to_string(), interface.clone(), None))
+            .await;
+
         // Read loop (blocking)
         let tx_clone = tx.clone();
         let stop_flag_clone = stop_flag.clone();

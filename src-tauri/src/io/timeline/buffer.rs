@@ -144,11 +144,19 @@ impl IODevice for BufferReader {
     }
 
     fn state(&self) -> IOState {
+        // If stream completed naturally, report as stopped so start() can be called to restart
+        if self.completed_flag.load(Ordering::Relaxed) {
+            return IOState::Stopped;
+        }
         self.reader_state.state()
     }
 
     fn session_id(&self) -> &str {
         self.reader_state.session_id()
+    }
+
+    fn device_type(&self) -> &'static str {
+        "buffer"
     }
 }
 

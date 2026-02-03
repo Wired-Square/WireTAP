@@ -200,6 +200,11 @@ pub async fn run_source(
         source_idx, port
     );
 
+    // Emit device-connected event
+    let _ = tx
+        .send(SourceMessage::Connected(source_idx, "gvret_usb".to_string(), port.clone(), None))
+        .await;
+
     // Read loop (blocking, so we run it in a blocking task)
     let tx_clone = tx.clone();
     let stop_flag_clone = stop_flag.clone();

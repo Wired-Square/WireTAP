@@ -22,7 +22,7 @@ use super::traits::{get_traits_for_profile_kind, validate_session_traits};
 use super::types::{SourceMessage, TransmitRequest};
 use super::{
     CanTransmitFrame, IOCapabilities, IODevice, IOState, InterfaceTraits, Protocol, TemporalMode,
-    TransmitPayload, TransmitResult,
+    TransmitPayload, TransmitResult, emit_buffer_orphaned, emit_buffer_created,
 };
 use crate::buffer_store::{self, BufferType};
 
@@ -378,7 +378,8 @@ impl IODevice for MultiSourceReader {
 
         // Orphan any existing buffer owned by this session (e.g., from a previous bookmark jump)
         // This makes the old buffer selectable in "Orphaned Buffers" while creating a fresh one
-        buffer_store::orphan_buffers_for_session(&self.session_id);
+        let orphaned = buffer_store::orphan_buffers_for_session(&self.session_id);
+        emit_buffer_orphaned(&self.app, &self.session_id, orphaned);
 
         // Create appropriate buffer(s) for this multi-source session
         // We may need both a Frames buffer (for CAN, framed serial) and a Bytes buffer (for raw serial)
@@ -388,6 +389,7 @@ impl IODevice for MultiSourceReader {
         if has_framing {
             // Create a frames buffer as active (for frame operations)
             let buffer_id = buffer_store::create_buffer(BufferType::Frames, self.session_id.clone());
+            emit_buffer_created(&self.app, &self.session_id, &buffer_id, &self.session_id, "frames");
             // Assign buffer ownership to this session
             let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
         }
@@ -399,12 +401,14 @@ impl IODevice for MultiSourceReader {
                     BufferType::Bytes,
                     self.session_id.clone(),
                 );
+                emit_buffer_created(&self.app, &self.session_id, &bytes_id, &self.session_id, "bytes");
                 // Assign buffer ownership to this session
                 let _ = buffer_store::set_buffer_owner(&bytes_id, &self.session_id);
                 bytes_buffer_id = Some(bytes_id);
             } else {
                 // Only raw bytes - create a bytes buffer as active
                 let buffer_id = buffer_store::create_buffer(BufferType::Bytes, self.session_id.clone());
+                emit_buffer_created(&self.app, &self.session_id, &buffer_id, &self.session_id, "bytes");
                 // Assign buffer ownership to this session
                 let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
             }

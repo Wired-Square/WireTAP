@@ -670,6 +670,11 @@ pub async fn run_source(
         source_idx, port_path, baud_rate, framing_encoding, emit_raw_bytes, output_bus
     );
 
+    // Emit device-connected event
+    let _ = tx
+        .send(SourceMessage::Connected(source_idx, "serial".to_string(), port_path.clone(), Some(output_bus)))
+        .await;
+
     // Read loop (blocking)
     let tx_clone = tx.clone();
     let stop_flag_clone = stop_flag.clone();

@@ -818,6 +818,12 @@ pub async fn run_source(
         source_idx, bus, address, bitrate, listen_only
     );
 
+    // Emit device-connected event
+    let addr_str = format!("{}:{}", bus, address);
+    let _ = tx
+        .send(SourceMessage::Connected(source_idx, "gs_usb".to_string(), addr_str, Some(channel)))
+        .await;
+
     // Bulk IN endpoint
     let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(0x81) {
         Ok(ep) => ep,
