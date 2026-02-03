@@ -5,7 +5,7 @@ import type { IOProfile } from "../../hooks/useSettings";
 import type { Session } from "../../stores/sessionStore";
 import type { ActiveSessionInfo, ProfileUsageInfo } from "../../api/io";
 import { CSV_EXTERNAL_ID, isRealtimeProfile, isMultiSourceCapable } from "./utils";
-import { badgeSmallNeutral, badgeSmallSuccess, badgeSmallWarning, badgeSmallPurple } from "../../styles/badgeStyles";
+import { badgeSmallNeutral, badgeSmallSuccess, badgeSmallWarning, badgeSmallPurple, badgeSmallInfo } from "../../styles/badgeStyles";
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
@@ -181,9 +181,9 @@ export default function ReaderList({
     );
   }
 
-  // Filter active sessions to show joinable ones (running, starting, or stopped)
+  // Filter active sessions to show joinable ones (running, starting, paused, or stopped)
   const joinableSessions = activeMultiSourceSessions.filter(
-    (s) => s.state === "running" || s.state === "starting" || s.state === "stopped"
+    (s) => s.state === "running" || s.state === "starting" || s.state === "paused" || s.state === "stopped"
   );
 
   // Get profile info for single-profile sessions
@@ -194,6 +194,7 @@ export default function ReaderList({
   // Get display info for a session
   const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
     const isMultiSource = session.deviceType === "multi_source";
+    const isBuffer = session.deviceType === "buffer";
     // Always use session ID as the primary display name
     const displayName = session.sessionId;
 
@@ -223,6 +224,25 @@ export default function ReaderList({
         bgHover: `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-purple)]`,
         indicatorColour: "border-[color:var(--text-purple)]",
         dotColour: "bg-[var(--text-purple)]",
+      };
+    } else if (isBuffer) {
+      // Buffer replay session (stopped live session switched to buffer playback)
+      // Look up original profile from session's source profiles
+      const sourceProfileIds = session.sourceProfileIds ?? [];
+      const originalProfile = sourceProfileIds.length > 0
+        ? readProfiles.find((p) => sourceProfileIds.includes(p.id))
+        : null;
+      const profileName = originalProfile?.name || "Buffer";
+      return {
+        displayName,
+        subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
+        sourceDetails: `${profileName} (buffer replay)`,
+        icon: Play,
+        iconColour: "text-[color:var(--text-cyan)]",
+        bgSelected: "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]",
+        bgHover: `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-cyan)]`,
+        indicatorColour: "border-[color:var(--text-cyan)]",
+        dotColour: "bg-[var(--text-cyan)]",
       };
     } else {
       // Single-source session (e.g., PostgreSQL)
@@ -282,13 +302,17 @@ export default function ReaderList({
                   <div className="flex-1 min-w-0">
                     <div className={`${textMedium} truncate flex items-center gap-2`}>
                       <span>{info.displayName}</span>
-                      {session.state !== "stopped" && (
+                      {session.state !== "stopped" && session.deviceType !== "buffer" && (
                         <Radio className={`${iconXs} text-green-500 animate-pulse`} />
                       )}
                     </div>
                     <div className={`${caption} flex items-center gap-2`}>
                       {session.state === "stopped" ? (
                         <span className={badgeSmallWarning}>Stopped</span>
+                      ) : session.state === "paused" && session.deviceType === "buffer" ? (
+                        <span className={badgeSmallInfo}>Paused</span>
+                      ) : session.deviceType === "buffer" ? (
+                        <span className={badgeSmallInfo}>Playing</span>
                       ) : (
                         <span className={badgeSmallSuccess}>Live</span>
                       )}

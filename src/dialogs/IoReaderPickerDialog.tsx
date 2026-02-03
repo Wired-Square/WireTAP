@@ -399,10 +399,13 @@ export default function IoReaderPickerDialog({
       try {
         const sessions = await listActiveSessions();
         console.log("[IoReaderPickerDialog] All active sessions:", sessions);
-        // Show multi_source sessions AND recorded-source sessions (supports_time_range)
-        // This allows apps to join PostgreSQL sessions from other apps
+        // Show joinable sessions:
+        // - multi_source: multi-bus sessions
+        // - buffer: sessions switched to buffer replay (e.g., stopped live sessions)
+        // - supports_time_range && !is_realtime: recorded sources like PostgreSQL
         const joinableSessions = sessions.filter((s) =>
           s.deviceType === "multi_source" ||
+          s.deviceType === "buffer" ||
           (s.capabilities.supports_time_range && !s.capabilities.is_realtime)
         );
         console.log("[IoReaderPickerDialog] Joinable sessions:", joinableSessions);
