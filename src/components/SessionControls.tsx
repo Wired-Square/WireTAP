@@ -1,9 +1,9 @@
 // src/components/SessionControls.tsx
 //
 // Shared session control components for top bars.
-// Handles reader display, stop/resume/detach/rejoin controls.
+// Handles reader display, stop/resume/leave controls.
 
-import { Star, FileText, Square, Unplug, Plug, Play, GitMerge, Bookmark } from "lucide-react";
+import { Star, FileText, Square, Play, GitMerge, Bookmark, LogOut } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
 import type { BufferMetadata } from "../api/buffer";
@@ -12,7 +12,6 @@ import {
   buttonBase,
   dangerButtonBase,
   warningButtonBase,
-  successButtonBase,
   successIconButton,
 } from "../styles/buttonStyles";
 
@@ -33,6 +32,10 @@ export interface ReaderButtonProps {
   bufferMetadata?: BufferMetadata | null;
   /** Default read profile ID (for star icon) */
   defaultReadProfileId?: string | null;
+  /** Current session ID (e.g., "f_abc123") - displayed in nav bar */
+  sessionId?: string | null;
+  /** Current IO state (running, stopped, paused, error) */
+  ioState?: string | null;
   /** Click handler to open reader picker */
   onClick: () => void;
   /** Whether button should be disabled (e.g., while streaming) */
@@ -44,8 +47,10 @@ export function ReaderButton({
   ioProfiles,
   multiBusMode = false,
   multiBusProfiles = [],
-  bufferMetadata,
+  bufferMetadata: _bufferMetadata,
   defaultReadProfileId,
+  sessionId,
+  ioState,
   onClick,
   disabled = false,
 }: ReaderButtonProps) {
@@ -60,20 +65,40 @@ export function ReaderButton({
 
   // Determine display name (buffer takes precedence over multi-bus)
   let displayName: string;
+  // Track whether sessionId is already shown in displayName (to avoid duplication)
+  let sessionIdInDisplayName = false;
   if (isBufferProfile) {
-    displayName = `Buffer: ${bufferMetadata?.name || "Buffer"}`;
+    // Buffer: just show the buffer ID (e.g., "buf_123")
+    displayName = ioProfile || "Buffer";
+    sessionIdInDisplayName = true; // buffer ID is the session ID
   } else if (showAsMultiBus) {
-    displayName = `Multi-Bus (${multiBusProfiles.length})`;
+    // Multi-bus: show sessionId with profile count (e.g., "f_abc123 (2)")
+    displayName = sessionId
+      ? `${sessionId} (${multiBusProfiles.length})`
+      : `Multi-Bus (${multiBusProfiles.length})`;
+    sessionIdInDisplayName = !!sessionId;
   } else if (selectedProfile) {
     displayName = selectedProfile.name;
   } else if (ioProfile) {
-    // No matching profile - show the session ID (e.g., "postgres_8852db")
+    // No matching profile - show the session ID (e.g., "t_8852db")
     displayName = ioProfile;
   } else {
     displayName = "No reader";
   }
 
   const isDefaultReader = !isBufferProfile && !showAsMultiBus && selectedProfile?.id === defaultReadProfileId;
+
+  // Determine status dot colour based on ioState
+  const getStatusColour = (): string | null => {
+    if (!ioState || !ioProfile) return null;
+    if (ioState === "running") return "bg-green-500";
+    if (ioState === "paused") return "bg-yellow-500";
+    if (ioState === "stopped") return "bg-[color:var(--text-muted)]";
+    if (ioState === "starting") return "bg-blue-500 animate-pulse";
+    if (ioState.startsWith("Error")) return "bg-red-500";
+    return null;
+  };
+  const statusColour = getStatusColour();
 
   return (
     <button
@@ -89,13 +114,22 @@ export function ReaderButton({
       ) : isDefaultReader ? (
         <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
       ) : null}
+      {statusColour && (
+        <span
+          className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColour}`}
+          title={ioState ?? undefined}
+        />
+      )}
       <span className="max-w-40 truncate">{displayName}</span>
+      {sessionId && !sessionIdInDisplayName && (
+        <span className="text-[color:var(--text-muted)] text-xs font-mono">{sessionId}</span>
+      )}
     </button>
   );
 }
 
 // ============================================================================
-// Session Action Buttons - stop, resume, detach, rejoin
+// Session Action Buttons - stop, resume, leave
 // ============================================================================
 
 export interface SessionActionButtonsProps {
@@ -103,20 +137,16 @@ export interface SessionActionButtonsProps {
   isStreaming: boolean;
   /** Whether the session is stopped but can be resumed */
   isStopped?: boolean;
-  /** Whether we've detached from the session */
-  isDetached?: boolean;
-  /** Number of apps connected to this session */
-  joinerCount?: number;
   /** Whether the IO source supports time range filtering (shows bookmark button) */
   supportsTimeRange?: boolean;
+  /** Whether we're connected to a live session (not a buffer) - enables Leave button */
+  isLiveSession?: boolean;
   /** Stop the session */
   onStop?: () => void;
   /** Resume a stopped session */
   onResume?: () => void;
-  /** Detach from a shared session without stopping */
-  onDetach?: () => void;
-  /** Rejoin after detaching */
-  onRejoin?: () => void;
+  /** Leave the session (last to leave triggers auto-destroy) */
+  onLeave?: () => void;
   /** Open bookmark picker (for time range sources) */
   onOpenBookmarkPicker?: () => void;
 }
@@ -124,15 +154,16 @@ export interface SessionActionButtonsProps {
 export function SessionActionButtons({
   isStreaming,
   isStopped = false,
-  isDetached = false,
-  joinerCount = 1,
   supportsTimeRange = false,
+  isLiveSession = false,
   onStop,
   onResume,
-  onDetach,
-  onRejoin,
+  onLeave,
   onOpenBookmarkPicker,
 }: SessionActionButtonsProps) {
+  // Show Leave for live sessions
+  const showSessionManagement = isLiveSession;
+
   return (
     <>
       {/* Bookmark button - shown when source supports time range */}
@@ -158,7 +189,7 @@ export function SessionActionButtons({
       )}
 
       {/* Resume button - shown when session is stopped but profile is selected */}
-      {isStopped && !isDetached && onResume && (
+      {isStopped && onResume && (
         <button
           onClick={onResume}
           className={successIconButton}
@@ -168,26 +199,14 @@ export function SessionActionButtons({
         </button>
       )}
 
-      {/* Detach button - only shown when streaming and multiple apps are connected */}
-      {isStreaming && joinerCount > 1 && onDetach && (
+      {/* Leave button - shown when joined to a live session */}
+      {showSessionManagement && onLeave && (
         <button
-          onClick={onDetach}
+          onClick={onLeave}
           className={warningButtonBase}
-          title="Detach from shared session (keeps streaming for other apps)"
+          title="Leave session"
         >
-          <Unplug className={iconSm} />
-        </button>
-      )}
-
-      {/* Rejoin button - shown when detached from a session */}
-      {isDetached && onRejoin && (
-        <button
-          onClick={onRejoin}
-          className={successButtonBase}
-          title="Rejoin Session"
-        >
-          <Plug className={iconSm} />
-          <span>Rejoin</span>
+          <LogOut className={iconSm} />
         </button>
       )}
     </>
@@ -212,6 +231,10 @@ export interface IOSessionControlsProps {
   bufferMetadata?: BufferMetadata | null;
   /** Default read profile ID (for star icon) */
   defaultReadProfileId?: string | null;
+  /** Current session ID (e.g., "f_abc123") - displayed in nav bar */
+  sessionId?: string | null;
+  /** Current IO state (running, stopped, paused, error) */
+  ioState?: string | null;
   /** Click handler to open reader picker */
   onOpenIoReaderPicker: () => void;
 
@@ -228,20 +251,14 @@ export interface IOSessionControlsProps {
   isStreaming: boolean;
   /** Whether the session is stopped but can be resumed */
   isStopped?: boolean;
-  /** Whether we've detached from the session */
-  isDetached?: boolean;
-  /** Number of apps connected to this session */
-  joinerCount?: number;
   /** Whether the IO source supports time range filtering */
   supportsTimeRange?: boolean;
   /** Stop the session */
   onStop?: () => void;
   /** Resume a stopped session */
   onResume?: () => void;
-  /** Detach from a shared session without stopping */
-  onDetach?: () => void;
-  /** Rejoin after detaching */
-  onRejoin?: () => void;
+  /** Leave the session (last to leave triggers auto-destroy) */
+  onLeave?: () => void;
   /** Open bookmark picker (for time range sources) */
   onOpenBookmarkPicker?: () => void;
   /** Hide session action buttons (for buffer mode where playback controls are elsewhere) */
@@ -250,7 +267,7 @@ export interface IOSessionControlsProps {
 
 /**
  * Combined IO session controls component.
- * Includes reader button, speed picker button, and session action buttons (stop/resume/detach/rejoin/bookmark).
+ * Includes reader button, speed picker button, and session action buttons (stop/resume/leave/bookmark).
  * Use this instead of separate ReaderButton + SessionActionButtons for consistent layout.
  */
 export function IOSessionControls({
@@ -261,6 +278,8 @@ export function IOSessionControls({
   multiBusProfiles = [],
   bufferMetadata,
   defaultReadProfileId,
+  sessionId,
+  ioState,
   onOpenIoReaderPicker,
   // Speed props
   speed = 1,
@@ -269,19 +288,18 @@ export function IOSessionControls({
   // Session action props
   isStreaming,
   isStopped = false,
-  isDetached = false,
-  joinerCount = 1,
   supportsTimeRange = false,
   onStop,
   onResume,
-  onDetach,
-  onRejoin,
+  onLeave,
   onOpenBookmarkPicker,
   hideSessionControls = false,
 }: IOSessionControlsProps) {
   // Auto-hide session controls when in buffer mode (playback controls are in the toolbar instead)
   const isBufferMode = isBufferProfileId(ioProfile);
   const shouldHideControls = hideSessionControls || isBufferMode;
+  // Live session = we have an ioProfile that's not a buffer
+  const isLiveSession = ioProfile !== null && !isBufferMode;
 
   return (
     <>
@@ -293,6 +311,8 @@ export function IOSessionControls({
         multiBusProfiles={multiBusProfiles}
         bufferMetadata={bufferMetadata}
         defaultReadProfileId={defaultReadProfileId}
+        sessionId={sessionId}
+        ioState={ioState}
         onClick={onOpenIoReaderPicker}
         disabled={isStreaming && !isBufferMode}
       />
@@ -308,18 +328,16 @@ export function IOSessionControls({
         </button>
       )}
 
-      {/* Session control buttons (bookmark, stop, resume, detach, rejoin) - hidden in buffer mode */}
+      {/* Session control buttons (bookmark, stop, resume, leave) - hidden in buffer mode */}
       {!shouldHideControls && (
         <SessionActionButtons
           isStreaming={isStreaming}
           isStopped={isStopped}
-          isDetached={isDetached}
-          joinerCount={joinerCount}
           supportsTimeRange={supportsTimeRange}
+          isLiveSession={isLiveSession}
           onStop={onStop}
           onResume={onResume}
-          onDetach={onDetach}
-          onRejoin={onRejoin}
+          onLeave={onLeave}
           onOpenBookmarkPicker={onOpenBookmarkPicker}
         />
       )}
