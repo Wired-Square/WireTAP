@@ -217,10 +217,7 @@ export default function Query() {
     skipReader,
     isStreaming,
     isStopped,
-    joinerCount,
-    isDetached,
-    handleDetach,
-    handleRejoin,
+    handleLeave,
     capabilities,
     session,
   } = manager;
@@ -400,13 +397,10 @@ export default function Query() {
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
           isStreaming={isStreaming}
           isStopped={isStopped}
-          joinerCount={joinerCount}
-          isDetached={isDetached}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
           onStop={stopWatch}
           onResume={session.start}
-          onDetach={handleDetach}
-          onRejoin={handleRejoin}
+          onLeave={handleLeave}
         />
       }
     >

@@ -14,11 +14,17 @@ type Props = {
   onIoProfileChange: (id: string | null) => void;
   defaultReadProfileId?: string | null;
   bufferMetadata?: BufferMetadata | null;
+  /** Current session ID (e.g., "f_abc123") */
+  sessionId?: string | null;
   isStreaming: boolean;
   /** Whether multi-bus mode is active */
   multiBusMode?: boolean;
   /** Profile IDs when in multi-bus mode */
   multiBusProfiles?: string[];
+  /** Current IO state (running, stopped, paused, error) */
+  ioState?: string | null;
+  /** Whether the session is a realtime source (not buffer replay) */
+  isRealtime?: boolean;
 
   // Stop control (Watch is initiated via data source dialog)
   onStopWatch?: () => void;
@@ -26,14 +32,8 @@ type Props = {
   isStopped?: boolean;
   /** Called when user wants to resume a stopped session */
   onResume?: () => void;
-  /** Number of apps connected to this session (for Detach button) */
-  joinerCount?: number;
-  /** Called when user wants to detach from shared session without stopping */
-  onDetach?: () => void;
-  /** Whether we've detached from the session but still have profile selected */
-  isDetached?: boolean;
-  /** Called when user wants to rejoin after detaching */
-  onRejoin?: () => void;
+  /** Called when user wants to leave session (session continues running) */
+  onLeave?: () => void;
   /** Whether the IO source supports time range filtering */
   supportsTimeRange?: boolean;
   /** Called to open bookmark picker */
@@ -78,16 +78,16 @@ export default function DiscoveryTopBar({
   ioProfile,
   defaultReadProfileId,
   bufferMetadata,
+  sessionId,
   isStreaming,
   multiBusMode = false,
   multiBusProfiles = [],
+  ioState,
+  isRealtime = true,
   onStopWatch,
   isStopped = false,
   onResume,
-  joinerCount = 1,
-  onDetach,
-  isDetached = false,
-  onRejoin,
+  onLeave,
   frameCount,
   selectedFrameCount,
   onOpenFramePicker,
@@ -122,19 +122,18 @@ export default function DiscoveryTopBar({
         multiBusProfiles,
         bufferMetadata,
         defaultReadProfileId,
+        sessionId,
+        ioState,
         onOpenIoReaderPicker,
         speed,
         supportsSpeed,
         onOpenSpeedPicker,
         isStreaming,
-        isStopped,
-        isDetached,
-        joinerCount,
+        isStopped, // Show Resume in both realtime and buffer mode (to return to live)
         supportsTimeRange,
-        onStop: onStopWatch,
-        onResume,
-        onDetach,
-        onRejoin,
+        onStop: isRealtime ? onStopWatch : undefined, // Hide Stop when in buffer mode
+        onResume, // Always show Resume when stopped (resumeFresh handles live return)
+        onLeave,
         onOpenBookmarkPicker,
       }}
       framePicker={{

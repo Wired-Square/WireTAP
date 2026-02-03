@@ -1,11 +1,12 @@
 // ui/src/apps/discovery/Discovery.tsx
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { listen, emit } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
+import { useIOPickerHandlers } from '../../hooks/useIOPickerHandlers';
 import { useFocusStore } from '../../stores/focusStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
@@ -28,8 +29,8 @@ import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import SelectionSetPickerDialog from "../../dialogs/SelectionSetPickerDialog";
 import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
 import { isBufferProfileId } from "../../hooks/useIOSessionManager";
-import { clearBuffer as clearBackendBuffer, getBufferMetadata, getBufferMetadataById, getBufferFramesPaginated, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, setActiveBuffer, type BufferMetadata } from "../../api/buffer";
-import { WINDOW_EVENTS, type BufferChangedPayload } from "../../events/registry";
+import { clearBuffer as clearBackendBuffer, getBufferMetadata, getBufferFramesPaginated, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
+import { WINDOW_EVENTS } from "../../events/registry";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import ToolboxDialog from "../../dialogs/ToolboxDialog";
 import { pickFileToSave } from "../../api/dialogs";
@@ -111,7 +112,6 @@ export default function Discovery() {
   const backendByteCount = useDiscoveryStore((state) => state.backendByteCount);
   const incrementBackendByteCount = useDiscoveryStore((state) => state.incrementBackendByteCount);
   const setBackendByteCount = useDiscoveryStore((state) => state.setBackendByteCount);
-  const triggerBufferReady = useDiscoveryStore((state) => state.triggerBufferReady);
   const framedBufferId = useDiscoveryStore((state) => state.framedBufferId);
   const backendFrameCount = useDiscoveryStore((state) => state.backendFrameCount);
   const incrementBackendFrameCount = useDiscoveryStore((state) => state.incrementBackendFrameCount);
@@ -155,80 +155,8 @@ export default function Discovery() {
   // Time range visibility
   const [showTimeRange] = useState(false);
 
-  // Load buffer metadata on mount (in case a CSV was already imported)
-  // Note: Uses setIoProfile directly (not selectProfile) because this runs before
-  // useIOSessionManager is called, and on mount there's no multi-bus state to clear.
-  useEffect(() => {
-    const loadBufferOnMount = async () => {
-      try {
-        const meta = await getBufferMetadata();
-        if (meta && meta.count > 0 && meta.buffer_type === 'frames') {
-          setBufferMetadata(meta);
-          enableBufferMode(meta.count);
-          setIoProfile(meta.id);
-          const frameInfoList = await getBufferFrameInfo();
-          setFrameInfoFromBuffer(frameInfoList);
-        }
-      } catch (e) {
-        // Buffer not available, that's fine
-      }
-    };
-    loadBufferOnMount();
-  }, [enableBufferMode, setFrameInfoFromBuffer, setIoProfile]);
-
-  // Listen for buffer changes from other windows
-  // Only load buffers that belong to Discovery's own session or orphaned buffers
-  // Note: Uses ioProfile as the session identifier since sessionId is derived from it
-  useEffect(() => {
-    const setupListener = async () => {
-      const unlisten = await listen<BufferChangedPayload>(
-        WINDOW_EVENTS.BUFFER_CHANGED,
-        async (event) => {
-          const meta = event.payload.metadata;
-
-          if (!meta) {
-            setBufferMetadata(null);
-            clearSerialBytes();
-            resetFraming();
-            return;
-          }
-
-          // Only process buffers owned by Discovery's current profile/session
-          // Skip buffers from other apps' sessions to prevent cross-app interference
-          // Note: For most sources, owning_session_id equals the profile ID
-          const bufferOwnedByUs = meta.owning_session_id === ioProfile ||
-            (meta.owning_session_id?.startsWith(ioProfile || "") && ioProfile);
-
-          // If buffer belongs to another session and we have a profile, ignore it
-          if (meta.owning_session_id && ioProfile && !bufferOwnedByUs) {
-            console.log(`[Discovery] Ignoring BUFFER_CHANGED from other session: ${meta.owning_session_id} (our profile: ${ioProfile})`);
-            return;
-          }
-
-          setBufferMetadata(meta);
-
-          if (meta.count > 0 && meta.buffer_type === 'frames') {
-            enableBufferMode(meta.count);
-            // Note: Uses setIoProfile directly because this runs before useIOSessionManager,
-            // and buffer events from other windows don't involve multi-bus state.
-            setIoProfile(meta.id);
-            try {
-              const frameInfoList = await getBufferFrameInfo();
-              setFrameInfoFromBuffer(frameInfoList);
-            } catch (e) {
-              console.error("Failed to load frame info from buffer:", e);
-            }
-          }
-        }
-      );
-      return unlisten;
-    };
-
-    const unlistenPromise = setupListener();
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
-  }, [ioProfile, enableBufferMode, setFrameInfoFromBuffer, clearSerialBytes, resetFraming, setIoProfile]);
+  // NOTE: Auto-join buffer on mount and BUFFER_CHANGED events removed.
+  // Discovery should NOT automatically join buffer sessions.
 
   // Callbacks for reader session
   // Note: Watch frame counting is handled by useIOSessionManager
@@ -408,33 +336,24 @@ export default function Discovery() {
     isStreaming,
     isPaused,
     isStopped,
+    canReturnToLive,
     isRealtime,
     sessionReady,
     capabilities,
     joinerCount,
-    // Detach/rejoin
-    isDetached,
-    handleDetach,
-    handleRejoin,
-    // Watch state
-    watchFrameCount,
+    handleLeave,
+    // Watch state (used by ioPickerProps hook)
     resetWatchFrameCount,
-    // Ingest state
-    isIngesting,
-    ingestProfileId,
-    ingestFrameCount,
-    ingestError,
-    stopIngest,
     // Session switching methods
     watchSingleSource,
     watchMultiSource,
     ingestSingleSource,
     ingestMultiSource,
     stopWatch,
+    resumeWithNewBuffer,
     selectProfile,
     selectMultipleProfiles,
     joinSession,
-    skipReader,
     // Bookmark methods
     jumpToBookmark,
   } = manager;
@@ -442,12 +361,8 @@ export default function Discovery() {
   // Session controls from the underlying session
   const {
     sessionId,
-    bufferAvailable,
-    bufferId,
+    state: readerState,
     bufferType,
-    bufferCount,
-    bufferOwningSessionId,
-    streamEndedReason,
     start,
     stop,
     pause,
@@ -458,96 +373,19 @@ export default function Discovery() {
     reinitialize,
   } = session;
 
-  // Track previous buffer state to detect when buffer becomes available
-  const prevBufferAvailableRef = useRef(false);
-
-  // Handle stream ended for Watch mode - only switch to buffer when stream completes naturally
-  // (not when stopped explicitly for bookmark jumps, etc.)
-  // Skip for ingest sessions (they use switchSessionToBufferReplay) and cross-app buffers
-  useEffect(() => {
-    // Debug: Log all values on every effect run
-    console.log(`[Discovery] Auto-transition effect: sessionId=${sessionId}, bufferOwningSessionId=${bufferOwningSessionId}, bufferAvailable=${bufferAvailable}, bufferCount=${bufferCount}, bufferId=${bufferId}, streamEndedReason=${streamEndedReason}, prevBufferAvailable=${prevBufferAvailableRef.current}`);
-
-    // Skip auto-transition for:
-    // 1. Ingest sessions (they use switchSessionToBufferReplay)
-    // 2. Buffers owned by OTHER sessions (cross-app buffer creation)
-    const isIngestBuffer = bufferOwningSessionId?.startsWith("ingest_");
-    const isOtherSessionsBuffer = bufferOwningSessionId && bufferOwningSessionId !== sessionId;
-
-    if (isIngestBuffer || isOtherSessionsBuffer) {
-      console.log(`[Discovery] Skipping auto-transition: owningSession=${bufferOwningSessionId}, currentSession=${sessionId}, isIngestBuffer=${isIngestBuffer}, isOtherSession=${isOtherSessionsBuffer}`);
-      prevBufferAvailableRef.current = bufferAvailable;
-      return;
-    }
-
-    if (bufferAvailable && bufferCount > 0 && bufferId && !prevBufferAvailableRef.current && streamEndedReason === "complete") {
-      console.log(`[Discovery] Buffer transition starting - bufferAvailable=${bufferAvailable}, bufferCount=${bufferCount}, bufferId=${bufferId}, bufferType=${bufferType}, streamEndedReason=${streamEndedReason}`);
-      (async () => {
-        const preferredBufferId = (bufferType === "bytes" && framedBufferId) ? framedBufferId : bufferId;
-        console.log(`[Discovery] Using preferredBufferId=${preferredBufferId}, framedBufferId=${framedBufferId}`);
-
-        const meta = await getBufferMetadataById(preferredBufferId);
-        if (meta) {
-          console.log(`[Discovery] Got buffer metadata: type=${meta.buffer_type}, count=${meta.count}`);
-          setBufferMetadata(meta);
-          await emit(WINDOW_EVENTS.BUFFER_CHANGED, {
-            metadata: meta,
-            action: "streamed",
-          });
-
-          if (meta.buffer_type === "bytes") {
-            console.log(`[Discovery] Bytes mode - loading bytes and switching to buffer session`);
-            await setActiveBuffer(meta.id);
-            try {
-              const bytes = await getBufferBytesById(meta.id);
-              const entries = bytes.map((b) => ({
-                byte: b.byte,
-                timestampUs: b.timestamp_us,
-              }));
-              clearSerialBytes(true);
-              resetFraming();
-              addSerialBytes(entries);
-              setBackendByteCount(meta.count);
-              triggerBufferReady();
-            } catch (e) {
-              console.error("Failed to load bytes from buffer:", e);
-            }
-            // Use the actual buffer ID for unique session naming
-            console.log(`[Discovery] Bytes mode - calling setIoProfile(${meta.id})`);
-            setIoProfile(meta.id);
-            console.log(`[Discovery] Bytes mode - calling reinitialize(${meta.id})`);
-            await reinitialize(meta.id, { useBuffer: true });
-            console.log(`[Discovery] Bytes mode - reinitialize complete`);
-            // Stop the session immediately - bytes are already loaded into the store, no streaming needed
-            console.log(`[Discovery] Bytes mode - stopping session (data already loaded)`);
-            await stop();
-            console.log(`[Discovery] Bytes mode - session stopped`);
-          } else {
-            // Frames mode - enable buffer mode and load frame info
-            console.log(`[Discovery] Frames mode - switching to buffer session`);
-            await setActiveBuffer(meta.id);
-            enableBufferMode(meta.count);
-            setMaxBuffer(meta.count);
-            try {
-              const frameInfoList = await getBufferFrameInfo();
-              console.log(`[Discovery] Frames mode - got ${frameInfoList.length} frame info entries`);
-              setFrameInfoFromBuffer(frameInfoList);
-            } catch (e) {
-              console.error("[Discovery] Failed to load frame info:", e);
-            }
-            console.log(`[Discovery] Frames mode - calling setIoProfile(${meta.id})`);
-            setIoProfile(meta.id);
-            console.log(`[Discovery] Frames mode - calling reinitialize(${meta.id})`);
-            await reinitialize(meta.id, { useBuffer: true });
-            console.log(`[Discovery] Frames mode - reinitialize complete`);
-          }
-        }
-      })();
-    }
-    prevBufferAvailableRef.current = bufferAvailable;
-  }, [bufferAvailable, bufferId, bufferCount, bufferType, bufferOwningSessionId, framedBufferId, streamEndedReason, sessionId, setIoProfile, reinitialize, stop, clearSerialBytes, resetFraming, addSerialBytes, triggerBufferReady, setBackendByteCount, enableBufferMode, setMaxBuffer, setFrameInfoFromBuffer]);
-
   // Note: isStreaming, isPaused, isStopped, isRealtime are now provided by useIOSessionManager
+
+  // Centralised IO picker handlers - ensures consistent behavior with other apps
+  const ioPickerProps = useIOPickerHandlers({
+    manager,
+    closeDialog: () => dialogs.ioReaderPicker.close(),
+    onJoinSession: (_sessionId, sourceProfileIds) => {
+      // Discovery-specific: show bus column for multi-source
+      if (sourceProfileIds && sourceProfileIds.length > 1) {
+        setShowBusColumn(true);
+      }
+    },
+  });
 
   // For realtime sources, update clock every second while streaming
   const [realtimeClock, setRealtimeClock] = useState<number | null>(null);
@@ -706,10 +544,6 @@ export default function Discovery() {
     resetWatchFrameCount,
     setBufferMetadata,
 
-    // Detach/rejoin handlers (from manager)
-    handleDetach,
-    handleRejoin,
-
     // Manager session switching methods
     watchSingleSource,
     watchMultiSource,
@@ -825,7 +659,7 @@ export default function Discovery() {
               if (isPaused) {
                 resume();
               } else if (isStopped && sessionReady) {
-                start();
+                resumeWithNewBuffer();
               }
               break;
             case "pause":
@@ -837,12 +671,6 @@ export default function Discovery() {
               // Pause frame delivery (like timeline Pause button)
               if (isStreaming && !isPaused) {
                 pause();
-              }
-              break;
-            case "detach":
-              // Disconnect from shared session (others keep streaming)
-              if (isStreaming && joinerCount > 1) {
-                handleDetach();
               }
               break;
             case "stopAll":
@@ -896,13 +724,8 @@ export default function Discovery() {
     return () => {
       cleanup.then((fn) => fn());
     };
-  }, [isPaused, isStopped, isStreaming, sessionReady, joinerCount, resume, start, pause, stop, stopWatch, handleDetach, handlers, currentTime, dialogs]);
+  }, [isPaused, isStopped, isStreaming, sessionReady, resume, resumeWithNewBuffer, pause, stop, stopWatch, handlers, currentTime, dialogs]);
 
-  // Handle skip for IoReaderPickerDialog
-  const handleSkip = useCallback(async () => {
-    await skipReader();
-    dialogs.ioReaderPicker.close();
-  }, [skipReader, dialogs.ioReaderPicker]);
 
   return (
     <AppLayout
@@ -913,16 +736,16 @@ export default function Discovery() {
           onIoProfileChange={handlers.handleIoProfileChange}
           defaultReadProfileId={settings?.default_read_profile}
           bufferMetadata={bufferMetadata}
+          sessionId={sessionId}
           isStreaming={isStreaming}
           multiBusMode={multiBusMode}
           multiBusProfiles={ioProfiles}
+          ioState={readerState}
+          isRealtime={isRealtime}
           onStopWatch={handlers.handleStop}
-          isStopped={isStopped}
-          onResume={start}
-          joinerCount={joinerCount}
-          onDetach={handlers.handleDetach}
-          isDetached={isDetached}
-          onRejoin={handlers.handleRejoin}
+          isStopped={isStopped || canReturnToLive}
+          onResume={resumeWithNewBuffer}
+          onLeave={handleLeave}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
           onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
           speed={playbackSpeed}
@@ -1080,18 +903,20 @@ export default function Discovery() {
         onImport={setBufferMetadata}
         bufferMetadata={bufferMetadata}
         defaultDir={settings?.dump_dir}
-        isIngesting={isIngesting || isStreaming}
-        ingestProfileId={isIngesting ? ingestProfileId : (isStreaming ? ioProfile : null)}
-        ingestFrameCount={isIngesting ? ingestFrameCount : watchFrameCount}
+        // Use centralized state props for consistent behavior across apps
+        isIngesting={ioPickerProps.isIngesting}
+        ingestProfileId={ioPickerProps.ingestProfileId}
+        ingestFrameCount={ioPickerProps.ingestFrameCount}
+        ingestError={ioPickerProps.ingestError}
         ingestSpeed={playbackSpeed}
         onIngestSpeedChange={(speed) => handlers.handleSpeedChange(speed)}
+        // Keep app-specific handlers for serial config, framing, etc.
         onStartIngest={handlers.handleDialogStartIngest}
         onStartMultiIngest={handlers.handleDialogStartMultiIngest}
-        onStopIngest={isIngesting ? stopIngest : handlers.handleStop}
-        ingestError={ingestError}
-        onJoinSession={handlers.handleJoinSession}
+        onStopIngest={ioPickerProps.onStopIngest}
+        onJoinSession={ioPickerProps.onJoinSession}
         allowMultiSelect={true}
-        onSkip={handleSkip}
+        onSkip={ioPickerProps.onSkip}
       />
 
       <FramePickerDialog

@@ -1,6 +1,6 @@
 // ui/src/apps/transmit/hooks/handlers/useTransmitSessionHandlers.ts
 //
-// Session-related handlers for Transmit: start, stop, resume, detach, rejoin, join, multi-bus.
+// Session-related handlers for Transmit: start, stop, resume, join, multi-bus.
 
 import { useCallback } from "react";
 import type { IngestOptions } from "../../../../hooks/useIOSessionManager";
@@ -20,10 +20,9 @@ export interface UseTransmitSessionHandlersParams {
   reinitialize: (profileId: string) => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  resumeFresh: () => Promise<void>;
   leave: () => Promise<void>;
   rejoin: (sessionId: string) => Promise<void>;
-  managerDetach: () => Promise<void>;
-  managerRejoin: () => Promise<void>;
   startMultiBusSession: (profileIds: string[], options: IngestOptions) => Promise<void>;
 
   // Dialog control
@@ -40,10 +39,9 @@ export function useTransmitSessionHandlers({
   reinitialize,
   start,
   stop,
+  resumeFresh,
   leave,
   rejoin,
-  managerDetach,
-  managerRejoin,
   startMultiBusSession,
   setShowIoPickerDialog,
 }: UseTransmitSessionHandlersParams) {
@@ -88,30 +86,18 @@ export function useTransmitSessionHandlers({
     [multiBusMode, setMultiBusMode, setMultiBusProfiles, setIoProfile, reinitialize, isStreaming, start, setShowIoPickerDialog]
   );
 
-  // Handle stop - also stop all queue repeats and leave session
+  // Handle stop - stop streaming and all queue repeats (but stay connected for resume)
   const handleStop = useCallback(async () => {
     // Stop all active repeats before stopping the session
     await stopAllRepeats();
     await stopAllGroupRepeats();
     await stop();
-    // Leave the session to release single-handle devices (serial, slcan)
-    await leave();
-  }, [stop, leave, stopAllRepeats, stopAllGroupRepeats]);
+  }, [stop, stopAllRepeats, stopAllGroupRepeats]);
 
-  // Handle resume
+  // Handle resume - use resumeFresh to handle returning to live mode from buffer
   const handleResume = useCallback(async () => {
-    await start();
-  }, [start]);
-
-  // Handle detach (leave session without stopping it)
-  const handleDetach = useCallback(async () => {
-    await managerDetach();
-  }, [managerDetach]);
-
-  // Handle rejoin after detaching
-  const handleRejoin = useCallback(async () => {
-    await managerRejoin();
-  }, [managerRejoin]);
+    await resumeFresh();
+  }, [resumeFresh]);
 
   // Handle joining an existing session from the IO picker dialog
   const handleJoinSession = useCallback(
@@ -187,8 +173,6 @@ export function useTransmitSessionHandlers({
     handleStartSession,
     handleStop,
     handleResume,
-    handleDetach,
-    handleRejoin,
     handleJoinSession,
     handleStartMultiIngest,
     handleSkip,

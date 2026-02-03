@@ -132,19 +132,18 @@ export default function AppTopBar({
             multiBusProfiles={ioSession.multiBusProfiles}
             bufferMetadata={ioSession.bufferMetadata}
             defaultReadProfileId={ioSession.defaultReadProfileId}
+            sessionId={ioSession.sessionId}
+            ioState={ioSession.ioState}
             onOpenIoReaderPicker={ioSession.onOpenIoReaderPicker}
             speed={ioSession.speed}
             supportsSpeed={ioSession.supportsSpeed}
             onOpenSpeedPicker={ioSession.onOpenSpeedPicker}
             isStreaming={ioSession.isStreaming ?? false}
             isStopped={ioSession.isStopped}
-            isDetached={ioSession.isDetached}
-            joinerCount={ioSession.joinerCount}
             supportsTimeRange={ioSession.supportsTimeRange}
             onStop={ioSession.onStop}
             onResume={ioSession.onResume}
-            onDetach={ioSession.onDetach}
-            onRejoin={ioSession.onRejoin}
+            onLeave={ioSession.onLeave}
             onOpenBookmarkPicker={ioSession.onOpenBookmarkPicker}
             hideSessionControls={ioSession.hideSessionControls}
           />

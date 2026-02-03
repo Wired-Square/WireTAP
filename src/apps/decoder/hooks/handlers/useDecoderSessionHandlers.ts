@@ -56,10 +56,6 @@ export interface UseDecoderSessionHandlersParams {
   // Watch state (read-only, from manager)
   isWatching: boolean;
 
-  // Detach/rejoin handlers (from manager)
-  handleDetach: () => Promise<void>;
-  handleRejoin: () => Promise<void>;
-
   // Manager session switching methods
   watchSingleSource: (profileId: string, options: ManagerIngestOptions, reinitializeOptions?: Record<string, unknown>) => Promise<void>;
   watchMultiSource: (profileIds: string[], options: ManagerIngestOptions) => Promise<void>;
@@ -91,8 +87,6 @@ export function useDecoderSessionHandlers({
   stopIngest,
   isIngesting,
   isWatching,
-  handleDetach,
-  handleRejoin,
   watchSingleSource,
   watchMultiSource,
   stopWatch,
@@ -237,9 +231,6 @@ export function useDecoderSessionHandlers({
     // The stream-ended event will handle buffer transition
   }, [stopWatch]);
 
-  // Note: handleDetach and handleRejoin are provided by useIOSessionManager
-  // They are passed through from the parent component
-
   // Handle IO profile change - manager handles common logic, app handles buffer mode
   const handleIoProfileChange = useCallback(
     async (profileId: string | null) => {
@@ -278,8 +269,6 @@ export function useDecoderSessionHandlers({
     handleSelectMultiple,
     handleDialogStopIngest,
     handleStopWatch,
-    handleDetach,
-    handleRejoin,
     handleIoProfileChange,
     handleJoinSession,
     handleSkip,

@@ -138,20 +138,20 @@ export default function Transmit() {
     isStreaming,
     isPaused,
     isStopped,
+    canReturnToLive,
     sessionReady,
     capabilities,
     joinerCount,
-    isDetached,
-    handleDetach: managerDetach,
-    handleRejoin: managerRejoin,
+    handleLeave: managerLeave,
     startMultiBusSession,
+    resumeWithNewBuffer,
   } = manager;
 
   // Session controls
   const { start, stop, leave, rejoin, reinitialize } = session;
 
   // Derive connected state
-  const isConnected = sessionReady && (isStreaming || isPaused || isStopped);
+  const isConnected = sessionReady && (isStreaming || isPaused || isStopped || canReturnToLive);
 
   // Compose all handlers using the orchestrator hook
   const handlers = useTransmitHandlers({
@@ -164,10 +164,9 @@ export default function Transmit() {
     reinitialize,
     start,
     stop,
+    resumeFresh: resumeWithNewBuffer,
     leave,
     rejoin,
-    managerDetach,
-    managerRejoin,
     startMultiBusSession,
     setShowIoPickerDialog,
   });
@@ -221,12 +220,6 @@ export default function Transmit() {
                 leave();
               }
               break;
-            case "detach":
-              // Disconnect from shared session (others keep streaming)
-              if (isStreaming && joinerCount > 1) {
-                managerDetach();
-              }
-              break;
             case "stopAll":
               // Stop the entire session for all apps
               if (isStreaming || isPaused) {
@@ -250,7 +243,7 @@ export default function Transmit() {
     return () => {
       cleanup.then((fn) => fn());
     };
-  }, [isStopped, isStreaming, isPaused, sessionReady, joinerCount, start, stop, leave, managerDetach, setShowIoPickerDialog]);
+  }, [isStopped, isStreaming, isPaused, sessionReady, start, stop, leave, setShowIoPickerDialog]);
 
   // Listen for transmit history events from repeat transmissions
   const addHistoryItem = useTransmitStore((s) => s.addHistoryItem);
@@ -351,18 +344,17 @@ export default function Transmit() {
           ioProfiles={transmitProfiles}
           ioProfile={ioProfile}
           defaultReadProfileId={settings?.default_read_profile}
+          sessionId={session.sessionId}
           multiBusMode={multiBusMode}
           multiBusProfiles={multiBusProfiles}
           isStreaming={isStreaming}
-          isStopped={isStopped}
-          isDetached={isDetached}
-          joinerCount={joinerCount}
+          isStopped={isStopped || canReturnToLive}
+          ioState={session.state}
           capabilities={capabilities}
           onOpenIoPicker={handlers.handleOpenIoPicker}
           onStop={handlers.handleStop}
           onResume={handlers.handleResume}
-          onDetach={handlers.handleDetach}
-          onRejoin={handlers.handleRejoin}
+          onLeave={managerLeave}
           isLoading={isLoading}
           error={transmitError}
         />

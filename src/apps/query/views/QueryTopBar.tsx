@@ -29,15 +29,12 @@ interface Props {
   // Session state (from useIOSessionManager)
   isStreaming: boolean;
   isStopped?: boolean;
-  joinerCount?: number;
-  isDetached?: boolean;
   supportsTimeRange?: boolean;
 
   // Session actions
   onStop?: () => void;
   onResume?: () => void;
-  onDetach?: () => void;
-  onRejoin?: () => void;
+  onLeave?: () => void;
   onOpenBookmarkPicker?: () => void;
 }
 
@@ -52,13 +49,10 @@ export default function QueryTopBar({
   onOpenIoReaderPicker,
   isStreaming,
   isStopped,
-  joinerCount,
-  isDetached,
   supportsTimeRange,
   onStop,
   onResume,
-  onDetach,
-  onRejoin,
+  onLeave,
   onOpenBookmarkPicker,
 }: Props) {
   // Normalise path for cross-platform comparison (Windows backslashes)
@@ -84,13 +78,10 @@ export default function QueryTopBar({
         onOpenIoReaderPicker,
         isStreaming,
         isStopped,
-        joinerCount,
-        isDetached,
         supportsTimeRange,
         onStop,
         onResume,
-        onDetach,
-        onRejoin,
+        onLeave,
         onOpenBookmarkPicker,
       }}
     >

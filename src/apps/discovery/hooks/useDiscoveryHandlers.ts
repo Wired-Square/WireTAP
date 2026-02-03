@@ -81,10 +81,6 @@ export interface UseDiscoveryHandlersParams {
   resetWatchFrameCount: () => void;
   setBufferMetadata: (meta: BufferMetadata | null) => void;
 
-  // Detach/rejoin handlers (from manager)
-  handleDetach: () => Promise<void>;
-  handleRejoin: () => Promise<void>;
-
   // Manager session switching methods
   watchSingleSource: (profileId: string, options: ManagerIngestOptions, reinitializeOptions?: Record<string, unknown>) => Promise<void>;
   watchMultiSource: (profileIds: string[], options: ManagerIngestOptions) => Promise<void>;
@@ -199,8 +195,6 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     setFramingConfig: params.setFramingConfig,
     resetWatchFrameCount: params.resetWatchFrameCount,
     showError: params.showError,
-    handleDetach: params.handleDetach,
-    handleRejoin: params.handleRejoin,
     setBufferMetadata: params.setBufferMetadata,
     closeIoReaderPicker: params.closeIoReaderPicker,
   });

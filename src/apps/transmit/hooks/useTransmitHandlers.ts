@@ -25,10 +25,9 @@ export interface UseTransmitHandlersParams {
   reinitialize: (profileId: string) => Promise<void>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
+  resumeFresh: () => Promise<void>;
   leave: () => Promise<void>;
   rejoin: (sessionId: string) => Promise<void>;
-  managerDetach: () => Promise<void>;
-  managerRejoin: () => Promise<void>;
   startMultiBusSession: (profileIds: string[], options: IngestOptions) => Promise<void>;
 
   // Dialog state setter
@@ -49,10 +48,9 @@ export function useTransmitHandlers(params: UseTransmitHandlersParams): Transmit
     reinitialize: params.reinitialize,
     start: params.start,
     stop: params.stop,
+    resumeFresh: params.resumeFresh,
     leave: params.leave,
     rejoin: params.rejoin,
-    managerDetach: params.managerDetach,
-    managerRejoin: params.managerRejoin,
     startMultiBusSession: params.startMultiBusSession,
     setShowIoPickerDialog: params.setShowIoPickerDialog,
   });

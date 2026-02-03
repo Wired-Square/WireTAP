@@ -62,10 +62,6 @@ export interface UseDiscoverySessionHandlersParams {
   resetWatchFrameCount: () => void;
   showError: (title: string, message: string, details?: string) => void;
 
-  // Detach/rejoin handlers (from manager)
-  handleDetach: () => Promise<void>;
-  handleRejoin: () => Promise<void>;
-
   // Buffer state
   setBufferMetadata: (meta: BufferMetadata | null) => void;
 
@@ -111,8 +107,6 @@ export function useDiscoverySessionHandlers({
   setFramingConfig,
   resetWatchFrameCount,
   showError,
-  handleDetach,
-  handleRejoin,
   setBufferMetadata,
   closeIoReaderPicker,
 }: UseDiscoverySessionHandlersParams) {
@@ -413,9 +407,6 @@ export function useDiscoverySessionHandlers({
     console.log(`[DiscoverySessionHandlers] handleStop - stop complete`);
   }, [stopWatch]);
 
-  // Note: handleDetach and handleRejoin are provided by useIOSessionManager
-  // They are passed through from the parent component
-
   // Handle pause button click
   const handlePause = useCallback(async () => {
     await pause();
@@ -488,8 +479,6 @@ export function useDiscoverySessionHandlers({
     handlePlayBackward,
     handlePlayForward,
     handleStop,
-    handleDetach,
-    handleRejoin,
     handlePause,
     handleStepBackward,
     handleStepForward,

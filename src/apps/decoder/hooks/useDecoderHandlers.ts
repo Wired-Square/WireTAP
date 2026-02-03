@@ -117,10 +117,6 @@ export interface UseDecoderHandlersParams {
   // Stream completed ref (from manager, for playback handlers)
   streamCompletedRef: React.MutableRefObject<boolean>;
 
-  // Detach/rejoin handlers (from manager)
-  handleDetach: () => Promise<void>;
-  handleRejoin: () => Promise<void>;
-
   // Manager session switching methods
   watchSingleSource: (profileId: string, options: ManagerIngestOptions, reinitializeOptions?: Record<string, unknown>) => Promise<void>;
   watchMultiSource: (profileIds: string[], options: ManagerIngestOptions) => Promise<void>;
@@ -169,8 +165,6 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
     stopIngest: params.stopIngest,
     isIngesting: params.isIngesting,
     isWatching: params.isWatching,
-    handleDetach: params.handleDetach,
-    handleRejoin: params.handleRejoin,
     // Manager session switching methods
     watchSingleSource: params.watchSingleSource,
     watchMultiSource: params.watchMultiSource,

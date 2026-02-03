@@ -446,14 +446,12 @@ export default function Decoder() {
     isStreaming,
     isPaused,
     isStopped,
+    canReturnToLive,
     isRealtime,
     isBufferMode,
     capabilities,
     joinerCount,
-    // Detach/rejoin
-    isDetached,
-    handleDetach,
-    handleRejoin,
+    handleLeave,
     // Watch state
     watchFrameCount,
     isWatching,
@@ -468,6 +466,7 @@ export default function Decoder() {
     watchSingleSource,
     watchMultiSource,
     stopWatch,
+    resumeWithNewBuffer,
     selectProfile,
     selectMultipleProfiles,
     joinSession,
@@ -487,6 +486,7 @@ export default function Decoder() {
     stop,
     pause,
     resume,
+    resumeFresh,
     setSpeed,
     setTimeRange,
     seek,
@@ -556,10 +556,6 @@ export default function Decoder() {
 
     // Stream completed ref (from manager, for playback handlers)
     streamCompletedRef,
-
-    // Detach/rejoin handlers (from manager)
-    handleDetach,
-    handleRejoin,
 
     // Manager session switching methods
     watchSingleSource,
@@ -659,12 +655,6 @@ export default function Decoder() {
                 pause();
               }
               break;
-            case "detach":
-              // Disconnect from shared session (others keep streaming)
-              if (isStreaming && joinerCount > 1) {
-                handleDetach();
-              }
-              break;
             case "stopAll":
               // Stop this app's watch (like top bar Stop button)
               if (isStreaming) {
@@ -700,7 +690,7 @@ export default function Decoder() {
     return () => {
       cleanup.then((fn) => fn());
     };
-  }, [isPaused, isStopped, isStreaming, isReady, joinerCount, resume, start, pause, stop, stopWatch, handleDetach, handlers, dialogs]);
+  }, [isPaused, isStopped, isStreaming, isReady, resume, start, pause, stop, stopWatch, handlers, dialogs]);
 
   // Note: Watch state is cleared automatically by useIOSessionManager when streaming stops
 
@@ -919,18 +909,18 @@ export default function Decoder() {
             onIoProfileChange={handlers.handleIoProfileChange}
             defaultReadProfileId={settings?.default_read_profile}
             bufferMetadata={bufferMetadata}
+            sessionId={sessionId}
             multiBusMode={multiBusMode}
             multiBusProfiles={ioProfiles}
+            ioState={readerState}
+            isRealtime={isRealtime}
             speed={playbackSpeed}
             supportsSpeed={capabilities?.supports_speed_control ?? false}
             isStreaming={isDecoding || isIngesting}
             onStopStream={isDecoding ? handlers.handleStopWatch : stopIngest}
-            isStopped={isStopped}
-            onResume={start}
-            joinerCount={joinerCount}
-            onDetach={handlers.handleDetach}
-            isDetached={isDetached}
-            onRejoin={handlers.handleRejoin}
+            isStopped={isStopped || canReturnToLive}
+            onResume={resumeWithNewBuffer}
+            onLeave={handleLeave}
             supportsTimeRange={capabilities?.supports_time_range ?? false}
             onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
             frameCount={frameList.length}

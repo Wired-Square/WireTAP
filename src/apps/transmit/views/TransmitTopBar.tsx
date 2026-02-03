@@ -3,7 +3,7 @@
 // Top toolbar for the Transmit app with IO picker button and session controls.
 // Uses shared AppTopBar component for consistent layout.
 
-import { Send, Link2, GitMerge } from "lucide-react";
+import { Send, GitMerge } from "lucide-react";
 import { flexRowGap2 } from "../../../styles/spacing";
 import type { IOProfile } from "../../../types/common";
 import AppTopBar from "../../../components/AppTopBar";
@@ -14,6 +14,8 @@ interface Props {
   ioProfiles: IOProfile[];
   ioProfile: string | null;
   defaultReadProfileId?: string | null;
+  /** Current session ID (e.g., "f_abc123") */
+  sessionId?: string | null;
 
   // Multi-bus mode
   multiBusMode?: boolean;
@@ -22,8 +24,8 @@ interface Props {
   // Session state
   isStreaming: boolean;
   isStopped?: boolean;
-  isDetached?: boolean;
-  joinerCount?: number;
+  /** Current IO state (running, stopped, paused, error) */
+  ioState?: string | null;
 
   // Session capabilities
   capabilities?: {
@@ -33,12 +35,20 @@ interface Props {
     available_buses: number[];
   } | null;
 
+  // Speed (for timeline sources)
+  speed?: number;
+  supportsSpeed?: boolean;
+  onOpenSpeedPicker?: () => void;
+
+  // Bookmark (for time range sources)
+  supportsTimeRange?: boolean;
+  onOpenBookmarkPicker?: () => void;
+
   // Handlers
   onOpenIoPicker: () => void;
   onStop?: () => void;
   onResume?: () => void;
-  onDetach?: () => void;
-  onRejoin?: () => void;
+  onLeave?: () => void;
 
   // Loading/error state
   isLoading?: boolean;
@@ -49,18 +59,22 @@ export default function TransmitTopBar({
   ioProfiles,
   ioProfile,
   defaultReadProfileId,
+  sessionId,
   multiBusMode = false,
   multiBusProfiles = [],
   isStreaming,
   isStopped = false,
-  isDetached = false,
-  joinerCount = 1,
+  ioState,
+  speed = 1,
+  supportsSpeed = false,
+  onOpenSpeedPicker,
+  supportsTimeRange = false,
+  onOpenBookmarkPicker,
   capabilities,
   onOpenIoPicker,
   onStop,
   onResume,
-  onDetach,
-  onRejoin,
+  onLeave,
   isLoading = false,
   error = null,
 }: Props) {
@@ -79,15 +93,19 @@ export default function TransmitTopBar({
         multiBusMode,
         multiBusProfiles,
         defaultReadProfileId,
+        sessionId,
+        ioState,
         onOpenIoReaderPicker: onOpenIoPicker,
+        speed,
+        supportsSpeed,
+        onOpenSpeedPicker,
+        supportsTimeRange,
+        onOpenBookmarkPicker,
         isStreaming,
         isStopped,
-        isDetached,
-        joinerCount,
         onStop,
         onResume,
-        onDetach,
-        onRejoin,
+        onLeave,
       }}
       actions={
         <>
@@ -127,13 +145,6 @@ export default function TransmitTopBar({
         </div>
       )}
 
-      {/* Joiner count indicator */}
-      {joinerCount > 1 && (
-        <div className="flex items-center gap-1 text-blue-400">
-          <Link2 size={14} />
-          <span className="text-xs">{joinerCount} apps connected</span>
-        </div>
-      )}
     </AppTopBar>
   );
 }
