@@ -129,9 +129,7 @@ export default function Transmit() {
     ioProfile,
     setIoProfile,
     ioProfileName,
-    multiBusMode,
     multiBusProfiles,
-    setMultiBusMode,
     setMultiBusProfiles,
     effectiveSessionId,
     session,
@@ -155,10 +153,9 @@ export default function Transmit() {
 
   // Compose all handlers using the orchestrator hook
   const handlers = useTransmitHandlers({
-    multiBusMode,
+    multiBusProfiles,
     isStreaming,
     sessionReady,
-    setMultiBusMode,
     setMultiBusProfiles,
     setIoProfile,
     reinitialize,
@@ -345,8 +342,7 @@ export default function Transmit() {
           ioProfile={ioProfile}
           defaultReadProfileId={settings?.default_read_profile}
           sessionId={session.sessionId}
-          multiBusMode={multiBusMode}
-          multiBusProfiles={multiBusProfiles}
+          multiBusProfiles={session.sessionId ? multiBusProfiles : []}
           isStreaming={isStreaming}
           isStopped={isStopped || canReturnToLive}
           ioState={session.state}

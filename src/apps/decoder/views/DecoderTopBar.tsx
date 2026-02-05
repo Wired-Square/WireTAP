@@ -24,8 +24,6 @@ type Props = {
   bufferMetadata?: BufferMetadata | null;
   /** Current session ID (e.g., "f_abc123") */
   sessionId?: string | null;
-  /** Whether multi-bus mode is active */
-  multiBusMode?: boolean;
   /** Profile IDs when in multi-bus mode */
   multiBusProfiles?: string[];
   /** Current IO state (running, stopped, paused, error) */
@@ -97,7 +95,6 @@ export default function DecoderTopBar({
   defaultReadProfileId,
   bufferMetadata,
   sessionId,
-  multiBusMode = false,
   multiBusProfiles = [],
   ioState,
   isRealtime = true,
@@ -150,7 +147,6 @@ export default function DecoderTopBar({
       ioSession={{
         ioProfile,
         ioProfiles,
-        multiBusMode,
         multiBusProfiles,
         bufferMetadata,
         defaultReadProfileId,

@@ -9,12 +9,11 @@ import { useSessionStore } from "../../../../stores/sessionStore";
 
 export interface UseTransmitSessionHandlersParams {
   // Session manager state
-  multiBusMode: boolean;
+  multiBusProfiles: string[];
   isStreaming: boolean;
   sessionReady: boolean;
 
   // Session manager actions
-  setMultiBusMode: (mode: boolean) => void;
   setMultiBusProfiles: (profiles: string[]) => void;
   setIoProfile: (profileId: string | null) => void;
   reinitialize: (profileId: string) => Promise<void>;
@@ -30,10 +29,9 @@ export interface UseTransmitSessionHandlersParams {
 }
 
 export function useTransmitSessionHandlers({
-  multiBusMode,
+  multiBusProfiles,
   isStreaming,
   sessionReady,
-  setMultiBusMode,
   setMultiBusProfiles,
   setIoProfile,
   reinitialize,
@@ -57,9 +55,8 @@ export function useTransmitSessionHandlers({
       _options: IngestOptions
     ) => {
       try {
-        // Exit multi-bus mode if switching to single profile
-        if (multiBusMode) {
-          setMultiBusMode(false);
+        // Clear multi-bus state if switching to single profile
+        if (multiBusProfiles.length > 0) {
           setMultiBusProfiles([]);
         }
 
@@ -83,7 +80,7 @@ export function useTransmitSessionHandlers({
         useSessionStore.getState().showAppError("Session Error", "Failed to create session.", msg);
       }
     },
-    [multiBusMode, setMultiBusMode, setMultiBusProfiles, setIoProfile, reinitialize, isStreaming, start, setShowIoPickerDialog]
+    [multiBusProfiles.length, setMultiBusProfiles, setIoProfile, reinitialize, isStreaming, start, setShowIoPickerDialog]
   );
 
   // Handle stop - stop streaming and all queue repeats (but stay connected for resume)
@@ -106,13 +103,11 @@ export function useTransmitSessionHandlers({
         // Check if this is a multi-source session
         if (sourceProfileIds && sourceProfileIds.length > 0) {
           // Multi-source session - join it
-          setMultiBusMode(false); // We're joining, not creating
           setMultiBusProfiles(sourceProfileIds);
           setIoProfile(sessionId);
         } else {
-          // Single profile session
-          if (multiBusMode) {
-            setMultiBusMode(false);
+          // Single profile session - clear multi-bus state
+          if (multiBusProfiles.length > 0) {
             setMultiBusProfiles([]);
           }
           setIoProfile(sessionId);
@@ -129,7 +124,7 @@ export function useTransmitSessionHandlers({
         useSessionStore.getState().showAppError("Session Error", "Failed to join session.", msg);
       }
     },
-    [multiBusMode, setMultiBusMode, setMultiBusProfiles, setIoProfile, rejoin, setShowIoPickerDialog]
+    [multiBusProfiles.length, setMultiBusProfiles, setIoProfile, rejoin, setShowIoPickerDialog]
   );
 
   // Handle starting a multi-source session from IO picker (multi-bus mode)
@@ -157,8 +152,7 @@ export function useTransmitSessionHandlers({
   // Handle skip (continue without reader)
   const handleSkip = useCallback(async () => {
     // Clear multi-bus state if active
-    if (multiBusMode) {
-      setMultiBusMode(false);
+    if (multiBusProfiles.length > 0) {
       setMultiBusProfiles([]);
     }
     // Leave the session if connected
@@ -167,7 +161,7 @@ export function useTransmitSessionHandlers({
     }
     setIoProfile(null);
     setShowIoPickerDialog(false);
-  }, [multiBusMode, sessionReady, setMultiBusMode, setMultiBusProfiles, leave, setIoProfile, setShowIoPickerDialog]);
+  }, [multiBusProfiles.length, sessionReady, setMultiBusProfiles, leave, setIoProfile, setShowIoPickerDialog]);
 
   return {
     handleStartSession,

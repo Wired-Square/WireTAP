@@ -18,7 +18,6 @@ interface Props {
   sessionId?: string | null;
 
   // Multi-bus mode
-  multiBusMode?: boolean;
   multiBusProfiles?: string[];
 
   // Session state
@@ -60,7 +59,6 @@ export default function TransmitTopBar({
   ioProfile,
   defaultReadProfileId,
   sessionId,
-  multiBusMode = false,
   multiBusProfiles = [],
   isStreaming,
   isStopped = false,
@@ -78,10 +76,8 @@ export default function TransmitTopBar({
   isLoading = false,
   error = null,
 }: Props) {
-  // Show as multi-bus if either:
-  // 1. multiBusMode is true (creating multi-bus session), OR
-  // 2. multiBusProfiles has entries (joined an existing multi-source session)
-  const showAsMultiBus = multiBusMode || multiBusProfiles.length > 0;
+  // Show as multi-bus when multiBusProfiles has entries
+  const showAsMultiBus = multiBusProfiles.length > 0;
 
   return (
     <AppTopBar
@@ -90,7 +86,6 @@ export default function TransmitTopBar({
       ioSession={{
         ioProfile,
         ioProfiles,
-        multiBusMode,
         multiBusProfiles,
         defaultReadProfileId,
         sessionId,

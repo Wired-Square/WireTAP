@@ -148,12 +148,8 @@ export interface UseIOSessionManagerResult {
   profileNamesMap: Map<string, string>;
 
   // ---- Multi-Bus State ----
-  /** Whether multi-bus mode is active */
-  multiBusMode: boolean;
   /** Profiles in the multi-bus session */
   multiBusProfiles: string[];
-  /** Set multi-bus mode */
-  setMultiBusMode: (enabled: boolean) => void;
   /** Set multi-bus profiles */
   setMultiBusProfiles: (profiles: string[]) => void;
   /** Source profile ID (preserved when switching to buffer) */
@@ -396,11 +392,9 @@ export function useIOSessionManager(
 
   // ---- Multi-Bus State ----
   const {
-    multiBusMode,
     multiBusProfiles,
     sourceProfileId,
     outputBusToSource,
-    setMultiBusMode,
     setMultiBusProfiles,
     setSourceProfileId,
     setOutputBusToSource,
@@ -429,17 +423,17 @@ export function useIOSessionManager(
 
   // ---- Derived Values ----
   // Effective session ID: multi-bus ID or single profile ID
-  const effectiveSessionId = multiBusMode ? (multiSessionId ?? undefined) : (ioProfile ?? undefined);
+  const effectiveSessionId = multiBusProfiles.length > 0 ? (multiSessionId ?? undefined) : (ioProfile ?? undefined);
 
   // Profile name for display
   const ioProfileName = useMemo(() => {
-    if (multiBusMode) {
+    if (multiBusProfiles.length > 0) {
       return `Multi-Bus (${multiBusProfiles.length} sources)`;
     }
     if (!ioProfile) return undefined;
     const profile = ioProfiles.find((p) => p.id === ioProfile);
     return profile?.name;
-  }, [ioProfile, multiBusMode, multiBusProfiles.length, ioProfiles]);
+  }, [ioProfile, multiBusProfiles.length, ioProfiles]);
 
   // Profile names map for multi-bus
   const profileNamesMap = useMemo(() => {
@@ -603,7 +597,6 @@ export function useIOSessionManager(
       await session.leave();
 
       // Clear multi-bus state
-      setMultiBusMode(false);
       setMultiBusProfiles([]);
 
       // Switch to the copied buffer
@@ -619,7 +612,7 @@ export function useIOSessionManager(
       setIsDetached(true);
       setIsWatching(false);
     }
-  }, [session, ioProfileName, setMultiBusMode, setMultiBusProfiles, setIoProfile]);
+  }, [session, ioProfileName, setMultiBusProfiles, setIoProfile]);
 
   const handleRejoin = useCallback(async () => {
     await session.rejoin();
@@ -638,12 +631,11 @@ export function useIOSessionManager(
       await destroyReaderSession(sessionId);
     }
     // Clear local state
-    setMultiBusMode(false);
     setMultiBusProfiles([]);
     setIsWatching(false);
     setIsDetached(false);
     // Note: the session destruction will emit lifecycle events that update the UI
-  }, [session.sessionId, setMultiBusMode, setMultiBusProfiles]);
+  }, [session.sessionId, setMultiBusProfiles]);
 
   const resetWatchFrameCount = useCallback(() => {
     setWatchFrameCount(0);
@@ -717,13 +709,12 @@ export function useIOSessionManager(
     }
 
     // Update state
-    setMultiBusMode(true);
     setMultiBusProfiles(profileIds);
     setOutputBusToSource(busToSource);
     setMultiSessionId(sessionId);
     setIoProfile(sessionId);
     setIsDetached(false);
-  }, [appName, profileNamesMap, setMultiBusMode, setMultiBusProfiles, setOutputBusToSource, setIoProfile]);
+  }, [appName, profileNamesMap, setMultiBusProfiles, setOutputBusToSource, setIoProfile]);
 
   // Join existing multi-source session
   const joinExistingSession = useCallback(async (
@@ -743,10 +734,13 @@ export function useIOSessionManager(
     // Update state
     setIoProfile(sessionId);
     setMultiBusProfiles(sourceProfileIds || []);
-    setMultiBusMode(false); // Use single-session mode when joining
+    // Set multiSessionId when joining with profiles so effectiveSessionId computation works
+    if (sourceProfileIds && sourceProfileIds.length > 0) {
+      setMultiSessionId(sessionId);
+    }
     setIsDetached(false);
     await session.rejoin(sessionId);
-  }, [appName, session, setIoProfile, setMultiBusProfiles, setMultiBusMode, onBeforeWatch, resetWatchFrameCount]);
+  }, [appName, session, setIoProfile, setMultiBusProfiles, onBeforeWatch, resetWatchFrameCount]);
 
   // ---- Session Switching Methods ----
 
@@ -797,7 +791,6 @@ export function useIOSessionManager(
     }
 
     // Clear multi-bus state when switching to a single source
-    setMultiBusMode(false);
     setMultiBusProfiles([]);
 
     // Set profile (use session ID so callbacks are registered correctly)
@@ -812,7 +805,7 @@ export function useIOSessionManager(
     setIsWatching(true);
     resetWatchFrameCount();
     streamCompletedRef.current = false;
-  }, [session, appName, ioProfiles, onBeforeWatch, setMultiBusMode, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
+  }, [session, appName, ioProfiles, onBeforeWatch, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
 
   // Watch multiple sources: start multi-bus session, set speed, start watching
   const watchMultiSource = useCallback(async (
@@ -876,7 +869,6 @@ export function useIOSessionManager(
     await session.leave();
 
     // Clear multi-bus state - we're now viewing a standalone buffer
-    setMultiBusMode(false);
     setMultiBusProfiles([]);
 
     // Set isDetached=false - we're viewing a buffer, not in detached state
@@ -886,7 +878,7 @@ export function useIOSessionManager(
 
     // Switch to the copied buffer
     await session.reinitialize(copiedBufferId, { useBuffer: true });
-  }, [session, ioProfileName, setMultiBusMode, setMultiBusProfiles]);
+  }, [session, ioProfileName, setMultiBusProfiles]);
 
   // Ingest a single source: fast ingest without rendering, auto-transitions to buffer reader
   // Apps join the session but frames are counted only (not rendered) until ingest completes.
@@ -937,7 +929,6 @@ export function useIOSessionManager(
       });
 
       // Clear multi-bus state when ingesting from a single source
-      setMultiBusMode(false);
       setMultiBusProfiles([]);
 
       // Update state - set profile to session ID so callbacks work
@@ -960,7 +951,7 @@ export function useIOSessionManager(
       setIngestError(msg);
       setIsIngesting(false);
     }
-  }, [session, appName, setMultiBusMode, setMultiBusProfiles, setIoProfile, setSourceProfileId, streamCompletedRef]);
+  }, [session, appName, setMultiBusProfiles, setIoProfile, setSourceProfileId, streamCompletedRef]);
 
   // Ingest multiple sources: fast multi-bus ingest without rendering
   const ingestMultiSource = useCallback(async (
@@ -1052,7 +1043,6 @@ export function useIOSessionManager(
     }
 
     // Clear multi-bus state when connecting to a single source
-    setMultiBusMode(false);
     setMultiBusProfiles([]);
 
     // Set profile but don't start watching
@@ -1062,7 +1052,7 @@ export function useIOSessionManager(
     }
 
     // Note: Do NOT set isWatching - session is connected but not streaming to us
-  }, [session, appName, setMultiBusMode, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
+  }, [session, appName, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
 
   // Jump to a bookmark: stop if streaming, cleanup, reinitialize with bookmark time range
   const jumpToBookmark = useCallback(
@@ -1112,7 +1102,6 @@ export function useIOSessionManager(
       onBeforeWatch?.();
 
       // Step 2: Clear multi-bus state
-      setMultiBusMode(false);
       setMultiBusProfiles([]);
 
       // Step 3: Either reconfigure existing session or reinitialize
@@ -1186,7 +1175,6 @@ export function useIOSessionManager(
       isWatching,
       session,
       onBeforeWatch,
-      setMultiBusMode,
       setMultiBusProfiles,
       setIoProfile,
       setPlaybackSpeedProp,
@@ -1200,7 +1188,6 @@ export function useIOSessionManager(
   // App handlers call this for common logic, then add buffer-specific or app-specific logic
   const selectProfile = useCallback((profileId: string | null) => {
     // Clear multi-bus state when selecting a single profile
-    setMultiBusMode(false);
     setMultiBusProfiles([]);
     setIoProfile(profileId);
 
@@ -1212,7 +1199,7 @@ export function useIOSessionManager(
         setPlaybackSpeedProp?.(defaultSpeed);
       }
     }
-  }, [setMultiBusMode, setMultiBusProfiles, setIoProfile, ioProfiles, setPlaybackSpeedProp]);
+  }, [setMultiBusProfiles, setIoProfile, ioProfiles, setPlaybackSpeedProp]);
 
   // Select multiple profiles for multi-bus mode
   const selectMultipleProfiles = useCallback((profileIds: string[]) => {
@@ -1230,7 +1217,6 @@ export function useIOSessionManager(
 
   // Skip IO reader selection: clear state, leave if streaming
   const skipReader = useCallback(async () => {
-    setMultiBusMode(false);
     setMultiBusProfiles([]);
     // Leave session if currently streaming or paused
     const readerState = session.state;
@@ -1239,7 +1225,7 @@ export function useIOSessionManager(
       setIsWatching(false);
     }
     setIoProfile(null);
-  }, [setMultiBusMode, setMultiBusProfiles, session, setIoProfile]);
+  }, [setMultiBusProfiles, session, setIoProfile]);
 
   // ---- Clear Watch State on Stream End ----
   useEffect(() => {
@@ -1257,9 +1243,7 @@ export function useIOSessionManager(
     profileNamesMap,
 
     // Multi-Bus State
-    multiBusMode,
     multiBusProfiles,
-    setMultiBusMode,
     setMultiBusProfiles,
     sourceProfileId,
     setSourceProfileId,

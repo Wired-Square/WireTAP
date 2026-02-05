@@ -6,6 +6,15 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Cross-App Timeline Synchronisation**: Discovery and Decoder now share timeline range when viewing the same session buffer. Session store tracks `startTimeUs` and `endTimeUs` in buffer info, populated from `stream-ended` and `session-suspended` events. New `useEffectiveBufferMetadata` hook centralises the merge logic for session and local buffer metadata.
+
+### Fixed
+
+- **Multi-Bus State Leaking Between Apps**: Fixed bug where Decoder incorrectly showed "Multi-Bus (1)" in its session picker when Discovery started a session. Removed redundant `multiBusMode` boolean state - now uses `multiBusProfiles.length > 0` as single source of truth. Added session ID guard to prevent global `multiBusProfiles` state from leaking to apps without an active session.
+- **Decoder Session Controls After Joining**: Fixed issue where Decoder showed wrong session controls (grey dot, play button) after joining an existing multi-source session. The `multiSessionId` was not being set when joining sessions with source profiles.
+
+### Added
+
 - **Session Stop/Buffer Playback Flow**: Live sessions can now be stopped to enter buffer playback mode, then resumed back to live capture. The flow is:
   - **Stop**: Switches session to BufferReader for timeline playback (scrub, pause, step)
   - **Buffer Playback**: Timeline controls appear for reviewing captured frames

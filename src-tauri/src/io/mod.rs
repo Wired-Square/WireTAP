@@ -497,6 +497,8 @@ pub struct SessionSuspendedPayload {
     pub buffer_count: usize,
     /// Buffer type: "frames" or "bytes"
     pub buffer_type: Option<String>,
+    /// Time range of captured data [first_us, last_us] or null if empty
+    pub time_range: Option<(u64, u64)>,
 }
 
 /// Payload emitted when a session is resuming with a new buffer
@@ -1466,15 +1468,19 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
     let metadata = buffer_store::finalize_buffer();
 
     // Emit session-suspended event with buffer info
-    let (buffer_id, buffer_count, buffer_type) = match metadata {
+    let (buffer_id, buffer_count, buffer_type, time_range) = match metadata {
         Some(ref m) => {
             let type_str = match m.buffer_type {
                 buffer_store::BufferType::Frames => "frames",
                 buffer_store::BufferType::Bytes => "bytes",
             };
-            (Some(m.id.clone()), m.count, Some(type_str.to_string()))
+            let tr = match (m.start_time_us, m.end_time_us) {
+                (Some(start), Some(end)) => Some((start, end)),
+                _ => None,
+            };
+            (Some(m.id.clone()), m.count, Some(type_str.to_string()), tr)
         }
-        None => (None, 0, None),
+        None => (None, 0, None, None),
     };
 
     emit_to_session(
@@ -1485,6 +1491,7 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
             buffer_id,
             buffer_count,
             buffer_type,
+            time_range,
         },
     );
 

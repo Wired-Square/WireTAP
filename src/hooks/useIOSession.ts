@@ -109,6 +109,10 @@ export interface UseIOSessionResult {
   bufferCount: number;
   /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
   bufferOwningSessionId: string | null;
+  /** Start time of buffer data in microseconds (null if empty or unknown) */
+  bufferStartTimeUs: number | null;
+  /** End time of buffer data in microseconds (null if empty or unknown) */
+  bufferEndTimeUs: number | null;
   /** Number of apps connected to this session (for showing Detach vs Stop) */
   joinerCount: number;
   /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
@@ -789,6 +793,8 @@ export function useIOSession(
     bufferType: session?.buffer?.type ?? null,
     bufferCount: session?.buffer?.count ?? 0,
     bufferOwningSessionId: session?.buffer?.owningSessionId ?? null,
+    bufferStartTimeUs: session?.buffer?.startTimeUs ?? null,
+    bufferEndTimeUs: session?.buffer?.endTimeUs ?? null,
     joinerCount: session?.listenerCount ?? 0,
     stoppedExplicitly: session?.stoppedExplicitly ?? false,
     streamEndedReason: session?.streamEndedReason ?? null,

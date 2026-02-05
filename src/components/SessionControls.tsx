@@ -24,8 +24,6 @@ export interface ReaderButtonProps {
   ioProfile: string | null;
   /** Available IO profiles */
   ioProfiles: IOProfile[];
-  /** Whether multi-bus mode is active */
-  multiBusMode?: boolean;
   /** Profile IDs when in multi-bus mode (for display count) */
   multiBusProfiles?: string[];
   /** Buffer metadata (for buffer display name) */
@@ -45,7 +43,6 @@ export interface ReaderButtonProps {
 export function ReaderButton({
   ioProfile,
   ioProfiles,
-  multiBusMode = false,
   multiBusProfiles = [],
   bufferMetadata: _bufferMetadata,
   defaultReadProfileId,
@@ -57,11 +54,9 @@ export function ReaderButton({
   const isBufferProfile = isBufferProfileId(ioProfile);
   const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
 
-  // Show as multi-bus if either:
-  // 1. multiBusMode is true (creating multi-bus session), OR
-  // 2. multiBusProfiles has entries (joined an existing multi-source session)
+  // Show as multi-bus when multiBusProfiles has entries
   // BUT: never show as multi-bus when viewing a buffer (buffer takes precedence)
-  const showAsMultiBus = !isBufferProfile && (multiBusMode || multiBusProfiles.length > 0);
+  const showAsMultiBus = !isBufferProfile && multiBusProfiles.length > 0;
 
   // Determine display name (buffer takes precedence over multi-bus)
   let displayName: string;
@@ -223,8 +218,6 @@ export interface IOSessionControlsProps {
   ioProfile: string | null;
   /** Available IO profiles */
   ioProfiles: IOProfile[];
-  /** Whether multi-bus mode is active */
-  multiBusMode?: boolean;
   /** Profile IDs when in multi-bus mode */
   multiBusProfiles?: string[];
   /** Buffer metadata (for buffer display name) */
@@ -274,7 +267,6 @@ export function IOSessionControls({
   // Reader props
   ioProfile,
   ioProfiles,
-  multiBusMode = false,
   multiBusProfiles = [],
   bufferMetadata,
   defaultReadProfileId,
@@ -307,7 +299,6 @@ export function IOSessionControls({
       <ReaderButton
         ioProfile={ioProfile}
         ioProfiles={ioProfiles}
-        multiBusMode={multiBusMode}
         multiBusProfiles={multiBusProfiles}
         bufferMetadata={bufferMetadata}
         defaultReadProfileId={defaultReadProfileId}

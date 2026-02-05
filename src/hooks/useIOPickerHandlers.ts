@@ -83,7 +83,6 @@ export function useIOPickerHandlers({
     ingestMultiSource,
     joinSession,
     skipReader,
-    setMultiBusMode,
     setMultiBusProfiles,
   } = manager;
 
@@ -154,12 +153,10 @@ export function useIOPickerHandlers({
   // Handle multi-select from dialog
   const handleSelectMultiple = useCallback(
     (profileIds: string[]) => {
-      const isMulti = profileIds.length > 1;
-      setMultiBusMode(isMulti);
       setMultiBusProfiles(profileIds);
       onMultiBusSet?.(profileIds);
     },
-    [setMultiBusMode, setMultiBusProfiles, onMultiBusSet]
+    [setMultiBusProfiles, onMultiBusSet]
   );
 
   return {

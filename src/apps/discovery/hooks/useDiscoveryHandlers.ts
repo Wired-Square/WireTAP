@@ -33,7 +33,6 @@ import type { TimeRangeFavorite } from "../../../utils/favorites";
 export interface UseDiscoveryHandlersParams {
   // Session state
   sessionId: string;
-  multiBusMode: boolean;
   isStreaming: boolean;
   isPaused: boolean;
   sessionReady: boolean;

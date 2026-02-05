@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
 import { useDecoderStore } from "../../stores/decoderStore";
 import { useIOSessionManager, type SessionReconfigurationInfo, isBufferProfileId } from '../../hooks/useIOSessionManager';
+import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
 import { getFavoritesForProfile } from "../../utils/favorites";
 import { useFocusStore } from '../../stores/focusStore';
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
@@ -444,7 +445,6 @@ export default function Decoder() {
   // Destructure everything from the manager
   const {
     // Multi-bus state
-    multiBusMode,
     multiBusProfiles: ioProfiles,
     // Source profile ID (for bookmark lookups - preserved when session ID differs)
     sourceProfileId,
@@ -495,6 +495,9 @@ export default function Decoder() {
     state: readerState,
     isReady,
     bufferAvailable,
+    bufferStartTimeUs,
+    bufferEndTimeUs,
+    bufferCount,
     start,
     stop,
     pause,
@@ -507,11 +510,17 @@ export default function Decoder() {
     reinitialize,
   } = session;
 
+  // Merged buffer metadata using session values for cross-app timeline sync
+  const effectiveBufferMetadata = useEffectiveBufferMetadata(
+    { bufferStartTimeUs, bufferEndTimeUs, bufferCount },
+    bufferMetadata
+  );
+
   // Derive decoding state - include "starting" to prevent race conditions
   // Use isStreaming from manager plus check for "starting" state
   const isDecoding = isStreaming || readerState === "starting";
   // Has buffer data available for replay - only relevant when in buffer mode
-  const hasBufferData = isBufferMode && (bufferAvailable || (bufferMetadata?.count ?? 0) > 0);
+  const hasBufferData = isBufferMode && (bufferAvailable || (effectiveBufferMetadata?.count ?? 0) > 0);
 
   // Fetch buffer metadata when joining a session already in buffer mode
   // This handles the case where another app stopped the session before we joined
@@ -614,9 +623,9 @@ export default function Decoder() {
     setBufferMetadata,
 
     // Buffer bounds for frame index calculation during scrub
-    minTimeUs: bufferMetadata?.start_time_us,
-    maxTimeUs: bufferMetadata?.end_time_us,
-    totalFrames: bufferMetadata?.count,
+    minTimeUs: effectiveBufferMetadata?.start_time_us,
+    maxTimeUs: effectiveBufferMetadata?.end_time_us,
+    totalFrames: effectiveBufferMetadata?.count,
   });
 
   // Report session state to menu when this panel is focused
@@ -939,8 +948,7 @@ export default function Decoder() {
             defaultReadProfileId={settings?.default_read_profile}
             bufferMetadata={bufferMetadata}
             sessionId={sessionId}
-            multiBusMode={multiBusMode}
-            multiBusProfiles={ioProfiles}
+            multiBusProfiles={sessionId ? ioProfiles : []}
             ioState={readerState}
             isRealtime={isRealtime}
             speed={playbackSpeed}
@@ -1009,11 +1017,11 @@ export default function Decoder() {
           endTime={endTime}
           onStartTimeChange={handlers.handleStartTimeChange}
           onEndTimeChange={handlers.handleEndTimeChange}
-          minTimeUs={bufferMetadata?.start_time_us}
-          maxTimeUs={bufferMetadata?.end_time_us}
+          minTimeUs={effectiveBufferMetadata?.start_time_us}
+          maxTimeUs={effectiveBufferMetadata?.end_time_us}
           currentTimeUs={sessionCurrentTimeUs}
           currentFrameIndex={sessionCurrentFrameIndex}
-          totalFrames={bufferMetadata?.count}
+          totalFrames={effectiveBufferMetadata?.count}
           onScrub={handlers.handleScrub}
           onFrameChange={handlers.handleFrameChange}
           signalColours={{
@@ -1057,7 +1065,7 @@ export default function Decoder() {
         onClose={() => dialogs.ioReaderPicker.close()}
         ioProfiles={settings?.io_profiles || []}
         selectedId={ioProfile}
-        selectedIds={multiBusMode ? ioProfiles : []}
+        selectedIds={ioProfiles.length > 0 ? ioProfiles : []}
         defaultId={settings?.default_read_profile}
         onSelect={handlers.handleIoProfileChange}
         onSelectMultiple={handlers.handleSelectMultiple}

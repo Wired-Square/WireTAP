@@ -29,6 +29,7 @@ import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import SelectionSetPickerDialog from "../../dialogs/SelectionSetPickerDialog";
 import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
 import { isBufferProfileId } from "../../hooks/useIOSessionManager";
+import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
 import { clearBuffer as clearBackendBuffer, getBufferMetadata, getBufferFramesPaginated, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
 import { WINDOW_EVENTS } from "../../events/registry";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
@@ -347,7 +348,6 @@ export default function Discovery() {
   // Destructure everything from the manager
   const {
     // Multi-bus state
-    multiBusMode,
     multiBusProfiles: ioProfiles,
     sourceProfileId,
     setSourceProfileId,
@@ -390,6 +390,9 @@ export default function Discovery() {
     sessionId,
     state: readerState,
     bufferType,
+    bufferStartTimeUs,
+    bufferEndTimeUs,
+    bufferCount,
     start,
     stop,
     pause,
@@ -518,6 +521,12 @@ export default function Discovery() {
     return profile?.kind === 'postgres' || profile?.kind === 'csv_file';
   }, [ioProfile, settings?.io_profiles]);
 
+  // Merged buffer metadata using session values for cross-app timeline sync
+  const effectiveBufferMetadata = useEffectiveBufferMetadata(
+    { bufferStartTimeUs, bufferEndTimeUs, bufferCount },
+    bufferMetadata
+  );
+
   // Export dialog computed values
   const exportDataMode: ExportDataMode = useMemo(() => {
     if (isSerialMode) {
@@ -547,7 +556,6 @@ export default function Discovery() {
   const handlers = useDiscoveryHandlers({
     // Session state
     sessionId,
-    multiBusMode,
     isStreaming,
     isPaused,
     sessionReady,
@@ -791,8 +799,7 @@ export default function Discovery() {
           bufferMetadata={bufferMetadata}
           sessionId={sessionId}
           isStreaming={isStreaming}
-          multiBusMode={multiBusMode}
-          multiBusProfiles={ioProfiles}
+          multiBusProfiles={sessionId ? ioProfiles : []}
           ioState={readerState}
           isRealtime={isRealtime}
           onStopWatch={handlers.handleStop}
@@ -848,7 +855,7 @@ export default function Discovery() {
             onMaxBufferChange={setMaxBuffer}
             currentTimeUs={sessionCurrentTimeUs}
             onScrub={handlers.handleScrub}
-            bufferMetadata={bufferMetadata}
+            bufferMetadata={effectiveBufferMetadata}
             isRecorded={isRecorded}
             isBufferMode={isBufferMode}
             // Playback controls
@@ -951,7 +958,7 @@ export default function Discovery() {
         onClose={() => dialogs.ioReaderPicker.close()}
         ioProfiles={settings?.io_profiles || []}
         selectedId={ioProfile}
-        selectedIds={multiBusMode ? ioProfiles : undefined}
+        selectedIds={ioProfiles.length > 0 ? ioProfiles : undefined}
         defaultId={settings?.default_read_profile}
         onSelect={handlers.handleIoProfileChange}
         onSelectMultiple={handlers.handleSelectMultiple}

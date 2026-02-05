@@ -590,6 +590,8 @@ export interface SessionSuspendedPayload {
   buffer_count: number;
   /** Buffer type: "frames" or "bytes" */
   buffer_type: "frames" | "bytes" | null;
+  /** Time range of captured data [first_us, last_us] or null if empty */
+  time_range: [number, number] | null;
 }
 
 /**

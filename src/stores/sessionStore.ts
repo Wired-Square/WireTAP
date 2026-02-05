@@ -254,6 +254,10 @@ export interface Session {
     count: number;
     /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
     owningSessionId: string | null;
+    /** Start time of captured data in microseconds (null if empty or unknown) */
+    startTimeUs: number | null;
+    /** End time of captured data in microseconds (null if empty or unknown) */
+    endTimeUs: number | null;
   };
   /** Timestamp when session was created/joined */
   createdAt: number;
@@ -355,8 +359,6 @@ export interface SessionStore {
   _eventListeners: Record<string, SessionEventListeners>;
 
   // ---- Multi-Bus State ----
-  /** Whether multi-bus mode is currently active */
-  multiBusMode: boolean;
   /** Profile IDs involved in the current multi-bus session */
   multiBusProfiles: string[];
   /** Source profile ID - preserved when switching to buffer mode */
@@ -431,8 +433,6 @@ export interface SessionStore {
   clearCallbacks: (sessionId: string, listenerId: string) => void;
 
   // ---- Actions: Multi-Bus State ----
-  /** Enable or disable multi-bus mode */
-  setMultiBusMode: (enabled: boolean) => void;
   /** Set profiles involved in multi-bus session */
   setMultiBusProfiles: (profiles: string[]) => void;
   /** Set source profile ID (preserved when switching to buffer) */
@@ -583,6 +583,8 @@ async function setupSessionEventListeners(
           type: payload.buffer_type,
           count: payload.count,
           owningSessionId: payload.owning_session_id,
+          startTimeUs: payload.time_range?.[0] ?? null,
+          endTimeUs: payload.time_range?.[1] ?? null,
         },
       });
       invokeCallbacks(eventListeners, "onStreamEnded", payload);
@@ -650,6 +652,8 @@ async function setupSessionEventListeners(
           type: payload.buffer_type,
           count: payload.buffer_count,
           owningSessionId: sessionId,
+          startTimeUs: payload.time_range?.[0] ?? null,
+          endTimeUs: payload.time_range?.[1] ?? null,
         },
       });
       invokeCallbacks(eventListeners, "onSuspended", payload);
@@ -673,6 +677,8 @@ async function setupSessionEventListeners(
           type: null,
           count: 0,
           owningSessionId: sessionId,
+          startTimeUs: null,
+          endTimeUs: null,
         },
       });
       invokeCallbacks(eventListeners, "onResuming", event.payload);
@@ -709,7 +715,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: {},
   activeSessionId: null,
   _eventListeners: {},
-  multiBusMode: false,
   multiBusProfiles: [],
   sourceProfileId: null,
   outputBusToSource: new Map(),
@@ -893,7 +898,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             errorMessage: msg,
             isOwner: false,
             listenerCount: 0,
-            buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null },
+            buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null },
             createdAt: Date.now(),
             hasQueuedMessages: false,
             stoppedExplicitly: false,
@@ -1030,6 +1035,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           type: bufferType,
           count: 0,
           owningSessionId: null,
+          startTimeUs: existingSession?.buffer?.startTimeUs ?? null,
+          endTimeUs: existingSession?.buffer?.endTimeUs ?? null,
         },
         createdAt: existingSession?.createdAt ?? Date.now(),
         hasQueuedMessages: existingSession?.hasQueuedMessages ?? false,
@@ -1524,7 +1531,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           ...s.sessions[sessionId],
           capabilities,
           ioState: "stopped",
-          buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null },
+          buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null },
         },
       },
     }));
@@ -1574,8 +1581,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   // ---- Multi-Bus State ----
-  setMultiBusMode: (enabled) => set({ multiBusMode: enabled }),
-
   setMultiBusProfiles: (profiles) => set({ multiBusProfiles: profiles }),
 
   setSourceProfileId: (profileId) => set({ sourceProfileId: profileId }),
@@ -1583,7 +1588,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   setOutputBusToSource: (mapping) => set({ outputBusToSource: mapping }),
 
   resetMultiBusState: () => set({
-    multiBusMode: false,
     multiBusProfiles: [],
     sourceProfileId: null,
     outputBusToSource: new Map(),
@@ -1716,16 +1720,12 @@ export interface BusSourceInfo {
 
 /** Multi-bus state returned by useMultiBusState hook */
 export interface MultiBusState {
-  /** Whether multi-bus mode is active */
-  multiBusMode: boolean;
   /** Profile IDs in the multi-bus session */
   multiBusProfiles: string[];
   /** Source profile ID (preserved when switching to buffer) */
   sourceProfileId: string | null;
   /** Maps output bus number to source info */
   outputBusToSource: Map<number, BusSourceInfo>;
-  /** Enable/disable multi-bus mode */
-  setMultiBusMode: (enabled: boolean) => void;
   /** Set profiles in multi-bus session */
   setMultiBusProfiles: (profiles: string[]) => void;
   /** Set source profile ID */
@@ -1740,11 +1740,9 @@ export interface MultiBusState {
 export function useMultiBusState(): MultiBusState {
   return useSessionStore(
     useShallow((s) => ({
-      multiBusMode: s.multiBusMode,
       multiBusProfiles: s.multiBusProfiles,
       sourceProfileId: s.sourceProfileId,
       outputBusToSource: s.outputBusToSource,
-      setMultiBusMode: s.setMultiBusMode,
       setMultiBusProfiles: s.setMultiBusProfiles,
       setSourceProfileId: s.setSourceProfileId,
       setOutputBusToSource: s.setOutputBusToSource,

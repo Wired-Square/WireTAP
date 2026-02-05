@@ -128,7 +128,6 @@ export default function AppTopBar({
           <IOSessionControls
             ioProfile={ioSession.ioProfile}
             ioProfiles={ioSession.ioProfiles}
-            multiBusMode={ioSession.multiBusMode}
             multiBusProfiles={ioSession.multiBusProfiles}
             bufferMetadata={ioSession.bufferMetadata}
             defaultReadProfileId={ioSession.defaultReadProfileId}

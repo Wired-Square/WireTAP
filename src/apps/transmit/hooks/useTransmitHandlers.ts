@@ -14,12 +14,11 @@ import type { IngestOptions } from "../../../hooks/useIOSessionManager";
 
 export interface UseTransmitHandlersParams {
   // Session manager state
-  multiBusMode: boolean;
+  multiBusProfiles: string[];
   isStreaming: boolean;
   sessionReady: boolean;
 
   // Session manager actions
-  setMultiBusMode: (mode: boolean) => void;
   setMultiBusProfiles: (profiles: string[]) => void;
   setIoProfile: (profileId: string | null) => void;
   reinitialize: (profileId: string) => Promise<void>;
@@ -39,10 +38,9 @@ export type TransmitHandlers = TransmitSessionHandlers & TransmitUIHandlers;
 export function useTransmitHandlers(params: UseTransmitHandlersParams): TransmitHandlers {
   // Session handlers (start, stop, resume, join, multi-bus)
   const sessionHandlers = useTransmitSessionHandlers({
-    multiBusMode: params.multiBusMode,
+    multiBusProfiles: params.multiBusProfiles,
     isStreaming: params.isStreaming,
     sessionReady: params.sessionReady,
-    setMultiBusMode: params.setMultiBusMode,
     setMultiBusProfiles: params.setMultiBusProfiles,
     setIoProfile: params.setIoProfile,
     reinitialize: params.reinitialize,
