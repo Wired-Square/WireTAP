@@ -59,6 +59,7 @@ export interface UseDecoderHandlersParams {
   setSpeed: (speed: number) => Promise<void>;
   setTimeRange: (start?: string, end?: string) => Promise<void>;
   seek: (timeUs: number) => Promise<void>;
+  seekByFrame: (frameIndex: number) => Promise<void>;
 
   // Reader state
   sessionId: string;
@@ -208,6 +209,7 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
   const timeHandlers = useDecoderTimeHandlers({
     setTimeRange: params.setTimeRange,
     seek: params.seek,
+    seekByFrame: params.seekByFrame,
     capabilities: params.capabilities,
     updateCurrentTime: params.updateCurrentTime,
     setCurrentFrameIndex: params.setCurrentFrameIndex,

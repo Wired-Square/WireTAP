@@ -23,6 +23,7 @@ import {
   updateReaderTimeRange,
   destroyReaderSession,
   seekReaderSession,
+  seekReaderSessionByFrame,
   transitionToBufferReader,
   sessionTransmitFrame,
   registerSessionListener,
@@ -407,6 +408,8 @@ export interface SessionStore {
   ) => Promise<void>;
   /** Seek to timestamp */
   seekSession: (sessionId: string, timestampUs: number) => Promise<void>;
+  /** Seek to frame index (preferred for buffer playback) */
+  seekSessionByFrame: (sessionId: string, frameIndex: number) => Promise<void>;
   /** Switch to buffer replay mode */
   switchToBuffer: (sessionId: string, speed?: number) => Promise<void>;
 
@@ -1487,6 +1490,29 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   seekSession: async (sessionId, timestampUs) => {
     await seekReaderSession(sessionId, timestampUs);
+  },
+
+  seekSessionByFrame: async (sessionId, frameIndex) => {
+    await seekReaderSessionByFrame(sessionId, frameIndex);
+    // Update local playback position immediately so UI reflects the seek
+    // (Backend will emit position events during playback, but we need immediate feedback for seeks while paused)
+    set((s) => {
+      const session = s.sessions[sessionId];
+      if (!session) return s;
+      return {
+        sessions: {
+          ...s.sessions,
+          [sessionId]: {
+            ...session,
+            playbackPosition: {
+              // Keep existing timestamp or default to 0 (frame index is what matters for position display)
+              timestamp_us: session.playbackPosition?.timestamp_us ?? 0,
+              frame_index: frameIndex,
+            },
+          },
+        },
+      };
+    });
   },
 
   switchToBuffer: async (sessionId, speed) => {

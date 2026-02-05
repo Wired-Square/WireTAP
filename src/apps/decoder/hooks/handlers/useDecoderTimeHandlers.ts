@@ -12,6 +12,7 @@ export interface UseDecoderTimeHandlersParams {
   // Session actions
   setTimeRange: (start?: string, end?: string) => Promise<void>;
   seek: (timeUs: number) => Promise<void>;
+  seekByFrame: (frameIndex: number) => Promise<void>;
 
   // Capabilities
   capabilities: IOCapabilities | null;
@@ -39,6 +40,7 @@ export interface UseDecoderTimeHandlersParams {
 export function useDecoderTimeHandlers({
   setTimeRange,
   seek,
+  seekByFrame,
   capabilities,
   updateCurrentTime,
   setCurrentFrameIndex,
@@ -67,7 +69,7 @@ export function useDecoderTimeHandlers({
     [setActiveBookmarkId, setTimeRange, startTime]
   );
 
-  // Handle timeline scrubber position change
+  // Handle timeline scrubber position change (timestamp-based - legacy)
   const handleScrub = useCallback(
     async (timeUs: number) => {
       // Update UI immediately for responsiveness
@@ -93,6 +95,20 @@ export function useDecoderTimeHandlers({
     [updateCurrentTime, setCurrentFrameIndex, minTimeUs, maxTimeUs, totalFrames, capabilities, seek]
   );
 
+  // Handle frame-based position change (preferred for buffer playback)
+  const handleFrameChange = useCallback(
+    async (frameIndex: number) => {
+      // Update UI immediately for responsiveness
+      setCurrentFrameIndex?.(frameIndex);
+
+      // If the reader supports seeking, tell it to jump to this frame
+      if (capabilities?.supports_seek) {
+        await seekByFrame(frameIndex);
+      }
+    },
+    [setCurrentFrameIndex, capabilities, seekByFrame]
+  );
+
   // Handle loading a bookmark - delegates to manager's jumpToBookmark
   // The manager handles: stopping if streaming, cleanup, reinitialize, notify apps
   const handleLoadBookmark = useCallback(
@@ -107,6 +123,7 @@ export function useDecoderTimeHandlers({
     handleStartTimeChange,
     handleEndTimeChange,
     handleScrub,
+    handleFrameChange,
     handleLoadBookmark,
   };
 }

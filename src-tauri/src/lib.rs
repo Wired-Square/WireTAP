@@ -597,6 +597,7 @@ pub fn run() {
             sessions::update_reader_time_range,
             sessions::reconfigure_reader_session,
             sessions::seek_reader_session,
+            sessions::seek_reader_session_by_frame,
             sessions::update_reader_direction,
             sessions::destroy_reader_session,
             sessions::create_buffer_reader_session,

@@ -73,6 +73,8 @@ type Props = {
   onStepBackward?: () => void;
   onStepForward?: () => void;
   onSpeedChange?: (speed: PlaybackSpeed) => void;
+  /** Frame-based seeking (preferred for buffer playback) */
+  onFrameChange?: (frameIndex: number) => void;
 };
 
 function DiscoveryFramesView({
@@ -110,6 +112,7 @@ function DiscoveryFramesView({
   onStepBackward,
   onStepForward,
   onSpeedChange,
+  onFrameChange,
 }: Props) {
 
   const renderBuffer = useDiscoveryStore((s) => s.renderBuffer);
@@ -118,6 +121,10 @@ function DiscoveryFramesView({
   const bufferMode = useDiscoveryStore((s) => s.bufferMode);
   const setBufferViewMode = useDiscoveryStore((s) => s.setBufferViewMode);
   const toolboxResults = useDiscoveryStore((s) => s.toolbox);
+
+  // Store previous page size and page when switching to playback mode
+  const prevRenderBufferRef = useRef<number | null>(null);
+  const prevPageRef = useRef<number>(0);
 
   // Use buffer-first hook when bufferId is available
   // This provides a unified interface for streaming (tail poll) and stopped (pagination)
@@ -147,6 +154,27 @@ function DiscoveryFramesView({
 
   // Pagination state (only used when not streaming)
   const [currentPage, setCurrentPage] = useState(0);
+
+  // Handle view mode toggle (pagination vs playback)
+  const handleViewModeToggle = useCallback(() => {
+    if (bufferMode.viewMode === 'pagination') {
+      // Switching to playback: save current state, show all frames from start
+      prevRenderBufferRef.current = renderBuffer;
+      prevPageRef.current = currentPage;
+      setRenderBuffer(-1);
+      setCurrentPage(0);
+      setBufferViewMode('playback');
+    } else {
+      // Switching to pagination: restore previous page size and page
+      if (prevRenderBufferRef.current !== null && prevRenderBufferRef.current !== -1) {
+        setRenderBuffer(prevRenderBufferRef.current);
+      } else {
+        setRenderBuffer(50); // Default page size
+      }
+      setCurrentPage(prevPageRef.current);
+      setBufferViewMode('pagination');
+    }
+  }, [bufferMode.viewMode, renderBuffer, currentPage, setRenderBuffer, setBufferViewMode]);
 
   // Buffer mode state - frames fetched from backend on demand
   const [bufferModeFrames, setBufferModeFrames] = useState<(FrameMessage & { hexBytes: string[] })[]>([]);
@@ -637,7 +665,7 @@ function DiscoveryFramesView({
       return rowIndex;
     }
     return null;
-  }, [currentFrameIndex, currentPage, renderBuffer, visibleFrames.length, framesWereReversed]);
+  }, [currentFrameIndex, effectiveCurrentPage, renderBuffer, visibleFrames.length, framesWereReversed]);
 
   // Handle row click - convert row index to global frame index and get timestamp
   const handleRowClick = useCallback((rowIndex: number) => {
@@ -645,10 +673,11 @@ function DiscoveryFramesView({
     const effectivePageSize = renderBuffer === -1 ? visibleFrames.length : renderBuffer;
     // If frames were reversed for display, convert the visual row index back to the original index
     const originalRowIndex = framesWereReversed ? visibleFrames.length - 1 - rowIndex : rowIndex;
-    const globalFrameIndex = currentPage * effectivePageSize + originalRowIndex;
+    // Use effectiveCurrentPage to match highlightedRowIndex calculation
+    const globalFrameIndex = effectiveCurrentPage * effectivePageSize + originalRowIndex;
     const timestampUs = visibleFrames[rowIndex].timestamp_us;
     onFrameSelect(globalFrameIndex, timestampUs);
-  }, [onFrameSelect, currentPage, renderBuffer, visibleFrames, framesWereReversed]);
+  }, [onFrameSelect, effectiveCurrentPage, renderBuffer, visibleFrames, framesWereReversed]);
 
   // Time range inputs for toolbar (optional feature)
   const timeRangeInputs = showTimeRange && onStartTimeChange && onEndTimeChange ? (
@@ -693,7 +722,7 @@ function DiscoveryFramesView({
       {/* View mode toggle (pagination vs playback) - only shown when buffer is available */}
       {(isBufferMode || bufferMode.enabled) && (
         <button
-          onClick={() => setBufferViewMode(bufferMode.viewMode === 'pagination' ? 'playback' : 'pagination')}
+          onClick={handleViewModeToggle}
           className={`p-1.5 rounded transition-colors ${
             bufferMode.viewMode === 'playback'
               ? 'bg-green-600 text-white hover:bg-green-500'
@@ -731,9 +760,11 @@ function DiscoveryFramesView({
 
   // Playback controls for toolbar center
   // In buffer mode, buffer reader always supports seek, speed control, pause, and reverse
-  // Show playback controls whenever in buffer mode (playing or paused)
-  const inBufferPlaybackMode = isBufferMode || bufferMode.enabled;
-  const playbackControls = onPlay && onPause ? (
+  // Only show when: in buffer mode (from session), recorded source, or buffer mode enabled when NOT streaming
+  // The `bufferMode.enabled` check only applies when not streaming to avoid stale state during live streams
+  const inBufferPlaybackMode = isBufferMode || (!isStreaming && bufferMode.enabled);
+  const showPlaybackControls = inBufferPlaybackMode || isRecorded;
+  const playbackControls = showPlaybackControls && onPlay && onPause ? (
     <PlaybackControls
       playbackState={playbackState}
       playbackDirection={playbackDirection}
@@ -747,13 +778,14 @@ function DiscoveryFramesView({
       maxTimeUs={timelineProps.maxTimeUs}
       currentTimeUs={timelineProps.currentTimeUs}
       currentFrameIndex={currentFrameIndex}
-      totalFrames={(isBufferMode || bufferMode.enabled) ? (bufferMetadata?.count ?? bufferMode.totalFrames) : undefined}
+      totalFrames={(isBufferMode || bufferMode.enabled) ? (bufferMetadata?.count || bufferMode.totalFrames || bufferFrameView.totalCount || undefined) : undefined}
       onPlay={onPlay}
       onPlayBackward={onPlayBackward}
       onPause={onPause}
       onStepBackward={onStepBackward}
       onStepForward={onStepForward}
       onScrub={timelineProps.onScrub}
+      onFrameChange={onFrameChange}
       onSpeedChange={onSpeedChange}
     />
   ) : null;
@@ -784,7 +816,7 @@ function DiscoveryFramesView({
               disabled: isStreaming,
               leftContent: timeRangeInputs,
               centerContent: playbackControls,
-              hidePagination: isStreaming || isFiltering || bufferModeLoading || isBufferFirstLoading,
+              hidePagination: isStreaming || isFiltering || bufferModeLoading || isBufferFirstLoading || bufferMode.viewMode === 'playback',
             }
           : undefined
       }
@@ -817,7 +849,7 @@ function DiscoveryFramesView({
           showBus={showBusColumn}
           highlightedRowIndex={highlightedRowIndex}
           onRowClick={onFrameSelect ? handleRowClick : undefined}
-          pageStartIndex={effectiveCurrentPage * (renderBuffer === -1 ? visibleFrames.length : renderBuffer)}
+          pageStartIndex={renderBuffer === -1 ? 0 : effectiveCurrentPage * renderBuffer}
           framesReversed={framesWereReversed}
           pageFrameCount={visibleFrames.length}
         />

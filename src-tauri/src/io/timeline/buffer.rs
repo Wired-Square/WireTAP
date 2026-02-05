@@ -18,6 +18,8 @@ use crate::buffer_store;
 
 /// Sentinel value meaning "no seek requested"
 const NO_SEEK: i64 = i64::MIN;
+/// Sentinel value meaning "no frame seek requested"
+const NO_SEEK_FRAME: i64 = -1;
 
 /// Buffer Reader - streams frames from the shared memory buffer
 pub struct BufferReader {
@@ -26,6 +28,9 @@ pub struct BufferReader {
     reader_state: TimelineReaderState,
     /// Seek target in microseconds. Set to NO_SEEK when no seek is pending.
     seek_target_us: Arc<AtomicI64>,
+    /// Seek target as frame index. Set to NO_SEEK_FRAME when no seek is pending.
+    /// Frame-based seek takes priority over timestamp-based seek.
+    seek_target_frame: Arc<AtomicI64>,
     /// Set to true when the stream completes naturally (not cancelled)
     completed_flag: Arc<AtomicBool>,
     /// Buffer ID to read from (extracted from session_id for buffer_N patterns)
@@ -45,6 +50,7 @@ impl BufferReader {
             app,
             reader_state: TimelineReaderState::new(session_id, speed),
             seek_target_us: Arc::new(AtomicI64::new(NO_SEEK)),
+            seek_target_frame: Arc::new(AtomicI64::new(NO_SEEK_FRAME)),
             completed_flag: Arc::new(AtomicBool::new(false)),
             buffer_id,
         }
@@ -58,6 +64,7 @@ impl BufferReader {
             app,
             reader_state: TimelineReaderState::new(session_id, speed),
             seek_target_us: Arc::new(AtomicI64::new(NO_SEEK)),
+            seek_target_frame: Arc::new(AtomicI64::new(NO_SEEK_FRAME)),
             completed_flag: Arc::new(AtomicBool::new(false)),
             buffer_id: Some(buffer_id),
         }
@@ -90,10 +97,11 @@ impl IODevice for BufferReader {
         let session_id = self.reader_state.session_id.clone();
         let control = self.reader_state.control.clone();
         let seek_target_us = self.seek_target_us.clone();
+        let seek_target_frame = self.seek_target_frame.clone();
         let completed_flag = self.completed_flag.clone();
         let buffer_id = self.buffer_id.clone();
 
-        let handle = spawn_buffer_stream(app, session_id, control, seek_target_us, completed_flag, buffer_id);
+        let handle = spawn_buffer_stream(app, session_id, control, seek_target_us, seek_target_frame, completed_flag, buffer_id);
         self.reader_state.mark_running(handle);
 
         Ok(())
@@ -130,6 +138,15 @@ impl IODevice for BufferReader {
             self.reader_state.session_id, timestamp_us
         );
         self.seek_target_us.store(timestamp_us, Ordering::Relaxed);
+        Ok(())
+    }
+
+    fn seek_by_frame(&mut self, frame_index: i64) -> Result<(), String> {
+        eprintln!(
+            "[Buffer:{}] Seek by frame requested to index {}",
+            self.reader_state.session_id, frame_index
+        );
+        self.seek_target_frame.store(frame_index, Ordering::Relaxed);
         Ok(())
     }
 
@@ -315,11 +332,12 @@ fn spawn_buffer_stream(
     session_id: String,
     control: TimelineControl,
     seek_target_us: Arc<AtomicI64>,
+    seek_target_frame: Arc<AtomicI64>,
     completed_flag: Arc<AtomicBool>,
     buffer_id: Option<String>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
-        run_buffer_stream(app_handle, session_id, control, seek_target_us, completed_flag, buffer_id).await;
+        run_buffer_stream(app_handle, session_id, control, seek_target_us, seek_target_frame, completed_flag, buffer_id).await;
     })
 }
 
@@ -328,6 +346,7 @@ async fn run_buffer_stream(
     session_id: String,
     control: TimelineControl,
     seek_target_us: Arc<AtomicI64>,
+    seek_target_frame: Arc<AtomicI64>,
     completed_flag: Arc<AtomicBool>,
     buffer_id: Option<String>,
 ) {
@@ -419,7 +438,65 @@ async fn run_buffer_stream(
             break;
         }
 
-        // Check for seek request BEFORE pause check so seek works while paused
+        // Check for frame-based seek request FIRST (takes priority over timestamp seek)
+        let seek_frame = seek_target_frame.load(Ordering::Relaxed);
+        if seek_frame != NO_SEEK_FRAME {
+            // Clear the seek request
+            seek_target_frame.store(NO_SEEK_FRAME, Ordering::Relaxed);
+
+            // Clamp to valid range
+            let target_idx = (seek_frame as usize).min(frames.len().saturating_sub(1));
+
+            let is_paused = control.is_paused();
+            eprintln!(
+                "[Buffer:{}] Seeking to frame {} (by index, paused={})",
+                session_id, target_idx, is_paused
+            );
+
+            frame_index = target_idx;
+
+            // Flush any pending batch
+            if !batch_buffer.is_empty() {
+                emit_to_session(
+                    &app_handle,
+                    "frame-message",
+                    &session_id,
+                    batch_buffer.clone(),
+                );
+                batch_buffer.clear();
+            }
+
+            // Reset timing baselines after seek
+            if let Some(f) = frames.get(target_idx) {
+                let seek_time_secs = f.timestamp_us as f64 / 1_000_000.0;
+                playback_baseline_secs = seek_time_secs;
+                wall_clock_baseline = std::time::Instant::now();
+                last_frame_time_secs = None;
+
+                // Emit the new playback position
+                emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
+                    timestamp_us: f.timestamp_us as i64,
+                    frame_index: target_idx,
+                });
+
+                // When paused, emit a snapshot of the most recent frame for each frame ID
+                if is_paused {
+                    let snapshot = build_snapshot(&frames, target_idx);
+                    if !snapshot.is_empty() {
+                        eprintln!(
+                            "[Buffer:{}] Emitting snapshot of {} unique frames at seek position",
+                            session_id,
+                            snapshot.len()
+                        );
+                        emit_frames(&app_handle, &session_id, snapshot);
+                    }
+                }
+            }
+
+            continue;
+        }
+
+        // Check for timestamp-based seek request (fallback for backwards compatibility)
         let seek_target = seek_target_us.load(Ordering::Relaxed);
         if seek_target != NO_SEEK {
             // Clear the seek request

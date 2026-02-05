@@ -485,6 +485,22 @@ export async function seekReaderSession(
 }
 
 /**
+ * Seek a reader session to a specific frame index.
+ * Preferred over timestamp-based seeking for buffer playback as it avoids floating-point issues.
+ * @param sessionId The session ID
+ * @param frameIndex The target frame index (0-based)
+ */
+export async function seekReaderSessionByFrame(
+  sessionId: string,
+  frameIndex: number
+): Promise<void> {
+  return invoke("seek_reader_session_by_frame", {
+    session_id: sessionId,
+    frame_index: Math.floor(frameIndex),
+  });
+}
+
+/**
  * Set playback direction for a reader session.
  * Only works for readers that support reverse playback (e.g., BufferReader).
  * @param sessionId The session ID

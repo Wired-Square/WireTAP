@@ -146,6 +146,11 @@ All notable changes to CANdor will be documented in this file.
 - **Serial Frame ID Validation**: Frame identifiers now accept hex values (`0xFDE2`), decimal numbers, and standard identifiers. Previously only alphanumeric identifiers starting with a letter were allowed.
 - **PostgreSQL Query Serialization**: Fixed boolean and timestamp parameter serialization errors in database queries by using explicit type casts
 - **Query App Results Tab Crash**: Fixed infinite re-render loop when clicking Results tab with no results. Changed from setState-during-render pattern to useEffect for page reset on query change.
+- **Discovery Buffer Playback Frame Highlighting**: Fixed several issues with frame highlighting in buffer playback mode:
+  - Frame click now correctly calculates global frame index using `effectiveCurrentPage` (derived from session position) instead of local `currentPage` state, ensuring highlight and click target match
+  - Cell highlight background now applied to each `<td>` individually for consistent rendering across browsers (previously relied on `<tr>` background which didn't propagate reliably)
+  - Time column highlight now matches other columns by wrapping text content in span (the `opacity-80` from `textDataTertiary` was affecting the cell background)
+  - Highlight styling now uses theme-aware colour tokens (`bgCyan`, `--status-cyan-border`) instead of hardcoded Tailwind classes
 
 ## [0.3.2] - 2026-01-31
 

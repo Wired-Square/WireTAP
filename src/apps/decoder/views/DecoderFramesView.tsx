@@ -126,6 +126,8 @@ type Props = {
   currentFrameIndex?: number | null;
   totalFrames?: number | null;
   onScrub?: (timeUs: number) => void;
+  /** Frame-based seeking (preferred for buffer playback) */
+  onFrameChange?: (frameIndex: number) => void;
 
   signalColours?: {
     none?: string;
@@ -804,6 +806,7 @@ export default function DecoderFramesView({
   currentFrameIndex,
   totalFrames,
   onScrub,
+  onFrameChange,
   signalColours,
   headerFieldFilters,
   onToggleHeaderFieldFilter,
@@ -1026,6 +1029,7 @@ export default function DecoderFramesView({
       onStepBackward={onStepBackward}
       onStepForward={onStepForward}
       onScrub={onScrub}
+      onFrameChange={onFrameChange}
       onSpeedChange={onSpeedChange}
     />
   );

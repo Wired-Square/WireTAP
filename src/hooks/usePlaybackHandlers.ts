@@ -50,7 +50,7 @@ export function usePlaybackHandlers({
   isPaused,
   isStreaming,
   sessionReady,
-  isBufferMode,
+  isBufferMode: _isBufferMode,
   currentFrameIndex,
   currentTimestampUs,
   selectedFrameIds,

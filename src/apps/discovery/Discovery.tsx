@@ -396,7 +396,7 @@ export default function Discovery() {
     resume,
     setSpeed,
     setTimeRange,
-    seek,
+    seekByFrame,
     reinitialize,
   } = session;
 
@@ -617,6 +617,7 @@ export default function Discovery() {
     reinitialize,
     setSpeed,
     setTimeRange,
+    seekByFrame,
 
     // Store actions
     setPlaybackSpeed,
@@ -860,7 +861,7 @@ export default function Discovery() {
               setCurrentFrameIndex(frameIndex);
               updateCurrentTime(timestampUs / 1_000_000);
               if (capabilities?.supports_seek) {
-                await seek(timestampUs);
+                await seekByFrame(frameIndex);
               }
             }}
             onPlay={() => { setPlaybackDirection("forward"); handlers.handlePlay(); }}
@@ -869,6 +870,7 @@ export default function Discovery() {
             onStepBackward={handlers.handleStepBackward}
             onStepForward={handlers.handleStepForward}
             onSpeedChange={handlers.handleSpeedChange}
+            onFrameChange={handlers.handleFrameChange}
           />
         )}
 

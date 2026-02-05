@@ -29,13 +29,13 @@ export interface PlaybackControlsProps {
   playbackSpeed?: PlaybackSpeed;
   /** Available speed options */
   speedOptions?: PlaybackSpeed[];
-  /** Timeline bounds for seek operations */
+  /** Timeline bounds for seek operations (timestamp mode) */
   minTimeUs?: number | null;
   maxTimeUs?: number | null;
   currentTimeUs?: number | null;
-  /** Current frame index (0-based) for step display */
+  /** Current frame index (0-based) for step display and frame-based seeking */
   currentFrameIndex?: number | null;
-  /** Total frame count for step display */
+  /** Total frame count for step display and frame-based seeking */
   totalFrames?: number | null;
   /** Callbacks */
   onPlay: () => void;
@@ -43,11 +43,16 @@ export interface PlaybackControlsProps {
   onPause: () => void;
   onStepBackward?: () => void;
   onStepForward?: () => void;
+  /** Called for timestamp-based seeking (legacy, for backward compatibility) */
   onScrub?: (timeUs: number) => void;
+  /** Called for frame-based seeking (preferred for buffer playback) */
+  onFrameChange?: (frameIndex: number) => void;
   onSpeedChange?: (speed: PlaybackSpeed) => void;
 }
 
 const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.25, 0.5, 1, 2, 10, 30, 60];
+/** Default number of frames to skip for 10-second jumps when we can't calculate from timestamps */
+const DEFAULT_SKIP_FRAMES = 100;
 
 /**
  * Playback controls for timeline readers.
@@ -74,6 +79,7 @@ export function PlaybackControls({
   onStepBackward,
   onStepForward,
   onScrub,
+  onFrameChange,
   onSpeedChange,
 }: PlaybackControlsProps) {
   const isPlaying = playbackState === "playing";
@@ -85,8 +91,69 @@ export function PlaybackControls({
   const showControls = isReady && (supportsSeek || supportsSpeedControl || canPause || supportsReverse);
   if (!showControls) return null;
 
-  // Whether seek controls should be shown
-  const showSeekControls = supportsSeek && onScrub && minTimeUs != null && maxTimeUs != null;
+  // Whether frame-based seeking is available (preferred)
+  const canSeekByFrame = supportsSeek && onFrameChange && totalFrames != null && totalFrames > 0;
+
+  // Whether timestamp-based seeking is available (fallback)
+  const canSeekByTime = supportsSeek && onScrub && minTimeUs != null && maxTimeUs != null;
+
+  // Whether any seek controls should be shown
+  const showSeekControls = canSeekByFrame || canSeekByTime;
+
+  // Calculate frames per 10 seconds for skip operations
+  const framesPerSkip = (() => {
+    if (!canSeekByFrame) return DEFAULT_SKIP_FRAMES;
+    if (minTimeUs != null && maxTimeUs != null && totalFrames > 1) {
+      const durationUs = maxTimeUs - minTimeUs;
+      const durationSecs = durationUs / 1_000_000;
+      if (durationSecs > 0) {
+        // Calculate frames for 10 seconds
+        const framesPerSec = totalFrames / durationSecs;
+        return Math.max(1, Math.round(framesPerSec * 10));
+      }
+    }
+    return DEFAULT_SKIP_FRAMES;
+  })();
+
+  // Handler for skip to start
+  const handleSkipToStart = () => {
+    if (canSeekByFrame) {
+      onFrameChange!(0);
+    } else if (canSeekByTime) {
+      onScrub!(minTimeUs!);
+    }
+  };
+
+  // Handler for skip to end
+  const handleSkipToEnd = () => {
+    if (canSeekByFrame) {
+      onFrameChange!(totalFrames! - 1);
+    } else if (canSeekByTime) {
+      onScrub!(maxTimeUs!);
+    }
+  };
+
+  // Handler for skip back (~10 seconds)
+  const handleSkipBack = () => {
+    if (canSeekByFrame && currentFrameIndex != null) {
+      const newFrame = Math.max(0, currentFrameIndex - framesPerSkip);
+      onFrameChange!(newFrame);
+    } else if (canSeekByTime) {
+      const newTime = Math.max(minTimeUs!, (currentTimeUs ?? minTimeUs!) - 10_000_000);
+      onScrub!(newTime);
+    }
+  };
+
+  // Handler for skip forward (~10 seconds)
+  const handleSkipForward = () => {
+    if (canSeekByFrame && currentFrameIndex != null) {
+      const newFrame = Math.min(totalFrames! - 1, currentFrameIndex + framesPerSkip);
+      onFrameChange!(newFrame);
+    } else if (canSeekByTime) {
+      const newTime = Math.min(maxTimeUs!, (currentTimeUs ?? minTimeUs!) + 10_000_000);
+      onScrub!(newTime);
+    }
+  };
 
   return (
     <div className="flex items-center gap-1">
@@ -94,7 +161,7 @@ export function PlaybackControls({
       {showSeekControls && (
         <button
           type="button"
-          onClick={() => onScrub!(minTimeUs!)}
+          onClick={handleSkipToStart}
           className="p-1 rounded text-gray-400 hover:bg-gray-700 hover:text-gray-200"
           title="Skip to start"
         >
@@ -106,12 +173,9 @@ export function PlaybackControls({
       {showSeekControls && (
         <button
           type="button"
-          onClick={() => {
-            const newTime = Math.max(minTimeUs!, (currentTimeUs ?? minTimeUs!) - 10_000_000);
-            onScrub!(newTime);
-          }}
+          onClick={handleSkipBack}
           className="p-1 rounded text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-          title="Skip back 10 seconds"
+          title={canSeekByFrame ? `Skip back ~${framesPerSkip} frames` : "Skip back 10 seconds"}
         >
           <Rewind className={iconSm} />
         </button>
@@ -219,12 +283,9 @@ export function PlaybackControls({
       {showSeekControls && (
         <button
           type="button"
-          onClick={() => {
-            const newTime = Math.min(maxTimeUs!, (currentTimeUs ?? minTimeUs!) + 10_000_000);
-            onScrub!(newTime);
-          }}
+          onClick={handleSkipForward}
           className="p-1 rounded text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-          title="Skip forward 10 seconds"
+          title={canSeekByFrame ? `Skip forward ~${framesPerSkip} frames` : "Skip forward 10 seconds"}
         >
           <FastForward className={iconSm} />
         </button>
@@ -234,7 +295,7 @@ export function PlaybackControls({
       {showSeekControls && (
         <button
           type="button"
-          onClick={() => onScrub!(maxTimeUs!)}
+          onClick={handleSkipToEnd}
           className="p-1 rounded text-gray-400 hover:bg-gray-700 hover:text-gray-200"
           title="Skip to end"
         >

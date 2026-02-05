@@ -10,7 +10,7 @@ use crate::{
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
         get_session_listeners, join_session, leave_session, list_sessions, pause_session,
         reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
-        resume_session_fresh, seek_session, set_listener_active, start_session, stop_session,
+        resume_session_fresh, seek_session, seek_session_by_frame, set_listener_active, start_session, stop_session,
         suspend_session, switch_to_buffer_replay, resume_to_live_session, transmit_frame, unregister_listener,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IODevice, IOState,
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, BufferReader, step_frame, StepResult,
@@ -865,6 +865,12 @@ pub async fn reconfigure_reader_session(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Result<(), String> {
     seek_session(&session_id, timestamp_us).await
+}
+
+/// Seek to a specific frame index (preferred for buffer playback - avoids floating-point issues)
+#[tauri::command(rename_all = "snake_case")]
+pub async fn seek_reader_session_by_frame(session_id: String, frame_index: i64) -> Result<(), String> {
+    seek_session_by_frame(&session_id, frame_index).await
 }
 
 /// Set playback direction for a reader session (reverse = true for backwards playback)

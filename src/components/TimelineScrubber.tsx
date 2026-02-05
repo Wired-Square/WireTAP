@@ -7,14 +7,22 @@ import { caption } from "../styles/typography";
 type TimeDisplayFormat = "delta-last" | "delta-start" | "timestamp" | "human";
 
 type Props = {
-  /** Minimum timestamp in microseconds */
-  minTimeUs: number;
-  /** Maximum timestamp in microseconds */
-  maxTimeUs: number;
-  /** Current position in microseconds */
-  currentTimeUs: number;
-  /** Called when user scrubs to a new position */
-  onPositionChange: (timeUs: number) => void;
+  /** Minimum timestamp in microseconds (for timestamp mode) */
+  minTimeUs?: number;
+  /** Maximum timestamp in microseconds (for timestamp mode) */
+  maxTimeUs?: number;
+  /** Current position in microseconds (for timestamp mode) */
+  currentTimeUs?: number;
+  /** Called when user scrubs to a new position in timestamp mode */
+  onPositionChange?: (timeUs: number) => void;
+
+  /** Total frames in buffer (enables frame-based mode when provided) */
+  totalFrames?: number;
+  /** Current frame index (0-based, for frame mode) */
+  currentFrameIndex?: number;
+  /** Called when user scrubs to a new frame index (for frame mode) */
+  onFrameChange?: (frameIndex: number) => void;
+
   /** Whether the scrubber is disabled (e.g., while streaming) */
   disabled?: boolean;
   /** Optional: show time labels at edges */
@@ -26,10 +34,13 @@ type Props = {
 };
 
 export default function TimelineScrubber({
-  minTimeUs,
-  maxTimeUs,
-  currentTimeUs,
+  minTimeUs = 0,
+  maxTimeUs = 0,
+  currentTimeUs = 0,
   onPositionChange,
+  totalFrames,
+  currentFrameIndex,
+  onFrameChange,
   disabled = false,
   showLabels = true,
   displayTimeFormat = "human",
@@ -37,36 +48,67 @@ export default function TimelineScrubber({
 }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [hoverTimeUs, setHoverTimeUs] = useState<number | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<number | null>(null); // frame index or timestamp
 
-  // Calculate position percentage
-  const range = maxTimeUs - minTimeUs;
+  // Determine if we're in frame-based mode
+  const isFrameMode = totalFrames != null && totalFrames > 0 && onFrameChange != null;
+  const effectiveCurrentFrameIndex = currentFrameIndex ?? 0;
+
+  // Calculate position percentage based on mode
   const positionPercent = useMemo(() => {
-    if (range <= 0) return 0;
-    const percent = ((currentTimeUs - minTimeUs) / range) * 100;
-    return Math.max(0, Math.min(100, percent));
-  }, [currentTimeUs, minTimeUs, range]);
+    if (isFrameMode) {
+      // Frame-based mode: position based on frame index
+      if (totalFrames <= 1) return 0;
+      const percent = (effectiveCurrentFrameIndex / (totalFrames - 1)) * 100;
+      return Math.max(0, Math.min(100, percent));
+    } else {
+      // Timestamp-based mode
+      const range = maxTimeUs - minTimeUs;
+      if (range <= 0) return 0;
+      const percent = ((currentTimeUs - minTimeUs) / range) * 100;
+      return Math.max(0, Math.min(100, percent));
+    }
+  }, [isFrameMode, totalFrames, effectiveCurrentFrameIndex, currentTimeUs, minTimeUs, maxTimeUs]);
 
-  // Convert pixel position to timestamp
+  // Convert pixel position to frame index (frame mode)
+  const pixelToFrame = useCallback(
+    (clientX: number): number => {
+      if (!trackRef.current || !totalFrames || totalFrames <= 1) return 0;
+      const rect = trackRef.current.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, x / rect.width));
+      // Round to nearest frame index
+      return Math.round(ratio * (totalFrames - 1));
+    },
+    [totalFrames]
+  );
+
+  // Convert pixel position to timestamp (timestamp mode)
   const pixelToTime = useCallback(
     (clientX: number): number => {
+      const range = maxTimeUs - minTimeUs;
       if (!trackRef.current || range <= 0) return minTimeUs;
       const rect = trackRef.current.getBoundingClientRect();
       const x = clientX - rect.left;
       const ratio = Math.max(0, Math.min(1, x / rect.width));
       return minTimeUs + ratio * range;
     },
-    [minTimeUs, range]
+    [minTimeUs, maxTimeUs]
   );
 
   // Handle click on track
   const handleTrackClick = useCallback(
     (e: React.MouseEvent) => {
       if (disabled) return;
-      const timeUs = pixelToTime(e.clientX);
-      onPositionChange(timeUs);
+      if (isFrameMode) {
+        const frameIndex = pixelToFrame(e.clientX);
+        onFrameChange!(frameIndex);
+      } else if (onPositionChange) {
+        const timeUs = pixelToTime(e.clientX);
+        onPositionChange(timeUs);
+      }
     },
-    [disabled, pixelToTime, onPositionChange]
+    [disabled, isFrameMode, pixelToFrame, pixelToTime, onFrameChange, onPositionChange]
   );
 
   // Handle mouse down on handle
@@ -83,11 +125,16 @@ export default function TimelineScrubber({
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (isDragging && !disabled) {
-        const timeUs = pixelToTime(e.clientX);
-        onPositionChange(timeUs);
+        if (isFrameMode) {
+          const frameIndex = pixelToFrame(e.clientX);
+          onFrameChange!(frameIndex);
+        } else if (onPositionChange) {
+          const timeUs = pixelToTime(e.clientX);
+          onPositionChange(timeUs);
+        }
       }
     },
-    [isDragging, disabled, pixelToTime, onPositionChange]
+    [isDragging, disabled, isFrameMode, pixelToFrame, pixelToTime, onFrameChange, onPositionChange]
   );
 
   // Handle mouse up
@@ -99,14 +146,19 @@ export default function TimelineScrubber({
   const handleTrackMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (disabled) return;
-      const timeUs = pixelToTime(e.clientX);
-      setHoverTimeUs(timeUs);
+      if (isFrameMode) {
+        const frameIndex = pixelToFrame(e.clientX);
+        setHoverPosition(frameIndex);
+      } else {
+        const timeUs = pixelToTime(e.clientX);
+        setHoverPosition(timeUs);
+      }
     },
-    [disabled, pixelToTime]
+    [disabled, isFrameMode, pixelToFrame, pixelToTime]
   );
 
   const handleTrackMouseLeave = useCallback(() => {
-    setHoverTimeUs(null);
+    setHoverPosition(null);
   }, []);
 
   // Set up global mouse listeners for drag
@@ -143,8 +195,25 @@ export default function TimelineScrubber({
     return formatHumanUs(us);
   }, [displayTimeFormat, streamStartTimeUs]);
 
+  // Calculate hover position percentage for tooltip
+  const hoverPercent = useMemo(() => {
+    if (hoverPosition === null) return 0;
+    if (isFrameMode) {
+      if (!totalFrames || totalFrames <= 1) return 0;
+      return (hoverPosition / (totalFrames - 1)) * 100;
+    } else {
+      const range = maxTimeUs - minTimeUs;
+      if (range <= 0) return 0;
+      return ((hoverPosition - minTimeUs) / range) * 100;
+    }
+  }, [hoverPosition, isFrameMode, totalFrames, minTimeUs, maxTimeUs]);
+
   // Don't render if no valid range
-  if (range <= 0) {
+  const hasValidRange = isFrameMode
+    ? totalFrames != null && totalFrames > 0
+    : (maxTimeUs - minTimeUs) > 0;
+
+  if (!hasValidRange) {
     return null;
   }
 
@@ -152,10 +221,10 @@ export default function TimelineScrubber({
     <div
       className={`flex items-center gap-2 ${disabled ? "opacity-50" : ""}`}
     >
-      {/* Start time label */}
+      {/* Start label */}
       {showLabels && (
         <span className={`${caption} font-mono shrink-0`}>
-          {formatLabelTime(minTimeUs)}
+          {isFrameMode ? "1" : formatLabelTime(minTimeUs)}
         </span>
       )}
 
@@ -192,22 +261,24 @@ export default function TimelineScrubber({
         />
 
         {/* Hover tooltip */}
-        {hoverTimeUs !== null && !isDragging && !disabled && (
+        {hoverPosition !== null && !isDragging && !disabled && (
           <div
             className="absolute bottom-5 transform -translate-x-1/2 px-2 py-1 bg-[var(--bg-primary)] text-[color:var(--text-primary)] text-xs rounded shadow-lg whitespace-nowrap pointer-events-none z-10"
             style={{
-              left: `${((hoverTimeUs - minTimeUs) / range) * 100}%`,
+              left: `${hoverPercent}%`,
             }}
           >
-            {formatTooltipTime(hoverTimeUs)}
+            {isFrameMode
+              ? `Frame ${(hoverPosition + 1).toLocaleString()}`
+              : formatTooltipTime(hoverPosition)}
           </div>
         )}
       </div>
 
-      {/* End time label */}
+      {/* End label */}
       {showLabels && (
         <span className={`${caption} font-mono shrink-0`}>
-          {formatLabelTime(maxTimeUs)}
+          {isFrameMode ? totalFrames!.toLocaleString() : formatLabelTime(maxTimeUs)}
         </span>
       )}
     </div>

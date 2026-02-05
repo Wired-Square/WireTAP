@@ -145,6 +145,8 @@ export interface UseIOSessionResult {
   setTimeRange: (start?: string, end?: string) => Promise<void>;
   /** Seek to a specific timestamp (only if capabilities.supports_seek) */
   seek: (timestampUs: number) => Promise<void>;
+  /** Seek to a specific frame index (preferred for buffer playback - avoids float issues) */
+  seekByFrame: (frameIndex: number) => Promise<void>;
   /** Reinitialize the session (e.g., after profile change, file selection, or buffer switch) */
   reinitialize: (
     profileId?: string,
@@ -238,6 +240,7 @@ export function useIOSession(
   const setSessionSpeed = useSessionStore((s) => s.setSessionSpeed);
   const setSessionTimeRange = useSessionStore((s) => s.setSessionTimeRange);
   const seekSession = useSessionStore((s) => s.seekSession);
+  const seekSessionByFrame = useSessionStore((s) => s.seekSessionByFrame);
   const switchToBuffer = useSessionStore((s) => s.switchToBuffer);
   const reinitializeSession = useSessionStore((s) => s.reinitializeSession);
   const registerCallbacks = useSessionStore((s) => s.registerCallbacks);
@@ -578,6 +581,19 @@ export function useIOSession(
     [effectiveSessionId, seekSession]
   );
 
+  const seekByFrame = useCallback(
+    async (frameIndex: number) => {
+      if (!effectiveSessionId) return;
+      try {
+        await seekSessionByFrame(effectiveSessionId, frameIndex);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        callbacksRef.current.onError?.(msg);
+      }
+    },
+    [effectiveSessionId, seekSessionByFrame]
+  );
+
   const reinitialize = useCallback(
     async (
       newProfileId?: string,
@@ -790,6 +806,7 @@ export function useIOSession(
     setSpeed,
     setTimeRange,
     seek,
+    seekByFrame,
     reinitialize,
     switchToBufferReplay,
     rejoin,

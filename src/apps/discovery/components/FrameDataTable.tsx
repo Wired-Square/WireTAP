@@ -22,6 +22,7 @@ import {
   textDataPurple,
   textDataAmber,
   textDataCyan,
+  bgCyan,
 } from '../../../styles';
 import { tableIconButtonDark } from '../../../styles/buttonStyles';
 
@@ -212,17 +213,19 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             const frameIndex = framesReversed
               ? pageStartIndex + pageFrameCount - 1 - idx
               : pageStartIndex + idx;
+            // Cell highlight class - apply to each td for consistent rendering across browsers
+            const cellHighlight = isCurrentFrame ? bgCyan : '';
 
             return (
               <tr
                 ref={isCurrentFrame ? highlightedRowRef : undefined}
                 key={`${frame.timestamp_us}-${frame.frame_id}-${idx}`}
-                className={`${hoverDataRow} ${frame.incomplete ? 'opacity-60' : ''} ${isCurrentFrame ? 'bg-cyan-900/40 ring-1 ring-cyan-500/50' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
-                title={`Frame ${frameIndex}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
+                className={`${isCurrentFrame ? '' : hoverDataRow} ${frame.incomplete ? 'opacity-60' : ''} ${isCurrentFrame ? 'ring-1 ring-[color:var(--status-cyan-border)]' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
+                title={`Frame ${frameIndex + 1}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
                 onClick={onRowClick ? () => onRowClick(idx) : undefined}
               >
                 {onBookmark && (
-                  <td className="px-1 py-0.5">
+                  <td className={`px-1 py-0.5 ${cellHighlight}`}>
                     <button
                       onClick={() => onBookmark(frame.frame_id, frame.timestamp_us)}
                       className={tableIconButtonDark}
@@ -233,33 +236,33 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                   </td>
                 )}
                 <td
-                  className={`px-2 py-0.5 ${textDataTertiary}`}
+                  className={`px-2 py-0.5 ${cellHighlight}`}
                   title={formatHumanUs(frame.timestamp_us)}
                 >
-                  {formatTime(frame.timestamp_us, prevFrame?.timestamp_us ?? null)}
+                  <span className={textDataTertiary}>{formatTime(frame.timestamp_us, prevFrame?.timestamp_us ?? null)}</span>
                 </td>
                 {showId && (
-                  <td className={`px-2 py-0.5 text-right ${frame.incomplete ? textDataOrange : textDataYellow}`}>
+                  <td className={`px-2 py-0.5 text-right ${frame.incomplete ? textDataOrange : textDataYellow} ${cellHighlight}`}>
                     {formatId(frame.frame_id, displayFrameIdFormat, frame.is_extended)}
                     {frame.incomplete && <span className={`ml-1 ${textDataOrange}`}>?</span>}
                   </td>
                 )}
                 {showBus && (
-                  <td className={`px-2 py-0.5 text-center ${textDataCyan}`}>
+                  <td className={`px-2 py-0.5 text-center ${textDataCyan} ${cellHighlight}`}>
                     {frame.bus ?? 0}
                   </td>
                 )}
                 {hasSourceAddress && (
-                  <td className={`px-2 py-0.5 text-right ${textDataPurple}`}>
+                  <td className={`px-2 py-0.5 text-right ${textDataPurple} ${cellHighlight}`}>
                     {frame.source_address !== undefined
                       ? `0x${frame.source_address.toString(16).toUpperCase().padStart(srcPadding, '0')}`
                       : '-'
                     }
                   </td>
                 )}
-                <td className={`px-2 py-0.5 ${textDataSecondary}`}>{frame.dlc}</td>
+                <td className={`px-2 py-0.5 ${textDataSecondary} ${cellHighlight}`}>{frame.dlc}</td>
                 {showCalculator && (
-                  <td className="px-1 py-0.5">
+                  <td className={`px-1 py-0.5 ${cellHighlight}`}>
                     <button
                       onClick={() => handleCalculator(frame.bytes)}
                       className={tableIconButtonDark}
@@ -269,11 +272,11 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                     </button>
                   </td>
                 )}
-                <td className="px-2 py-0.5">
+                <td className={`px-2 py-0.5 ${cellHighlight}`}>
                   {renderBytes ? renderBytes(frame) : defaultRenderBytes(frame)}
                 </td>
                 {showAscii && (
-                  <td className={`px-2 py-0.5 ${textDataYellow} whitespace-nowrap`}>
+                  <td className={`px-2 py-0.5 ${textDataYellow} whitespace-nowrap ${cellHighlight}`}>
                     |{bytesToAscii(frame.bytes)}|
                   </td>
                 )}

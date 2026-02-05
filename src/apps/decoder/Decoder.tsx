@@ -499,10 +499,10 @@ export default function Decoder() {
     stop,
     pause,
     resume,
-    resumeFresh,
     setSpeed,
     setTimeRange,
     seek,
+    seekByFrame,
     switchToBufferReplay,
     reinitialize,
   } = session;
@@ -538,6 +538,7 @@ export default function Decoder() {
     setSpeed,
     setTimeRange,
     seek,
+    seekByFrame,
 
     // Reader state
     sessionId,
@@ -1014,6 +1015,7 @@ export default function Decoder() {
           currentFrameIndex={sessionCurrentFrameIndex}
           totalFrames={bufferMetadata?.count}
           onScrub={handlers.handleScrub}
+          onFrameChange={handlers.handleFrameChange}
           signalColours={{
             none: settings?.signal_colour_none,
             low: settings?.signal_colour_low,

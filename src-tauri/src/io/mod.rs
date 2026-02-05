@@ -560,6 +560,13 @@ pub trait IODevice: Send + Sync {
         Err("This device does not support seeking".to_string())
     }
 
+    /// Seek to a specific frame index (if supported).
+    /// This is the preferred method for buffer playback as it avoids floating-point issues.
+    /// Default implementation returns an error.
+    fn seek_by_frame(&mut self, _frame_index: i64) -> Result<(), String> {
+        Err("This device does not support frame-based seeking".to_string())
+    }
+
     /// Set playback direction (forward or reverse).
     /// Default implementation returns an error.
     fn set_direction(&mut self, _reverse: bool) -> Result<(), String> {
@@ -1712,6 +1719,16 @@ pub async fn seek_session(session_id: &str, timestamp_us: i64) -> Result<(), Str
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
     session.device.seek(timestamp_us)
+}
+
+/// Seek to a specific frame index (preferred for buffer playback)
+pub async fn seek_session_by_frame(session_id: &str, frame_index: i64) -> Result<(), String> {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    session.device.seek_by_frame(frame_index)
 }
 
 /// Set playback direction (reverse = true for backwards playback)

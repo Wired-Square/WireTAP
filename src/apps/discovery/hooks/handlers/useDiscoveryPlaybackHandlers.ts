@@ -19,6 +19,7 @@ export interface UseDiscoveryPlaybackHandlersParams {
   resume: () => Promise<void>;
   setSpeed: (speed: number) => Promise<void>;
   setTimeRange: (start: string, end: string) => Promise<void>;
+  seekByFrame: (frameIndex: number) => Promise<void>;
 
   // Reader state
   isPaused: boolean;
@@ -66,6 +67,7 @@ export function useDiscoveryPlaybackHandlers({
   resume,
   setSpeed,
   setTimeRange,
+  seekByFrame,
   isPaused,
   isStreaming,
   sessionReady,
@@ -156,10 +158,18 @@ export function useDiscoveryPlaybackHandlers({
     }
   }, [setEndTime, setActiveBookmarkId, setTimeRange, startTime]);
 
-  // Handle timeline scrubber position change
+  // Handle timeline scrubber position change (timestamp-based)
   const handleScrub = useCallback((timeUs: number) => {
     updateCurrentTime(timeUs / 1_000_000);
   }, [updateCurrentTime]);
+
+  // Handle frame-based position change (preferred for buffer playback)
+  const handleFrameChange = useCallback(async (frameIndex: number) => {
+    // Update local state immediately for responsiveness
+    setCurrentFrameIndex?.(frameIndex);
+    // Tell the session to seek to this frame
+    await seekByFrame(frameIndex);
+  }, [setCurrentFrameIndex, seekByFrame]);
 
   return {
     // From shared handlers
@@ -176,6 +186,7 @@ export function useDiscoveryPlaybackHandlers({
     handleStartTimeChange,
     handleEndTimeChange,
     handleScrub,
+    handleFrameChange,
   };
 }
 
