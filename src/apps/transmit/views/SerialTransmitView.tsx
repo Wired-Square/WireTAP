@@ -7,6 +7,7 @@ import { Plus, RotateCcw, Send } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import { ioTransmitSerial } from "../../../api/transmit";
+import { applyFraming } from "../utils/slipFraming";
 import {
   bgDataToolbar,
   borderDataView,
@@ -106,30 +107,12 @@ export default function SerialTransmitView() {
   const handleSend = useCallback(async () => {
     if (!activeSession?.id || parsedBytes.length === 0) return;
 
-    // Apply framing if needed
-    let bytesToSend = [...parsedBytes];
-    if (serialEditor.framingMode === "slip") {
-      // SLIP framing: END(0xC0), escape special chars, END(0xC0)
-      const SLIP_END = 0xc0;
-      const SLIP_ESC = 0xdb;
-      const SLIP_ESC_END = 0xdc;
-      const SLIP_ESC_ESC = 0xdd;
-      const framed: number[] = [SLIP_END];
-      for (const b of parsedBytes) {
-        if (b === SLIP_END) {
-          framed.push(SLIP_ESC, SLIP_ESC_END);
-        } else if (b === SLIP_ESC) {
-          framed.push(SLIP_ESC, SLIP_ESC_ESC);
-        } else {
-          framed.push(b);
-        }
-      }
-      framed.push(SLIP_END);
-      bytesToSend = framed;
-    } else if (serialEditor.framingMode === "delimiter") {
-      // Append delimiter
-      bytesToSend = [...parsedBytes, ...serialEditor.delimiter];
-    }
+    // Apply framing using centralised utility
+    const bytesToSend = applyFraming(
+      parsedBytes,
+      serialEditor.framingMode,
+      serialEditor.delimiter
+    );
 
     setIsSending(true);
     try {

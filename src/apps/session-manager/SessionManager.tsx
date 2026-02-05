@@ -28,7 +28,7 @@ import SessionLogView from "./views/SessionLogView";
 export default function SessionManager() {
   const { settings } = useSettings();
   const [sessions, setSessions] = useState<ActiveSessionInfo[]>([]);
-  const [activeTab, setActiveTab] = useState<string>("visual");
+  const [activeTab, setActiveTab] = useState<string>("log");
   const autoRefresh = useSessionManagerStore((s) => s.autoRefresh);
   const refreshIntervalMs = useSessionManagerStore((s) => s.refreshIntervalMs);
   const setIsRefreshing = useSessionManagerStore((s) => s.setIsRefreshing);
@@ -42,13 +42,13 @@ export default function SessionManager() {
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(
     () => [
-      { id: "visual", label: "Visual" },
       {
         id: "log",
         label: "Log",
         count: logEntryCount > 0 ? logEntryCount : undefined,
         countColor: "gray" as const,
       },
+      { id: "visual", label: "Visual" },
     ],
     [logEntryCount]
   );

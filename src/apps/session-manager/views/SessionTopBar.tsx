@@ -1,9 +1,10 @@
 // src/apps/session-manager/views/SessionTopBar.tsx
 
-import { RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { Network, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
-import { iconMd } from "../../../styles/spacing";
+import { iconLg, iconMd } from "../../../styles/spacing";
 import { iconButtonHover } from "../../../styles/buttonStyles";
+import FlexSeparator from "../../../components/FlexSeparator";
 
 interface SessionTopBarProps {
   sessionCount: number;
@@ -17,11 +18,10 @@ export default function SessionTopBar({ sessionCount, onRefresh }: SessionTopBar
 
   return (
     <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--border-default)] bg-[var(--bg-surface)]">
-      {/* Left: Title and count */}
+      {/* Left: Icon, title, count, and separator */}
       <div className="flex items-center gap-3">
-        <h2 className="text-sm font-medium text-[color:var(--text-primary)]">
-          Session Manager
-        </h2>
+        <Network className={`${iconLg} text-cyan-400 shrink-0`} />
+        <FlexSeparator />
         <span className="px-2 py-0.5 text-xs rounded-full bg-cyan-500/20 text-cyan-400">
           {sessionCount} active
         </span>

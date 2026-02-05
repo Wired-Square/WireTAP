@@ -4,7 +4,6 @@
 // Uses useIOSessionManager for session management and useTransmitHandlers for business logic.
 
 import { useEffect, useCallback, useMemo, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { invoke } from "@tauri-apps/api/core";
 import { Send, AlertCircle } from "lucide-react";
@@ -14,7 +13,7 @@ import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useFocusStore } from "../../stores/focusStore";
 import { useSettings, type IOProfile } from "../../hooks/useSettings";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
-import type { TransmitHistoryEvent, SerialTransmitHistoryEvent, RepeatStoppedEvent } from "../../api/transmit";
+import { useTransmitHistorySubscription } from "./hooks/useTransmitHistorySubscription";
 import {
   bgDataToolbar,
   borderDataView,
@@ -112,25 +111,35 @@ export default function Transmit() {
   // Dialog state
   const [showIoPickerDialog, setShowIoPickerDialog] = useState(false);
 
+  // Store actions for stopping repeats
+  const stopAllRepeats = useTransmitStore((s) => s.stopAllRepeats);
+  const stopAllGroupRepeats = useTransmitStore((s) => s.stopAllGroupRepeats);
+
   // Error handler for session errors
   const handleError = useCallback((error: string) => {
     console.error("[Transmit] Session error:", error);
   }, []);
+
+  // Callback before starting a watch session - stop all repeats
+  const handleBeforeWatch = useCallback(async () => {
+    await stopAllRepeats();
+    await stopAllGroupRepeats();
+  }, [stopAllRepeats, stopAllGroupRepeats]);
 
   // Use centralized IO session manager
   const manager = useIOSessionManager({
     appName: "transmit",
     ioProfiles: transmitProfiles,
     onError: handleError,
+    onBeforeWatch: handleBeforeWatch,
+    onBeforeMultiWatch: handleBeforeWatch,
   });
 
   // Destructure manager state
   const {
     ioProfile,
-    setIoProfile,
     ioProfileName,
     multiBusProfiles,
-    setMultiBusProfiles,
     effectiveSessionId,
     session,
     isStreaming,
@@ -141,30 +150,28 @@ export default function Transmit() {
     capabilities,
     joinerCount,
     handleLeave: managerLeave,
-    startMultiBusSession,
+    watchSingleSource,
+    watchMultiSource,
+    stopWatch,
+    joinSession,
+    skipReader,
     resumeWithNewBuffer,
   } = manager;
 
-  // Session controls
-  const { start, stop, leave, rejoin, reinitialize } = session;
+  // Session controls (for menu commands)
+  const { start, stop, leave } = session;
 
   // Derive connected state
   const isConnected = sessionReady && (isStreaming || isPaused || isStopped || canReturnToLive);
 
   // Compose all handlers using the orchestrator hook
   const handlers = useTransmitHandlers({
-    multiBusProfiles,
-    isStreaming,
-    sessionReady,
-    setMultiBusProfiles,
-    setIoProfile,
-    reinitialize,
-    start,
-    stop,
-    resumeFresh: resumeWithNewBuffer,
-    leave,
-    rejoin,
-    startMultiBusSession,
+    watchSingleSource,
+    watchMultiSource,
+    stopWatch,
+    joinSession,
+    skipReader,
+    resumeWithNewBuffer,
     setShowIoPickerDialog,
   });
 
@@ -242,53 +249,8 @@ export default function Transmit() {
     };
   }, [isStopped, isStreaming, isPaused, sessionReady, start, stop, leave, setShowIoPickerDialog]);
 
-  // Listen for transmit history events from repeat transmissions
-  const addHistoryItem = useTransmitStore((s) => s.addHistoryItem);
-  const markRepeatStopped = useTransmitStore((s) => s.markRepeatStopped);
-  useEffect(() => {
-    // CAN transmit history events
-    const unlistenCan = listen<TransmitHistoryEvent>("transmit-history", (event) => {
-      const data = event.payload;
-      const profileName = ioProfileName ?? data.session_id;
-      addHistoryItem({
-        timestamp_us: data.timestamp_us,
-        profileId: data.session_id,
-        profileName,
-        type: "can",
-        frame: data.frame,
-        success: data.success,
-        error: data.error,
-      });
-    });
-
-    // Serial transmit history events
-    const unlistenSerial = listen<SerialTransmitHistoryEvent>("serial-transmit-history", (event) => {
-      const data = event.payload;
-      const profileName = ioProfileName ?? data.session_id;
-      addHistoryItem({
-        timestamp_us: data.timestamp_us,
-        profileId: data.session_id,
-        profileName,
-        type: "serial",
-        bytes: data.bytes,
-        success: data.success,
-        error: data.error,
-      });
-    });
-
-    // Repeat stopped events (due to permanent error)
-    const unlistenStopped = listen<RepeatStoppedEvent>("repeat-stopped", (event) => {
-      const data = event.payload;
-      console.warn(`[Transmit] Repeat stopped for ${data.queue_id}: ${data.reason}`);
-      markRepeatStopped(data.queue_id);
-    });
-
-    return () => {
-      unlistenCan.then((fn) => fn());
-      unlistenSerial.then((fn) => fn());
-      unlistenStopped.then((fn) => fn());
-    };
-  }, [addHistoryItem, markRepeatStopped, ioProfileName]);
+  // Subscribe to transmit history events from repeat transmissions
+  useTransmitHistorySubscription({ profileName: ioProfileName ?? null });
 
   // Set active session for child components (CanTransmitView, etc.)
   useEffect(() => {

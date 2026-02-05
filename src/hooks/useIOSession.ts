@@ -1,7 +1,9 @@
 // ui/src/hooks/useIOSession.ts
 //
 // React hook for managing IO sessions with scoped event handling.
-// Thin wrapper around sessionStore - all session state lives in the store.
+// Each hook instance manages its own local state, queried from the backend on mount.
+// Tauri events update local state directly (no Zustand caching).
+// This enables cross-window sync since events are broadcast to all windows.
 //
 // SIMPLIFIED MODEL: Session ID = Profile ID
 // Multiple apps using the same profile automatically share the session.
@@ -11,11 +13,9 @@
 // - unregisterSessionListener() - removes this hook as a listener
 // - Rust tracks all listeners and destroys session when last one leaves
 
-import { useEffect, useRef, useCallback } from "react";
-import {
-  useSessionStore,
-  useSession,
-} from "../stores/sessionStore";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { useSessionStore } from "../stores/sessionStore";
 
 // Module-level map to track sessions being reinitialized.
 // This persists across re-renders and prevents the effect from
@@ -23,17 +23,63 @@ import {
 const reinitializingSessions = new Map<string, boolean>();
 import {
   setSessionListenerActive,
+  getIOSessionState,
+  getIOSessionCapabilities,
+  getReaderSessionJoinerCount,
+  getStateType,
+  parseStateString,
   type IOCapabilities,
   type IOStateType,
   type StreamEndedPayload,
   type SessionSuspendedPayload,
   type SessionResumingPayload,
+  type StateChangePayload,
   type CanTransmitFrame,
   type TransmitResult,
   type PlaybackPosition,
   type RawBytesPayload,
 } from "../api/io";
 import type { FrameMessage } from "../stores/discoveryStore";
+
+// ============================================================================
+// Local Session State Type
+// ============================================================================
+
+/**
+ * Local session state managed by useIOSession.
+ * This is updated from backend queries on mount and Tauri events during operation.
+ * NOT cached in Zustand - each hook instance manages its own state.
+ */
+interface LocalSessionState {
+  /** IO state from backend (running/stopped/paused/etc) */
+  ioState: IOStateType;
+  /** IO capabilities (null until connected) */
+  capabilities: IOCapabilities | null;
+  /** Error message if ioState is "error" */
+  errorMessage: string | null;
+  /** Number of listeners connected to this session */
+  listenerCount: number;
+  /** Whether session is ready (created and listeners attached) */
+  isReady: boolean;
+  /** Buffer info */
+  buffer: {
+    available: boolean;
+    id: string | null;
+    type: "frames" | "bytes" | null;
+    count: number;
+    owningSessionId: string | null;
+    startTimeUs: number | null;
+    endTimeUs: number | null;
+  };
+  /** Whether the session was stopped explicitly by user */
+  stoppedExplicitly: boolean;
+  /** Reason why the stream ended */
+  streamEndedReason: "complete" | "stopped" | "disconnected" | "error" | null;
+  /** Current playback speed */
+  speed: number | null;
+  /** Current playback position */
+  playbackPosition: PlaybackPosition | null;
+}
 
 export interface UseIOSessionOptions {
   /**
@@ -229,8 +275,10 @@ export function useIOSession(
   // Profile name for display (fall back to session ID if not provided)
   const effectiveProfileName = profileNameOption || effectiveSessionId;
 
-  // Get session from store using the profile ID directly
-  const session = useSession(effectiveSessionId);
+  // ---- Local Session State (queried from backend, updated via events) ----
+  // This replaces the Zustand useSession() hook to enable cross-window sync.
+  // Each hook instance manages its own state, updated by Tauri events.
+  const [localState, setLocalState] = useState<LocalSessionState | null>(null);
 
   // Store actions
   const openSession = useSessionStore((s) => s.openSession);
@@ -288,6 +336,229 @@ export function useIOSession(
       onResuming,
     };
   }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onResuming]);
+
+  // ---- Query Backend + Set Up Event Listeners ----
+  // This effect queries the backend for current state on mount/sessionId change,
+  // then sets up event listeners that update local state directly.
+  // This enables cross-window sync since each window receives the same Tauri events.
+  useEffect(() => {
+    if (!effectiveSessionId) {
+      setLocalState(null);
+      return;
+    }
+
+    let cancelled = false;
+    const unlistenFns: UnlistenFn[] = [];
+
+    const setupStateTracking = async () => {
+      // Query backend for current state
+      try {
+        const [state, caps, joinerCount] = await Promise.all([
+          getIOSessionState(effectiveSessionId),
+          getIOSessionCapabilities(effectiveSessionId),
+          getReaderSessionJoinerCount(effectiveSessionId),
+        ]);
+
+        if (cancelled) return;
+
+        if (state && caps) {
+          setLocalState({
+            ioState: getStateType(state),
+            capabilities: caps,
+            errorMessage: state.type === "Error" ? state.message : null,
+            listenerCount: joinerCount,
+            isReady: true,
+            buffer: {
+              available: false,
+              id: null,
+              type: null,
+              count: 0,
+              owningSessionId: null,
+              startTimeUs: null,
+              endTimeUs: null,
+            },
+            stoppedExplicitly: false,
+            streamEndedReason: null,
+            speed: null,
+            playbackPosition: null,
+          });
+        } else {
+          // Session doesn't exist yet - will be created by openSession below
+          setLocalState(null);
+        }
+      } catch (e) {
+        console.log(`[useIOSession:${appName}] Failed to query backend state:`, e);
+        // Session may not exist yet - that's fine, openSession will create it
+      }
+
+      // Set up event listeners that update local state
+      // These are in addition to sessionStore listeners (which handle callback routing)
+
+      // State changes
+      const unlistenState = await listen<StateChangePayload>(
+        `session-state:${effectiveSessionId}`,
+        (event) => {
+          const newState = parseStateString(event.payload.current);
+          const errorMessage =
+            newState === "error" && event.payload.current.startsWith("error:")
+              ? event.payload.current.slice(6)
+              : null;
+          setLocalState((prev) =>
+            prev
+              ? { ...prev, ioState: newState, errorMessage, isReady: true }
+              : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenState);
+
+      // Joiner count changes
+      const unlistenJoiner = await listen<{ count: number }>(
+        `joiner-count-changed:${effectiveSessionId}`,
+        (event) => {
+          setLocalState((prev) =>
+            prev ? { ...prev, listenerCount: event.payload.count } : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenJoiner);
+
+      // Speed changes
+      const unlistenSpeed = await listen<number>(
+        `speed-changed:${effectiveSessionId}`,
+        (event) => {
+          setLocalState((prev) =>
+            prev ? { ...prev, speed: event.payload } : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenSpeed);
+
+      // Playback position
+      const unlistenPosition = await listen<PlaybackPosition>(
+        `playback-time:${effectiveSessionId}`,
+        (event) => {
+          setLocalState((prev) =>
+            prev ? { ...prev, playbackPosition: event.payload } : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenPosition);
+
+      // Stream complete
+      const unlistenComplete = await listen<boolean>(
+        `stream-complete:${effectiveSessionId}`,
+        () => {
+          setLocalState((prev) =>
+            prev ? { ...prev, ioState: "stopped" } : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenComplete);
+
+      // Stream ended
+      const unlistenEnded = await listen<StreamEndedPayload>(
+        `stream-ended:${effectiveSessionId}`,
+        (event) => {
+          const payload = event.payload;
+          setLocalState((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ioState: "stopped",
+                  streamEndedReason: payload.reason as LocalSessionState["streamEndedReason"],
+                  buffer: {
+                    available: payload.buffer_available,
+                    id: payload.buffer_id,
+                    type: payload.buffer_type,
+                    count: payload.count,
+                    owningSessionId: payload.owning_session_id,
+                    startTimeUs: payload.time_range?.[0] ?? null,
+                    endTimeUs: payload.time_range?.[1] ?? null,
+                  },
+                }
+              : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenEnded);
+
+      // Session suspended
+      const unlistenSuspended = await listen<SessionSuspendedPayload>(
+        `session-suspended:${effectiveSessionId}`,
+        (event) => {
+          const payload = event.payload;
+          setLocalState((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ioState: "stopped",
+                  buffer: {
+                    available: payload.buffer_count > 0,
+                    id: payload.buffer_id,
+                    type: payload.buffer_type,
+                    count: payload.buffer_count,
+                    owningSessionId: effectiveSessionId,
+                    startTimeUs: payload.time_range?.[0] ?? null,
+                    endTimeUs: payload.time_range?.[1] ?? null,
+                  },
+                }
+              : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenSuspended);
+
+      // Session resuming
+      const unlistenResuming = await listen<SessionResumingPayload>(
+        `session-resuming:${effectiveSessionId}`,
+        (event) => {
+          setLocalState((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ioState: "running", // Session is starting again
+                  stoppedExplicitly: false,
+                  streamEndedReason: null,
+                  buffer: {
+                    available: false,
+                    id: event.payload.new_buffer_id,
+                    type: null,
+                    count: 0,
+                    owningSessionId: effectiveSessionId,
+                    startTimeUs: null,
+                    endTimeUs: null,
+                  },
+                }
+              : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenResuming);
+
+      // Session error
+      const unlistenError = await listen<string>(
+        `session-error:${effectiveSessionId}`,
+        (event) => {
+          setLocalState((prev) =>
+            prev
+              ? { ...prev, ioState: "error", errorMessage: event.payload }
+              : null
+          );
+        }
+      );
+      unlistenFns.push(unlistenError);
+    };
+
+    setupStateTracking();
+
+    return () => {
+      cancelled = true;
+      for (const unlisten of unlistenFns) {
+        unlisten();
+      }
+    };
+  }, [effectiveSessionId, appName]);
 
   // Initialize session on mount
   useEffect(() => {
@@ -356,6 +627,41 @@ export function useIOSession(
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
         });
         console.log(`[useIOSession:${appName}] registerCallbacks completed`);
+
+        // Initialize local state after session is created/joined
+        // This ensures we have state even if the state tracking effect ran first
+        try {
+          const [state, caps, joinerCount] = await Promise.all([
+            getIOSessionState(effectiveSessionId),
+            getIOSessionCapabilities(effectiveSessionId),
+            getReaderSessionJoinerCount(effectiveSessionId),
+          ]);
+          if (state && caps && isMountedRef.current) {
+            setLocalState({
+              ioState: getStateType(state),
+              capabilities: caps,
+              errorMessage: state.type === "Error" ? state.message : null,
+              listenerCount: joinerCount,
+              isReady: true,
+              buffer: {
+                available: false,
+                id: null,
+                type: null,
+                count: 0,
+                owningSessionId: null,
+                startTimeUs: null,
+                endTimeUs: null,
+              },
+              stoppedExplicitly: false,
+              streamEndedReason: null,
+              speed: null,
+              playbackPosition: null,
+            });
+            console.log(`[useIOSession:${appName}] local state initialized: ioState=${getStateType(state)}`);
+          }
+        } catch (e) {
+          console.warn(`[useIOSession:${appName}] Failed to initialize local state:`, e);
+        }
 
         // Mark setup as complete and track current session
         setupCompleteRef.current = true;
@@ -698,6 +1004,40 @@ export function useIOSession(
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
         });
 
+        // Update local state after reinitialize
+        try {
+          const [state, caps, joinerCount] = await Promise.all([
+            getIOSessionState(targetSessionId),
+            getIOSessionCapabilities(targetSessionId),
+            getReaderSessionJoinerCount(targetSessionId),
+          ]);
+          if (state && caps) {
+            setLocalState({
+              ioState: getStateType(state),
+              capabilities: caps,
+              errorMessage: state.type === "Error" ? state.message : null,
+              listenerCount: joinerCount,
+              isReady: true,
+              buffer: {
+                available: false,
+                id: null,
+                type: null,
+                count: 0,
+                owningSessionId: null,
+                startTimeUs: null,
+                endTimeUs: null,
+              },
+              stoppedExplicitly: false,
+              streamEndedReason: null,
+              speed: opts?.speed ?? null,
+              playbackPosition: null,
+            });
+            console.log(`[useIOSession:${appName}] reinitialize() - local state updated: ioState=${getStateType(state)}`);
+          }
+        } catch (e) {
+          console.warn(`[useIOSession:${appName}] reinitialize() - failed to update local state:`, e);
+        }
+
         // Mark setup as complete for the new session
         setupCompleteRef.current = true;
       } catch (e) {
@@ -780,28 +1120,28 @@ export function useIOSession(
     [effectiveSessionId, transmitFrameAction]
   );
 
-  // Derive values from session state
+  // Derive values from local state (queried from backend, updated via events)
   return {
     sessionId: effectiveSessionId,
     actualSessionId: effectiveSessionId, // Same as sessionId now (kept for backwards compat)
-    capabilities: session?.capabilities ?? null,
-    state: session?.ioState ?? "stopped",
-    isReady: session?.lifecycleState === "connected",
-    errorMessage: session?.errorMessage ?? null,
-    bufferAvailable: session?.buffer?.available ?? false,
-    bufferId: session?.buffer?.id ?? null,
-    bufferType: session?.buffer?.type ?? null,
-    bufferCount: session?.buffer?.count ?? 0,
-    bufferOwningSessionId: session?.buffer?.owningSessionId ?? null,
-    bufferStartTimeUs: session?.buffer?.startTimeUs ?? null,
-    bufferEndTimeUs: session?.buffer?.endTimeUs ?? null,
-    joinerCount: session?.listenerCount ?? 0,
-    stoppedExplicitly: session?.stoppedExplicitly ?? false,
-    streamEndedReason: session?.streamEndedReason ?? null,
-    speed: session?.speed ?? null,
-    playbackPosition: session?.playbackPosition ?? null,
-    currentTimeUs: session?.playbackPosition?.timestamp_us ?? null,
-    currentFrameIndex: session?.playbackPosition?.frame_index ?? null,
+    capabilities: localState?.capabilities ?? null,
+    state: localState?.ioState ?? "stopped",
+    isReady: localState?.isReady ?? false,
+    errorMessage: localState?.errorMessage ?? null,
+    bufferAvailable: localState?.buffer?.available ?? false,
+    bufferId: localState?.buffer?.id ?? null,
+    bufferType: localState?.buffer?.type ?? null,
+    bufferCount: localState?.buffer?.count ?? 0,
+    bufferOwningSessionId: localState?.buffer?.owningSessionId ?? null,
+    bufferStartTimeUs: localState?.buffer?.startTimeUs ?? null,
+    bufferEndTimeUs: localState?.buffer?.endTimeUs ?? null,
+    joinerCount: localState?.listenerCount ?? 0,
+    stoppedExplicitly: localState?.stoppedExplicitly ?? false,
+    streamEndedReason: localState?.streamEndedReason ?? null,
+    speed: localState?.speed ?? null,
+    playbackPosition: localState?.playbackPosition ?? null,
+    currentTimeUs: localState?.playbackPosition?.timestamp_us ?? null,
+    currentFrameIndex: localState?.playbackPosition?.frame_index ?? null,
     start,
     stop,
     leave,

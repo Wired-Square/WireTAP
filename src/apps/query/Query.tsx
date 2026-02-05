@@ -10,12 +10,13 @@ import { useSettings } from "../../hooks/useSettings";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useQueryStore } from "./stores/queryStore";
 import { useDialogManager } from "../../hooks/useDialogManager";
+import { useQueryHandlers } from "./hooks/useQueryHandlers";
 import type { FrameMessage } from "../../stores/discoveryStore";
 import type { PlaybackPosition } from "../../api/io";
 import type { CatalogMetadata } from "../../api/catalog";
 import { listCatalogs } from "../../api/catalog";
 import { resolveDefaultCatalogPath } from "../../utils/catalogUtils";
-import { getFavoritesForProfile, addFavorite, type TimeRangeFavorite } from "../../utils/favorites";
+import { getFavoritesForProfile, type TimeRangeFavorite } from "../../utils/favorites";
 import { loadCatalog } from "../../utils/catalogParser";
 import type { TimeBounds } from "../../components/TimeBoundsInput";
 import AppLayout from "../../components/AppLayout";
@@ -43,8 +44,6 @@ export default function Query() {
   const setError = useQueryStore((s) => s.setError);
   const queue = useQueryStore((s) => s.queue);
   const selectedQueryId = useQueryStore((s) => s.selectedQueryId);
-  const setSelectedQueryId = useQueryStore((s) => s.setSelectedQueryId);
-  const removeQueueItem = useQueryStore((s) => s.removeQueueItem);
   const catalogPath = useQueryStore((s) => s.catalogPath);
   const setCatalogPath = useQueryStore((s) => s.setCatalogPath);
   const setParsedCatalog = useQueryStore((s) => s.setParsedCatalog);
@@ -222,77 +221,25 @@ export default function Query() {
     session,
   } = manager;
 
-  // Handle Connect from IoReaderPickerDialog (connect mode)
-  // Creates session without streaming - queries run inside session but don't stream to other apps
-  const handleConnect = useCallback(async (profileId: string) => {
-    await connectOnly(profileId);
-  }, [connectOnly]);
-
-  // Profile change handler (for onSelect callback)
-  const handleIoProfileChange = useCallback(
-    (profileId: string | null) => {
-      setIoProfile(profileId);
-    },
-    [setIoProfile]
-  );
-
-  // Ingest around event handler - called when user clicks a result row
-  const handleIngestAroundEvent = useCallback(
-    async (timestampUs: number) => {
-      const { contextWindow } = useQueryStore.getState();
-      const eventTimeMs = timestampUs / 1000;
-
-      const startTime = new Date(eventTimeMs - contextWindow.beforeMs).toISOString();
-      const endTime = new Date(eventTimeMs + contextWindow.afterMs).toISOString();
-
-      if (ioProfile) {
-        await watchSingleSource(ioProfile, { startTime, endTime });
-      }
-    },
-    [ioProfile, watchSingleSource]
-  );
-
-  // Skip handler for IO picker
-  const handleSkip = useCallback(async () => {
-    await skipReader();
-    dialogs.ioReaderPicker.close();
-  }, [skipReader, dialogs.ioReaderPicker]);
-
-  // Close error dialog
-  const handleCloseError = useCallback(() => {
-    setError(null);
-    dialogs.error.close();
-  }, [setError, dialogs.error]);
-
-  // Handle catalog selection
-  const handleCatalogChange = useCallback(
-    (path: string) => {
-      setCatalogPath(path);
-    },
-    [setCatalogPath]
-  );
-
-  // Handle time bounds change
-  const handleTimeBoundsChange = useCallback((bounds: TimeBounds) => {
-    setTimeBounds(bounds);
-  }, []);
-
-  // Handle queue item selection
-  const handleSelectQuery = useCallback(
-    (id: string) => {
-      setSelectedQueryId(id);
-      setActiveTab("results");
-    },
-    [setSelectedQueryId]
-  );
-
-  // Handle queue item removal
-  const handleRemoveQuery = useCallback(
-    (id: string) => {
-      removeQueueItem(id);
-    },
-    [removeQueueItem]
-  );
+  // Compose all handlers using the orchestrator hook
+  const handlers = useQueryHandlers({
+    connectOnly,
+    watchSingleSource,
+    stopWatch,
+    skipReader,
+    ioProfile,
+    setIoProfile,
+    openIoReaderPicker: dialogs.ioReaderPicker.open,
+    closeIoReaderPicker: dialogs.ioReaderPicker.close,
+    openCatalogPicker: dialogs.catalogPicker.open,
+    closeCatalogPicker: dialogs.catalogPicker.close,
+    openErrorDialog: dialogs.error.open,
+    closeErrorDialog: dialogs.error.close,
+    openAddBookmarkDialog: dialogs.addBookmark.open,
+    closeAddBookmarkDialog: dialogs.addBookmark.close,
+    setActiveTab,
+    setFavourites,
+  });
 
   // Get time range from selected query results for bookmarking
   const getSelectedQueryTimeRange = useCallback(() => {
@@ -307,44 +254,34 @@ export default function Query() {
     };
   }, [selectedQuery]);
 
-  // Handle bookmark button click (from results)
-  const handleBookmarkQuery = useCallback(() => {
-    if (selectedQuery) {
-      dialogs.addBookmark.open();
-    }
-  }, [selectedQuery, dialogs.addBookmark]);
-
-  // Handle save bookmark
-  const handleSaveBookmark = useCallback(
-    async (name: string, startTime: string, endTime: string) => {
-      if (!ioProfile) return;
-      try {
-        await addFavorite(name, ioProfile, startTime, endTime);
-        // Reload favourites
-        const favs = await getFavoritesForProfile(ioProfile);
-        setFavourites(favs);
-      } catch (e) {
-        console.error("Failed to save bookmark:", e);
-      }
-    },
-    [ioProfile]
-  );
-
-  // Handle ingest all results (from selected query)
-  const handleIngestAllResults = useCallback(async () => {
+  // Handle ingest all results wrapper (gets time range from selected query)
+  const handleIngestAllResultsWrapper = useCallback(async () => {
     const timeRange = getSelectedQueryTimeRange();
-    if (timeRange && ioProfile) {
-      const startTime = new Date(timeRange.minTimestampUs / 1000).toISOString();
-      const endTime = new Date(timeRange.maxTimestampUs / 1000).toISOString();
-      await watchSingleSource(ioProfile, { startTime, endTime });
+    if (timeRange) {
+      await handlers.handleIngestAllResults(
+        timeRange.minTimestampUs,
+        timeRange.maxTimestampUs
+      );
     }
-  }, [ioProfile, watchSingleSource, getSelectedQueryTimeRange]);
+  }, [handlers, getSelectedQueryTimeRange]);
 
-  // Handle export (placeholder)
-  const handleExportQuery = useCallback(() => {
-    // TODO: Implement export functionality
-    console.log("Export query results:", selectedQuery?.id);
-  }, [selectedQuery]);
+  // Handle bookmark query wrapper
+  const handleBookmarkQueryWrapper = useCallback(() => {
+    handlers.handleBookmarkQuery(selectedQuery !== null);
+  }, [handlers, selectedQuery]);
+
+  // Handle export query wrapper
+  const handleExportQueryWrapper = useCallback(() => {
+    handlers.handleExportQuery(selectedQuery?.id);
+  }, [handlers, selectedQuery]);
+
+  // Handle time bounds change wrapper
+  const handleTimeBoundsChangeWrapper = useCallback(
+    (bounds: TimeBounds) => {
+      handlers.handleTimeBoundsChange(bounds, setTimeBounds);
+    },
+    [handlers]
+  );
 
   // Get bookmark time range for the dialog
   const bookmarkTimeRange = useMemo(() => {
@@ -398,7 +335,7 @@ export default function Query() {
           isStreaming={isStreaming}
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
-          onStop={stopWatch}
+          onStop={handlers.handleStopWatch}
           onResume={session.start}
           onLeave={handleLeave}
         />
@@ -420,22 +357,22 @@ export default function Query() {
             disabled={!ioProfile}
             favourites={favourites}
             timeBounds={timeBounds}
-            onTimeBoundsChange={handleTimeBoundsChange}
+            onTimeBoundsChange={handleTimeBoundsChangeWrapper}
           />
         )}
         {activeTab === "queue" && (
           <QueuePanel
-            onSelectQuery={handleSelectQuery}
-            onRemoveQuery={handleRemoveQuery}
+            onSelectQuery={handlers.handleSelectQuery}
+            onRemoveQuery={handlers.handleRemoveQuery}
           />
         )}
         {activeTab === "results" && (
           <ResultsPanel
             selectedQuery={selectedQuery}
-            onIngestEvent={handleIngestAroundEvent}
-            onIngestAll={handleIngestAllResults}
-            onExport={handleExportQuery}
-            onBookmark={handleBookmarkQuery}
+            onIngestEvent={handlers.handleIngestAroundEvent}
+            onIngestAll={handleIngestAllResultsWrapper}
+            onExport={handleExportQueryWrapper}
+            onBookmark={handleBookmarkQueryWrapper}
           />
         )}
         {activeTab === "stats" && <StatsPanel profileId={ioProfile} />}
@@ -449,9 +386,9 @@ export default function Query() {
         ioProfiles={postgresProfiles}
         selectedId={ioProfile}
         defaultId={settings?.default_read_profile}
-        onSelect={handleIoProfileChange}
-        onConnect={handleConnect}
-        onSkip={handleSkip}
+        onSelect={handlers.handleIoProfileChange}
+        onConnect={handlers.handleConnect}
+        onSkip={handlers.handleSkip}
       />
 
       {/* Error Dialog */}
@@ -459,7 +396,7 @@ export default function Query() {
         isOpen={dialogs.error.isOpen || error !== null}
         title="Query Error"
         message={error || "An error occurred"}
-        onClose={handleCloseError}
+        onClose={handlers.handleCloseError}
       />
 
       {/* Catalog Picker Dialog */}
@@ -469,7 +406,7 @@ export default function Query() {
         catalogs={catalogs}
         selectedPath={catalogPath}
         defaultFilename={settings?.default_catalog}
-        onSelect={handleCatalogChange}
+        onSelect={handlers.handleCatalogChange}
       />
 
       {/* Add Bookmark Dialog */}
@@ -478,7 +415,7 @@ export default function Query() {
         frameId={0}
         frameTime={bookmarkTimeRange.startTime}
         onClose={() => dialogs.addBookmark.close()}
-        onSave={handleSaveBookmark}
+        onSave={handlers.handleSaveBookmark}
       />
     </AppLayout>
   );

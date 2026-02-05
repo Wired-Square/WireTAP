@@ -10,6 +10,7 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Cross-Window Session State Sync**: Fixed session state not synchronizing between windows. When a session was started from another window, apps in other windows showed stale state (e.g., blue "starting" light instead of green "running", missing Stop button). The root cause was each Tauri window having its own JavaScript runtime with a separate Zustand store. Rewrote `useIOSession` to query the backend on mount and manage state locally via `useState`, with Tauri events updating each hook instance directly. Since Tauri events broadcast to all windows via `app.emit()`, each window now receives state updates automatically.
 - **Discovery Buffer Playback Not Updating Frames**: Fixed bug where frames stayed static during buffer playback despite timeline moving. The `useBufferFrameView` hook now accepts `isBufferPlayback` to use pagination mode instead of tail polling during buffer playback. Also fixed auto-navigate effect returning early in playback mode (`renderBuffer === -1`).
 - **Rows Per Page Setting Ignored During Streaming**: The "Rows per page" dropdown selection (e.g. 20) was ignored during streaming, always showing 50 frames due to `Math.max(renderBuffer, 50)` in the tail size calculation.
 - **View Resetting to First Page When Stream Ends**: Discovery view would jump back to page 0 when playback ended because the reset effect triggered on `isStreaming` state changes. Now only resets when the frame selection actually changes.

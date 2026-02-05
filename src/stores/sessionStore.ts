@@ -1378,13 +1378,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       console.log(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to buffer replay`);
       try {
         const capabilities = await switchSessionToBufferReplay(sessionId, 1.0);
+        // Get buffer metadata - Rust sets the active buffer during switch, so we can query it
+        const { getBufferMetadata } = await import("../api/buffer");
+        const bufferMetadata = await getBufferMetadata();
         addSessionLog({
           eventType: "state-change",
           sessionId,
           profileId: session?.profileId ?? null,
           profileName,
           appName: null,
-          details: `Switched to buffer replay mode (is_realtime: ${capabilities.is_realtime})`,
+          details: `Switched to buffer replay mode (is_realtime: ${capabilities.is_realtime}, buffer: ${bufferMetadata?.id ?? 'none'})`,
         });
         set((s) => ({
           sessions: {
@@ -1393,6 +1396,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               ...s.sessions[sessionId],
               capabilities,
               ioState: "stopped",
+              // Set buffer state so handleDetach knows a buffer exists
+              buffer: bufferMetadata ? {
+                available: true,
+                id: bufferMetadata.id,
+                type: bufferMetadata.buffer_type,
+                count: bufferMetadata.count,
+                owningSessionId: bufferMetadata.owning_session_id,
+                startTimeUs: bufferMetadata.start_time_us,
+                endTimeUs: bufferMetadata.end_time_us,
+              } : s.sessions[sessionId]?.buffer ?? { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null },
             },
           },
         }));
