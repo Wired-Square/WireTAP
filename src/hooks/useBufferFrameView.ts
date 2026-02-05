@@ -30,6 +30,8 @@ export interface UseBufferFrameViewOptions {
   tailSize?: number;
   /** Poll interval for tail updates in ms (default: 200) */
   pollIntervalMs?: number;
+  /** Buffer playback mode - uses pagination even when isStreaming is true */
+  isBufferPlayback?: boolean;
 }
 
 export interface UseBufferFrameViewResult {
@@ -84,6 +86,7 @@ export function useBufferFrameView(
     pageSize,
     tailSize = 50,
     pollIntervalMs = 200,
+    isBufferPlayback = false,
   } = options;
 
   const [frames, setFrames] = useState<FrameWithHex[]>([]);
@@ -146,9 +149,10 @@ export function useBufferFrameView(
     fetchMetadata();
   }, [bufferId]);
 
-  // TAIL MODE: Poll for latest frames during streaming
+  // TAIL MODE: Poll for latest frames during live streaming (not buffer playback)
   useEffect(() => {
-    if (!bufferId || !isStreaming) return;
+    // Only use tail mode for live streaming, not buffer playback
+    if (!bufferId || !isStreaming || isBufferPlayback) return;
 
     let isMounted = true;
 
@@ -189,11 +193,12 @@ export function useBufferFrameView(
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [bufferId, isStreaming, tailSize, pollIntervalMs]);
+  }, [bufferId, isStreaming, isBufferPlayback, tailSize, pollIntervalMs]);
 
-  // PAGINATION MODE: Fetch page when stopped
+  // PAGINATION MODE: Fetch page when stopped or during buffer playback
   useEffect(() => {
-    if (!bufferId || isStreaming) return;
+    // Run pagination when stopped, OR when in buffer playback mode
+    if (!bufferId || (isStreaming && !isBufferPlayback)) return;
 
     let isMounted = true;
 
@@ -225,12 +230,13 @@ export function useBufferFrameView(
     return () => {
       isMounted = false;
     };
-  }, [bufferId, isStreaming, currentPage, pageSize, selectedFrames]);
+  }, [bufferId, isStreaming, isBufferPlayback, currentPage, pageSize, selectedFrames]);
 
   // Navigate to timestamp (for timeline scrub)
   const navigateToTimestamp = useCallback(
     async (timeUs: number) => {
-      if (!bufferId || isStreaming) return;
+      // Allow navigation when stopped or during buffer playback
+      if (!bufferId || (isStreaming && !isBufferPlayback)) return;
 
       try {
         // Ensure integer timestamp (backend expects u64)
@@ -245,15 +251,24 @@ export function useBufferFrameView(
         console.error("[useBufferFrameView] timestamp navigation error:", e);
       }
     },
-    [bufferId, isStreaming]
+    [bufferId, isStreaming, isBufferPlayback]
   );
 
-  // Reset to page 0 when selection changes (when stopped)
+  // Track previous selection to detect actual changes
+  const prevSelectedFramesRef = useRef<Set<number>>(selectedFrames);
+
+  // Reset to page 0 when selection actually changes (not when streaming state changes)
   useEffect(() => {
-    if (!isStreaming && bufferId) {
+    const prevSet = prevSelectedFramesRef.current;
+    const changed =
+      prevSet.size !== selectedFrames.size ||
+      [...selectedFrames].some((id) => !prevSet.has(id));
+
+    if (changed && bufferId) {
       setCurrentPage(0);
+      prevSelectedFramesRef.current = selectedFrames;
     }
-  }, [selectedFrames, isStreaming, bufferId]);
+  }, [selectedFrames, bufferId]);
 
   // Calculate total pages
   const totalPages = useMemo(() => {

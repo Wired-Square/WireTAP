@@ -136,8 +136,9 @@ function DiscoveryFramesView({
     isStreaming,
     selectedFrames,
     pageSize: renderBuffer === -1 ? 1000 : renderBuffer,
-    tailSize: renderBuffer === -1 ? 100 : Math.max(renderBuffer, 50),
+    tailSize: renderBuffer === -1 ? 100 : renderBuffer,
     pollIntervalMs: 200,
+    isBufferPlayback: isBufferMode,
   });
 
   // Tab state for CAN frames view - stored in UI store so analysis can switch to it
@@ -633,9 +634,10 @@ function DiscoveryFramesView({
   // This works for buffer playback (where currentFrameIndex is set from session playback position)
   // During live streaming, currentFrameIndex is null so this effect doesn't run
   useEffect(() => {
-    if (currentFrameIndex == null || renderBuffer === -1) return;
+    if (currentFrameIndex == null) return;
 
-    const pageSizeForCalc = renderBuffer;
+    // In playback mode (renderBuffer === -1), use the hook's page size (1000), otherwise use renderBuffer
+    const pageSizeForCalc = renderBuffer === -1 ? 1000 : renderBuffer;
     const pageStart = effectiveCurrentPageRef.current * pageSizeForCalc;
     const pageEnd = pageStart + pageSizeForCalc - 1;
 
@@ -651,7 +653,8 @@ function DiscoveryFramesView({
   const highlightedRowIndex = useMemo(() => {
     if (currentFrameIndex == null || visibleFrames.length === 0) return null;
 
-    const pageSizeForCalc = renderBuffer === -1 ? visibleFrames.length : renderBuffer;
+    // In playback mode (renderBuffer === -1), use the hook's page size (1000) to match auto-navigate
+    const pageSizeForCalc = renderBuffer === -1 ? 1000 : renderBuffer;
     const pageStart = effectiveCurrentPage * pageSizeForCalc;
     const pageEnd = pageStart + visibleFrames.length - 1;
 

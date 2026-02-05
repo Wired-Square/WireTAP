@@ -10,6 +10,9 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Discovery Buffer Playback Not Updating Frames**: Fixed bug where frames stayed static during buffer playback despite timeline moving. The `useBufferFrameView` hook now accepts `isBufferPlayback` to use pagination mode instead of tail polling during buffer playback. Also fixed auto-navigate effect returning early in playback mode (`renderBuffer === -1`).
+- **Rows Per Page Setting Ignored During Streaming**: The "Rows per page" dropdown selection (e.g. 20) was ignored during streaming, always showing 50 frames due to `Math.max(renderBuffer, 50)` in the tail size calculation.
+- **View Resetting to First Page When Stream Ends**: Discovery view would jump back to page 0 when playback ended because the reset effect triggered on `isStreaming` state changes. Now only resets when the frame selection actually changes.
 - **Multi-Bus State Leaking Between Apps**: Fixed bug where Decoder incorrectly showed "Multi-Bus (1)" in its session picker when Discovery started a session. Removed redundant `multiBusMode` boolean state - now uses `multiBusProfiles.length > 0` as single source of truth. Added session ID guard to prevent global `multiBusProfiles` state from leaking to apps without an active session.
 - **Decoder Session Controls After Joining**: Fixed issue where Decoder showed wrong session controls (grey dot, play button) after joining an existing multi-source session. The `multiSessionId` was not being set when joining sessions with source profiles.
 
