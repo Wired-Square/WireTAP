@@ -20,7 +20,6 @@ use crate::{
         MqttConfig, MqttReader,
         MultiSourceReader, SourceConfig,
         Parity, PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
-        SerialConfig, SerialFramingConfig, SerialReader,
         CanTransmitFrame, TransmitResult,
         emit_device_probe, DeviceProbePayload,
     },
@@ -548,93 +547,6 @@ pub async fn create_reader_session(
             };
 
             Box::new(CsvReader::new(app.clone(), session_id.clone(), options))
-        }
-        "serial" => {
-            let port = profile
-                .connection
-                .get("port")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| "Serial port is required".to_string())?
-                .to_string();
-
-            let baud_rate = profile
-                .connection
-                .get("baud_rate")
-                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                .unwrap_or(115200) as u32;
-
-            let data_bits = profile
-                .connection
-                .get("data_bits")
-                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                .unwrap_or(8) as u8;
-
-            let stop_bits = profile
-                .connection
-                .get("stop_bits")
-                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                .unwrap_or(1) as u8;
-
-            let parity = match profile
-                .connection
-                .get("parity")
-                .and_then(|v| v.as_str())
-                .unwrap_or("none")
-            {
-                "odd" => Parity::Odd,
-                "even" => Parity::Even,
-                _ => Parity::None,
-            };
-
-            // Build framing config if encoding is specified
-            eprintln!(
-                "[create_reader_session] Serial framing params: encoding={:?}, frame_id_start={:?}, frame_id_bytes={:?}, frame_id_big_endian={:?}",
-                framing_encoding, frame_id_start_byte, frame_id_bytes, frame_id_big_endian
-            );
-            let framing = framing_encoding.as_deref().and_then(|enc| {
-                let encoding = match enc {
-                    "slip" => Some(FramingEncoding::Slip),
-                    "modbus_rtu" => Some(FramingEncoding::ModbusRtu {
-                        device_address: None, // TODO: add parameter
-                        validate_crc: true,
-                    }),
-                    "delimiter" => Some(FramingEncoding::Delimiter {
-                        delimiter: delimiter.clone().unwrap_or_else(|| vec![0x0D, 0x0A]),
-                        max_length: max_frame_length.unwrap_or(256),
-                        include_delimiter: false,
-                    }),
-                    _ => None, // "raw" or unknown = no framing
-                };
-
-                encoding.map(|enc| SerialFramingConfig {
-                    encoding: enc,
-                    frame_id_config: frame_id_start_byte.map(|start| FrameIdConfig {
-                        start_byte: start,
-                        num_bytes: frame_id_bytes.unwrap_or(1),
-                        big_endian: frame_id_big_endian.unwrap_or(false),
-                    }),
-                    source_address_config: source_address_start_byte.map(|start| FrameIdConfig {
-                        start_byte: start,
-                        num_bytes: source_address_bytes.unwrap_or(1),
-                        big_endian: source_address_big_endian.unwrap_or(false),
-                    }),
-                    min_frame_length,
-                    emit_raw_bytes: emit_raw_bytes.unwrap_or(true),
-                })
-            });
-
-            let config = SerialConfig {
-                port,
-                baud_rate,
-                data_bits,
-                stop_bits,
-                parity,
-                framing,
-                limit,
-                display_name: Some(profile.name.clone()),
-            };
-
-            Box::new(SerialReader::new(app.clone(), session_id.clone(), config))
         }
         "mqtt" => {
             let host = profile

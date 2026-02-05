@@ -325,22 +325,6 @@ pub fn set_buffer_owner(buffer_id: &str, session_id: &str) -> Result<(), String>
     }
 }
 
-/// Orphan a buffer (remove session ownership).
-/// The buffer becomes available for standalone use.
-pub fn orphan_buffer(buffer_id: &str) -> Result<(), String> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
-    if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
-        let old_owner = buffer.metadata.owning_session_id.take();
-        eprintln!(
-            "[BufferStore] Orphaned buffer '{}' (was owned by {:?})",
-            buffer_id, old_owner
-        );
-        Ok(())
-    } else {
-        Err(format!("Buffer '{}' not found", buffer_id))
-    }
-}
-
 /// Info about an orphaned buffer for event emission
 #[derive(Clone, Debug, Serialize)]
 pub struct OrphanedBufferInfo {

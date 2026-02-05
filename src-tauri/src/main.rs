@@ -11,5 +11,5 @@ fn main() {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
 
-    candor_ui_lib::run()
+    candor_lib::run()
 }

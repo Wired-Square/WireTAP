@@ -40,7 +40,7 @@ pub use gs_usb::GsUsbConfig;
 pub use gvret::{BusMapping, GvretDeviceInfo, probe_gvret_tcp, probe_gvret_usb};
 pub use multi_source::{MultiSourceReader, SourceConfig};
 pub use mqtt::{MqttConfig, MqttReader};
-pub use serial::{Parity, SerialConfig, SerialFramingConfig, SerialReader};
+pub use serial::Parity;
 
 // Error types
 #[allow(unused_imports)]

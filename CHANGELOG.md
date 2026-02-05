@@ -4,6 +4,14 @@ All notable changes to CANdor will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **macOS Menu Name**: The macOS application menu now shows "Quit CANdor" instead of "Quit candor-ui". Renamed Cargo package from `candor-ui` to `candor` and added explicit binary name `CANdor` via `[[bin]]` section.
+
+### Removed
+
+- **Dead Code Cleanup**: Removed unused `orphan_buffer` function from buffer store. Removed `SerialConfig`, `SerialFramingConfig`, and `SerialReader` which were unreachable since serial is classified as a realtime device and routes through `MultiSourceReader::single_source()`.
+
 ### Added
 
 - **Cross-App Timeline Synchronisation**: Discovery and Decoder now share timeline range when viewing the same session buffer. Session store tracks `startTimeUs` and `endTimeUs` in buffer info, populated from `stream-ended` and `session-suspended` events. New `useEffectiveBufferMetadata` hook centralises the merge logic for session and local buffer metadata.
