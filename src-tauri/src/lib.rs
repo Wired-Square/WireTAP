@@ -670,6 +670,10 @@ pub fn run() {
     #[cfg(not(target_os = "ios"))]
     let builder = builder.plugin(tauri_plugin_window_state::Builder::new().build());
 
+    // Keep screen on plugin for iOS (prevents screen dimming during sessions)
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_keep_screen_on::init());
+
     let builder = builder.setup(|app| {
             // Initialise the centralised store manager
             if let Err(e) = store_manager::initialise(app.handle()) {

@@ -15,6 +15,7 @@ import {
   getAllFavorites,
   type TimeRangeFavorite,
 } from '../../../utils/favorites';
+import { setIOSScreenWake } from '../../../utils/platform';
 // Types
 export type SettingsSection = "general" | "locations" | "data-io" | "catalogs" | "bookmarks" | "display";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
@@ -549,11 +550,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         originalSettings: normalized,
       });
 
-      // Update backend wake settings cache
+      // Update backend wake settings cache (desktop)
       setWakeSettingsApi(
         normalized.prevent_idle_sleep ?? true,
         normalized.keep_display_awake ?? false
       ).catch(console.error);
+
+      // Set iOS screen wake state on startup (no-op on other platforms)
+      setIOSScreenWake(normalized.keep_display_awake ?? false).catch(console.error);
 
       // Load catalogs after we have the decoder dir
       get().loadCatalogs();
@@ -1030,8 +1034,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       general: { ...state.general, keepDisplayAwake: value },
     }));
     scheduleSave(get().saveSettings);
-    // Update backend cache immediately
+    // Update backend cache immediately (desktop)
     const { preventIdleSleep } = get().general;
     setWakeSettingsApi(preventIdleSleep, value).catch(console.error);
+    // Update iOS screen wake (no-op on other platforms)
+    setIOSScreenWake(value).catch(console.error);
   },
 }));

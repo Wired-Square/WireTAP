@@ -55,6 +55,7 @@ nusb = { version = "0.2", features = ["tokio"] }
 # iOS
 [target.'cfg(target_os = "ios")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
+tauri-plugin-keep-screen-on = "0.1"
 
 # Windows
 [target.'cfg(target_os = "windows")'.dependencies]

@@ -93,11 +93,12 @@ export default function GeneralView({
         />
       </div>
 
-      {/* Power Management Section (hidden on iOS) */}
-      {!isIOS && (
-        <div className="pt-4 border-t border-[color:var(--border-default)]">
-          <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Power Management</h3>
-          <div className="space-y-4">
+      {/* Power Management Section */}
+      <div className="pt-4 border-t border-[color:var(--border-default)]">
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Power Management</h3>
+        <div className="space-y-4">
+          {/* Prevent idle sleep: desktop only (uses keepawake crate) */}
+          {!isIOS && (
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -114,26 +115,27 @@ export default function GeneralView({
                 </p>
               </div>
             </label>
+          )}
 
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={keepDisplayAwake}
-                onChange={(e) => onChangeKeepDisplayAwake(e.target.checked)}
-                className="mt-1"
-              />
-              <div>
-                <span className={labelDefault}>
-                  Keep display awake during active sessions
-                </span>
-                <p className={helpText}>
-                  Prevent the display from turning off while a session is active
-                </p>
-              </div>
-            </label>
-          </div>
+          {/* Keep display awake: all platforms (iOS uses tauri-plugin-keep-screen-on) */}
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={keepDisplayAwake}
+              onChange={(e) => onChangeKeepDisplayAwake(e.target.checked)}
+              className="mt-1"
+            />
+            <div>
+              <span className={labelDefault}>
+                Keep display awake during active sessions
+              </span>
+              <p className={helpText}>
+                Prevent the display from turning off while a session is active
+              </p>
+            </div>
+          </label>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -45,3 +45,19 @@ export async function isMacOS(): Promise<boolean> {
 export async function isIOS(): Promise<boolean> {
   return (await getPlatform()) === "ios";
 }
+
+/**
+ * Set iOS screen wake state.
+ * Only has effect on iOS - no-op on other platforms.
+ * Uses dynamic import to avoid loading the plugin on non-iOS platforms.
+ */
+export async function setIOSScreenWake(enabled: boolean): Promise<void> {
+  if (!(await isIOS())) return;
+
+  try {
+    const { keepScreenOn } = await import("tauri-plugin-keep-screen-on-api");
+    await keepScreenOn(enabled);
+  } catch (err) {
+    console.warn("Failed to set iOS screen wake:", err);
+  }
+}

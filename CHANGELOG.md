@@ -14,6 +14,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **iOS File Sharing**: Enabled `UIFileSharingEnabled` and `LSSupportsOpeningDocumentsInPlace` in iOS Info.plist. The app's Documents folder is now visible in the iOS Files app under "On My iPad/iPhone" > "CANdor", allowing users to add decoder catalogs via Files app or Finder when connected.
 
+- **iOS Screen Wake**: Added support for keeping the screen awake on iOS via the `tauri-plugin-keep-screen-on` plugin. When "Keep display awake" is enabled in Settings, iOS will prevent screen dimming during active sessions (uses `UIApplication.isIdleTimerDisabled`).
+
 ### Fixed
 
 - **Session Switching Not Receiving Traffic**: Fixed bug where switching between GVRET profiles (or other realtime sources) would result in the second session not receiving any frames, despite Rust logs showing frames arriving. Two issues were fixed:
@@ -28,7 +30,7 @@ All notable changes to CANdor will be documented in this file.
 
 - **iOS Settings Visibility**: Hide desktop-only settings on iOS:
   - Storage section (custom directory paths) is hidden since iOS sandboxing prevents custom directory selection
-  - Power Management settings are hidden since iOS manages power independently
+  - "Prevent idle sleep" power setting is hidden (desktop-only); "Keep display awake" is shown and works via iOS native API
 
 - **Decoder Scroll Position Preservation**: The Decoder app now remembers scroll position when switching between panels (e.g., Decoder → Discovery → Decoder). Each tab (Signals, Unmatched, Filtered) maintains its own scroll position. Positions are session-only and reset on app restart.
 
