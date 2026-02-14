@@ -1,0 +1,1585 @@
+[meta]
+name = "SBRXXX"
+version = 4
+
+[meta.can]
+default_byte_order = "little"
+
+[frame.can."0x000"]
+length = 8
+mirror_of = "0x700"
+
+[frame.can."0x001"]
+length = 8
+mirror_of = "0x701"
+
+[frame.can."0x002"]
+length = 8
+mirror_of = "0x702"
+
+[frame.can."0x003"]
+length = 8
+mirror_of = "0x703"
+
+[frame.can."0x004"]
+length = 8
+mirror_of = "0x704"
+
+[frame.can."0x005"]
+length = 8
+mirror_of = "0x705"
+
+[frame.can."0x006"]
+length = 8
+mirror_of = "0x706"
+
+[frame.can."0x013"]
+length = 8
+mirror_of = "0x713"
+
+[frame.can."0x014"]
+length = 8
+mirror_of = "0x714"
+
+[frame.can."0x015"]
+length = 8
+mirror_of = "0x715"
+
+[frame.can."0x016"]
+length = 8
+mirror_of = "0x716"
+
+[frame.can."0x017"]
+length = 8
+mirror_of = "0x717"
+
+[frame.can."0x018"]
+length = 8
+mirror_of = "0x718"
+
+[frame.can."0x019"]
+length = 8
+mirror_of = "0x719"
+
+[frame.can."0x01A"]
+length = 8
+mirror_of = "0x71A"
+
+[frame.can."0x01b"]
+length = 8
+mirror_of = "0x71B"
+
+[frame.can."0x01c"]
+length = 8
+mirror_of = "0x71c"
+
+[frame.can."0x01d"]
+length = 8
+mirror_of = "0x71d"
+
+[frame.can."0x01e"]
+length = 8
+mirror_of = "0x71e"
+
+[frame.can."0x100"]
+length = 8
+transmitter = "Inverter"
+
+[[frame.can."0x100".signals]]
+name = "100"
+start_bit = 0
+bit_length = 64
+signed = false
+format = "hex"
+
+[frame.can."0x101"]
+length = 8
+transmitter = "Inverter"
+
+[[frame.can."0x101".signals]]
+name = "Status_Inverter_Timestamp"
+start_bit = 0
+bit_length = 32
+signed = false
+format = "unix_time"
+confidence = "high"
+notes = "Once per hour when battery connected"
+
+[frame.can."0x102"]
+length = 8
+transmitter = "Inverter"
+
+[[frame.can."0x102".signals]]
+name = "102"
+start_bit = 0
+bit_length = 64
+signed = false
+format = "hex"
+notes = "NOBATT"
+
+[frame.can."0x103"]
+length = 8
+transmitter = "Inverter"
+signals = []
+
+[frame.can."0x103".mux]
+name = "mux_259_0_8"
+start_bit = 0
+bit_length = 8
+
+[[frame.can."0x103".mux."0".signals]]
+name = "Info_Inverter_SN_1"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "utf8"
+confidence = "medium"
+notes = "NOBATT"
+
+[[frame.can."0x103".mux."1".signals]]
+name = "Info_Inverter_SN_2"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "utf8"
+confidence = "medium"
+notes = "NOBATT"
+
+[frame.can."0x104"]
+length = 8
+transmitter = "Inverter"
+signals = []
+
+[frame.can."0x104".mux]
+name = "mux_260_0_8"
+start_bit = 0
+bit_length = 8
+
+[[frame.can."0x104".mux."0".signals]]
+name = "Info_Inverter_Manufacturer_1"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "utf8"
+confidence = "medium"
+notes = "NOBATT"
+
+[[frame.can."0x104".mux."1".signals]]
+name = "Info_Inverter_Manufacturer_2"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "utf8"
+confidence = "medium"
+notes = "NOBATT"
+
+[frame.can."0x105"]
+length = 8
+transmitter = "Inverter"
+signals = []
+
+[frame.can."0x105".mux]
+name = "mux_261_0_8"
+start_bit = 0
+bit_length = 8
+
+[[frame.can."0x105".mux."0".signals]]
+name = "Info_Inverter_Model_1"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "utf8"
+confidence = "medium"
+notes = "NOBATT"
+
+[[frame.can."0x105".mux."1".signals]]
+name = "Info_Inverter_Model_2"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "utf8"
+notes = "NOBATT"
+
+[frame.can."0x106"]
+length = 8
+transmitter = "Inverter"
+
+[[frame.can."0x106".signals]]
+name = "106"
+start_bit = 0
+bit_length = 64
+signed = false
+format = "hex"
+
+[frame.can."0x108"]
+length = 8
+transmitter = "Inverter"
+
+[[frame.can."0x108".signals]]
+name = "108"
+start_bit = 0
+bit_length = 64
+signed = false
+format = "hex"
+
+[frame.can."0x109"]
+length = 8
+transmitter = "Inverter"
+
+[[frame.can."0x109".signals]]
+name = "109_Unknown_1"
+start_bit = 0
+bit_length = 8
+signed = false
+format = "hex"
+
+[[frame.can."0x109".signals]]
+name = "109_Unknown_2"
+start_bit = 8
+bit_length = 16
+signed = false
+
+[[frame.can."0x109".signals]]
+name = "109_Unknown_3"
+start_bit = 24
+bit_length = 40
+signed = false
+format = "hex"
+
+[frame.can."0x191"]
+length = 8
+notes = "NOBATT Discovery Message"
+transmitter = "Inverter"
+
+[[frame.can."0x191".signals]]
+name = "191"
+start_bit = 0
+bit_length = 64
+signed = false
+format = "hex"
+
+[frame.can."0x1E0"]
+length = 8
+notes = "A note"
+
+[[frame.can."0x1E0".signals]]
+name = "Modbus_Over_CAN"
+start_bit = 0
+bit_length = 64
+signed = false
+confidence = "high"
+
+[frame.can."0x400"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x400".signals]]
+name = "400_Padding"
+start_bit = 0
+bit_length = 8
+signed = false
+format = "hex"
+
+[[frame.can."0x400".signals]]
+name = "Status_Battery_Actual_SoC"
+start_bit = 8
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+
+[[frame.can."0x400".signals]]
+name = "400_Unknown"
+start_bit = 24
+bit_length = 40
+signed = false
+format = "hex"
+
+[frame.can."0x401"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x401".signals]]
+name = "401_Padding"
+start_bit = 0
+bit_length = 64
+signed = false
+endianness = "big"
+
+[frame.can."0x500"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x500".signals]]
+name = "500_Unknown_0"
+start_bit = 0
+bit_length = 8
+signed = false
+
+[[frame.can."0x500".signals]]
+name = "500_Unknown_1"
+start_bit = 8
+bit_length = 16
+signed = false
+format = "hex"
+
+[[frame.can."0x500".signals]]
+name = "500_Unknown_2"
+start_bit = 24
+bit_length = 32
+signed = false
+format = "hex"
+
+[[frame.can."0x500".signals]]
+name = "Status_Battery_SoC_Int"
+start_bit = 56
+bit_length = 8
+unit = "%"
+signed = false
+min = 0
+max = 100
+confidence = "high"
+
+[frame.can."0x501"]
+length = 8
+mirror_of = "0x701"
+
+[frame.can."0x502"]
+length = 8
+mirror_of = "0x702"
+
+[frame.can."0x503"]
+length = 8
+mirror_of = "0x703"
+
+[frame.can."0x504"]
+length = 8
+mirror_of = "0x704"
+
+[[frame.can."0x504".signals]]
+name = "Status_Battery_Current_Inverted"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = true
+confidence = "high"
+notes = "This is the opposite sign to the signal at 0x704"
+
+[frame.can."0x505"]
+length = 8
+mirror_of = "0x705"
+
+[frame.can."0x506"]
+length = 8
+mirror_of = "0x706"
+
+[frame.can."0x512"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x512".signals]]
+name = "512_Padding"
+start_bit = 0
+bit_length = 64
+signed = false
+
+[frame.can."0x700"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x700".signals]]
+name = "700_Padding"
+start_bit = 0
+bit_length = 64
+signed = false
+
+[frame.can."0x701"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x701".signals]]
+name = "Info_Battery_Max_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x701".signals]]
+name = "Info_Battery_Min_Voltage"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x701".signals]]
+name = "Info_Battery_Max_Charge_Current"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = false
+confidence = "high"
+
+[[frame.can."0x701".signals]]
+name = "Info_Battery_Max_Discharge_Curre"
+start_bit = 48
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = false
+confidence = "high"
+
+[frame.can."0x702"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x702".signals]]
+name = "Status_Battery_Reported_SoC"
+start_bit = 0
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+
+[[frame.can."0x702".signals]]
+name = "Status_Battery_SoH"
+start_bit = 16
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+confidence = "high"
+
+[[frame.can."0x702".signals]]
+name = "Status_Battery_Remaining_Energy"
+start_bit = 32
+bit_length = 16
+unit = "Wh"
+signed = false
+confidence = "high"
+
+[[frame.can."0x702".signals]]
+name = "Status_Battery_Max_Energy"
+start_bit = 48
+bit_length = 16
+unit = "Wh"
+signed = false
+confidence = "high"
+
+[frame.can."0x703"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x703".signals]]
+name = "Status_Battery_Energy_Charged"
+start_bit = 0
+bit_length = 32
+unit = "Wh"
+signed = false
+confidence = "high"
+
+[[frame.can."0x703".signals]]
+name = "Status_Battery_Energy_Discharged"
+start_bit = 32
+bit_length = 32
+unit = "Wh"
+signed = false
+confidence = "high"
+
+[frame.can."0x704"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x704".signals]]
+name = "Status_Battery_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x704".signals]]
+name = "Status_Battery_Current"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = true
+confidence = "high"
+
+[[frame.can."0x704".signals]]
+name = "Status_Another_Battery_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "V"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x704".signals]]
+name = "Status_Battery_Temperature"
+start_bit = 48
+bit_length = 16
+factor = 0.1
+unit = "°C"
+signed = true
+confidence = "high"
+
+[frame.can."0x705"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x705".signals]]
+name = "Info_Battery_Operation"
+start_bit = 0
+bit_length = 8
+signed = false
+format = "enum"
+confidence = "high"
+
+[frame.can."0x705".signals.enum]
+0 = "Unplugged"
+1 = "Standby"
+2 = "Run"
+
+[[frame.can."0x705".signals]]
+name = "705_Always_0"
+start_bit = 8
+bit_length = 8
+signed = false
+
+[[frame.can."0x705".signals]]
+name = "705_Always_1"
+start_bit = 16
+bit_length = 8
+signed = false
+
+[[frame.can."0x705".signals]]
+name = "Info_Battery_Type"
+start_bit = 24
+bit_length = 16
+signed = false
+format = "enum"
+confidence = "high"
+
+[frame.can."0x705".signals.enum]
+8422 = "SBR064"
+8423 = "SBR096"
+8424 = "SBR128"
+8425 = "SBR160"
+8426 = "SBR192"
+8427 = "SBR224"
+8428 = "SBR256"
+
+[[frame.can."0x705".signals]]
+name = "Status_Another_Battery_Voltage"
+start_bit = 40
+bit_length = 16
+factor = 0.1
+unit = "V"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x705".signals]]
+name = "705_Padding"
+start_bit = 56
+bit_length = 8
+signed = false
+
+[frame.can."0x706"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x706".signals]]
+name = "Overview_Cell_Max_Temp"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "°C"
+signed = true
+confidence = "high"
+
+[[frame.can."0x706".signals]]
+name = "Overview_Cell_Min_Temp"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "°C"
+signed = true
+confidence = "high"
+
+[[frame.can."0x706".signals]]
+name = "Overview_Cell_Max_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x706".signals]]
+name = "Overview_Cell_Min_Voltage"
+start_bit = 48
+bit_length = 16
+factor = 0.001
+unit = "V"
+signed = false
+confidence = "high"
+
+[frame.can."0x707"]
+length = 8
+
+[[frame.can."0x707".signals]]
+name = "707_Unknown_Bitfield__"
+start_bit = 0
+bit_length = 16
+signed = false
+
+[[frame.can."0x707".signals]]
+name = "707_Unknown_Usually_1"
+start_bit = 24
+bit_length = 8
+signed = false
+
+[[frame.can."0x707".signals]]
+name = "Info_Battery_Nameplate_Capacity"
+start_bit = 32
+bit_length = 16
+unit = "Wh"
+signed = false
+confidence = "high"
+
+[[frame.can."0x707".signals]]
+name = "Info_Battery_Module_Count"
+start_bit = 48
+bit_length = 16
+signed = false
+confidence = "high"
+
+[frame.can."0x708"]
+length = 8
+transmitter = "BMS"
+
+[frame.can."0x708".tx]
+interval_ms = 10000
+
+[frame.can."0x708".mux]
+name = "mux_1800_0_8"
+start_bit = 0
+bit_length = 8
+
+[[frame.can."0x708".mux."0".signals]]
+name = "Info_Battery_SN_1"
+start_bit = 8
+bit_length = 56
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x708".mux."1".signals]]
+name = "Info_Battery_SN_2"
+start_bit = 8
+bit_length = 48
+signed = false
+confidence = "high"
+
+[frame.can."0x709"]
+length = 8
+transmitter = "BMS"
+
+[frame.can."0x709".tx]
+interval_ms = 10000
+
+[[frame.can."0x709".signals]]
+name = "709_Padding"
+start_bit = 0
+bit_length = 64
+signed = false
+
+[frame.can."0x70A"]
+length = 8
+transmitter = "BMS"
+
+[frame.can."0x70A".tx]
+interval_ms = 10000
+
+[frame.can."0x70A".mux]
+name = "mux_1802_0_8"
+start_bit = 0
+bit_length = 8
+
+[[frame.can."0x70A".mux."0".signals]]
+name = "Info_Battery_Manufacturer"
+start_bit = 8
+bit_length = 56
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x70A".mux."1".signals]]
+name = "Info_Battery_Model_Short"
+start_bit = 8
+bit_length = 56
+format = "utf8"
+confidence = "medium"
+
+[frame.can."0x70B"]
+length = 8
+transmitter = "BMS"
+
+[frame.can."0x70B".tx]
+interval_ms = 10000
+
+[[frame.can."0x70B".signals]]
+name = "Info_Battery_Model"
+start_bit = 0
+bit_length = 64
+format = "utf8"
+confidence = "medium"
+
+[frame.can."0x70D"]
+length = 8
+transmitter = "BMS"
+
+[frame.can."0x70D".tx]
+interval_ms = 10000
+
+[[frame.can."0x70D".signals]]
+name = "70d_Unknown_Permission_3_10701__"
+start_bit = 0
+bit_length = 64
+signed = false
+format = "hex"
+
+[frame.can."0x70E"]
+length = 8
+transmitter = "BMS"
+
+[frame.can."0x70E".tx]
+interval_ms = 10000
+
+[[frame.can."0x70E".signals]]
+name = "70E_Unknown_Permission_3_10705__"
+start_bit = 0
+bit_length = 64
+signed = false
+format = "hex"
+
+[frame.can."0x70F"]
+length = 8
+transmitter = "BMS"
+
+[frame.can."0x70F".tx]
+interval_ms = 10000
+
+[frame.can."0x70F".mux]
+name = "mux_1807_0_8"
+start_bit = 0
+bit_length = 8
+
+[[frame.can."0x70F".mux."0".signals]]
+name = "70F_Unknown_Mux_0"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "hex"
+
+[[frame.can."0x70F".mux."1".signals]]
+name = "70F_Unknown_Mux_1"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "hex"
+
+[[frame.can."0x70F".mux."2".signals]]
+name = "70F_Unknown_Mux_2"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "hex"
+
+[[frame.can."0x70F".mux."3".signals]]
+name = "70F_Unknown_Mux_3"
+start_bit = 8
+bit_length = 56
+signed = false
+format = "hex"
+
+[[frame.can."0x70F".mux."4".signals]]
+name = "70F_Unknown_Mux_4"
+start_bit = 8
+bit_length = 48
+signed = false
+format = "hex"
+
+[[frame.can."0x70F".mux."4".signals]]
+name = "TODO_Charge_Enum"
+start_bit = 56
+bit_length = 8
+signed = false
+format = "enum"
+
+[frame.can."0x70F".mux."4".signals.enum]
+0 = "Normal"
+2 = "Stop Charge"
+
+[[frame.can."0x70F".mux."5".signals]]
+name = "Status_Module_1_SoC"
+start_bit = 16
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x70F".mux."5".signals]]
+name = "Status_Module_2_SoC"
+start_bit = 32
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x70F".mux."5".signals]]
+name = "Status_Module_3_SoC"
+start_bit = 48
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x70F".mux."6".signals]]
+name = "Status_Module_4_SoC"
+start_bit = 16
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+format = "number"
+confidence = "medium"
+
+[[frame.can."0x70F".mux."6".signals]]
+name = "Status_Module_5_SoC"
+start_bit = 32
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x70F".mux."6".signals]]
+name = "Status_Module_6_SoC"
+start_bit = 48
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x70F".mux."7".signals]]
+name = "Status_Module_7_SoC"
+start_bit = 16
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x70F".mux."7".signals]]
+name = "Status_Module_8_SoC"
+start_bit = 32
+bit_length = 16
+factor = 0.01
+unit = "%"
+signed = false
+confidence = "medium"
+
+[[frame.can."0x70F".mux."7".signals]]
+name = "70F_Unknown_Mux_7"
+start_bit = 48
+bit_length = 16
+signed = false
+format = "hex"
+
+[frame.can."0x713"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x713".signals]]
+name = "Status_Pos_Cell_Min_Temp"
+start_bit = 0
+bit_length = 8
+unit = "Cell #"
+signed = false
+confidence = "high"
+
+[[frame.can."0x713".signals]]
+name = "Status_Pos_Module_Min_Temp"
+start_bit = 8
+bit_length = 8
+unit = "Module #"
+signed = false
+confidence = "high"
+
+[[frame.can."0x713".signals]]
+name = "Status_Cell_Min_Temp"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "°C"
+signed = false
+confidence = "high"
+
+[[frame.can."0x713".signals]]
+name = "Status_Pos_Cell_Max_Temp"
+start_bit = 32
+bit_length = 8
+unit = "Cell #"
+signed = false
+confidence = "high"
+
+[[frame.can."0x713".signals]]
+name = "Status_Pos_Module_Max_Temp"
+start_bit = 40
+bit_length = 8
+unit = "Module #"
+signed = false
+confidence = "high"
+
+[[frame.can."0x713".signals]]
+name = "Status_Cell_Max_Temp"
+start_bit = 48
+bit_length = 16
+factor = 0.1
+unit = "°C"
+signed = false
+confidence = "high"
+
+[frame.can."0x714"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x714".signals]]
+name = "Status_Pos_Cell_Min_Voltage"
+start_bit = 0
+bit_length = 8
+unit = "Cell #"
+signed = false
+confidence = "high"
+
+[[frame.can."0x714".signals]]
+name = "Status_Pos_Module_Min_Voltage"
+start_bit = 8
+bit_length = 8
+unit = "Module #"
+signed = false
+confidence = "high"
+
+[[frame.can."0x714".signals]]
+name = "Status_Cell_Min_Voltage_HP"
+start_bit = 16
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x714".signals]]
+name = "Status_Pos_Cell_Max_Voltage"
+start_bit = 32
+bit_length = 8
+unit = "Cell #"
+signed = false
+confidence = "high"
+
+[[frame.can."0x714".signals]]
+name = "Status_Pos_Module_Max_Voltage"
+start_bit = 40
+bit_length = 8
+unit = "Module #"
+signed = false
+confidence = "high"
+
+[[frame.can."0x714".signals]]
+name = "Status_Cell_Max_Voltage_HP"
+start_bit = 48
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[frame.can."0x715"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x715".signals]]
+name = "Status_Module_1_Min_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x715".signals]]
+name = "Status_Module_1_Max_Voltage"
+start_bit = 16
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x715".signals]]
+name = "Status_Module_2_Min_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x715".signals]]
+name = "Status_Module_2_Max_Voltage"
+start_bit = 48
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[frame.can."0x716"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x716".signals]]
+name = "Status_Module_3_Min_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x716".signals]]
+name = "Status_Module_3_Max_Voltage"
+start_bit = 16
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x716".signals]]
+name = "Status_Module_4_Min_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x716".signals]]
+name = "Status_Module_4_Max_Voltage"
+start_bit = 48
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[frame.can."0x717"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x717".signals]]
+name = "Status_Module_5_Min_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x717".signals]]
+name = "Status_Module_5_Max_Voltage"
+start_bit = 16
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x717".signals]]
+name = "Status_Module_6_Min_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x717".signals]]
+name = "Status_Module_6_Max_Voltage"
+start_bit = 48
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[frame.can."0x718"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x718".signals]]
+name = "Status_Module_7_Min_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x718".signals]]
+name = "Status_Module_7_Max_Voltage"
+start_bit = 16
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x718".signals]]
+name = "Status_Module_8_Min_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[[frame.can."0x718".signals]]
+name = "Status_Module_8_Max_Voltage"
+start_bit = 48
+bit_length = 16
+factor = 0.0001
+unit = "V"
+signed = false
+confidence = "high"
+
+[frame.can."0x719"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x719".signals]]
+name = "Status_3_10789__"
+start_bit = 0
+bit_length = 16
+signed = false
+confidence = "low"
+
+[[frame.can."0x719".signals]]
+name = "Status_Module_Fault_3_10790__"
+start_bit = 16
+bit_length = 16
+signed = false
+confidence = "low"
+
+[frame.can."0x71A"]
+length = 8
+transmitter = "BMS"
+tx_interval_ms = 60000
+
+[[frame.can."0x71A".signals]]
+name = "Info_Module_1_Cell_Type"
+start_bit = 0
+bit_length = 8
+format = "enum"
+confidence = "high"
+
+[frame.can."0x71A".signals.enum]
+66 = "IEC"
+68 = "Non-IEC"
+
+[[frame.can."0x71A".signals]]
+name = "Info_Module_2_Cell_Type"
+start_bit = 8
+bit_length = 8
+format = "enum"
+confidence = "high"
+
+[frame.can."0x71A".signals.enum]
+66 = "IEC"
+68 = "Non-IEC"
+
+[[frame.can."0x71A".signals]]
+name = "Info_Module_3_Cell_Type"
+start_bit = 16
+bit_length = 8
+format = "enum"
+confidence = "high"
+
+[frame.can."0x71A".signals.enum]
+66 = "IEC"
+68 = "Non-IEC"
+
+[[frame.can."0x71A".signals]]
+name = "Info_Module_4_Cell_Type"
+start_bit = 24
+bit_length = 8
+format = "enum"
+confidence = "high"
+
+[frame.can."0x71A".signals.enum]
+66 = "IEC"
+68 = "Non-IEC"
+
+[[frame.can."0x71A".signals]]
+name = "Info_Module_5_Cell_Type"
+start_bit = 32
+bit_length = 8
+format = "enum"
+confidence = "high"
+
+[frame.can."0x71A".signals.enum]
+66 = "IEC"
+68 = "Non-IEC"
+
+[[frame.can."0x71A".signals]]
+name = "Info_Module_6_Cell_Type"
+start_bit = 40
+bit_length = 8
+format = "enum"
+confidence = "high"
+
+[frame.can."0x71A".signals.enum]
+66 = "IEC"
+68 = "Non-IEC"
+
+[[frame.can."0x71A".signals]]
+name = "Info_Module_7_Cell_Type"
+start_bit = 48
+bit_length = 8
+format = "enum"
+confidence = "high"
+
+[frame.can."0x71A".signals.enum]
+66 = "IEC"
+68 = "Non-IEC"
+
+[[frame.can."0x71A".signals]]
+name = "Info_Module_8_Cell_Type"
+start_bit = 56
+bit_length = 8
+format = "enum"
+confidence = "high"
+
+[frame.can."0x71A".signals.enum]
+66 = "IEC"
+68 = "Non-IEC"
+
+[frame.can."0x71B"]
+length = 8
+transmitter = "BMS"
+tx_interval_ms = 60000
+
+[[frame.can."0x71B".signals]]
+name = "Info_Module_1_Production_Date"
+start_bit = 0
+bit_length = 32
+signed = false
+confidence = "high"
+
+[[frame.can."0x71B".signals]]
+name = "Info_Module_2_Production_Date"
+start_bit = 32
+bit_length = 32
+signed = false
+confidence = "high"
+
+[frame.can."0x71C"]
+length = 8
+transmitter = "BMS"
+tx_interval_ms = 60000
+
+[[frame.can."0x71C".signals]]
+name = "Info_Module_3_Production_Date"
+start_bit = 0
+bit_length = 32
+signed = false
+confidence = "high"
+
+[[frame.can."0x71C".signals]]
+name = "Info_Module_4_Production_Date"
+start_bit = 32
+bit_length = 32
+signed = false
+confidence = "high"
+
+[frame.can."0x71D"]
+length = 8
+transmitter = "BMS"
+tx_interval_ms = 60000
+
+[[frame.can."0x71D".signals]]
+name = "Info_Module_5_Production_Date"
+start_bit = 0
+bit_length = 32
+signed = false
+confidence = "high"
+
+[[frame.can."0x71D".signals]]
+name = "Info_Module_6_Production_Date"
+start_bit = 32
+bit_length = 32
+signed = false
+confidence = "high"
+
+[frame.can."0x71E"]
+length = 8
+transmitter = "BMS"
+tx_interval_ms = 60000
+
+[[frame.can."0x71E".signals]]
+name = "Info_Module_7_Production_Date"
+start_bit = 0
+bit_length = 32
+signed = false
+confidence = "high"
+
+[[frame.can."0x71E".signals]]
+name = "Info_Module_8_Production_Date"
+start_bit = 32
+bit_length = 32
+signed = false
+confidence = "high"
+
+[frame.can."0x71F"]
+length = 8
+transmitter = "BMS"
+tx_interval_ms = 60000
+notes = "Characters 8–9 = year (YY), 10 = month (M, or A/B/C for 10–12), 11–12 = day (DD)."
+
+[frame.can."0x71F".mux]
+name = "mux_1823_0_8"
+start_bit = 0
+bit_length = 8
+
+[frame.can."0x71F".mux."1".mux]
+name = "mux_1823_1_8_8"
+start_bit = 8
+bit_length = 8
+
+[[frame.can."0x71F".mux."1".mux."1".signals]]
+name = "Info_Module_1_SN_1"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."1".mux."2".signals]]
+name = "Info_Module_1_SN_2"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."1".mux."3".signals]]
+name = "Info_Module_1_SN_3"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[frame.can."0x71F".mux."2".mux]
+name = "mux_1823_2_8_8"
+start_bit = 8
+bit_length = 8
+
+[[frame.can."0x71F".mux."2".mux."1".signals]]
+name = "Info_Module_2_SN_1"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."2".mux."2".signals]]
+name = "Info_Module_2_SN_2"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."2".mux."3".signals]]
+name = "Info_Module_2_SN_3"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[frame.can."0x71F".mux."3".mux]
+name = "mux_1823_3_8_8"
+start_bit = 8
+bit_length = 8
+
+[[frame.can."0x71F".mux."3".mux."1".signals]]
+name = "Info_Module_3_SN_1"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."3".mux."2".signals]]
+name = "Info_Module_3_SN_2"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."3".mux."3".signals]]
+name = "Info_Module_3_SN_3"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[frame.can."0x71F".mux."4".mux]
+name = "mux_1823_4_8_8"
+start_bit = 8
+bit_length = 8
+
+[[frame.can."0x71F".mux."4".mux."1".signals]]
+name = "Info_Module_4_SN_1"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."4".mux."2".signals]]
+name = "Info_Module_4_SN_2"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."4".mux."3".signals]]
+name = "Info_Module_4_SN_3"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[frame.can."0x71F".mux."5".mux]
+name = "mux_1823_5_8_8"
+start_bit = 8
+bit_length = 8
+
+[[frame.can."0x71F".mux."5".mux."1".signals]]
+name = "Info_Module_5_SN_1"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."5".mux."2".signals]]
+name = "Info_Module_5_SN_2"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."5".mux."3".signals]]
+name = "Info_Module_5_SN_3"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[frame.can."0x71F".mux."6".mux]
+name = "mux_1823_6_8_8"
+start_bit = 8
+bit_length = 8
+
+[[frame.can."0x71F".mux."6".mux."1".signals]]
+name = "Info_Module_6_SN_1"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."6".mux."2".signals]]
+name = "Info_Module_6_SN_2"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."6".mux."3".signals]]
+name = "Info_Module_6_SN_3"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[frame.can."0x71F".mux."7".mux]
+name = "mux_1823_7_8_8"
+start_bit = 8
+bit_length = 8
+
+[[frame.can."0x71F".mux."7".mux."1".signals]]
+name = "Info_Module_7_SN_1"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."7".mux."2".signals]]
+name = "Info_Module_7_SN_2"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."7".mux."3".signals]]
+name = "Info_Module_7_SN_3"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[frame.can."0x71F".mux."8".mux]
+name = "mux_1823_8_8_8"
+start_bit = 8
+bit_length = 8
+
+[[frame.can."0x71F".mux."8".mux."1".signals]]
+name = "Info_Module_8_SN_1"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."8".mux."2".signals]]
+name = "Info_Module_8_SN_2"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[[frame.can."0x71F".mux."8".mux."3".signals]]
+name = "Info_Module_8_SN_3"
+start_bit = 16
+bit_length = 48
+format = "utf8"
+confidence = "high"
+
+[node.Inverter]
+[node.BMS]
