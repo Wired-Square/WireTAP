@@ -695,6 +695,8 @@ export function useIOSessionManager(
       sourceAddressBigEndian: sourceAddressEndianness === "big",
     };
 
+    // Create the session and set up heartbeats
+    // This ensures heartbeats start immediately, keeping the session alive
     await createAndStartMultiSourceSession(createOptions);
 
     // Build output bus → source mapping
@@ -713,7 +715,9 @@ export function useIOSessionManager(
       }
     }
 
-    // Update state
+    // Update state - React 18 batches these together
+    // useIOSession's effect will run with the new sessionId and register callbacks
+    // It will see the backend already exists and join it properly
     setMultiBusProfiles(profileIds);
     setOutputBusToSource(busToSource);
     setMultiSessionId(sessionId);
@@ -730,6 +734,7 @@ export function useIOSessionManager(
     onBeforeWatch?.();
     resetWatchFrameCount();
 
+    // Join the session and set up heartbeats
     await joinMultiSourceSession({
       sessionId,
       listenerId: appName,

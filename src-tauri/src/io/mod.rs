@@ -1354,58 +1354,66 @@ pub async fn leave_session(session_id: &str) -> Result<usize, String> {
 /// Called periodically by the watchdog task.
 /// Returns a list of (session_id, removed_count, remaining_count) for sessions that had stale listeners.
 pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let now = std::time::Instant::now();
-    let timeout = std::time::Duration::from_secs(HEARTBEAT_TIMEOUT_SECS);
     let mut results = Vec::new();
+    let mut sessions_to_destroy: Vec<String> = Vec::new();
 
-    for (session_id, session) in sessions.iter_mut() {
-        let before_count = session.listeners.len();
+    // Phase 1: Remove stale listeners while holding the lock
+    {
+        let mut sessions = IO_SESSIONS.lock().await;
+        let now = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(HEARTBEAT_TIMEOUT_SECS);
 
-        // Remove stale listeners
-        session.listeners.retain(|listener_id, listener| {
-            let is_stale = now.duration_since(listener.last_heartbeat) > timeout;
-            if is_stale {
-                eprintln!(
-                    "[reader] Session '{}' removing stale listener '{}' (no heartbeat for {:?})",
-                    session_id,
-                    listener_id,
-                    now.duration_since(listener.last_heartbeat)
-                );
-            }
-            !is_stale
-        });
+        for (session_id, session) in sessions.iter_mut() {
+            let before_count = session.listeners.len();
 
-        let after_count = session.listeners.len();
-        let removed_count = before_count - after_count;
+            // Remove stale listeners
+            session.listeners.retain(|listener_id, listener| {
+                let is_stale = now.duration_since(listener.last_heartbeat) > timeout;
+                if is_stale {
+                    eprintln!(
+                        "[reader] Session '{}' removing stale listener '{}' (no heartbeat for {:?})",
+                        session_id,
+                        listener_id,
+                        now.duration_since(listener.last_heartbeat)
+                    );
+                }
+                !is_stale
+            });
 
-        if removed_count > 0 {
-            results.push((session_id.clone(), removed_count, after_count));
+            let after_count = session.listeners.len();
+            let removed_count = before_count - after_count;
 
-            // Sync the legacy joiner_count with listener count
-            // This ensures the UI shows the correct count after cleanup
-            if session.joiner_count > after_count {
-                let old_count = session.joiner_count;
-                session.joiner_count = after_count;
-                eprintln!(
-                    "[reader] Session '{}' synced joiner_count {} -> {} after cleanup",
-                    session_id, old_count, after_count
-                );
+            if removed_count > 0 {
+                results.push((session_id.clone(), removed_count, after_count));
 
-                // Emit joiner count change (sync - no specific listener)
-                emit_joiner_count_change(&session.app, session_id, after_count, None, None);
+                // Sync the legacy joiner_count with listener count
+                // This ensures the UI shows the correct count after cleanup
+                if session.joiner_count > after_count {
+                    let old_count = session.joiner_count;
+                    session.joiner_count = after_count;
+                    eprintln!(
+                        "[reader] Session '{}' synced joiner_count {} -> {} after cleanup",
+                        session_id, old_count, after_count
+                    );
 
-                // If no listeners left, stop the session
-                if after_count == 0 {
-                    eprintln!("[reader] Session '{}' has no listeners left after cleanup, stopping", session_id);
-                    let previous = session.device.state();
-                    if !matches!(previous, IOState::Stopped) {
-                        // Note: Can't await here while holding the lock, so we just log
-                        // The session will be stopped on next interaction or when destroyed
-                        eprintln!("[reader] Session '{}' should be stopped (async stop not possible in cleanup)", session_id);
+                    // Emit joiner count change (sync - no specific listener)
+                    emit_joiner_count_change(&session.app, session_id, after_count, None, None);
+
+                    // If no listeners left, mark for destruction
+                    if after_count == 0 {
+                        eprintln!("[reader] Session '{}' has no listeners left after cleanup, will destroy", session_id);
+                        sessions_to_destroy.push(session_id.clone());
                     }
                 }
             }
+        }
+    } // Lock released here
+
+    // Phase 2: Destroy orphaned sessions without holding the lock
+    for session_id in sessions_to_destroy {
+        eprintln!("[reader watchdog] Destroying orphaned session '{}'", session_id);
+        if let Err(e) = destroy_session(&session_id).await {
+            eprintln!("[reader watchdog] Failed to destroy session '{}': {}", session_id, e);
         }
     }
 

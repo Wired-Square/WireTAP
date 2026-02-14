@@ -16,6 +16,10 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Session Switching Not Receiving Traffic**: Fixed bug where switching between GVRET profiles (or other realtime sources) would result in the second session not receiving any frames, despite Rust logs showing frames arriving. Two issues were fixed:
+  1. **Frontend**: Multi-bus session creation now sets up event listeners and heartbeats immediately in `createAndStartMultiSourceSession`, ensuring the session stays alive during React's render cycle while `useIOSession` registers callbacks
+  2. **Backend**: `cleanup_stale_listeners()` now properly destroys orphaned sessions by collecting session IDs while holding the lock, then releasing it before calling `destroy_session()` - previously sessions with 0 listeners would persist indefinitely
+
 - **iOS Directory Path Resolution**: Fixed decoder catalogs not loading on iOS. The app now uses Tauri's `app.path().document_dir()` API instead of the `dirs` crate, which doesn't work correctly on iOS. Added `AppSettings::with_defaults(app)` for proper iOS-compatible path initialisation.
 
 - **iOS Stale Path Detection**: Fixed issue where reinstalling the iOS app would cause the app to look in old container paths. On iOS, app reinstalls create new container UUIDs, invalidating saved absolute paths. The app now detects stale paths on settings load and regenerates them automatically.

@@ -1929,6 +1929,70 @@ export async function createAndStartMultiSourceSession(
     useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
   }
 
+  // Set up event listeners and heartbeat interval
+  // This is needed because useIOSession's effect may skip setup when the session ID changes
+  // during multi-bus session creation (to avoid stale closure issues)
+  const store = useSessionStore.getState();
+  let eventListeners = store._eventListeners[sessionId];
+  if (!eventListeners) {
+    eventListeners = {
+      unlistenFunctions: [],
+      callbacks: new Map(),
+      heartbeatIntervalId: null,
+      registeredListeners: new Set(),
+    };
+
+    useSessionStore.setState((s) => {
+      if (s._eventListeners[sessionId]) {
+        eventListeners = s._eventListeners[sessionId];
+        return s;
+      }
+      return {
+        ...s,
+        _eventListeners: { ...s._eventListeners, [sessionId]: eventListeners! },
+      };
+    });
+
+    eventListeners = useSessionStore.getState()._eventListeners[sessionId]!;
+
+    if (eventListeners.unlistenFunctions.length === 0) {
+      const updateSession = (id: string, updates: Partial<Session>) => {
+        useSessionStore.setState((s) => ({
+          sessions: {
+            ...s.sessions,
+            [id]: s.sessions[id] ? { ...s.sessions[id], ...updates } : s.sessions[id],
+          },
+        }));
+      };
+
+      eventListeners.unlistenFunctions = await setupSessionEventListeners(
+        sessionId,
+        eventListeners,
+        updateSession
+      );
+
+      // Start heartbeat interval to keep listeners alive in Rust backend
+      if (!eventListeners.heartbeatIntervalId) {
+        const heartbeatSessionId = sessionId;
+        eventListeners.heartbeatIntervalId = setInterval(async () => {
+          const listeners = useSessionStore.getState()._eventListeners[heartbeatSessionId];
+          if (!listeners || listeners.registeredListeners.size === 0) return;
+
+          for (const lid of listeners.registeredListeners) {
+            try {
+              await registerSessionListener(heartbeatSessionId, lid);
+            } catch {
+              // Ignore heartbeat errors - session may have been destroyed
+            }
+          }
+        }, 5000);
+      }
+    }
+  }
+
+  // Add this listener to the registered listeners set for heartbeat tracking
+  eventListeners.registeredListeners.add(listenerId);
+
   return {
     sessionId,
     sourceProfileIds: profileIds,
@@ -1967,6 +2031,68 @@ export async function joinMultiSourceSession(
   if (regResult.startup_error) {
     useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
   }
+
+  // Set up event listeners and heartbeat interval if not already set up
+  const store = useSessionStore.getState();
+  let eventListeners = store._eventListeners[sessionId];
+  if (!eventListeners) {
+    eventListeners = {
+      unlistenFunctions: [],
+      callbacks: new Map(),
+      heartbeatIntervalId: null,
+      registeredListeners: new Set(),
+    };
+
+    useSessionStore.setState((s) => {
+      if (s._eventListeners[sessionId]) {
+        eventListeners = s._eventListeners[sessionId];
+        return s;
+      }
+      return {
+        ...s,
+        _eventListeners: { ...s._eventListeners, [sessionId]: eventListeners! },
+      };
+    });
+
+    eventListeners = useSessionStore.getState()._eventListeners[sessionId]!;
+
+    if (eventListeners.unlistenFunctions.length === 0) {
+      const updateSession = (id: string, updates: Partial<Session>) => {
+        useSessionStore.setState((s) => ({
+          sessions: {
+            ...s.sessions,
+            [id]: s.sessions[id] ? { ...s.sessions[id], ...updates } : s.sessions[id],
+          },
+        }));
+      };
+
+      eventListeners.unlistenFunctions = await setupSessionEventListeners(
+        sessionId,
+        eventListeners,
+        updateSession
+      );
+
+      // Start heartbeat interval to keep listeners alive in Rust backend
+      if (!eventListeners.heartbeatIntervalId) {
+        const heartbeatSessionId = sessionId;
+        eventListeners.heartbeatIntervalId = setInterval(async () => {
+          const listeners = useSessionStore.getState()._eventListeners[heartbeatSessionId];
+          if (!listeners || listeners.registeredListeners.size === 0) return;
+
+          for (const lid of listeners.registeredListeners) {
+            try {
+              await registerSessionListener(heartbeatSessionId, lid);
+            } catch {
+              // Ignore heartbeat errors - session may have been destroyed
+            }
+          }
+        }, 5000);
+      }
+    }
+  }
+
+  // Add this listener to the registered listeners set for heartbeat tracking
+  eventListeners.registeredListeners.add(listenerId);
 
   return {
     sessionId,
