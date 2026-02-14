@@ -5,6 +5,8 @@
 
 use std::sync::mpsc as std_mpsc;
 
+use crate::buffer_store::TimestampedByte;
+use serde::Serialize;
 use super::FrameMessage;
 
 // ============================================================================
@@ -50,3 +52,18 @@ pub struct TransmitRequest {
 
 /// Sender type for transmit requests (sync-safe)
 pub type TransmitSender = std_mpsc::SyncSender<TransmitRequest>;
+
+// ============================================================================
+// Byte Payload Types
+// ============================================================================
+
+/// Payload for raw bytes event - emitted in batches for performance.
+/// Each byte has its own timestamp for precise timing analysis.
+/// This is a shared type that can be used across all platforms (unlike SerialRawBytesPayload).
+#[derive(Clone, Serialize)]
+pub struct RawBytesPayload {
+    /// Bytes with individual timestamps
+    pub bytes: Vec<TimestampedByte>,
+    /// Source identifier (e.g., port name, "multi-source")
+    pub source: String,
+}

@@ -16,7 +16,7 @@ use crate::{
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, BufferReader, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
         CsvReader, CsvReaderOptions,
-        GvretDeviceInfo, probe_gvret_tcp, probe_gvret_usb,
+        GvretDeviceInfo, probe_gvret_tcp,
         MqttConfig, MqttReader,
         MultiSourceReader, SourceConfig,
         PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
@@ -27,6 +27,8 @@ use crate::{
     profile_tracker,
     settings::{self, AppSettings, IOProfile},
 };
+#[cfg(not(target_os = "ios"))]
+use crate::io::probe_gvret_usb;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -1043,6 +1045,7 @@ pub async fn probe_gvret_device(
                 .await
                 .map_err(String::from)
         }
+        #[cfg(not(target_os = "ios"))]
         "gvret_usb" | "gvret-usb" => {
             let port = profile
                 .connection
@@ -1062,6 +1065,10 @@ pub async fn probe_gvret_device(
             })
                 .await
                 .map_err(|e| format!("Probe task failed: {}", e))?
+        }
+        #[cfg(target_os = "ios")]
+        "gvret_usb" | "gvret-usb" => {
+            Err("GVRET USB is not available on iOS".to_string())
         }
         _ => Err(format!(
             "Profile '{}' is not a GVRET device (kind: {})",
@@ -1114,6 +1121,7 @@ pub async fn probe_device(
     app: tauri::AppHandle,
     profile_id: String,
 ) -> Result<DeviceProbeResult, String> {
+    #[cfg(not(target_os = "ios"))]
     use crate::io::slcan::reader::probe_slcan_device;
 
     // Check cache first - if we have a successful probe result, return it immediately
@@ -1176,6 +1184,7 @@ pub async fn probe_device(
             }
         }
 
+        #[cfg(not(target_os = "ios"))]
         "gvret_usb" | "gvret-usb" => {
             let port = profile.connection.get("port")
                 .and_then(|v| v.as_str())
@@ -1215,8 +1224,21 @@ pub async fn probe_device(
                 }),
             }
         }
+        #[cfg(target_os = "ios")]
+        "gvret_usb" | "gvret-usb" => {
+            Ok(DeviceProbeResult {
+                success: false,
+                device_type: "gvret".to_string(),
+                is_multi_bus: true,
+                bus_count: 0,
+                primary_info: None,
+                secondary_info: None,
+                error: Some("GVRET USB is not available on iOS".to_string()),
+            })
+        }
 
-        // slcan devices - single-bus
+        // slcan devices - single-bus (desktop only)
+        #[cfg(not(target_os = "ios"))]
         "slcan" => {
             let port = profile.connection.get("port")
                 .and_then(|v| v.as_str())
@@ -1247,6 +1269,18 @@ pub async fn probe_device(
                 primary_info: result.version,
                 secondary_info: result.hardware_version,
                 error: result.error,
+            })
+        }
+        #[cfg(target_os = "ios")]
+        "slcan" => {
+            Ok(DeviceProbeResult {
+                success: false,
+                device_type: "slcan".to_string(),
+                is_multi_bus: false,
+                bus_count: 0,
+                primary_info: None,
+                secondary_info: None,
+                error: Some("slcan is not available on iOS".to_string()),
             })
         }
 
@@ -1320,7 +1354,8 @@ pub async fn probe_device(
             }
         }
 
-        // Serial port - check if port exists
+        // Serial port - check if port exists (desktop only)
+        #[cfg(not(target_os = "ios"))]
         "serial" => {
             let port = profile.connection.get("port")
                 .and_then(|v| v.as_str())
@@ -1351,6 +1386,18 @@ pub async fn probe_device(
                     error: Some(format!("Port '{}' not found", port)),
                 })
             }
+        }
+        #[cfg(target_os = "ios")]
+        "serial" => {
+            Ok(DeviceProbeResult {
+                success: false,
+                device_type: "serial".to_string(),
+                is_multi_bus: false,
+                bus_count: 0,
+                primary_info: None,
+                secondary_info: None,
+                error: Some("Serial ports are not available on iOS".to_string()),
+            })
         }
 
         // Recorded sources or unsupported types

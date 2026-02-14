@@ -6,6 +6,12 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **iOS Build Support (WIP)**: Initial iOS build support via Tauri 2. Desktop-only features (serial ports, USB devices, window management, menus) are conditionally compiled out on iOS. Centralised profile traits system (`src/utils/profileTraits.ts`) filters unavailable IO profile types per platform:
+  - Available on iOS: GVRET TCP, MQTT, PostgreSQL, CSV File
+  - Hidden on iOS: GVRET USB, Serial Port, slcan, gs_usb, SocketCAN (require serial/USB/kernel features)
+  - Added `isIOS()` platform detection function
+  - Rust backend uses `#[cfg(target_os = "ios")]` guards for platform-specific code
+
 - **Decoder Scroll Position Preservation**: The Decoder app now remembers scroll position when switching between panels (e.g., Decoder → Discovery → Decoder). Each tab (Signals, Unmatched, Filtered) maintains its own scroll position. Positions are session-only and reset on app restart.
 
 - **Power Management**: Prevent system sleep/hibernation while a session is actively streaming data. Cross-platform support via the `keepawake` crate:

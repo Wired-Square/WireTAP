@@ -76,11 +76,17 @@ pub struct RepeatStoppedEvent {
     pub reason: String,
 }
 
-/// Kinds that support CAN transmit
+/// Kinds that support CAN transmit (platform-dependent)
+#[cfg(not(target_os = "ios"))]
 const CAN_TRANSMIT_KINDS: [&str; 5] = ["slcan", "gvret_tcp", "gvret_usb", "socketcan", "gs_usb"];
+#[cfg(target_os = "ios")]
+const CAN_TRANSMIT_KINDS: [&str; 1] = ["gvret_tcp"];
 
-/// Kinds that support serial transmit
+/// Kinds that support serial transmit (not available on iOS)
+#[cfg(not(target_os = "ios"))]
 const SERIAL_TRANSMIT_KINDS: [&str; 1] = ["serial"];
+#[cfg(target_os = "ios")]
+const SERIAL_TRANSMIT_KINDS: [&str; 0] = [];
 
 // ============================================================================
 // Helper Functions

@@ -18,7 +18,9 @@ pub mod gs_usb; // pub for Tauri command access
 pub mod gvret; // GVRET TCP/USB driver
 mod mqtt;
 mod multi_source;
+#[cfg(not(target_os = "ios"))]
 pub mod serial; // pub for Tauri command access (list_serial_ports)
+#[cfg(not(target_os = "ios"))]
 pub mod slcan; // pub for slcan transmit_frame access
 mod socketcan;
 
@@ -27,19 +29,31 @@ pub use timeline::{step_frame, BufferReader, StepResult};
 pub use timeline::{parse_csv_file, CsvReader, CsvReaderOptions};
 pub use timeline::{PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType};
 
-// Re-export codec types
+// Re-export codec types (platform-specific codecs are conditionally exported from codec.rs)
 #[allow(unused_imports)]
-pub use codec::{FrameCodec, GsUsbCodec, SlcanCodec, SocketCanCodec, SocketCanEncodedFrame};
+pub use codec::FrameCodec;
 #[allow(unused_imports)]
 pub use gvret::GvretCodec;
+#[cfg(not(target_os = "ios"))]
+#[allow(unused_imports)]
+pub use codec::SlcanCodec;
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+#[allow(unused_imports)]
+pub use codec::GsUsbCodec;
+#[cfg(target_os = "linux")]
+#[allow(unused_imports)]
+pub use codec::{SocketCanCodec, SocketCanEncodedFrame};
 
 // Re-export driver types
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 #[allow(unused_imports)]
 pub use gs_usb::GsUsbConfig;
-pub use gvret::{BusMapping, GvretDeviceInfo, probe_gvret_tcp, probe_gvret_usb};
+pub use gvret::{BusMapping, GvretDeviceInfo, probe_gvret_tcp};
+#[cfg(not(target_os = "ios"))]
+pub use gvret::probe_gvret_usb;
 pub use multi_source::{MultiSourceReader, SourceConfig};
 pub use mqtt::{MqttConfig, MqttReader};
+#[cfg(not(target_os = "ios"))]
 #[allow(unused_imports)]
 pub use serial::Parity;
 
@@ -52,6 +66,7 @@ pub use error::IoError;
 // go through MultiSourceReader
 
 use async_trait::async_trait;
+#[cfg(not(target_os = "ios"))]
 use keepawake::{Builder as KeepAwakeBuilder, KeepAwake};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -707,6 +722,7 @@ impl Default for WakeSettings {
 static WAKE_SETTINGS: Lazy<RwLock<WakeSettings>> = Lazy::new(|| RwLock::new(WakeSettings::default()));
 
 /// Active wake lock guard (holds system awake while Some)
+#[cfg(not(target_os = "ios"))]
 static WAKE_LOCK: Lazy<std::sync::Mutex<Option<KeepAwake>>> =
     Lazy::new(|| std::sync::Mutex::new(None));
 
@@ -724,6 +740,7 @@ pub fn set_wake_settings(prevent_idle_sleep: bool, keep_display_awake: bool) {
 
 /// Update the wake lock based on current session state and settings.
 /// Called periodically by the heartbeat watchdog.
+#[cfg(not(target_os = "ios"))]
 async fn update_wake_lock() {
     // Read current settings
     let settings = match WAKE_SETTINGS.read() {
@@ -784,6 +801,12 @@ async fn update_wake_lock() {
             }
         }
     }
+}
+
+/// iOS stub - wake lock not supported
+#[cfg(target_os = "ios")]
+async fn update_wake_lock() {
+    // No-op on iOS - system handles power management differently
 }
 
 /// Startup errors for sessions (errors that occurred before any listener registered).

@@ -34,7 +34,7 @@ export interface DeviceProbeResponse {
  * Returns port information including USB device details where available.
  */
 export async function listSerialPorts(): Promise<SerialPortInfo[]> {
-  return invoke("list_serial_ports");
+  return invoke("platform_list_serial_ports");
 }
 
 /** Optional serial framing parameters for probing */
@@ -61,7 +61,7 @@ export async function probeSlcanDevice(
   baudRate: number,
   framing?: SerialFramingOptions
 ): Promise<DeviceProbeResponse> {
-  return invoke("probe_slcan_device", {
+  return invoke("platform_probe_slcan_device", {
     port,
     baudRate,
     dataBits: framing?.dataBits,

@@ -14,12 +14,104 @@ mod store_manager;
 mod transmit;
 
 use std::sync::Mutex;
-use tauri::{menu::*, AppHandle, Emitter, Manager, State, WebviewWindowBuilder, WebviewUrl, WindowEvent, Wry};
+#[cfg(not(target_os = "ios"))]
+use tauri::menu::*;
+use tauri::{AppHandle, Emitter, Manager, State};
+#[cfg(not(target_os = "ios"))]
+use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent, Wry};
+
+// ============================================================================
+// Platform-Aware Serial/Slcan Commands
+// ============================================================================
+// Serial and slcan modules are not available on iOS due to platform limitations.
+// These wrapper functions delegate to real implementations on desktop or return
+// stub responses on iOS.
+
+/// Serial port info (duplicated for iOS compatibility)
+#[derive(Clone, serde::Serialize)]
+pub struct SerialPortInfoCompat {
+    pub port_name: String,
+    pub port_type: String,
+    pub manufacturer: Option<String>,
+    pub product: Option<String>,
+    pub serial_number: Option<String>,
+    pub vid: Option<u16>,
+    pub pid: Option<u16>,
+}
+
+/// slcan probe result (duplicated for iOS compatibility)
+#[derive(Clone, serde::Serialize)]
+pub struct SlcanProbeResultCompat {
+    pub success: bool,
+    pub version: Option<String>,
+    pub hardware_version: Option<String>,
+    pub serial_number: Option<String>,
+    pub error: Option<String>,
+}
+
+/// List serial ports - returns empty on iOS, real list on desktop
+/// Named with platform_ prefix to avoid macro name collision with io::serial::reader::list_serial_ports
+#[tauri::command(rename_all = "snake_case")]
+fn platform_list_serial_ports() -> Result<Vec<SerialPortInfoCompat>, String> {
+    #[cfg(not(target_os = "ios"))]
+    {
+        io::serial::reader::list_serial_ports().map(|ports| {
+            ports.into_iter().map(|p| SerialPortInfoCompat {
+                port_name: p.port_name,
+                port_type: p.port_type,
+                manufacturer: p.manufacturer,
+                product: p.product,
+                serial_number: p.serial_number,
+                vid: p.vid,
+                pid: p.pid,
+            }).collect()
+        })
+    }
+    #[cfg(target_os = "ios")]
+    {
+        Ok(vec![])
+    }
+}
+
+/// Probe slcan device - not supported on iOS
+/// Named with platform_ prefix to avoid macro name collision with io::slcan::reader::probe_slcan_device
+#[tauri::command(rename_all = "snake_case")]
+fn platform_probe_slcan_device(
+    port: String,
+    baud_rate: u32,
+    data_bits: Option<u8>,
+    stop_bits: Option<u8>,
+    parity: Option<String>,
+) -> SlcanProbeResultCompat {
+    #[cfg(not(target_os = "ios"))]
+    {
+        let result = io::slcan::reader::probe_slcan_device(port, baud_rate, data_bits, stop_bits, parity);
+        SlcanProbeResultCompat {
+            success: result.success,
+            version: result.version,
+            hardware_version: result.hardware_version,
+            serial_number: result.serial_number,
+            error: result.error,
+        }
+    }
+    #[cfg(target_os = "ios")]
+    {
+        let _ = (port, baud_rate, data_bits, stop_bits, parity);
+        SlcanProbeResultCompat {
+            success: false,
+            version: None,
+            hardware_version: None,
+            serial_number: None,
+            error: Some("Serial ports are not available on iOS".to_string()),
+        }
+    }
+}
 
 // Track which window has the Settings panel open (singleton behavior)
 struct SettingsWindowState(Mutex<Option<String>>);
 
 // Store references to dynamic menu items that need to be updated at runtime
+#[cfg(not(target_os = "ios"))]
 struct SessionMenuItems {
     source: MenuItem<Wry>,
     play: MenuItem<Wry>,
@@ -29,10 +121,18 @@ struct SessionMenuItems {
     stop_all: MenuItem<Wry>,
 }
 
+#[cfg(not(target_os = "ios"))]
 struct SessionMenuState(Mutex<Option<SessionMenuItems>>);
 
 // Store reference to the bookmarks submenu for dynamic updates
+#[cfg(not(target_os = "ios"))]
 struct BookmarksMenuState(Mutex<Option<Submenu<Wry>>>);
+
+// iOS stub types for menu state (not used, but needed for compilation)
+#[cfg(target_os = "ios")]
+struct SessionMenuState(Mutex<()>);
+#[cfg(target_os = "ios")]
+struct BookmarksMenuState(Mutex<()>);
 
 // Bookmark info received from frontend for menu display
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -119,9 +219,10 @@ fn open_settings_singleton(app: &AppHandle, state: &State<SettingsWindowState>) 
 
     // Check if Settings is already open in a window
     if let Some(label) = settings_window.as_ref() {
-        if let Some(window) = app.get_webview_window(label) {
+        if let Some(_window) = app.get_webview_window(label) {
             // Window exists - focus it and tell it to focus Settings panel
-            let _ = window.set_focus();
+            #[cfg(not(target_os = "ios"))]
+            let _ = _window.set_focus();
             let _ = app.emit_to(label, "menu-focus-panel", "settings");
             return;
         }
@@ -170,6 +271,7 @@ fn open_settings_panel(app: AppHandle, state: State<SettingsWindowState>) {
 
 /// Update the Session menu state based on the focused app's session.
 /// Called by the frontend when panel focus or session state changes.
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 fn update_menu_session_state(
     state: State<SessionMenuState>,
@@ -207,6 +309,7 @@ fn update_menu_session_state(
 
 /// Update the Bookmarks > Jump to Bookmark submenu with bookmarks for the current profile.
 /// Called by the frontend when panel focus or IO profile changes.
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 fn update_bookmarks_menu(
     app: AppHandle,
@@ -249,6 +352,7 @@ fn update_bookmarks_menu(
 /// This command spawns window creation in a background task and returns immediately.
 /// On Windows, synchronous window creation can deadlock when called from a Tauri command
 /// that's being awaited by the frontend, because window creation needs the UI thread.
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 async fn create_main_window(app: AppHandle, label: String) -> Result<(), String> {
     // Check if window already exists
@@ -289,248 +393,292 @@ async fn create_main_window(app: AppHandle, label: String) -> Result<(), String>
     Ok(())
 }
 
+// iOS stub commands - menus/windows not available on iOS
+#[cfg(target_os = "ios")]
+#[tauri::command]
+async fn create_main_window(_app: AppHandle, _label: String) -> Result<(), String> {
+    Ok(()) // No-op on iOS
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+fn update_menu_session_state(
+    _state: State<SessionMenuState>,
+    _profile_name: Option<String>,
+    _is_streaming: bool,
+    _is_paused: bool,
+    _can_pause: bool,
+    _joiner_count: u32,
+) {
+    // No-op on iOS
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+fn update_bookmarks_menu(
+    _app: AppHandle,
+    _state: State<BookmarksMenuState>,
+    _bookmarks: Vec<BookmarkInfo>,
+) -> Result<(), String> {
+    Ok(()) // No-op on iOS
+}
+
+/// Setup menus for desktop platforms (not available on iOS)
+#[cfg(not(target_os = "ios"))]
+fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    // Create About menu item (App submenu on macOS)
+    let about_item = MenuItemBuilder::with_id("about", "About CANdor").build(app)?;
+
+    let app_menu = SubmenuBuilder::new(app, "CANdor")
+        .item(&about_item)
+        .separator()
+        .quit()
+        .build()?;
+
+    // Create Apps menu items
+    let discovery_item = MenuItemBuilder::with_id("app-discovery", "Discovery")
+        .accelerator("cmdOrCtrl+1")
+        .build(app)?;
+    let decoder_item = MenuItemBuilder::with_id("app-decoder", "Decoder")
+        .accelerator("cmdOrCtrl+2")
+        .build(app)?;
+    let transmit_item = MenuItemBuilder::with_id("app-transmit", "Transmit")
+        .accelerator("cmdOrCtrl+3")
+        .build(app)?;
+    let catalog_item = MenuItemBuilder::with_id("app-catalog-editor", "Catalog Editor")
+        .accelerator("cmdOrCtrl+4")
+        .build(app)?;
+    let calculator_item = MenuItemBuilder::with_id("app-calculator", "Calculator")
+        .accelerator("cmdOrCtrl+5")
+        .build(app)?;
+    let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
+        .accelerator("cmdOrCtrl+,")
+        .build(app)?;
+
+    let apps_menu = SubmenuBuilder::new(app, "Apps")
+        .item(&discovery_item)
+        .item(&decoder_item)
+        .item(&transmit_item)
+        .separator()
+        .item(&catalog_item)
+        .item(&calculator_item)
+        .separator()
+        .item(&settings_item)
+        .build()?;
+
+    // Create View menu items
+    let new_window_item = MenuItemBuilder::with_id("new-window", "New Window")
+        .accelerator("cmdOrCtrl+N")
+        .build(app)?;
+
+    // Edit menu - use predefined items for native clipboard/undo support
+    let find_item = MenuItemBuilder::with_id("find", "Find…")
+        .accelerator("cmdOrCtrl+F")
+        .build(app)?;
+
+    let edit_menu = SubmenuBuilder::new(app, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .separator()
+        .select_all()
+        .separator()
+        .item(&find_item)
+        .build()?;
+
+    // Create Session menu for stream control
+    let session_source_item = MenuItemBuilder::with_id("session-source", "No source selected")
+        .enabled(false)
+        .build(app)?;
+    let session_picker_item = MenuItemBuilder::with_id("session-picker", "Select Source…")
+        .accelerator("cmdOrCtrl+I")
+        .build(app)?;
+
+    // Playback controls (frame delivery)
+    let session_play_item = MenuItemBuilder::with_id("session-play", "Play")
+        .accelerator("cmdOrCtrl+Return")
+        .build(app)?;
+    let session_pause_item = MenuItemBuilder::with_id("session-pause", "Pause")
+        .accelerator("cmdOrCtrl+.")
+        .build(app)?;
+    let session_stop_item = MenuItemBuilder::with_id("session-stop", "Stop")
+        .accelerator("cmdOrCtrl+Shift+.")
+        .build(app)?;
+
+    // Session connection controls
+    let session_detach_item = MenuItemBuilder::with_id("session-detach", "Detach Session")
+        .enabled(false)
+        .build(app)?;
+    let session_stop_all_item = MenuItemBuilder::with_id("session-stop-all", "Stop Session")
+        .build(app)?;
+
+    let session_clear_item = MenuItemBuilder::with_id("session-clear", "Clear Frames")
+        .accelerator("cmdOrCtrl+K")
+        .build(app)?;
+
+    let session_menu = SubmenuBuilder::new(app, "Session")
+        .item(&session_source_item)
+        .item(&session_picker_item)
+        .separator()
+        .item(&session_play_item)
+        .item(&session_pause_item)
+        .item(&session_stop_item)
+        .separator()
+        .item(&session_detach_item)
+        .item(&session_stop_all_item)
+        .separator()
+        .item(&session_clear_item)
+        .build()?;
+
+    // Create Bookmarks menu
+    let bookmark_save_item = MenuItemBuilder::with_id("bookmark-save", "Save Bookmark…")
+        .accelerator("cmdOrCtrl+D")
+        .build(app)?;
+    let bookmark_manage_item =
+        MenuItemBuilder::with_id("bookmark-manage", "Manage Bookmarks…").build(app)?;
+
+    // Create "Jump to Bookmark" submenu (dynamically populated by frontend)
+    let jump_to_bookmark_submenu = SubmenuBuilder::new(app, "Jump to Bookmark")
+        .build()?;
+
+    let bookmarks_menu = SubmenuBuilder::new(app, "Bookmarks")
+        .item(&bookmark_save_item)
+        .item(&jump_to_bookmark_submenu)
+        .separator()
+        .item(&bookmark_manage_item)
+        .build()?;
+
+    // Create View submenu
+    let view_menu = SubmenuBuilder::new(app, "View")
+        .item(&new_window_item)
+        .separator()
+        .fullscreen()
+        .build()?;
+
+    // Create main menu
+    let menu = MenuBuilder::new(app)
+        .items(&[
+            &app_menu,
+            &apps_menu,
+            &edit_menu,
+            &session_menu,
+            &bookmarks_menu,
+            &view_menu,
+        ])
+        .build()?;
+
+    app.set_menu(menu)?;
+
+    // Store session menu items for dynamic updates
+    let session_menu_items = SessionMenuItems {
+        source: session_source_item,
+        play: session_play_item,
+        pause: session_pause_item,
+        stop: session_stop_item,
+        detach: session_detach_item,
+        stop_all: session_stop_all_item,
+    };
+    *app.state::<SessionMenuState>().0.lock().unwrap() = Some(session_menu_items);
+
+    // Store bookmarks submenu reference for dynamic updates
+    *app.state::<BookmarksMenuState>().0.lock().unwrap() = Some(jump_to_bookmark_submenu);
+
+    // Handle menu events
+    app.on_menu_event(|app, event| {
+        let event_id = event.id().as_ref();
+
+        match event_id {
+            "about" => {
+                emit_to_focused_window(app, "show-about", ());
+            }
+            // Note: undo, redo, cut, copy, paste, select-all are handled natively
+            // by predefined menu items - no custom handlers needed
+            "find" => {
+                emit_to_focused_window(app, "menu-find", ());
+            }
+            // App menu items - open as tabs in focused window
+            "app-discovery" | "app-decoder" | "app-transmit"
+            | "app-catalog-editor" | "app-calculator" => {
+                let panel_id = event_id.strip_prefix("app-").unwrap_or(event_id);
+                open_panel_in_focused_window(app, panel_id);
+            }
+            // Settings - singleton across all windows
+            "settings" => {
+                open_settings_singleton(app, &app.state::<SettingsWindowState>());
+            }
+            "new-window" => {
+                // Emit event to frontend - it will allocate a stable label and create the window
+                let _ = app.emit("menu-new-window", ());
+            }
+            // Session control menu items
+            "session-picker" => {
+                emit_to_focused_window(app, "menu-session-picker", ());
+            }
+            "session-play" => {
+                emit_to_focused_window(app, "menu-session-play", ());
+            }
+            "session-pause" => {
+                emit_to_focused_window(app, "menu-session-pause", ());
+            }
+            "session-stop" => {
+                emit_to_focused_window(app, "menu-session-stop", ());
+            }
+            "session-detach" => {
+                emit_to_focused_window(app, "menu-session-detach", ());
+            }
+            "session-stop-all" => {
+                emit_to_focused_window(app, "menu-session-stop-all", ());
+            }
+            "session-clear" => {
+                emit_to_focused_window(app, "menu-session-clear", ());
+            }
+            // Bookmark menu items
+            "bookmark-save" => {
+                emit_to_focused_window(app, "menu-bookmark-save", ());
+            }
+            "bookmark-manage" => {
+                // Open Settings panel and navigate to Bookmarks tab
+                open_settings_singleton(app, &app.state::<SettingsWindowState>());
+                emit_to_focused_window(app, "menu-bookmark-manage", ());
+            }
+            id if id.starts_with("bookmark-jump-") => {
+                // Jump to specific bookmark - extract ID and emit to focused window
+                let bookmark_id = id.strip_prefix("bookmark-jump-").unwrap_or("");
+                emit_to_focused_window(app, "menu-jump-to-bookmark", bookmark_id.to_string());
+            }
+            _ => {
+                // Unknown menu item - ignore
+            }
+        }
+    });
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_window_state::Builder::new().build())
-        .setup(|app| {
+        .plugin(tauri_plugin_dialog::init());
+
+    // Window state plugin only available on desktop
+    #[cfg(not(target_os = "ios"))]
+    let builder = builder.plugin(tauri_plugin_window_state::Builder::new().build());
+
+    let builder = builder.setup(|app| {
             // Initialise the centralised store manager
             if let Err(e) = store_manager::initialise(app.handle()) {
                 eprintln!("[setup] Failed to initialise store manager: {}", e);
             }
 
-            // Create About menu item (App submenu on macOS)
-            let about_item = MenuItemBuilder::with_id("about", "About CANdor").build(app)?;
-
-            let app_menu = SubmenuBuilder::new(app, "CANdor")
-                .item(&about_item)
-                .separator()
-                .quit()
-                .build()?;
-
-            // Create Apps menu items
-            let discovery_item = MenuItemBuilder::with_id("app-discovery", "Discovery")
-                .accelerator("cmdOrCtrl+1")
-                .build(app)?;
-            let decoder_item = MenuItemBuilder::with_id("app-decoder", "Decoder")
-                .accelerator("cmdOrCtrl+2")
-                .build(app)?;
-            let transmit_item = MenuItemBuilder::with_id("app-transmit", "Transmit")
-                .accelerator("cmdOrCtrl+3")
-                .build(app)?;
-            let catalog_item = MenuItemBuilder::with_id("app-catalog-editor", "Catalog Editor")
-                .accelerator("cmdOrCtrl+4")
-                .build(app)?;
-            let calculator_item = MenuItemBuilder::with_id("app-calculator", "Calculator")
-                .accelerator("cmdOrCtrl+5")
-                .build(app)?;
-            let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
-                .accelerator("cmdOrCtrl+,")
-                .build(app)?;
-
-            let apps_menu = SubmenuBuilder::new(app, "Apps")
-                .item(&discovery_item)
-                .item(&decoder_item)
-                .item(&transmit_item)
-                .separator()
-                .item(&catalog_item)
-                .item(&calculator_item)
-                .separator()
-                .item(&settings_item)
-                .build()?;
-
-            // Create View menu items
-            let new_window_item = MenuItemBuilder::with_id("new-window", "New Window")
-                .accelerator("cmdOrCtrl+N")
-                .build(app)?;
-
-            // Edit menu - use predefined items for native clipboard/undo support
-            let find_item = MenuItemBuilder::with_id("find", "Find…")
-                .accelerator("cmdOrCtrl+F")
-                .build(app)?;
-
-            let edit_menu = SubmenuBuilder::new(app, "Edit")
-                .undo()
-                .redo()
-                .separator()
-                .cut()
-                .copy()
-                .paste()
-                .separator()
-                .select_all()
-                .separator()
-                .item(&find_item)
-                .build()?;
-
-            // Create Session menu for stream control
-            let session_source_item = MenuItemBuilder::with_id("session-source", "No source selected")
-                .enabled(false)
-                .build(app)?;
-            let session_picker_item = MenuItemBuilder::with_id("session-picker", "Select Source…")
-                .accelerator("cmdOrCtrl+I")
-                .build(app)?;
-
-            // Playback controls (frame delivery)
-            let session_play_item = MenuItemBuilder::with_id("session-play", "Play")
-                .accelerator("cmdOrCtrl+Return")
-                .build(app)?;
-            let session_pause_item = MenuItemBuilder::with_id("session-pause", "Pause")
-                .accelerator("cmdOrCtrl+.")
-                .build(app)?;
-            let session_stop_item = MenuItemBuilder::with_id("session-stop", "Stop")
-                .accelerator("cmdOrCtrl+Shift+.")
-                .build(app)?;
-
-            // Session connection controls
-            let session_detach_item = MenuItemBuilder::with_id("session-detach", "Detach Session")
-                .enabled(false)
-                .build(app)?;
-            let session_stop_all_item = MenuItemBuilder::with_id("session-stop-all", "Stop Session")
-                .build(app)?;
-
-            let session_clear_item = MenuItemBuilder::with_id("session-clear", "Clear Frames")
-                .accelerator("cmdOrCtrl+K")
-                .build(app)?;
-
-            let session_menu = SubmenuBuilder::new(app, "Session")
-                .item(&session_source_item)
-                .item(&session_picker_item)
-                .separator()
-                .item(&session_play_item)
-                .item(&session_pause_item)
-                .item(&session_stop_item)
-                .separator()
-                .item(&session_detach_item)
-                .item(&session_stop_all_item)
-                .separator()
-                .item(&session_clear_item)
-                .build()?;
-
-            // Create Bookmarks menu
-            let bookmark_save_item = MenuItemBuilder::with_id("bookmark-save", "Save Bookmark…")
-                .accelerator("cmdOrCtrl+D")
-                .build(app)?;
-            let bookmark_manage_item =
-                MenuItemBuilder::with_id("bookmark-manage", "Manage Bookmarks…").build(app)?;
-
-            // Create "Jump to Bookmark" submenu (dynamically populated by frontend)
-            let jump_to_bookmark_submenu = SubmenuBuilder::new(app, "Jump to Bookmark")
-                .build()?;
-
-            let bookmarks_menu = SubmenuBuilder::new(app, "Bookmarks")
-                .item(&bookmark_save_item)
-                .item(&jump_to_bookmark_submenu)
-                .separator()
-                .item(&bookmark_manage_item)
-                .build()?;
-
-            // Create View submenu
-            let view_menu = SubmenuBuilder::new(app, "View")
-                .item(&new_window_item)
-                .separator()
-                .fullscreen()
-                .build()?;
-
-            // Create main menu
-            let menu = MenuBuilder::new(app)
-                .items(&[
-                    &app_menu,
-                    &apps_menu,
-                    &edit_menu,
-                    &session_menu,
-                    &bookmarks_menu,
-                    &view_menu,
-                ])
-                .build()?;
-
-            app.set_menu(menu)?;
-
-            // Store session menu items for dynamic updates
-            let session_menu_items = SessionMenuItems {
-                source: session_source_item,
-                play: session_play_item,
-                pause: session_pause_item,
-                stop: session_stop_item,
-                detach: session_detach_item,
-                stop_all: session_stop_all_item,
-            };
-            *app.state::<SessionMenuState>().0.lock().unwrap() = Some(session_menu_items);
-
-            // Store bookmarks submenu reference for dynamic updates
-            *app.state::<BookmarksMenuState>().0.lock().unwrap() = Some(jump_to_bookmark_submenu);
-
-            // Handle menu events
-            app.on_menu_event(|app, event| {
-                let event_id = event.id().as_ref();
-
-                match event_id {
-                    "about" => {
-                        emit_to_focused_window(app, "show-about", ());
-                    }
-                    // Note: undo, redo, cut, copy, paste, select-all are handled natively
-                    // by predefined menu items - no custom handlers needed
-                    "find" => {
-                        emit_to_focused_window(app, "menu-find", ());
-                    }
-                    // App menu items - open as tabs in focused window
-                    "app-discovery" | "app-decoder" | "app-transmit"
-                    | "app-catalog-editor" | "app-calculator" => {
-                        let panel_id = event_id.strip_prefix("app-").unwrap_or(event_id);
-                        open_panel_in_focused_window(app, panel_id);
-                    }
-                    // Settings - singleton across all windows
-                    "settings" => {
-                        open_settings_singleton(app, &app.state::<SettingsWindowState>());
-                    }
-                    "new-window" => {
-                        // Emit event to frontend - it will allocate a stable label and create the window
-                        let _ = app.emit("menu-new-window", ());
-                    }
-                    // Session control menu items
-                    "session-picker" => {
-                        emit_to_focused_window(app, "menu-session-picker", ());
-                    }
-                    "session-play" => {
-                        emit_to_focused_window(app, "menu-session-play", ());
-                    }
-                    "session-pause" => {
-                        emit_to_focused_window(app, "menu-session-pause", ());
-                    }
-                    "session-stop" => {
-                        emit_to_focused_window(app, "menu-session-stop", ());
-                    }
-                    "session-detach" => {
-                        emit_to_focused_window(app, "menu-session-detach", ());
-                    }
-                    "session-stop-all" => {
-                        emit_to_focused_window(app, "menu-session-stop-all", ());
-                    }
-                    "session-clear" => {
-                        emit_to_focused_window(app, "menu-session-clear", ());
-                    }
-                    // Bookmark menu items
-                    "bookmark-save" => {
-                        emit_to_focused_window(app, "menu-bookmark-save", ());
-                    }
-                    "bookmark-manage" => {
-                        // Open Settings panel and navigate to Bookmarks tab
-                        open_settings_singleton(app, &app.state::<SettingsWindowState>());
-                        emit_to_focused_window(app, "menu-bookmark-manage", ());
-                    }
-                    id if id.starts_with("bookmark-jump-") => {
-                        // Jump to specific bookmark - extract ID and emit to focused window
-                        let bookmark_id = id.strip_prefix("bookmark-jump-").unwrap_or("");
-                        emit_to_focused_window(app, "menu-jump-to-bookmark", bookmark_id.to_string());
-                    }
-                    _ => {
-                        // Unknown menu item - ignore
-                    }
-                }
-            });
+            // Setup desktop menus (not available on iOS)
+            #[cfg(not(target_os = "ios"))]
+            setup_desktop_menus(app)?;
 
             // Start the heartbeat watchdog to clean up stale session joiners
             io::start_heartbeat_watchdog();
@@ -554,10 +702,19 @@ pub fn run() {
 
             Ok(())
         })
-        .manage(SettingsWindowState(Mutex::new(None)))
+        .manage(SettingsWindowState(Mutex::new(None)));
+
+    // Add menu state management (platform-specific types)
+    #[cfg(not(target_os = "ios"))]
+    let builder = builder
         .manage(SessionMenuState(Mutex::new(None)))
-        .manage(BookmarksMenuState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![
+        .manage(BookmarksMenuState(Mutex::new(None)));
+    #[cfg(target_os = "ios")]
+    let builder = builder
+        .manage(SessionMenuState(Mutex::new(())))
+        .manage(BookmarksMenuState(Mutex::new(())));
+
+    let builder = builder.invoke_handler(tauri::generate_handler![
             greet,
             create_main_window,
             settings_panel_closed,
@@ -651,10 +808,10 @@ pub fn run() {
             buffers::list_orphaned_buffers,
             // Backend framing
             framing::apply_framing_to_buffer,
-            // Serial port API
-            io::serial::reader::list_serial_ports,
-            // slcan device probing
-            io::slcan::reader::probe_slcan_device,
+            // Serial port API (platform-aware: real on desktop, stub on iOS)
+            platform_list_serial_ports,
+            // slcan device probing (platform-aware: real on desktop, stub on iOS)
+            platform_probe_slcan_device,
             // gs_usb device enumeration and setup commands
             io::gs_usb::list_gs_usb_devices,
             io::gs_usb::get_can_setup_command,
@@ -698,9 +855,12 @@ pub fn run() {
             dbquery::db_query_activity,
             dbquery::db_cancel_backend,
             dbquery::db_terminate_backend,
-        ])
-        // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)
-        //
+        ]);
+
+    // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)
+    // Only on desktop - iOS doesn't have multiple windows or hide()
+    #[cfg(not(target_os = "ios"))]
+    let builder = builder.on_window_event(|window, event| {
         // The crash occurs in WebKit::WebPageProxy::dispatchSetObscuredContentInsets()
         // when events are emitted to a WebView that is being destroyed.
         //
@@ -713,54 +873,55 @@ pub fn run() {
         //
         // NOTE: This bypasses the JavaScript StopStreamDialog. For UX, if you want
         // to confirm with the user, you'd need to use a different approach.
-        .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                let label = window.label().to_string();
-                // For decoder/discovery windows, do safe close with cleanup
-                if label == "decoder" || label == "discovery" {
-                    // Check if we're already in the close process (prevents infinite loop)
-                    let is_first_close = io::mark_session_closing_sync(&label);
-                    if !is_first_close {
-                        // Second close request - let it through (this is our programmatic close)
-                        eprintln!("[WindowEvent] Second close for '{}', allowing", label);
-                        return;
-                    }
-
-                    // Prevent the default close - we'll destroy manually
-                    api.prevent_close();
-
-                    let window_clone = window.clone();
-
-                    // Spawn async cleanup
-                    tauri::async_runtime::spawn(async move {
-                        eprintln!("[WindowEvent] CloseRequested for '{}', stopping session", label);
-
-                        // Stop the streaming session - this waits for the task to finish
-                        let _ = io::stop_session(&label).await;
-
-                        // Destroy the session state
-                        let _ = io::destroy_session(&label).await;
-
-                        // Wait for WebKit to process any pending IPC operations.
-                        // The session is stopped, so no new events will be emitted.
-                        // This delay lets the main run loop drain pending operations.
-                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-                        eprintln!("[WindowEvent] Cleanup complete for '{}', hiding window", label);
-
-                        // Hide the window instead of destroying it.
-                        // On macOS Tahoe (26.2+), calling destroy() can crash in
-                        // WebKit::WebPageProxy::dispatchSetObscuredContentInsets()
-                        // even after stopping the session and waiting.
-                        // By hiding, the window stays in memory but is invisible.
-                        // It will be cleaned up when the app exits.
-                        if let Err(e) = window_clone.hide() {
-                            eprintln!("[WindowEvent] Failed to hide '{}': {:?}", label, e);
-                        }
-                    });
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            let label = window.label().to_string();
+            // For decoder/discovery windows, do safe close with cleanup
+            if label == "decoder" || label == "discovery" {
+                // Check if we're already in the close process (prevents infinite loop)
+                let is_first_close = io::mark_session_closing_sync(&label);
+                if !is_first_close {
+                    // Second close request - let it through (this is our programmatic close)
+                    eprintln!("[WindowEvent] Second close for '{}', allowing", label);
+                    return;
                 }
+
+                // Prevent the default close - we'll destroy manually
+                api.prevent_close();
+
+                let window_clone = window.clone();
+
+                // Spawn async cleanup
+                tauri::async_runtime::spawn(async move {
+                    eprintln!("[WindowEvent] CloseRequested for '{}', stopping session", label);
+
+                    // Stop the streaming session - this waits for the task to finish
+                    let _ = io::stop_session(&label).await;
+
+                    // Destroy the session state
+                    let _ = io::destroy_session(&label).await;
+
+                    // Wait for WebKit to process any pending IPC operations.
+                    // The session is stopped, so no new events will be emitted.
+                    // This delay lets the main run loop drain pending operations.
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+                    eprintln!("[WindowEvent] Cleanup complete for '{}', hiding window", label);
+
+                    // Hide the window instead of destroying it.
+                    // On macOS Tahoe (26.2+), calling destroy() can crash in
+                    // WebKit::WebPageProxy::dispatchSetObscuredContentInsets()
+                    // even after stopping the session and waiting.
+                    // By hiding, the window stays in memory but is invisible.
+                    // It will be cleaned up when the app exits.
+                    if let Err(e) = window_clone.hide() {
+                        eprintln!("[WindowEvent] Failed to hide '{}': {:?}", label, e);
+                    }
+                });
             }
-        })
+        }
+    });
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -53,16 +53,19 @@ pub trait FrameCodec {
 // Re-exports from driver modules
 // ============================================================================
 
-// GVRET codec
+// GVRET codec (available on all platforms - TCP works on iOS)
 pub use super::gvret::codec::GvretCodec;
 
-// slcan codec
+// slcan codec (desktop only - requires serial port)
+#[cfg(not(target_os = "ios"))]
 pub use super::slcan::codec::SlcanCodec;
 
-// gs_usb codec
+// gs_usb codec (Windows/macOS only via nusb)
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 pub use super::gs_usb::codec::GsUsbCodec;
 
-// SocketCAN codec
+// SocketCAN codec (Linux only)
+#[cfg(target_os = "linux")]
 pub use super::socketcan::codec::{SocketCanCodec, SocketCanEncodedFrame};
 
 // ============================================================================
@@ -96,6 +99,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "ios"))]
     fn test_slcan_roundtrip() {
         let frame = make_test_frame();
         let encoded = SlcanCodec::encode(&frame).expect("encode failed");
@@ -106,6 +110,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     fn test_gs_usb_encode() {
         let frame = make_test_frame();
         let encoded = GsUsbCodec::encode(&frame).expect("encode failed");
@@ -116,6 +121,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn test_socketcan_encode_classic() {
         let frame = make_test_frame();
         let encoded = SocketCanCodec::encode(&frame).expect("encode failed");

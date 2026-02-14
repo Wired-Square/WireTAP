@@ -7,8 +7,12 @@ use std::sync::Arc;
 use tauri::AppHandle;
 use tokio::sync::mpsc;
 
-use crate::io::gvret::{run_gvret_tcp_source, run_gvret_usb_source, BusMapping};
+use crate::io::gvret::{run_gvret_tcp_source, BusMapping};
+#[cfg(not(target_os = "ios"))]
+use crate::io::gvret::run_gvret_usb_source;
+#[cfg(not(target_os = "ios"))]
 use crate::io::serial::{parse_profile_for_source, run_source as run_serial_source};
+#[cfg(not(target_os = "ios"))]
 use crate::io::slcan::run_slcan_source;
 use crate::io::types::SourceMessage;
 use crate::settings::IOProfile;
@@ -47,9 +51,11 @@ pub(super) async fn run_source_reader(
         "gvret_tcp" | "gvret-tcp" => {
             run_gvret_tcp_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await;
         }
+        #[cfg(not(target_os = "ios"))]
         "gvret_usb" | "gvret-usb" => {
             run_gvret_usb_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await;
         }
+        #[cfg(not(target_os = "ios"))]
         "slcan" => {
             run_slcan_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await;
         }
@@ -61,6 +67,7 @@ pub(super) async fn run_source_reader(
         "socketcan" => {
             run_socketcan_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await;
         }
+        #[cfg(not(target_os = "ios"))]
         "serial" => {
             run_serial_reader(
                 source_idx,
@@ -124,6 +131,7 @@ async fn run_gvret_tcp_reader(
     run_gvret_tcp_source(source_idx, host, port, timeout_sec, bus_mappings, stop_flag, tx).await;
 }
 
+#[cfg(not(target_os = "ios"))]
 async fn run_gvret_usb_reader(
     source_idx: usize,
     profile: &IOProfile,
@@ -152,6 +160,7 @@ async fn run_gvret_usb_reader(
     run_gvret_usb_source(source_idx, port, baud_rate, bus_mappings, stop_flag, tx).await;
 }
 
+#[cfg(not(target_os = "ios"))]
 async fn run_slcan_reader(
     source_idx: usize,
     profile: &IOProfile,
@@ -285,6 +294,7 @@ async fn run_socketcan_reader(
     run_socketcan_source(source_idx, interface, bitrate, bus_mappings, stop_flag, tx).await;
 }
 
+#[cfg(not(target_os = "ios"))]
 async fn run_serial_reader(
     source_idx: usize,
     profile: &IOProfile,

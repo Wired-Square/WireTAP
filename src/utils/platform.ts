@@ -38,3 +38,10 @@ export async function isLinux(): Promise<boolean> {
 export async function isMacOS(): Promise<boolean> {
   return (await getPlatform()) === "macos";
 }
+
+/**
+ * Check if running on iOS.
+ */
+export async function isIOS(): Promise<boolean> {
+  return (await getPlatform()) === "ios";
+}

@@ -40,15 +40,21 @@ hex = "0.4"
 chrono = "0.4"
 async-trait = "0.1"
 toml = "0.8"
-serialport = "4.3"
 reqwest = { version = "0.12", features = ["json"] }
 rumqttc = "0.24"
+# Desktop-only dependencies (serial/USB/keepawake not available on iOS)
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+serialport = "4.3"
 keepawake = "0.5"
 
 # MacOS
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
 nusb = { version = "0.2", features = ["tokio"] }
+
+# iOS
+[target.'cfg(target_os = "ios")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
 
 # Windows
 [target.'cfg(target_os = "windows")'.dependencies]

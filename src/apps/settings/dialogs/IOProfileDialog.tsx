@@ -25,7 +25,8 @@ import {
 import { probeSlcanDevice } from "../../../api/serial";
 import { probeGsUsbDevice } from "../../../api/gs_usb";
 import { probeDevice, type GvretDeviceInfo } from "../../../api/io";
-import { isWindows, isLinux, isMacOS } from "../../../utils/platform";
+import { getPlatform, isWindows, isLinux, isMacOS } from "../../../utils/platform";
+import { getAvailableProfileKinds, type Platform, type ProfileKind } from "../../../utils/profileTraits";
 import type { GvretInterfaceConfig } from "../../../hooks/useSettings";
 
 export type MqttFormatKind = "json" | "savvycan" | "decode";
@@ -257,11 +258,17 @@ export default function IOProfileDialog({
   const [platformIsWindows, setPlatformIsWindows] = useState(false);
   const [platformIsLinux, setPlatformIsLinux] = useState(false);
   const [platformIsMacos, setPlatformIsMacos] = useState(false);
+  const [availableKinds, setAvailableKinds] = useState<ProfileKind[]>([]);
 
   useEffect(() => {
+    // Individual platform flags for device probing
     isWindows().then(setPlatformIsWindows);
     isLinux().then(setPlatformIsLinux);
     isMacOS().then(setPlatformIsMacos);
+    // Available profile kinds based on platform traits
+    getPlatform().then((platform) => {
+      setAvailableKinds(getAvailableProfileKinds(platform as Platform));
+    });
   }, []);
 
   // gs_usb device probe state (Windows/macOS)
@@ -348,7 +355,7 @@ export default function IOProfileDialog({
             />
           </FormField>
 
-          {/* Profile Type */}
+          {/* Profile Type - filtered based on platform availability */}
           <FormField label="Type" variant="default">
             <Select
               variant="default"
@@ -357,15 +364,15 @@ export default function IOProfileDialog({
                 onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
               }
             >
-              <option value="csv_file">CSV File</option>
-              {(platformIsWindows || platformIsMacos) && <option value="gs_usb">gs_usb (candleLight)</option>}
-              <option value="gvret_tcp">GVRET TCP</option>
-              <option value="gvret_usb">GVRET USB (Serial)</option>
-              <option value="mqtt">MQTT</option>
-              <option value="postgres">PostgreSQL</option>
-              <option value="serial">Serial Port</option>
-              <option value="slcan">slcan (CANable, USB-CAN)</option>
-              {platformIsLinux && <option value="socketcan">SocketCAN (Linux)</option>}
+              {availableKinds.includes("csv_file") && <option value="csv_file">CSV File</option>}
+              {availableKinds.includes("gs_usb") && <option value="gs_usb">gs_usb (candleLight)</option>}
+              {availableKinds.includes("gvret_tcp") && <option value="gvret_tcp">GVRET TCP</option>}
+              {availableKinds.includes("gvret_usb") && <option value="gvret_usb">GVRET USB (Serial)</option>}
+              {availableKinds.includes("mqtt") && <option value="mqtt">MQTT</option>}
+              {availableKinds.includes("postgres") && <option value="postgres">PostgreSQL</option>}
+              {availableKinds.includes("serial") && <option value="serial">Serial Port</option>}
+              {availableKinds.includes("slcan") && <option value="slcan">slcan (CANable, USB-CAN)</option>}
+              {availableKinds.includes("socketcan") && <option value="socketcan">SocketCAN (Linux)</option>}
             </Select>
           </FormField>
 

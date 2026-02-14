@@ -15,6 +15,7 @@ use tauri::AppHandle;
 use tokio::sync::mpsc;
 
 use super::gvret::{encode_gvret_frame, validate_gvret_frame};
+#[cfg(not(target_os = "ios"))]
 use super::slcan::encode_transmit_frame as encode_slcan_frame;
 #[cfg(target_os = "linux")]
 use super::socketcan::{encode_frame as encode_socketcan_frame, EncodedFrame};
@@ -273,6 +274,7 @@ impl MultiSourceReader {
             }
             #[cfg(any(target_os = "windows", target_os = "macos"))]
             "gs_usb" => encode_gs_usb_frame(&routed_frame, 0).to_vec(),
+            #[cfg(not(target_os = "ios"))]
             "slcan" => encode_slcan_frame(&routed_frame),
             #[cfg(target_os = "linux")]
             "socketcan" => {

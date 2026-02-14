@@ -10,8 +10,7 @@ use tokio::sync::mpsc;
 use super::spawner::run_source_reader;
 use super::types::{SourceConfig, TransmitChannels};
 use crate::buffer_store::{self, TimestampedByte};
-use crate::io::serial::SerialRawBytesPayload;
-use crate::io::types::SourceMessage;
+use crate::io::types::{RawBytesPayload, SourceMessage};
 use crate::io::{emit_device_connected, emit_frames, emit_session_error, emit_stream_ended, emit_to_session, FrameMessage};
 
 /// Main merge task that spawns sub-readers and combines their frames/bytes
@@ -228,9 +227,9 @@ pub(super) async fn run_merge_task(
                 }
 
                 // Emit to frontend
-                let payload = SerialRawBytesPayload {
+                let payload = RawBytesPayload {
                     bytes: pending_bytes,
-                    port: "multi-source".to_string(),
+                    source: "multi-source".to_string(),
                 };
                 emit_to_session(&app, "serial-raw-bytes", &session_id, payload);
                 pending_bytes = Vec::new();
@@ -256,9 +255,9 @@ pub(super) async fn run_merge_task(
         } else {
             buffer_store::append_raw_bytes(pending_bytes.clone());
         }
-        let payload = SerialRawBytesPayload {
+        let payload = RawBytesPayload {
             bytes: pending_bytes,
-            port: "multi-source".to_string(),
+            source: "multi-source".to_string(),
         };
         emit_to_session(&app, "serial-raw-bytes", &session_id, payload);
     }

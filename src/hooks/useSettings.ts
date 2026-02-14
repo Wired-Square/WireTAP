@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { loadSettings as loadSettingsApi } from '../api/settings';
 import { getOrCreateDefaultDirs } from '../utils/defaultPaths';
 import { WINDOW_EVENTS } from '../events/registry';
+import { getTraitsForKind } from '../utils/profileTraits';
 
 export interface IOProfile {
   id: string;
@@ -25,56 +26,38 @@ export interface GvretInterfaceConfig {
 
 /** Get the protocol(s) supported by a reader kind */
 export function getReaderProtocols(kind: IOProfile['kind'], connection?: Record<string, any>): ReaderProtocol[] {
-  switch (kind) {
-    case 'gvret_tcp':
-    case 'gvret_usb':
-    case 'slcan':
-    case 'socketcan':
-    case 'gs_usb':
-      return ['can'];
-    case 'serial':
-      return ['serial'];
-    case 'postgres': {
-      // PostgreSQL protocol depends on source_type configuration
-      const sourceType = connection?.source_type || 'can_frame';
-      switch (sourceType) {
-        case 'can_frame':
-          return ['can'];
-        case 'modbus_frame':
-          return ['modbus'];
-        case 'serial_frame':
-        case 'serial_raw':
-          return ['serial'];
-        default:
-          return ['can'];
-      }
+  // PostgreSQL protocol depends on source_type configuration
+  if (kind === 'postgres') {
+    const sourceType = connection?.source_type || 'can_frame';
+    switch (sourceType) {
+      case 'can_frame':
+        return ['can'];
+      case 'modbus_frame':
+        return ['modbus'];
+      case 'serial_frame':
+      case 'serial_raw':
+        return ['serial'];
+      default:
+        return ['can'];
     }
-    case 'csv_file':
-      return ['can']; // CSV files are CAN frames
-    case 'mqtt':
-      return ['can']; // MQTT typically carries CAN frames
-    default:
-      return ['can'];
   }
+
+  // For other kinds, delegate to centralised trait system
+  const traits = getTraitsForKind(kind);
+  if (traits) {
+    // Convert Protocol[] to ReaderProtocol[] (filter to supported subset)
+    return traits.protocols.filter(
+      (p): p is ReaderProtocol => ['can', 'serial', 'modbus'].includes(p)
+    );
+  }
+
+  return ['can'];
 }
 
 /** Check if a reader kind is realtime (hardware) vs historical (replay) */
 export function isReaderRealtime(kind: IOProfile['kind']): boolean {
-  switch (kind) {
-    case 'gvret_tcp':
-    case 'gvret_usb':
-    case 'slcan':
-    case 'socketcan':
-    case 'gs_usb':
-    case 'serial':
-    case 'mqtt':
-      return true;
-    case 'postgres':
-    case 'csv_file':
-      return false;
-    default:
-      return true;
-  }
+  const traits = getTraitsForKind(kind);
+  return traits?.temporalMode === 'realtime';
 }
 
 export type FrameIdFormat = "hex" | "decimal";
