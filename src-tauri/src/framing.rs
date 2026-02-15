@@ -20,7 +20,9 @@ mod ios_stub {
     }
 
     /// Configuration for backend framing (iOS stub)
+    /// Fields are parsed by serde but not read (stub returns error immediately)
     #[derive(Clone, serde::Deserialize)]
+    #[allow(dead_code)]
     pub struct BackendFramingConfig {
         pub mode: String,
         #[serde(default)]

@@ -30,6 +30,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **Cross-Platform Warning Cleanup**: Eliminated all Rust compile warnings across macOS and iOS builds. Desktop-only code (window management, serial framing, gs_usb transmit) is now properly gated with `#[cfg(not(target_os = "ios"))]`. Removed unused legacy buffer functions and unused `SerialRawBytesPayload` type.
+
 - **iOS Settings Visibility**: Hide desktop-only settings on iOS:
   - Storage section (custom directory paths) is hidden since iOS sandboxing prevents custom directory selection
   - "Prevent idle sleep" power setting is hidden (desktop-only); "Keep display awake" is shown and works via iOS native API

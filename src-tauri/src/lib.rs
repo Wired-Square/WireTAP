@@ -130,8 +130,10 @@ struct BookmarksMenuState(Mutex<Option<Submenu<Wry>>>);
 
 // iOS stub types for menu state (not used, but needed for compilation)
 #[cfg(target_os = "ios")]
+#[allow(dead_code)]
 struct SessionMenuState(Mutex<()>);
 #[cfg(target_os = "ios")]
+#[allow(dead_code)]
 struct BookmarksMenuState(Mutex<()>);
 
 // Bookmark info received from frontend for menu display
@@ -141,7 +143,8 @@ struct BookmarkInfo {
     name: String,
 }
 
-// Window configuration helper
+// Window configuration helper (desktop only - multi-window support)
+#[cfg(not(target_os = "ios"))]
 struct WindowConfig {
     title: &'static str,
     width: f64,
@@ -150,6 +153,7 @@ struct WindowConfig {
     min_height: f64,
 }
 
+#[cfg(not(target_os = "ios"))]
 fn get_window_config(label: &str) -> WindowConfig {
     match label {
         "catalog-editor" => WindowConfig {
@@ -197,7 +201,8 @@ fn get_window_config(label: &str) -> WindowConfig {
     }
 }
 
-// Emit an event to the currently focused window only
+// Emit an event to the currently focused window only (desktop only - multi-window support)
+#[cfg(not(target_os = "ios"))]
 fn emit_to_focused_window<S: serde::Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
     if let Some(window) = app
         .webview_windows()
@@ -208,7 +213,8 @@ fn emit_to_focused_window<S: serde::Serialize + Clone>(app: &AppHandle, event: &
     }
 }
 
-// Open or focus a panel in the currently focused window
+// Open or focus a panel in the currently focused window (desktop only - multi-window support)
+#[cfg(not(target_os = "ios"))]
 fn open_panel_in_focused_window(app: &AppHandle, panel_id: &str) {
     emit_to_focused_window(app, "menu-open-panel", panel_id);
 }

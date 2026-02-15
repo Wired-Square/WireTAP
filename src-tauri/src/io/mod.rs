@@ -359,6 +359,8 @@ impl IOCapabilities {
     }
 
     /// Set CAN transmit capability
+    /// Only used by gs_usb which is not available on iOS
+    #[cfg(not(target_os = "ios"))]
     pub fn with_transmit(mut self, can_transmit: bool) -> Self {
         self.can_transmit = can_transmit;
         self
@@ -841,6 +843,8 @@ fn clear_startup_error(session_id: &str) {
 /// Mark a session as closing (sync version for use in window event handler)
 /// This prevents further events from being emitted to the closing window.
 /// Returns true if this is the first time marking as closing, false if already closing.
+/// Only used by window close handler which is desktop-only.
+#[cfg(not(target_os = "ios"))]
 pub fn mark_session_closing_sync(session_id: &str) -> bool {
     if let Ok(mut closing) = CLOSING_SESSIONS.write() {
         let is_new = closing.insert(session_id.to_string());

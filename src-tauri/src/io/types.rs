@@ -27,6 +27,8 @@ pub enum SourceMessage {
     /// Frames from a source (source_index, frames)
     Frames(usize, Vec<FrameMessage>),
     /// Raw bytes from a source (source_index, bytes with timestamps)
+    /// Only constructed by serial reader which is not available on iOS
+    #[cfg_attr(target_os = "ios", allow(dead_code))]
     Bytes(usize, Vec<ByteEntry>),
     /// Source ended (source_index, reason)
     Ended(usize, String),

@@ -18,9 +18,9 @@ pub use tcp::probe_gvret_tcp;
 pub use usb::probe_gvret_usb;
 
 // Internal items used by multi_source and other drivers
-pub(crate) use common::{
-    apply_bus_mapping, encode_gvret_frame, validate_gvret_frame,
-};
+#[cfg(not(target_os = "ios"))]
+pub(crate) use common::apply_bus_mapping;
+pub(crate) use common::{encode_gvret_frame, validate_gvret_frame};
 // parse_gvret_frames exported for tests
 #[cfg(test)]
 pub(crate) use common::parse_gvret_frames;

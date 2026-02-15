@@ -24,6 +24,7 @@ use crate::io::socketcan::run_source as run_socketcan_source;
 use crate::io::gs_usb::run_source as run_gs_usb_source;
 
 /// Run a single source reader and send frames to the merge task
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn run_source_reader(
     _app: AppHandle,
     _session_id: String,
@@ -32,18 +33,19 @@ pub(super) async fn run_source_reader(
     bus_mappings: Vec<BusMapping>,
     _display_name: String,
     // Framing config from session options (overrides profile settings for serial)
-    framing_encoding_override: Option<String>,
-    delimiter_override: Option<Vec<u8>>,
-    max_frame_length_override: Option<usize>,
-    min_frame_length_override: Option<usize>,
-    emit_raw_bytes_override: Option<bool>,
+    // Note: Prefixed with _ as these are only used on desktop (serial not available on iOS)
+    _framing_encoding_override: Option<String>,
+    _delimiter_override: Option<Vec<u8>>,
+    _max_frame_length_override: Option<usize>,
+    _min_frame_length_override: Option<usize>,
+    _emit_raw_bytes_override: Option<bool>,
     // Frame ID extraction config from session options (overrides profile settings for serial)
-    frame_id_start_byte_override: Option<i32>,
-    frame_id_bytes_override: Option<u8>,
-    frame_id_big_endian_override: Option<bool>,
-    source_address_start_byte_override: Option<i32>,
-    source_address_bytes_override: Option<u8>,
-    source_address_big_endian_override: Option<bool>,
+    _frame_id_start_byte_override: Option<i32>,
+    _frame_id_bytes_override: Option<u8>,
+    _frame_id_big_endian_override: Option<bool>,
+    _source_address_start_byte_override: Option<i32>,
+    _source_address_bytes_override: Option<u8>,
+    _source_address_big_endian_override: Option<bool>,
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
@@ -73,17 +75,17 @@ pub(super) async fn run_source_reader(
                 source_idx,
                 &profile,
                 bus_mappings,
-                framing_encoding_override,
-                delimiter_override,
-                max_frame_length_override,
-                min_frame_length_override,
-                emit_raw_bytes_override,
-                frame_id_start_byte_override,
-                frame_id_bytes_override,
-                frame_id_big_endian_override,
-                source_address_start_byte_override,
-                source_address_bytes_override,
-                source_address_big_endian_override,
+                _framing_encoding_override,
+                _delimiter_override,
+                _max_frame_length_override,
+                _min_frame_length_override,
+                _emit_raw_bytes_override,
+                _frame_id_start_byte_override,
+                _frame_id_bytes_override,
+                _frame_id_big_endian_override,
+                _source_address_start_byte_override,
+                _source_address_bytes_override,
+                _source_address_big_endian_override,
                 stop_flag,
                 tx,
             )

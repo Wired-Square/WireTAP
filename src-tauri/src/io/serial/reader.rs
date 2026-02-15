@@ -20,22 +20,11 @@ use crate::io::{now_us, FrameMessage};
 
 // Re-export Parity for external use
 pub use super::utils::Parity;
-use crate::buffer_store::TimestampedByte;
 use super::framer::{extract_frame_id, FrameIdConfig, FramingEncoding, SerialFramer};
 
 // ============================================================================
 // Types
 // ============================================================================
-
-/// Payload for raw serial bytes event - emitted in batches for performance,
-/// but each byte has its own timestamp for precise timing analysis
-#[derive(Clone, Serialize)]
-pub struct SerialRawBytesPayload {
-    /// Bytes with individual timestamps (uses TimestampedByte from buffer_store)
-    pub bytes: Vec<TimestampedByte>,
-    /// Serial port name
-    pub port: String,
-}
 
 /// Information about an available serial port
 #[derive(Clone, Serialize)]

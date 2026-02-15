@@ -280,12 +280,6 @@ pub fn clear_all_buffers() {
     eprintln!("[BufferStore] Cleared all buffers");
 }
 
-/// Check if there's an active buffer.
-pub fn has_active_buffer() -> bool {
-    let registry = BUFFER_REGISTRY.read().unwrap();
-    registry.active_id.is_some()
-}
-
 /// Get the active buffer ID.
 pub fn get_active_buffer_id() -> Option<String> {
     let registry = BUFFER_REGISTRY.read().unwrap();
@@ -489,6 +483,8 @@ pub fn append_frames(new_frames: Vec<FrameMessage>) {
 
 /// Append frames to a specific buffer by ID.
 /// Silently returns if buffer doesn't exist or is not a frame buffer.
+/// Only used by framing.rs which is desktop-only.
+#[cfg(not(target_os = "ios"))]
 pub fn append_frames_to_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
     if new_frames.is_empty() {
         return;
@@ -513,6 +509,8 @@ pub fn append_frames_to_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
 /// Clear a frame buffer and refill it with new frames.
 /// Used during live framing to reuse the same buffer ID instead of creating new ones.
 /// Silently returns if buffer doesn't exist or is not a frame buffer.
+/// Only used by framing.rs which is desktop-only.
+#[cfg(not(target_os = "ios"))]
 pub fn clear_and_refill_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
     let mut registry = BUFFER_REGISTRY.write().unwrap();
 
@@ -959,11 +957,6 @@ pub fn has_data() -> bool {
 pub fn clear_buffer() -> Result<(), String> {
     clear_all_buffers();
     Ok(())
-}
-
-/// Legacy is_streaming check.
-pub fn is_streaming() -> bool {
-    has_active_buffer()
 }
 
 /// Get paginated frames from the active buffer (or first frame buffer as fallback).
