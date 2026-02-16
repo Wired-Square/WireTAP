@@ -4,6 +4,8 @@
 // Used in Query app (with bookmarks) and BookmarkEditorDialog (without bookmarks).
 
 import { useCallback, useMemo } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { Globe } from "lucide-react";
 import { iconXs } from "../styles/spacing";
 import { caption } from "../styles/typography";
@@ -11,6 +13,31 @@ import { bgSurface } from "../styles/colourTokens";
 import { getLocalTimezoneAbbr, convertDatetimeLocal } from "./TimezoneBadge";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import type { TimeRangeFavorite } from "../utils/favorites";
+
+/**
+ * Convert a datetime-local string (YYYY-MM-DDTHH:mm:ss) to a Date object.
+ * Returns null if the string is empty or invalid.
+ */
+function datetimeLocalToDate(value: string): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Convert a Date object to a datetime-local string (YYYY-MM-DDTHH:mm:ss).
+ * Returns empty string if the date is null.
+ */
+function dateToDatetimeLocal(date: Date | null): string {
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
 
 /** The resolved time bounds emitted by the component */
 export interface TimeBounds {
@@ -48,6 +75,19 @@ export default function TimeBoundsInput({
 }: TimeBoundsInputProps) {
   const defaultTz = useSettingsStore((s) => s.display.timezone);
   const localTzAbbr = useMemo(() => getLocalTimezoneAbbr(), []);
+
+  // Convert string values to Date objects for react-datepicker
+  const startDate = useMemo(
+    () => datetimeLocalToDate(value.startTime),
+    [value.startTime]
+  );
+  const endDate = useMemo(
+    () => datetimeLocalToDate(value.endTime),
+    [value.endTime]
+  );
+
+  // Max date is now - prevents selecting future dates/times
+  const maxDate = useMemo(() => new Date(), []);
 
   // Handle bookmark selection - pre-fill the fields and remember the name
   const handleBookmarkChange = useCallback(
@@ -102,17 +142,25 @@ export default function TimeBoundsInput({
     [value, defaultTz, onChange]
   );
 
-  // Handle individual field changes - clear bookmark name when manually edited
-  const handleStartTimeChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onChange({ ...value, startTime: e.target.value, bookmarkName: undefined });
+  // Handle date picker changes - convert Date back to string format
+  const handleStartDateChange = useCallback(
+    (date: Date | null) => {
+      onChange({
+        ...value,
+        startTime: dateToDatetimeLocal(date),
+        bookmarkName: undefined,
+      });
     },
     [value, onChange]
   );
 
-  const handleEndTimeChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onChange({ ...value, endTime: e.target.value, bookmarkName: undefined });
+  const handleEndDateChange = useCallback(
+    (date: Date | null) => {
+      onChange({
+        ...value,
+        endTime: dateToDatetimeLocal(date),
+        bookmarkName: undefined,
+      });
     },
     [value, onChange]
   );
@@ -181,28 +229,39 @@ export default function TimeBoundsInput({
         </div>
       </div>
 
-      {/* Start/End time inputs */}
+      {/* Start/End time inputs using react-datepicker */}
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={`block ${caption} mb-1`}>Start Time</label>
-          <input
-            type="datetime-local"
-            step="1"
-            value={value.startTime}
-            onChange={handleStartTimeChange}
+          <DatePicker
+            selected={startDate}
+            onChange={handleStartDateChange}
+            showTimeSelect
+            timeIntervals={1}
+            timeFormat="HH:mm:ss"
+            dateFormat="dd/MM/yyyy, h:mm:ss aa"
+            maxDate={maxDate}
             disabled={disabled}
             className={inputClasses}
+            placeholderText="Select start time..."
+            isClearable
           />
         </div>
         <div>
           <label className={`block ${caption} mb-1`}>End Time</label>
-          <input
-            type="datetime-local"
-            step="1"
-            value={value.endTime}
-            onChange={handleEndTimeChange}
+          <DatePicker
+            selected={endDate}
+            onChange={handleEndDateChange}
+            showTimeSelect
+            timeIntervals={1}
+            timeFormat="HH:mm:ss"
+            dateFormat="dd/MM/yyyy, h:mm:ss aa"
+            maxDate={maxDate}
+            minDate={startDate ?? undefined}
             disabled={disabled}
             className={inputClasses}
+            placeholderText="Select end time..."
+            isClearable
           />
         </div>
       </div>

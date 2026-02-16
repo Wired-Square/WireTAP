@@ -32,6 +32,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **Improved Date/Time Picker**: Replaced native `datetime-local` inputs in the Data Source dialog with `react-datepicker`. The native macOS picker had issues where editing one field (e.g., toggling AM/PM) would clear other fields, and allowed partial manual entry. The new picker enforces complete date/time selection, prevents future dates, and properly supports dark/light mode via CSS variables.
+
 - **Cross-Platform Warning Cleanup**: Eliminated all Rust compile warnings across macOS and iOS builds. Desktop-only code (window management, serial framing, gs_usb transmit) is now properly gated with `#[cfg(not(target_os = "ios"))]`. Removed unused legacy buffer functions and unused `SerialRawBytesPayload` type.
 
 - **iOS Settings Visibility**: Hide desktop-only settings on iOS:
