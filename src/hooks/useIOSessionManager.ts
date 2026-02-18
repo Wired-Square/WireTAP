@@ -15,6 +15,7 @@ import {
   createAndStartMultiSourceSession,
   joinMultiSourceSession,
   useMultiBusState,
+  useSessionStore,
   isBufferProfileId,
   BUFFER_PROFILE_ID,
   type CreateMultiSourceOptions,
@@ -133,6 +134,8 @@ export interface UseIOSessionManagerOptions {
   streamCompletedRef?: React.MutableRefObject<boolean>;
   /** Called after session is reconfigured (bookmark jump, time range change) */
   onSessionReconfigured?: (info: SessionReconfigurationInfo) => void;
+  /** Called when session is destroyed externally (e.g., from Sessions app). Apps can clear frame data, etc. */
+  onSessionDestroyed?: () => void;
 }
 
 /** Result of the IO session manager hook */
@@ -382,6 +385,7 @@ export function useIOSessionManager(
     onBeforeMultiWatch,
     streamCompletedRef: streamCompletedRefProp,
     onSessionReconfigured,
+    onSessionDestroyed,
   } = options;
 
   // ---- Profile State ----
@@ -544,6 +548,33 @@ export function useIOSessionManager(
     onStreamEnded?.(payload);
   }, [appName, onStreamEnded]);
 
+  // Handle external session destruction (e.g., destroyed from Sessions app)
+  // Switches to buffer mode if orphaned buffers are available, otherwise clears state
+  const handleSessionDestroyed = useCallback((orphanedBufferIds: string[]) => {
+    console.log(`[IOSessionManager:${appName}] Session destroyed externally, orphaned buffers:`, orphanedBufferIds);
+
+    // Clear app state (frame lists, etc.)
+    onBeforeWatch?.();
+
+    // Clear all session-related state
+    setMultiBusProfiles([]);
+    setIsWatching(false);
+    setIsIngesting(false);
+    setIsDetached(false);
+    setWatchFrameCount(0);
+    streamCompletedRef.current = false;
+
+    // Switch to orphaned buffer if available, otherwise clear profile
+    if (orphanedBufferIds.length > 0) {
+      setIoProfile(orphanedBufferIds[0]);
+    } else {
+      setIoProfile(null);
+    }
+
+    // Notify app
+    onSessionDestroyed?.();
+  }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
+
   const sessionOptions: UseIOSessionOptions = {
     appName,
     sessionId: effectiveSessionId,
@@ -559,6 +590,7 @@ export function useIOSessionManager(
     onSpeedChange,
     onReconfigure: handleReconfigure,
     onResuming: handleResuming,
+    onDestroyed: handleSessionDestroyed,
   };
 
   const session = useIOSession(sessionOptions);
@@ -587,37 +619,49 @@ export function useIOSessionManager(
   // Detach from session with a copy of the buffer
   // After detaching, the app views the copied buffer (standalone, not detached state)
   const handleDetach = useCallback(async () => {
-    const bufferId = session.bufferId;
+    let bufferId = session.bufferId;
 
-    // If there's a buffer, copy it and switch to it
+    // No buffer yet - try to create one by suspending first
+    if (!bufferId && session.sessionId) {
+      if (joinerCount <= 1) {
+        // Sole listener: suspend to create a buffer, then copy and leave
+        await session.suspend();
+        // Read buffer ID from store (suspendSession sets it synchronously)
+        const storeSession = useSessionStore.getState().sessions[session.sessionId];
+        bufferId = storeSession?.buffer?.id ?? null;
+      } else {
+        // Multiple listeners: just leave, clear state
+        await session.leave();
+        setMultiBusProfiles([]);
+        setIoProfile(null);
+        setIsWatching(false);
+        setIsDetached(false);
+        return;
+      }
+    }
+
     if (bufferId) {
-      // Import the copy function
       const { copyBufferForDetach } = await import("../api/io");
-
-      // Create a copy of the buffer for this app
       const copyName = `${ioProfileName || "detached"}-${Date.now()}`;
       const copiedBufferId = await copyBufferForDetach(bufferId, copyName);
 
       // Leave the session (others keep streaming)
       await session.leave();
 
-      // Clear multi-bus state
+      // Clear multi-bus state and switch to the copied buffer
       setMultiBusProfiles([]);
-
-      // Switch to the copied buffer
       setIoProfile(copiedBufferId);
       setIsWatching(false);
-
-      // Explicitly set isDetached=false - we're viewing a standalone buffer, not detached from a session
-      // This ensures the IO picker shows the buffer, not "Rejoin"
       setIsDetached(false);
     } else {
-      // No buffer - just leave and set detached
+      // No buffer even after suspend - just leave and clear state
       await session.leave();
-      setIsDetached(true);
+      setMultiBusProfiles([]);
+      setIoProfile(null);
       setIsWatching(false);
+      setIsDetached(false);
     }
-  }, [session, ioProfileName, setMultiBusProfiles, setIoProfile]);
+  }, [session, ioProfileName, joinerCount, setMultiBusProfiles, setIoProfile]);
 
   const handleRejoin = useCallback(async () => {
     await session.rejoin();

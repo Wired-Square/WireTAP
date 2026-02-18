@@ -1992,7 +1992,14 @@ pub async fn resume_to_live_session(
 pub async fn destroy_session(session_id: &str) -> Result<(), String> {
     let mut sessions = IO_SESSIONS.lock().await;
     if let Some(mut session) = sessions.remove(session_id) {
-        // Emit lifecycle event before stopping
+        // Stop the reader first
+        let _ = session.device.stop().await;
+        // Orphan buffers and emit buffer-orphaned BEFORE the lifecycle event.
+        // This ensures the frontend receives buffer IDs before the "destroyed"
+        // lifecycle event, so apps can transition to buffer mode.
+        let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
+        emit_buffer_orphaned(&session.app, session_id, orphaned);
+        // Now emit lifecycle event - frontend can use buffer IDs it already received
         let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
         emit_session_lifecycle(&session.app, SessionLifecyclePayload {
             session_id: session_id.to_string(),
@@ -2003,11 +2010,6 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
             source_profile_ids,
             creator_listener_id: None,
         });
-        // Stop the reader before destroying
-        let _ = session.device.stop().await;
-        // Orphan any buffers owned by this session (emit event before losing app handle)
-        let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
-        emit_buffer_orphaned(&session.app, session_id, orphaned);
     }
     // Clear the closing flag now that the session is fully destroyed
     clear_session_closing(session_id);
@@ -2254,7 +2256,12 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
             if remaining == 0 {
                 eprintln!("[reader] Session '{}' has no listeners left, destroying", session_id);
                 let _ = session.device.stop().await;
-                // Emit lifecycle event before removing
+                // Orphan buffers and emit buffer-orphaned BEFORE the lifecycle event.
+                // This ensures the frontend receives buffer IDs before "destroyed",
+                // so apps can transition to buffer mode.
+                let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
+                emit_buffer_orphaned(&app, session_id, orphaned);
+                // Now emit lifecycle event
                 let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
                 emit_session_lifecycle(&app, SessionLifecyclePayload {
                     session_id: session_id.to_string(),

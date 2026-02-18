@@ -787,9 +787,9 @@ pub async fn destroy_reader_session(session_id: String) -> Result<(), String> {
         profile_tracker::unregister_usage_by_session(&profile_id, &session_id);
     }
 
-    // Orphan any buffers owned by this session
-    buffer_store::orphan_buffers_for_session(&session_id);
-
+    // Buffer orphaning is handled by destroy_session() which also emits
+    // the buffer-orphaned event. Don't orphan here to avoid a double-call
+    // that would cause destroy_session's emit to have an empty buffer list.
     destroy_session(&session_id).await
 }
 

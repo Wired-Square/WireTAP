@@ -137,6 +137,8 @@ export interface UseIOSessionOptions {
   onSuspended?: (payload: SessionSuspendedPayload) => void;
   /** Callback when session is resuming with a new buffer - apps should clear their frame lists */
   onResuming?: (payload: SessionResumingPayload) => void;
+  /** Callback when session is destroyed externally (e.g., from Session Manager or last-listener auto-destroy) */
+  onDestroyed?: (orphanedBufferIds: string[]) => void;
 }
 
 export interface UseIOSessionResult {
@@ -275,6 +277,7 @@ export function useIOSession(
     onReconfigure,
     onSuspended,
     onResuming,
+    onDestroyed,
   } = options;
 
   // Session ID = Profile ID (use sessionId if provided, fall back to profileId for compat)
@@ -322,6 +325,8 @@ export function useIOSession(
   // Track the expected state from reinitialize - used to return correct state before React commits the update
   // This is needed because Zustand updates (setIoProfile) trigger re-renders before React state (setLocalState) is committed
   const expectedStateRef = useRef<{ sessionId: string; state: LocalSessionState } | null>(null);
+  // Track orphaned buffer IDs from buffer-orphaned events (set before session-lifecycle "destroyed")
+  const orphanedBufferIdsRef = useRef<string[]>([]);
 
   // Store callbacks in refs to keep them current
   const callbacksRef = useRef({
@@ -335,6 +340,7 @@ export function useIOSession(
     onReconfigure,
     onSuspended,
     onResuming,
+    onDestroyed,
   });
   useEffect(() => {
     callbacksRef.current = {
@@ -348,8 +354,9 @@ export function useIOSession(
       onReconfigure,
       onSuspended,
       onResuming,
+      onDestroyed,
     };
-  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onResuming]);
+  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onResuming, onDestroyed]);
 
   // ---- Query Backend + Set Up Event Listeners ----
   // This effect queries the backend for current state on mount/sessionId change,
@@ -358,8 +365,12 @@ export function useIOSession(
   useEffect(() => {
     if (!effectiveSessionId) {
       setLocalState(null);
+      orphanedBufferIdsRef.current = [];
       return;
     }
+
+    // Reset orphaned buffer IDs when session changes
+    orphanedBufferIdsRef.current = [];
 
     let cancelled = false;
     const unlistenFns: UnlistenFn[] = [];
@@ -578,6 +589,49 @@ export function useIOSession(
         }
       );
       unlistenFns.push(unlistenError);
+
+      // Buffer orphaned - fires when session's buffers are orphaned (before session-lifecycle "destroyed").
+      // Captures buffer IDs so the onDestroyed callback can transition to buffer mode.
+      const unlistenBufferOrphaned = await listen<{ buffer_id: string; buffer_name: string; buffer_type: string; count: number }>(
+        `buffer-orphaned:${effectiveSessionId}`,
+        (event) => {
+          if (cancelled) return;
+          const id = event.payload.buffer_id;
+          if (id && !orphanedBufferIdsRef.current.includes(id)) {
+            orphanedBufferIdsRef.current = [...orphanedBufferIdsRef.current, id];
+          }
+        }
+      );
+      unlistenFns.push(unlistenBufferOrphaned);
+
+      // Session destroyed externally (from Session Manager, last-listener auto-destroy, etc.)
+      // This is a global event - we filter by our session ID.
+      const unlistenLifecycle = await listen<{ session_id: string; event_type: string }>(
+        "session-lifecycle",
+        (event) => {
+          if (cancelled) return;
+          if (
+            event.payload.event_type === "destroyed" &&
+            event.payload.session_id === effectiveSessionId
+          ) {
+            console.log(
+              `[useIOSession:${appName}] Session '${effectiveSessionId}' destroyed externally`
+            );
+            // Prevent the cleanup timeout (from the mount effect) from trying to leave
+            setupCompleteRef.current = false;
+            currentSessionIdRef.current = null;
+            // Clean up session store entry (local-only, session is already gone in Rust)
+            useSessionStore.getState().cleanupDestroyedSession(effectiveSessionId);
+            // Clear local state
+            setLocalState(null);
+            // Notify higher-level hooks with orphaned buffer IDs
+            const bufferIds = orphanedBufferIdsRef.current;
+            orphanedBufferIdsRef.current = [];
+            callbacksRef.current.onDestroyed?.(bufferIds);
+          }
+        }
+      );
+      unlistenFns.push(unlistenLifecycle);
     };
 
     setupStateTracking();

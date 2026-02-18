@@ -386,6 +386,8 @@ export interface SessionStore {
   leaveSession: (sessionId: string, listenerId: string) => Promise<void>;
   /** Remove session from list entirely */
   removeSession: (sessionId: string) => Promise<void>;
+  /** Clean up a session that was destroyed externally (local-only, no backend calls) */
+  cleanupDestroyedSession: (sessionId: string) => void;
   /** Reinitialize a session with new options (atomic check via Rust) */
   reinitializeSession: (
     sessionId: string,
@@ -1190,6 +1192,28 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     pendingFramesMap.delete(sessionId);
 
     // Remove from store
+    set((s) => {
+      const { [sessionId]: _, ...remainingSessions } = s.sessions;
+      const { [sessionId]: __, ...remainingListeners } = s._eventListeners;
+      return {
+        sessions: remainingSessions,
+        _eventListeners: remainingListeners,
+        activeSessionId: s.activeSessionId === sessionId ? null : s.activeSessionId,
+      };
+    });
+  },
+
+  cleanupDestroyedSession: (sessionId) => {
+    console.log(`[sessionStore:cleanupDestroyedSession] Cleaning up session '${sessionId}' (destroyed externally)`);
+    const eventListeners = get()._eventListeners[sessionId];
+    if (eventListeners) {
+      cleanupEventListeners(eventListeners);
+    }
+
+    // Clear any pending frames for this session
+    pendingFramesMap.delete(sessionId);
+
+    // Remove from store (no backend calls - session is already gone)
     set((s) => {
       const { [sessionId]: _, ...remainingSessions } = s.sessions;
       const { [sessionId]: __, ...remainingListeners } = s._eventListeners;
