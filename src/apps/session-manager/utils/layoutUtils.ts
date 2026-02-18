@@ -95,42 +95,43 @@ export function buildSessionGraph(
     });
   });
 
-  // Column 3: Listener nodes
-  // We need to extract listeners from sessions - the API provides listenerCount but not individual listeners
-  // For now, we'll show a single aggregated listener node per session with listener info
-  // In the future, the backend could expose individual listener IDs
+  // Column 3: Individual listener nodes
   sessions.forEach((session, sessionIndex) => {
-    if (session.listenerCount > 0) {
-      // Create a placeholder listener node showing the count
+    const sessionBaseY = START_Y + sessionIndex * ROW_SPACING;
+
+    session.listeners.forEach((listener, listenerIndex) => {
       const nodeData: ListenerNodeData = {
-        listenerId: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
-        appName: "listeners",
+        listenerId: listener.listener_id,
+        appName: listener.listener_id,
         sessionId: session.sessionId,
-        isOwner: false,
+        isOwner: listener.is_owner,
+        isActive: listener.is_active,
+        registeredSecondsAgo: listener.registered_seconds_ago,
       };
 
+      const nodeId = `listener::${session.sessionId}::${listener.listener_id}`;
+
       nodes.push({
-        id: `listeners-${session.sessionId}`,
+        id: nodeId,
         type: "listener",
         position: {
           x: START_X + COLUMN_SPACING * 2,
-          y: START_Y + sessionIndex * ROW_SPACING,
+          y: sessionBaseY + listenerIndex * (ROW_SPACING * 0.6),
         },
         data: nodeData,
       });
 
-      // Edge from session to listeners
       edges.push({
-        id: `edge-${session.sessionId}-listeners`,
+        id: `edge-${session.sessionId}::${listener.listener_id}`,
         source: `session-${session.sessionId}`,
-        target: `listeners-${session.sessionId}`,
-        animated: session.state === "running" && session.isStreaming,
+        target: nodeId,
+        animated: session.state === "running" && session.isStreaming && listener.is_active,
         style: {
-          stroke: session.isStreaming ? "#22c55e" : "#6b7280",
+          stroke: listener.is_active && session.isStreaming ? "#22c55e" : "#6b7280",
           strokeWidth: 2,
         },
       });
-    }
+    });
   });
 
   return { nodes, edges };

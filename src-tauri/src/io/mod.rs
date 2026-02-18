@@ -2038,6 +2038,8 @@ pub struct ActiveSessionInfo {
     pub capabilities: IOCapabilities,
     /// Number of listeners
     pub listener_count: usize,
+    /// Individual listener details
+    pub listeners: Vec<ListenerInfo>,
     /// For multi-source sessions: the source configurations
     pub multi_source_configs: Option<Vec<multi_source::SourceConfig>>,
     /// Profile IDs feeding this session (populated from SESSION_PROFILES in sessions.rs)
@@ -2072,12 +2074,26 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
             // Check if session is actively streaming (running state)
             let is_streaming = matches!(session.device.state(), IOState::Running);
 
+            // Build individual listener details
+            let now = std::time::Instant::now();
+            let listeners: Vec<ListenerInfo> = session
+                .listeners
+                .values()
+                .map(|l| ListenerInfo {
+                    listener_id: l.listener_id.clone(),
+                    is_owner: l.is_owner,
+                    registered_seconds_ago: now.duration_since(l.registered_at).as_secs(),
+                    is_active: l.is_active,
+                })
+                .collect();
+
             ActiveSessionInfo {
                 session_id: session_id.clone(),
                 device_type: session.device.device_type().to_string(),
                 state: session.device.state(),
                 capabilities: session.device.capabilities(),
                 listener_count: session.listeners.len(),
+                listeners,
                 multi_source_configs: session.device.multi_source_configs(),
                 source_profile_ids,
                 buffer_id,
@@ -2136,6 +2152,8 @@ pub struct ListenerInfo {
     pub is_owner: bool,
     /// Seconds since registration
     pub registered_seconds_ago: u64,
+    /// Whether this listener is actively receiving frames
+    pub is_active: bool,
 }
 
 /// Result of registering a listener
@@ -2308,6 +2326,7 @@ pub async fn get_session_listeners(session_id: &str) -> Result<Vec<ListenerInfo>
             listener_id: l.listener_id.clone(),
             is_owner: l.is_owner,
             registered_seconds_ago: now.duration_since(l.registered_at).as_secs(),
+            is_active: l.is_active,
         })
         .collect();
 

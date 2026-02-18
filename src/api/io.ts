@@ -743,6 +743,8 @@ export interface ListenerInfo {
   is_owner: boolean;
   /** Seconds since registration */
   registered_seconds_ago: number;
+  /** Whether this listener is actively receiving frames */
+  is_active: boolean;
 }
 
 /**
@@ -1112,6 +1114,8 @@ export interface ActiveSessionInfo {
   capabilities: IOCapabilities;
   /** Number of listeners */
   listenerCount: number;
+  /** Individual listener details */
+  listeners: ListenerInfo[];
   /** For multi-source sessions: the source configurations */
   multiSourceConfigs: MultiSourceInput[] | null;
   /** Profile IDs feeding this session */
@@ -1135,6 +1139,12 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     state: IOState; // Rust sends { type: "Running" } etc, not simple string
     capabilities: IOCapabilities;
     listener_count: number;
+    listeners: Array<{
+      listener_id: string;
+      is_owner: boolean;
+      registered_seconds_ago: number;
+      is_active: boolean;
+    }>;
     multi_source_configs: Array<{
       profile_id: string;
       display_name: string;
@@ -1158,6 +1168,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     state: getStateType(s.state), // Convert IOState to IOStateType
     capabilities: s.capabilities,
     listenerCount: s.listener_count,
+    listeners: s.listeners ?? [],
     multiSourceConfigs: s.multi_source_configs?.map((c) => ({
       profileId: c.profile_id,
       displayName: c.display_name,

@@ -58,7 +58,7 @@ export default function SessionDetailPanel({
     }
 
     if (selectedNode.type === "listener") {
-      return <ListenerDetails nodeId={selectedNode.id} />;
+      return <ListenerDetails nodeId={selectedNode.id} sessions={sessions} />;
     }
 
     return null;
@@ -296,11 +296,38 @@ function SourceDetails({ profile }: { profile: IOProfile }) {
 }
 
 // Listener details sub-component
-function ListenerDetails({ nodeId }: { nodeId: string }) {
-  const sessionId = nodeId.replace("listeners-", "");
+function ListenerDetails({ nodeId, sessions }: { nodeId: string; sessions: ActiveSessionInfo[] }) {
+  // Parse "listener::${sessionId}::${listenerId}"
+  const parts = nodeId.split("::");
+  const sessionId = parts[1];
+  const listenerId = parts[2];
+
+  const session = sessions.find((s) => s.sessionId === sessionId);
+  const listener = session?.listeners.find((l) => l.listener_id === listenerId);
+
+  if (!listener) {
+    return <p className="text-sm text-[color:var(--text-muted)]">Listener not found</p>;
+  }
+
+  const formatUptime = (seconds: number): string => {
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m ago`;
+  };
 
   return (
     <div className="space-y-4">
+      {/* Listener ID */}
+      <div>
+        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          Listener ID
+        </label>
+        <p className="text-sm text-[color:var(--text-primary)] font-mono">
+          {listener.listener_id}
+        </p>
+      </div>
+
+      {/* Session */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
           Session
@@ -310,10 +337,38 @@ function ListenerDetails({ nodeId }: { nodeId: string }) {
         </p>
       </div>
 
-      <p className="text-xs text-[color:var(--text-muted)]">
-        Individual listener details are not yet available from the backend.
-        Future updates will show per-listener information.
-      </p>
+      {/* Role */}
+      <div>
+        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          Role
+        </label>
+        <p className={`text-sm font-medium ${listener.is_owner ? "text-green-400" : "text-[color:var(--text-primary)]"}`}>
+          {listener.is_owner ? "Owner" : "Listener"}
+        </p>
+      </div>
+
+      {/* Active status */}
+      <div>
+        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          Status
+        </label>
+        <div className="flex items-center gap-2">
+          <span className={`inline-block w-2 h-2 rounded-full ${listener.is_active ? "bg-green-400" : "bg-gray-500"}`} />
+          <p className={`text-sm ${listener.is_active ? "text-green-400" : "text-[color:var(--text-muted)]"}`}>
+            {listener.is_active ? "Active" : "Inactive"}
+          </p>
+        </div>
+      </div>
+
+      {/* Registration time */}
+      <div>
+        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          Registered
+        </label>
+        <p className="text-sm text-[color:var(--text-primary)]">
+          {formatUptime(listener.registered_seconds_ago)}
+        </p>
+      </div>
     </div>
   );
 }

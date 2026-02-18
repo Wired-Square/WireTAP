@@ -61,7 +61,10 @@ export default function SessionCanvas({ sessions, profiles }: SessionCanvasProps
       return graphData.nodes as Node[];
     });
     setEdges((prev) => {
-      if (prev.length === graphData.edges.length) return prev;
+      const newEdgeIds = new Set(graphData.edges.map((e) => e.id));
+      if (prev.length === graphData.edges.length && prev.every((e) => newEdgeIds.has(e.id))) {
+        return prev;
+      }
       return graphData.edges;
     });
   }, [graphData, setNodes, setEdges]);

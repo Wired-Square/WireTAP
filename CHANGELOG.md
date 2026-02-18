@@ -6,6 +6,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Session Manager Individual Listeners**: The Visual tab now shows individual listener nodes instead of an aggregated count. Each listener displays its app icon, owner/listener role, and an active/inactive status dot. Clicking a listener node shows full details in the side panel (listener ID, session, role, status, registration time). Inactive listeners are dimmed with greyed edges; active listeners show animated green edges when streaming.
+
 - **CAN FD Support**: Full CAN FD support for gs_usb (candleLight/CANable) and SocketCAN adapters. Features include:
   - Device capability detection during probe (shows "FD Capable" or "Classic CAN Only")
   - Enable CAN FD checkbox in profile configuration

@@ -10,6 +10,8 @@ export interface ListenerNodeData {
   appName: string;
   sessionId: string;
   isOwner: boolean;
+  isActive: boolean;
+  registeredSecondsAgo: number;
 }
 
 // Map app names to icons and colours
@@ -29,7 +31,7 @@ interface ListenerNodeProps {
 }
 
 function ListenerNode({ data, selected }: ListenerNodeProps) {
-  const { listenerId, appName, isOwner } = data;
+  const { listenerId, appName, isOwner, isActive } = data;
 
   const config = appConfig[appName.toLowerCase()] || {
     icon: Search,
@@ -54,7 +56,7 @@ function ListenerNode({ data, selected }: ListenerNodeProps) {
 
   return (
     <div
-      className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-[120px] shadow-lg`}
+      className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-[120px] shadow-lg ${isActive ? "" : "opacity-50"}`}
     >
       {/* Input handle - connects from sessions */}
       <Handle
@@ -69,6 +71,7 @@ function ListenerNode({ data, selected }: ListenerNodeProps) {
         <span className="font-medium text-sm text-[color:var(--text-primary)] truncate">
           {displayName}
         </span>
+        <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${isActive ? "bg-green-400" : "bg-gray-500"}`} />
       </div>
 
       {/* Role */}
