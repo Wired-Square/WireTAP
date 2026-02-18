@@ -19,6 +19,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Session Manager Visual Tab**: Fixed detail panel scroll clipping action buttons, visual canvas not fitting nodes into view on tab open, and viewport resetting every 2 seconds during auto-refresh. Root causes: detail panel lacked height constraints, fitView padding was passed as pixel values instead of ReactFlow's expected ratio (100 → 0.3), flex layout used `h-full` instead of `flex-1 min-h-0` causing overflow, and node updates on auto-refresh replaced entire objects triggering ReactFlow re-measurement.
+
 - **gs_usb Device Probe Using Wrong Device ID**: Fixed gs_usb device probing in Settings using stale bus:address instead of serial number. When a device was unplugged and replugged at a different USB address, the probe would fail with "device not found" at the old address. Now passes the serial number to the backend for stable device matching across USB re-enumeration.
 
 - **Logo Menu Text Colour**: Fixed logo menu dropdown text visibility in both light and dark modes. The dropdown container now sets the text colour explicitly so that buttons inherit the correct theme-aware colour after Dockview's CSS reset.

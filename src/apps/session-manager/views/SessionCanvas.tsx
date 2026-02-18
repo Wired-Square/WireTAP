@@ -1,6 +1,6 @@
 // src/apps/session-manager/views/SessionCanvas.tsx
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -40,42 +40,51 @@ export default function SessionCanvas({ sessions, profiles }: SessionCanvasProps
   const { fitView } = useReactFlow();
   const setSelectedNode = useSessionManagerStore((s) => s.setSelectedNode);
 
-  // Build graph from session data
   const graphData = useMemo(
     () => buildSessionGraph(sessions, profiles),
     [sessions, profiles]
   );
 
-  // Cast to Node[] for React Flow compatibility
   const [nodes, setNodes, onNodesChange] = useNodesState(graphData.nodes as Node[]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(graphData.edges);
 
-  // Update nodes/edges when graph data changes
+  // Only replace nodes/edges when the topology changes (sessions added/removed).
+  // Returning the same reference on auto-refresh prevents ReactFlow from
+  // re-measuring nodes and resetting the viewport. Live session data is still
+  // available in the detail panel which reads directly from the sessions prop.
   useEffect(() => {
-    setNodes(graphData.nodes as Node[]);
-    setEdges(graphData.edges);
+    setNodes((prev) => {
+      const newIds = new Set(graphData.nodes.map((n) => n.id));
+      if (prev.length === graphData.nodes.length && prev.every((n) => newIds.has(n.id))) {
+        return prev;
+      }
+      return graphData.nodes as Node[];
+    });
+    setEdges((prev) => {
+      if (prev.length === graphData.edges.length) return prev;
+      return graphData.edges;
+    });
   }, [graphData, setNodes, setEdges]);
 
-  // Fit view when nodes change significantly
+  // Fit view once on mount. Delayed because the conditionally-rendered
+  // container needs a frame to get its dimensions.
+  const fitViewRef = useRef(fitView);
+  fitViewRef.current = fitView;
   useEffect(() => {
-    if (nodes.length > 0) {
-      const timeoutId = setTimeout(() => {
-        fitView({ padding: calculateFitViewPadding(nodes.length), duration: 200 });
-      }, 50);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [nodes.length, fitView]);
+    const id = setTimeout(() => {
+      fitViewRef.current({ padding: calculateFitViewPadding(nodes.length), duration: 200 });
+    }, 300);
+    return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Handle node selection
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      const nodeType = node.type as "source" | "session" | "listener";
-      setSelectedNode({ id: node.id, type: nodeType });
+      setSelectedNode({ id: node.id, type: node.type as "source" | "session" | "listener" });
     },
     [setSelectedNode]
   );
 
-  // Handle background click to deselect
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
   }, [setSelectedNode]);
@@ -90,13 +99,9 @@ export default function SessionCanvas({ sessions, profiles }: SessionCanvasProps
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: calculateFitViewPadding(nodes.length) }}
         minZoom={0.1}
         maxZoom={2}
-        defaultEdgeOptions={{
-          type: "smoothstep",
-        }}
+        defaultEdgeOptions={{ type: "smoothstep" }}
         proOptions={{ hideAttribution: true }}
       >
         <Background
@@ -113,14 +118,10 @@ export default function SessionCanvas({ sessions, profiles }: SessionCanvasProps
         <MiniMap
           nodeColor={(node) => {
             switch (node.type) {
-              case "source":
-                return "#a855f7"; // purple
-              case "session":
-                return "#06b6d4"; // cyan
-              case "listener":
-                return "#22c55e"; // green
-              default:
-                return "#6b7280";
+              case "source": return "#a855f7";
+              case "session": return "#06b6d4";
+              case "listener": return "#22c55e";
+              default: return "#6b7280";
             }
           }}
           maskColor="rgba(0, 0, 0, 0.7)"

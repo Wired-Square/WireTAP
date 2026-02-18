@@ -139,9 +139,9 @@ export default function SessionManager() {
         contentArea={{ wrap: false }}
       >
         {activeTab === "visual" && (
-          <div className="flex h-full">
+          <div className="flex flex-1 min-h-0">
             {/* Main canvas */}
-            <div className="flex-1 h-full">
+            <div className="flex-1 min-h-0">
               <ReactFlowProvider>
                 <SessionCanvas sessions={sessions} profiles={profiles} />
               </ReactFlowProvider>

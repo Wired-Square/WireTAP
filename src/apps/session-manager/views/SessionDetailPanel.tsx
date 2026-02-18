@@ -65,7 +65,7 @@ export default function SessionDetailPanel({
   };
 
   return (
-    <div className="w-64 border-l border-[color:var(--border-default)] bg-[var(--bg-surface)] flex flex-col">
+    <div className="w-64 h-full min-h-0 border-l border-[color:var(--border-default)] bg-[var(--bg-surface)] flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--border-default)]">
         <span className="text-sm font-medium text-[color:var(--text-primary)] capitalize">

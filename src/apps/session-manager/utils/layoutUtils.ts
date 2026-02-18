@@ -137,11 +137,11 @@ export function buildSessionGraph(
 }
 
 /**
- * Calculate the center position for fitting all nodes in view
+ * Calculate fitView padding as a ratio (ReactFlow convention).
+ * 0.2 = 20% of bounding box added as whitespace around nodes.
  */
 export function calculateFitViewPadding(nodeCount: number): number {
-  // More padding for fewer nodes to avoid them being too large
-  if (nodeCount <= 3) return 100;
-  if (nodeCount <= 6) return 50;
-  return 20;
+  if (nodeCount <= 3) return 0.3;
+  if (nodeCount <= 6) return 0.2;
+  return 0.1;
 }
