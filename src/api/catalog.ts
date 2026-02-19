@@ -94,6 +94,15 @@ export async function deleteCatalog(path: string): Promise<void> {
 }
 
 /**
+ * Import a DBC file and convert to TOML catalog format
+ * @param content - Raw DBC file content
+ * @returns TOML catalog content string
+ */
+export async function importDbc(content: string): Promise<string> {
+  return await invoke<string>("import_dbc", { content });
+}
+
+/**
  * DBC multiplexing export mode
  * - "extended": Uses SG_MUL_VAL_ with proper mNM notation for nested mux (default)
  * - "flattened": Legacy mode that flattens nested mux into composite values

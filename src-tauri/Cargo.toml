@@ -40,6 +40,7 @@ hex = "0.4"
 chrono = "0.4"
 async-trait = "0.1"
 toml = "0.8"
+can-dbc = "8"
 reqwest = { version = "0.12", features = ["json"] }
 rumqttc = "0.24"
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)

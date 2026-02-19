@@ -14,7 +14,11 @@ All notable changes to CANdor will be documented in this file.
 
 - **Bus Labels on Edges**: Source-to-session edges in the Session Manager Visual tab now display bus labels near both handles (e.g., "bus0" on the source side, "bus1" on the session side). Each source connects to its own input handle on the session node, with sources sorted by output bus to avoid edge crossings.
 
+- **DBC Import**: Import DBC files as CANdor catalogs via the Catalog Editor's "Import from File" button. Converts messages, signals (with start bit conversion for both Intel and Motorola byte orders), multiplexing (standard and extended/nested), value descriptions (enums), comments, and node definitions to the TOML catalog format. The imported file is saved as a `.toml` catalog in the decoder directory.
+
 ### Fixed
+
+- **DBC Import: large signal values causing parse errors**: Signals with large bit lengths (e.g., 56-bit unsigned) produced min/max values exceeding JavaScript's safe integer range. The frontend TOML parser rejected these as integer overflow. Fixed by always formatting min, max, factor, and offset as TOML floats.
 
 - **Update notification contrast on Windows**: The update button in the nav bar was nearly invisible on Windows because Dockview's `all: unset` CSS rule overrode Tailwind classes. Switched to inline styles to guarantee visibility on all platforms.
 

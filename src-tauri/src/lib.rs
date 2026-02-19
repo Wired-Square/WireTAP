@@ -4,6 +4,7 @@ mod catalog;
 mod checksums;
 mod credentials;
 mod dbc_export;
+mod dbc_import;
 mod dbquery;
 mod framing;
 mod io;
@@ -740,6 +741,7 @@ pub fn run() {
             catalog::rename_catalog,
             catalog::delete_catalog,
             catalog::export_catalog,
+            catalog::import_dbc,
             settings::load_settings,
             settings::save_settings,
             settings::validate_directory,

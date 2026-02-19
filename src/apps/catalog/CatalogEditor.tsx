@@ -635,6 +635,7 @@ export default function CatalogEditor() {
         catalogs={catalogs}
         selectedPath={catalogPath}
         defaultFilename={settings?.default_catalog}
+        decoderDir={decoderDir}
         onSelect={handleSelectCatalog}
         onImport={(path, content) => openSuccess(path, content)}
         onImportError={(message) => setValidation([{ field: "import", message }])}

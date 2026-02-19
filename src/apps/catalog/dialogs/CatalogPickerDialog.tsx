@@ -6,8 +6,8 @@ import { caption, textMedium } from "../../../styles/typography";
 import { borderDivider, hoverLight, bgSurface, dialogOptionButton } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import type { CatalogMetadata } from "../../../api/catalog";
-import { pickFileToOpen } from "../../../api/dialogs";
-import { openCatalog } from "../../../api/catalog";
+import { pickFileToOpen, pickCatalogToSave } from "../../../api/dialogs";
+import { openCatalog, importDbc, saveCatalog } from "../../../api/catalog";
 
 type Props = {
   isOpen: boolean;
@@ -15,6 +15,7 @@ type Props = {
   catalogs: CatalogMetadata[];
   selectedPath: string | null;
   defaultFilename?: string | null;
+  decoderDir?: string | null;
   onSelect: (path: string) => void;
   onImport?: (path: string, content: string) => void;
   onImportError?: (message: string) => void;
@@ -27,6 +28,7 @@ export default function CatalogPickerDialog({
   catalogs,
   selectedPath,
   defaultFilename,
+  decoderDir,
   onSelect,
   onImport,
   onImportError,
@@ -49,8 +51,22 @@ export default function CatalogPickerDialog({
 
       if (selected) {
         if (selected.endsWith(".dbc")) {
-          // DBC import not yet supported
-          onImportError?.("DBC import is not yet supported. Only TOML files can be imported.");
+          // Read DBC file and convert to TOML
+          const dbcContent = await openCatalog(selected);
+          const tomlContent = await importDbc(dbcContent);
+
+          // Derive default save path from DBC filename
+          const dbcFilename = selected.split(/[/\\]/).pop() || "imported";
+          const baseName = dbcFilename.replace(/\.dbc$/i, "");
+          const defaultPath = decoderDir ? `${decoderDir}/${baseName}.toml` : undefined;
+
+          // Prompt user to save the converted TOML
+          const savePath = await pickCatalogToSave(defaultPath);
+          if (savePath) {
+            await saveCatalog(savePath, tomlContent);
+            onImport?.(savePath, tomlContent);
+            onClose();
+          }
           return;
         }
 

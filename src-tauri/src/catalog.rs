@@ -706,6 +706,12 @@ pub async fn delete_catalog(path: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to delete catalog: {}", e))
 }
 
+/// Import a DBC file and convert to TOML catalog format
+#[tauri::command]
+pub async fn import_dbc(content: String) -> Result<String, String> {
+    crate::dbc_import::convert_dbc_to_toml(&content)
+}
+
 /// Export catalog to file in specified format (toml or dbc)
 ///
 /// For DBC export, mux_mode controls how multiplexed signals are exported:
