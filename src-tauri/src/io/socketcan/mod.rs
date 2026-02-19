@@ -16,6 +16,7 @@ mod reader;
 
 // Re-export reader types (platform-specific)
 #[cfg(target_os = "linux")]
+#[allow(unused_imports)]
 pub use reader::{encode_frame, run_source, EncodedFrame, SocketCanConfig, SocketCanReader};
 
 #[cfg(not(target_os = "linux"))]

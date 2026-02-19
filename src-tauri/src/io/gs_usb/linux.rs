@@ -59,7 +59,7 @@ pub fn list_devices() -> Result<Vec<GsUsbDeviceInfo>, String> {
 /// Get gs_usb device info for a specific CAN interface
 fn get_gs_usb_info_for_interface(iface_name: &str) -> Option<GsUsbDeviceInfo> {
     let device_path = format!("/sys/class/net/{}/device", iface_name);
-    let device_link = fs::read_link(&device_path).ok()?;
+    let _device_link = fs::read_link(&device_path).ok()?;
 
     // The device link points to something like:
     // ../../../devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0

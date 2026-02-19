@@ -532,7 +532,7 @@ mod linux_impl {
 // Re-export for Linux
 #[cfg(target_os = "linux")]
 pub use linux_impl::{
-    configure_interface, encode_frame, run_source, EncodedFrame, SocketCanConfig, SocketCanReader,
+    encode_frame, run_source, EncodedFrame, SocketCanConfig, SocketCanReader,
 };
 
 // ============================================================================

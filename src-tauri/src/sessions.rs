@@ -1437,6 +1437,7 @@ pub async fn probe_device(
                     bus_count: 1,
                     primary_info: Some(format!("Interface: {}", interface)),
                     secondary_info: None,
+                    supports_fd: None,
                     error: None,
                 })
             } else {
@@ -1447,6 +1448,7 @@ pub async fn probe_device(
                     bus_count: 0,
                     primary_info: None,
                     secondary_info: None,
+                    supports_fd: None,
                     error: Some(format!("Interface '{}' not found", interface)),
                 })
             }

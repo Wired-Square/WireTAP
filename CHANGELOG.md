@@ -2,6 +2,12 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **SocketCAN probe missing `supports_fd` field**: SocketCAN device probing failed to compile after the CAN FD support changes due to missing `supports_fd` field in `DeviceProbeResult` initialisers.
+
 ## [0.4.2] - 2026-02-19
 
 ### Added
