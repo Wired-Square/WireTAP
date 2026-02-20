@@ -5,7 +5,7 @@ import { pickDirectory } from '../../api/dialogs';
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
 import AppSideBar, { type SideBarItem } from "../../components/AppSideBar";
-import { Cog, MapPin, Cable, BookOpen, Monitor, Bookmark, Star } from "lucide-react";
+import { Cog, MapPin, Cable, BookOpen, Monitor, Bookmark, Star, LayoutGrid } from "lucide-react";
 import { bgDataView, borderDataView } from "../../styles/colourTokens";
 import LocationsView from './views/LocationsView';
 import DisplayView from './views/DisplayView';
@@ -14,18 +14,21 @@ import DataIOView from './views/DataIOView';
 import GeneralView from './views/GeneralView';
 import BookmarksView from './views/BookmarksView';
 import SelectionSetsView from './views/SelectionSetsView';
+import GraphLayoutsView from './views/GraphLayoutsView';
 import IOProfileDialog from './dialogs/IOProfileDialog';
 import EditCatalogDialog from './dialogs/EditCatalogDialog';
 import ConfirmDeleteDialog from '../../dialogs/ConfirmDeleteDialog';
 import DuplicateCatalogDialog from './dialogs/DuplicateCatalogDialog';
 import EditBookmarkDialog from './dialogs/EditBookmarkDialog';
 import EditSelectionSetDialog from './dialogs/EditSelectionSetDialog';
+import EditGraphLayoutDialog from './dialogs/EditGraphLayoutDialog';
 import CreateBookmarkDialog from './dialogs/CreateBookmarkDialog';
 import { useSettingsStore, type SettingsSection } from './stores/settingsStore';
 import { useSettingsForms } from './hooks/useSettingsForms';
 import { useSettingsHandlers } from './hooks/useSettingsHandlers';
 import { getTimeRangeCapableProfiles } from '../../utils/profileFilters';
 import { isIOS } from '../../utils/platform';
+import { onStoreChanged } from '../../api/store';
 
 export default function Settings() {
   // Form state for dialogs
@@ -37,6 +40,7 @@ export default function Settings() {
   const loadSettings = useSettingsStore((s) => s.loadSettings);
   const loadBookmarks = useSettingsStore((s) => s.loadBookmarks);
   const loadSelectionSets = useSettingsStore((s) => s.loadSelectionSets);
+  const loadGraphLayouts = useSettingsStore((s) => s.loadGraphLayouts);
 
   // Locations
   const decoderDir = useSettingsStore((s) => s.locations.decoderDir);
@@ -105,6 +109,9 @@ export default function Settings() {
   // Selection sets
   const selectionSets = useSettingsStore((s) => s.selectionSets);
 
+  // Graph layouts
+  const graphLayouts = useSettingsStore((s) => s.graphLayouts);
+
   // Dialog state
   const dialogs = useSettingsStore((s) => s.ui.dialogs);
   const dialogPayload = useSettingsStore((s) => s.ui.dialogPayload);
@@ -131,6 +138,9 @@ export default function Settings() {
     selectionSetName: forms.selectionSetName,
     resetSelectionSetForm: forms.resetSelectionSetForm,
     initEditSelectionSetForm: forms.initEditSelectionSetForm,
+    graphLayoutName: forms.graphLayoutName,
+    resetGraphLayoutForm: forms.resetGraphLayoutForm,
+    initEditGraphLayoutForm: forms.initEditGraphLayoutForm,
   });
 
   // Sidebar collapsed state
@@ -144,8 +154,19 @@ export default function Settings() {
     loadSettings();
     loadBookmarks();
     loadSelectionSets();
+    loadGraphLayouts();
     isIOS().then(setIsIOSPlatform);
-  }, [loadSettings, loadBookmarks, loadSelectionSets]);
+  }, [loadSettings, loadBookmarks, loadSelectionSets, loadGraphLayouts]);
+
+  // Reload collections when they change from other panels
+  useEffect(() => {
+    const promise = onStoreChanged((event) => {
+      if (event.key === 'graph.layouts') loadGraphLayouts();
+      if (event.key === 'favorites.timeRanges') loadBookmarks();
+      if (event.key === 'selectionSets.all') loadSelectionSets();
+    });
+    return () => { promise.then((unlisten) => unlisten()); };
+  }, [loadGraphLayouts, loadBookmarks, loadSelectionSets]);
 
   // Sidebar items (Storage hidden on iOS due to sandboxing restrictions)
   const sidebarItems: SideBarItem[] = [
@@ -156,6 +177,7 @@ export default function Settings() {
     { id: 'catalogs', label: 'Catalogs', icon: BookOpen },
     { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
     { id: 'selection-sets', label: 'Selection Sets', icon: Star },
+    { id: 'graph-layouts', label: 'Graph Layouts', icon: LayoutGrid },
     { id: 'display', label: 'Display', icon: Monitor },
   ];
 
@@ -275,6 +297,15 @@ export default function Settings() {
               selectionSets={selectionSets}
               onEditSelectionSet={handlers.handleEditSelectionSet}
               onDeleteSelectionSet={handlers.handleDeleteSelectionSet}
+            />
+          )}
+
+          {/* Graph Layouts Section */}
+          {currentSection === 'graph-layouts' && (
+            <GraphLayoutsView
+              graphLayouts={graphLayouts}
+              onEditGraphLayout={handlers.handleEditGraphLayout}
+              onDeleteGraphLayout={handlers.handleDeleteGraphLayout}
             />
           )}
 
@@ -421,6 +452,25 @@ export default function Settings() {
         highlightText={dialogPayload.selectionSetToDelete?.name}
         onCancel={handlers.handleCancelDeleteSelectionSet}
         onConfirm={handlers.handleConfirmDeleteSelectionSet}
+      />
+
+      {/* Edit Graph Layout Dialog */}
+      <EditGraphLayoutDialog
+        isOpen={dialogs.editGraphLayout}
+        name={forms.graphLayoutName}
+        onChangeName={forms.setGraphLayoutName}
+        onCancel={handlers.handleCancelEditGraphLayout}
+        onSave={handlers.handleConfirmEditGraphLayout}
+      />
+
+      {/* Delete Graph Layout Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        open={dialogs.deleteGraphLayout}
+        title="Delete Graph Layout"
+        message="Are you sure you want to delete"
+        highlightText={dialogPayload.graphLayoutToDelete?.name}
+        onCancel={handlers.handleCancelDeleteGraphLayout}
+        onConfirm={handlers.handleConfirmDeleteGraphLayout}
       />
     </AppLayout>
   );

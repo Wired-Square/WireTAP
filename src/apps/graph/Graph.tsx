@@ -9,6 +9,7 @@ import { useIOPickerHandlers } from "../../hooks/useIOPickerHandlers";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { mergeSerialConfig } from "../../utils/sessionConfigMerge";
 import { catalogFilenameFromPath } from "../../utils/graphLayouts";
+import { onStoreChanged } from "../../api/store";
 import AppLayout from "../../components/AppLayout";
 import GraphTopBar from "./views/GraphTopBar";
 import GraphGrid from "./views/GraphGrid";
@@ -258,6 +259,14 @@ export default function Graph() {
     }
     loadSavedLayouts();
   }, [decoderDir, loadSavedLayouts]);
+
+  // Reload saved layouts when they change from other panels
+  useEffect(() => {
+    const promise = onStoreChanged((event) => {
+      if (event.key === 'graph.layouts') loadSavedLayouts();
+    });
+    return () => { promise.then((unlisten) => unlisten()); };
+  }, [loadSavedLayouts]);
 
   // ── Dialog handlers ──
   const handleCatalogChange = useCallback(async (path: string) => {

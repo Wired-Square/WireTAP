@@ -12,6 +12,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Bookmark menu greying out**: Save Bookmark and Jump to Bookmark are now disabled when the source is not timeline-based (e.g. realtime sources like GVRET, MQTT, SocketCAN) or when the focused app does not support bookmarks.
 
+- **Graph Layouts settings tab**: Graph layouts can now be browsed, renamed, and deleted from the Settings panel, matching the Bookmarks and Selection Sets tabs. Changes sync live between Settings and the Graph app.
+
 - **Graph gauge tooltip**: Hovering over a gauge panel now shows a tooltip listing all signals with their coloured dots, values, units, and confidence indicators, matching the line chart tooltip style.
 
 - **Graph menu integration**: Select Source, Play, Pause, Stop, and Clear Frames now work from the menu when Graph is focused.

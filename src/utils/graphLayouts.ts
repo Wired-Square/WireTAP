@@ -57,6 +57,19 @@ export async function saveGraphLayout(
   return newLayout;
 }
 
+/** Update a saved graph layout by ID */
+export async function updateGraphLayout(
+  id: string,
+  updates: Partial<Pick<GraphLayout, 'name'>>,
+): Promise<boolean> {
+  const layouts = await getAllGraphLayouts();
+  const idx = layouts.findIndex((l) => l.id === id);
+  if (idx === -1) return false;
+  Object.assign(layouts[idx], updates, { updatedAt: Date.now() });
+  await storeSet(GRAPH_LAYOUTS_KEY, layouts);
+  return true;
+}
+
 /** Delete a saved graph layout by ID */
 export async function deleteGraphLayout(id: string): Promise<boolean> {
   const layouts = await getAllGraphLayouts();

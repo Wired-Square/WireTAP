@@ -19,9 +19,13 @@ import {
   getAllSelectionSets,
   type SelectionSet,
 } from '../../../utils/selectionSets';
+import {
+  getAllGraphLayouts,
+  type GraphLayout,
+} from '../../../utils/graphLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "locations" | "data-io" | "catalogs" | "bookmarks" | "selection-sets" | "display";
+export type SettingsSection = "general" | "locations" | "data-io" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
 export interface DirectoryValidation {
@@ -136,7 +140,9 @@ type DialogName =
   | 'deleteBookmark'
   | 'createBookmark'
   | 'editSelectionSet'
-  | 'deleteSelectionSet';
+  | 'deleteSelectionSet'
+  | 'editGraphLayout'
+  | 'deleteGraphLayout';
 
 interface DialogPayload {
   editingProfileId: string | null;
@@ -149,6 +155,8 @@ interface DialogPayload {
   bookmarkToDelete: TimeRangeFavorite | null;
   selectionSetToEdit: SelectionSet | null;
   selectionSetToDelete: SelectionSet | null;
+  graphLayoutToEdit: GraphLayout | null;
+  graphLayoutToDelete: GraphLayout | null;
 }
 
 const initialDialogs: Record<DialogName, boolean> = {
@@ -162,6 +170,8 @@ const initialDialogs: Record<DialogName, boolean> = {
   createBookmark: false,
   editSelectionSet: false,
   deleteSelectionSet: false,
+  editGraphLayout: false,
+  deleteGraphLayout: false,
 };
 
 const initialDialogPayload: DialogPayload = {
@@ -175,6 +185,8 @@ const initialDialogPayload: DialogPayload = {
   bookmarkToDelete: null,
   selectionSetToEdit: null,
   selectionSetToDelete: null,
+  graphLayoutToEdit: null,
+  graphLayoutToDelete: null,
 };
 
 const defaultSignalColours: SignalColours = {
@@ -249,6 +261,9 @@ interface SettingsState {
   // Selection sets
   selectionSets: SelectionSet[];
 
+  // Graph layouts
+  graphLayouts: GraphLayout[];
+
   // Display settings
   display: {
     frameIdFormat: 'hex' | 'decimal';
@@ -288,6 +303,7 @@ interface SettingsState {
   loadCatalogs: () => Promise<void>;
   loadBookmarks: () => Promise<void>;
   loadSelectionSets: () => Promise<void>;
+  loadGraphLayouts: () => Promise<void>;
 
   // Actions - Saving
   saveSettings: () => Promise<void>;
@@ -385,6 +401,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   bookmarks: [],
 
   selectionSets: [],
+
+  graphLayouts: [],
 
   display: {
     frameIdFormat: 'hex',
@@ -614,6 +632,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       set({ selectionSets: allSets });
     } catch (error) {
       console.error('Failed to load selection sets:', error);
+    }
+  },
+
+  loadGraphLayouts: async () => {
+    try {
+      const allLayouts = await getAllGraphLayouts();
+      allLayouts.sort((a, b) => a.name.localeCompare(b.name));
+      set({ graphLayouts: allLayouts });
+    } catch (error) {
+      console.error('Failed to load graph layouts:', error);
     }
   },
 

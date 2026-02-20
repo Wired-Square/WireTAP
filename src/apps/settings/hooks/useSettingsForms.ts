@@ -32,6 +32,9 @@ export function useSettingsForms() {
   // Selection set dialog form (for editing)
   const [selectionSetName, setSelectionSetName] = useState('');
 
+  // Graph layout dialog form (for editing)
+  const [graphLayoutName, setGraphLayoutName] = useState('');
+
   // Reset helpers
   const resetCatalogForm = () => {
     setCatalogName('');
@@ -93,6 +96,15 @@ export function useSettingsForms() {
     setSelectionSetName(name);
   }, []);
 
+  // Reset / initialize graph layout form
+  const resetGraphLayoutForm = useCallback(() => {
+    setGraphLayoutName('');
+  }, []);
+
+  const initEditGraphLayoutForm = useCallback((name: string) => {
+    setGraphLayoutName(name);
+  }, []);
+
   // Handle time bounds changes
   const handleBookmarkTimeBoundsChange = useCallback((bounds: TimeBounds) => {
     setBookmarkTimeBounds(bounds);
@@ -135,6 +147,12 @@ export function useSettingsForms() {
     setSelectionSetName,
     resetSelectionSetForm,
     initEditSelectionSetForm,
+
+    // Graph layout form (editing)
+    graphLayoutName,
+    setGraphLayoutName,
+    resetGraphLayoutForm,
+    initEditGraphLayoutForm,
   };
 }
 

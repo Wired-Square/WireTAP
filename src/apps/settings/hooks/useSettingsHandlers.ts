@@ -14,6 +14,10 @@ import {
   useSelectionSetSettingsHandlers,
   type SelectionSetSettingsHandlers,
 } from './handlers/useSelectionSetSettingsHandlers';
+import {
+  useGraphLayoutHandlers,
+  type GraphLayoutHandlers,
+} from './handlers/useGraphLayoutHandlers';
 import type { IOProfile } from '../stores/settingsStore';
 import type { TimeBounds } from '../../../components/TimeBoundsInput';
 
@@ -50,9 +54,14 @@ export interface UseSettingsHandlersParams {
   selectionSetName: string;
   resetSelectionSetForm: () => void;
   initEditSelectionSetForm: (name: string) => void;
+
+  // Graph layout form (editing)
+  graphLayoutName: string;
+  resetGraphLayoutForm: () => void;
+  initEditGraphLayoutForm: (name: string) => void;
 }
 
-export type SettingsHandlers = IOProfileHandlers & SettingsCatalogHandlers & BookmarkHandlers & SelectionSetSettingsHandlers;
+export type SettingsHandlers = IOProfileHandlers & SettingsCatalogHandlers & BookmarkHandlers & SelectionSetSettingsHandlers & GraphLayoutHandlers;
 
 export function useSettingsHandlers(params: UseSettingsHandlersParams): SettingsHandlers {
   // IO Profile handlers (no params needed - uses store directly)
@@ -90,11 +99,19 @@ export function useSettingsHandlers(params: UseSettingsHandlersParams): Settings
     initEditSelectionSetForm: params.initEditSelectionSetForm,
   });
 
+  // Graph layout handlers
+  const graphLayoutHandlers = useGraphLayoutHandlers({
+    graphLayoutName: params.graphLayoutName,
+    resetGraphLayoutForm: params.resetGraphLayoutForm,
+    initEditGraphLayoutForm: params.initEditGraphLayoutForm,
+  });
+
   // Spread all handlers into a flat object
   return {
     ...ioProfileHandlers,
     ...catalogHandlers,
     ...bookmarkHandlers,
     ...selectionSetHandlers,
+    ...graphLayoutHandlers,
   };
 }
