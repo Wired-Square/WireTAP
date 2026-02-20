@@ -277,7 +277,7 @@ interface DecoderState {
 
   // Actions - Frame management
   toggleFrameSelection: (id: number) => void;
-  bulkSelectBus: (bus: number, select: boolean) => void;
+  bulkSelectBus: (bus: number | null, select: boolean) => void;
   selectAllFrames: () => void;
   deselectAllFrames: () => void;
   clearFrames: () => void;
@@ -534,7 +534,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   bulkSelectBus: (bus, select) => {
     const { frames, selectedFrames, activeSelectionSetId } = get();
     const ids = Array.from(frames.values())
-      .filter((f) => f.bus === bus)
+      .filter((f) => bus === null ? f.bus === undefined : f.bus === bus)
       .map((f) => f.id);
 
     if (ids.length === 0) return;

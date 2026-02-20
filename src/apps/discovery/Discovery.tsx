@@ -25,8 +25,7 @@ import ExportFramesDialog, { type ExportDataMode } from "../../dialogs/ExportFra
 import BookmarkEditorDialog from "../../dialogs/BookmarkEditorDialog";
 import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
-import { getAllSelectionSets, type SelectionSet } from "../../utils/selectionSets";
-import { useSettingsStore } from "../settings/stores/settingsStore";
+import { useSelectionSets } from "../../hooks/useSelectionSets";
 import { isBufferProfileId } from "../../hooks/useIOSessionManager";
 import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
 import { clearBuffer as clearBackendBuffer, getBufferMetadata, getBufferFramesPaginated, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
@@ -138,20 +137,8 @@ export default function Discovery() {
     'toolbox',
   ] as const);
 
-  // Selection sets for the dropdown in FramePicker
-  const [selectionSets, setSelectionSets] = useState<SelectionSet[]>([]);
-  const loadSelectionSets = useCallback(async () => {
-    const all = await getAllSelectionSets();
-    all.sort((a, b) => a.name.localeCompare(b.name));
-    setSelectionSets(all);
-  }, []);
-  useEffect(() => { loadSelectionSets(); }, [loadSelectionSets]);
-
-  // Refresh both local dropdown and settings store after selection set mutations
-  const handleSelectionSetMutate = useCallback(async () => {
-    await loadSelectionSets();
-    useSettingsStore.getState().loadSelectionSets();
-  }, [loadSelectionSets]);
+  // Selection sets for the dropdown in FramePicker (auto-refreshes cross-panel)
+  const { selectionSets } = useSelectionSets();
 
   // Additional dialog state (data associated with dialogs)
   const [bookmarkFrameId, setBookmarkFrameId] = useState(0);
@@ -694,7 +681,6 @@ export default function Discovery() {
     openBookmarkDialog: dialogs.bookmark.open,
     closeSpeedChangeDialog: dialogs.speedChange.close,
     openSaveSelectionSetDialog: dialogs.saveSelectionSet.open,
-    onAfterSelectionSetMutate: handleSelectionSetMutate,
     closeExportDialog: dialogs.export.close,
     closeIoReaderPicker: dialogs.ioReaderPicker.close,
   });
@@ -900,13 +886,6 @@ export default function Discovery() {
         profileId={sourceProfileId || ioProfile}
       />
 
-      <SaveSelectionSetDialog
-        isOpen={dialogs.saveSelectionSet.isOpen}
-        frameCount={selectedFrames.size}
-        onClose={() => dialogs.saveSelectionSet.close()}
-        onSave={handlers.handleSaveNewSelectionSet}
-      />
-
       <IoReaderPickerDialog
         isOpen={dialogs.ioReaderPicker.isOpen}
         onClose={() => dialogs.ioReaderPicker.close()}
@@ -952,6 +931,13 @@ export default function Discovery() {
         onLoadSelectionSet={handlers.handleLoadSelectionSet}
         onClearSelectionSet={handlers.handleClearSelectionSet}
         onSaveAsNewSelectionSet={() => dialogs.saveSelectionSet.open()}
+      />
+
+      <SaveSelectionSetDialog
+        isOpen={dialogs.saveSelectionSet.isOpen}
+        frameCount={selectedFrames.size}
+        onClose={() => dialogs.saveSelectionSet.close()}
+        onSave={handlers.handleSaveNewSelectionSet}
       />
 
       <ToolboxDialog

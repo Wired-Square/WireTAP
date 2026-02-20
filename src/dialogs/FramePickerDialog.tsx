@@ -14,7 +14,7 @@ type Props = {
   frames: FrameInfo[];
   selectedFrames: Set<number>;
   onToggleFrame: (id: number) => void;
-  onBulkSelect: (bus: number, select: boolean) => void;
+  onBulkSelect: (bus: number | null, select: boolean) => void;
   displayFrameIdFormat: "hex" | "decimal";
   onSelectAll?: () => void;
   onDeselectAll?: () => void;

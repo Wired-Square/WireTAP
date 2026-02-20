@@ -22,6 +22,10 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Cross-app selection set sync**: Selection set list now auto-refreshes across all panels (Decoder, Discovery, Settings) via store change events, replacing the manual refresh pattern.
+
+- **Bus selector "No bus" group**: FramePicker now shows a "No bus" group with All/None for frames without a bus assignment (e.g. frames introduced from a selection set), fixing the issue where per-bus None couldn't deselect them.
+
 - **Multi-bus state isolation**: Multi-bus state (`multiBusProfiles`, `sourceProfileId`, `outputBusToSource`) is now per-instance in `useIOSessionManager` instead of global in `sessionStore`, preventing multiple windows or app instances from clobbering each other's bus mappings.
 
 - **Multi-window listener counting**: Two windows with the same app (e.g., Discovery) connected to the same session now correctly show 2 listeners instead of 1. Each app instance gets a unique listener ID while preserving the human-readable app name for display and logging.

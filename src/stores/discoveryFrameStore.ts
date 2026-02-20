@@ -48,7 +48,7 @@ interface DiscoveryFrameState {
 
   // Actions - Frame selection
   toggleFrameSelection: (id: number, activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
-  bulkSelectBus: (bus: number, select: boolean, activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
+  bulkSelectBus: (bus: number | null, select: boolean, activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
   selectAllFrames: (activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
   deselectAllFrames: (activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
   applySelectionSet: (selectionSet: SelectionSet, setActiveId: (id: string | null) => void, setDirty: (dirty: boolean) => void) => void;
@@ -291,7 +291,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   bulkSelectBus: (bus, select, activeSelectionSetId, setDirty) => {
     const { frameInfoMap, selectedFrames } = get();
     const ids = Array.from(frameInfoMap.entries())
-      .filter(([, info]) => info.bus === bus)
+      .filter(([, info]) => bus === null ? info.bus === undefined : info.bus === bus)
       .map(([id]) => id);
 
     if (ids.length === 0) return;

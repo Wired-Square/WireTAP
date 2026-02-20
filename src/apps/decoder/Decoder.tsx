@@ -26,8 +26,7 @@ import FlashNotification from "../../components/FlashNotification";
 import BookmarkEditorDialog from "../../dialogs/BookmarkEditorDialog";
 import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import FilterDialog from "./dialogs/FilterDialog";
-import { getAllSelectionSets, type SelectionSet } from "../../utils/selectionSets";
-import { useSettingsStore } from "../settings/stores/settingsStore";
+import { useSelectionSets } from "../../hooks/useSelectionSets";
 import { WINDOW_EVENTS, type CatalogSavedPayload, type BufferChangedPayload } from "../../events/registry";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useDecoderHandlers } from "./hooks/useDecoderHandlers";
@@ -56,20 +55,8 @@ export default function Decoder() {
   ] as const);
   const [bufferMetadata, setBufferMetadata] = useState<BufferMetadata | null>(null);
 
-  // Selection sets for the dropdown in FramePicker
-  const [selectionSets, setSelectionSets] = useState<SelectionSet[]>([]);
-  const loadSelectionSets = useCallback(async () => {
-    const all = await getAllSelectionSets();
-    all.sort((a, b) => a.name.localeCompare(b.name));
-    setSelectionSets(all);
-  }, []);
-  useEffect(() => { loadSelectionSets(); }, [loadSelectionSets]);
-
-  // Refresh both local dropdown and settings store after selection set mutations
-  const handleSelectionSetMutate = useCallback(async () => {
-    await loadSelectionSets();
-    useSettingsStore.getState().loadSelectionSets();
-  }, [loadSelectionSets]);
+  // Selection sets for the dropdown in FramePicker (auto-refreshes cross-panel)
+  const { selectionSets } = useSelectionSets();
 
   // Active tab for per-tab clear functionality
   const [activeTab, setActiveTab] = useState<string>('signals');
@@ -635,7 +622,6 @@ export default function Decoder() {
 
     // Dialog controls
     openSaveSelectionSet: dialogs.saveSelectionSet.open,
-    onAfterSelectionSetMutate: handleSelectionSetMutate,
 
     // Active tab
     activeTab,

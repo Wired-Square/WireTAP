@@ -19,7 +19,7 @@ type Props = {
   frames: FrameInfo[];
   selected: Set<number>;
   onToggle: (id: number) => void;
-  onBulkSelect: (bus: number, select: boolean) => void;
+  onBulkSelect: (bus: number | null, select: boolean) => void;
   displayFrameIdFormat: "hex" | "decimal";
   actions?: React.ReactNode;
   onSelectAll?: () => void;
@@ -76,6 +76,11 @@ function FramePicker({
     });
     return Array.from(set).sort((a, b) => a - b);
   }, [frames]);
+
+  const hasBuslessFrames = useMemo(
+    () => frames.some((f) => typeof f.bus !== "number"),
+    [frames]
+  );
 
   const selectedCount = useMemo(
     () => sortedFrames.filter((f) => selected.has(f.id)).length,
@@ -247,7 +252,7 @@ function FramePicker({
             </div>
           )}
           {/* Per-bus bulk select buttons */}
-          {buses.length > 0 && (
+          {(buses.length > 0 || hasBuslessFrames) && (
             <div className="space-y-1">
               <div className="flex flex-wrap gap-1">
                 {buses.map((bus) => (
@@ -271,6 +276,27 @@ function FramePicker({
                     </button>
                   </div>
                 ))}
+                {hasBuslessFrames && (
+                  <div className="flex items-center gap-0.5 text-[10px]">
+                    <span className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] border border-[color:var(--border-default)] text-[color:var(--text-muted)] italic">
+                      No bus
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onBulkSelect(null, true)}
+                      className="px-1.5 py-0.5 rounded bg-green-600 text-white hover:bg-green-700"
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onBulkSelect(null, false)}
+                      className="px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95"
+                    >
+                      None
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
