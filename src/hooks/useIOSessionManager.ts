@@ -433,11 +433,18 @@ export function useIOSessionManager(
       return `Multi-Bus (${multiBusProfiles.length} sources)`;
     }
     // For single profile (whether directly selected or routed through multi-source),
-    // look up the actual profile name
+    // look up the actual profile name. Try multi-bus first, then ioProfile, then
+    // sourceProfileId (for connect-only sessions where ioProfile is a session ID)
     const lookupId = multiBusProfiles.length === 1 ? multiBusProfiles[0] : ioProfile;
     if (!lookupId) return undefined;
-    return ioProfiles.find((p) => p.id === lookupId)?.name;
-  }, [ioProfile, multiBusProfiles, ioProfiles]);
+    const found = ioProfiles.find((p) => p.id === lookupId)?.name;
+    if (found) return found;
+    // Fall back to sourceProfileId (e.g., ioProfile is a generated session ID like t_xxxx)
+    if (sourceProfileId) {
+      return ioProfiles.find((p) => p.id === sourceProfileId)?.name;
+    }
+    return undefined;
+  }, [ioProfile, sourceProfileId, multiBusProfiles, ioProfiles]);
 
   // Profile names map for multi-bus
   const profileNamesMap = useMemo(() => {
@@ -1101,18 +1108,22 @@ export function useIOSessionManager(
     profileId: string,
     opts?: IngestOptions
   ) => {
+    // Generate a unique session ID like other recorded sources
+    const sessionId = generateRecordedSessionId();
+
     await session.reinitialize(profileId, {
       startTime: opts?.startTime,
       endTime: opts?.endTime,
       speed: opts?.speed,
       limit: opts?.maxFrames,
       skipAutoStart: true, // Don't auto-start - Query connects but doesn't stream
+      sessionIdOverride: sessionId,
     });
 
     // Mark our listener as INACTIVE so we don't receive frames
     // This is the key difference from watchSingleSource - we connect but don't stream
     try {
-      await setSessionListenerActive(profileId, appName, false);
+      await setSessionListenerActive(sessionId, appName, false);
     } catch {
       // Ignore - listener may not be fully registered yet
     }
@@ -1120,14 +1131,15 @@ export function useIOSessionManager(
     // Clear multi-bus state when connecting to a single source
     setMultiBusProfiles([]);
 
-    // Set profile but don't start watching
-    setIoProfile(profileId);
+    // Set profile to the generated session ID and track the original profile
+    setIoProfile(sessionId);
+    setSourceProfileId(profileId);
     if (opts?.speed !== undefined) {
       setPlaybackSpeedProp?.(opts.speed);
     }
 
     // Note: Do NOT set isWatching - session is connected but not streaming to us
-  }, [session, appName, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp]);
+  }, [session, appName, setMultiBusProfiles, setIoProfile, setSourceProfileId, setPlaybackSpeedProp]);
 
   // Jump to a bookmark: stop if streaming, cleanup, reinitialize with bookmark time range
   const jumpToBookmark = useCallback(

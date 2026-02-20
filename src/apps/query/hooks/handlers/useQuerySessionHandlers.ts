@@ -1,6 +1,6 @@
 // src/apps/query/hooks/handlers/useQuerySessionHandlers.ts
 //
-// Session-related handlers for Query: connect, ingest, stop, skip.
+// Session-related handlers for Query: ingest around event, ingest all, stop.
 // Delegates session orchestration to useIOSessionManager methods.
 
 import { useCallback } from "react";
@@ -9,48 +9,21 @@ import { useQueryStore } from "../../stores/queryStore";
 
 export interface UseQuerySessionHandlersParams {
   // Session manager actions
-  connectOnly: (profileId: string, options?: IngestOptions) => Promise<void>;
   watchSingleSource: (
     profileId: string,
     options: IngestOptions
   ) => Promise<void>;
   stopWatch: () => Promise<void>;
-  skipReader: () => Promise<void>;
 
-  // Profile state
-  ioProfile: string | null;
-  setIoProfile: (profileId: string | null) => void;
-
-  // Dialog control
-  closeIoReaderPicker: () => void;
+  // Source profile ID (the actual IO profile, not the session ID)
+  sourceProfileId: string | null;
 }
 
 export function useQuerySessionHandlers({
-  connectOnly,
   watchSingleSource,
   stopWatch,
-  skipReader,
-  ioProfile,
-  setIoProfile,
-  closeIoReaderPicker,
+  sourceProfileId,
 }: UseQuerySessionHandlersParams) {
-  // Handle Connect from IoReaderPickerDialog (connect mode)
-  // Creates session without streaming - queries run inside session but don't stream to other apps
-  const handleConnect = useCallback(
-    async (profileId: string) => {
-      await connectOnly(profileId);
-    },
-    [connectOnly]
-  );
-
-  // Profile change handler (for onSelect callback)
-  const handleIoProfileChange = useCallback(
-    (profileId: string | null) => {
-      setIoProfile(profileId);
-    },
-    [setIoProfile]
-  );
-
   // Ingest around event handler - called when user clicks a result row
   const handleIngestAroundEvent = useCallback(
     async (timestampUs: number) => {
@@ -64,30 +37,24 @@ export function useQuerySessionHandlers({
         eventTimeMs + contextWindow.afterMs
       ).toISOString();
 
-      if (ioProfile) {
-        await watchSingleSource(ioProfile, { startTime, endTime });
+      if (sourceProfileId) {
+        await watchSingleSource(sourceProfileId, { startTime, endTime });
       }
     },
-    [ioProfile, watchSingleSource]
+    [sourceProfileId, watchSingleSource]
   );
 
   // Handle ingest all results (from selected query)
   const handleIngestAllResults = useCallback(
     async (minTimestampUs: number, maxTimestampUs: number) => {
-      if (ioProfile) {
+      if (sourceProfileId) {
         const startTime = new Date(minTimestampUs / 1000).toISOString();
         const endTime = new Date(maxTimestampUs / 1000).toISOString();
-        await watchSingleSource(ioProfile, { startTime, endTime });
+        await watchSingleSource(sourceProfileId, { startTime, endTime });
       }
     },
-    [ioProfile, watchSingleSource]
+    [sourceProfileId, watchSingleSource]
   );
-
-  // Skip handler for IO picker
-  const handleSkip = useCallback(async () => {
-    await skipReader();
-    closeIoReaderPicker();
-  }, [skipReader, closeIoReaderPicker]);
 
   // Stop watch handler
   const handleStopWatch = useCallback(async () => {
@@ -95,11 +62,8 @@ export function useQuerySessionHandlers({
   }, [stopWatch]);
 
   return {
-    handleConnect,
-    handleIoProfileChange,
     handleIngestAroundEvent,
     handleIngestAllResults,
-    handleSkip,
     handleStopWatch,
   };
 }

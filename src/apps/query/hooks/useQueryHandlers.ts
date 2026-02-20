@@ -15,21 +15,17 @@ import type { TimeRangeFavorite } from "../../../utils/favorites";
 
 export interface UseQueryHandlersParams {
   // Session manager actions
-  connectOnly: (profileId: string, options?: IngestOptions) => Promise<void>;
   watchSingleSource: (
     profileId: string,
     options: IngestOptions
   ) => Promise<void>;
   stopWatch: () => Promise<void>;
-  skipReader: () => Promise<void>;
 
   // Profile state
-  ioProfile: string | null;
-  setIoProfile: (profileId: string | null) => void;
+  sourceProfileId: string | null;
 
   // Dialog controls
   openIoReaderPicker: () => void;
-  closeIoReaderPicker: () => void;
   openCatalogPicker: () => void;
   closeCatalogPicker: () => void;
   openErrorDialog: () => void;
@@ -47,28 +43,22 @@ export interface UseQueryHandlersParams {
 export type QueryHandlers = QuerySessionHandlers & QueryUIHandlers;
 
 export function useQueryHandlers(params: UseQueryHandlersParams): QueryHandlers {
-  // Session handlers (connect, ingest, stop, skip)
+  // Session handlers (ingest, stop)
   const sessionHandlers = useQuerySessionHandlers({
-    connectOnly: params.connectOnly,
     watchSingleSource: params.watchSingleSource,
     stopWatch: params.stopWatch,
-    skipReader: params.skipReader,
-    ioProfile: params.ioProfile,
-    setIoProfile: params.setIoProfile,
-    closeIoReaderPicker: params.closeIoReaderPicker,
+    sourceProfileId: params.sourceProfileId,
   });
 
   // UI handlers (dialogs, tabs, queue, bookmarks)
   const uiHandlers = useQueryUIHandlers({
-    openIoReaderPicker: params.openIoReaderPicker,
-    closeIoReaderPicker: params.closeIoReaderPicker,
     openCatalogPicker: params.openCatalogPicker,
     closeCatalogPicker: params.closeCatalogPicker,
     openErrorDialog: params.openErrorDialog,
     closeErrorDialog: params.closeErrorDialog,
     openAddBookmarkDialog: params.openAddBookmarkDialog,
     closeAddBookmarkDialog: params.closeAddBookmarkDialog,
-    ioProfile: params.ioProfile,
+    ioProfile: params.sourceProfileId,
     setActiveTab: params.setActiveTab,
     setFavourites: params.setFavourites,
   });

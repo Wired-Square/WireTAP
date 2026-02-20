@@ -9,8 +9,6 @@ import type { TimeBounds } from "../../../../components/TimeBoundsInput";
 
 export interface UseQueryUIHandlersParams {
   // Dialog controls
-  openIoReaderPicker: () => void;
-  closeIoReaderPicker: () => void;
   openCatalogPicker: () => void;
   closeCatalogPicker: () => void;
   openErrorDialog: () => void;

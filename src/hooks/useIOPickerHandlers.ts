@@ -54,6 +54,7 @@ export interface IOPickerDialogProps {
   onJoinSession: (sessionId: string, sourceProfileIds?: string[]) => Promise<void>;
   onSkip: () => Promise<void>;
   onSelectMultiple: (profileIds: string[]) => void;
+  onConnect: (profileId: string) => Promise<void>;
 }
 
 /**
@@ -84,6 +85,7 @@ export function useIOPickerHandlers({
     joinSession,
     skipReader,
     setMultiBusProfiles,
+    connectOnly,
   } = manager;
 
   // Handle Watch/Ingest from IoReaderPickerDialog
@@ -150,6 +152,15 @@ export function useIOPickerHandlers({
     closeDialog();
   }, [skipReader, closeDialog]);
 
+  // Handle connect-only from IoReaderPickerDialog (connect mode)
+  // Dialog handles closing itself after onConnect
+  const handleConnect = useCallback(
+    async (profileId: string) => {
+      await connectOnly(profileId);
+    },
+    [connectOnly]
+  );
+
   // Handle multi-select from dialog
   const handleSelectMultiple = useCallback(
     (profileIds: string[]) => {
@@ -174,5 +185,6 @@ export function useIOPickerHandlers({
     onJoinSession: handleJoinSession,
     onSkip: handleSkip,
     onSelectMultiple: handleSelectMultiple,
+    onConnect: handleConnect,
   };
 }

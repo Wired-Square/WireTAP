@@ -20,7 +20,15 @@ All notable changes to CANdor will be documented in this file.
 
 - **Query menu state reporting**: Query now reports its session state to the menu bar when focused, showing the connected source name.
 
+### Changed
+
+- **Query IO picker centralised**: Query now uses the shared `useIOPickerHandlers` hook for connect/skip dialog handling, matching the pattern used by Decoder, Discovery, and Graph. Removes duplicated handler wiring from `useQuerySessionHandlers`.
+
 ### Fixed
+
+- **Query DB status light**: The DB indicator now shows green when connected to a PostgreSQL source, instead of always showing red.
+
+- **Query session ID format**: `connectOnly` now generates `t_` prefixed session IDs consistent with other recorded sources, and correctly tracks `sourceProfileId` so database queries use the real profile ID.
 
 - **Cross-app selection set sync**: Selection set list now auto-refreshes across all panels (Decoder, Discovery, Settings) via store change events, replacing the manual refresh pattern.
 

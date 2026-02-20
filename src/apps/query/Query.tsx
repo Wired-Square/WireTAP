@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSettings } from "../../hooks/useSettings";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
+import { useIOPickerHandlers } from "../../hooks/useIOPickerHandlers";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useQueryStore } from "./stores/queryStore";
 import { useDialogManager } from "../../hooks/useDialogManager";
@@ -124,24 +125,6 @@ export default function Query() {
     }
   }, [settings?.default_catalog, catalogs, catalogPath, setCatalogPath]);
 
-  // Load favourites when profile changes
-  useEffect(() => {
-    if (!ioProfile) {
-      setFavourites([]);
-      return;
-    }
-
-    const loadFavourites = async () => {
-      try {
-        const favs = await getFavoritesForProfile(ioProfile);
-        setFavourites(favs);
-      } catch (e) {
-        console.error("Failed to load favourites:", e);
-      }
-    };
-    loadFavourites();
-  }, [ioProfile]);
-
   // Filter profiles to postgres only
   const postgresProfiles = useMemo(
     () => (settings?.io_profiles ?? []).filter((p) => p.kind === "postgres"),
@@ -179,11 +162,10 @@ export default function Query() {
 
   // Destructure session state and actions from manager
   const {
-    connectOnly,
     watchSingleSource,
     stopWatch,
-    skipReader,
     ioProfileName,
+    sourceProfileId,
     isStreaming,
     isPaused,
     isStopped,
@@ -192,6 +174,24 @@ export default function Query() {
     capabilities,
     session,
   } = manager;
+
+  // Load favourites when source profile changes
+  useEffect(() => {
+    if (!sourceProfileId) {
+      setFavourites([]);
+      return;
+    }
+
+    const loadFavourites = async () => {
+      try {
+        const favs = await getFavoritesForProfile(sourceProfileId);
+        setFavourites(favs);
+      } catch (e) {
+        console.error("Failed to load favourites:", e);
+      }
+    };
+    loadFavourites();
+  }, [sourceProfileId]);
 
   // ── Menu session control ──
   useMenuSessionControl({
@@ -208,16 +208,18 @@ export default function Query() {
     },
   });
 
+  // Centralised IO picker dialog handlers (connect, skip, etc.)
+  const ioPickerProps = useIOPickerHandlers({
+    manager,
+    closeDialog: () => dialogs.ioReaderPicker.close(),
+  });
+
   // Compose all handlers using the orchestrator hook
   const handlers = useQueryHandlers({
-    connectOnly,
     watchSingleSource,
     stopWatch,
-    skipReader,
-    ioProfile,
-    setIoProfile,
+    sourceProfileId,
     openIoReaderPicker: dialogs.ioReaderPicker.open,
-    closeIoReaderPicker: dialogs.ioReaderPicker.close,
     openCatalogPicker: dialogs.catalogPicker.open,
     closeCatalogPicker: dialogs.catalogPicker.close,
     openErrorDialog: dialogs.error.open,
@@ -303,8 +305,8 @@ export default function Query() {
 
   // Protocol badge for PostgreSQL
   const protocolBadges: ProtocolBadge[] = useMemo(
-    () => (ioProfile ? [{ label: "PostgreSQL", color: "blue" as const }] : []),
-    [ioProfile]
+    () => (sourceProfileId ? [{ label: "PostgreSQL", color: "blue" as const }] : []),
+    [sourceProfileId]
   );
 
   return (
@@ -319,7 +321,7 @@ export default function Query() {
           defaultCatalogFilename={settings?.default_catalog}
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
-          isStreaming={isStreaming}
+          isStreaming={isStreaming || sourceProfileId !== null}
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
           onStop={handlers.handleStopWatch}
@@ -335,13 +337,13 @@ export default function Query() {
         onTabChange={setActiveTab}
         protocolLabel="DB"
         protocolBadges={protocolBadges}
-        isStreaming={isStreaming}
+        isStreaming={isStreaming || sourceProfileId !== null}
         contentArea={{ className: "p-0" }}
       >
         {activeTab === "query" && (
           <QueryBuilderPanel
-            profileId={ioProfile}
-            disabled={!ioProfile}
+            profileId={sourceProfileId}
+            disabled={!sourceProfileId}
             favourites={favourites}
             timeBounds={timeBounds}
             onTimeBoundsChange={handleTimeBoundsChangeWrapper}
@@ -362,20 +364,19 @@ export default function Query() {
             onBookmark={handleBookmarkQueryWrapper}
           />
         )}
-        {activeTab === "stats" && <StatsPanel profileId={ioProfile} />}
+        {activeTab === "stats" && <StatsPanel profileId={sourceProfileId} />}
       </AppTabView>
 
       {/* IO Reader Picker Dialog - connect mode for database selection */}
       <IoReaderPickerDialog
         mode="connect"
+        {...ioPickerProps}
         isOpen={dialogs.ioReaderPicker.isOpen}
         onClose={() => dialogs.ioReaderPicker.close()}
         ioProfiles={postgresProfiles}
-        selectedId={ioProfile}
+        selectedId={sourceProfileId}
         defaultId={settings?.default_read_profile}
-        onSelect={handlers.handleIoProfileChange}
-        onConnect={handlers.handleConnect}
-        onSkip={handlers.handleSkip}
+        onSelect={setIoProfile}
       />
 
       {/* Error Dialog */}
