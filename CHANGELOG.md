@@ -9,9 +9,20 @@ All notable changes to CANdor will be documented in this file.
 - **Graph App**: New app for visualising decoded CAN signal values in real time. Features include:
   - **Line chart panels** powered by uPlot for fast time-series plotting with auto-scrolling
   - **Radial gauge panels** with custom SVG arc display showing live signal values
+  - **List panels** for displaying decoded signal values in a vertical list
+  - **Multi-signal gauges** with concentric arcs, adaptive stroke width, and per-signal colour legend
+  - **Hover tooltips** on line charts showing timestamp, signal names, values, and colour swatches (floats above panel boundaries)
+  - **Responsive charts** that adapt axis sizes, legends, and labels to panel dimensions
+  - **Signal display name override** — set friendly names per signal in panel settings, rendered in all panel types
+  - **Selectable primary gauge value** — choose which signal's value is shown as the large centre reading
+  - **Signal confidence indicators** — small coloured dots using the configurable confidence colours from Settings
+  - **Layout persistence** — save and load named panel layouts via the Layouts dropdown, with auto-restore on app restart
+  - **Catalogue mismatch warnings** on saved layouts when the current catalog differs
+  - **Compact panel headers** with numbered circle badge for signal count
+  - **Auto-title** — panel title defaults to the first signal's name
   - **Draggable/resizable grid layout** via react-grid-layout v2 — panels can be rearranged and resized freely
   - **Signal picker dialog** for selecting which catalog signals to plot on each panel
-  - **Panel configuration** for editing titles and gauge min/max ranges
+  - **Panel configuration** for editing titles, gauge ranges, signal colours, and display names
   - Independent session and catalog selection (not coupled to the Decoder)
 
 - **Shared CatalogPickerDialog**: Moved `CatalogPickerDialog` from the Decoder to `src/dialogs/` as a shared component with a configurable `title` prop, reused by Decoder, Query, and Graph apps.

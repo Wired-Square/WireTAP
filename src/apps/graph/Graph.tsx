@@ -7,6 +7,7 @@ import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useIOPickerHandlers } from "../../hooks/useIOPickerHandlers";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { mergeSerialConfig } from "../../utils/sessionConfigMerge";
+import { catalogFilenameFromPath } from "../../utils/graphLayouts";
 import AppLayout from "../../components/AppLayout";
 import GraphTopBar from "./views/GraphTopBar";
 import GraphGrid from "./views/GraphGrid";
@@ -49,6 +50,13 @@ export default function Graph() {
   const pushSignalValues = useGraphStore((s) => s.pushSignalValues);
   const clearData = useGraphStore((s) => s.clearData);
   const setPlaybackSpeed = useGraphStore((s) => s.setPlaybackSpeed);
+
+  // Layout persistence
+  const savedLayouts = useGraphStore((s) => s.savedLayouts);
+  const saveCurrentLayout = useGraphStore((s) => s.saveCurrentLayout);
+  const loadLayout = useGraphStore((s) => s.loadLayout);
+  const deleteSavedLayout = useGraphStore((s) => s.deleteSavedLayout);
+  const loadSavedLayouts = useGraphStore((s) => s.loadSavedLayouts);
 
   const decoderDir = settings?.decoder_dir ?? "";
 
@@ -208,12 +216,13 @@ export default function Graph() {
     }
   }, [settings, initFromSettings]);
 
-  // Load catalog list
+  // Load catalog list and saved layouts on mount
   useEffect(() => {
     if (decoderDir) {
       listCatalogs(decoderDir).then(setCatalogs).catch(console.error);
     }
-  }, [decoderDir]);
+    loadSavedLayouts();
+  }, [decoderDir, loadSavedLayouts]);
 
   // ── Dialog handlers ──
   const handleCatalogChange = useCallback(async (path: string) => {
@@ -253,6 +262,11 @@ export default function Graph() {
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
           isWatching={isWatching}
           watchFrameCount={watchFrameCount}
+          savedLayouts={savedLayouts}
+          onSaveLayout={saveCurrentLayout}
+          onLoadLayout={loadLayout}
+          onDeleteLayout={deleteSavedLayout}
+          catalogFilename={catalogFilenameFromPath(catalogPath)}
         />
       }
     >

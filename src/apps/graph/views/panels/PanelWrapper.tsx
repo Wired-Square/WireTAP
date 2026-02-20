@@ -26,8 +26,11 @@ export default function PanelWrapper({ panel, onOpenSignalPicker, onOpenPanelCon
 
         {/* Signal count badge */}
         {panel.signals.length > 0 && (
-          <span className="text-[10px] text-[color:var(--text-muted)] tabular-nums">
-            {panel.signals.length} signal{panel.signals.length !== 1 ? "s" : ""}
+          <span
+            className="w-4 h-4 rounded-full text-[10px] font-medium tabular-nums flex items-center justify-center shrink-0 bg-[var(--border-default)] text-[color:var(--text-secondary)]"
+            title={`${panel.signals.length} signal${panel.signals.length !== 1 ? "s" : ""}`}
+          >
+            {panel.signals.length}
           </span>
         )}
 

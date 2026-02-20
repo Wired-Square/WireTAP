@@ -6,6 +6,7 @@ import { useGraphStore, type LayoutItem } from "../../../stores/graphStore";
 import PanelWrapper from "./panels/PanelWrapper";
 import LineChartPanel from "./panels/line-chart/LineChartPanel";
 import GaugePanel from "./panels/gauge/GaugePanel";
+import ListPanel from "./panels/list/ListPanel";
 import { useCallback, useMemo } from "react";
 import { textSecondary } from "../../../styles/colourTokens";
 
@@ -78,8 +79,10 @@ export default function GraphGrid({ onOpenSignalPicker, onOpenPanelConfig }: Pro
               >
                 {panel.type === "line-chart" ? (
                   <LineChartPanel panel={panel} />
-                ) : (
+                ) : panel.type === "gauge" ? (
                   <GaugePanel panel={panel} />
+                ) : (
+                  <ListPanel panel={panel} />
                 )}
               </PanelWrapper>
             </div>
