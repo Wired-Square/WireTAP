@@ -17,13 +17,13 @@ import { getReaderProtocols, type IOProfile } from "../hooks/useSettings";
 import { useSessionStore } from "../stores/sessionStore";
 import { pickCsvToOpen } from "../api/dialogs";
 import {
-  importCsvToBuffer,
   listOrphanedBuffers,
   deleteBuffer,
   setActiveBuffer,
   clearBuffer,
   type BufferMetadata,
 } from "../api/buffer";
+import { CsvColumnMapperDialog } from "./csv-column-mapper";
 import { WINDOW_EVENTS, type BufferChangedPayload } from "../events/registry";
 import {
   createIOSession,
@@ -209,6 +209,10 @@ export default function IoReaderPickerDialog({
 
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  // CSV column mapper state
+  const [csvMapperFilePath, setCsvMapperFilePath] = useState<string | null>(null);
+  const [showCsvMapper, setShowCsvMapper] = useState(false);
 
   // Multi-buffer state
   const [buffers, setBuffers] = useState<BufferMetadata[]>([]);
@@ -1062,35 +1066,46 @@ export default function IoReaderPickerDialog({
     try {
       const filePath = await pickCsvToOpen(defaultDir);
       if (!filePath) {
-        // User cancelled
         setIsImporting(false);
         return;
       }
 
-      const metadata = await importCsvToBuffer(filePath);
-
-      // Refresh buffer list
-      const allBuffers = await listOrphanedBuffers();
-      setBuffers(allBuffers);
-
-      onImport?.(metadata);
-
-      // Notify other windows that buffer has changed
-      const payload: BufferChangedPayload = {
-        metadata,
-        timestamp: Date.now(),
-      };
-      await emit(WINDOW_EVENTS.BUFFER_CHANGED, payload);
-
-      // Auto-select the buffer using its actual ID
-      onSelect(metadata.id);
-      onClose();
+      // Open the column mapper dialog instead of importing directly
+      setCsvMapperFilePath(filePath);
+      setShowCsvMapper(true);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setImportError(msg);
     } finally {
       setIsImporting(false);
     }
+  };
+
+  const handleCsvMapperComplete = async (metadata: BufferMetadata) => {
+    setShowCsvMapper(false);
+    setCsvMapperFilePath(null);
+
+    // Refresh buffer list
+    const allBuffers = await listOrphanedBuffers();
+    setBuffers(allBuffers);
+
+    onImport?.(metadata);
+
+    // Notify other windows that buffer has changed
+    const payload: BufferChangedPayload = {
+      metadata,
+      timestamp: Date.now(),
+    };
+    await emit(WINDOW_EVENTS.BUFFER_CHANGED, payload);
+
+    // Auto-select the buffer and close
+    onSelect(metadata.id);
+    onClose();
+  };
+
+  const handleCsvMapperCancel = () => {
+    setShowCsvMapper(false);
+    setCsvMapperFilePath(null);
   };
 
   // Delete a specific buffer by ID
@@ -1181,6 +1196,7 @@ export default function IoReaderPickerDialog({
   };
 
   return (
+    <>
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
       <div className={`${cardElevated} shadow-xl overflow-hidden`}>
         {/* Header */}
@@ -1412,5 +1428,16 @@ export default function IoReaderPickerDialog({
         />
       </div>
     </Dialog>
+
+    {/* CSV column mapper dialog (opens after file pick) */}
+    {showCsvMapper && csvMapperFilePath && (
+      <CsvColumnMapperDialog
+        isOpen={showCsvMapper}
+        filePath={csvMapperFilePath}
+        onCancel={handleCsvMapperCancel}
+        onImportComplete={handleCsvMapperComplete}
+      />
+    )}
+    </>
   );
 }

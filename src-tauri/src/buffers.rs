@@ -55,6 +55,41 @@ pub async fn import_csv_to_buffer(file_path: String) -> Result<BufferMetadata, S
         .ok_or_else(|| "Failed to store frames in buffer".to_string())
 }
 
+/// Preview a CSV file: read first N rows, detect headers, suggest column mappings
+#[tauri::command(rename_all = "snake_case")]
+pub async fn preview_csv(
+    file_path: String,
+    max_rows: Option<usize>,
+) -> Result<io::CsvPreview, String> {
+    let max = max_rows.unwrap_or(20);
+    io::preview_csv_file(&file_path, max)
+}
+
+/// Import a CSV file with user-provided column mappings
+#[tauri::command(rename_all = "snake_case")]
+pub async fn import_csv_with_mapping(
+    file_path: String,
+    mappings: Vec<io::CsvColumnMapping>,
+    skip_first_row: bool,
+) -> Result<BufferMetadata, String> {
+    let filename = std::path::Path::new(&file_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown.csv")
+        .to_string();
+
+    let frames = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row)?;
+
+    if frames.is_empty() {
+        return Err("CSV file contains no valid frames with the given column mapping".to_string());
+    }
+
+    buffer_store::set_buffer(frames, filename);
+
+    buffer_store::get_metadata()
+        .ok_or_else(|| "Failed to store frames in buffer".to_string())
+}
+
 // ============================================================================
 // Active Buffer Commands (Legacy Single-Buffer API)
 // ============================================================================

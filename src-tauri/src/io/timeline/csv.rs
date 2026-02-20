@@ -104,6 +104,53 @@ impl IODevice for CsvReader {
     }
 }
 
+// ============================================================================
+// Flexible CSV column mapping types (for user-driven import)
+// ============================================================================
+
+/// Column role assignment for flexible CSV import
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CsvColumnRole {
+    Ignore,
+    FrameId,
+    Timestamp,
+    /// Space-separated hex bytes in one column (e.g., "62 6E 60 77 A9 01 22 35")
+    DataBytes,
+    /// Individual hex byte column (position determined by column order)
+    DataByte,
+    Dlc,
+    Extended,
+    Bus,
+    Direction,
+}
+
+/// A single column mapping: column index to its assigned role
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CsvColumnMapping {
+    pub column_index: usize,
+    pub role: CsvColumnRole,
+}
+
+/// Result of previewing a CSV file
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct CsvPreview {
+    /// Raw header strings (if first row is a header)
+    pub headers: Option<Vec<String>>,
+    /// First N rows of raw string values
+    pub rows: Vec<Vec<String>>,
+    /// Total number of data rows in the file (excluding header)
+    pub total_rows: usize,
+    /// Auto-detected column mappings (user can override)
+    pub suggested_mappings: Vec<CsvColumnMapping>,
+    /// Whether the first row appears to be a header
+    pub has_header: bool,
+}
+
+// ============================================================================
+// Legacy column indices (for GVRET/SavvyCAN auto-detect path)
+// ============================================================================
+
 /// Column indices for CSV parsing - detected from header
 #[derive(Debug, Clone)]
 struct CsvColumnIndices {
@@ -263,6 +310,536 @@ pub fn parse_csv_file(file_path: &str) -> Result<Vec<FrameMessage>, String> {
     }
 
     Ok(frames)
+}
+
+// ============================================================================
+// Flexible CSV import (user-driven column mapping)
+// ============================================================================
+
+/// Preview a CSV file: read first N rows, detect headers, suggest column mappings.
+pub fn preview_csv_file(file_path: &str, max_rows: usize) -> Result<CsvPreview, String> {
+    let file = File::open(file_path)
+        .map_err(|e| format!("Failed to open CSV file '{}': {}", file_path, e))?;
+    let reader = BufReader::new(file);
+
+    let mut all_rows: Vec<Vec<String>> = Vec::new();
+    let mut total_lines = 0usize;
+
+    for line_result in reader.lines() {
+        let line = line_result.map_err(|e| format!("Read error: {}", e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        total_lines += 1;
+        // Collect preview rows (up to max_rows + 1 for potential header)
+        if all_rows.len() <= max_rows {
+            let cells: Vec<String> = line.split(',').map(|s| s.trim().to_string()).collect();
+            all_rows.push(cells);
+        }
+    }
+
+    if all_rows.is_empty() {
+        return Err("CSV file is empty".to_string());
+    }
+
+    let has_header = detect_has_header(&all_rows[0]);
+
+    let (headers, data_rows, total_data_rows) = if has_header {
+        let h = all_rows[0].clone();
+        let data: Vec<Vec<String>> = all_rows[1..].to_vec();
+        (Some(h), data, total_lines - 1)
+    } else {
+        (None, all_rows.clone(), total_lines)
+    };
+
+    // Truncate data_rows to max_rows
+    let preview_rows: Vec<Vec<String>> = data_rows.into_iter().take(max_rows).collect();
+
+    // Suggest mappings
+    let num_columns = all_rows[0].len();
+    let header_slice = if has_header {
+        all_rows[0].as_slice()
+    } else {
+        &[]
+    };
+    let suggested = suggest_column_mappings(header_slice, &preview_rows, num_columns);
+
+    Ok(CsvPreview {
+        headers,
+        rows: preview_rows,
+        total_rows: total_data_rows,
+        suggested_mappings: suggested,
+        has_header,
+    })
+}
+
+/// Parse an entire CSV file using user-provided column mappings.
+pub fn parse_csv_with_mapping(
+    file_path: &str,
+    mappings: &[CsvColumnMapping],
+    skip_first_row: bool,
+) -> Result<Vec<FrameMessage>, String> {
+    let file = File::open(file_path)
+        .map_err(|e| format!("Failed to open CSV file '{}': {}", file_path, e))?;
+    let reader = BufReader::new(file);
+
+    // Build role -> column index lookups
+    let frame_id_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::FrameId))
+        .map(|m| m.column_index);
+    let timestamp_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::Timestamp))
+        .map(|m| m.column_index);
+    let data_bytes_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::DataBytes))
+        .map(|m| m.column_index);
+    let dlc_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::Dlc))
+        .map(|m| m.column_index);
+    let extended_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::Extended))
+        .map(|m| m.column_index);
+    let bus_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::Bus))
+        .map(|m| m.column_index);
+    let direction_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::Direction))
+        .map(|m| m.column_index);
+
+    // Collect individual data byte columns sorted by column index
+    let mut data_byte_cols: Vec<usize> = mappings
+        .iter()
+        .filter(|m| matches!(m.role, CsvColumnRole::DataByte))
+        .map(|m| m.column_index)
+        .collect();
+    data_byte_cols.sort();
+
+    if frame_id_col.is_none() {
+        return Err("Column mapping must include at least a Frame ID column".to_string());
+    }
+
+    let mut frames: Vec<FrameMessage> = Vec::new();
+    let mut line_number = 0usize;
+    let mut synthetic_timestamp: u64 = 0;
+    // Collect raw i64 timestamps so we can normalise after the loop
+    let mut raw_i64_timestamps: Vec<i64> = Vec::new();
+
+    for line_result in reader.lines() {
+        line_number += 1;
+        let line = line_result
+            .map_err(|e| format!("Read error at line {}: {}", line_number, e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        if line_number == 1 && skip_first_row {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.split(',').collect();
+
+        // Parse frame ID (required)
+        let id_str = match parts.get(frame_id_col.unwrap()) {
+            Some(s) => s.trim(),
+            None => continue,
+        };
+        let frame_id = match parse_hex_or_decimal_u32(id_str) {
+            Some(id) => id,
+            None => continue,
+        };
+
+        // Parse timestamp — store as i64 to preserve ordering for negative values.
+        // We'll normalise to u64 after collecting all frames.
+        let raw_timestamp = if let Some(ts_col) = timestamp_col {
+            parts
+                .get(ts_col)
+                .and_then(|s| s.trim().parse::<i64>().ok())
+                .unwrap_or_else(|| {
+                    synthetic_timestamp += 1000;
+                    synthetic_timestamp as i64
+                })
+        } else {
+            synthetic_timestamp += 1000;
+            synthetic_timestamp as i64
+        };
+        raw_i64_timestamps.push(raw_timestamp);
+        // Placeholder — will be corrected after the loop
+        let timestamp_us = 0u64;
+
+        // Parse data bytes
+        let bytes = if let Some(db_col) = data_bytes_col {
+            parts
+                .get(db_col)
+                .map(|s| parse_space_separated_hex(s.trim()))
+                .unwrap_or_default()
+        } else if !data_byte_cols.is_empty() {
+            data_byte_cols
+                .iter()
+                .filter_map(|&col| {
+                    parts.get(col).and_then(|s| {
+                        let s = s.trim();
+                        if s.is_empty() {
+                            None
+                        } else {
+                            let stripped = s
+                                .strip_prefix("0x")
+                                .or_else(|| s.strip_prefix("0X"))
+                                .unwrap_or(s);
+                            u8::from_str_radix(stripped, 16).ok()
+                        }
+                    })
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        let dlc = if let Some(dlc_c) = dlc_col {
+            parts
+                .get(dlc_c)
+                .and_then(|s| s.trim().parse::<u8>().ok())
+                .unwrap_or(bytes.len() as u8)
+        } else {
+            bytes.len() as u8
+        };
+
+        let is_extended = extended_col
+            .and_then(|c| parts.get(c))
+            .map(|s| s.trim().eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        let bus = bus_col
+            .and_then(|c| parts.get(c))
+            .and_then(|s| s.trim().parse::<u8>().ok())
+            .unwrap_or(0);
+
+        let direction = direction_col.and_then(|c| parts.get(c)).map(|s| {
+            if s.trim().eq_ignore_ascii_case("tx") {
+                "tx".to_string()
+            } else {
+                "rx".to_string()
+            }
+        });
+
+        frames.push(FrameMessage {
+            protocol: "can".to_string(),
+            timestamp_us,
+            frame_id,
+            bus,
+            dlc,
+            bytes,
+            is_extended,
+            is_fd: dlc > 8,
+            source_address: None,
+            incomplete: None,
+            direction,
+        });
+    }
+
+    // Normalise timestamps: offset so the minimum becomes 0, preserving order
+    if !raw_i64_timestamps.is_empty() && frames.len() == raw_i64_timestamps.len() {
+        let min_ts = raw_i64_timestamps.iter().copied().min().unwrap_or(0);
+        for (frame, &raw_ts) in frames.iter_mut().zip(raw_i64_timestamps.iter()) {
+            frame.timestamp_us = (raw_ts - min_ts) as u64;
+        }
+    }
+
+    Ok(frames)
+}
+
+// ============================================================================
+// Auto-detection helpers
+// ============================================================================
+
+/// Detect whether the first row looks like a header
+fn detect_has_header(first_row: &[String]) -> bool {
+    let header_keywords = [
+        "id", "time", "timestamp", "stamp", "dlc", "len", "length", "bus", "dir", "direction",
+        "ext", "extended", "data", "byte", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8",
+    ];
+    let lower: Vec<String> = first_row.iter().map(|s| s.to_lowercase()).collect();
+    let matches = lower
+        .iter()
+        .filter(|cell| header_keywords.iter().any(|kw| cell.contains(kw)))
+        .count();
+    matches >= 2
+}
+
+/// Suggest column role mappings based on headers and sample data
+fn suggest_column_mappings(
+    headers: &[String],
+    sample_rows: &[Vec<String>],
+    num_columns: usize,
+) -> Vec<CsvColumnMapping> {
+    let mut mappings = Vec::with_capacity(num_columns);
+
+    // First pass: detect roles per column independently
+    for col_idx in 0..num_columns {
+        let header = headers.get(col_idx).map(|h| h.to_lowercase());
+        let samples: Vec<&str> = sample_rows
+            .iter()
+            .filter_map(|row| row.get(col_idx).map(|s| s.as_str()))
+            .collect();
+
+        let role = guess_column_role(header.as_deref(), &samples);
+        mappings.push(CsvColumnMapping {
+            column_index: col_idx,
+            role,
+        });
+    }
+
+    // Second pass: disambiguate Bus and DLC from DataByte columns using context.
+    // Bus/DLC values ("0", "8") look like hex bytes to the first pass, but they
+    // have low cardinality and specific value ranges that distinguish them.
+
+    // Only run Bus/DLC disambiguation when we haven't already detected them via headers
+    let mut has_bus = mappings.iter().any(|m| m.role == CsvColumnRole::Bus);
+    let mut has_dlc = mappings.iter().any(|m| m.role == CsvColumnRole::Dlc);
+
+    if !has_bus || !has_dlc {
+        // Determine expected data length from already-detected columns.
+        // If we have a DataBytes column (space-separated hex), count its values.
+        let data_bytes_len = mappings.iter()
+            .find(|m| m.role == CsvColumnRole::DataBytes)
+            .and_then(|m| {
+                sample_rows.iter()
+                    .filter_map(|row| row.get(m.column_index))
+                    .find(|s| !s.is_empty())
+                    .map(|s| s.split_whitespace().count())
+            });
+
+        // For individual DataByte columns, the raw count includes Bus/DLC
+        // candidates. Pre-count metadata candidates (all-decimal, low cardinality,
+        // ≤64) so we can subtract them to get the true data byte count.
+        let data_byte_indices: Vec<usize> = mappings.iter()
+            .filter(|m| m.role == CsvColumnRole::DataByte)
+            .map(|m| m.column_index)
+            .collect();
+        let mut metadata_candidate_count = 0usize;
+        for &col_idx in &data_byte_indices {
+            let samples: Vec<&str> = sample_rows
+                .iter()
+                .filter_map(|row| row.get(col_idx).map(|s| s.as_str()))
+                .filter(|s| !s.is_empty())
+                .collect();
+            let parsed: Vec<u64> = samples.iter().filter_map(|s| s.parse::<u64>().ok()).collect();
+            if parsed.len() == samples.len() && !parsed.is_empty() {
+                let unique: std::collections::HashSet<u64> = parsed.iter().copied().collect();
+                if unique.len() <= 3 && parsed.iter().all(|&v| v <= 64) {
+                    metadata_candidate_count += 1;
+                }
+            }
+        }
+        let actual_data_byte_count = data_byte_indices.len().saturating_sub(metadata_candidate_count);
+        let expected_data_len = data_bytes_len.unwrap_or(actual_data_byte_count);
+
+        for mapping in mappings.iter_mut() {
+            if mapping.role != CsvColumnRole::DataByte {
+                continue;
+            }
+            let samples: Vec<&str> = sample_rows
+                .iter()
+                .filter_map(|row| row.get(mapping.column_index).map(|s| s.as_str()))
+                .filter(|s| !s.is_empty())
+                .collect();
+            if samples.is_empty() {
+                continue;
+            }
+
+            // Parse all values as decimal integers
+            let parsed: Vec<u64> = samples.iter().filter_map(|s| s.parse::<u64>().ok()).collect();
+            if parsed.len() != samples.len() {
+                // Not all values are decimal — likely a real data byte (hex like "A6")
+                continue;
+            }
+
+            let unique: std::collections::HashSet<u64> = parsed.iter().copied().collect();
+
+            // DLC: values match expected data length (e.g., all "8" when there are 8 data byte cols)
+            if !has_dlc && expected_data_len > 0
+                && parsed.iter().all(|&v| v <= 64)
+                && unique.len() <= 3
+                && unique.contains(&(expected_data_len as u64))
+            {
+                mapping.role = CsvColumnRole::Dlc;
+                has_dlc = true;
+                continue;
+            }
+
+            // Bus: all values 0-3, very low cardinality
+            if !has_bus && parsed.iter().all(|&v| v <= 3) && unique.len() <= 3 {
+                mapping.role = CsvColumnRole::Bus;
+                has_bus = true;
+            }
+        }
+    }
+
+    mappings
+}
+
+/// Guess the role of a single column from its header name and sample values
+fn guess_column_role(header: Option<&str>, samples: &[&str]) -> CsvColumnRole {
+    // 1. Header-based matching (strongest signal)
+    if let Some(h) = header {
+        if h == "id" || h == "frame_id" || h == "can_id" || h == "arb_id" || h == "arbitration_id"
+        {
+            return CsvColumnRole::FrameId;
+        }
+        if h.contains("time") || h.contains("stamp") {
+            return CsvColumnRole::Timestamp;
+        }
+        if h == "dlc" || h == "len" || h == "length" {
+            return CsvColumnRole::Dlc;
+        }
+        if h == "extended" || h == "ext" {
+            return CsvColumnRole::Extended;
+        }
+        if h == "bus" {
+            return CsvColumnRole::Bus;
+        }
+        if h == "dir" || h == "direction" {
+            return CsvColumnRole::Direction;
+        }
+        // "data bytes", "data", "payload"
+        if h.contains("data") && (h.contains("byte") || h.contains("payload")) {
+            return CsvColumnRole::DataBytes;
+        }
+        // d1, d2... or byte1, byte2... or data1, data2...
+        if h.starts_with('d') && h.len() <= 3 && h[1..].chars().all(|c| c.is_ascii_digit()) {
+            return CsvColumnRole::DataByte;
+        }
+        if (h.starts_with("byte") || h.starts_with("data"))
+            && h.chars()
+                .skip_while(|c| c.is_alphabetic())
+                .all(|c| c.is_ascii_digit())
+        {
+            return CsvColumnRole::DataByte;
+        }
+    }
+
+    // 2. Content-based matching
+    if samples.is_empty() {
+        return CsvColumnRole::Ignore;
+    }
+
+    let non_empty: Vec<&&str> = samples.iter().filter(|s| !s.is_empty()).collect();
+    if non_empty.is_empty() {
+        return CsvColumnRole::Ignore;
+    }
+
+    // Space-separated hex bytes (e.g., "62 6E 60 77 A9 01 22 35")
+    let space_hex_count = non_empty
+        .iter()
+        .filter(|s| {
+            let parts: Vec<&str> = s.split_whitespace().collect();
+            parts.len() >= 2
+                && parts
+                    .iter()
+                    .all(|p| p.len() <= 2 && u8::from_str_radix(p, 16).is_ok())
+        })
+        .count();
+    if space_hex_count > non_empty.len() / 2 {
+        return CsvColumnRole::DataBytes;
+    }
+
+    // Frame ID: 3-8 char hex strings (e.g., "00000286", "142", "1A3")
+    // Must be all hex digits, 3-8 chars, and parseable as u32
+    let frame_id_count = non_empty
+        .iter()
+        .filter(|s| {
+            let s = s.trim_start_matches("0x").trim_start_matches("0X");
+            s.len() >= 3
+                && s.len() <= 8
+                && s.chars().all(|c| c.is_ascii_hexdigit())
+                && u32::from_str_radix(s, 16).is_ok()
+        })
+        .count();
+    if frame_id_count > non_empty.len() / 2 {
+        return CsvColumnRole::FrameId;
+    }
+
+    // Boolean (true/false) → Extended
+    let bool_count = non_empty
+        .iter()
+        .filter(|s| s.eq_ignore_ascii_case("true") || s.eq_ignore_ascii_case("false"))
+        .count();
+    if bool_count > non_empty.len() / 2 {
+        return CsvColumnRole::Extended;
+    }
+
+    // Direction (tx/rx)
+    let dir_count = non_empty
+        .iter()
+        .filter(|s| s.eq_ignore_ascii_case("tx") || s.eq_ignore_ascii_case("rx"))
+        .count();
+    if dir_count > non_empty.len() / 2 {
+        return CsvColumnRole::Direction;
+    }
+
+    // Single hex byte (1-2 hex chars, e.g., "A6", "00", "FF")
+    let hex_byte_count = non_empty
+        .iter()
+        .filter(|s| s.len() <= 2 && u8::from_str_radix(s, 16).is_ok())
+        .count();
+    if hex_byte_count > non_empty.len() / 2 {
+        return CsvColumnRole::DataByte;
+    }
+
+    // Large numbers → Timestamp
+    let large_num_count = non_empty
+        .iter()
+        .filter(|s| {
+            // Handle negative timestamps too
+            let s = s.trim_start_matches('-');
+            s.parse::<u64>().map(|n| n > 1_000_000).unwrap_or(false)
+        })
+        .count();
+    if large_num_count > non_empty.len() / 2 {
+        return CsvColumnRole::Timestamp;
+    }
+
+    CsvColumnRole::Ignore
+}
+
+/// Parse a hex string (with or without 0x prefix) or decimal into u32
+fn parse_hex_or_decimal_u32(s: &str) -> Option<u32> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    if s.starts_with("0x") || s.starts_with("0X") {
+        u32::from_str_radix(&s[2..], 16).ok()
+    } else if s.len() == 8 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+        // 8-char hex without prefix (GVRET format)
+        u32::from_str_radix(s, 16).ok()
+    } else if s.len() <= 4
+        && s.chars().all(|c| c.is_ascii_hexdigit())
+        && s.chars().any(|c| c.is_ascii_alphabetic())
+    {
+        // Short hex like "1A3" - has non-decimal chars so must be hex
+        u32::from_str_radix(s, 16).ok()
+    } else {
+        s.parse().ok()
+    }
+}
+
+/// Parse space-separated hex bytes: "62 6E 60 77" -> [0x62, 0x6E, 0x60, 0x77]
+fn parse_space_separated_hex(s: &str) -> Vec<u8> {
+    s.split_whitespace()
+        .filter_map(|b| {
+            let stripped = b
+                .strip_prefix("0x")
+                .or_else(|| b.strip_prefix("0X"))
+                .unwrap_or(b);
+            u8::from_str_radix(stripped, 16).ok()
+        })
+        .collect()
 }
 
 /// Spawn a CSV reader task with scoped events and pause support

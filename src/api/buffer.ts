@@ -50,6 +50,85 @@ export async function importCsvToBuffer(filePath: string): Promise<BufferMetadat
   return invoke("import_csv_to_buffer", { file_path: filePath });
 }
 
+// ============================================================================
+// Flexible CSV Import API (column mapping)
+// ============================================================================
+
+/**
+ * Column role for CSV mapping
+ */
+export type CsvColumnRole =
+  | "ignore"
+  | "frame_id"
+  | "timestamp"
+  | "data_bytes"
+  | "data_byte"
+  | "dlc"
+  | "extended"
+  | "bus"
+  | "direction";
+
+/**
+ * A single column mapping: column index to role
+ */
+export interface CsvColumnMapping {
+  column_index: number;
+  role: CsvColumnRole;
+}
+
+/**
+ * Preview data from a CSV file
+ */
+export interface CsvPreview {
+  /** Header strings if first row is a header */
+  headers: string[] | null;
+  /** Preview data rows (raw cell strings) */
+  rows: string[][];
+  /** Total number of data rows in the file */
+  total_rows: number;
+  /** Auto-detected column mappings */
+  suggested_mappings: CsvColumnMapping[];
+  /** Whether the first row was detected as a header */
+  has_header: boolean;
+}
+
+/**
+ * Preview a CSV file: reads first N rows, detects headers, suggests column mappings.
+ *
+ * @param filePath - Full path to the CSV file
+ * @param maxRows - Maximum preview rows (default: 20)
+ * @returns Preview data with suggested mappings
+ */
+export async function previewCsv(
+  filePath: string,
+  maxRows?: number
+): Promise<CsvPreview> {
+  return invoke("preview_csv", {
+    file_path: filePath,
+    max_rows: maxRows ?? null,
+  });
+}
+
+/**
+ * Import a CSV file with user-provided column mappings.
+ *
+ * @param filePath - Full path to the CSV file
+ * @param mappings - Column role assignments
+ * @param skipFirstRow - Whether to skip the first row (header)
+ * @returns Buffer metadata for the imported data
+ */
+export async function importCsvWithMapping(
+  filePath: string,
+  mappings: CsvColumnMapping[],
+  skipFirstRow: boolean
+): Promise<BufferMetadata> {
+  return invoke("import_csv_with_mapping", {
+    file_path: filePath,
+    mappings,
+    skip_first_row: skipFirstRow,
+  });
+}
+
 /**
  * Get the current buffer metadata.
  * Returns null if no data is loaded.

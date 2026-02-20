@@ -6,6 +6,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **CSV column mapper dialog**: CSV import now opens an interactive dialog that auto-detects column roles (Frame ID, Timestamp, Data Bytes, individual Data Byte, DLC, Bus, Extended, Direction) from headers and content heuristics. Users can override any assignment via dropdowns before importing. Supports both combined hex data columns (`"62 6E 60 77 A9 01 22 35"`) and individual byte columns. Colour-coded by role for easy scanning.
+
 - **Apps menu**: Query, Graph, and Sessions now appear in the native menu bar. Session-aware apps are grouped first (Cmd+1–5), tool apps second (Cmd+6–8).
 
 - **Session menu greying out**: Session menu items (Select Source, Play, Pause, Stop, Clear, etc.) are now disabled when the focused app does not use sessions (e.g. Catalog Editor, Calculator, Settings).

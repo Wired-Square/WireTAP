@@ -885,6 +885,8 @@ pub fn run() {
             io::get_active_listeners,
             // Buffer / CSV Import API
             buffers::import_csv_to_buffer,
+            buffers::preview_csv,
+            buffers::import_csv_with_mapping,
             buffers::get_buffer_metadata,
             buffers::clear_buffer,
             buffers::get_buffer_frames,
