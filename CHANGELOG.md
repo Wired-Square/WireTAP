@@ -18,6 +18,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Decoder mirror icon**: Mirror frame badge now uses the Layers icon to match the Catalog Editor tree.
+
 - **Transmit stale closure bug**: Session control menu commands (Play, Stop) in Transmit could reference stale state because the event listener was re-registered on every state change instead of using a ref.
 
 ### Changed

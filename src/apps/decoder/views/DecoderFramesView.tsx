@@ -1,7 +1,7 @@
 // ui/src/apps/decoder/views/DecoderFramesView.tsx
 
 import { useRef, useEffect, useState, useMemo } from "react";
-import { Calculator, Star, Clock, Check, X, ArrowDownRight } from "lucide-react";
+import { Calculator, Star, Clock, Check, X, Layers } from "lucide-react";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
 import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
@@ -542,7 +542,7 @@ function FrameCard({
         {/* Mirror frame badge */}
         {frame.mirrorOf && (
           <span className={badgeDarkPanelCyan} title={`Inherits signals from frame ${frame.mirrorOf}`}>
-            <ArrowDownRight className={iconXs} />
+            <Layers className={iconXs} />
             Mirror of {formatFrameId(parseCanId(frame.mirrorOf) ?? 0, displayFrameIdFormat)}
           </span>
         )}
