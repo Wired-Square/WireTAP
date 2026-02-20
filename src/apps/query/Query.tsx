@@ -5,9 +5,9 @@
 // session to visualise discovered timeslices.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useSettings } from "../../hooks/useSettings";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
+import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useQueryStore } from "./stores/queryStore";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useQueryHandlers } from "./hooks/useQueryHandlers";
@@ -77,37 +77,6 @@ export default function Query() {
     "catalogPicker",
     "addBookmark",
   ] as const);
-
-  // Listen for session control menu commands
-  useEffect(() => {
-    const currentWindow = getCurrentWebviewWindow();
-
-    const setupListeners = async () => {
-      const unlistenControl = await currentWindow.listen<{ action: string; targetPanelId: string | null; windowLabel?: string }>(
-        "session-control",
-        (event) => {
-          const { action, targetPanelId, windowLabel } = event.payload;
-          if (windowLabel && windowLabel !== currentWindow.label) return;
-          if (targetPanelId !== "query") return;
-
-          switch (action) {
-            case "picker":
-              dialogs.ioReaderPicker.open();
-              break;
-          }
-        }
-      );
-
-      return () => {
-        unlistenControl();
-      };
-    };
-
-    const cleanup = setupListeners();
-    return () => {
-      cleanup.then((fn) => fn());
-    };
-  }, [dialogs.ioReaderPicker]);
 
   // Load catalogs when decoder directory changes
   useEffect(() => {
@@ -214,12 +183,30 @@ export default function Query() {
     watchSingleSource,
     stopWatch,
     skipReader,
+    ioProfileName,
     isStreaming,
+    isPaused,
     isStopped,
+    joinerCount,
     handleLeave,
     capabilities,
     session,
   } = manager;
+
+  // ── Menu session control ──
+  useMenuSessionControl({
+    panelId: "query",
+    sessionState: {
+      profileName: ioProfileName ?? null,
+      isStreaming,
+      isPaused,
+      capabilities,
+      joinerCount,
+    },
+    callbacks: {
+      onPicker: () => dialogs.ioReaderPicker.open(),
+    },
+  });
 
   // Compose all handlers using the orchestrator hook
   const handlers = useQueryHandlers({

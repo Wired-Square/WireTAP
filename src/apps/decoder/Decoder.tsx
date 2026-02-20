@@ -2,16 +2,15 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { invoke } from "@tauri-apps/api/core";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
 import { useDecoderStore } from "../../stores/decoderStore";
-import { useIOSessionManager, type SessionReconfigurationInfo, isBufferProfileId } from '../../hooks/useIOSessionManager';
+import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOPickerHandlers } from '../../hooks/useIOPickerHandlers';
+import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
 import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
+import { useFocusStore } from '../../stores/focusStore';
 import { getFavoritesForProfile } from "../../utils/favorites";
 import { mergeSerialConfigForWatch } from "../../utils/sessionConfigMerge";
-import { useFocusStore } from '../../stores/focusStore';
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { clearBuffer } from "../../api/buffer";
 import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
@@ -42,7 +41,7 @@ export default function Decoder() {
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [showTimeRange, setShowTimeRange] = useState(false);
 
-  // Track if this panel is focused (for menu state reporting)
+  // Track if this panel is focused (for scroll position restoration)
   const isFocused = useFocusStore((s) => s.focusedPanelId === "decoder");
 
   // Dialog visibility states managed by hook
@@ -660,143 +659,43 @@ export default function Decoder() {
     mergeOptions: (options) => mergeSerialConfigForWatch(useDecoderStore.getState().serialConfig, options),
   });
 
-  // Report session state to menu when this panel is focused
-  useEffect(() => {
-    if (isFocused) {
-      invoke("update_menu_session_state", {
-        profileName: ioProfileName ?? null,
-        isStreaming,
-        isPaused,
-        canPause: capabilities?.can_pause ?? false,
-        joinerCount: joinerCount ?? 1,
-      });
-    }
-  }, [isFocused, ioProfileName, isStreaming, isPaused, capabilities, joinerCount]);
-
-  // Report bookmarks to menu when focused or profile changes
-  // Use sourceProfileId for lookups (falls back to ioProfile for realtime sources where session ID = profile ID)
+  // ── Menu session control ──
   const bookmarkProfileId = sourceProfileId || ioProfile;
-  useEffect(() => {
-    const updateBookmarksMenu = async () => {
-      if (isFocused) {
-        if (bookmarkProfileId && !isBufferProfileId(bookmarkProfileId)) {
+  useMenuSessionControl({
+    panelId: "decoder",
+    sessionState: {
+      profileName: ioProfileName ?? null,
+      isStreaming,
+      isPaused,
+      capabilities,
+      joinerCount,
+    },
+    callbacks: {
+      onPlay: () => {
+        if (isPaused) resume();
+        else if (isStopped && isReady) start();
+      },
+      onPause: () => {
+        if (isStreaming && !isPaused) pause();
+      },
+      onStop: () => {
+        if (isStreaming && !isPaused) pause();
+      },
+      onStopAll: () => {
+        if (isStreaming) stopWatch();
+      },
+      onClear: () => handlers.handleClear(),
+      onPicker: () => dialogs.ioReaderPicker.open(),
+      onJumpToBookmark: async (bookmarkId) => {
+        if (bookmarkProfileId) {
           const bookmarks = await getFavoritesForProfile(bookmarkProfileId);
-          await invoke("update_bookmarks_menu", {
-            bookmarks: bookmarks.map((b) => ({ id: b.id, name: b.name })),
-          });
-        } else {
-          // No profile or buffer mode - clear bookmarks menu
-          await invoke("update_bookmarks_menu", { bookmarks: [] });
+          const bookmark = bookmarks.find((b) => b.id === bookmarkId);
+          if (bookmark) await jumpToBookmark(bookmark);
         }
-      }
-    };
-    updateBookmarksMenu();
-  }, [isFocused, bookmarkProfileId]);
-
-  // Listen for session control menu commands
-  // Refs for menu command handlers to avoid stale closures and effect re-runs
-  const menuStateRef = useRef({
-    isPaused,
-    isStopped,
-    isStreaming,
-    isReady,
-    resume,
-    start,
-    pause,
-    stopWatch,
-    handlers,
-    dialogs,
-    bookmarkProfileId,
-    jumpToBookmark,
+      },
+    },
+    bookmarks: { profileId: bookmarkProfileId },
   });
-  // Keep ref in sync with current values
-  menuStateRef.current = {
-    isPaused,
-    isStopped,
-    isStreaming,
-    isReady,
-    resume,
-    start,
-    pause,
-    stopWatch,
-    handlers,
-    dialogs,
-    bookmarkProfileId,
-    jumpToBookmark,
-  };
-
-  // Listen for session control menu commands
-  // Uses ref to access current state without re-running effect on every state change
-  useEffect(() => {
-    const currentWindow = getCurrentWebviewWindow();
-
-    const setupListeners = async () => {
-      // Session control events from menu (only respond when targeted)
-      const unlistenControl = await currentWindow.listen<{ action: string; targetPanelId: string | null; windowLabel?: string; bookmarkId?: string }>(
-        "session-control",
-        async (event) => {
-          const { action, targetPanelId, windowLabel, bookmarkId } = event.payload;
-          if (windowLabel && windowLabel !== currentWindow.label) return;
-          if (targetPanelId !== "decoder") return;
-
-          // Access current state via ref to avoid stale closures
-          const state = menuStateRef.current;
-
-          switch (action) {
-            case "play":
-              if (state.isPaused) {
-                state.resume();
-              } else if (state.isStopped && state.isReady) {
-                state.start();
-              }
-              break;
-            case "pause":
-              if (state.isStreaming && !state.isPaused) {
-                state.pause();
-              }
-              break;
-            case "stop":
-              // Pause frame delivery (like timeline Pause button)
-              if (state.isStreaming && !state.isPaused) {
-                state.pause();
-              }
-              break;
-            case "stopAll":
-              // Stop this app's watch (like top bar Stop button)
-              if (state.isStreaming) {
-                state.stopWatch();
-              }
-              break;
-            case "clear":
-              state.handlers.handleClear();
-              break;
-            case "picker":
-              state.dialogs.ioReaderPicker.open();
-              break;
-            case "jump-to-bookmark":
-              // Jump to bookmark from menu (use sourceProfileId for recorded sources)
-              if (bookmarkId && state.bookmarkProfileId) {
-                const bookmarks = await getFavoritesForProfile(state.bookmarkProfileId);
-                const bookmark = bookmarks.find((b) => b.id === bookmarkId);
-                if (bookmark) {
-                  await state.jumpToBookmark(bookmark);
-                }
-              }
-              break;
-          }
-        }
-      );
-
-      return () => {
-        unlistenControl();
-      };
-    };
-
-    const cleanup = setupListeners();
-    return () => {
-      cleanup.then((fn) => fn());
-    };
-  }, []); // Empty deps - effect runs once, uses ref for current values
 
   // Note: Watch state is cleared automatically by useIOSessionManager when streaming stops
 

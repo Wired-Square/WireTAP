@@ -41,6 +41,15 @@ export {
   type SaveDialogOptions,
 } from "./dialogs";
 
+// Menu API
+export {
+  updateMenuSessionState,
+  updateBookmarksMenu,
+  updateMenuFocusState,
+  type MenuSessionState,
+  type BookmarkMenuInfo,
+} from "./menu";
+
 // Checksum API
 export {
   calculateChecksum,

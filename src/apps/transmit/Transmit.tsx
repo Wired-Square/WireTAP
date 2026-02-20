@@ -4,13 +4,11 @@
 // Uses useIOSessionManager for session management and useTransmitHandlers for business logic.
 
 import { useEffect, useCallback, useMemo, useState } from "react";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { invoke } from "@tauri-apps/api/core";
 import { Send, AlertCircle } from "lucide-react";
 import { useTransmitStore } from "../../stores/transmitStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
-import { useFocusStore } from "../../stores/focusStore";
+import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useSettings, type IOProfile } from "../../hooks/useSettings";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
 import { useTransmitHistorySubscription } from "./hooks/useTransmitHistorySubscription";
@@ -71,9 +69,6 @@ export default function Transmit() {
   // Settings for IO profiles
   const { settings } = useSettings();
   const ioProfiles = settings?.io_profiles ?? [];
-
-  // Track if this panel is focused (for menu state reporting)
-  const isFocused = useFocusStore((s) => s.focusedPanelId === "transmit");
 
   // Get all CAN/serial profiles that could potentially be used for transmit
   const transmitProfiles = useMemo(
@@ -187,67 +182,29 @@ export default function Transmit() {
     };
   }, [cleanup]);
 
-  // Report session state to menu when this panel is focused
-  useEffect(() => {
-    if (isFocused) {
-      invoke("update_menu_session_state", {
-        profileName: ioProfileName ?? null,
-        isStreaming,
-        isPaused,
-        canPause: capabilities?.can_pause ?? false,
-        joinerCount: joinerCount ?? 1,
-      });
-    }
-  }, [isFocused, ioProfileName, isStreaming, isPaused, capabilities, joinerCount]);
-
-  // Listen for session control menu commands
-  useEffect(() => {
-    const currentWindow = getCurrentWebviewWindow();
-
-    const setupListeners = async () => {
-      const unlistenControl = await currentWindow.listen<{ action: string; targetPanelId: string | null; windowLabel?: string }>(
-        "session-control",
-        (event) => {
-          const { action, targetPanelId, windowLabel } = event.payload;
-          if (windowLabel && windowLabel !== currentWindow.label) return;
-          if (targetPanelId !== "transmit") return;
-
-          switch (action) {
-            case "play":
-              if (isStopped && sessionReady) {
-                start();
-              }
-              break;
-            case "stop":
-              // Stop this app's connection (leave session)
-              if (isStreaming || isPaused) {
-                leave();
-              }
-              break;
-            case "stopAll":
-              // Stop the entire session for all apps
-              if (isStreaming || isPaused) {
-                stop();
-              }
-              break;
-            case "picker":
-              setShowIoPickerDialog(true);
-              break;
-            // Note: Transmit doesn't use pause/clear
-          }
-        }
-      );
-
-      return () => {
-        unlistenControl();
-      };
-    };
-
-    const cleanup = setupListeners();
-    return () => {
-      cleanup.then((fn) => fn());
-    };
-  }, [isStopped, isStreaming, isPaused, sessionReady, start, stop, leave, setShowIoPickerDialog]);
+  // ── Menu session control ──
+  useMenuSessionControl({
+    panelId: "transmit",
+    sessionState: {
+      profileName: ioProfileName ?? null,
+      isStreaming,
+      isPaused,
+      capabilities,
+      joinerCount,
+    },
+    callbacks: {
+      onPlay: () => {
+        if (isStopped && sessionReady) start();
+      },
+      onStop: () => {
+        if (isStreaming || isPaused) leave();
+      },
+      onStopAll: () => {
+        if (isStreaming || isPaused) stop();
+      },
+      onPicker: () => setShowIoPickerDialog(true),
+    },
+  });
 
   // Subscribe to transmit history events from repeat transmissions
   useTransmitHistorySubscription({ profileName: ioProfileName ?? null });

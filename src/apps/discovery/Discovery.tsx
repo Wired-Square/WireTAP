@@ -2,12 +2,10 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { emit } from "@tauri-apps/api/event";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { invoke } from "@tauri-apps/api/core";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOPickerHandlers } from '../../hooks/useIOPickerHandlers';
-import { useFocusStore } from '../../stores/focusStore';
+import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
@@ -44,8 +42,7 @@ import { getFavoritesForProfile } from "../../utils/favorites";
 export default function Discovery() {
   const { settings } = useSettings();
 
-  // Track if this panel is focused (for menu state reporting)
-  const isFocused = useFocusStore((s) => s.focusedPanelId === "discovery");
+
 
   // Zustand store selectors
   const frames = useDiscoveryStore((state) => state.frames);
@@ -702,177 +699,50 @@ export default function Discovery() {
     closeIoReaderPicker: dialogs.ioReaderPicker.close,
   });
 
-  // Report session state to menu when this panel is focused
-  useEffect(() => {
-    if (isFocused) {
-      invoke("update_menu_session_state", {
-        profileName: ioProfileName ?? null,
-        isStreaming,
-        isPaused,
-        canPause: capabilities?.can_pause ?? false,
-        joinerCount: joinerCount ?? 1,
-      });
-    }
-  }, [isFocused, ioProfileName, isStreaming, isPaused, capabilities, joinerCount]);
-
-  // Report bookmarks to menu when focused or profile changes
-  useEffect(() => {
-    const updateBookmarksMenu = async () => {
-      if (isFocused) {
+  // ── Menu session control ──
+  const bookmarkProfileId = sourceProfileId || ioProfile;
+  useMenuSessionControl({
+    panelId: "discovery",
+    sessionState: {
+      profileName: ioProfileName ?? null,
+      isStreaming,
+      isPaused,
+      capabilities,
+      joinerCount,
+    },
+    callbacks: {
+      onPlay: () => {
+        if (isPaused) resume();
+        else if (isStopped && sessionReady) resumeWithNewBuffer();
+      },
+      onPause: () => {
+        if (isStreaming && !isPaused) pause();
+      },
+      onStop: () => {
+        if (isStreaming && !isPaused) pause();
+      },
+      onStopAll: () => {
+        if (isStreaming) stopWatch();
+      },
+      onClear: () => handlers.handleClearDiscoveredFrames(),
+      onPicker: () => dialogs.ioReaderPicker.open(),
+      onJumpToBookmark: async (bookmarkId) => {
         const profileId = sourceProfileId || ioProfile;
-        if (profileId && !isBufferProfileId(profileId)) {
+        if (profileId) {
           const bookmarks = await getFavoritesForProfile(profileId);
-          await invoke("update_bookmarks_menu", {
-            bookmarks: bookmarks.map((b) => ({ id: b.id, name: b.name })),
-          });
-        } else {
-          // No profile or buffer mode - clear bookmarks menu
-          await invoke("update_bookmarks_menu", { bookmarks: [] });
+          const bookmark = bookmarks.find((b) => b.id === bookmarkId);
+          if (bookmark) await jumpToBookmark(bookmark);
         }
-      }
-    };
-    updateBookmarksMenu();
-  }, [isFocused, ioProfile, sourceProfileId]);
-
-  // Refs for menu command handlers to avoid stale closures and effect re-runs
-  const menuStateRef = useRef({
-    isPaused,
-    isStopped,
-    isStreaming,
-    sessionReady,
-    resume,
-    resumeWithNewBuffer,
-    pause,
-    stopWatch,
-    handlers,
-    currentTime,
-    dialogs,
-    sourceProfileId,
-    ioProfile,
-    jumpToBookmark,
+      },
+      onBookmarkSave: () => {
+        const timeUs = currentTime !== null ? currentTime * 1_000_000 : 0;
+        setBookmarkFrameId(0);
+        setBookmarkFrameTime(new Date(timeUs / 1000).toISOString());
+        dialogs.bookmark.open();
+      },
+    },
+    bookmarks: { profileId: bookmarkProfileId },
   });
-  // Keep ref in sync with current values
-  menuStateRef.current = {
-    isPaused,
-    isStopped,
-    isStreaming,
-    sessionReady,
-    resume,
-    resumeWithNewBuffer,
-    pause,
-    stopWatch,
-    handlers,
-    currentTime,
-    dialogs,
-    sourceProfileId,
-    ioProfile,
-    jumpToBookmark,
-  };
-
-  // Listen for session control menu commands
-  // Uses ref to access current state without re-running effect on every state change
-  useEffect(() => {
-    const currentWindow = getCurrentWebviewWindow();
-
-    const setupListeners = async () => {
-      // Session control events from menu (only respond when targeted)
-      const unlistenControl = await currentWindow.listen<{ action: string; targetPanelId: string | null; windowLabel?: string; bookmarkId?: string }>(
-        "session-control",
-        async (event) => {
-          const { action, targetPanelId, windowLabel, bookmarkId } = event.payload;
-          if (windowLabel && windowLabel !== currentWindow.label) return;
-          if (targetPanelId !== "discovery") return;
-
-          // Access current state via ref to avoid stale closures
-          const state = menuStateRef.current;
-
-          switch (action) {
-            case "play":
-              if (state.isPaused) {
-                state.resume();
-              } else if (state.isStopped && state.sessionReady) {
-                state.resumeWithNewBuffer();
-              }
-              break;
-            case "pause":
-              if (state.isStreaming && !state.isPaused) {
-                state.pause();
-              }
-              break;
-            case "stop":
-              // Pause frame delivery (like timeline Pause button)
-              if (state.isStreaming && !state.isPaused) {
-                state.pause();
-              }
-              break;
-            case "stopAll":
-              // Stop this app's watch (like top bar Stop button)
-              if (state.isStreaming) {
-                state.stopWatch();
-              }
-              break;
-            case "clear":
-              state.handlers.handleClearDiscoveredFrames();
-              break;
-            case "picker":
-              state.dialogs.ioReaderPicker.open();
-              break;
-            case "jump-to-bookmark":
-              // Jump to bookmark from menu
-              if (bookmarkId) {
-                const profileId = state.sourceProfileId || state.ioProfile;
-                if (profileId) {
-                  const bookmarks = await getFavoritesForProfile(profileId);
-                  const bookmark = bookmarks.find((b) => b.id === bookmarkId);
-                  if (bookmark) {
-                    await state.jumpToBookmark(bookmark);
-                  }
-                }
-              }
-              break;
-          }
-        }
-      );
-
-      // Save bookmark from menu - open dialog with current time (Discovery only)
-      const unlistenBookmark = await currentWindow.listen<{ targetPanelId: string | null } | undefined>(
-        "menu-bookmark-save",
-        () => {
-          // Access current state via ref
-          const state = menuStateRef.current;
-          // Bookmark save is Discovery-specific, always respond
-          const timeUs = state.currentTime !== null ? state.currentTime * 1_000_000 : 0;
-          setBookmarkFrameId(0); // No specific frame
-          setBookmarkFrameTime(new Date(timeUs / 1000).toISOString());
-          state.dialogs.bookmark.open();
-        }
-      );
-
-      return () => {
-        unlistenControl();
-        unlistenBookmark();
-      };
-    };
-
-    let cleanupFn: (() => void) | null = null;
-    let mounted = true;
-
-    setupListeners().then((fn) => {
-      if (mounted) {
-        cleanupFn = fn;
-      } else {
-        // Component unmounted before listeners were set up - clean up immediately
-        fn();
-      }
-    });
-
-    return () => {
-      mounted = false;
-      if (cleanupFn) {
-        cleanupFn();
-      }
-    };
-  }, []); // Empty deps - effect runs once, uses ref for current values
 
 
   return (

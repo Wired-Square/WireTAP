@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSettings } from "../../hooks/useSettings";
 import { useGraphStore, type SignalValueEntry } from "../../stores/graphStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
+import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useIOPickerHandlers } from "../../hooks/useIOPickerHandlers";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { mergeSerialConfig } from "../../utils/sessionConfigMerge";
@@ -178,13 +179,18 @@ export default function Graph() {
   const {
     // Session
     session,
+    // Profile
+    ioProfileName,
     // Multi-bus state
     multiBusProfiles,
     // Derived state
     isStreaming,
+    isPaused,
     isStopped,
+    sessionReady,
     capabilities,
     isDetached,
+    joinerCount,
     handleLeave,
     resumeWithNewBuffer,
     // Watch state
@@ -200,6 +206,38 @@ export default function Graph() {
     manager,
     closeDialog: () => dialogs.ioReaderPicker.close(),
     mergeOptions: (options) => mergeSerialConfig(useGraphStore.getState().serialConfig, options),
+  });
+
+  // ── Menu session control ──
+  useMenuSessionControl({
+    panelId: "graph",
+    sessionState: {
+      profileName: ioProfileName ?? null,
+      isStreaming,
+      isPaused,
+      capabilities,
+      joinerCount,
+    },
+    callbacks: {
+      onPlay: () => {
+        if (isPaused) {
+          session.resume();
+        } else if (isStopped && sessionReady) {
+          session.start();
+        }
+      },
+      onPause: () => {
+        if (isStreaming && !isPaused) session.pause();
+      },
+      onStop: () => {
+        if (isStreaming && !isPaused) session.pause();
+      },
+      onStopAll: () => {
+        if (isStreaming) stopWatch();
+      },
+      onClear: clearData,
+      onPicker: () => dialogs.ioReaderPicker.open(),
+    },
   });
 
   // ── Initialise from settings ──

@@ -6,6 +6,24 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Apps menu**: Query, Graph, and Sessions now appear in the native menu bar. Session-aware apps are grouped first (Cmd+1–5), tool apps second (Cmd+6–8).
+
+- **Session menu greying out**: Session menu items (Select Source, Play, Pause, Stop, Clear, etc.) are now disabled when the focused app does not use sessions (e.g. Catalog Editor, Calculator, Settings).
+
+- **Bookmark menu greying out**: Save Bookmark and Jump to Bookmark are now disabled when the focused app does not support bookmarks (only Discovery and Decoder do).
+
+- **Graph menu integration**: Select Source, Play, Pause, Stop, and Clear Frames now work from the menu when Graph is focused.
+
+- **Query menu state reporting**: Query now reports its session state to the menu bar when focused, showing the connected source name.
+
+### Fixed
+
+- **Transmit stale closure bug**: Session control menu commands (Play, Stop) in Transmit could reference stale state because the event listener was re-registered on every state change instead of using a ref.
+
+### Changed
+
+- **Centralised session control hook** (`useMenuSessionControl`): Replaced duplicated session-control event listeners and menu state reporting across Decoder, Discovery, Transmit, Query, and Graph with a single shared hook (~400 lines removed).
+
 - **FramePicker selection set dropdown**: Replaced the Star icon with a `<select>` dropdown for quick switching between selection sets. Star icon now saves as a new set, save icon saves to the active set.
 
 - **Selection Sets in Settings**: New "Selection Sets" section in Settings (under Bookmarks) for managing selection sets — rename and delete sets without opening the frame picker.

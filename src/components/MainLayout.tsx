@@ -32,7 +32,7 @@ import {
   removeOpenMainWindow,
   getNextMainWindowNumber,
 } from "../utils/persistence";
-import { getAppVersion, settingsPanelClosed, openSettingsPanel } from "../api";
+import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuFocusState } from "../api";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
 import logo from "../assets/logo.png";
@@ -521,6 +521,17 @@ export default function MainLayout() {
       cleanup.then((fn) => fn());
     };
   }, [handlePanelClick]);
+
+  // Update native menu item availability based on focused panel's capabilities
+  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "graph"]));
+  const BOOKMARK_AWARE_PANELS = useRef(new Set(["discovery", "decoder"]));
+  const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
+
+  useEffect(() => {
+    const hasSession = focusedPanelId !== null && SESSION_AWARE_PANELS.current.has(focusedPanelId);
+    const hasBookmarks = focusedPanelId !== null && BOOKMARK_AWARE_PANELS.current.has(focusedPanelId);
+    updateMenuFocusState(hasSession, hasBookmarks);
+  }, [focusedPanelId]);
 
   // Listen for session control menu commands
   // These are re-emitted as session-control events with the target panel ID

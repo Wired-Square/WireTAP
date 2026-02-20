@@ -115,9 +115,11 @@ struct SettingsWindowState(Mutex<Option<String>>);
 #[cfg(not(target_os = "ios"))]
 struct SessionMenuItems {
     source: MenuItem<Wry>,
+    picker: MenuItem<Wry>,
     play: MenuItem<Wry>,
     pause: MenuItem<Wry>,
     stop: MenuItem<Wry>,
+    clear: MenuItem<Wry>,
     detach: MenuItem<Wry>,
     stop_all: MenuItem<Wry>,
 }
@@ -129,6 +131,15 @@ struct SessionMenuState(Mutex<Option<SessionMenuItems>>);
 #[cfg(not(target_os = "ios"))]
 struct BookmarksMenuState(Mutex<Option<Submenu<Wry>>>);
 
+// Store references to bookmark menu items for dynamic enable/disable
+#[cfg(not(target_os = "ios"))]
+struct BookmarkMenuItems {
+    save: MenuItem<Wry>,
+}
+
+#[cfg(not(target_os = "ios"))]
+struct BookmarkMenuItemState(Mutex<Option<BookmarkMenuItems>>);
+
 // iOS stub types for menu state (not used, but needed for compilation)
 #[cfg(target_os = "ios")]
 #[allow(dead_code)]
@@ -136,6 +147,9 @@ struct SessionMenuState(Mutex<()>);
 #[cfg(target_os = "ios")]
 #[allow(dead_code)]
 struct BookmarksMenuState(Mutex<()>);
+#[cfg(target_os = "ios")]
+#[allow(dead_code)]
+struct BookmarkMenuItemState(Mutex<()>);
 
 // Bookmark info received from frontend for menu display
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -305,6 +319,11 @@ fn update_menu_session_state(
 
         // Stop Session: enabled when streaming (stops entire session for all apps)
         let _ = items.stop_all.set_enabled(is_streaming);
+
+        // Picker and Clear: always enabled when a session-aware app is focused
+        // (they're disabled entirely via update_menu_focus_state for non-session apps)
+        let _ = items.picker.set_enabled(true);
+        let _ = items.clear.set_enabled(true);
     }
 }
 
@@ -346,6 +365,45 @@ fn update_bookmarks_menu(
         }
     }
     Ok(())
+}
+
+/// Update menu item availability based on the focused app's capabilities.
+/// Called by the frontend when panel focus changes. Disables session and bookmark
+/// menu items when the focused app doesn't support those features.
+#[cfg(not(target_os = "ios"))]
+#[tauri::command]
+fn update_menu_focus_state(
+    session_state: State<SessionMenuState>,
+    bookmark_item_state: State<BookmarkMenuItemState>,
+    bookmarks_menu_state: State<BookmarksMenuState>,
+    has_session: bool,
+    has_bookmarks: bool,
+) {
+    // Enable/disable all session menu items based on whether focused app uses sessions
+    if let Some(items) = session_state.0.lock().unwrap().as_ref() {
+        if !has_session {
+            let _ = items.source.set_text("No source selected");
+            let _ = items.picker.set_enabled(false);
+            let _ = items.play.set_enabled(false);
+            let _ = items.pause.set_enabled(false);
+            let _ = items.stop.set_enabled(false);
+            let _ = items.clear.set_enabled(false);
+            let _ = items.detach.set_enabled(false);
+            let _ = items.stop_all.set_enabled(false);
+        }
+        // When has_session is true, the app will call update_menu_session_state
+        // with fine-grained state shortly after focus
+    }
+
+    // Enable/disable bookmark items
+    if let Some(items) = bookmark_item_state.0.lock().unwrap().as_ref() {
+        let _ = items.save.set_enabled(has_bookmarks);
+    }
+
+    // Enable/disable jump-to-bookmark submenu
+    if let Some(submenu) = bookmarks_menu_state.0.lock().unwrap().as_ref() {
+        let _ = submenu.set_enabled(has_bookmarks);
+    }
 }
 
 /// Create a new main window with the specified label.
@@ -424,6 +482,18 @@ fn update_bookmarks_menu(
     Ok(()) // No-op on iOS
 }
 
+#[cfg(target_os = "ios")]
+#[tauri::command]
+fn update_menu_focus_state(
+    _session_state: State<SessionMenuState>,
+    _bookmark_item_state: State<BookmarkMenuItemState>,
+    _bookmarks_menu_state: State<BookmarksMenuState>,
+    _has_session: bool,
+    _has_bookmarks: bool,
+) {
+    // No-op on iOS
+}
+
 /// Setup menus for desktop platforms (not available on iOS)
 #[cfg(not(target_os = "ios"))]
 fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -436,7 +506,7 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
         .quit()
         .build()?;
 
-    // Create Apps menu items
+    // Create Apps menu items -- session-aware apps first (1-5), then tools (6-8)
     let discovery_item = MenuItemBuilder::with_id("app-discovery", "Discovery")
         .accelerator("cmdOrCtrl+1")
         .build(app)?;
@@ -446,11 +516,20 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
     let transmit_item = MenuItemBuilder::with_id("app-transmit", "Transmit")
         .accelerator("cmdOrCtrl+3")
         .build(app)?;
-    let catalog_item = MenuItemBuilder::with_id("app-catalog-editor", "Catalog Editor")
+    let query_item = MenuItemBuilder::with_id("app-query", "Query")
         .accelerator("cmdOrCtrl+4")
         .build(app)?;
-    let calculator_item = MenuItemBuilder::with_id("app-calculator", "Calculator")
+    let graph_item = MenuItemBuilder::with_id("app-graph", "Graph")
         .accelerator("cmdOrCtrl+5")
+        .build(app)?;
+    let catalog_item = MenuItemBuilder::with_id("app-catalog-editor", "Catalog Editor")
+        .accelerator("cmdOrCtrl+6")
+        .build(app)?;
+    let calculator_item = MenuItemBuilder::with_id("app-calculator", "Calculator")
+        .accelerator("cmdOrCtrl+7")
+        .build(app)?;
+    let sessions_item = MenuItemBuilder::with_id("app-session-manager", "Sessions")
+        .accelerator("cmdOrCtrl+8")
         .build(app)?;
     let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
         .accelerator("cmdOrCtrl+,")
@@ -460,9 +539,12 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
         .item(&discovery_item)
         .item(&decoder_item)
         .item(&transmit_item)
+        .item(&query_item)
+        .item(&graph_item)
         .separator()
         .item(&catalog_item)
         .item(&calculator_item)
+        .item(&sessions_item)
         .separator()
         .item(&settings_item)
         .build()?;
@@ -576,13 +658,21 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
     // Store session menu items for dynamic updates
     let session_menu_items = SessionMenuItems {
         source: session_source_item,
+        picker: session_picker_item,
         play: session_play_item,
         pause: session_pause_item,
         stop: session_stop_item,
+        clear: session_clear_item,
         detach: session_detach_item,
         stop_all: session_stop_all_item,
     };
     *app.state::<SessionMenuState>().0.lock().unwrap() = Some(session_menu_items);
+
+    // Store bookmark menu items for dynamic updates
+    let bookmark_items = BookmarkMenuItems {
+        save: bookmark_save_item,
+    };
+    *app.state::<BookmarkMenuItemState>().0.lock().unwrap() = Some(bookmark_items);
 
     // Store bookmarks submenu reference for dynamic updates
     *app.state::<BookmarksMenuState>().0.lock().unwrap() = Some(jump_to_bookmark_submenu);
@@ -602,7 +692,9 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
             }
             // App menu items - open as tabs in focused window
             "app-discovery" | "app-decoder" | "app-transmit"
-            | "app-catalog-editor" | "app-calculator" => {
+            | "app-query" | "app-graph"
+            | "app-catalog-editor" | "app-calculator"
+            | "app-session-manager" => {
                 let panel_id = event_id.strip_prefix("app-").unwrap_or(event_id);
                 open_panel_in_focused_window(app, panel_id);
             }
@@ -713,11 +805,13 @@ pub fn run() {
     #[cfg(not(target_os = "ios"))]
     let builder = builder
         .manage(SessionMenuState(Mutex::new(None)))
-        .manage(BookmarksMenuState(Mutex::new(None)));
+        .manage(BookmarksMenuState(Mutex::new(None)))
+        .manage(BookmarkMenuItemState(Mutex::new(None)));
     #[cfg(target_os = "ios")]
     let builder = builder
         .manage(SessionMenuState(Mutex::new(())))
-        .manage(BookmarksMenuState(Mutex::new(())));
+        .manage(BookmarksMenuState(Mutex::new(())))
+        .manage(BookmarkMenuItemState(Mutex::new(())));
 
     let builder = builder.invoke_handler(tauri::generate_handler![
             create_main_window,
@@ -725,6 +819,7 @@ pub fn run() {
             open_settings_panel,
             update_menu_session_state,
             update_bookmarks_menu,
+            update_menu_focus_state,
             catalog::open_catalog,
             catalog::save_catalog,
             catalog::validate_catalog,
