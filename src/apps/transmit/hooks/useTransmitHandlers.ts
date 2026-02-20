@@ -10,28 +10,15 @@ import {
   useTransmitUIHandlers,
   type TransmitUIHandlers,
 } from "./handlers/useTransmitUIHandlers";
-import type { IngestOptions } from "../../../hooks/useIOSessionManager";
 
 export interface UseTransmitHandlersParams {
-  // Session manager actions
-  watchSingleSource: (
-    profileId: string,
-    options: IngestOptions
-  ) => Promise<void>;
-  watchMultiSource: (
-    profileIds: string[],
-    options: IngestOptions
-  ) => Promise<void>;
+  // Session manager actions (TopBar only)
   stopWatch: () => Promise<void>;
-  joinSession: (
-    sessionId: string,
-    sourceProfileIds?: string[]
-  ) => Promise<void>;
-  skipReader: () => Promise<void>;
   resumeWithNewBuffer: () => Promise<void>;
 
-  // Dialog state setter
-  setShowIoPickerDialog: (show: boolean) => void;
+  // Dialog control
+  openIoPicker: () => void;
+  closeIoPicker: () => void;
 }
 
 export type TransmitHandlers = TransmitSessionHandlers & TransmitUIHandlers;
@@ -39,20 +26,16 @@ export type TransmitHandlers = TransmitSessionHandlers & TransmitUIHandlers;
 export function useTransmitHandlers(
   params: UseTransmitHandlersParams
 ): TransmitHandlers {
-  // Session handlers (start, stop, resume, join, multi-bus)
+  // Session handlers (stop, resume - for TopBar)
   const sessionHandlers = useTransmitSessionHandlers({
-    watchSingleSource: params.watchSingleSource,
-    watchMultiSource: params.watchMultiSource,
     stopWatch: params.stopWatch,
-    joinSession: params.joinSession,
-    skipReader: params.skipReader,
     resumeWithNewBuffer: params.resumeWithNewBuffer,
-    setShowIoPickerDialog: params.setShowIoPickerDialog,
   });
 
   // UI handlers (tabs, dialogs)
   const uiHandlers = useTransmitUIHandlers({
-    setShowIoPickerDialog: params.setShowIoPickerDialog,
+    openIoPicker: params.openIoPicker,
+    closeIoPicker: params.closeIoPicker,
   });
 
   // Spread all handlers into a flat object

@@ -3,11 +3,13 @@
 // Main Transmit app component with tabbed interface for CAN/Serial transmission.
 // Uses useIOSessionManager for session management and useTransmitHandlers for business logic.
 
-import { useEffect, useCallback, useMemo, useState } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { Send, AlertCircle } from "lucide-react";
 import { useTransmitStore } from "../../stores/transmitStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
+import { useIOPickerHandlers } from "../../hooks/useIOPickerHandlers";
+import { useDialogManager } from "../../hooks/useDialogManager";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useSettings, type IOProfile } from "../../hooks/useSettings";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
@@ -104,7 +106,7 @@ export default function Transmit() {
   const clearError = useTransmitStore((s) => s.clearError);
 
   // Dialog state
-  const [showIoPickerDialog, setShowIoPickerDialog] = useState(false);
+  const dialogs = useDialogManager(['ioReaderPicker'] as const);
 
   // Store actions for stopping repeats
   const stopAllRepeats = useTransmitStore((s) => s.stopAllRepeats);
@@ -146,11 +148,7 @@ export default function Transmit() {
     capabilities,
     joinerCount,
     handleLeave: managerLeave,
-    watchSingleSource,
-    watchMultiSource,
     stopWatch,
-    joinSession,
-    skipReader,
     resumeWithNewBuffer,
   } = manager;
 
@@ -162,13 +160,16 @@ export default function Transmit() {
 
   // Compose all handlers using the orchestrator hook
   const handlers = useTransmitHandlers({
-    watchSingleSource,
-    watchMultiSource,
     stopWatch,
-    joinSession,
-    skipReader,
     resumeWithNewBuffer,
-    setShowIoPickerDialog,
+    openIoPicker: () => dialogs.ioReaderPicker.open(),
+    closeIoPicker: () => dialogs.ioReaderPicker.close(),
+  });
+
+  // Centralised IO picker dialog handlers
+  const ioPickerProps = useIOPickerHandlers({
+    manager,
+    closeDialog: () => dialogs.ioReaderPicker.close(),
   });
 
   // Load profiles on mount
@@ -203,7 +204,7 @@ export default function Transmit() {
       onStopAll: () => {
         if (isStreaming || isPaused) stop();
       },
-      onPicker: () => setShowIoPickerDialog(true),
+      onPicker: () => dialogs.ioReaderPicker.open(),
     },
   });
 
@@ -381,22 +382,16 @@ export default function Transmit() {
 
       {/* IO Picker Dialog */}
       <IoReaderPickerDialog
-        isOpen={showIoPickerDialog}
-        onClose={handlers.handleCloseIoPicker}
+        {...ioPickerProps}
+        isOpen={dialogs.ioReaderPicker.isOpen}
+        onClose={() => dialogs.ioReaderPicker.close()}
         ioProfiles={transmitProfiles}
         selectedId={ioProfile ?? null}
         defaultId={settings?.default_read_profile}
         onSelect={() => {}}
-        onStartIngest={handlers.handleStartSession}
-        onStartMultiIngest={handlers.handleStartMultiIngest}
-        onJoinSession={handlers.handleJoinSession}
         hideBuffers={true}
         allowMultiSelect={true}
         disabledProfiles={transmitStatusMap}
-        onSkip={handlers.handleSkip}
-        isIngesting={isStreaming}
-        ingestProfileId={isStreaming ? effectiveSessionId : null}
-        onStopIngest={handlers.handleStop}
       />
     </AppLayout>
   );

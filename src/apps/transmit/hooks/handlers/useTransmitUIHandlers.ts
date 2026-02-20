@@ -1,4 +1,4 @@
-// ui/src/apps/transmit/hooks/handlers/useTransmitUIHandlers.ts
+// src/apps/transmit/hooks/handlers/useTransmitUIHandlers.ts
 //
 // UI-related handlers for Transmit: tab switching, dialog control.
 
@@ -6,11 +6,13 @@ import { useCallback } from "react";
 import { useTransmitStore, type TransmitTab } from "../../../../stores/transmitStore";
 
 export interface UseTransmitUIHandlersParams {
-  setShowIoPickerDialog: (show: boolean) => void;
+  openIoPicker: () => void;
+  closeIoPicker: () => void;
 }
 
 export function useTransmitUIHandlers({
-  setShowIoPickerDialog,
+  openIoPicker,
+  closeIoPicker,
 }: UseTransmitUIHandlersParams) {
   const setActiveTab = useTransmitStore((s) => s.setActiveTab);
 
@@ -24,13 +26,13 @@ export function useTransmitUIHandlers({
 
   // Handle opening IO picker
   const handleOpenIoPicker = useCallback(() => {
-    setShowIoPickerDialog(true);
-  }, [setShowIoPickerDialog]);
+    openIoPicker();
+  }, [openIoPicker]);
 
   // Handle closing IO picker
   const handleCloseIoPicker = useCallback(() => {
-    setShowIoPickerDialog(false);
-  }, [setShowIoPickerDialog]);
+    closeIoPicker();
+  }, [closeIoPicker]);
 
   return {
     handleTabClick,

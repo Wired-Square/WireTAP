@@ -24,6 +24,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Query IO picker centralised**: Query now uses the shared `useIOPickerHandlers` hook for connect/skip dialog handling, matching the pattern used by Decoder, Discovery, and Graph. Removes duplicated handler wiring from `useQuerySessionHandlers`.
 
+- **Transmit IO picker centralised**: Transmit now uses the shared `useIOPickerHandlers` hook and `useDialogManager` for IO picker dialog handling, matching the pattern used by Decoder, Discovery, Graph, and Query. Removes duplicated session handlers for start, multi-start, join, and skip from `useTransmitSessionHandlers`.
+
 ### Fixed
 
 - **Query DB status light**: The DB indicator now shows green when connected to a PostgreSQL source, instead of always showing red.
