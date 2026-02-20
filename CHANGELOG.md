@@ -10,7 +10,7 @@ All notable changes to CANdor will be documented in this file.
 
 - **Session menu greying out**: Session menu items (Select Source, Play, Pause, Stop, Clear, etc.) are now disabled when the focused app does not use sessions (e.g. Catalog Editor, Calculator, Settings).
 
-- **Bookmark menu greying out**: Save Bookmark and Jump to Bookmark are now disabled when the focused app does not support bookmarks (only Discovery and Decoder do).
+- **Bookmark menu greying out**: Save Bookmark and Jump to Bookmark are now disabled when the source is not timeline-based (e.g. realtime sources like GVRET, MQTT, SocketCAN) or when the focused app does not support bookmarks.
 
 - **Graph menu integration**: Select Source, Play, Pause, Stop, and Clear Frames now work from the menu when Graph is focused.
 
@@ -21,6 +21,8 @@ All notable changes to CANdor will be documented in this file.
 - **Transmit stale closure bug**: Session control menu commands (Play, Stop) in Transmit could reference stale state because the event listener was re-registered on every state change instead of using a ref.
 
 ### Changed
+
+- **Logo menu ordering**: Logo dropdown menu now matches the native Apps menu in item order and separator grouping (session-aware apps, then tools, then Settings).
 
 - **Centralised session control hook** (`useMenuSessionControl`): Replaced duplicated session-control event listeners and menu state reporting across Decoder, Discovery, Transmit, Query, and Graph with a single shared hook (~400 lines removed).
 

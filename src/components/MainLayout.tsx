@@ -523,14 +523,16 @@ export default function MainLayout() {
   }, [handlePanelClick]);
 
   // Update native menu item availability based on focused panel's capabilities
+  // Session-aware panels manage their own session + bookmark state via useMenuSessionControl,
+  // so we only call updateMenuFocusState here to disable everything for non-session panels.
   const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "graph"]));
-  const BOOKMARK_AWARE_PANELS = useRef(new Set(["discovery", "decoder"]));
   const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
 
   useEffect(() => {
     const hasSession = focusedPanelId !== null && SESSION_AWARE_PANELS.current.has(focusedPanelId);
-    const hasBookmarks = focusedPanelId !== null && BOOKMARK_AWARE_PANELS.current.has(focusedPanelId);
-    updateMenuFocusState(hasSession, hasBookmarks);
+    if (!hasSession) {
+      updateMenuFocusState(false, false);
+    }
   }, [focusedPanelId]);
 
   // Listen for session control menu commands

@@ -23,6 +23,8 @@ interface MenuItem {
   bgColor: string;
 }
 
+// Order and grouping matches the native Apps menu:
+// Session-aware apps (1-5), then tools (6-8), then Settings
 const menuItems: MenuItem[] = [
   {
     id: "discovery",
@@ -46,6 +48,20 @@ const menuItems: MenuItem[] = [
     bgColor: "hover:bg-red-500/10",
   },
   {
+    id: "query",
+    icon: DatabaseZap,
+    label: "Query",
+    color: "text-amber-400",
+    bgColor: "hover:bg-amber-500/10",
+  },
+  {
+    id: "graph",
+    icon: BarChart3,
+    label: "Graph",
+    color: "text-pink-400",
+    bgColor: "hover:bg-pink-500/10",
+  },
+  {
     id: "catalog-editor",
     icon: FileText,
     label: "Catalog Editor",
@@ -60,25 +76,11 @@ const menuItems: MenuItem[] = [
     bgColor: "hover:bg-teal-500/10",
   },
   {
-    id: "query",
-    icon: DatabaseZap,
-    label: "Query",
-    color: "text-amber-400",
-    bgColor: "hover:bg-amber-500/10",
-  },
-  {
     id: "session-manager",
     icon: Network,
     label: "Sessions",
     color: "text-cyan-400",
     bgColor: "hover:bg-cyan-500/10",
-  },
-  {
-    id: "graph",
-    icon: BarChart3,
-    label: "Graph",
-    color: "text-pink-400",
-    bgColor: "hover:bg-pink-500/10",
   },
   {
     id: "settings",
@@ -171,8 +173,7 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
         <div className={`absolute top-full left-2 mt-1 py-1 min-w-[180px] ${bgSurface} ${borderDefault} ${textPrimary} rounded-lg shadow-xl z-50`}>
           {menuItems.map((item) => {
             const Icon = item.icon;
-            // Add divider before Settings
-            const showDivider = item.id === "settings";
+            const showDivider = item.id === "catalog-editor" || item.id === "settings";
             return (
               <div key={item.id}>
                 {showDivider && <div className={`my-1 border-t ${borderDefault}`} />}

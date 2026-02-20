@@ -7,6 +7,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useFocusStore } from "../stores/focusStore";
 import {
   updateMenuSessionState,
+  updateMenuFocusState,
   updateBookmarksMenu,
   type BookmarkMenuInfo,
 } from "../api/menu";
@@ -87,6 +88,10 @@ export function useMenuSessionControl({
       canPause: capabilities?.can_pause ?? false,
       joinerCount: joinerCount ?? 1,
     });
+
+    // Update bookmark menu availability — only enable for timeline sources
+    const bookmarksEnabled = !!bookmarks && capabilities?.is_realtime === false;
+    updateMenuFocusState(true, bookmarksEnabled);
   }, [
     isFocused,
     sessionState.profileName,
