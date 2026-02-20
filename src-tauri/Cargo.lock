@@ -505,7 +505,7 @@ dependencies = [
 
 [[package]]
 name = "candor"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "async-trait",
  "can-dbc",

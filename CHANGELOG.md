@@ -2,7 +2,7 @@
 
 All notable changes to CANdor will be documented in this file.
 
-## [Unreleased]
+## [0.4.3] - 2026-02-20
 
 ### Added
 
