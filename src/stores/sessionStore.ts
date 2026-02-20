@@ -47,7 +47,7 @@ import {
   type PlaybackPosition,
   type RawBytesPayload,
 } from "../api/io";
-import type { FrameMessage } from "./discoveryStore";
+import type { FrameMessage } from "../types/frame";
 import {
   useSessionLogStore,
   type SessionLogEventType,

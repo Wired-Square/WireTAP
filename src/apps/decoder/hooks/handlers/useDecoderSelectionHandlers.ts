@@ -1,14 +1,9 @@
 // ui/src/apps/decoder/hooks/handlers/useDecoderSelectionHandlers.ts
 //
-// Selection set handlers for Decoder: save, load, clear selection sets.
+// Selection set handlers for Decoder: thin wrapper around shared hook.
 
-import { useCallback } from "react";
-import {
-  addSelectionSet,
-  updateSelectionSet,
-  markSelectionSetUsed,
-  type SelectionSet,
-} from "../../../../utils/selectionSets";
+import { useSelectionSetHandlers } from "../../../../hooks/useSelectionSetHandlers";
+import type { SelectionSet } from "../../../../utils/selectionSets";
 import type { FrameDetail } from "../../../../types/decoder";
 
 export interface UseDecoderSelectionHandlersParams {
@@ -37,65 +32,16 @@ export function useDecoderSelectionHandlers({
   applySelectionSet,
   openSaveSelectionSet,
 }: UseDecoderSelectionHandlersParams) {
-  // Save selection set handler
-  const handleSaveSelectionSet = useCallback(async () => {
-    if (activeSelectionSetId && selectionSetDirty) {
-      // Already working with a set - save immediately
-      // In Decoder, frameIds = all frame IDs from catalog, selectedIds = those that are selected
-      const allFrameIds = Array.from(frames.keys());
-      const selectedIds = Array.from(selectedFrames);
-      await updateSelectionSet(activeSelectionSetId, {
-        frameIds: allFrameIds,
-        selectedIds: selectedIds,
-      });
-      setSelectionSetDirty(false);
-    } else {
-      // No active set - open save dialog
-      openSaveSelectionSet();
-    }
-  }, [
+  return useSelectionSetHandlers({
+    frameMap: frames,
+    selectedFrames,
     activeSelectionSetId,
     selectionSetDirty,
-    frames,
-    selectedFrames,
+    setActiveSelectionSet,
     setSelectionSetDirty,
-    openSaveSelectionSet,
-  ]);
-
-  // Save new selection set with a name
-  const handleSaveNewSelectionSet = useCallback(
-    async (name: string) => {
-      // In Decoder, frameIds = all frame IDs from catalog, selectedIds = those that are selected
-      const allFrameIds = Array.from(frames.keys());
-      const selectedIds = Array.from(selectedFrames);
-      const newSet = await addSelectionSet(name, allFrameIds, selectedIds);
-      setActiveSelectionSet(newSet.id);
-      setSelectionSetDirty(false);
-    },
-    [frames, selectedFrames, setActiveSelectionSet, setSelectionSetDirty]
-  );
-
-  // Load a selection set
-  const handleLoadSelectionSet = useCallback(
-    async (selectionSet: SelectionSet) => {
-      applySelectionSet(selectionSet);
-      await markSelectionSetUsed(selectionSet.id);
-    },
-    [applySelectionSet]
-  );
-
-  // Clear current selection set
-  const handleClearSelectionSet = useCallback(() => {
-    setActiveSelectionSet(null);
-    setSelectionSetDirty(false);
-  }, [setActiveSelectionSet, setSelectionSetDirty]);
-
-  return {
-    handleSaveSelectionSet,
-    handleSaveNewSelectionSet,
-    handleLoadSelectionSet,
-    handleClearSelectionSet,
-  };
+    applySelectionSet,
+    openSaveDialog: openSaveSelectionSet,
+  });
 }
 
 export type DecoderSelectionHandlers = ReturnType<typeof useDecoderSelectionHandlers>;

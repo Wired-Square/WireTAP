@@ -5,7 +5,7 @@
 // The timing-specific mux detection (detectMuxSelector) remains here as it needs
 // access to FrameMessage timestamps.
 
-import type { FrameMessage } from '../../stores/discoveryStore';
+import type { FrameMessage } from '../../types/frame';
 import { isMuxLikeSequence } from './muxDetection';
 
 // ============================================================================

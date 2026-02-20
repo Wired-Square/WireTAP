@@ -27,7 +27,7 @@ import {
 export { isBufferProfileId, BUFFER_PROFILE_ID };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
-import type { FrameMessage } from "../stores/discoveryStore";
+import type { FrameMessage } from "../types/frame";
 import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, type StreamEndedPayload, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";

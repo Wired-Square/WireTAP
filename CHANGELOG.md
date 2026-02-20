@@ -43,6 +43,22 @@ All notable changes to CANdor will be documented in this file.
 
 - **Decoder session handlers simplified**: Removed 6 dialog handler methods (~100 lines) from `useDecoderSessionHandlers` that are now handled by the shared `useIOPickerHandlers` hook.
 
+- **Shared selection set handlers**: Extracted duplicated selection set logic (save, save-as, load, clear) from Decoder and Discovery into `useSelectionSetHandlers` shared hook. Both apps now use thin wrappers.
+
+- **FrameMessage imports fixed**: Shared hooks, stores, and utilities now import `FrameMessage` from `types/frame` instead of `discoveryStore`, removing a cross-domain dependency.
+
+- **Moved `useBufferFrameView` to Discovery**: Hook was only used by Discovery — relocated from shared `hooks/` to `apps/discovery/hooks/`.
+
+### Removed
+
+- **Dead discovery API**: Removed `src/api/discovery.ts` (`startCanStream`, `stopCanStream`, `updatePlaybackSpeed`) — these wrapped Rust commands that no longer exist.
+
+- **Deprecated `useIngestSession` hook**: Removed `src/hooks/useIngestSession.ts` — functionality was migrated to `useIOSessionManager` and the hook had zero consumers.
+
+- **`greet` scaffold command**: Removed unused example Tauri command from the Rust backend.
+
+- **Stray `npm` dependency**: Removed `npm` package from production dependencies — it was never imported.
+
 ### Fixed
 
 - **SocketCAN probe missing `supports_fd` field**: SocketCAN device probing failed to compile after the CAN FD support changes due to missing `supports_fd` field in `DeviceProbeResult` initialisers.

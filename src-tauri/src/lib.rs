@@ -255,12 +255,6 @@ fn open_settings_singleton(app: &AppHandle, state: &State<SettingsWindowState>) 
     }
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 /// Clear the Settings panel tracking when the panel is closed.
 /// This allows Settings to be opened in a different window.
 #[tauri::command]
@@ -726,7 +720,6 @@ pub fn run() {
         .manage(BookmarksMenuState(Mutex::new(())));
 
     let builder = builder.invoke_handler(tauri::generate_handler![
-            greet,
             create_main_window,
             settings_panel_closed,
             open_settings_panel,

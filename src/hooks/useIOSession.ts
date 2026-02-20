@@ -46,7 +46,7 @@ import {
   type PlaybackPosition,
   type RawBytesPayload,
 } from "../api/io";
-import type { FrameMessage } from "../stores/discoveryStore";
+import type { FrameMessage } from "../types/frame";
 
 // ============================================================================
 // Local Session State Type

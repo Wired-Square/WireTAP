@@ -28,14 +28,6 @@ export {
   type ValidationResult,
 } from "./catalog";
 
-// Discovery/Streaming API
-export {
-  startCanStream,
-  stopCanStream,
-  updatePlaybackSpeed,
-  type StartStreamOptions,
-} from "./discovery";
-
 // Dialog API
 export {
   pickFileToOpen,

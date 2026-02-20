@@ -11,7 +11,7 @@ import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useQueryStore } from "./stores/queryStore";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useQueryHandlers } from "./hooks/useQueryHandlers";
-import type { FrameMessage } from "../../stores/discoveryStore";
+import type { FrameMessage } from "../../types/frame";
 import type { PlaybackPosition } from "../../api/io";
 import type { CatalogMetadata } from "../../api/catalog";
 import { listCatalogs } from "../../api/catalog";

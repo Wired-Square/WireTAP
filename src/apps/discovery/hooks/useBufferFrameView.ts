@@ -1,4 +1,4 @@
-// ui/src/hooks/useBufferFrameView.ts
+// ui/src/apps/discovery/hooks/useBufferFrameView.ts
 //
 // Hook for buffer-first frame display in Discovery app.
 // Provides a unified interface for viewing frames from a buffer,
@@ -11,8 +11,8 @@ import {
   findBufferOffsetForTimestamp,
   getBufferMetadataById,
   type BufferFrame,
-} from "../api/buffer";
-import type { FrameMessage } from "../types/frame";
+} from "../../../api/buffer";
+import type { FrameMessage } from "../../../types/frame";
 
 /** Frame with pre-computed hex bytes for display */
 export type FrameWithHex = FrameMessage & { hexBytes: string[] };

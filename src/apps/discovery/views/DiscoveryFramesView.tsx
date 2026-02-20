@@ -16,7 +16,7 @@ import ChecksumDiscoveryResultView from "./tools/ChecksumDiscoveryResultView";
 import { bgDataView, textDataSecondary, bgSurface, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import type { IOCapabilities } from "../../../api/io";
-import { useBufferFrameView } from "../../../hooks/useBufferFrameView";
+import { useBufferFrameView } from "../hooks/useBufferFrameView";
 
 type Props = {
   /** @deprecated Use bufferId prop instead for buffer-first mode */

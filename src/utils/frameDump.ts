@@ -1,7 +1,7 @@
 // ui/src/utils/frameDump.ts
 // Frame dump export utilities for various formats
 
-import type { FrameMessage } from "../stores/discoveryStore";
+import type { FrameMessage } from "../types/frame";
 import type { SerialBytesEntry } from "../stores/discoverySerialStore";
 import { CAN_FD_DLC_VALUES } from "../constants";
 
