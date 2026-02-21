@@ -5,7 +5,7 @@ import { Search, Activity, FileText, Calculator, Settings, Send, ArrowUpCircle, 
 import { iconMd } from "../styles/spacing";
 import { bgSurface, borderDefault, textPrimary } from "../styles";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import logo from "../assets/logo.png";
+const logo = "/logo.png";
 import { useUpdateStore } from "../stores/updateStore";
 import { openSettingsPanel } from "../api";
 

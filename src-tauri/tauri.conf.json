@@ -19,10 +19,10 @@
         "height": 600,
         "minWidth": 700,
         "minHeight": 500,
-        "center": true,
         "resizable": true,
         "dragDropEnabled": false,
-        "acceptFirstMouse": true
+        "acceptFirstMouse": true,
+        "visible": false
       }
     ],
     "security": {

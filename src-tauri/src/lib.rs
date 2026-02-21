@@ -452,6 +452,14 @@ async fn create_main_window(app: AppHandle, label: String) -> Result<(), String>
     Ok(())
 }
 
+/// Show the calling window and give it focus.
+/// Called from the frontend inline script once the splash HTML is painted.
+#[tauri::command]
+fn show_current_window(window: tauri::WebviewWindow) {
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
 // iOS stub commands - menus/windows not available on iOS
 #[cfg(target_os = "ios")]
 #[tauri::command]
@@ -769,6 +777,33 @@ pub fn run() {
                 eprintln!("[setup] Failed to initialise store manager: {}", e);
             }
 
+            // Restore dashboard window geometry from persisted state.
+            // The window starts hidden (visible: false in tauri.conf.json) and is
+            // shown by a frontend inline script once the splash HTML has rendered,
+            // so it appears at the saved position with content already painted.
+            if let Some(window) = app.get_webview_window("dashboard") {
+                let mut restored = false;
+
+                if let Some(value) = store_manager::get("windows.state.dashboard") {
+                    if let Some(geom) = value.get("geometry") {
+                        let x = geom.get("x").and_then(|v| v.as_f64());
+                        let y = geom.get("y").and_then(|v| v.as_f64());
+                        let w = geom.get("width").and_then(|v| v.as_f64());
+                        let h = geom.get("height").and_then(|v| v.as_f64());
+
+                        if let (Some(x), Some(y), Some(w), Some(h)) = (x, y, w, h) {
+                            let _ = window.set_size(tauri::LogicalSize::new(w, h));
+                            let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+                            restored = true;
+                        }
+                    }
+                }
+
+                if !restored {
+                    let _ = window.center();
+                }
+            }
+
             // Setup desktop menus (not available on iOS)
             #[cfg(not(target_os = "ios"))]
             setup_desktop_menus(app)?;
@@ -810,6 +845,7 @@ pub fn run() {
         .manage(BookmarkMenuItemState(Mutex::new(())));
 
     let builder = builder.invoke_handler(tauri::generate_handler![
+            show_current_window,
             create_main_window,
             settings_panel_closed,
             open_settings_panel,

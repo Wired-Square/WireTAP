@@ -11,7 +11,84 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <style>
+        html, body { margin: 0; padding: 0; background-color: #f6f6f6; }
+        @media (prefers-color-scheme: dark) { html, body { background-color: #0f172a; } }
+        .splash {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          margin: 0;
+          background-color: #f6f6f6;
+          color: #0f172a;
+          font-family: 'Ubuntu', system-ui, -apple-system, sans-serif;
+          animation: splash-fade-in 0.3s ease-out;
+        }
+        .splash-logo {
+          width: 80px;
+          height: 80px;
+          border-radius: 16px;
+          background: #fff;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          padding: 8px;
+          box-sizing: border-box;
+        }
+        .splash-logo img {
+          width: 100%;
+          height: 100%;
+          border-radius: 10px;
+          object-fit: cover;
+        }
+        .splash-title {
+          margin: 20px 0 0;
+          font-size: 36px;
+          font-weight: 600;
+          letter-spacing: -0.5px;
+        }
+        .splash-version {
+          margin: 6px 0 0;
+          font-size: 13px;
+          opacity: 0.5;
+        }
+        .splash-byline {
+          margin: 4px 0 0;
+          font-size: 15px;
+          opacity: 0.6;
+        }
+        @media (prefers-color-scheme: dark) {
+          .splash {
+            background-color: #0f172a;
+            color: #ffffff;
+          }
+          .splash-logo {
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          }
+        }
+        @keyframes splash-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      </style>
+      <div class="splash">
+        <div class="splash-logo"><img src="/logo.png" alt="CANdor" /></div>
+        <div class="splash-title">CANdor</div>
+        <div class="splash-version">v{{VERSION}}</div>
+        <div class="splash-byline">by Wired Square</div>
+      </div>
+    </div>
+    <script>
+      // Show the window once the splash content is in the DOM.
+      // The window starts hidden (visible: false) and Rust restores its
+      // geometry before the WebView loads, so it appears at the saved
+      // position with the splash already painted — no white flash.
+      if (window.__TAURI_INTERNALS__) {
+        window.__TAURI_INTERNALS__.invoke('show_current_window');
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

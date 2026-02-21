@@ -9,6 +9,12 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [
+    {
+      name: 'html-version',
+      transformIndexHtml(html) {
+        return html.replace(/\{\{VERSION\}\}/g, version);
+      },
+    },
     react(),
     // Upload source maps to Sentry during production builds (requires SENTRY_AUTH_TOKEN)
     sentryVitePlugin({
