@@ -4,6 +4,7 @@
 // Session lifecycle and listener management is handled by Rust backend.
 // This store manages frontend state and event listeners.
 
+import * as Sentry from "@sentry/react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -1663,7 +1664,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     ),
 
   // ---- Global App Error Dialog ----
-  showAppError: (title, message, details) =>
+  showAppError: (title, message, details) => {
+    Sentry.captureMessage(message, {
+      level: "error",
+      extra: { title, details },
+    });
     set({
       appErrorDialog: {
         isOpen: true,
@@ -1671,7 +1676,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         message,
         details: details ?? null,
       },
-    }),
+    });
+  },
 
   closeAppError: () =>
     set({

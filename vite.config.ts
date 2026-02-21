@@ -1,12 +1,29 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { version } from "./package.json";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Upload source maps to Sentry during production builds (requires SENTRY_AUTH_TOKEN)
+    sentryVitePlugin({
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      release: { name: `candor@${version}` },
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+    }),
+  ],
+
+  // Inject app version as a global constant
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
 
   test: {
     include: ["src/**/*.{test,spec}.ts?(x)"],
@@ -17,6 +34,7 @@ export default defineConfig(async () => ({
   // Optimized build configuration for Tauri desktop app
   build: {
     chunkSizeWarningLimit: 500,
+    sourcemap: true,
     rollupOptions: {
       output: {
         // Split vendor chunks for better caching
@@ -34,6 +52,8 @@ export default defineConfig(async () => ({
           'vendor-zustand': ['zustand'],
           // TOML parsing (used by catalog editor)
           'vendor-toml': ['smol-toml'],
+          // Error tracking
+          'vendor-sentry': ['@sentry/react'],
         },
       },
     },
@@ -50,10 +70,10 @@ export default defineConfig(async () => ({
     host: host || false,
     hmr: host
       ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
+            protocol: "ws",
+            host,
+            port: 1421,
+          }
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`

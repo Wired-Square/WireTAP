@@ -23,6 +23,7 @@
     "release:rebuild": "node scripts/release.js rebuild"
   },
   "dependencies": {
+    "@sentry/react": "^10.39.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.4.2",
     "@tauri-apps/plugin-opener": "^2",
@@ -43,6 +44,7 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^4.9.1",
     "@tailwindcss/postcss": "^4.1.18",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",

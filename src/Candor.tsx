@@ -1,5 +1,6 @@
 // ui/Candor.tsx
 
+import * as Sentry from "@sentry/react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import "./Candor.css";
@@ -55,9 +56,11 @@ export default function Candor() {
       <Suspense fallback={null}>
         <AboutDialog isOpen={showAbout} onClose={() => setShowAbout(false)} />
       </Suspense>
-      <Suspense fallback={<LoadingFallback />}>
-        <MainLayout />
-      </Suspense>
+      <Sentry.ErrorBoundary fallback={<LoadingFallback />}>
+        <Suspense fallback={<LoadingFallback />}>
+          <MainLayout />
+        </Suspense>
+      </Sentry.ErrorBoundary>
       {/* Global app error dialog - shown for errors across all apps */}
       <ErrorDialog
         isOpen={appErrorOpen}

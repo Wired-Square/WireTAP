@@ -2,6 +2,12 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Sentry error tracking**: Frontend error tracking via `@sentry/react`. Captures uncaught exceptions, unhandled promise rejections, and React render errors via `Sentry.ErrorBoundary`. App-level errors shown through `showAppError` are also reported. Source maps are uploaded during CI builds for readable stack traces. Sentry is disabled when `VITE_SENTRY_DSN` is not set.
+
 ## [0.4.3] - 2026-02-20
 
 ### Added
