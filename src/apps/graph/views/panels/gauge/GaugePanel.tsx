@@ -1,10 +1,9 @@
 // ui/src/apps/graph/views/panels/gauge/GaugePanel.tsx
 
-import { useState, useRef, useCallback } from "react";
-import { createPortal } from "react-dom";
-import { useGraphStore, getConfidenceColour, getSignalLabel, type GraphPanel } from "../../../../../stores/graphStore";
+import { useGraphStore, getConfidenceColour, type GraphPanel } from "../../../../../stores/graphStore";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { textSecondary } from "../../../../../styles/colourTokens";
+import PanelTooltip from "../PanelTooltip";
 
 interface Props {
   panel: GraphPanel;
@@ -87,36 +86,6 @@ export default function GaugePanel({ panel }: Props) {
   const primarySignal = panel.signals[primaryIdx];
   const displayValue = formatValue(primaryValue);
 
-  // Tooltip state
-  const [tip, setTip] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
-  const tipRef = useRef<HTMLDivElement>(null);
-
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    setTip({ x: e.clientX, y: e.clientY, visible: true });
-  }, []);
-
-  const onMouseLeave = useCallback(() => {
-    setTip((prev) => ({ ...prev, visible: false }));
-  }, []);
-
-  // Compute tooltip screen position with edge-aware flipping
-  let tipX = tip.x + 12;
-  let tipY = tip.y - 4;
-  if (tip.visible && tipRef.current) {
-    const rect = tipRef.current.getBoundingClientRect();
-    if (tipX + rect.width > window.innerWidth - 8) {
-      tipX = tip.x - rect.width - 12;
-    }
-    tipY = Math.max(4, Math.min(tip.y - rect.height / 2, window.innerHeight - rect.height - 4));
-  }
-
-  const confidenceColours = settings ? {
-    none: settings.signal_colour_none || "#94a3b8",
-    low: settings.signal_colour_low || "#f59e0b",
-    medium: settings.signal_colour_medium || "#3b82f6",
-    high: settings.signal_colour_high || "#22c55e",
-  } : undefined;
-
   if (signalCount === 0) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -128,7 +97,13 @@ export default function GaugePanel({ panel }: Props) {
   }
 
   return (
-    <div className="flex items-center justify-center h-full p-1" onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
+    <PanelTooltip
+      signals={panel.signals}
+      values={values}
+      settings={settings}
+      showColourDot
+      className="flex items-center justify-center h-full p-1"
+    >
       <svg viewBox="0 0 200 165" className="w-full h-full">
         {/* Arc rings — one per signal */}
         {rings.map(({ sig, radius, pct, valueAngle, stroke: sw }, i) => (
@@ -236,45 +211,6 @@ export default function GaugePanel({ panel }: Props) {
           {maxValue}
         </text>
       </svg>
-
-      {/* Hover tooltip — portalled to body to escape panel overflow */}
-      {tip.visible && createPortal(
-        <div
-          ref={tipRef}
-          style={{
-            position: "fixed",
-            left: tipX,
-            top: tipY,
-            pointerEvents: "none",
-            zIndex: 9999,
-            padding: "6px 10px",
-            borderRadius: 6,
-            fontSize: 11,
-            lineHeight: 1.5,
-            whiteSpace: "nowrap",
-            background: "var(--bg-surface)",
-            color: "var(--text-primary)",
-            border: "1px solid var(--border-default)",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-          }}
-        >
-          {rings.map(({ sig, value }, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: sig.colour, flexShrink: 0 }} />
-              <span style={{ color: "var(--text-secondary)" }}>{getSignalLabel(sig)}</span>
-              {sig.confidence && confidenceColours && (
-                <span
-                  style={{ display: "inline-block", width: 5, height: 5, borderRadius: "50%", background: confidenceColours[sig.confidence] || confidenceColours.none, flexShrink: 0 }}
-                  title={`Confidence: ${sig.confidence}`}
-                />
-              )}
-              <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontWeight: 500 }}>{formatValue(value)}</span>
-              {sig.unit && <span style={{ color: "var(--text-muted)", fontSize: 10 }}>{sig.unit}</span>}
-            </div>
-          ))}
-        </div>,
-        document.body,
-      )}
-    </div>
+    </PanelTooltip>
   );
 }

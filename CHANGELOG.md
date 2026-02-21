@@ -6,11 +6,23 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Graph raw JSON view**: A glasses toggle (purple, matching the Catalog Editor) shows the current panel layout as editable JSON. Copy/paste to export or import layouts between sessions.
+
+- **Graph signal reordering**: Signals in the Panel Settings dialog can be reordered by dragging the grip handle.
+
+- **Graph signal source replacement**: A swap button per signal in Panel Settings opens the signal picker in replace mode, changing the source while preserving colour and display name.
+
+- **Graph panel hover tooltips**: Gauge and list panels show a rich hover tooltip with full signal names, values, units, and confidence. Extracted into a shared `PanelTooltip` component.
+
 - **Graph panel clone**: Panels can be duplicated via a clone button in the hover icon bar, copying type, title, signals, and gauge range.
 
 - **Graph signal search**: The Select Signals dialog now has a search bar that filters signals by name (case-insensitive), auto-expanding matching frames.
 
+- **Shared CodeView component**: The Catalog Editor's text mode editor extracted to `src/components/CodeView.tsx` for reuse across apps.
+
 ### Changed
+
+- **Graph top bar buttons**: "Add Panel" shortened to a `+` icon; "Layouts" shortened to an icon. Both use `iconMd` sizing with hover tooltips.
 
 - **Graph panel header**: Icons are now hidden by default and revealed on hover; only the title is visible at rest, maximising content area.
 

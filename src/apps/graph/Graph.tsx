@@ -13,6 +13,7 @@ import { onStoreChanged } from "../../api/store";
 import AppLayout from "../../components/AppLayout";
 import GraphTopBar from "./views/GraphTopBar";
 import GraphGrid from "./views/GraphGrid";
+import CodeView from "../../components/CodeView";
 import CatalogPickerDialog from "../../dialogs/CatalogPickerDialog";
 import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
 import SignalPickerDialog from "./dialogs/SignalPickerDialog";
@@ -30,6 +31,13 @@ export default function Graph() {
 
   // Dialog to configure which panel
   const [configuringPanelId, setConfiguringPanelId] = useState<string | null>(null);
+
+  // Replace signal mode
+  const [replacingSignalIndex, setReplacingSignalIndex] = useState<number | null>(null);
+
+  // Raw view mode
+  const [rawViewMode, setRawViewMode] = useState(false);
+  const [rawViewContent, setRawViewContent] = useState("");
 
   const dialogs = useDialogManager([
     'ioReaderPicker',
@@ -61,6 +69,53 @@ export default function Graph() {
   const loadSavedLayouts = useGraphStore((s) => s.loadSavedLayouts);
 
   const decoderDir = settings?.decoder_dir ?? "";
+
+  // ── Raw view toggle ──
+  const handleToggleRawView = useCallback(() => {
+    if (!rawViewMode) {
+      // Entering raw view: merge panels + layout into a single flat array per panel
+      const { panels, layout } = useGraphStore.getState();
+      const layoutMap = new Map(layout.map((l) => [l.i, l]));
+      const merged = panels.map((p) => {
+        const li = layoutMap.get(p.id);
+        return {
+          ...p,
+          x: li?.x ?? 0,
+          y: li?.y ?? 0,
+          w: li?.w ?? 6,
+          h: li?.h ?? 3,
+        };
+      });
+      setRawViewContent(JSON.stringify({ panels: merged }, null, 2));
+    } else {
+      // Leaving raw view: split flat panels back into panels + layout
+      try {
+        const parsed = JSON.parse(rawViewContent);
+        if (Array.isArray(parsed.panels)) {
+          const panels = parsed.panels.map(({ x, y, w, h, ...rest }: Record<string, unknown>) => rest);
+          const layout = parsed.panels.map((p: Record<string, unknown>) => ({
+            i: p.id as string,
+            x: (p.x as number) ?? 0,
+            y: (p.y as number) ?? 0,
+            w: (p.w as number) ?? 6,
+            h: (p.h as number) ?? 3,
+          }));
+          loadLayout({
+            id: 'import',
+            name: 'Imported',
+            catalogFilename: catalogFilenameFromPath(catalogPath),
+            panels,
+            layout,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+        }
+      } catch {
+        // Invalid JSON — discard and exit raw view
+      }
+    }
+    setRawViewMode(!rawViewMode);
+  }, [rawViewMode, rawViewContent, catalogPath, loadLayout]);
 
   // ── Frame batching ──
   const pendingValuesRef = useRef<SignalValueEntry[]>([]);
@@ -275,6 +330,7 @@ export default function Graph() {
 
   const openSignalPicker = useCallback((panelId: string) => {
     setConfiguringPanelId(panelId);
+    setReplacingSignalIndex(null);
     dialogs.signalPicker.open();
   }, [dialogs.signalPicker]);
 
@@ -282,6 +338,13 @@ export default function Graph() {
     setConfiguringPanelId(panelId);
     dialogs.panelConfig.open();
   }, [dialogs.panelConfig]);
+
+  const handleReplaceSignal = useCallback((panelId: string, signalIndex: number) => {
+    setConfiguringPanelId(panelId);
+    setReplacingSignalIndex(signalIndex);
+    dialogs.panelConfig.close();
+    dialogs.signalPicker.open();
+  }, [dialogs]);
 
   return (
     <AppLayout
@@ -311,13 +374,23 @@ export default function Graph() {
           onLoadLayout={loadLayout}
           onDeleteLayout={deleteSavedLayout}
           catalogFilename={catalogFilenameFromPath(catalogPath)}
+          rawViewMode={rawViewMode}
+          onToggleRawView={handleToggleRawView}
         />
       }
     >
-      <GraphGrid
-        onOpenSignalPicker={openSignalPicker}
-        onOpenPanelConfig={openPanelConfig}
-      />
+      {rawViewMode ? (
+        <CodeView
+          content={rawViewContent}
+          onChange={setRawViewContent}
+          placeholder="Paste a graph layout JSON here…"
+        />
+      ) : (
+        <GraphGrid
+          onOpenSignalPicker={openSignalPicker}
+          onOpenPanelConfig={openPanelConfig}
+        />
+      )}
 
       <CatalogPickerDialog
         isOpen={dialogs.catalogPicker.isOpen}
@@ -341,14 +414,20 @@ export default function Graph() {
 
       <SignalPickerDialog
         isOpen={dialogs.signalPicker.isOpen}
-        onClose={() => dialogs.signalPicker.close()}
+        onClose={() => {
+          dialogs.signalPicker.close();
+          setReplacingSignalIndex(null);
+        }}
         panelId={configuringPanelId}
+        replacingSignalIndex={replacingSignalIndex}
+        onReplaceDone={() => setReplacingSignalIndex(null)}
       />
 
       <PanelConfigDialog
         isOpen={dialogs.panelConfig.isOpen}
         onClose={() => dialogs.panelConfig.close()}
         panelId={configuringPanelId}
+        onReplaceSignal={handleReplaceSignal}
       />
     </AppLayout>
   );

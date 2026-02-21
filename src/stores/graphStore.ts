@@ -210,6 +210,8 @@ interface GraphState {
   removeSignalFromPanel: (panelId: string, frameId: number, signalName: string) => void;
   updateSignalColour: (panelId: string, frameId: number, signalName: string, colour: string) => void;
   updateSignalDisplayName: (panelId: string, frameId: number, signalName: string, displayName: string) => void;
+  reorderSignals: (panelId: string, fromIndex: number, toIndex: number) => void;
+  replaceSignalSource: (panelId: string, oldFrameId: number, oldSignalName: string, newFrameId: number, newSignalName: string, newUnit?: string) => void;
   updateLayout: (layout: LayoutItem[]) => void;
 
   // Layout persistence
@@ -507,6 +509,64 @@ export const useGraphStore = create<GraphState>((set, get) => ({
             }
           : p
       ),
+    });
+    scheduleAutoSave();
+  },
+
+  reorderSignals: (panelId, fromIndex, toIndex) => {
+    const { panels } = get();
+    set({
+      panels: panels.map((p) => {
+        if (p.id !== panelId) return p;
+        const signals = [...p.signals];
+        const [moved] = signals.splice(fromIndex, 1);
+        signals.splice(toIndex, 0, moved);
+        // Adjust primarySignalIndex if affected by the reorder
+        let primary = p.primarySignalIndex;
+        if (primary !== undefined) {
+          if (primary === fromIndex) {
+            primary = toIndex;
+          } else if (fromIndex < primary && toIndex >= primary) {
+            primary--;
+          } else if (fromIndex > primary && toIndex <= primary) {
+            primary++;
+          }
+        }
+        return { ...p, signals, primarySignalIndex: primary };
+      }),
+    });
+    scheduleAutoSave();
+  },
+
+  replaceSignalSource: (panelId, oldFrameId, oldSignalName, newFrameId, newSignalName, newUnit) => {
+    const { panels, frames } = get();
+
+    // Look up confidence for the new signal
+    let confidence: Confidence | undefined;
+    const frame = frames.get(newFrameId);
+    if (frame) {
+      const signalDef = frame.signals.find((s) => s.name === newSignalName);
+      if (signalDef?.confidence) {
+        confidence = signalDef.confidence;
+      } else if (frame.mux) {
+        confidence = findMuxSignalConfidence(frame.mux, newSignalName);
+      }
+    }
+
+    set({
+      panels: panels.map((p) => {
+        if (p.id !== panelId) return p;
+        // Don't replace if target already exists in this panel
+        if (p.signals.some((s) => s.frameId === newFrameId && s.signalName === newSignalName)) return p;
+        return {
+          ...p,
+          signals: p.signals.map((s) =>
+            s.frameId === oldFrameId && s.signalName === oldSignalName
+              ? { ...s, frameId: newFrameId, signalName: newSignalName, unit: newUnit, confidence }
+              : s
+          ),
+        };
+      }),
     });
     scheduleAutoSave();
   },

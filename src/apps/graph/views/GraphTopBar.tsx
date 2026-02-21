@@ -1,10 +1,10 @@
 // ui/src/apps/graph/views/GraphTopBar.tsx
 
-import { BarChart3, Plus, LineChart, Gauge, List, Save, Layout, X, AlertTriangle } from "lucide-react";
+import { BarChart3, Plus, LineChart, Gauge, List, Save, Layout, X, AlertTriangle, Glasses } from "lucide-react";
 import AppTopBar from "../../../components/AppTopBar";
-import { buttonBase, iconButtonHoverDanger } from "../../../styles/buttonStyles";
+import { iconButtonBase, iconButtonHoverDanger, toggleButtonClass } from "../../../styles/buttonStyles";
 import { inputBase } from "../../../styles/inputStyles";
-import { iconSm } from "../../../styles/spacing";
+import { iconSm, iconMd } from "../../../styles/spacing";
 import { textSecondary } from "../../../styles/colourTokens";
 import { useGraphStore } from "../../../stores/graphStore";
 import { useState, useRef, useEffect } from "react";
@@ -51,6 +51,10 @@ interface Props {
   onLoadLayout: (layout: GraphLayout) => void;
   onDeleteLayout: (id: string) => Promise<void>;
   catalogFilename: string;
+
+  // Raw view mode
+  rawViewMode: boolean;
+  onToggleRawView: () => void;
 }
 
 export default function GraphTopBar({
@@ -78,6 +82,8 @@ export default function GraphTopBar({
   onLoadLayout,
   onDeleteLayout,
   catalogFilename,
+  rawViewMode,
+  onToggleRawView,
 }: Props) {
   const addPanel = useGraphStore((s) => s.addPanel);
 
@@ -163,11 +169,10 @@ export default function GraphTopBar({
       <div ref={addMenuRef} className="relative">
         <button
           onClick={() => setAddMenuOpen(!addMenuOpen)}
-          className={`${buttonBase} px-2 py-1 text-xs gap-1`}
+          className={iconButtonBase}
           title="Add panel"
         >
-          <Plus className={iconSm} />
-          Add Panel
+          <Plus className={iconMd} />
         </button>
         {addMenuOpen && (
           <div className={menuContainer}>
@@ -195,11 +200,10 @@ export default function GraphTopBar({
             setIsSaving(false);
             setSaveName("");
           }}
-          className={`${buttonBase} px-2 py-1 text-xs gap-1`}
+          className={iconButtonBase}
           title="Manage layouts"
         >
-          <Layout className={iconSm} />
-          Layouts
+          <Layout className={iconMd} />
         </button>
         {layoutMenuOpen && (
           <div className={menuContainer} style={{ minWidth: 220 }}>
@@ -284,6 +288,15 @@ export default function GraphTopBar({
           </div>
         )}
       </div>
+
+      {/* Raw view toggle */}
+      <button
+        onClick={onToggleRawView}
+        title={rawViewMode ? "Switch to Grid View" : "Switch to Raw JSON View"}
+        className={toggleButtonClass(rawViewMode, "purple")}
+      >
+        <Glasses className={iconMd} fill={rawViewMode ? "currentColor" : "none"} />
+      </button>
     </AppTopBar>
   );
 }
