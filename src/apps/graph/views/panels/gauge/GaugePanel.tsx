@@ -155,6 +155,9 @@ export default function GaugePanel({ panel }: Props) {
           fontSize="28"
           fontWeight="600"
           fontFamily="ui-monospace, monospace"
+          stroke="var(--bg-primary)"
+          strokeWidth={2}
+          paintOrder="stroke"
         >
           {displayValue}
         </text>
@@ -167,6 +170,9 @@ export default function GaugePanel({ panel }: Props) {
           dominantBaseline="middle"
           fill="var(--text-secondary)"
           fontSize="12"
+          stroke="var(--bg-primary)"
+          strokeWidth={1.5}
+          paintOrder="stroke"
         >
           {primarySignal?.unit ?? ""}
         </text>

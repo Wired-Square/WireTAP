@@ -1,22 +1,29 @@
 // ui/src/apps/graph/views/panels/PanelWrapper.tsx
 
-import { type ReactNode, useRef, useCallback, useEffect } from "react";
-import { Trash2, Settings2, Copy, Maximize2, ChevronsRight, BarChart2, Download } from "lucide-react";
+import { type ReactNode, useRef, useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { Trash2, Settings2, Copy, Maximize2, ChevronsRight, BarChart2, Download, EllipsisVertical } from "lucide-react";
 import { iconSm } from "../../../../styles/spacing";
-import { iconButtonHover, iconButtonDanger } from "../../../../styles/buttonStyles";
+import { iconButtonHover } from "../../../../styles/buttonStyles";
 import { useGraphStore, type GraphPanel } from "../../../../stores/graphStore";
 
-/** Compact toggle button for the panel icon bar (p-0.5 sizing). */
-function compactToggle(isActive: boolean, colour: "blue" | "purple"): string {
+/** Menu-item toggle styling for active toggles in the dropdown. */
+function menuToggle(isActive: boolean, colour: "blue" | "purple"): string {
   if (isActive) {
-    const bg = colour === "blue" ? "bg-blue-600 hover:bg-blue-700" : "bg-purple-600 hover:bg-purple-700";
-    return `p-0.5 rounded transition-colors ${bg} text-white`;
+    return colour === "blue" ? "bg-blue-600/15 text-blue-400" : "bg-purple-600/15 text-purple-400";
   }
-  return `p-0.5 rounded transition-colors ${iconButtonHover}`;
+  return "";
 }
 
 /** Distance threshold (px) to distinguish a click from a drag. */
 const DRAG_THRESHOLD = 5;
+
+/** Delay (ms) before closing the menu after mouse leaves, allowing button→menu transition. */
+const HOVER_CLOSE_DELAY = 150;
+
+const menuClasses = "fixed py-1 min-w-[160px] bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg shadow-xl z-[9999]";
+const menuItem = "w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[color:var(--text-primary)] hover:bg-[var(--hover-bg)] transition-colors cursor-pointer";
+const menuDivider = "my-1 border-t border-[var(--border-default)]";
 
 interface Props {
   panel: GraphPanel;
@@ -34,6 +41,66 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, child
 
   const isLineChart = panel.type === "line-chart";
   const followMode = panel.followMode !== false;
+
+  // -- Hover menu state --
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Stash the button rect when hover begins so layout-effect can use it. */
+  const buttonRectRef = useRef<DOMRect | null>(null);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setMenuOpen(false), HOVER_CLOSE_DELAY);
+  }, [cancelClose]);
+
+  const handleButtonEnter = useCallback(() => {
+    cancelClose();
+    if (!buttonRef.current) return;
+    buttonRectRef.current = buttonRef.current.getBoundingClientRect();
+    setMenuStyle({ visibility: "hidden" }); // reset until measured
+    setMenuOpen(true);
+  }, [cancelClose]);
+
+  const handleMenuEnter = useCallback(() => cancelClose(), [cancelClose]);
+  const handleMenuLeave = useCallback(() => scheduleClose(), [scheduleClose]);
+
+  /** After the portal menu mounts, measure it and position within the viewport. */
+  useLayoutEffect(() => {
+    if (!menuOpen || !menuRef.current || !buttonRectRef.current) return;
+    const menu = menuRef.current;
+    const btnRect = buttonRectRef.current;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    const gap = 2;
+
+    // Vertical: prefer below button, flip above if it won't fit
+    let top = btnRect.bottom + gap;
+    if (top + mh > vh) top = btnRect.top - gap - mh;
+    // Clamp to viewport
+    top = Math.max(4, Math.min(top, vh - mh - 4));
+
+    // Horizontal: align right edge to button right edge, push left if needed
+    let left = btnRect.right - mw;
+    if (left < 4) left = 4;
+    if (left + mw > vw - 4) left = vw - 4 - mw;
+
+    setMenuStyle({ top, left, visibility: "visible" });
+  }, [menuOpen]);
+
+  // Clean up timer on unmount
+  useEffect(() => () => cancelClose(), [cancelClose]);
 
   // Track whether a drag-relocate occurred to suppress button clicks.
   // react-grid-layout uses mousemove-based dragging (not native HTML5 drag),
@@ -66,7 +133,7 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, child
     };
   }, []);
 
-  /** Capture-phase handler on the icon bar — suppresses all button clicks after a drag. */
+  /** Capture-phase handler — suppresses all button clicks after a drag. */
   const handleClickCapture = useCallback((e: React.MouseEvent) => {
     if (didDragRef.current) {
       e.stopPropagation();
@@ -77,104 +144,31 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, child
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg overflow-hidden">
-      {/* Header — drag handle; icon bar hidden until header hover */}
+      {/* Header — drag handle with title and overflow menu */}
       <div
-        className="group/header drag-handle cursor-grab active:cursor-grabbing select-none border-b border-[var(--border-default)] bg-[var(--bg-primary)]"
+        className="drag-handle cursor-grab active:cursor-grabbing select-none border-b border-[var(--border-default)] bg-[var(--bg-primary)]"
         onMouseDown={handleMouseDown}
       >
-        {/* Icon bar — collapsed by default, revealed on header hover */}
-        <div className="grid grid-rows-[0fr] group-hover/header:grid-rows-[1fr] transition-[grid-template-rows] duration-150">
-          <div className="overflow-hidden">
-            <div
-              className="flex items-center justify-end gap-0.5 px-1.5 py-0.5"
-              onClickCapture={handleClickCapture}
-            >
-              {/* Signal count badge */}
-              {panel.signals.length > 0 && (
-                <span
-                  className="w-4 h-4 rounded-full text-[10px] font-medium tabular-nums flex items-center justify-center shrink-0 bg-[var(--border-default)] text-[color:var(--text-secondary)]"
-                  title={`${panel.signals.length} signal${panel.signals.length !== 1 ? "s" : ""}`}
-                >
-                  {panel.signals.length}
-                </span>
-              )}
-
-              {/* Line-chart-specific controls */}
-              {isLineChart && (
-                <>
-                  {/* Follow mode toggle */}
-                  <button
-                    onClick={() => setFollowMode(panel.id, !followMode)}
-                    className={compactToggle(followMode, "blue")}
-                    title={followMode ? "Following latest data (click to disable)" : "Follow latest data"}
-                  >
-                    <ChevronsRight className={iconSm} />
-                  </button>
-
-                  {/* Stats toggle */}
-                  <button
-                    onClick={() => toggleStats(panel.id)}
-                    className={compactToggle(panel.showStats === true, "purple")}
-                    title={panel.showStats ? "Hide statistics" : "Show statistics (min/avg/max)"}
-                  >
-                    <BarChart2 className={iconSm} />
-                  </button>
-
-                  {/* Reset zoom */}
-                  <button
-                    onClick={triggerZoomReset}
-                    className={`p-0.5 rounded ${iconButtonHover}`}
-                    title="Reset zoom"
-                  >
-                    <Maximize2 className={iconSm} />
-                  </button>
-                </>
-              )}
-
-              {/* Export data */}
-              {onExport && (
-                <button
-                  onClick={onExport}
-                  className={`p-0.5 rounded ${iconButtonHover}`}
-                  title="Export data as CSV"
-                >
-                  <Download className={iconSm} />
-                </button>
-              )}
-
-              {/* Configure */}
-              <button
-                onClick={onOpenPanelConfig}
-                className={`p-0.5 rounded ${iconButtonHover}`}
-                title="Configure panel"
-              >
-                <Settings2 className={iconSm} />
-              </button>
-
-              {/* Clone */}
-              <button
-                onClick={() => clonePanel(panel.id)}
-                className={`p-0.5 rounded ${iconButtonHover}`}
-                title="Clone panel"
-              >
-                <Copy className={iconSm} />
-              </button>
-
-              {/* Remove */}
-              <button
-                onClick={() => removePanel(panel.id)}
-                className={`p-0.5 rounded ${iconButtonDanger}`}
-                title="Remove panel"
-              >
-                <Trash2 className={iconSm} />
-              </button>
-            </div>
+        <div className="flex items-center px-2 py-0.5">
+          <div className="flex-1 min-w-0 text-xs font-medium text-[color:var(--text-primary)] truncate">
+            {panel.title}
           </div>
-        </div>
 
-        {/* Title — always visible */}
-        <div className="px-2 py-0.5 text-xs font-medium text-[color:var(--text-primary)] truncate">
-          {panel.title}
+          {/* Overflow menu button — always visible */}
+          <div
+            className="shrink-0 ml-1"
+            onMouseEnter={handleButtonEnter}
+            onMouseLeave={scheduleClose}
+            onClickCapture={handleClickCapture}
+          >
+            <button
+              ref={buttonRef}
+              className={`p-0.5 rounded ${iconButtonHover}`}
+              title="Panel actions"
+            >
+              <EllipsisVertical className={iconSm} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -182,6 +176,79 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, child
       <div className="flex-1 min-h-0 overflow-hidden">
         {children}
       </div>
+
+      {/* Dropdown menu — rendered in portal to escape overflow clipping */}
+      {menuOpen && createPortal(
+        <div
+          ref={menuRef}
+          className={menuClasses}
+          style={menuStyle}
+          onMouseEnter={handleMenuEnter}
+          onMouseLeave={handleMenuLeave}
+          onClickCapture={handleClickCapture}
+        >
+          {/* Signal count */}
+          {panel.signals.length > 0 && (
+            <div className="px-3 py-1 text-[10px] font-medium text-[color:var(--text-muted)]">
+              {panel.signals.length} signal{panel.signals.length !== 1 ? "s" : ""}
+            </div>
+          )}
+
+          {/* Line-chart controls */}
+          {isLineChart && (
+            <>
+              <button
+                onClick={() => setFollowMode(panel.id, !followMode)}
+                className={`${menuItem} ${menuToggle(followMode, "blue")}`}
+              >
+                <ChevronsRight className={iconSm} />
+                {followMode ? "Following" : "Follow mode"}
+              </button>
+              <button
+                onClick={() => toggleStats(panel.id)}
+                className={`${menuItem} ${menuToggle(panel.showStats === true, "purple")}`}
+              >
+                <BarChart2 className={iconSm} />
+                {panel.showStats ? "Hide stats" : "Show stats"}
+              </button>
+              <button onClick={triggerZoomReset} className={menuItem}>
+                <Maximize2 className={iconSm} />
+                Reset zoom
+              </button>
+              <div className={menuDivider} />
+            </>
+          )}
+
+          {/* Export */}
+          {onExport && (
+            <button onClick={onExport} className={menuItem}>
+              <Download className={iconSm} />
+              Export CSV
+            </button>
+          )}
+
+          {/* Configure */}
+          <button onClick={onOpenPanelConfig} className={menuItem}>
+            <Settings2 className={iconSm} />
+            Configure
+          </button>
+
+          {/* Clone */}
+          <button onClick={() => clonePanel(panel.id)} className={menuItem}>
+            <Copy className={iconSm} />
+            Clone
+          </button>
+
+          <div className={menuDivider} />
+
+          {/* Remove */}
+          <button onClick={() => removePanel(panel.id)} className={`${menuItem} text-red-400 hover:bg-red-500/10`}>
+            <Trash2 className={iconSm} />
+            Remove
+          </button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

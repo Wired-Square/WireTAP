@@ -38,6 +38,10 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **Graph panel overflow menu**: Panel header icons replaced with a persistent ellipsis (⋮) button that opens a hover dropdown menu. The dropdown renders via a portal so it is never clipped by small panels, and automatically repositions to stay within the window bounds. All panel actions (follow mode, stats, zoom reset, export, configure, clone, remove) are accessible from the menu regardless of panel size.
+
+- **Graph gauge text stroke**: Gauge centre value and unit text now have a subtle background-coloured stroke outline (`paint-order: stroke`) so they remain legible when overlapping arc rings.
+
 - **Graph panel configuration flow**: The "Add signals" button moved from the panel header toolbar into the Configure Panel dialog. Signal selection now uses OK/Cancel confirmation — changes are only applied on OK.
 
 - **Graph signal removal**: Signals can now be removed directly from the Configure Panel dialog via a red bin icon per signal row.
