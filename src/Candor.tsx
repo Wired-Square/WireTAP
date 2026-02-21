@@ -8,7 +8,9 @@ import MainLayout from "./components/MainLayout";
 import { useUpdateStore } from "./stores/updateStore";
 import { useTheme } from "./hooks/useTheme";
 import { useAppErrorDialog } from "./stores/sessionStore";
+import { useSettingsStore } from "./apps/settings/stores/settingsStore";
 import ErrorDialog from "./dialogs/ErrorDialog";
+import TelemetryConsentDialog from "./dialogs/TelemetryConsentDialog";
 
 // Lazy load AboutDialog since it's rarely used
 const AboutDialog = lazy(() => import("./dialogs/AboutDialog"));
@@ -25,13 +27,29 @@ function LoadingFallback() {
   );
 }
 
+/** Enable or disable the Sentry client at runtime */
+function setSentryEnabled(enabled: boolean) {
+  const client = Sentry.getClient();
+  if (client) {
+    client.getOptions().enabled = enabled;
+  }
+}
+
 export default function Candor() {
   const [showAbout, setShowAbout] = useState(false);
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
   const currentWindow = getCurrentWebviewWindow();
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
 
   // Global app error dialog state
   const { isOpen: appErrorOpen, title: appErrorTitle, message: appErrorMessage, details: appErrorDetails, closeAppError } = useAppErrorDialog();
+
+  // Telemetry consent state
+  const settingsLoaded = useSettingsStore((s) => s.originalSettings !== null);
+  const telemetryEnabled = useSettingsStore((s) => s.general.telemetryEnabled);
+  const telemetryConsentGiven = useSettingsStore((s) => s.general.telemetryConsentGiven);
+  const setTelemetryEnabled = useSettingsStore((s) => s.setTelemetryEnabled);
+  const setTelemetryConsentGiven = useSettingsStore((s) => s.setTelemetryConsentGiven);
 
   // Apply global theme (dark/light mode + CSS variables)
   useTheme();
@@ -51,6 +69,33 @@ export default function Candor() {
     };
   }, [currentWindow]);
 
+  // Show consent dialog on first boot (or upgrade without the setting)
+  useEffect(() => {
+    if (settingsLoaded && !telemetryConsentGiven) {
+      setShowConsentDialog(true);
+    }
+  }, [settingsLoaded, telemetryConsentGiven]);
+
+  // Enable/disable Sentry based on consent + preference
+  useEffect(() => {
+    if (settingsLoaded && telemetryConsentGiven) {
+      setSentryEnabled(telemetryEnabled);
+    }
+  }, [settingsLoaded, telemetryConsentGiven, telemetryEnabled]);
+
+  const handleConsentAccept = () => {
+    setTelemetryEnabled(true);
+    setTelemetryConsentGiven(true);
+    setShowConsentDialog(false);
+    setSentryEnabled(true);
+  };
+
+  const handleConsentDecline = () => {
+    setTelemetryEnabled(false);
+    setTelemetryConsentGiven(true);
+    setShowConsentDialog(false);
+  };
+
   return (
     <>
       <Suspense fallback={null}>
@@ -68,6 +113,12 @@ export default function Candor() {
         message={appErrorMessage}
         details={appErrorDetails ?? undefined}
         onClose={closeAppError}
+      />
+      {/* Telemetry consent dialog - shown on first boot */}
+      <TelemetryConsentDialog
+        isOpen={showConsentDialog}
+        onAccept={handleConsentAccept}
+        onDecline={handleConsentDecline}
       />
     </>
   );

@@ -96,6 +96,12 @@ pub struct AppSettings {
     pub prevent_idle_sleep: bool,
     #[serde(default = "default_keep_display_awake")]
     pub keep_display_awake: bool,
+
+    // Privacy / telemetry
+    #[serde(default = "default_telemetry_enabled")]
+    pub telemetry_enabled: bool,
+    #[serde(default = "default_telemetry_consent_given")]
+    pub telemetry_consent_given: bool,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -202,6 +208,14 @@ fn default_keep_display_awake() -> bool {
     false
 }
 
+// Privacy / telemetry defaults
+fn default_telemetry_enabled() -> bool {
+    false
+}
+fn default_telemetry_consent_given() -> bool {
+    false
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         // Get platform-specific documents directory
@@ -256,6 +270,9 @@ impl Default for AppSettings {
             // Power management
             prevent_idle_sleep: default_prevent_idle_sleep(),
             keep_display_awake: default_keep_display_awake(),
+            // Privacy / telemetry
+            telemetry_enabled: default_telemetry_enabled(),
+            telemetry_consent_given: default_telemetry_consent_given(),
         }
     }
 }
@@ -317,6 +334,9 @@ impl AppSettings {
             // Power management
             prevent_idle_sleep: default_prevent_idle_sleep(),
             keep_display_awake: default_keep_display_awake(),
+            // Privacy / telemetry
+            telemetry_enabled: default_telemetry_enabled(),
+            telemetry_consent_given: default_telemetry_consent_given(),
         })
     }
 }

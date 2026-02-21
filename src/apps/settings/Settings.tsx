@@ -5,7 +5,7 @@ import { pickDirectory } from '../../api/dialogs';
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
 import AppSideBar, { type SideBarItem } from "../../components/AppSideBar";
-import { Cog, MapPin, Cable, BookOpen, Monitor, Bookmark, Star, LayoutGrid } from "lucide-react";
+import { Cog, MapPin, Cable, BookOpen, Monitor, Bookmark, Star, LayoutGrid, Shield } from "lucide-react";
 import { bgDataView, borderDataView } from "../../styles/colourTokens";
 import LocationsView from './views/LocationsView';
 import DisplayView from './views/DisplayView';
@@ -15,6 +15,7 @@ import GeneralView from './views/GeneralView';
 import BookmarksView from './views/BookmarksView';
 import SelectionSetsView from './views/SelectionSetsView';
 import GraphLayoutsView from './views/GraphLayoutsView';
+import PrivacyView from './views/PrivacyView';
 import IOProfileDialog from './dialogs/IOProfileDialog';
 import EditCatalogDialog from './dialogs/EditCatalogDialog';
 import ConfirmDeleteDialog from '../../dialogs/ConfirmDeleteDialog';
@@ -94,6 +95,10 @@ export default function Settings() {
   const keepDisplayAwake = useSettingsStore((s) => s.general.keepDisplayAwake);
   const setKeepDisplayAwake = useSettingsStore((s) => s.setKeepDisplayAwake);
 
+  // Privacy
+  const telemetryEnabled = useSettingsStore((s) => s.general.telemetryEnabled);
+  const setTelemetryEnabled = useSettingsStore((s) => s.setTelemetryEnabled);
+
   // IO Profiles
   const ioProfiles = useSettingsStore((s) => s.ioProfiles.profiles);
   const defaultReadProfile = useSettingsStore((s) => s.ioProfiles.defaultReadProfile);
@@ -171,6 +176,7 @@ export default function Settings() {
   // Sidebar items (Storage hidden on iOS due to sandboxing restrictions)
   const sidebarItems: SideBarItem[] = [
     { id: 'general', label: 'General', icon: Cog },
+    { id: 'privacy', label: 'Privacy', icon: Shield },
     // Hide Storage on iOS - custom directory paths aren't supported
     ...(!isIOSPlatform ? [{ id: 'locations' as const, label: 'Storage', icon: MapPin }] : []),
     { id: 'data-io', label: 'Data IO', icon: Cable },
@@ -250,6 +256,13 @@ export default function Settings() {
               keepDisplayAwake={keepDisplayAwake}
               onChangeKeepDisplayAwake={setKeepDisplayAwake}
               isIOS={isIOSPlatform}
+            />
+          )}
+
+          {currentSection === 'privacy' && (
+            <PrivacyView
+              telemetryEnabled={telemetryEnabled}
+              onChangeTelemetryEnabled={setTelemetryEnabled}
             />
           )}
 

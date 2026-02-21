@@ -8,6 +8,10 @@ All notable changes to CANdor will be documented in this file.
 
 - **Sentry error tracking**: Frontend error tracking via `@sentry/react`. Captures uncaught exceptions, unhandled promise rejections, and React render errors via `Sentry.ErrorBoundary`. App-level errors shown through `showAppError` are also reported. Source maps are uploaded during CI builds for readable stack traces. Sentry is disabled when `VITE_SENTRY_DSN` is not set.
 
+- **Telemetry consent dialog**: On first boot (or upgrading from a version without the setting), a consent dialog asks whether to share anonymous crash reports. No data is sent until the user explicitly opts in. The preference can be changed at any time in Settings → Privacy.
+
+- **Privacy settings tab**: New Privacy tab in Settings with a toggle for anonymous crash reporting.
+
 ## [0.4.3] - 2026-02-20
 
 ### Added

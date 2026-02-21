@@ -25,7 +25,7 @@ import {
 } from '../../../utils/graphLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "locations" | "data-io" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
+export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
 export interface DirectoryValidation {
@@ -127,6 +127,9 @@ interface AppSettings {
   // Power management
   prevent_idle_sleep?: boolean;
   keep_display_awake?: boolean;
+  // Privacy / telemetry
+  telemetry_enabled?: boolean;
+  telemetry_consent_given?: boolean;
 }
 
 // Dialog types
@@ -286,6 +289,8 @@ interface SettingsState {
     sessionManagerStatsInterval: number;
     preventIdleSleep: boolean;
     keepDisplayAwake: boolean;
+    telemetryEnabled: boolean;
+    telemetryConsentGiven: boolean;
   };
 
   // UI state
@@ -361,6 +366,8 @@ interface SettingsState {
   setSessionManagerStatsInterval: (interval: number) => void;
   setPreventIdleSleep: (value: boolean) => void;
   setKeepDisplayAwake: (value: boolean) => void;
+  setTelemetryEnabled: (value: boolean) => void;
+  setTelemetryConsentGiven: (value: boolean) => void;
 }
 
 // Auto-save debounce
@@ -424,6 +431,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     sessionManagerStatsInterval: 60,
     preventIdleSleep: true,
     keepDisplayAwake: false,
+    telemetryEnabled: false,
+    telemetryConsentGiven: false,
   },
 
   ui: {
@@ -516,6 +525,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Power management
         prevent_idle_sleep: settings.prevent_idle_sleep ?? true,
         keep_display_awake: settings.keep_display_awake ?? false,
+        // Privacy / telemetry
+        telemetry_enabled: settings.telemetry_enabled ?? false,
+        telemetry_consent_given: settings.telemetry_consent_given ?? false,
       };
 
       set({
@@ -582,6 +594,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           sessionManagerStatsInterval: normalized.session_manager_stats_interval ?? 60,
           preventIdleSleep: normalized.prevent_idle_sleep ?? true,
           keepDisplayAwake: normalized.keep_display_awake ?? false,
+          telemetryEnabled: normalized.telemetry_enabled ?? false,
+          telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
         },
         originalSettings: normalized,
       });
@@ -679,6 +693,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Power management
         prevent_idle_sleep: general.preventIdleSleep,
         keep_display_awake: general.keepDisplayAwake,
+        // Privacy / telemetry
+        telemetry_enabled: general.telemetryEnabled,
+        telemetry_consent_given: general.telemetryConsentGiven,
         // Theme settings
         theme_mode: display.themeMode,
         theme_bg_primary_light: display.themeColours.bgPrimaryLight,
@@ -745,6 +762,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // Power management
       prevent_idle_sleep: general.preventIdleSleep,
       keep_display_awake: general.keepDisplayAwake,
+      // Privacy / telemetry
+      telemetry_enabled: general.telemetryEnabled,
+      telemetry_consent_given: general.telemetryConsentGiven,
       // Theme settings
       theme_mode: display.themeMode,
       theme_bg_primary_light: display.themeColours.bgPrimaryLight,
@@ -1095,5 +1115,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     setWakeSettingsApi(preventIdleSleep, value).catch(console.error);
     // Update iOS screen wake (no-op on other platforms)
     setIOSScreenWake(value).catch(console.error);
+  },
+
+  setTelemetryEnabled: (value) => {
+    set((state) => ({
+      general: { ...state.general, telemetryEnabled: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setTelemetryConsentGiven: (value) => {
+    set((state) => ({
+      general: { ...state.general, telemetryConsentGiven: value },
+    }));
+    scheduleSave(get().saveSettings);
   },
 }));

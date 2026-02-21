@@ -112,6 +112,9 @@ export interface AppSettings {
   // Power management
   prevent_idle_sleep?: boolean;
   keep_display_awake?: boolean;
+  // Privacy / telemetry
+  telemetry_enabled?: boolean;
+  telemetry_consent_given?: boolean;
 }
 
 /**
@@ -163,6 +166,9 @@ function normalizeSettings(
     theme_accent_success: settings.theme_accent_success || "#16a34a",
     theme_accent_danger: settings.theme_accent_danger || "#dc2626",
     theme_accent_warning: settings.theme_accent_warning || "#d97706",
+    // Privacy / telemetry
+    telemetry_enabled: settings.telemetry_enabled ?? false,
+    telemetry_consent_given: settings.telemetry_consent_given ?? false,
   };
 }
 
