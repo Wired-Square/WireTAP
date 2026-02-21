@@ -1,9 +1,9 @@
 // ui/src/apps/graph/dialogs/SignalPickerDialog.tsx
 
-import { useState } from "react";
-import { X, ChevronRight, ChevronDown, Check } from "lucide-react";
+import { useState, useMemo } from "react";
+import { X, ChevronRight, ChevronDown, Check, Search } from "lucide-react";
 import { iconSm, iconLg } from "../../../styles/spacing";
-import { bgSurface, borderDivider, textSecondary, hoverLight } from "../../../styles";
+import { bgSurface, borderDivider, textSecondary, hoverLight, inputSimple } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useGraphStore } from "../../../stores/graphStore";
 import { formatFrameId } from "../../../utils/frameIds";
@@ -22,8 +22,22 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId }: Props) 
   const removeSignalFromPanel = useGraphStore((s) => s.removeSignalFromPanel);
 
   const [expandedFrames, setExpandedFrames] = useState<Set<number>>(new Set());
+  const [search, setSearch] = useState("");
 
   const panel = panels.find((p) => p.id === panelId);
+
+  // Sort frames by ID, filter by search query — must be before early return
+  const needle = search.toLowerCase();
+  const sortedFrames = useMemo(() => {
+    const all = Array.from(frames.entries()).sort(([a], [b]) => a - b);
+    if (!needle) return all;
+    return all.filter(([, frame]) =>
+      getAllFrameSignals(frame).some(
+        (s) => s.name && s.name.toLowerCase().includes(needle),
+      ),
+    );
+  }, [frames, needle]);
+
   if (!panel) {
     return (
       <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
@@ -57,9 +71,6 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId }: Props) 
     });
   };
 
-  // Sort frames by ID
-  const sortedFrames = Array.from(frames.entries()).sort(([a], [b]) => a - b);
-
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
@@ -76,19 +87,37 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId }: Props) 
           </button>
         </div>
 
+        {/* Search */}
+        <div className="px-4 py-2 border-b border-[var(--border-default)]">
+          <div className="relative">
+            <Search className={`${iconSm} absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]`} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search signals…"
+              className={`${inputSimple} w-full pl-8`}
+              autoFocus
+            />
+          </div>
+        </div>
+
         {/* Signal list */}
         <div className="max-h-[50vh] overflow-y-auto">
           {sortedFrames.length === 0 ? (
             <div className="p-4 text-sm text-[color:var(--text-muted)]">
-              No catalog loaded. Load a catalog first.
+              {needle ? "No matching signals found." : "No catalog loaded. Load a catalog first."}
             </div>
           ) : (
             <div className="py-1">
               {sortedFrames.map(([frameId, frame]) => {
-                const isExpanded = expandedFrames.has(frameId);
-                const numericSignals = getAllFrameSignals(frame).filter(
+                const isExpanded = expandedFrames.has(frameId) || !!needle;
+                const allNumeric = getAllFrameSignals(frame).filter(
                   (s) => s.name && s.format !== "ascii" && s.format !== "utf8" && s.format !== "hex",
                 );
+                const numericSignals = needle
+                  ? allNumeric.filter((s) => s.name!.toLowerCase().includes(needle))
+                  : allNumeric;
                 if (numericSignals.length === 0) return null;
 
                 const selectedCount = numericSignals.filter((s) =>

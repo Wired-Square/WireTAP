@@ -6,6 +6,30 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Graph panel clone**: Panels can be duplicated via a clone button in the hover icon bar, copying type, title, signals, and gauge range.
+
+- **Graph signal search**: The Select Signals dialog now has a search bar that filters signals by name (case-insensitive), auto-expanding matching frames.
+
+### Changed
+
+- **Graph panel header**: Icons are now hidden by default and revealed on hover; only the title is visible at rest, maximising content area.
+
+- **Graph grid resolution**: Row height halved (80px → 40px) for finer panel sizing and positioning.
+
+- **Graph list panels**: Replaced per-signal colour dot with a single confidence dot, matching the panel's read-only purpose.
+
+- **Graph panel settings colours**: Colour pickers are hidden for list panels since they don't use per-signal colours.
+
+### Fixed
+
+- **Panel settings number inputs**: Changed min/max value fields from `type="number"` to `type="text"` with `inputMode="decimal"`, fixing inability to highlight and retype values on Windows and twitchy behaviour on Mac.
+
+- **Panel settings input styling**: Upgraded inputs from bare `inputBase` to `inputSimple` for proper padding, background, border, and focus ring.
+
+- **Dialog drag-select dismissal**: Dialogs no longer close when a text selection drag ends outside the dialog boundary.
+
+- **Signal display name trailing spaces**: Spaces can now be typed mid-name; trailing whitespace is trimmed on save rather than on every keystroke.
+
 - **Sentry error tracking**: Frontend error tracking via `@sentry/react`. Captures uncaught exceptions, unhandled promise rejections, and React render errors via `Sentry.ErrorBoundary`. App-level errors shown through `showAppError` are also reported. Source maps are uploaded during CI builds for readable stack traces. Sentry is disabled when `VITE_SENTRY_DSN` is not set.
 
 - **Telemetry consent dialog**: On first boot (or upgrading from a version without the setting), a consent dialog asks whether to share anonymous crash reports. No data is sent until the user explicitly opts in. The preference can be changed at any time in Settings → Privacy.

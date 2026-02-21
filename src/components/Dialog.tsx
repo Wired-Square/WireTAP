@@ -45,7 +45,10 @@ export default function Dialog({
 }: DialogProps) {
   if (!isOpen) return null;
 
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Use onMouseDown so that drag-selecting text that ends outside
+  // the dialog doesn't dismiss it (mouseup on backdrop after mousedown
+  // inside the dialog would otherwise fire onClick on the backdrop).
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget && onBackdropClick) {
       onBackdropClick();
     }
@@ -56,11 +59,11 @@ export default function Dialog({
       className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 ${
         backdropPadding ? 'p-4' : ''
       }`}
-      onClick={handleBackdropClick}
+      onMouseDown={handleBackdropMouseDown}
     >
       <div
         className={`${bgSurface} rounded-xl shadow-2xl ${maxWidth} w-full`}
-        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {children}
       </div>

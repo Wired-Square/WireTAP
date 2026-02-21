@@ -48,20 +48,12 @@ export default function ListPanel({ panel }: Props) {
           key={values[i].key}
           className="flex items-center gap-2 py-1 border-b border-[var(--border-default)] last:border-b-0"
         >
-          {/* Colour dot */}
+          {/* Confidence dot */}
           <span
             className="w-2 h-2 rounded-full shrink-0"
-            style={{ background: signal.colour }}
+            style={{ background: getConfidenceColour(signal.confidence, settings) }}
+            title={signal.confidence ? `Confidence: ${signal.confidence}` : undefined}
           />
-
-          {/* Confidence dot */}
-          {signal.confidence && (
-            <span
-              className="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ background: getConfidenceColour(signal.confidence, settings) }}
-              title={`Confidence: ${signal.confidence}`}
-            />
-          )}
 
           {/* Signal name */}
           <span className="text-xs text-[color:var(--text-secondary)] truncate flex-1">

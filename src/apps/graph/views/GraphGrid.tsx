@@ -17,7 +17,7 @@ interface Props {
 
 const gridConfig = {
   cols: 12,
-  rowHeight: 80,
+  rowHeight: 40,
   margin: [8, 8] as const,
 };
 

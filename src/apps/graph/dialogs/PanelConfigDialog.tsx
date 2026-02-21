@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
-import { bgSurface, borderDivider, hoverLight, inputBase, selectSimple, primaryButtonBase } from "../../../styles";
+import { bgSurface, borderDivider, hoverLight, inputSimple, selectSimple, primaryButtonBase } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useGraphStore, getSignalLabel, getConfidenceColour } from "../../../stores/graphStore";
 import { useSettings } from "../../../hooks/useSettings";
@@ -28,7 +28,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId }: Props) {
   const [maxValue, setMaxValue] = useState("100");
   const [primarySignalIndex, setPrimarySignalIndex] = useState("0");
 
-  // Sync local state when panel changes
+  // Sync local state when dialog opens (or switches to a different panel)
   useEffect(() => {
     if (panel) {
       setTitle(panel.title);
@@ -36,13 +36,22 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId }: Props) {
       setMaxValue(String(panel.maxValue));
       setPrimarySignalIndex(String(panel.primarySignalIndex ?? 0));
     }
-  }, [panel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelId]);
 
   if (!panel) {
     return null;
   }
 
   const handleSave = () => {
+    // Strip trailing whitespace from display names before saving
+    for (const signal of panel.signals) {
+      const raw = signal.displayName;
+      if (raw && raw !== raw.trimEnd()) {
+        updateSignalDisplayName(panel.id, signal.frameId, signal.signalName, raw.trimEnd());
+      }
+    }
+
     updatePanel(panel.id, {
       title: title.trim() || panel.title,
       minValue: parseFloat(minValue) || 0,
@@ -86,7 +95,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId }: Props) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              className={`${inputBase} w-full`}
+              className={`${inputSimple} w-full`}
               placeholder="Panel title"
             />
           </div>
@@ -99,11 +108,12 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId }: Props) {
                   Min Value
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={minValue}
                   onChange={(e) => setMinValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className={`${inputBase} w-full`}
+                  className={`${inputSimple} w-full`}
                 />
               </div>
               <div className="flex-1">
@@ -111,11 +121,12 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId }: Props) {
                   Max Value
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={maxValue}
                   onChange={(e) => setMaxValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className={`${inputBase} w-full`}
+                  className={`${inputSimple} w-full`}
                 />
               </div>
             </div>
@@ -153,14 +164,16 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId }: Props) {
                     key={`${signal.frameId}:${signal.signalName}`}
                     className="flex items-center gap-2"
                   >
-                    <input
-                      type="color"
-                      value={signal.colour}
-                      onChange={(e) =>
-                        updateSignalColour(panel.id, signal.frameId, signal.signalName, e.target.value)
-                      }
-                      className="h-7 w-10 cursor-pointer bg-transparent border border-[color:var(--border-default)] rounded shrink-0"
-                    />
+                    {panel.type !== "list" && (
+                      <input
+                        type="color"
+                        value={signal.colour}
+                        onChange={(e) =>
+                          updateSignalColour(panel.id, signal.frameId, signal.signalName, e.target.value)
+                        }
+                        className="h-7 w-10 cursor-pointer bg-transparent border border-[color:var(--border-default)] rounded shrink-0"
+                      />
+                    )}
                     <input
                       type="text"
                       value={signal.displayName ?? ""}
@@ -168,7 +181,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId }: Props) {
                         updateSignalDisplayName(panel.id, signal.frameId, signal.signalName, e.target.value)
                       }
                       placeholder={signal.signalName}
-                      className={`${inputBase} flex-1 text-sm`}
+                      className={`${inputSimple} flex-1 text-sm`}
                     />
                     {/* Confidence indicator */}
                     {signal.confidence && (

@@ -203,6 +203,7 @@ interface GraphState {
 
   // Panel management
   addPanel: (type: PanelType) => void;
+  clonePanel: (panelId: string) => void;
   removePanel: (panelId: string) => void;
   updatePanel: (panelId: string, updates: Partial<Pick<GraphPanel, 'title' | 'minValue' | 'maxValue' | 'primarySignalIndex'>>) => void;
   addSignalToPanel: (panelId: string, frameId: number, signalName: string, unit?: string) => void;
@@ -368,6 +369,37 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     scheduleAutoSave();
   },
 
+  clonePanel: (panelId) => {
+    const { panels, layout } = get();
+    const source = panels.find((p) => p.id === panelId);
+    const sourceLayout = layout.find((l) => l.i === panelId);
+    if (!source || !sourceLayout) return;
+
+    const id = generatePanelId();
+    const maxY = layout.reduce((max, item) => Math.max(max, item.y + item.h), 0);
+
+    const cloned: GraphPanel = {
+      ...source,
+      id,
+      title: `${source.title} (copy)`,
+      signals: source.signals.map((s) => ({ ...s })),
+    };
+
+    const clonedLayout: LayoutItem = {
+      i: id,
+      x: 0,
+      y: maxY,
+      w: sourceLayout.w,
+      h: sourceLayout.h,
+    };
+
+    set({
+      panels: [...panels, cloned],
+      layout: [...layout, clonedLayout],
+    });
+    scheduleAutoSave();
+  },
+
   removePanel: (panelId) => {
     const { panels, layout } = get();
     set({
@@ -469,7 +501,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
               ...p,
               signals: p.signals.map((s) =>
                 s.frameId === frameId && s.signalName === signalName
-                  ? { ...s, displayName: displayName.trim() || undefined }
+                  ? { ...s, displayName: displayName || undefined }
                   : s
               ),
             }
