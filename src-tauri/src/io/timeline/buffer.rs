@@ -133,7 +133,7 @@ impl IODevice for BufferReader {
     }
 
     fn seek(&mut self, timestamp_us: i64) -> Result<(), String> {
-        eprintln!(
+        tlog!(
             "[Buffer:{}] Seek requested to {}us",
             self.reader_state.session_id, timestamp_us
         );
@@ -142,7 +142,7 @@ impl IODevice for BufferReader {
     }
 
     fn seek_by_frame(&mut self, frame_index: i64) -> Result<(), String> {
-        eprintln!(
+        tlog!(
             "[Buffer:{}] Seek by frame requested to index {}",
             self.reader_state.session_id, frame_index
         );
@@ -151,7 +151,7 @@ impl IODevice for BufferReader {
     }
 
     fn set_direction(&mut self, reverse: bool) -> Result<(), String> {
-        eprintln!(
+        tlog!(
             "[Buffer:{}] Direction set to {}",
             self.reader_state.session_id,
             if reverse { "reverse" } else { "forward" }
@@ -301,7 +301,7 @@ pub fn step_frame(
     let frame = &frames[new_idx];
     let new_timestamp_us = frame.timestamp_us as i64;
 
-    eprintln!(
+    tlog!(
         "[Buffer:{}] Step {} from frame {} to frame {} (timestamp {}us, frame_id=0x{:X})",
         session_id,
         if backward { "backward" } else { "forward" },
@@ -370,7 +370,7 @@ async fn run_buffer_stream(
     let metadata = buffer_store::get_metadata();
     let initial_speed = control.read_speed();
     let initial_pacing = control.is_pacing_enabled();
-    eprintln!(
+    tlog!(
         "[Buffer:{}] Starting stream (frames: {}, speed: {}x, pacing: {}, source: '{}')",
         session_id,
         frames.len(),
@@ -407,7 +407,7 @@ async fn run_buffer_stream(
     let mut last_pacing_check = std::time::Instant::now();
     let mut last_reverse = control.is_reverse();
 
-    eprintln!(
+    tlog!(
         "[Buffer:{}] Starting frame-by-frame loop (stream_start: {:.3}s, reverse: {})",
         session_id, stream_start_secs, last_reverse
     );
@@ -431,7 +431,7 @@ async fn run_buffer_stream(
         }
         // Check if cancelled
         if control.is_cancelled() {
-            eprintln!(
+            tlog!(
                 "[Buffer:{}] Stream cancelled, stopping immediately ({} remaining frames)",
                 session_id,
                 frames.len() - frame_index
@@ -449,7 +449,7 @@ async fn run_buffer_stream(
             let target_idx = (seek_frame as usize).min(frames.len().saturating_sub(1));
 
             let is_paused = control.is_paused();
-            eprintln!(
+            tlog!(
                 "[Buffer:{}] Seeking to frame {} (by index, paused={})",
                 session_id, target_idx, is_paused
             );
@@ -485,7 +485,7 @@ async fn run_buffer_stream(
                 if is_paused {
                     let snapshot = build_snapshot(&frames, target_idx);
                     if !snapshot.is_empty() {
-                        eprintln!(
+                        tlog!(
                             "[Buffer:{}] Emitting snapshot of {} unique frames at seek position",
                             session_id,
                             snapshot.len()
@@ -510,7 +510,7 @@ async fn run_buffer_stream(
                 .unwrap_or_else(|i| i.min(frames.len().saturating_sub(1)));
 
             let is_paused = control.is_paused();
-            eprintln!(
+            tlog!(
                 "[Buffer:{}] Seeking to frame {} (timestamp {}us, paused={})",
                 session_id, target_idx, seek_target, is_paused
             );
@@ -548,7 +548,7 @@ async fn run_buffer_stream(
                 if is_paused {
                     let snapshot = build_snapshot(&frames, target_idx);
                     if !snapshot.is_empty() {
-                        eprintln!(
+                        tlog!(
                             "[Buffer:{}] Emitting snapshot of {} unique frames at seek position",
                             session_id,
                             snapshot.len()
@@ -587,7 +587,7 @@ async fn run_buffer_stream(
 
         // Check for direction change and reset timing baseline
         if is_reverse != last_reverse {
-            eprintln!(
+            tlog!(
                 "[Buffer:{}] Direction changed to {}",
                 session_id,
                 if is_reverse { "reverse" } else { "forward" }
@@ -749,7 +749,7 @@ async fn run_buffer_stream(
     // Calculate stats
     let total_wall_time_ms = wall_clock_baseline.elapsed().as_millis();
     let data_duration_secs = last_frame_time_secs.unwrap_or(stream_start_secs) - stream_start_secs;
-    eprintln!(
+    tlog!(
         "[Buffer:{}] Stream ended (reason: {}, count: {}, wall_time: {}ms, data_duration: {:.1}s, waits: {} totaling {}ms)",
         session_id, reason, total_emitted, total_wall_time_ms, data_duration_secs, wait_count, total_wait_ms
     );

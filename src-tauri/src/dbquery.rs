@@ -80,13 +80,13 @@ pub async fn db_cancel_query(query_id: String) -> Result<(), String> {
     };
 
     if let Some(query) = query {
-        println!("[dbquery] Cancelling query: {}", query_id);
+        tlog!("[dbquery] Cancelling query: {}", query_id);
         query
             .cancel_token
             .cancel_query(NoTls)
             .await
             .map_err(|e| format!("Failed to cancel query: {}", e))?;
-        println!("[dbquery] Query cancelled: {}", query_id);
+        tlog!("[dbquery] Query cancelled: {}", query_id);
 
         // Remove from running queries
         unregister_query(&query_id).await;
@@ -247,28 +247,28 @@ fn get_profile_password(profile: &IOProfile) -> Option<String> {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    println!("[dbquery] get_profile_password: password_stored={}", password_stored);
+    tlog!("[dbquery] get_profile_password: password_stored={}", password_stored);
 
     if password_stored {
         // Try to get from credential storage (field is "password")
         match get_credential(&profile.id, "password") {
             Ok(Some(pw)) => {
-                println!("[dbquery] get_profile_password: got password from credential storage");
+                tlog!("[dbquery] get_profile_password: got password from credential storage");
                 Some(pw)
             }
             Ok(None) => {
-                println!("[dbquery] get_profile_password: no password in credential storage");
+                tlog!("[dbquery] get_profile_password: no password in credential storage");
                 None
             }
             Err(e) => {
-                println!("[dbquery] get_profile_password: credential storage error: {}", e);
+                tlog!("[dbquery] get_profile_password: credential storage error: {}", e);
                 None
             }
         }
     } else {
         // Fall back to connection config
         let pw = profile.connection.get("password").and_then(|v| v.as_str()).map(|s| s.to_string());
-        println!("[dbquery] get_profile_password: from config: {}", if pw.is_some() { "found" } else { "not found" });
+        tlog!("[dbquery] get_profile_password: from config: {}", if pw.is_some() { "found" } else { "not found" });
         pw
     }
 }
@@ -293,20 +293,20 @@ pub async fn db_query_byte_changes(
     let result_limit = limit.unwrap_or(10000);
     let query_id = query_id.unwrap_or_else(|| format!("byte_changes_{}", query_start.elapsed().as_nanos()));
 
-    println!("[dbquery] db_query_byte_changes called with profile_id='{}', frame_id={}, byte_index={}, is_extended={:?}, limit={}",
+    tlog!("[dbquery] db_query_byte_changes called with profile_id='{}', frame_id={}, byte_index={}, is_extended={:?}, limit={}",
         profile_id, frame_id, byte_index, is_extended, result_limit);
 
     // Load settings to get profile
     let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
 
-    println!("[dbquery] Loaded settings, found {} IO profiles", settings.io_profiles.len());
+    tlog!("[dbquery] Loaded settings, found {} IO profiles", settings.io_profiles.len());
 
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
-    println!("[dbquery] Found profile: id='{}', kind='{}', name='{}'",
+    tlog!("[dbquery] Found profile: id='{}', kind='{}', name='{}'",
         profile.id, profile.kind, profile.name);
-    println!("[dbquery] Profile connection config: {:?}", profile.connection);
+    tlog!("[dbquery] Profile connection config: {:?}", profile.connection);
 
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
@@ -314,7 +314,7 @@ pub async fn db_query_byte_changes(
 
     // Get password
     let password = get_profile_password(&profile);
-    println!("[dbquery] Got password: {}", if password.is_some() { "yes (hidden)" } else { "no" });
+    tlog!("[dbquery] Got password: {}", if password.is_some() { "yes (hidden)" } else { "no" });
 
     let conn_str = build_connection_string(&profile, password);
     // Log connection string but redact password
@@ -322,13 +322,13 @@ pub async fn db_query_byte_changes(
         .map(|part| if part.starts_with("password=") { "password=***" } else { part })
         .collect::<Vec<_>>()
         .join(" ");
-    println!("[dbquery] Connection string: {}", safe_conn_str);
+    tlog!("[dbquery] Connection string: {}", safe_conn_str);
 
     // Connect to database
     let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
         .await
         .map_err(|e| {
-            println!("[dbquery] Connection failed: {:?}", e);
+            tlog!("[dbquery] Connection failed: {:?}", e);
             format!("Failed to connect to database: {}", e)
         })?;
 
@@ -339,7 +339,7 @@ pub async fn db_query_byte_changes(
     // Spawn connection handler
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("PostgreSQL connection error: {}", e);
+            tlog!("PostgreSQL connection error: {}", e);
         }
     });
 
@@ -409,8 +409,8 @@ pub async fn db_query_byte_changes(
         result_limit
     ));
 
-    println!("[dbquery] Executing query:\n{}", query);
-    println!("[dbquery] Query params: frame_id={}, byte_index={}, is_extended={:?}, start_time={:?}, end_time={:?}",
+    tlog!("[dbquery] Executing query:\n{}", query);
+    tlog!("[dbquery] Query params: frame_id={}, byte_index={}, is_extended={:?}, start_time={:?}, end_time={:?}",
         frame_id_i32, byte_index_i32, is_extended, start_time, end_time);
 
     let rows = client
@@ -419,7 +419,7 @@ pub async fn db_query_byte_changes(
         .map_err(|e| format!("Query failed: {}", e))?;
 
     let rows_scanned = rows.len();
-    println!("[dbquery] Query returned {} change rows (filtered in SQL)", rows_scanned);
+    tlog!("[dbquery] Query returned {} change rows (filtered in SQL)", rows_scanned);
 
     // Parse results - byte comparison already done in SQL
     let mut results = Vec::new();
@@ -436,7 +436,7 @@ pub async fn db_query_byte_changes(
     }
 
     let execution_time_ms = query_start.elapsed().as_millis() as u64;
-    println!("[dbquery] byte_changes: frame=0x{:X} byte={} ext={:?} | {} changes, {}ms",
+    tlog!("[dbquery] byte_changes: frame=0x{:X} byte={} ext={:?} | {} changes, {}ms",
         frame_id, byte_index, is_extended, results.len(), execution_time_ms);
 
     unregister_query(&query_id).await;
@@ -470,7 +470,7 @@ pub async fn db_query_frame_changes(
     let result_limit = limit.unwrap_or(10000);
     let query_id = query_id.unwrap_or_else(|| format!("frame_changes_{}", query_start.elapsed().as_nanos()));
 
-    println!("[dbquery] db_query_frame_changes called with profile_id='{}', frame_id={}, is_extended={:?}, limit={}",
+    tlog!("[dbquery] db_query_frame_changes called with profile_id='{}', frame_id={}, is_extended={:?}, limit={}",
         profile_id, frame_id, is_extended, result_limit);
 
     // Load settings to get profile
@@ -479,9 +479,9 @@ pub async fn db_query_frame_changes(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
-    println!("[dbquery] Found profile: id='{}', kind='{}', name='{}'",
+    tlog!("[dbquery] Found profile: id='{}', kind='{}', name='{}'",
         profile.id, profile.kind, profile.name);
-    println!("[dbquery] Profile connection config: {:?}", profile.connection);
+    tlog!("[dbquery] Profile connection config: {:?}", profile.connection);
 
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
@@ -489,7 +489,7 @@ pub async fn db_query_frame_changes(
 
     // Get password
     let password = get_profile_password(&profile);
-    println!("[dbquery] Got password: {}", if password.is_some() { "yes (hidden)" } else { "no" });
+    tlog!("[dbquery] Got password: {}", if password.is_some() { "yes (hidden)" } else { "no" });
 
     let conn_str = build_connection_string(&profile, password);
     // Log connection string but redact password
@@ -497,13 +497,13 @@ pub async fn db_query_frame_changes(
         .map(|part| if part.starts_with("password=") { "password=***" } else { part })
         .collect::<Vec<_>>()
         .join(" ");
-    println!("[dbquery] Connection string: {}", safe_conn_str);
+    tlog!("[dbquery] Connection string: {}", safe_conn_str);
 
     // Connect to database
     let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
         .await
         .map_err(|e| {
-            println!("[dbquery] Connection failed: {:?}", e);
+            tlog!("[dbquery] Connection failed: {:?}", e);
             format!("Failed to connect to database: {}", e)
         })?;
 
@@ -514,7 +514,7 @@ pub async fn db_query_frame_changes(
     // Spawn connection handler
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("PostgreSQL connection error: {}", e);
+            tlog!("PostgreSQL connection error: {}", e);
         }
     });
 
@@ -579,8 +579,8 @@ pub async fn db_query_frame_changes(
         result_limit
     ));
 
-    println!("[dbquery] Executing query:\n{}", query);
-    println!("[dbquery] Query params: frame_id={}, is_extended={:?}, start_time={:?}, end_time={:?}",
+    tlog!("[dbquery] Executing query:\n{}", query);
+    tlog!("[dbquery] Query params: frame_id={}, is_extended={:?}, start_time={:?}, end_time={:?}",
         frame_id_i32, is_extended, start_time, end_time);
 
     let rows = client
@@ -589,7 +589,7 @@ pub async fn db_query_frame_changes(
         .map_err(|e| format!("Query failed: {}", e))?;
 
     let rows_scanned = rows.len();
-    println!("[dbquery] Query returned {} change rows (filtered in SQL)", rows_scanned);
+    tlog!("[dbquery] Query returned {} change rows (filtered in SQL)", rows_scanned);
 
     // Parse results - only changed frames are returned
     let mut results = Vec::new();
@@ -619,7 +619,7 @@ pub async fn db_query_frame_changes(
     }
 
     let execution_time_ms = query_start.elapsed().as_millis() as u64;
-    println!("[dbquery] frame_changes: frame=0x{:X} ext={:?} | {} changes, {}ms",
+    tlog!("[dbquery] frame_changes: frame=0x{:X} ext={:?} | {} changes, {}ms",
         frame_id, is_extended, results.len(), execution_time_ms);
 
     unregister_query(&query_id).await;
@@ -656,7 +656,7 @@ pub async fn db_query_mirror_validation(
     let result_limit = limit.unwrap_or(10000);
     let query_id = query_id.unwrap_or_else(|| format!("mirror_validation_{}", query_start.elapsed().as_nanos()));
 
-    println!("[dbquery] db_query_mirror_validation called with profile_id='{}', mirror=0x{:X}, source=0x{:X}, is_extended={:?}, tolerance={}ms, limit={}",
+    tlog!("[dbquery] db_query_mirror_validation called with profile_id='{}', mirror=0x{:X}, source=0x{:X}, is_extended={:?}, tolerance={}ms, limit={}",
         profile_id, mirror_frame_id, source_frame_id, is_extended, tolerance_ms, result_limit);
 
     // Load settings to get profile
@@ -665,7 +665,7 @@ pub async fn db_query_mirror_validation(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
-    println!("[dbquery] Found profile: id='{}', kind='{}', name='{}'",
+    tlog!("[dbquery] Found profile: id='{}', kind='{}', name='{}'",
         profile.id, profile.kind, profile.name);
 
     if profile.kind != "postgres" {
@@ -686,7 +686,7 @@ pub async fn db_query_mirror_validation(
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("PostgreSQL connection error: {}", e);
+            tlog!("PostgreSQL connection error: {}", e);
         }
     });
 
@@ -791,7 +791,7 @@ pub async fn db_query_mirror_validation(
         result_limit
     ));
 
-    println!("[dbquery] Executing mirror validation query");
+    tlog!("[dbquery] Executing mirror validation query");
 
     let rows = client
         .query(&query, &params)
@@ -799,7 +799,7 @@ pub async fn db_query_mirror_validation(
         .map_err(|e| format!("Query failed: {}", e))?;
 
     let rows_scanned = rows.len();
-    println!("[dbquery] Query returned {} mismatch rows", rows_scanned);
+    tlog!("[dbquery] Query returned {} mismatch rows", rows_scanned);
 
     // Parse results and compute mismatch indices
     let mut results = Vec::new();
@@ -830,7 +830,7 @@ pub async fn db_query_mirror_validation(
     }
 
     let execution_time_ms = query_start.elapsed().as_millis() as u64;
-    println!("[dbquery] mirror_validation: mirror=0x{:X} source=0x{:X} ext={:?} | {} mismatches, {}ms",
+    tlog!("[dbquery] mirror_validation: mirror=0x{:X} source=0x{:X} ext={:?} | {} mismatches, {}ms",
         mirror_frame_id, source_frame_id, is_extended, results.len(), execution_time_ms);
 
     unregister_query(&query_id).await;
@@ -854,7 +854,7 @@ pub async fn db_query_activity(
     app: AppHandle,
     profile_id: String,
 ) -> Result<DatabaseActivityResult, String> {
-    println!("[dbquery] db_query_activity called for profile '{}'", profile_id);
+    tlog!("[dbquery] db_query_activity called for profile '{}'", profile_id);
 
     // Load settings to get profile
     let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
@@ -876,7 +876,7 @@ pub async fn db_query_activity(
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("PostgreSQL connection error: {}", e);
+            tlog!("PostgreSQL connection error: {}", e);
         }
     });
 
@@ -940,7 +940,7 @@ pub async fn db_query_activity(
         }
     }
 
-    println!("[dbquery] Found {} active queries, {} idle sessions for database '{}'",
+    tlog!("[dbquery] Found {} active queries, {} idle sessions for database '{}'",
         queries.len(), sessions.len(), database_name);
 
     Ok(DatabaseActivityResult { queries, sessions })
@@ -956,7 +956,7 @@ pub async fn db_cancel_backend(
     profile_id: String,
     pid: i32,
 ) -> Result<bool, String> {
-    println!("[dbquery] db_cancel_backend called for pid {} on profile '{}'", pid, profile_id);
+    tlog!("[dbquery] db_cancel_backend called for pid {} on profile '{}'", pid, profile_id);
 
     // Load settings to get profile
     let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
@@ -978,7 +978,7 @@ pub async fn db_cancel_backend(
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("PostgreSQL connection error: {}", e);
+            tlog!("PostgreSQL connection error: {}", e);
         }
     });
 
@@ -990,7 +990,7 @@ pub async fn db_cancel_backend(
         .map_err(|e| format!("Failed to cancel backend: {}", e))?;
 
     let cancelled: bool = row.get(0);
-    println!("[dbquery] pg_cancel_backend({}) returned: {}", pid, cancelled);
+    tlog!("[dbquery] pg_cancel_backend({}) returned: {}", pid, cancelled);
 
     Ok(cancelled)
 }
@@ -1005,7 +1005,7 @@ pub async fn db_terminate_backend(
     profile_id: String,
     pid: i32,
 ) -> Result<bool, String> {
-    println!("[dbquery] db_terminate_backend called for pid {} on profile '{}'", pid, profile_id);
+    tlog!("[dbquery] db_terminate_backend called for pid {} on profile '{}'", pid, profile_id);
 
     // Load settings to get profile
     let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
@@ -1027,7 +1027,7 @@ pub async fn db_terminate_backend(
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("PostgreSQL connection error: {}", e);
+            tlog!("PostgreSQL connection error: {}", e);
         }
     });
 
@@ -1038,7 +1038,7 @@ pub async fn db_terminate_backend(
         .map_err(|e| format!("Failed to terminate backend: {}", e))?;
 
     let terminated: bool = row.get(0);
-    println!("[dbquery] pg_terminate_backend({}) returned: {}", pid, terminated);
+    tlog!("[dbquery] pg_terminate_backend({}) returned: {}", pid, terminated);
 
     Ok(terminated)
 }

@@ -101,7 +101,7 @@ pub async fn run_source(
         .map(|m| m.output_bus)
         .unwrap_or(0);
 
-    eprintln!(
+    tlog!(
         "[serial] Source {} connected to {} (baud: {}, framing: {:?}, emit_raw: {}, bus: {})",
         source_idx, port_path, baud_rate, framing_encoding, emit_raw_bytes, output_bus
     );
@@ -132,7 +132,7 @@ pub async fn run_source(
                         .and_then(|_| port.flush())
                         .map_err(|e| format!("Write error: {}", e)),
                     Err(e) => {
-                        eprintln!("[serial] Mutex poisoned in transmit: {}", e);
+                        tlog!("[serial] Mutex poisoned in transmit: {}", e);
                         Err(format!("Port mutex poisoned: {}", e))
                     }
                 };
@@ -143,7 +143,7 @@ pub async fn run_source(
             let read_result = match serial_port_clone.lock() {
                 Ok(mut port) => port.read(&mut buf),
                 Err(e) => {
-                    eprintln!("[serial] Mutex poisoned in read loop: {}", e);
+                    tlog!("[serial] Mutex poisoned in read loop: {}", e);
                     let _ = tx_clone.blocking_send(SourceMessage::Error(
                         source_idx,
                         format!("Port mutex poisoned: {}", e),

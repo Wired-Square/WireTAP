@@ -193,12 +193,12 @@ impl TimelineReaderState {
     /// Set playback speed with logging.
     pub fn set_speed(&mut self, speed: f64, device_name: &str) -> Result<(), String> {
         if speed == 0.0 {
-            eprintln!(
+            tlog!(
                 "[{}:{}] set_speed: disabling pacing (speed=0)",
                 device_name, self.session_id
             );
         } else {
-            eprintln!(
+            tlog!(
                 "[{}:{}] set_speed: enabling pacing at {}x",
                 device_name, self.session_id, speed
             );

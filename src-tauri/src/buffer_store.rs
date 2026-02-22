@@ -170,7 +170,7 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
         registry.active_id = Some(id.clone());
     }
 
-    eprintln!(
+    tlog!(
         "[BufferStore] Created buffer '{}' ({:?}) - '{}' [streaming={}]",
         id, buffer_type, name, set_streaming
     );
@@ -186,7 +186,7 @@ pub fn finalize_buffer() -> Option<BufferMetadata> {
 
     if let Some(id) = registry.streaming_id.take() {
         if let Some(buffer) = registry.buffers.get(&id) {
-            eprintln!(
+            tlog!(
                 "[BufferStore] Finalized buffer '{}' with {} items",
                 id, buffer.metadata.count
             );
@@ -209,14 +209,14 @@ pub fn list_buffers() -> Vec<BufferMetadata> {
 
     // Only log when state changes
     if should_log {
-        eprintln!(
+        tlog!(
             "[BufferStore] list_buffers - streaming_id: {:?}, buffers: {}",
             streaming_id.as_deref(),
             buffer_count
         );
         for b in registry.buffers.values() {
             let is_streaming = streaming_id.as_deref() == Some(b.metadata.id.as_str());
-            eprintln!(
+            tlog!(
                 "[BufferStore]   buffer '{}' is_streaming: {}",
                 b.metadata.id, is_streaming
             );
@@ -264,7 +264,7 @@ pub fn delete_buffer(id: &str) -> Result<(), String> {
     }
 
     if registry.buffers.remove(id).is_some() {
-        eprintln!("[BufferStore] Deleted buffer '{}'", id);
+        tlog!("[BufferStore] Deleted buffer '{}'", id);
         Ok(())
     } else {
         Err(format!("Buffer '{}' not found", id))
@@ -277,7 +277,7 @@ pub fn clear_all_buffers() {
     registry.buffers.clear();
     registry.active_id = None;
     registry.streaming_id = None;
-    eprintln!("[BufferStore] Cleared all buffers");
+    tlog!("[BufferStore] Cleared all buffers");
 }
 
 /// Get the active buffer ID.
@@ -292,7 +292,7 @@ pub fn set_active_buffer(buffer_id: &str) -> Result<(), String> {
     let mut registry = BUFFER_REGISTRY.write().unwrap();
     if registry.buffers.contains_key(buffer_id) {
         registry.active_id = Some(buffer_id.to_string());
-        eprintln!("[BufferStore] Set active buffer: {}", buffer_id);
+        tlog!("[BufferStore] Set active buffer: {}", buffer_id);
         Ok(())
     } else {
         Err(format!("Buffer '{}' not found", buffer_id))
@@ -309,7 +309,7 @@ pub fn set_buffer_owner(buffer_id: &str, session_id: &str) -> Result<(), String>
     let mut registry = BUFFER_REGISTRY.write().unwrap();
     if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
         buffer.metadata.owning_session_id = Some(session_id.to_string());
-        eprintln!(
+        tlog!(
             "[BufferStore] Assigned buffer '{}' to session '{}'",
             buffer_id, session_id
         );
@@ -348,7 +348,7 @@ pub fn orphan_buffers_for_session(session_id: &str) -> Vec<OrphanedBufferInfo> {
     }
 
     if !orphaned.is_empty() {
-        eprintln!(
+        tlog!(
             "[BufferStore] Orphaned {} buffer(s) for session '{}': {:?}",
             orphaned.len(),
             session_id,
@@ -441,7 +441,7 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
     };
     registry.buffers.insert(id.clone(), buffer);
 
-    eprintln!(
+    tlog!(
         "[BufferStore] Copied buffer '{}' -> '{}' ('{}', {} items)",
         source_buffer_id, id, new_name, count
     );
@@ -527,7 +527,7 @@ pub fn clear_and_refill_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
             // Add new frames
             frames.extend(new_frames);
 
-            eprintln!(
+            tlog!(
                 "[BufferStore] Refilled buffer '{}' with {} frames",
                 buffer_id, buffer.metadata.count
             );
@@ -936,12 +936,12 @@ pub fn get_frames_by_id(buffer_id: &str) -> Vec<FrameMessage> {
 
     if let Some(buffer) = registry.buffers.get(buffer_id) {
         if let BufferData::Frames(frames) = &buffer.data {
-            eprintln!("[BufferStore] get_frames_by_id('{}') returning {} frames", buffer_id, frames.len());
+            tlog!("[BufferStore] get_frames_by_id('{}') returning {} frames", buffer_id, frames.len());
             return frames.clone();
         }
     }
 
-    eprintln!("[BufferStore] get_frames_by_id('{}') buffer not found, falling back to get_frames()", buffer_id);
+    tlog!("[BufferStore] get_frames_by_id('{}') buffer not found, falling back to get_frames()", buffer_id);
     drop(registry);
     get_frames()
 }
@@ -1026,7 +1026,7 @@ pub fn get_frame_info_map() -> Vec<BufferFrameInfo> {
         if let Some(active_id) = &registry.active_id {
             if let Some(buffer) = registry.buffers.get(active_id) {
                 if matches!(&buffer.data, BufferData::Frames(_)) {
-                    eprintln!("[BufferStore] get_frame_info_map using active buffer '{}'", active_id);
+                    tlog!("[BufferStore] get_frame_info_map using active buffer '{}'", active_id);
                     return get_buffer_frame_info(active_id);
                 }
             }
@@ -1039,7 +1039,7 @@ pub fn get_frame_info_map() -> Vec<BufferFrameInfo> {
     };
 
     if let Some(id) = buffer_id {
-        eprintln!("[BufferStore] get_frame_info_map using fallback buffer '{}'", id);
+        tlog!("[BufferStore] get_frame_info_map using fallback buffer '{}'", id);
         get_buffer_frame_info(&id)
     } else {
         Vec::new()
@@ -1081,5 +1081,5 @@ pub fn set_buffer(frames: Vec<FrameMessage>, filename: String) {
     let id = create_buffer(BufferType::Frames, filename);
     append_frames(frames);
     finalize_buffer();
-    eprintln!("[BufferStore] Imported frames into buffer '{}'", id);
+    tlog!("[BufferStore] Imported frames into buffer '{}'", id);
 }

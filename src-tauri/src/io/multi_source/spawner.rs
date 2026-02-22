@@ -403,7 +403,7 @@ async fn run_serial_reader(
         config.source_address_config
     };
 
-    eprintln!(
+    tlog!(
         "[multi_source] Serial source {} using framing: {:?} (override: {:?}), frame_id_config: {:?}",
         source_idx, config.framing_encoding, framing_encoding_override, frame_id_config
     );

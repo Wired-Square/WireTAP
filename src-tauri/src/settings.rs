@@ -99,6 +99,10 @@ pub struct AppSettings {
     #[serde(default = "default_keep_display_awake")]
     pub keep_display_awake: bool,
 
+    // Diagnostics
+    #[serde(default = "default_enable_file_logging")]
+    pub enable_file_logging: bool,
+
     // Privacy / telemetry
     #[serde(default = "default_telemetry_enabled")]
     pub telemetry_enabled: bool,
@@ -213,6 +217,11 @@ fn default_keep_display_awake() -> bool {
     false
 }
 
+// Diagnostics defaults
+fn default_enable_file_logging() -> bool {
+    false
+}
+
 // Privacy / telemetry defaults
 fn default_telemetry_enabled() -> bool {
     false
@@ -276,6 +285,8 @@ impl Default for AppSettings {
             // Power management
             prevent_idle_sleep: default_prevent_idle_sleep(),
             keep_display_awake: default_keep_display_awake(),
+            // Diagnostics
+            enable_file_logging: default_enable_file_logging(),
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
             telemetry_consent_given: default_telemetry_consent_given(),
@@ -341,6 +352,8 @@ impl AppSettings {
             // Power management
             prevent_idle_sleep: default_prevent_idle_sleep(),
             keep_display_awake: default_keep_display_awake(),
+            // Diagnostics
+            enable_file_logging: default_enable_file_logging(),
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
             telemetry_consent_given: default_telemetry_consent_given(),
@@ -375,7 +388,7 @@ fn paths_are_stale(settings: &AppSettings, app: &AppHandle) -> bool {
     // Check if the saved path starts with the current document directory.
     // If not, the path is stale and needs regeneration.
     if !decoder_path.starts_with(&current_doc_dir) {
-        eprintln!(
+        tlog!(
             "[settings] Detected stale paths: decoder_dir {:?} doesn't start with {:?}",
             decoder_path, current_doc_dir
         );
@@ -398,7 +411,7 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
 
         // Check for stale paths (e.g., old iOS container UUIDs after reinstall)
         if paths_are_stale(&settings, &app) {
-            eprintln!("[settings] Regenerating stale directory paths");
+            tlog!("[settings] Regenerating stale directory paths");
             let fresh_defaults = AppSettings::with_defaults(&app)?;
             settings.decoder_dir = fresh_defaults.decoder_dir;
             settings.dump_dir = fresh_defaults.dump_dir;
@@ -436,22 +449,22 @@ fn initialize_directories(settings: &AppSettings) -> Result<(), String> {
 /// Only copies files that don't already exist (never overwrites).
 pub fn install_example_decoders(app: &AppHandle, decoder_dir: &str) -> Result<u32, String> {
     let decoder_path = PathBuf::from(decoder_dir);
-    eprintln!("[settings] Decoder directory: {:?}", decoder_path);
+    tlog!("[settings] Decoder directory: {:?}", decoder_path);
 
     // Try to resolve the bundled examples directory
     // First try BaseDirectory::Resource (works on desktop)
     let examples_dir = match app.path().resolve("examples", BaseDirectory::Resource) {
         Ok(path) => {
-            eprintln!("[settings] Resolved examples via Resource: {:?}", path);
+            tlog!("[settings] Resolved examples via Resource: {:?}", path);
             path
         }
         Err(e) => {
-            eprintln!("[settings] Failed to resolve via Resource: {}", e);
+            tlog!("[settings] Failed to resolve via Resource: {}", e);
             // Fallback: try resource_dir directly (for iOS)
             match app.path().resource_dir() {
                 Ok(resource_dir) => {
                     let path = resource_dir.join("examples");
-                    eprintln!("[settings] Trying resource_dir fallback: {:?}", path);
+                    tlog!("[settings] Trying resource_dir fallback: {:?}", path);
                     path
                 }
                 Err(e2) => {
@@ -463,7 +476,7 @@ pub fn install_example_decoders(app: &AppHandle, decoder_dir: &str) -> Result<u3
 
     // If examples directory doesn't exist (dev mode without resources), skip silently
     if !examples_dir.exists() {
-        eprintln!("[settings] Examples directory not found at {:?}, skipping installation", examples_dir);
+        tlog!("[settings] Examples directory not found at {:?}, skipping installation", examples_dir);
         return Ok(0);
     }
 
@@ -491,24 +504,24 @@ pub fn install_example_decoders(app: &AppHandle, decoder_dir: &str) -> Result<u3
         // Check if file already exists in destination
         let dest_path = decoder_path.join(filename);
         if dest_path.exists() {
-            eprintln!("[settings] Skipping '{}' - already exists in decoder directory", filename);
+            tlog!("[settings] Skipping '{}' - already exists in decoder directory", filename);
             continue;
         }
 
         // Copy the file
         match std::fs::copy(&path, &dest_path) {
             Ok(_) => {
-                eprintln!("[settings] Installed example decoder: {}", filename);
+                tlog!("[settings] Installed example decoder: {}", filename);
                 installed_count += 1;
             }
             Err(e) => {
-                eprintln!("[settings] Failed to install '{}': {}", filename, e);
+                tlog!("[settings] Failed to install '{}': {}", filename, e);
             }
         }
     }
 
     if installed_count > 0 {
-        eprintln!("[settings] Installed {} example decoder(s)", installed_count);
+        tlog!("[settings] Installed {} example decoder(s)", installed_count);
     }
 
     Ok(installed_count)

@@ -196,14 +196,14 @@ fn get_secure_credential(profile: &IOProfile, field: &str) -> Option<String> {
         match credentials::get_credential(&profile.id, field) {
             Ok(Some(value)) => Some(value),
             Ok(None) => {
-                eprintln!(
+                tlog!(
                     "[get_secure_credential] No {} found in keyring for profile {}",
                     field, profile.id
                 );
                 None
             }
             Err(e) => {
-                eprintln!(
+                tlog!(
                     "[get_secure_credential] Failed to get {} from keyring for profile {}: {}",
                     field, profile.id, e
                 );
@@ -474,7 +474,7 @@ pub async fn create_reader_session(
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
 
-            eprintln!(
+            tlog!(
                 "[create_reader_session] PostgreSQL time range - param start: {:?}, param end: {:?}, profile start: {:?}, profile end: {:?}",
                 start_time, end_time, start_from_profile, end_from_profile
             );
@@ -626,15 +626,15 @@ pub async fn create_reader_session(
     let is_playback_source = matches!(profile.kind.as_str(), "postgres" | "csv_file" | "csv-file");
 
     if result.is_new && !is_playback_source {
-        eprintln!("[create_reader_session] Auto-starting new session '{}' (real-time device)", session_id);
+        tlog!("[create_reader_session] Auto-starting new session '{}' (real-time device)", session_id);
         if let Err(e) = start_session(&session_id).await {
-            eprintln!("[create_reader_session] Failed to auto-start session '{}': {}", session_id, e);
+            tlog!("[create_reader_session] Failed to auto-start session '{}': {}", session_id, e);
             // Don't fail the whole creation - session is created but not started
         }
     } else if result.is_new && is_playback_source {
-        eprintln!("[create_reader_session] Created playback session '{}' (not auto-starting - frontend will start after listener registration)", session_id);
+        tlog!("[create_reader_session] Created playback session '{}' (not auto-starting - frontend will start after listener registration)", session_id);
     } else {
-        eprintln!("[create_reader_session] Joined existing session '{}' (listener_count: {})", session_id, result.listener_count);
+        tlog!("[create_reader_session] Joined existing session '{}' (listener_count: {})", session_id, result.listener_count);
     }
 
     Ok(result.capabilities)
@@ -1214,7 +1214,7 @@ pub async fn probe_device(
 
     // Check cache first - if we have a successful probe result, return it immediately
     if let Some(cached) = get_cached_probe(&profile_id) {
-        eprintln!("[probe_device] Returning cached probe result for profile '{}'", profile_id);
+        tlog!("[probe_device] Returning cached probe result for profile '{}'", profile_id);
         emit_device_probe(&app, DeviceProbePayload {
             profile_id: profile_id.clone(),
             device_type: cached.device_type.clone(),
@@ -1608,7 +1608,7 @@ fn resolve_source_config(
     // Use provided bus mappings, or auto-assign if none provided
     let bus_mappings = if input.bus_mappings.is_empty() {
         let output_bus = source_idx as u8;
-        eprintln!(
+        tlog!(
             "[resolve_source_config] Source {} '{}' has no bus mappings, auto-assigning output bus {}",
             source_idx, display_name, output_bus
         );
@@ -1747,7 +1747,7 @@ pub async fn create_multi_source_session(
 
     if should_start {
         if let Err(e) = start_session(&session_id).await {
-            eprintln!(
+            tlog!(
                 "[create_multi_source_session] Failed to auto-start session '{}': {}",
                 session_id, e
             );

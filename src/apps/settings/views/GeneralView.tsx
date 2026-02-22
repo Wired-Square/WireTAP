@@ -20,6 +20,8 @@ type GeneralViewProps = {
   onChangePreventIdleSleep: (value: boolean) => void;
   keepDisplayAwake: boolean;
   onChangeKeepDisplayAwake: (value: boolean) => void;
+  enableFileLogging: boolean;
+  onChangeEnableFileLogging: (value: boolean) => void;
   isIOS?: boolean;
 };
 
@@ -36,6 +38,8 @@ export default function GeneralView({
   onChangePreventIdleSleep,
   keepDisplayAwake,
   onChangeKeepDisplayAwake,
+  enableFileLogging,
+  onChangeEnableFileLogging,
   isIOS = false,
 }: GeneralViewProps) {
   return (
@@ -155,6 +159,29 @@ export default function GeneralView({
               </span>
               <p className={helpText}>
                 Prevent the display from turning off while a session is active
+              </p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Diagnostics Section */}
+      <div className="pt-4 border-t border-[color:var(--border-default)]">
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Diagnostics</h3>
+        <div className="space-y-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={enableFileLogging}
+              onChange={(e) => onChangeEnableFileLogging(e.target.checked)}
+              className="mt-1"
+            />
+            <div>
+              <span className={labelDefault}>
+                Log to file
+              </span>
+              <p className={helpText}>
+                Write diagnostic logs to ~/Documents/CANdor/Reports/
               </p>
             </div>
           </label>

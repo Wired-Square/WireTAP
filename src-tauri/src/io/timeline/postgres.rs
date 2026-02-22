@@ -257,7 +257,7 @@ async fn run_postgres_stream(
 
     // Connect to PostgreSQL
     let conn_str = config.to_connection_string();
-    eprintln!(
+    tlog!(
         "[PostgreSQL:{}] Connecting to {}:{}/{}",
         session_id, config.host, config.port, config.database
     );
@@ -279,13 +279,13 @@ async fn run_postgres_stream(
     let conn_session_id = session_id.clone();
     tauri::async_runtime::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("[PostgreSQL:{}] Connection error: {}", conn_session_id, e);
+            tlog!("[PostgreSQL:{}] Connection error: {}", conn_session_id, e);
         }
     });
 
     // Build query based on source type
     let query = build_query(&options);
-    eprintln!(
+    tlog!(
         "[PostgreSQL:{}] Query: {}",
         session_id, query
     );
@@ -346,7 +346,7 @@ async fn run_postgres_stream(
 
             let fetch_elapsed = fetch_start.elapsed();
             if fetch_elapsed.as_secs() > 5 {
-                eprintln!("[PostgreSQL:{}] Slow query: {} rows in {:?}. Consider adding an index on 'ts' or using a time filter.",
+                tlog!("[PostgreSQL:{}] Slow query: {} rows in {:?}. Consider adding an index on 'ts' or using a time filter.",
                     session_id, rows.len(), fetch_elapsed);
             }
 
@@ -362,7 +362,7 @@ async fn run_postgres_stream(
                         *total_fetched += 1;
                     }
                     Err(e) => {
-                        eprintln!("[PostgreSQL] Failed to parse row: {}", e);
+                        tlog!("[PostgreSQL] Failed to parse row: {}", e);
                     }
                 }
             }
@@ -390,7 +390,7 @@ async fn run_postgres_stream(
     }
 
     if frame_queue.is_empty() {
-        eprintln!("[PostgreSQL:{}] No frames returned from query", session_id);
+        tlog!("[PostgreSQL:{}] No frames returned from query", session_id);
         emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
         return Ok(());
     }
@@ -414,7 +414,7 @@ async fn run_postgres_stream(
     let mut last_speed = control.read_speed();
     let mut last_pacing_check = std::time::Instant::now();
 
-    eprintln!(
+    tlog!(
         "[PostgreSQL:{}] Streaming (speed: {}x)",
         session_id, options.speed
     );
@@ -641,12 +641,12 @@ async fn run_postgres_stream(
     // When cancelled (user clicked Stop), suspend_session() will emit session-suspended.
     // This prevents double event emission that confuses the frontend.
     if control.is_cancelled() {
-        eprintln!(
+        tlog!(
             "[PostgreSQL:{}] Stream cancelled by user (fetched: {}, emitted: {})",
             session_id, total_fetched, total_emitted
         );
     } else {
-        eprintln!(
+        tlog!(
             "[PostgreSQL:{}] Stream ended (reason: {}, fetched: {}, emitted: {})",
             session_id, stream_reason, total_fetched, total_emitted
         );

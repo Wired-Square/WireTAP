@@ -522,7 +522,7 @@ async fn run_gs_usb_stream(
         }
     };
 
-    eprintln!(
+    tlog!(
         "[gs_usb:{}] Opened device at {}:{} (bitrate: {}, listen_only: {})",
         session_id, config.bus, config.address, config.bitrate, config.listen_only
     );
@@ -534,7 +534,7 @@ async fn run_gs_usb_stream(
         return;
     }
 
-    eprintln!("[gs_usb:{}] Device initialized, starting stream", session_id);
+    tlog!("[gs_usb:{}] Device initialized, starting stream", session_id);
 
     // Bulk IN endpoint (usually 0x81 = EP1 IN)
     let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(0x81) {
@@ -552,7 +552,7 @@ async fn run_gs_usb_stream(
         // Bulk OUT endpoint for transmit (0x02 = EP2 OUT)
         match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::Out>(0x02) {
             Ok(ep) => {
-                eprintln!("[gs_usb:{}] Bulk OUT endpoint opened for transmit", session_id);
+                tlog!("[gs_usb:{}] Bulk OUT endpoint opened for transmit", session_id);
                 let mut writer = ep.writer(64);
                 let cancel_flag_for_transmit = cancel_flag.clone();
 
@@ -584,7 +584,7 @@ async fn run_gs_usb_stream(
                 Some(handle)
             }
             Err(e) => {
-                eprintln!("[gs_usb:{}] Warning: could not open bulk OUT endpoint: {} (transmit disabled)", session_id, e);
+                tlog!("[gs_usb:{}] Warning: could not open bulk OUT endpoint: {} (transmit disabled)", session_id, e);
                 None
             }
         }
@@ -614,7 +614,7 @@ async fn run_gs_usb_stream(
         // Check frame limit
         if let Some(limit) = config.limit {
             if total_frames >= limit {
-                eprintln!(
+                tlog!(
                     "[gs_usb:{}] Reached limit of {} frames",
                     session_id, limit
                 );
@@ -698,7 +698,7 @@ async fn run_gs_usb_stream(
                         bulk_in.submit(bulk_in.allocate(buf_size));
                     }
                     Err(e) => {
-                        eprintln!("[gs_usb:{}] Bulk transfer error: {:?}", session_id, e);
+                        tlog!("[gs_usb:{}] Bulk transfer error: {:?}", session_id, e);
                         stream_reason = "error";
                         break;
                     }
@@ -855,7 +855,7 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
             .await
             .map_err(|e| format!("DATA_BITTIMING failed: {:?} (device may not support CAN FD)", e))?;
 
-        eprintln!(
+        tlog!(
             "[gs_usb] FD mode: data bitrate {} bps, sample point {}%",
             config.data_bitrate, config.data_sample_point
         );
@@ -1071,7 +1071,7 @@ pub async fn run_source(
         return;
     }
 
-    eprintln!(
+    tlog!(
         "[gs_usb] Source {} connected to {}:{} (bitrate: {}, listen_only: {})",
         source_idx, bus, address, bitrate, listen_only
     );
@@ -1130,7 +1130,7 @@ pub async fn run_source(
                 Some(handle)
             }
             Err(e) => {
-                eprintln!(
+                tlog!(
                     "[gs_usb] Source {} warning: could not open bulk OUT: {}",
                     source_idx, e
                 );

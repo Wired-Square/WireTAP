@@ -113,6 +113,8 @@ export interface AppSettings {
   // Power management
   prevent_idle_sleep?: boolean;
   keep_display_awake?: boolean;
+  // Diagnostics
+  enable_file_logging?: boolean;
   // Privacy / telemetry
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;

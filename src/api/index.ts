@@ -11,6 +11,7 @@ export {
   settingsPanelClosed,
   openSettingsPanel,
   setWakeSettings,
+  setFileLogging,
 } from "./settings";
 
 // Catalog API

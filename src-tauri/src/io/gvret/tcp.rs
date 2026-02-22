@@ -32,7 +32,7 @@ pub async fn probe_gvret_tcp(
     port: u16,
     timeout_sec: f64,
 ) -> Result<GvretDeviceInfo, IoError> {
-    eprintln!(
+    tlog!(
         "[probe_gvret_tcp] Probing GVRET device at {}:{} (timeout: {}s)",
         host, port, timeout_sec
     );
@@ -48,7 +48,7 @@ pub async fn probe_gvret_tcp(
 
     let mut stream = match connect_res {
         Ok(Ok(s)) => {
-            eprintln!("[probe_gvret_tcp] Connected to {}:{}", host, port);
+            tlog!("[probe_gvret_tcp] Connected to {}:{}", host, port);
             s
         }
         Ok(Err(e)) => return Err(IoError::connection(&device, e.to_string())),
@@ -101,7 +101,7 @@ pub async fn probe_gvret_tcp(
 
                 // Check for NUMBUSES response
                 if let Some(bus_count) = parse_numbuses_response(&buf[..total_read]) {
-                    eprintln!(
+                    tlog!(
                         "[probe_gvret_tcp] SUCCESS: Device at {}:{} has {} buses available",
                         host, port, bus_count
                     );
@@ -123,7 +123,7 @@ pub async fn probe_gvret_tcp(
     }
 
     // If we didn't get a response, assume 1 bus (safer default)
-    eprintln!("[probe_gvret_tcp] No NUMBUSES response received, defaulting to 1 bus");
+    tlog!("[probe_gvret_tcp] No NUMBUSES response received, defaulting to 1 bus");
     Ok(GvretDeviceInfo { bus_count: 1 })
 }
 
@@ -197,7 +197,7 @@ pub async fn run_source(
         .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
         .await;
 
-    eprintln!(
+    tlog!(
         "[gvret_tcp] Source {} connected to {}:{}, transmit channel ready",
         source_idx, host, port
     );

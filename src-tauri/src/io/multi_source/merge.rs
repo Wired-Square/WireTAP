@@ -31,7 +31,7 @@ pub(super) async fn run_merge_task(
     let settings = match settings::load_settings(app.clone()).await {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("[MultiSourceReader] Failed to load settings: {}", e);
+            tlog!("[MultiSourceReader] Failed to load settings: {}", e);
             emit_stream_ended(&app, &session_id, "error", "MultiSourceReader");
             return;
         }
@@ -43,7 +43,7 @@ pub(super) async fn run_merge_task(
         let profile = match settings.io_profiles.iter().find(|p| p.id == source_config.profile_id) {
             Some(p) => p.clone(),
             None => {
-                eprintln!(
+                tlog!(
                     "[MultiSourceReader] Profile '{}' not found",
                     source_config.profile_id
                 );
@@ -130,7 +130,7 @@ pub(super) async fn run_merge_task(
                     }
                 }
                 SourceMessage::Ended(source_idx, reason) => {
-                    eprintln!(
+                    tlog!(
                         "[MultiSourceReader] Source {} ended: {}",
                         source_idx, reason
                     );
@@ -141,7 +141,7 @@ pub(super) async fn run_merge_task(
                     active_sources = active_sources.saturating_sub(1);
                 }
                 SourceMessage::Error(source_idx, error) => {
-                    eprintln!(
+                    tlog!(
                         "[MultiSourceReader] Source {} error: {}",
                         source_idx, error
                     );
@@ -153,7 +153,7 @@ pub(super) async fn run_merge_task(
                     active_sources = active_sources.saturating_sub(1);
                 }
                 SourceMessage::TransmitReady(source_idx, tx_sender) => {
-                    eprintln!(
+                    tlog!(
                         "[MultiSourceReader] Source {} transmit channel ready",
                         source_idx
                     );
@@ -162,7 +162,7 @@ pub(super) async fn run_merge_task(
                     }
                 }
                 SourceMessage::Connected(source_idx, device_type, address, bus_number) => {
-                    eprintln!(
+                    tlog!(
                         "[MultiSourceReader] Source {} connected: {} at {}",
                         source_idx, device_type, address
                     );
@@ -186,7 +186,7 @@ pub(super) async fn run_merge_task(
                 .iter()
                 .map(|(bus, count)| format!("bus {}: {}", bus, count))
                 .collect();
-            eprintln!(
+            tlog!(
                 "[MultiSourceReader] Frame counts per bus: {}",
                 counts_str.join(", ")
             );

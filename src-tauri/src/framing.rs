@@ -165,7 +165,7 @@ mod desktop {
         config: BackendFramingConfig,
         reuse_buffer_id: Option<String>,
     ) -> Result<FramingResult, String> {
-        eprintln!("[framing] apply_framing_to_buffer called with min_length={:?}", config.min_length);
+        tlog!("[framing] apply_framing_to_buffer called with min_length={:?}", config.min_length);
 
         // Get active byte buffer
         let buffer_id = buffer_store::get_active_buffer_id()

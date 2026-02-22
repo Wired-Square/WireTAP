@@ -87,7 +87,7 @@ static SAVE_CHANNEL: Lazy<mpsc::UnboundedSender<()>> = Lazy::new(|| {
                     _ = tokio::time::sleep(debounce_duration), if pending => {
                         pending = false;
                         if let Err(e) = save_to_disk_internal() {
-                            eprintln!("[StoreManager] Failed to save: {}", e);
+                            tlog!("[StoreManager] Failed to save: {}", e);
                         }
                     }
                 }
@@ -191,7 +191,7 @@ pub fn initialise(app: &AppHandle) -> Result<(), String> {
     manager.store_path = Some(path.clone());
     manager.dirty = false;
 
-    eprintln!(
+    tlog!(
         "[StoreManager] Initialised with {} entries",
         manager.data.entries.len()
     );
@@ -203,7 +203,7 @@ pub fn initialise(app: &AppHandle) -> Result<(), String> {
     // Migrate favorites.dat -> favorites.timeRanges
     if !manager.data.entries.contains_key("favorites.timeRanges") {
         if let Some(data) = migrate_old_store(app_data_dir, "favorites.dat", "timeRangeFavorites") {
-            eprintln!("[StoreManager] Migrating favorites from old store");
+            tlog!("[StoreManager] Migrating favorites from old store");
             manager.data.entries.insert("favorites.timeRanges".to_string(), data);
             migrated = true;
         }
@@ -212,7 +212,7 @@ pub fn initialise(app: &AppHandle) -> Result<(), String> {
     // Migrate selection-sets.dat -> selectionSets.all
     if !manager.data.entries.contains_key("selectionSets.all") {
         if let Some(data) = migrate_old_store(app_data_dir, "selection-sets.dat", "selectionSets") {
-            eprintln!("[StoreManager] Migrating selection sets from old store");
+            tlog!("[StoreManager] Migrating selection sets from old store");
             manager.data.entries.insert("selectionSets.all".to_string(), data);
             migrated = true;
         }
@@ -222,7 +222,7 @@ pub fn initialise(app: &AppHandle) -> Result<(), String> {
         manager.dirty = true;
         drop(manager); // Release lock before saving
         schedule_save();
-        eprintln!("[StoreManager] Migration complete, scheduled save");
+        tlog!("[StoreManager] Migration complete, scheduled save");
     }
 
     Ok(())

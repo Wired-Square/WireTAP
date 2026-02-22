@@ -528,7 +528,7 @@ pub async fn run_source(
             .await;
     }
 
-    eprintln!(
+    tlog!(
         "[slcan] Source {} connected to {} (bitrate: {}, silent: {})",
         source_idx, port_path, bitrate, silent_mode
     );
@@ -557,7 +557,7 @@ pub async fn run_source(
                             .and_then(|_| port.flush())
                             .map_err(|e| format!("Write error: {}", e)),
                         Err(e) => {
-                            eprintln!("[slcan] Mutex poisoned in transmit: {}", e);
+                            tlog!("[slcan] Mutex poisoned in transmit: {}", e);
                             Err(format!("Port mutex poisoned: {}", e))
                         }
                     };
@@ -569,7 +569,7 @@ pub async fn run_source(
             let read_result = match serial_port_clone.lock() {
                 Ok(mut port) => port.read(&mut read_buf),
                 Err(e) => {
-                    eprintln!("[slcan] Mutex poisoned in read loop: {}", e);
+                    tlog!("[slcan] Mutex poisoned in read loop: {}", e);
                     let _ = tx_clone.blocking_send(SourceMessage::Error(
                         source_idx,
                         format!("Port mutex poisoned: {}", e),
@@ -599,7 +599,7 @@ pub async fn run_source(
                         } else if byte.is_ascii() && !byte.is_ascii_control() {
                             line_buf.push(byte as char);
                             if line_buf.len() > 64 {
-                                eprintln!("[slcan] Line buffer exceeded 64 bytes, discarding");
+                                tlog!("[slcan] Line buffer exceeded 64 bytes, discarding");
                                 line_buf.clear();
                             }
                         }

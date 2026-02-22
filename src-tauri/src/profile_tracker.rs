@@ -30,7 +30,7 @@ pub fn register_usage(profile_id: &str, session_id: &str) {
         let sessions = map.entry(profile_id.to_string()).or_insert_with(HashSet::new);
         let is_new = sessions.insert(session_id.to_string());
         if is_new {
-            eprintln!(
+            tlog!(
                 "[profile_tracker] Registered usage for profile '{}' by session '{}' (total: {})",
                 profile_id, session_id, sessions.len()
             );
@@ -44,14 +44,14 @@ pub fn unregister_usage_by_session(profile_id: &str, session_id: &str) {
     if let Ok(mut map) = PROFILE_USAGE.lock() {
         if let Some(sessions) = map.get_mut(profile_id) {
             if sessions.remove(session_id) {
-                eprintln!(
+                tlog!(
                     "[profile_tracker] Unregistered session '{}' from profile '{}' (remaining: {})",
                     session_id, profile_id, sessions.len()
                 );
                 // Remove the profile entry entirely if no sessions remain
                 if sessions.is_empty() {
                     map.remove(profile_id);
-                    eprintln!(
+                    tlog!(
                         "[profile_tracker] Profile '{}' has no more sessions, removed from tracker",
                         profile_id
                     );
@@ -71,13 +71,13 @@ pub fn unregister_usage(profile_id: &str) {
             // Remove one session (for backwards compatibility)
             if let Some(session_id) = sessions.iter().next().cloned() {
                 sessions.remove(&session_id);
-                eprintln!(
+                tlog!(
                     "[profile_tracker] Unregistered session '{}' from profile '{}' (remaining: {})",
                     session_id, profile_id, sessions.len()
                 );
                 if sessions.is_empty() {
                     map.remove(profile_id);
-                    eprintln!(
+                    tlog!(
                         "[profile_tracker] Profile '{}' has no more sessions, removed from tracker",
                         profile_id
                     );

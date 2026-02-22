@@ -7,6 +7,7 @@ import {
   validateDirectory as validateDirectoryApi,
   listCatalogs,
   setWakeSettings as setWakeSettingsApi,
+  setFileLogging as setFileLoggingApi,
 } from '../../../api';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../../../events/registry';
@@ -128,6 +129,8 @@ interface AppSettings {
   // Power management
   prevent_idle_sleep?: boolean;
   keep_display_awake?: boolean;
+  // Diagnostics
+  enable_file_logging?: boolean;
   // Privacy / telemetry
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
@@ -291,6 +294,7 @@ interface SettingsState {
     graphBufferSize: number;
     preventIdleSleep: boolean;
     keepDisplayAwake: boolean;
+    enableFileLogging: boolean;
     telemetryEnabled: boolean;
     telemetryConsentGiven: boolean;
   };
@@ -369,6 +373,7 @@ interface SettingsState {
   setGraphBufferSize: (size: number) => void;
   setPreventIdleSleep: (value: boolean) => void;
   setKeepDisplayAwake: (value: boolean) => void;
+  setEnableFileLogging: (value: boolean) => void;
   setTelemetryEnabled: (value: boolean) => void;
   setTelemetryConsentGiven: (value: boolean) => void;
 }
@@ -435,6 +440,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     graphBufferSize: 10000,
     preventIdleSleep: true,
     keepDisplayAwake: false,
+    enableFileLogging: false,
     telemetryEnabled: false,
     telemetryConsentGiven: false,
   },
@@ -530,6 +536,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Power management
         prevent_idle_sleep: settings.prevent_idle_sleep ?? true,
         keep_display_awake: settings.keep_display_awake ?? false,
+        // Diagnostics
+        enable_file_logging: settings.enable_file_logging ?? false,
         // Privacy / telemetry
         telemetry_enabled: settings.telemetry_enabled ?? false,
         telemetry_consent_given: settings.telemetry_consent_given ?? false,
@@ -600,6 +608,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           graphBufferSize: normalized.graph_buffer_size ?? 10000,
           preventIdleSleep: normalized.prevent_idle_sleep ?? true,
           keepDisplayAwake: normalized.keep_display_awake ?? false,
+          enableFileLogging: normalized.enable_file_logging ?? false,
           telemetryEnabled: normalized.telemetry_enabled ?? false,
           telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
         },
@@ -700,6 +709,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Power management
         prevent_idle_sleep: general.preventIdleSleep,
         keep_display_awake: general.keepDisplayAwake,
+        // Diagnostics
+        enable_file_logging: general.enableFileLogging,
         // Privacy / telemetry
         telemetry_enabled: general.telemetryEnabled,
         telemetry_consent_given: general.telemetryConsentGiven,
@@ -770,6 +781,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // Power management
       prevent_idle_sleep: general.preventIdleSleep,
       keep_display_awake: general.keepDisplayAwake,
+      // Diagnostics
+      enable_file_logging: general.enableFileLogging,
       // Privacy / telemetry
       telemetry_enabled: general.telemetryEnabled,
       telemetry_consent_given: general.telemetryConsentGiven,
@@ -1130,6 +1143,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     setWakeSettingsApi(preventIdleSleep, value).catch(console.error);
     // Update iOS screen wake (no-op on other platforms)
     setIOSScreenWake(value).catch(console.error);
+  },
+
+  setEnableFileLogging: (value) => {
+    set((state) => ({
+      general: { ...state.general, enableFileLogging: value },
+    }));
+    scheduleSave(get().saveSettings);
+    // Enable/disable file logging immediately
+    setFileLoggingApi(value).catch(console.error);
   },
 
   setTelemetryEnabled: (value) => {

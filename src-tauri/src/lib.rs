@@ -1,3 +1,5 @@
+#[macro_use]
+pub(crate) mod logging;
 mod buffer_store;
 mod buffers;
 mod catalog;
@@ -444,7 +446,7 @@ async fn create_main_window(app: AppHandle, label: String) -> Result<(), String>
                 .accept_first_mouse(true)
                 .build()
             {
-                eprintln!("[create_main_window] Failed to create window '{}': {}", label_for_window, e);
+                tlog!("[create_main_window] Failed to create window '{}': {}", label_for_window, e);
             }
         });
     });
@@ -458,6 +460,23 @@ async fn create_main_window(app: AppHandle, label: String) -> Result<(), String>
 fn show_current_window(window: tauri::WebviewWindow) {
     let _ = window.show();
     let _ = window.set_focus();
+}
+
+/// Enable or disable file logging to ~/Documents/CANdor/Reports/.
+#[tauri::command]
+async fn set_file_logging(app: AppHandle, enabled: bool) -> Result<(), String> {
+    if enabled {
+        let reports_dir = app
+            .path()
+            .document_dir()
+            .map_err(|e| format!("Failed to get documents dir: {}", e))?
+            .join("CANdor")
+            .join("Reports");
+        logging::init_file_logging(&reports_dir)?;
+    } else {
+        logging::stop_file_logging();
+    }
+    Ok(())
 }
 
 // iOS stub commands - menus/windows not available on iOS
@@ -772,9 +791,29 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_keep_screen_on::init());
 
     let builder = builder.setup(|app| {
+            // Start file logging as early as possible (before anything else logs).
+            // Read the settings file synchronously to check the flag.
+            if let Ok(settings_dir) = app.path().app_config_dir() {
+                let settings_path = settings_dir.join("settings.json");
+                if settings_path.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&settings_path) {
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                            if json.get("enable_file_logging").and_then(|v| v.as_bool()).unwrap_or(false) {
+                                if let Ok(doc_dir) = app.path().document_dir() {
+                                    let reports_dir = doc_dir.join("CANdor").join("Reports");
+                                    if let Err(e) = logging::init_file_logging(&reports_dir) {
+                                        tlog!("[setup] Failed to init file logging: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Initialise the centralised store manager
             if let Err(e) = store_manager::initialise(app.handle()) {
-                eprintln!("[setup] Failed to initialise store manager: {}", e);
+                tlog!("[setup] Failed to initialise store manager: {}", e);
             }
 
             // Restore dashboard window geometry from persisted state.
@@ -819,11 +858,12 @@ pub fn run() {
                     Ok(app_settings) => {
                         // Install example decoders (won't overwrite existing files)
                         if let Err(e) = settings::install_example_decoders(&app_handle, &app_settings.decoder_dir) {
-                            eprintln!("[setup] Failed to install example decoders: {}", e);
+                            tlog!("[setup] Failed to install example decoders: {}", e);
                         }
+
                     }
                     Err(e) => {
-                        eprintln!("[setup] Failed to load settings for example decoder installation: {}", e);
+                        tlog!("[setup] Failed to load settings for example decoder installation: {}", e);
                     }
                 }
             });
@@ -846,6 +886,7 @@ pub fn run() {
 
     let builder = builder.invoke_handler(tauri::generate_handler![
             show_current_window,
+            set_file_logging,
             create_main_window,
             settings_panel_closed,
             open_settings_panel,
@@ -1022,7 +1063,7 @@ pub fn run() {
                 let is_first_close = io::mark_session_closing_sync(&label);
                 if !is_first_close {
                     // Second close request - let it through (this is our programmatic close)
-                    eprintln!("[WindowEvent] Second close for '{}', allowing", label);
+                    tlog!("[WindowEvent] Second close for '{}', allowing", label);
                     return;
                 }
 
@@ -1033,7 +1074,7 @@ pub fn run() {
 
                 // Spawn async cleanup
                 tauri::async_runtime::spawn(async move {
-                    eprintln!("[WindowEvent] CloseRequested for '{}', stopping session", label);
+                    tlog!("[WindowEvent] CloseRequested for '{}', stopping session", label);
 
                     // Stop the streaming session - this waits for the task to finish
                     let _ = io::stop_session(&label).await;
@@ -1046,7 +1087,7 @@ pub fn run() {
                     // This delay lets the main run loop drain pending operations.
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-                    eprintln!("[WindowEvent] Cleanup complete for '{}', hiding window", label);
+                    tlog!("[WindowEvent] Cleanup complete for '{}', hiding window", label);
 
                     // Hide the window instead of destroying it.
                     // On macOS Tahoe (26.2+), calling destroy() can crash in
@@ -1055,7 +1096,7 @@ pub fn run() {
                     // By hiding, the window stays in memory but is invisible.
                     // It will be cleaned up when the app exits.
                     if let Err(e) = window_clone.hide() {
-                        eprintln!("[WindowEvent] Failed to hide '{}': {:?}", label, e);
+                        tlog!("[WindowEvent] Failed to hide '{}': {:?}", label, e);
                     }
                 });
             }

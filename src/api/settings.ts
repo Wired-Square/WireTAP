@@ -85,3 +85,10 @@ export async function setWakeSettings(
     keep_display_awake: keepDisplayAwake,
   });
 }
+
+/**
+ * Enable or disable file logging to ~/Documents/CANdor/Reports/.
+ */
+export async function setFileLogging(enabled: boolean): Promise<void> {
+  await invoke("set_file_logging", { enabled });
+}

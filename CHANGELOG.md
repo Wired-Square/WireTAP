@@ -6,6 +6,10 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Timestamped CLI logging**: All backend log messages now include `HH:MM:SS.mmm` local timestamps via a `tlog!` macro, replacing bare `eprintln!` calls across the entire Rust codebase.
+
+- **File logging**: New "Log to file" setting under Settings → General → Diagnostics. When enabled, writes all backend logs to `~/Documents/CANdor/Reports/YYYYMMDD-HHmmss-CANdor.log`. A `CANdor.log` symlink (Unix) always points to the latest log file. File logging initialises early in the startup sequence so no messages are lost.
+
 - **Graph flow view panel**: New panel type for plotting raw data bytes of a selected CAN frame ID over time. Works without a catalog — essential for reverse engineering. Plots byte[0]..byte[N] as coloured lines with full zoom, pan, follow mode, stats, and measurement support. Configure the target frame ID and byte count (1–8) in Panel Settings.
 
 - **Graph bit heatmap panel**: New panel type showing an 8×8 grid (8 bytes × 8 bits) colour-coded by bit change frequency for a selected frame ID. Static bits appear grey, frequently-changing bits glow hot red. Hover cells for byte index, bit position, change count, and change rate.

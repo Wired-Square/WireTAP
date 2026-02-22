@@ -746,7 +746,7 @@ pub fn set_wake_settings(prevent_idle_sleep: bool, keep_display_awake: bool) {
     if let Ok(mut settings) = WAKE_SETTINGS.write() {
         settings.prevent_idle_sleep = prevent_idle_sleep;
         settings.keep_display_awake = keep_display_awake;
-        eprintln!(
+        tlog!(
             "[wake] Settings updated: prevent_idle_sleep={}, keep_display_awake={}",
             prevent_idle_sleep, keep_display_awake
         );
@@ -768,7 +768,7 @@ async fn update_wake_lock() {
         if let Ok(mut guard) = WAKE_LOCK.lock() {
             if guard.is_some() {
                 *guard = None;
-                eprintln!("[wake] Released wake lock (settings disabled)");
+                tlog!("[wake] Released wake lock (settings disabled)");
             }
         }
         return;
@@ -796,20 +796,20 @@ async fn update_wake_lock() {
                 {
                     Ok(lock) => {
                         *guard = Some(lock);
-                        eprintln!(
+                        tlog!(
                             "[wake] Acquired wake lock (idle={}, display={})",
                             settings.prevent_idle_sleep, settings.keep_display_awake
                         );
                     }
                     Err(e) => {
-                        eprintln!("[wake] Failed to acquire wake lock: {:?}", e);
+                        tlog!("[wake] Failed to acquire wake lock: {:?}", e);
                     }
                 }
             }
             (false, true) => {
                 // Release wake lock
                 *guard = None;
-                eprintln!("[wake] Released wake lock (no active sessions)");
+                tlog!("[wake] Released wake lock (no active sessions)");
             }
             _ => {
                 // No change needed
@@ -832,7 +832,7 @@ static STARTUP_ERRORS: Lazy<RwLock<HashMap<String, String>>> = Lazy::new(|| RwLo
 /// Store a startup error for a session (called when error occurs with no listeners)
 pub fn store_startup_error(session_id: &str, error: String) {
     if let Ok(mut errors) = STARTUP_ERRORS.write() {
-        eprintln!("[reader] Storing startup error for session '{}': {}", session_id, error);
+        tlog!("[reader] Storing startup error for session '{}': {}", session_id, error);
         errors.insert(session_id.to_string(), error);
     }
 }
@@ -862,7 +862,7 @@ pub fn mark_session_closing_sync(session_id: &str) -> bool {
     if let Ok(mut closing) = CLOSING_SESSIONS.write() {
         let is_new = closing.insert(session_id.to_string());
         if is_new {
-            eprintln!("[reader] Marked session '{}' as closing", session_id);
+            tlog!("[reader] Marked session '{}' as closing", session_id);
         }
         is_new
     } else {
@@ -899,7 +899,7 @@ pub fn emit_to_session<S: Serialize + Clone>(
     // Check closing flag FIRST (prevents emit during window destruction)
     // This catches the race between window close and event emission
     if is_session_closing(session_id) {
-        eprintln!("[emit_to_session] Blocked event '{}:{}' - session is closing", event, session_id);
+        tlog!("[emit_to_session] Blocked event '{}:{}' - session is closing", event, session_id);
         return;
     }
 
@@ -916,7 +916,7 @@ pub fn emit_to_session<S: Serialize + Clone>(
         || app.get_webview_window("frame-calculator").is_some()
         || app.get_webview_window("transmit").is_some();
     if !has_window {
-        eprintln!("[emit_to_session] Blocked event '{}:{}' - no window found", event, session_id);
+        tlog!("[emit_to_session] Blocked event '{}:{}' - no window found", event, session_id);
         return;
     }
 
@@ -946,7 +946,7 @@ pub struct SessionLifecyclePayload {
 /// Emit a global session lifecycle event to all windows.
 /// This event is NOT scoped to a session ID - it broadcasts to all windows.
 pub fn emit_session_lifecycle(app: &AppHandle, payload: SessionLifecyclePayload) {
-    eprintln!(
+    tlog!(
         "[lifecycle_event] Emitting '{}' for session '{}' (profiles: {:?})",
         payload.event_type, payload.session_id, payload.source_profile_ids
     );
@@ -1031,7 +1031,7 @@ pub fn emit_stream_ended(
             owning_session_id: session_id.to_string(),
         },
     );
-    eprintln!(
+    tlog!(
         "[{}:{}] Stream ended (reason: {}, count: {})",
         log_prefix, session_id, reason, count
     );
@@ -1178,7 +1178,7 @@ pub async fn create_session(
                 );
                 existing.joiner_count = existing.listeners.len();
 
-                eprintln!(
+                tlog!(
                     "[reader] Session '{}' - listener '{}' joined existing session, total: {}",
                     session_id, lid, existing.listeners.len()
                 );
@@ -1215,12 +1215,12 @@ pub async fn create_session(
                 is_active: true, // New listeners are active by default
             },
         );
-        eprintln!(
+        tlog!(
             "[reader] Session '{}' created with listener '{}', total: 1",
             session_id, lid
         );
     } else {
-        eprintln!("[reader] Session '{}' created with no initial listener", session_id);
+        tlog!("[reader] Session '{}' created with no initial listener", session_id);
     }
 
     let listener_count = listeners.len().max(1);
@@ -1392,7 +1392,7 @@ pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
             session.listeners.retain(|listener_id, listener| {
                 let is_stale = now.duration_since(listener.last_heartbeat) > timeout;
                 if is_stale {
-                    eprintln!(
+                    tlog!(
                         "[reader] Session '{}' removing stale listener '{}' (no heartbeat for {:?})",
                         session_id,
                         listener_id,
@@ -1413,7 +1413,7 @@ pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
                 if session.joiner_count > after_count {
                     let old_count = session.joiner_count;
                     session.joiner_count = after_count;
-                    eprintln!(
+                    tlog!(
                         "[reader] Session '{}' synced joiner_count {} -> {} after cleanup",
                         session_id, old_count, after_count
                     );
@@ -1423,7 +1423,7 @@ pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
 
                     // If no listeners left, mark for destruction
                     if after_count == 0 {
-                        eprintln!("[reader] Session '{}' has no listeners left after cleanup, will destroy", session_id);
+                        tlog!("[reader] Session '{}' has no listeners left after cleanup, will destroy", session_id);
                         sessions_to_destroy.push(session_id.clone());
                     }
                 }
@@ -1433,9 +1433,9 @@ pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
 
     // Phase 2: Destroy orphaned sessions without holding the lock
     for session_id in sessions_to_destroy {
-        eprintln!("[reader watchdog] Destroying orphaned session '{}'", session_id);
+        tlog!("[reader watchdog] Destroying orphaned session '{}'", session_id);
         if let Err(e) = destroy_session(&session_id).await {
-            eprintln!("[reader watchdog] Failed to destroy session '{}': {}", session_id, e);
+            tlog!("[reader watchdog] Failed to destroy session '{}': {}", session_id, e);
         }
     }
 
@@ -1454,7 +1454,7 @@ async fn log_session_status() {
         return; // Don't log if nothing active
     }
 
-    eprintln!("[session status] ========== Active Sessions ==========");
+    tlog!("[session status] ========== Active Sessions ==========");
     for (session_id, session) in sessions.iter() {
         let state = match session.device.state() {
             IOState::Stopped => "stopped",
@@ -1469,7 +1469,7 @@ async fn log_session_status() {
         } else {
             format!(", sources={:?}", session.source_names)
         };
-        eprintln!(
+        tlog!(
             "[session status]   '{}': state={}, listeners={} {:?}{}",
             session_id,
             state,
@@ -1479,16 +1479,16 @@ async fn log_session_status() {
         );
     }
     if !running_queries.is_empty() {
-        eprintln!("[session status] ---------- Running Queries -----------");
+        tlog!("[session status] ---------- Running Queries -----------");
         for (id, query) in running_queries {
             let elapsed = query.started_at.elapsed().as_secs();
-            eprintln!(
+            tlog!(
                 "[session status]   '{}': type={}, profile={}, running for {}s",
                 id, query.query_type, query.profile_id, elapsed
             );
         }
     }
-    eprintln!("[session status] =====================================");
+    tlog!("[session status] =====================================");
 }
 
 /// Start the heartbeat watchdog task.
@@ -1507,7 +1507,7 @@ pub fn start_heartbeat_watchdog() {
             // Cleanup stale listeners every tick
             let results = cleanup_stale_listeners().await;
             for (session_id, removed, remaining) in results {
-                eprintln!(
+                tlog!(
                     "[reader watchdog] Session '{}': removed {} stale listeners, {} remaining",
                     session_id, removed, remaining
                 );
@@ -1527,29 +1527,29 @@ pub fn start_heartbeat_watchdog() {
 /// Start a reader session
 /// Returns the confirmed state after the operation.
 pub async fn start_session(session_id: &str) -> Result<IOState, String> {
-    eprintln!("[reader] start_session('{}') called", session_id);
+    tlog!("[reader] start_session('{}') called", session_id);
     let mut sessions = IO_SESSIONS.lock().await;
     let session = sessions
         .get_mut(session_id)
         .ok_or_else(|| {
-            eprintln!("[reader] start_session('{}') - session not found!", session_id);
+            tlog!("[reader] start_session('{}') - session not found!", session_id);
             format!("Session '{}' not found", session_id)
         })?;
 
     let previous = session.device.state();
-    eprintln!("[reader] start_session('{}') - previous state: {:?}", session_id, previous);
+    tlog!("[reader] start_session('{}') - previous state: {:?}", session_id, previous);
 
     // Idempotency: if already running, return success
     if matches!(previous, IOState::Running) {
-        eprintln!("[reader] start_session('{}') - already running, returning", session_id);
+        tlog!("[reader] start_session('{}') - already running, returning", session_id);
         return Ok(previous);
     }
 
-    eprintln!("[reader] start_session('{}') - calling device.start()...", session_id);
+    tlog!("[reader] start_session('{}') - calling device.start()...", session_id);
     session.device.start().await?;
 
     let current = session.device.state();
-    eprintln!("[reader] start_session('{}') - current state: {:?}", session_id, current);
+    tlog!("[reader] start_session('{}') - current state: {:?}", session_id, current);
     if previous != current {
         emit_state_change(&session.app, session_id, &previous, &current);
     }
@@ -1638,7 +1638,7 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
         emit_state_change(&session.app, session_id, &previous, &current);
     }
 
-    eprintln!(
+    tlog!(
         "[reader] suspend_session('{}') - buffer finalized, session stays alive",
         session_id
     );
@@ -1690,7 +1690,7 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
         emit_state_change(&session.app, session_id, &previous, &current);
     }
 
-    eprintln!(
+    tlog!(
         "[reader] resume_session_fresh('{}') - device started with fresh buffer",
         session_id
     );
@@ -1769,7 +1769,7 @@ pub async fn update_session_time_range(
     start: Option<String>,
     end: Option<String>,
 ) -> Result<(), String> {
-    eprintln!(
+    tlog!(
         "[io] update_session_time_range called - session: {}, start: {:?}, end: {:?}",
         session_id,
         start,
@@ -1779,13 +1779,13 @@ pub async fn update_session_time_range(
     let mut sessions = IO_SESSIONS.lock().await;
     let session = sessions.get_mut(session_id).ok_or_else(|| {
         let err = format!("Session '{}' not found", session_id);
-        eprintln!("[io] update_session_time_range: {}", err);
+        tlog!("[io] update_session_time_range: {}", err);
         err
     })?;
 
     let result = session.device.set_time_range(start, end);
     if let Err(ref e) = result {
-        eprintln!("[io] update_session_time_range failed: {}", e);
+        tlog!("[io] update_session_time_range failed: {}", e);
     }
     result
 }
@@ -1799,7 +1799,7 @@ pub async fn reconfigure_session(
     start: Option<String>,
     end: Option<String>,
 ) -> Result<(), String> {
-    eprintln!(
+    tlog!(
         "[io] reconfigure_session called - session: {}, start: {:?}, end: {:?}",
         session_id, start, end
     );
@@ -1807,7 +1807,7 @@ pub async fn reconfigure_session(
     let mut sessions = IO_SESSIONS.lock().await;
     let session = sessions.get_mut(session_id).ok_or_else(|| {
         let err = format!("Session '{}' not found", session_id);
-        eprintln!("[io] reconfigure_session: {}", err);
+        tlog!("[io] reconfigure_session: {}", err);
         err
     })?;
 
@@ -1831,10 +1831,10 @@ pub async fn reconfigure_session(
     // Phase 2: Start the new stream (orphans old buffer, creates new one)
     let result = session.device.complete_reconfigure().await;
     if let Err(ref e) = result {
-        eprintln!("[io] reconfigure_session failed on restart: {}", e);
+        tlog!("[io] reconfigure_session failed on restart: {}", e);
     } else {
         let state_after = session.device.state();
-        eprintln!(
+        tlog!(
             "[io] reconfigure_session completed successfully - final state: {:?}",
             state_after
         );
@@ -1884,12 +1884,12 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
         .ok_or_else(|| {
             // Log all buffers for debugging
             let buffers = crate::buffer_store::list_buffers();
-            eprintln!(
+            tlog!(
                 "[io] switch_to_buffer_replay: No buffer found for session '{}'. Available buffers:",
                 session_id
             );
             for buf in &buffers {
-                eprintln!(
+                tlog!(
                     "  - {} (owner: {:?}, count: {})",
                     buf.id,
                     buf.owning_session_id,
@@ -1901,7 +1901,7 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
 
     // Log buffer details
     let buffer_count = crate::buffer_store::get_buffer_count(&buffer_id);
-    eprintln!(
+    tlog!(
         "[io] switch_to_buffer_replay: session='{}', buffer='{}', frames={}, speed={}",
         session_id, buffer_id, buffer_count, speed
     );
@@ -1931,7 +1931,7 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
     // Replace the device
     session.device = Box::new(new_reader);
 
-    eprintln!(
+    tlog!(
         "[io] switch_to_buffer_replay: session='{}' now in buffer replay mode",
         session_id
     );
@@ -1954,7 +1954,7 @@ pub async fn resume_to_live_session(
     session_id: &str,
     new_reader: Box<dyn IODevice>,
 ) -> Result<IOCapabilities, String> {
-    eprintln!(
+    tlog!(
         "[io] resume_to_live_session: session='{}' switching from buffer to live",
         session_id
     );
@@ -1989,7 +1989,7 @@ pub async fn resume_to_live_session(
     // Get the new buffer ID created by the reader's start() method
     let new_buffer_id = buffer_store::get_buffer_for_session(session_id);
 
-    eprintln!(
+    tlog!(
         "[io] resume_to_live_session: session='{}' now back in live mode with buffer '{:?}'",
         session_id, new_buffer_id
     );
@@ -2228,7 +2228,7 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
         // Update legacy joiner_count
         session.joiner_count = session.listeners.len();
 
-        eprintln!(
+        tlog!(
             "[reader] Session '{}' registered listener '{}', total: {}",
             session_id,
             listener_id,
@@ -2254,7 +2254,7 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
     // Retrieve any startup error (one-shot: cleared after retrieval)
     let startup_error = take_startup_error(session_id);
     if let Some(ref err) = startup_error {
-        eprintln!("[reader] Returning startup error for session '{}': {}", session_id, err);
+        tlog!("[reader] Returning startup error for session '{}': {}", session_id, err);
     }
 
     Ok(RegisterListenerResult {
@@ -2280,7 +2280,7 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
             let remaining = session.listeners.len();
             let app = session.app.clone();
 
-            eprintln!(
+            tlog!(
                 "[reader] Session '{}' unregistered listener '{}', remaining: {}",
                 session_id, listener_id, remaining
             );
@@ -2290,7 +2290,7 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
 
             // If no listeners left, stop and destroy the session
             if remaining == 0 {
-                eprintln!("[reader] Session '{}' has no listeners left, destroying", session_id);
+                tlog!("[reader] Session '{}' has no listeners left, destroying", session_id);
                 let _ = session.device.stop().await;
                 // Orphan buffers and emit buffer-orphaned BEFORE the lifecycle event.
                 // This ensures the frontend receives buffer IDs before "destroyed",
@@ -2314,7 +2314,7 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
                 clear_session_closing(session_id);
                 // Clean up profile tracking (release single-handle device locks)
                 crate::sessions::cleanup_session_profiles(session_id);
-                eprintln!("[reader] Session '{}' destroyed", session_id);
+                tlog!("[reader] Session '{}' destroyed", session_id);
             }
 
             Ok(remaining)
@@ -2339,14 +2339,14 @@ pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_
         let copy_name = format!("{} (evicted)", listener_id);
         match crate::buffer_store::copy_buffer(&buffer_id, copy_name) {
             Ok(copied_id) => {
-                eprintln!(
+                tlog!(
                     "[reader] Copied buffer '{}' -> '{}' for evicted listener '{}'",
                     buffer_id, copied_id, listener_id
                 );
                 copied_buffer_ids.push(copied_id);
             }
             Err(e) => {
-                eprintln!(
+                tlog!(
                     "[reader] Failed to copy buffer for evicted listener '{}': {}",
                     listener_id, e
                 );
@@ -2372,7 +2372,7 @@ pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_
     };
     let _ = app.emit("listener-evicted", payload);
 
-    eprintln!(
+    tlog!(
         "[reader] Evicted listener '{}' from session '{}' (remaining: {}, buffer copies: {:?})",
         listener_id, session_id, remaining, copied_buffer_ids
     );
@@ -2449,7 +2449,7 @@ pub async fn add_source_to_session(
         }
     }
 
-    eprintln!(
+    tlog!(
         "[reader] Added source '{}' to session '{}' (sources: {:?})",
         new_display_name, session_id, session.source_names
     );
@@ -2531,7 +2531,7 @@ pub async fn remove_source_from_session(
         }
     }
 
-    eprintln!(
+    tlog!(
         "[reader] Removed source '{}' from session '{}' (remaining sources: {:?})",
         profile_id, session_id, session.source_names
     );
@@ -2630,7 +2630,7 @@ pub async fn reinitialize_session_if_safe(
     }
     clear_session_closing(session_id);
 
-    eprintln!(
+    tlog!(
         "[reader] Session '{}' reinitialized by listener '{}'",
         session_id, listener_id
     );
@@ -2693,7 +2693,7 @@ pub async fn set_listener_active(session_id: &str, listener_id: &str, is_active:
     if let Some(listener) = session.listeners.get_mut(listener_id) {
         let was_active = listener.is_active;
         listener.is_active = is_active;
-        eprintln!(
+        tlog!(
             "[reader] Session '{}' listener '{}' active: {} -> {}",
             session_id, listener_id, was_active, is_active
         );

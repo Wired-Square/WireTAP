@@ -869,7 +869,7 @@ async fn run_csv_stream(
     options: CsvReaderOptions,
     control: TimelineControl,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    eprintln!(
+    tlog!(
         "[CSV:{}] Opening file: {}",
         session_id, options.file_path
     );
@@ -897,7 +897,7 @@ async fn run_csv_stream(
         // Detect header and parse column indices
         if line_number == 1 && (line.to_lowercase().contains("time") || line.to_lowercase().contains("id,")) {
             indices = Some(parse_csv_header(&line));
-            eprintln!("[CSV:{}] Detected header: {:?}", session_id, indices);
+            tlog!("[CSV:{}] Detected header: {:?}", session_id, indices);
             continue;
         }
 
@@ -905,16 +905,16 @@ async fn run_csv_stream(
         if let Some(frame) = parse_csv_line_with_indices(&line, &col_indices) {
             frames.push_back(frame);
         } else {
-            eprintln!("[CSV:{}] Failed to parse line {}: {}", session_id, line_number, line);
+            tlog!("[CSV:{}] Failed to parse line {}: {}", session_id, line_number, line);
         }
     }
 
     if frames.is_empty() {
-        eprintln!("[CSV:{}] No frames found in file", session_id);
+        tlog!("[CSV:{}] No frames found in file", session_id);
         return Ok(());
     }
 
-    eprintln!(
+    tlog!(
         "[CSV:{}] Loaded {} frames from file",
         session_id,
         frames.len()
@@ -944,7 +944,7 @@ async fn run_csv_stream(
     let mut last_speed = control.read_speed();
     let mut last_pacing_check = std::time::Instant::now();
 
-    eprintln!(
+    tlog!(
         "[CSV:{}] Starting stream (frames: {}, speed: {}x)",
         session_id, frames.len(), options.speed
     );
@@ -952,7 +952,7 @@ async fn run_csv_stream(
     while let Some(frame) = frames.pop_front() {
         // Check if cancelled
         if control.is_cancelled() {
-            eprintln!(
+            tlog!(
                 "[CSV:{}] Stream cancelled, stopping immediately (discarding {} remaining frames)",
                 session_id,
                 frames.len()
@@ -973,7 +973,7 @@ async fn run_csv_stream(
 
         // Log pacing state changes periodically
         if total_emitted % 1000 == 0 {
-            eprintln!(
+            tlog!(
                 "[CSV:{}] frame {} - is_pacing: {}, speed: {}x",
                 session_id, total_emitted, is_pacing, current_speed
             );
@@ -1106,7 +1106,7 @@ async fn run_csv_stream(
         emit_frames(&app_handle, &session_id, batch_buffer);
     }
 
-    eprintln!(
+    tlog!(
         "[CSV:{}] Stream ended (reason: complete, count: {})",
         session_id, total_emitted
     );

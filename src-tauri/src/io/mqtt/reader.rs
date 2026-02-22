@@ -268,7 +268,7 @@ fn spawn_mqtt_stream(
             return;
         }
 
-        eprintln!(
+        tlog!(
             "[MQTT:{}] Connected to {}:{}, subscribed to '{}'",
             session_id, config.host, config.port, config.topic
         );
@@ -317,7 +317,7 @@ fn spawn_mqtt_stream(
                             }
                             Err(e) => {
                                 // Log parse error but continue (might be non-CAN message)
-                                eprintln!(
+                                tlog!(
                                     "[MQTT:{}] Failed to parse message on '{}': {}",
                                     session_id, publish.topic, e
                                 );
@@ -345,7 +345,7 @@ fn spawn_mqtt_stream(
         // Disconnect cleanly
         let _ = client.disconnect().await;
 
-        eprintln!("[MQTT:{}] Stream ended: {}", session_id, stream_reason);
+        tlog!("[MQTT:{}] Stream ended: {}", session_id, stream_reason);
         emit_stream_ended(&app_handle, &session_id, stream_reason, "MQTT");
     })
 }

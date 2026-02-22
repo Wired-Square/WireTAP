@@ -378,7 +378,7 @@ pub async fn io_start_repeat_transmit(
 
         if should_stop {
             let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-            eprintln!(
+            tlog!(
                 "[io_transmit] Stopping repeat for '{}' due to permanent error: {}",
                 queue_id_for_task, reason
             );
@@ -410,7 +410,7 @@ pub async fn io_start_repeat_transmit(
             // Stop on permanent errors (device gone, session invalid)
             if should_stop {
                 let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-                eprintln!(
+                tlog!(
                     "[io_transmit] Stopping repeat for '{}' due to permanent error: {}",
                     queue_id_for_task, reason
                 );
@@ -442,7 +442,7 @@ pub async fn io_start_repeat_transmit(
 pub async fn io_stop_repeat_transmit(queue_id: String) -> Result<(), String> {
     let mut tasks = IO_REPEAT_TASKS.lock().await;
     if let Some(task) = tasks.remove(&queue_id) {
-        eprintln!("[io_transmit] Stopping repeat for queue_id '{}'", queue_id);
+        tlog!("[io_transmit] Stopping repeat for queue_id '{}'", queue_id);
         task.cancel_flag.store(true, Ordering::Relaxed);
         // Don't await the handle - let it finish on its own after seeing cancel flag
     }
@@ -457,7 +457,7 @@ pub async fn io_stop_all_repeats(_session_id: String) -> Result<(), String> {
 
     for queue_id in queue_ids {
         if let Some(task) = tasks.remove(&queue_id) {
-            eprintln!(
+            tlog!(
                 "[io_transmit] Stopping repeat for queue_id '{}' (stop all)",
                 queue_id
             );
@@ -534,7 +534,7 @@ pub async fn io_start_serial_repeat_transmit(
 
         if should_stop {
             let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-            eprintln!(
+            tlog!(
                 "[io_transmit] Stopping serial repeat for '{}' due to permanent error: {}",
                 queue_id_for_task, reason
             );
@@ -566,7 +566,7 @@ pub async fn io_start_serial_repeat_transmit(
             // Stop on permanent errors (device gone, session invalid)
             if should_stop {
                 let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-                eprintln!(
+                tlog!(
                     "[io_transmit] Stopping serial repeat for '{}' due to permanent error: {}",
                     queue_id_for_task, reason
                 );
@@ -633,7 +633,7 @@ pub async fn io_start_repeat_group(
     let group_id_for_task = group_id.clone();
 
     let task_id = IO_REPEAT_TASK_COUNTER.fetch_add(1, Ordering::Relaxed);
-    eprintln!(
+    tlog!(
         "[io_transmit] Starting group repeat task {} for group '{}', session '{}', {} frames, interval {}ms",
         task_id, group_id, session_id, frames.len(), interval_ms
     );
@@ -676,7 +676,7 @@ pub async fn io_start_repeat_group(
 
             if should_stop {
                 let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-                eprintln!(
+                tlog!(
                     "[io_transmit] Stopping group repeat for '{}' due to permanent error: {}",
                     group_id_for_task, reason
                 );
@@ -711,7 +711,7 @@ pub async fn io_start_repeat_group(
                 // Stop on permanent errors (device gone, session invalid)
                 if should_stop {
                     let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-                    eprintln!(
+                    tlog!(
                         "[io_transmit] Stopping group repeat for '{}' due to permanent error: {}",
                         group_id_for_task, reason
                     );
@@ -744,7 +744,7 @@ pub async fn io_start_repeat_group(
 pub async fn io_stop_repeat_group(group_id: String) -> Result<(), String> {
     let mut groups = IO_REPEAT_GROUPS.lock().await;
     if let Some(task) = groups.remove(&group_id) {
-        eprintln!("[io_transmit] Stopping group repeat for '{}'", group_id);
+        tlog!("[io_transmit] Stopping group repeat for '{}'", group_id);
         task.cancel_flag.store(true, Ordering::Relaxed);
         // Don't await the handle - let it finish on its own after seeing cancel flag
     }
@@ -759,7 +759,7 @@ pub async fn io_stop_all_group_repeats() -> Result<(), String> {
 
     for group_id in group_ids {
         if let Some(task) = groups.remove(&group_id) {
-            eprintln!(
+            tlog!(
                 "[io_transmit] Stopping group repeat for '{}' (stop all)",
                 group_id
             );

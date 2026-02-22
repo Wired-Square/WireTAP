@@ -53,7 +53,7 @@ pub struct GvretUsbConfig {
 /// Returns `IoError` for typed error handling. Use `.map_err(String::from)` if
 /// you need a String error for backwards compatibility.
 pub fn probe_gvret_usb(port: &str, baud_rate: u32) -> Result<GvretDeviceInfo, IoError> {
-    eprintln!(
+    tlog!(
         "[probe_gvret_usb] Probing GVRET device at {} (baud: {})",
         port, baud_rate
     );
@@ -66,7 +66,7 @@ pub fn probe_gvret_usb(port: &str, baud_rate: u32) -> Result<GvretDeviceInfo, Io
         .open()
         .map_err(|e| IoError::connection(&device, e.to_string()))?;
 
-    eprintln!("[probe_gvret_usb] Opened serial port {}", port);
+    tlog!("[probe_gvret_usb] Opened serial port {}", port);
 
     // Clear any pending data
     let _ = serial_port.clear(serialport::ClearBuffer::All);
@@ -104,7 +104,7 @@ pub fn probe_gvret_usb(port: &str, baud_rate: u32) -> Result<GvretDeviceInfo, Io
 
                 // Check for NUMBUSES response
                 if let Some(bus_count) = parse_numbuses_response(&buf[..total_read]) {
-                    eprintln!(
+                    tlog!(
                         "[probe_gvret_usb] SUCCESS: Device at {} has {} buses available",
                         port, bus_count
                     );
@@ -126,7 +126,7 @@ pub fn probe_gvret_usb(port: &str, baud_rate: u32) -> Result<GvretDeviceInfo, Io
     }
 
     // If we didn't get a response, assume 1 bus (safer default)
-    eprintln!("[probe_gvret_usb] No NUMBUSES response received, defaulting to 1 bus");
+    tlog!("[probe_gvret_usb] No NUMBUSES response received, defaulting to 1 bus");
     Ok(GvretDeviceInfo { bus_count: 1 })
 }
 
@@ -195,7 +195,7 @@ pub async fn run_source(
         .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
         .await;
 
-    eprintln!(
+    tlog!(
         "[gvret_usb] Source {} connected to {}, transmit channel ready",
         source_idx, port
     );

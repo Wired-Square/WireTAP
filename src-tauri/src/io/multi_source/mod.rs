@@ -357,7 +357,7 @@ impl IODevice for MultiSourceReader {
         // Check that we have a receiver before changing state
         // If rx was consumed and not recreated (e.g., after error), recreate it
         if self.rx.is_none() {
-            eprintln!(
+            tlog!(
                 "[MultiSourceReader] Receiver was consumed, recreating channel for session '{}'",
                 self.session_id
             );
@@ -456,7 +456,7 @@ impl IODevice for MultiSourceReader {
     }
 
     async fn stop(&mut self) -> Result<(), String> {
-        eprintln!(
+        tlog!(
             "[MultiSourceReader] Stopping session '{}'",
             self.session_id
         );
@@ -466,7 +466,7 @@ impl IODevice for MultiSourceReader {
         // Wait for all tasks to finish
         for handle in self.task_handles.drain(..) {
             if let Err(e) = handle.await {
-                eprintln!("[MultiSource] Task panicked during stop: {:?}", e);
+                tlog!("[MultiSource] Task panicked during stop: {:?}", e);
             }
         }
 

@@ -78,7 +78,7 @@ mod linux_impl {
     ) -> Result<(), String> {
         use std::process::Command;
 
-        eprintln!(
+        tlog!(
             "[socketcan] Configuring interface {} with bitrate {}{} using pkexec",
             interface,
             bitrate,
@@ -119,7 +119,7 @@ mod linux_impl {
             })?;
 
         if output.status.success() {
-            eprintln!("[socketcan] Interface {} configured successfully", interface);
+            tlog!("[socketcan] Interface {} configured successfully", interface);
             Ok(())
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -408,7 +408,7 @@ mod linux_impl {
 
         // Set read timeout
         if let Err(e) = socket.set_read_timeout(Duration::from_millis(50)) {
-            eprintln!("[socketcan] Warning: could not set read timeout: {}", e);
+            tlog!("[socketcan] Warning: could not set read timeout: {}", e);
         }
 
         // Create transmit channel
@@ -417,7 +417,7 @@ mod linux_impl {
             .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
             .await;
 
-        eprintln!(
+        tlog!(
             "[socketcan] Source {} connected to {} (FD capable)",
             source_idx, interface
         );
