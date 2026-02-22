@@ -2,7 +2,7 @@
 // Store for update checking state
 
 import { create } from "zustand";
-import { checkForUpdates, type UpdateInfo } from "../api/settings";
+import { checkForUpdates, tlog, type UpdateInfo } from "../api/settings";
 
 interface UpdateState {
   availableUpdate: UpdateInfo | null;
@@ -18,7 +18,7 @@ export const useUpdateStore = create<UpdateState>((set) => ({
       set({ availableUpdate: update });
     } catch (error) {
       // Silently fail - don't bother user if offline or API unavailable
-      console.warn("Failed to check for updates:", error);
+      tlog.info(`[updateStore] Failed to check for updates: ${error}`);
     }
   },
 }));

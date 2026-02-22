@@ -5,6 +5,7 @@
 // Supports backend buffer mode for large captures (bytes stored in Rust).
 
 import { create } from 'zustand';
+import { tlog } from '../api/settings';
 import type { FrameMessage } from '../types/frame';
 import {
   getBufferBytesPaginated,
@@ -247,7 +248,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
       try {
         await deleteBuffer(previousBufferId);
       } catch (e) {
-        console.error('Failed to delete framed buffer:', e);
+        tlog.info(`[discoverySerialStore] Failed to delete framed buffer: ${e}`);
       }
       set({
         framingConfig: null,
@@ -319,7 +320,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
       // The caller can check framedBufferId to know if framing succeeded
       return [];
     } catch (error) {
-      console.error('Failed to apply framing in backend:', error);
+      tlog.info(`[discoverySerialStore] Failed to apply framing in backend: ${error}`);
       set({ framedData: [], framedBufferId: null, backendFrameCount: 0, filteredFrameCount: 0, filteredBufferId: null, filteredFrames: [] });
       return [];
     }
@@ -496,7 +497,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
     try {
       return await getBufferBytesPaginated(offset, limit);
     } catch (error) {
-      console.error('Failed to fetch bytes from backend:', error);
+      tlog.info(`[discoverySerialStore] Failed to fetch bytes from backend: ${error}`);
       return { bytes: [], total_count: 0, offset, limit };
     }
   },

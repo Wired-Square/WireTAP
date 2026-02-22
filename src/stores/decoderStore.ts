@@ -1,6 +1,7 @@
 // ui/src/stores/decoderStore.ts
 
 import { create } from 'zustand';
+import { tlog } from '../api/settings';
 import { LRUMap } from '../utils/LRUMap';
 
 /** Maximum number of unmatched frames to keep in buffer */
@@ -501,7 +502,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         mirrorSourceMap,
       });
     } catch (e) {
-      console.error('Failed to load catalog', e);
+      tlog.info(`[decoderStore] Failed to load catalog: ${e}`);
     }
   },
 
@@ -1218,7 +1219,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     const { selectedFrames, frames, saveMetadata } = get();
 
     if (!decoderDir) {
-      console.error('Decoder directory is not set in settings.');
+      tlog.info("[decoderStore] Decoder directory is not set in settings");
       return;
     }
 

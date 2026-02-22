@@ -49,10 +49,19 @@ import {
   type RawBytesPayload,
 } from "../api/io";
 import type { FrameMessage } from "../types/frame";
+import { tlog } from "../api/settings";
 import {
   useSessionLogStore,
   type SessionLogEventType,
 } from "../apps/session-manager/stores/sessionLogStore";
+
+// ============================================================================
+// Debug: Log visibility changes (helps diagnose WebKit timer throttling)
+// ============================================================================
+
+document.addEventListener("visibilitychange", () => {
+  tlog.info(`[visibility] ${document.visibilityState}`);
+});
 
 // ============================================================================
 // Session Logging Helper
@@ -609,7 +618,7 @@ async function setupSessionEventListeners(
   const unlistenReconfigured = await listen<SessionReconfiguredPayload>(
     `session-reconfigured:${sessionId}`,
     (event) => {
-      console.log(`[sessionStore] Session '${sessionId}' reconfigured:`, event.payload);
+      tlog.debug(`[sessionStore] Session '${sessionId}' reconfigured: ${JSON.stringify(event.payload)}`);
       invokeCallbacks(eventListeners, "onReconfigure", event.payload);
     }
   );
@@ -660,7 +669,7 @@ async function setupSessionEventListeners(
   const unlistenResuming = await listen<SessionResumingPayload>(
     `session-resuming:${sessionId}`,
     (event) => {
-      console.log(`[sessionStore] Session '${sessionId}' resuming with new buffer:`, event.payload);
+      tlog.debug(`[sessionStore] Session '${sessionId}' resuming with new buffer: ${JSON.stringify(event.payload)}`);
       // Clear buffer state since we're starting fresh
       updateSession(sessionId, {
         ioState: "starting",
@@ -719,7 +728,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   // ---- Session Lifecycle ----
   openSession: async (profileId, profileName, listenerId, appName, options = {}) => {
-    console.log(`[sessionStore:openSession] Called with profileId=${profileId}, profileName=${profileName}, listenerId=${listenerId}`);
+    tlog.debug(`[sessionStore:openSession] Called with profileId=${profileId}, profileName=${profileName}, listenerId=${listenerId}`);
     console.log(`[sessionStore:openSession] Options: ${JSON.stringify(options)}`);
 
     // Session ID can be explicitly provided (for recorded sources that need unique IDs)
@@ -959,12 +968,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             const listeners = get()._eventListeners[heartbeatSessionId];
             if (!listeners || listeners.registeredListeners.size === 0) return;
 
+            tlog.info(
+              `[heartbeat:${heartbeatSessionId}] sending for ${listeners.registeredListeners.size} listener(s)`
+            );
+
             // Send heartbeat for each registered listener
             for (const lid of listeners.registeredListeners) {
               try {
                 await registerSessionListener(heartbeatSessionId, lid);
-              } catch {
-                // Ignore heartbeat errors - session may have been destroyed
+              } catch (e) {
+                tlog.info(
+                  `[heartbeat:${heartbeatSessionId}] failed for ${lid}: ${e}`
+                );
               }
             }
           }, 5000);
@@ -1038,7 +1053,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       };
     });
 
-    console.log(`[sessionStore:openSession] Complete - returning session for ${sessionId}`);
+    tlog.debug(`[sessionStore:openSession] Complete - returning session for ${sessionId}`);
     return get().sessions[sessionId];
   },
 
@@ -1174,7 +1189,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   cleanupDestroyedSession: (sessionId) => {
-    console.log(`[sessionStore:cleanupDestroyedSession] Cleaning up session '${sessionId}' (destroyed externally)`);
+    tlog.info(`[sessionStore:cleanupDestroyedSession] Cleaning up session '${sessionId}' (destroyed externally)`);
     const eventListeners = get()._eventListeners[sessionId];
     if (eventListeners) {
       cleanupEventListeners(eventListeners);
@@ -1196,7 +1211,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   cleanupEvictedListener: (sessionId, listenerId) => {
-    console.log(`[sessionStore:cleanupEvictedListener] Cleaning up evicted listener '${listenerId}' from session '${sessionId}'`);
+    tlog.info(`[sessionStore:cleanupEvictedListener] Cleaning up evicted listener '${listenerId}' from session '${sessionId}'`);
     const eventListeners = get()._eventListeners[sessionId];
 
     if (eventListeners) {
@@ -1415,7 +1430,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
     if (isRealtime) {
       // Realtime source: switch to BufferReader for timeline playback
-      console.log(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to buffer replay`);
+      tlog.info(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to buffer replay`);
       try {
         const capabilities = await switchSessionToBufferReplay(sessionId, 1.0);
         // Get buffer metadata - Rust sets the active buffer during switch, so we can query it
@@ -1451,7 +1466,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         }));
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[sessionStore] suspendSession: failed to switch to buffer replay: ${msg}`);
+        tlog.info(`[sessionStore] suspendSession: failed to switch to buffer replay: ${msg}`);
         addSessionLog({
           eventType: "session-error",
           sessionId,
@@ -1473,12 +1488,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             },
           }));
         } catch (fallbackError) {
-          console.error(`[sessionStore] suspendSession: fallback also failed:`, fallbackError);
+          tlog.info(`[sessionStore] suspendSession: fallback also failed: ${fallbackError}`);
         }
       }
     } else {
       // Timeline source: just stop the reader
-      console.log(`[sessionStore] suspendSession: timeline session '${sessionId}' - stopping reader`);
+      tlog.info(`[sessionStore] suspendSession: timeline session '${sessionId}' - stopping reader`);
       const confirmedState = await suspendReaderSession(sessionId);
       set((s) => ({
         sessions: {
@@ -1508,10 +1523,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Try to resume to live first (for realtime sources that were suspended to buffer mode)
     // This will fail if the session doesn't have stored profile IDs (timeline sources)
     try {
-      console.log(`[sessionStore] resumeSessionFresh: trying resumeSessionToLive for '${sessionId}'`);
+      tlog.info(`[sessionStore] resumeSessionFresh: trying resumeSessionToLive for '${sessionId}'`);
       const capabilities = await resumeSessionToLive(sessionId);
       // Success - session is now back in live mode with a fresh buffer
-      console.log(`[sessionStore] resumeSessionFresh: '${sessionId}' resumed to live mode`);
+      tlog.info(`[sessionStore] resumeSessionFresh: '${sessionId}' resumed to live mode`);
       set((s) => ({
         sessions: {
           ...s.sessions,
@@ -1524,7 +1539,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }));
     } catch (e) {
       // No profile IDs stored (timeline source) - use the existing resume logic
-      console.log(`[sessionStore] resumeSessionFresh: '${sessionId}' falling back to resumeReaderSessionFresh - ${e}`);
+      tlog.info(`[sessionStore] resumeSessionFresh: '${sessionId}' falling back to resumeReaderSessionFresh - ${e}`);
       const confirmedState = await resumeReaderSessionFresh(sessionId);
       set((s) => ({
         sessions: {

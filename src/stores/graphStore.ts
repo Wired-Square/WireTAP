@@ -1,6 +1,7 @@
 // ui/src/stores/graphStore.ts
 
 import { create } from 'zustand';
+import { tlog } from '../api/settings';
 import type { FrameDetail, SignalDef, MuxDef } from '../types/decoder';
 import type { Confidence } from '../types/catalog';
 import type { CanProtocolConfig } from '../utils/catalogParser';
@@ -351,7 +352,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         frameIdMask,
       });
     } catch (e) {
-      console.error('Graph: Failed to load catalog', e);
+      tlog.info(`[graphStore] Failed to load catalog: ${e}`);
     }
   },
 

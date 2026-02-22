@@ -96,8 +96,8 @@ export default function Settings() {
   const setPreventIdleSleep = useSettingsStore((s) => s.setPreventIdleSleep);
   const keepDisplayAwake = useSettingsStore((s) => s.general.keepDisplayAwake);
   const setKeepDisplayAwake = useSettingsStore((s) => s.setKeepDisplayAwake);
-  const enableFileLogging = useSettingsStore((s) => s.general.enableFileLogging);
-  const setEnableFileLogging = useSettingsStore((s) => s.setEnableFileLogging);
+  const logLevel = useSettingsStore((s) => s.general.logLevel);
+  const setLogLevel = useSettingsStore((s) => s.setLogLevel);
 
   // Privacy
   const telemetryEnabled = useSettingsStore((s) => s.general.telemetryEnabled);
@@ -261,8 +261,8 @@ export default function Settings() {
               onChangePreventIdleSleep={setPreventIdleSleep}
               keepDisplayAwake={keepDisplayAwake}
               onChangeKeepDisplayAwake={setKeepDisplayAwake}
-              enableFileLogging={enableFileLogging}
-              onChangeEnableFileLogging={setEnableFileLogging}
+              logLevel={logLevel}
+              onChangeLogLevel={setLogLevel}
               isIOS={isIOSPlatform}
             />
           )}

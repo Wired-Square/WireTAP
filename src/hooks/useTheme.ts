@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { loadSettings } from '../api/settings';
+import { loadSettings, tlog } from '../api/settings';
 import { WINDOW_EVENTS } from '../events/registry';
 import {
   type ThemeMode,
@@ -133,7 +133,7 @@ export function useTheme(): ThemeState {
         applyTheme(mode, colours);
       })
       .catch((err) => {
-        console.error('Failed to load theme settings:', err);
+        tlog.info(`[useTheme] Failed to load theme settings: ${err}`);
         // Apply defaults on error
         applyTheme('auto', defaultThemeColours);
       });

@@ -4,6 +4,7 @@
 // Handles frame buffer, frame info map, and selection.
 
 import { create } from 'zustand';
+import { tlog } from '../api/settings';
 import type { FrameMessage } from '../types/frame';
 import type { SelectionSet } from '../utils/selectionSets';
 
@@ -233,7 +234,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
     const { frames } = get();
     if (frames.length === 0) return;
 
-    console.log(`[rebuildFramePickerFromBuffer] Building frame picker from ${frames.length} frames`);
+    tlog.debug(`[discoveryFrameStore] Building frame picker from ${frames.length} frames`);
 
     const nextSeenIds = new Set<number>();
     const nextFrameInfoMap = new Map<number, FrameInfo>();
@@ -270,7 +271,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
       }
     }
 
-    console.log(`[rebuildFramePickerFromBuffer] Found ${nextSeenIds.size} unique frame IDs`);
+    tlog.debug(`[discoveryFrameStore] Found ${nextSeenIds.size} unique frame IDs`);
 
     set({
       seenIds: nextSeenIds,
@@ -367,7 +368,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
 
   // Buffer mode actions
   enableBufferMode: (totalFrames) => {
-    console.log(`[discoveryFrameStore] Enabling buffer mode with ${totalFrames} frames`);
+    tlog.debug(`[discoveryFrameStore] Enabling buffer mode with ${totalFrames} frames`);
     set({
       bufferMode: { enabled: true, totalFrames, viewMode: "pagination" },
       frames: [],
@@ -375,7 +376,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   },
 
   disableBufferMode: () => {
-    console.log('[discoveryFrameStore] Disabling buffer mode');
+    tlog.debug("[discoveryFrameStore] Disabling buffer mode");
     set({
       bufferMode: { enabled: false, totalFrames: 0, viewMode: "pagination" },
     });
@@ -388,7 +389,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   },
 
   setFrameInfoFromBuffer: (frameInfoList, protocol, activeSelectionSetSelectedIds = null) => {
-    console.log(`[discoveryFrameStore] Setting frame info from buffer: ${frameInfoList.length} unique frames, protocol: ${protocol || 'can'}`);
+    tlog.debug(`[discoveryFrameStore] Setting frame info from buffer: ${frameInfoList.length} unique frames, protocol: ${protocol || 'can'}`);
 
     const nextSeenIds = new Set<number>();
     const nextFrameInfoMap = new Map<number, FrameInfo>();

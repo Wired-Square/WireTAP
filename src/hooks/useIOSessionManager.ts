@@ -11,6 +11,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useIOSession, type UseIOSessionOptions, type UseIOSessionResult } from "./useIOSession";
 import type { StreamEndedPayload as IngestStreamEndedPayload } from "../api/io";
+import { tlog } from "../api/settings";
 import {
   createAndStartMultiSourceSession,
   joinMultiSourceSession,
@@ -494,10 +495,10 @@ export function useIOSessionManager(
       // stopped and BEFORE the new one starts. Any stale in-flight frames from the old stream
       // were suppressed by the flag check in handleFrames. Clear the flag so new-stream
       // frames flow normally.
-      console.log(`[IOSessionManager:${appName}] Self-initiated reconfigure - skipping external cleanup`);
+      tlog.debug(`[IOSessionManager:${appName}] Self-initiated reconfigure - skipping external cleanup`);
       return;
     }
-    console.log(`[IOSessionManager:${appName}] Session reconfigured externally - clearing state`);
+    tlog.debug(`[IOSessionManager:${appName}] Session reconfigured externally - clearing state`);
     // Call the same cleanup as before watch
     onBeforeWatch?.();
     // Reset frame count
@@ -511,7 +512,7 @@ export function useIOSessionManager(
   // Handler for when session resumes to live (another app clicked Resume)
   // This clears frames so the app doesn't show old buffer frames mixed with new live frames
   const handleResuming = useCallback(() => {
-    console.log(`[IOSessionManager:${appName}] Session resuming to live - clearing state`);
+    tlog.debug(`[IOSessionManager:${appName}] Session resuming to live - clearing state`);
     // Call the same cleanup as before watch
     onBeforeWatch?.();
     // Reset frame count
@@ -524,20 +525,20 @@ export function useIOSessionManager(
 
   // Handle stream-ended with auto-transition for ingest mode
   const handleStreamEndedWithIngest = useCallback(async (payload: StreamEndedPayload) => {
-    console.log(`[IOSessionManager:${appName}] Stream ended, isIngesting=${isIngestingRef.current}, payload:`, payload);
+    tlog.debug(`[IOSessionManager:${appName}] Stream ended, isIngesting=${isIngestingRef.current}, payload: ${JSON.stringify(payload)}`);
 
     if (isIngestingRef.current && payload.buffer_available) {
       // Ingest completed with buffer available - switch to buffer replay mode
-      console.log(`[IOSessionManager:${appName}] Ingest complete - switching to buffer replay mode`);
+      tlog.debug(`[IOSessionManager:${appName}] Ingest complete - switching to buffer replay mode`);
 
       const sessionId = ingestSessionIdRef.current;
       if (sessionId) {
         try {
           // Switch session to buffer replay mode (keeps session alive, swaps reader)
           await switchSessionToBufferReplay(sessionId, 1.0);
-          console.log(`[IOSessionManager:${appName}] Session '${sessionId}' now in buffer replay mode`);
+          tlog.debug(`[IOSessionManager:${appName}] Session '${sessionId}' now in buffer replay mode`);
         } catch (e) {
-          console.error(`[IOSessionManager:${appName}] Failed to switch to buffer replay:`, e);
+          tlog.info(`[IOSessionManager:${appName}] Failed to switch to buffer replay: ${e}`);
           setIngestError(e instanceof Error ? e.message : String(e));
         }
       }
@@ -551,7 +552,7 @@ export function useIOSessionManager(
       }
     } else if (isIngestingRef.current) {
       // Ingest ended without buffer (error or empty)
-      console.log(`[IOSessionManager:${appName}] Ingest ended without buffer`);
+      tlog.debug(`[IOSessionManager:${appName}] Ingest ended without buffer`);
       setIsIngesting(false);
       if (onIngestCompleteRef.current) {
         await onIngestCompleteRef.current(payload);
@@ -565,7 +566,7 @@ export function useIOSessionManager(
   // Handle external session destruction (e.g., destroyed from Sessions app)
   // Switches to buffer mode if orphaned buffers are available, otherwise clears state
   const handleSessionDestroyed = useCallback((orphanedBufferIds: string[]) => {
-    console.log(`[IOSessionManager:${appName}] Session destroyed externally, orphaned buffers:`, orphanedBufferIds);
+    tlog.info(`[IOSessionManager:${appName}] Session destroyed externally, orphaned buffers: ${JSON.stringify(orphanedBufferIds)}`);
 
     // Clear app state (frame lists, etc.)
     onBeforeWatch?.();
@@ -915,9 +916,9 @@ export function useIOSessionManager(
         // Use session.switchToBufferReplay which also updates local capabilities
         try {
           await session.switchToBufferReplay(1.0);
-          console.log(`[IOSessionManager:${appName}] Switched to buffer replay mode after stop`);
+          tlog.debug(`[IOSessionManager:${appName}] Switched to buffer replay mode after stop`);
         } catch (e) {
-          console.error(`[IOSessionManager:${appName}] Failed to switch to buffer replay:`, e);
+          tlog.info(`[IOSessionManager:${appName}] Failed to switch to buffer replay after stop: ${e}`);
         }
       }
     }
@@ -943,7 +944,7 @@ export function useIOSessionManager(
   const detachWithBufferCopy = useCallback(async () => {
     const bufferId = session.bufferId;
     if (!bufferId) {
-      console.warn("[IOSessionManager] Cannot detach - no buffer available");
+      tlog.debug("[IOSessionManager] Cannot detach - no buffer available");
       return;
     }
 
@@ -987,7 +988,7 @@ export function useIOSessionManager(
 
     // Generate unique session ID for this ingest
     const sessionId = generateIngestSessionId();
-    console.log(`[IOSessionManager:${appName}] Starting ingest with session ID: ${sessionId}`);
+    tlog.info(`[IOSessionManager:${appName}] Starting ingest with session ID: ${sessionId}`);
 
     // IMPORTANT: Set refs SYNCHRONOUSLY before reinitialize
     // With speed=0, the stream can complete DURING reinitialize, before React re-renders.
@@ -1030,10 +1031,10 @@ export function useIOSessionManager(
       setIsWatching(false);
       streamCompletedRef.current = false;
 
-      console.log(`[IOSessionManager:${appName}] Ingest started for session: ${sessionId}`);
+      tlog.info(`[IOSessionManager:${appName}] Ingest started for session: ${sessionId}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[IOSessionManager:${appName}] Failed to start ingest:`, msg);
+      tlog.info(`[IOSessionManager:${appName}] Failed to start ingest: ${msg}`);
       // Reset refs on error
       isIngestingRef.current = false;
       ingestSessionIdRef.current = null;
@@ -1081,10 +1082,10 @@ export function useIOSessionManager(
       setIsWatching(false);
       streamCompletedRef.current = false;
 
-      console.log(`[IOSessionManager:${appName}] Multi-source ingest started with session: ${sessionId}`);
+      tlog.info(`[IOSessionManager:${appName}] Multi-source ingest started with session: ${sessionId}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[IOSessionManager:${appName}] Failed to start multi-source ingest:`, msg);
+      tlog.info(`[IOSessionManager:${appName}] Failed to start multi-source ingest: ${msg}`);
       // Reset refs on error
       isIngestingRef.current = false;
       ingestSessionIdRef.current = null;
@@ -1095,7 +1096,7 @@ export function useIOSessionManager(
 
   // Stop ingest: stop session, clear ingest state
   const stopIngest = useCallback(async () => {
-    console.log(`[IOSessionManager:${appName}] Stopping ingest`);
+    tlog.debug(`[IOSessionManager:${appName}] Stopping ingest`);
     await session.stop();
     // Note: handleStreamEndedWithIngest will handle the state cleanup and transition
   }, [appName, session]);
@@ -1159,14 +1160,14 @@ export function useIOSessionManager(
       const endUtc = localToUtc(bookmark.endTime);
 
       if (!startUtc) {
-        console.warn("[IOSessionManager:jumpToBookmark] No valid start time in bookmark");
+        tlog.debug("[IOSessionManager:jumpToBookmark] No valid start time in bookmark");
         return;
       }
 
       // Determine target profile (bookmark's profile or current)
       const targetProfileId = bookmark.profileId || sourceProfileId || ioProfile;
       if (!targetProfileId) {
-        console.warn("[IOSessionManager:jumpToBookmark] No profile available");
+        tlog.debug("[IOSessionManager:jumpToBookmark] No profile available");
         return;
       }
 
@@ -1190,7 +1191,7 @@ export function useIOSessionManager(
         sessionId = targetProfileId;
       }
 
-      console.log(`[IOSessionManager:jumpToBookmark] Jumping to bookmark "${bookmark.name}" (session: ${sessionId}, profile: ${targetProfileId}, sameProfile: ${isSameProfile}, isRecorded: ${isRecorded})`);
+      tlog.debug(`[IOSessionManager:jumpToBookmark] Jumping to bookmark "${bookmark.name}" (session: ${sessionId}, profile: ${targetProfileId}, sameProfile: ${isSameProfile}, isRecorded: ${isRecorded})`);
 
       // Step 1: Run cleanup callback (same as onBeforeWatch)
       onBeforeWatch?.();
@@ -1215,15 +1216,15 @@ export function useIOSessionManager(
         // Other apps joined to this session stay connected
         // Suppress the session-reconfigured event handler since we already ran cleanup
         selfReconfigureRef.current = true;
-        console.log("[IOSessionManager:jumpToBookmark] Using reconfigure (same profile, session stays alive)");
+        tlog.debug("[IOSessionManager:jumpToBookmark] Using reconfigure (same profile, session stays alive)");
         await reconfigureReaderSession(sessionId, startUtc, endUtc || undefined);
       } else {
         // Different profile or realtime source - full reinitialize
-        console.log("[IOSessionManager:jumpToBookmark] Using reinitialize (different profile or realtime)");
+        tlog.debug("[IOSessionManager:jumpToBookmark] Using reinitialize (different profile or realtime)");
 
         // Stop current stream if watching
         if (isWatching) {
-          console.log("[IOSessionManager:jumpToBookmark] Stopping current watch...");
+          tlog.debug("[IOSessionManager:jumpToBookmark] Stopping current watch...");
           await session.stop();
           setIsWatching(false);
         }

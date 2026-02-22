@@ -1,6 +1,7 @@
 // ui/src/stores/catalogEditorStore.ts
 
 import { create } from 'zustand';
+import { tlog } from '../api/settings';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../events/registry';
 import type { CatalogSavedPayload } from '../events/registry';
@@ -407,7 +408,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
         timestamp: Date.now(),
       };
       emit(WINDOW_EVENTS.CATALOG_SAVED, payload).catch((err) =>
-        console.error('Failed to emit catalog-saved event:', err)
+        tlog.info(`[catalogEditorStore] Failed to emit catalog-saved event: ${err}`)
       );
     }
   },

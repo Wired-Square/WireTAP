@@ -87,8 +87,26 @@ export async function setWakeSettings(
 }
 
 /**
- * Enable or disable file logging to ~/Documents/CANdor/Reports/.
+ * Set the log level and start/stop file logging accordingly.
+ * Levels: "off" | "info" | "debug" | "verbose"
  */
-export async function setFileLogging(enabled: boolean): Promise<void> {
-  await invoke("set_file_logging", { enabled });
+export async function setLogLevel(level: string): Promise<void> {
+  await invoke("set_log_level", { level });
 }
+
+/**
+ * Levelled frontend logging — sends messages to the backend log file (and stderr).
+ * Messages are filtered by the current log level threshold set in Settings.
+ * Fire-and-forget — errors are silently ignored.
+ */
+export const tlog = {
+  info: (message: string): void => {
+    invoke("log_from_frontend", { level: "info", message }).catch(() => {});
+  },
+  debug: (message: string): void => {
+    invoke("log_from_frontend", { level: "debug", message }).catch(() => {});
+  },
+  verbose: (message: string): void => {
+    invoke("log_from_frontend", { level: "verbose", message }).catch(() => {});
+  },
+};

@@ -100,7 +100,10 @@ pub struct AppSettings {
     pub keep_display_awake: bool,
 
     // Diagnostics
-    #[serde(default = "default_enable_file_logging")]
+    #[serde(default = "default_log_level")]
+    pub log_level: String, // "off" | "info" | "debug" | "verbose"
+    /// Backward compat: old settings files may have this instead of log_level
+    #[serde(default)]
     pub enable_file_logging: bool,
 
     // Privacy / telemetry
@@ -218,6 +221,9 @@ fn default_keep_display_awake() -> bool {
 }
 
 // Diagnostics defaults
+fn default_log_level() -> String {
+    "off".to_string()
+}
 fn default_enable_file_logging() -> bool {
     false
 }
@@ -286,6 +292,7 @@ impl Default for AppSettings {
             prevent_idle_sleep: default_prevent_idle_sleep(),
             keep_display_awake: default_keep_display_awake(),
             // Diagnostics
+            log_level: default_log_level(),
             enable_file_logging: default_enable_file_logging(),
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
@@ -353,6 +360,7 @@ impl AppSettings {
             prevent_idle_sleep: default_prevent_idle_sleep(),
             keep_display_awake: default_keep_display_awake(),
             // Diagnostics
+            log_level: default_log_level(),
             enable_file_logging: default_enable_file_logging(),
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
@@ -408,6 +416,12 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
 
         let mut settings: AppSettings = serde_json::from_str(&content)
             .map_err(|e| format!("Failed to parse settings: {}", e))?;
+
+        // Migrate enable_file_logging → log_level (backward compat)
+        if settings.enable_file_logging && settings.log_level == "off" {
+            settings.log_level = "info".to_string();
+            settings.enable_file_logging = false;
+        }
 
         // Check for stale paths (e.g., old iOS container UUIDs after reinstall)
         if paths_are_stale(&settings, &app) {

@@ -462,10 +462,26 @@ fn show_current_window(window: tauri::WebviewWindow) {
     let _ = window.set_focus();
 }
 
-/// Enable or disable file logging to ~/Documents/CANdor/Reports/.
+/// Write a frontend log message to the backend log file.
+/// The message is filtered by the current log level threshold.
 #[tauri::command]
-async fn set_file_logging(app: AppHandle, enabled: bool) -> Result<(), String> {
-    if enabled {
+fn log_from_frontend(level: String, message: String) {
+    let msg_level: u8 = match level.as_str() {
+        "info" => 1,
+        "debug" => 2,
+        "verbose" => 3,
+        _ => 1,
+    };
+    if msg_level <= logging::get_log_level() {
+        tlog!("[frontend:{}] {}", level, message);
+    }
+}
+
+/// Set the log level and start/stop file logging accordingly.
+#[tauri::command]
+async fn set_log_level(app: AppHandle, level: String) -> Result<(), String> {
+    logging::set_log_level(&level);
+    if level != "off" {
         let reports_dir = app
             .path()
             .document_dir()
@@ -792,13 +808,25 @@ pub fn run() {
 
     let builder = builder.setup(|app| {
             // Start file logging as early as possible (before anything else logs).
-            // Read the settings file synchronously to check the flag.
+            // Read the settings file synchronously to check the log level.
             if let Ok(settings_dir) = app.path().app_config_dir() {
                 let settings_path = settings_dir.join("settings.json");
                 if settings_path.exists() {
                     if let Ok(content) = std::fs::read_to_string(&settings_path) {
                         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                            if json.get("enable_file_logging").and_then(|v| v.as_bool()).unwrap_or(false) {
+                            // Read log_level, falling back to enable_file_logging for backward compat
+                            let level = json.get("log_level")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| {
+                                    if json.get("enable_file_logging").and_then(|v| v.as_bool()).unwrap_or(false) {
+                                        "info".to_string()
+                                    } else {
+                                        "off".to_string()
+                                    }
+                                });
+                            logging::set_log_level(&level);
+                            if level != "off" {
                                 if let Ok(doc_dir) = app.path().document_dir() {
                                     let reports_dir = doc_dir.join("CANdor").join("Reports");
                                     if let Err(e) = logging::init_file_logging(&reports_dir) {
@@ -886,7 +914,8 @@ pub fn run() {
 
     let builder = builder.invoke_handler(tauri::generate_handler![
             show_current_window,
-            set_file_logging,
+            log_from_frontend,
+            set_log_level,
             create_main_window,
             settings_panel_closed,
             open_settings_panel,

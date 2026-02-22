@@ -20,8 +20,8 @@ type GeneralViewProps = {
   onChangePreventIdleSleep: (value: boolean) => void;
   keepDisplayAwake: boolean;
   onChangeKeepDisplayAwake: (value: boolean) => void;
-  enableFileLogging: boolean;
-  onChangeEnableFileLogging: (value: boolean) => void;
+  logLevel: string;
+  onChangeLogLevel: (value: string) => void;
   isIOS?: boolean;
 };
 
@@ -38,8 +38,8 @@ export default function GeneralView({
   onChangePreventIdleSleep,
   keepDisplayAwake,
   onChangeKeepDisplayAwake,
-  enableFileLogging,
-  onChangeEnableFileLogging,
+  logLevel,
+  onChangeLogLevel,
   isIOS = false,
 }: GeneralViewProps) {
   return (
@@ -168,23 +168,20 @@ export default function GeneralView({
       {/* Diagnostics Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
         <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Diagnostics</h3>
-        <div className="space-y-4">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={enableFileLogging}
-              onChange={(e) => onChangeEnableFileLogging(e.target.checked)}
-              className="mt-1"
-            />
-            <div>
-              <span className={labelDefault}>
-                Log to file
-              </span>
-              <p className={helpText}>
-                Write diagnostic logs to ~/Documents/CANdor/Reports/
-              </p>
-            </div>
-          </label>
+        <div className="space-y-2">
+          <label className={labelDefault}>Log Level</label>
+          <p className={helpText}>
+            Diagnostic log verbosity. Logs are written to ~/Documents/CANdor/Reports/
+          </p>
+          <Select
+            value={logLevel}
+            onChange={(e) => onChangeLogLevel(e.target.value)}
+          >
+            <option value="off">Off</option>
+            <option value="info">Info</option>
+            <option value="debug">Debug</option>
+            <option value="verbose">Verbose</option>
+          </Select>
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useSessionStore } from "../stores/sessionStore";
+import { tlog } from "../api/settings";
 
 // Generate unique listener instance IDs using random suffix.
 // Random is needed because each Tauri window has its own JS context,
@@ -623,7 +624,7 @@ export function useIOSession(
             event.payload.event_type === "destroyed" &&
             event.payload.session_id === effectiveSessionId
           ) {
-            console.log(
+            tlog.info(
               `[useIOSession:${appName}] Session '${effectiveSessionId}' destroyed externally`
             );
             // Prevent the cleanup timeout (from the mount effect) from trying to leave
@@ -652,7 +653,7 @@ export function useIOSession(
             event.payload.session_id === effectiveSessionId &&
             event.payload.listener_id === listenerIdRef.current
           ) {
-            console.log(
+            tlog.info(
               `[useIOSession:${appName}] Evicted from session '${effectiveSessionId}', buffer copies: ${event.payload.buffer_ids}`
             );
             // Prevent the cleanup timeout from trying to leave
@@ -802,7 +803,7 @@ export function useIOSession(
         console.log(`[useIOSession:${appName}] setup() complete, setupComplete=true, currentSessionIdRef='${currentSessionIdRef.current}'`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error(`[useIOSession:${appName}] setup() failed:`, msg);
+        tlog.info(`[useIOSession:${appName}] setup() failed: ${msg}`);
         // Don't show error for expected errors
         if (
           msg !== "No IO profile configured" &&

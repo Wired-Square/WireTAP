@@ -6,6 +6,7 @@
 import { useCallback } from "react";
 import { getBufferMetadataById, type BufferMetadata } from "../api/buffer";
 import { isBufferProfileId } from "./useIOSessionManager";
+import { tlog } from "../api/settings";
 
 export interface BufferSessionParams {
   // Required: buffer metadata setter
@@ -55,7 +56,7 @@ export function useBufferSession({
         return { success: false, metadata: null };
       }
 
-      console.log(`[BufferSession] Switching to buffer: ${profileId}`);
+      tlog.debug(`[BufferSession] Switching to buffer: ${profileId}`);
 
       // Run optional pre-switch actions (e.g., clearing previous state)
       onBeforeSwitch?.();
@@ -63,7 +64,7 @@ export function useBufferSession({
       // Fetch metadata for this specific buffer
       const meta = await getBufferMetadataById(profileId);
 
-      console.log(
+      tlog.debug(
         `[BufferSession] Got metadata: id=${meta?.id}, count=${meta?.count}, type=${meta?.buffer_type}`
       );
 
@@ -81,7 +82,7 @@ export function useBufferSession({
       // Run optional post-switch actions (e.g., loading frame info)
       onAfterSwitch?.(meta);
 
-      console.log(`[BufferSession] Buffer switch complete`);
+      tlog.debug(`[BufferSession] Buffer switch complete`);
       return { success: true, metadata: meta };
     },
     [setBufferMetadata, updateCurrentTime, setCurrentFrameIndex, onBeforeSwitch, onAfterSwitch]

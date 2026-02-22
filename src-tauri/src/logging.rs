@@ -1,8 +1,30 @@
 use std::path::Path;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 /// Global log file handle. When `Some`, `tlog!` writes to both stderr and this file.
 pub(crate) static LOG_FILE: Mutex<Option<std::fs::File>> = Mutex::new(None);
+
+/// Global log level threshold (0=Off, 1=Info, 2=Debug, 3=Verbose).
+/// Controls which frontend messages pass through `log_from_frontend`.
+/// Rust `tlog!` always writes regardless of level.
+pub(crate) static LOG_LEVEL: AtomicU8 = AtomicU8::new(0);
+
+/// Set the log level from a string ("off", "info", "debug", "verbose").
+pub(crate) fn set_log_level(level: &str) {
+    let value = match level {
+        "info" => 1,
+        "debug" => 2,
+        "verbose" => 3,
+        _ => 0, // "off" or unknown
+    };
+    LOG_LEVEL.store(value, Ordering::Relaxed);
+}
+
+/// Get the current log level as a u8 (0=Off, 1=Info, 2=Debug, 3=Verbose).
+pub(crate) fn get_log_level() -> u8 {
+    LOG_LEVEL.load(Ordering::Relaxed)
+}
 
 /// Initialise file logging to the given reports directory.
 /// Creates a timestamped log file and a `CANdor.log` symlink (Unix only).

@@ -7,7 +7,7 @@ import {
   validateDirectory as validateDirectoryApi,
   listCatalogs,
   setWakeSettings as setWakeSettingsApi,
-  setFileLogging as setFileLoggingApi,
+  setLogLevel as setLogLevelApi,
 } from '../../../api';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../../../events/registry';
@@ -130,7 +130,7 @@ interface AppSettings {
   prevent_idle_sleep?: boolean;
   keep_display_awake?: boolean;
   // Diagnostics
-  enable_file_logging?: boolean;
+  log_level?: string;
   // Privacy / telemetry
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
@@ -294,7 +294,7 @@ interface SettingsState {
     graphBufferSize: number;
     preventIdleSleep: boolean;
     keepDisplayAwake: boolean;
-    enableFileLogging: boolean;
+    logLevel: string;
     telemetryEnabled: boolean;
     telemetryConsentGiven: boolean;
   };
@@ -373,7 +373,7 @@ interface SettingsState {
   setGraphBufferSize: (size: number) => void;
   setPreventIdleSleep: (value: boolean) => void;
   setKeepDisplayAwake: (value: boolean) => void;
-  setEnableFileLogging: (value: boolean) => void;
+  setLogLevel: (value: string) => void;
   setTelemetryEnabled: (value: boolean) => void;
   setTelemetryConsentGiven: (value: boolean) => void;
 }
@@ -440,7 +440,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     graphBufferSize: 10000,
     preventIdleSleep: true,
     keepDisplayAwake: false,
-    enableFileLogging: false,
+    logLevel: "off",
     telemetryEnabled: false,
     telemetryConsentGiven: false,
   },
@@ -537,7 +537,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         prevent_idle_sleep: settings.prevent_idle_sleep ?? true,
         keep_display_awake: settings.keep_display_awake ?? false,
         // Diagnostics
-        enable_file_logging: settings.enable_file_logging ?? false,
+        log_level: settings.log_level ?? "off",
         // Privacy / telemetry
         telemetry_enabled: settings.telemetry_enabled ?? false,
         telemetry_consent_given: settings.telemetry_consent_given ?? false,
@@ -608,7 +608,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           graphBufferSize: normalized.graph_buffer_size ?? 10000,
           preventIdleSleep: normalized.prevent_idle_sleep ?? true,
           keepDisplayAwake: normalized.keep_display_awake ?? false,
-          enableFileLogging: normalized.enable_file_logging ?? false,
+          logLevel: normalized.log_level ?? "off",
           telemetryEnabled: normalized.telemetry_enabled ?? false,
           telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
         },
@@ -710,7 +710,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         prevent_idle_sleep: general.preventIdleSleep,
         keep_display_awake: general.keepDisplayAwake,
         // Diagnostics
-        enable_file_logging: general.enableFileLogging,
+        log_level: general.logLevel,
         // Privacy / telemetry
         telemetry_enabled: general.telemetryEnabled,
         telemetry_consent_given: general.telemetryConsentGiven,
@@ -782,7 +782,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       prevent_idle_sleep: general.preventIdleSleep,
       keep_display_awake: general.keepDisplayAwake,
       // Diagnostics
-      enable_file_logging: general.enableFileLogging,
+      log_level: general.logLevel,
       // Privacy / telemetry
       telemetry_enabled: general.telemetryEnabled,
       telemetry_consent_given: general.telemetryConsentGiven,
@@ -1145,13 +1145,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     setIOSScreenWake(value).catch(console.error);
   },
 
-  setEnableFileLogging: (value) => {
+  setLogLevel: (value) => {
     set((state) => ({
-      general: { ...state.general, enableFileLogging: value },
+      general: { ...state.general, logLevel: value },
     }));
     scheduleSave(get().saveSettings);
-    // Enable/disable file logging immediately
-    setFileLoggingApi(value).catch(console.error);
+    // Update log level immediately
+    setLogLevelApi(value).catch(console.error);
   },
 
   setTelemetryEnabled: (value) => {

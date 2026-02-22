@@ -6,6 +6,7 @@
 import { useCallback } from "react";
 import type { PlaybackSpeed } from "../components/TimeController";
 import { stepBufferFrame, updateReaderDirection } from "../api/io";
+import { tlog } from "../api/settings";
 
 export interface UsePlaybackHandlersParams {
   // Session ID for direction control
@@ -85,7 +86,7 @@ export function usePlaybackHandlers({
     try {
       await updateReaderDirection(sessionId, true);
     } catch (e) {
-      console.error("[PlaybackHandlers] Failed to set direction:", e);
+      tlog.debug(`[PlaybackHandlers] Failed to set direction: ${e}`);
       return;
     }
 
@@ -121,16 +122,11 @@ export function usePlaybackHandlers({
 
   // Handle step backward (one frame earlier, respecting filter)
   const handleStepBackward = useCallback(async () => {
-    console.log('[PlaybackHandlers] handleStepBackward called', {
-      isPaused,
-      currentFrameIndex,
-      currentTimestampUs,
-      sessionId,
-    });
+    tlog.debug(`[PlaybackHandlers] handleStepBackward called ${JSON.stringify({ isPaused, currentFrameIndex, currentTimestampUs, sessionId })}`);
 
     // Need to be paused and have some position info (frame index or timestamp)
     if (!isPaused || (currentFrameIndex == null && currentTimestampUs == null)) {
-      console.log('[PlaybackHandlers] handleStepBackward early return - guard condition met');
+      tlog.debug('[PlaybackHandlers] handleStepBackward early return - guard condition met');
       return;
     }
     try {
@@ -145,22 +141,17 @@ export function usePlaybackHandlers({
         updateCurrentTime?.(result.timestamp_us / 1_000_000);
       }
     } catch (e) {
-      console.error("[PlaybackHandlers] Failed to step backward:", e);
+      tlog.debug(`[PlaybackHandlers] Failed to step backward: ${e}`);
     }
   }, [sessionId, isPaused, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
 
   // Handle step forward (one frame later, respecting filter)
   const handleStepForward = useCallback(async () => {
-    console.log('[PlaybackHandlers] handleStepForward called', {
-      isPaused,
-      currentFrameIndex,
-      currentTimestampUs,
-      sessionId,
-    });
+    tlog.debug(`[PlaybackHandlers] handleStepForward called ${JSON.stringify({ isPaused, currentFrameIndex, currentTimestampUs, sessionId })}`);
 
     // Need to be paused and have some position info (frame index or timestamp)
     if (!isPaused || (currentFrameIndex == null && currentTimestampUs == null)) {
-      console.log('[PlaybackHandlers] handleStepForward early return - guard condition met');
+      tlog.debug('[PlaybackHandlers] handleStepForward early return - guard condition met');
       return;
     }
     try {
@@ -175,7 +166,7 @@ export function usePlaybackHandlers({
         updateCurrentTime?.(result.timestamp_us / 1_000_000);
       }
     } catch (e) {
-      console.error("[PlaybackHandlers] Failed to step forward:", e);
+      tlog.debug(`[PlaybackHandlers] Failed to step forward: ${e}`);
     }
   }, [sessionId, isPaused, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
 

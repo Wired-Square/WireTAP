@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { loadSettings as loadSettingsApi } from '../api/settings';
+import { loadSettings as loadSettingsApi, tlog } from '../api/settings';
 import { getOrCreateDefaultDirs } from '../utils/defaultPaths';
 import { WINDOW_EVENTS } from '../events/registry';
 import { getTraitsForKind } from '../utils/profileTraits';
@@ -114,7 +114,7 @@ export interface AppSettings {
   prevent_idle_sleep?: boolean;
   keep_display_awake?: boolean;
   // Diagnostics
-  enable_file_logging?: boolean;
+  log_level?: string; // "off" | "info" | "debug" | "verbose"
   // Privacy / telemetry
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
@@ -213,7 +213,7 @@ export function useSettings(): UseSettingsReturn {
         try {
           defaultDirs = await getOrCreateDefaultDirs();
         } catch (err) {
-          console.warn('Could not get/create default directories:', err);
+          tlog.info(`[useSettings] Could not get/create default directories: ${err}`);
         }
       }
 
@@ -222,7 +222,7 @@ export function useSettings(): UseSettingsReturn {
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setError(error);
-      console.error('Failed to load settings:', error);
+      tlog.info(`[useSettings] Failed to load settings: ${error}`);
     } finally {
       setLoading(false);
     }

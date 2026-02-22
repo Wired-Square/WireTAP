@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { windowManager } from '../managers/WindowManager';
+import { tlog } from '../api/settings';
 
 /**
  * Hook to automatically save and restore window geometry.
@@ -26,13 +27,13 @@ export function useWindowPersistence(label: string) {
   // Restore geometry on mount
   useEffect(() => {
     windowManager.restoreGeometry(label).catch((error) => {
-      console.error(`[useWindowPersistence] Failed to restore geometry for ${label}:`, error);
+      tlog.info(`[useWindowPersistence] Failed to restore geometry for ${label}: ${error}`);
     });
   }, [label]);
 
   // Save geometry on resize/move
   useEffect(() => {
-    console.log(`[useWindowPersistence] Setting up persistence for ${label}`);
+    tlog.info(`[useWindowPersistence] Setting up persistence for ${label}`);
     const currentWindow = getCurrentWebviewWindow();
 
     // Reset refs on (re-)mount — required for React Strict Mode which unmounts/remounts
@@ -44,7 +45,7 @@ export function useWindowPersistence(label: string) {
     // Don't save geometry changes for the first 2 seconds after window creation
     // This prevents saving the intermediate sizes during initial rendering
     const initTimer = setTimeout(() => {
-      console.log(`[useWindowPersistence] Enabling geometry saving for ${label}`);
+      tlog.info(`[useWindowPersistence] Enabling geometry saving for ${label}`);
       allowSavingRef.current = true;
     }, 2000);
 

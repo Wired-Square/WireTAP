@@ -15,6 +15,7 @@ import { useDiscoverySerialStore } from './discoverySerialStore';
 import { useDiscoveryToolboxStore } from './discoveryToolboxStore';
 import type { FrameMessage } from '../types/frame';
 import type { SelectionSet } from '../utils/selectionSets';
+import { tlog } from '../api/settings';
 
 // Re-export types for backward compatibility
 export type { FrameMessage } from '../types/frame';
@@ -355,9 +356,9 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           // Pass 'serial' protocol since this is from serial framing
           frameStore.setFrameInfoFromBuffer(frameInfoList, 'serial');
           frameStore.enableBufferMode(backendFrameCount);
-          console.log(`[discoveryStore] Loaded ${frameInfoList.length} unique frame IDs from backend buffer`);
+          tlog.debug(`[discoveryStore] Loaded ${frameInfoList.length} unique frame IDs from backend buffer`);
         } catch (e) {
-          console.error('[discoveryStore] Failed to load frame info from backend buffer:', e);
+          tlog.info(`[discoveryStore] Failed to load frame info from backend buffer: ${e}`);
         }
       } else if (hasStreamingFrames) {
         // Streaming mode: frames are already in mainFrames, just need to update frame info
@@ -415,12 +416,12 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
 
             // Replace frames in store with updated ones
             frameStore.setFrames(updatedFrames);
-            console.log(`[discoveryStore] Applied extraction configs to ${updatedFrames.length} streaming frames`);
+            tlog.debug(`[discoveryStore] Applied extraction configs to ${updatedFrames.length} streaming frames`);
           } else {
             // No extraction configs, just rebuild frame picker
             frameStore.rebuildFramePickerFromBuffer();
           }
-          console.log(`[discoveryStore] Accepted ${mainFrames.length} streaming frames`);
+          tlog.debug(`[discoveryStore] Accepted ${mainFrames.length} streaming frames`);
         }
       } else if (frames.length > 0) {
         // Local framing mode: frames are in memory
@@ -434,7 +435,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           try {
             await createFrameBufferFromFrames(name, completeFrames);
           } catch (e) {
-            console.error('[discoveryStore] Failed to create frame buffer:', e);
+            tlog.info(`[discoveryStore] Failed to create frame buffer: ${e}`);
           }
         }
       }
@@ -512,7 +513,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
               if (response.frames.length === 0) break; // Safety check
             }
           } catch (e) {
-            console.error('[runAnalysis] Failed to fetch frames from backend buffer:', e);
+            tlog.info(`[discoveryStore] Failed to fetch frames from backend buffer: ${e}`);
             toolboxStore.setIsRunning(false);
             return;
           }
@@ -553,7 +554,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
             offset += response.frames.length;
           }
         } catch (e) {
-          console.error('[runAnalysis] Failed to fetch frames from buffer:', e);
+          tlog.info(`[discoveryStore] Failed to fetch frames from buffer: ${e}`);
           toolboxStore.setIsRunning(false);
           return;
         }
