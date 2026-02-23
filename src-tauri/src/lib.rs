@@ -888,7 +888,8 @@ pub fn run() {
             setup_desktop_menus(app)?;
 
             // Start the heartbeat watchdog to clean up stale session joiners
-            io::start_heartbeat_watchdog();
+            // and probe WebView health (detects content process jettison on macOS)
+            io::start_heartbeat_watchdog(app.handle().clone());
 
             // Install example decoders on app startup (only copies missing files)
             let app_handle = app.handle().clone();
@@ -998,6 +999,8 @@ pub fn run() {
             // Power management API
             sessions::set_wake_settings,
             io::get_active_listeners,
+            io::webview_health_pong,
+            io::check_recovery_occurred,
             // Buffer / CSV Import API
             buffers::import_csv_to_buffer,
             buffers::preview_csv,

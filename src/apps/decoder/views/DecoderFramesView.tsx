@@ -56,6 +56,8 @@ type Props = {
   decoded: Map<number, DecodedFrame>;
   /** Decoded frames keyed by "frameId:sourceAddress" for per-source view mode */
   decodedPerSource: Map<string, DecodedFrame>;
+  /** Version counter for decoded data — triggers useMemo recomputation */
+  decodedVersion: number;
   /** View mode: 'single' shows most recent per frame, 'per-source' shows by source address */
   viewMode: DecoderViewMode;
   displayFrameIdFormat: "hex" | "decimal";
@@ -769,6 +771,7 @@ export default function DecoderFramesView({
   selectedIds,
   decoded,
   decodedPerSource,
+  decodedVersion,
   viewMode,
   displayFrameIdFormat,
   isDecoding,
@@ -913,7 +916,7 @@ export default function DecoderFramesView({
     }
 
     return result;
-  }, [decoded, headerFieldFilters]);
+  }, [decoded, headerFieldFilters, decodedVersion]);
 
   const isPaused = playbackState === "paused";
   const supportsTimeRange = capabilities?.supports_time_range ?? false;

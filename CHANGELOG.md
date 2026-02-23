@@ -92,6 +92,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Session killed by GC pause during long captures**: Two sources of allocation churn froze the main thread for 13+ seconds after ~30 minutes of streaming (~100k frames), causing both listeners to miss heartbeats and the backend to destroy the session. (1) The Decoder called `decodeSignals` per-frame, copying LRU maps (500 + 2,000 entries) and calling Zustand `set()` for every frame — switched to the existing `decodeSignalsBatch` which creates maps once and does a single store update per flush, with mirror validation via a pre-built reverse lookup map. (2) Discovery's frame store created a new 100k-element array via `concat()` on every 40ms flush, generating ~20 MB/s of large-object garbage — replaced with a mutable buffer (`push`/`splice` in place) and a `frameVersion` counter for React change detection.
+
 - **Window shrinking on mixed-DPI multi-monitor Macs**: Removed `tauri-plugin-window-state` which incorrectly converted between physical and logical coordinates on mixed-DPI setups, causing windows to progressively shrink on each restart. Replaced with custom persistence using logical (point) coordinates that work correctly across monitors with different scale factors.
 
 - **Panel settings number inputs**: Changed min/max value fields from `type="number"` to `type="text"` with `inputMode="decimal"`, fixing inability to highlight and retype values on Windows and twitchy behaviour on Mac.

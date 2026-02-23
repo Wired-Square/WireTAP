@@ -1325,3 +1325,12 @@ export async function getProfilesUsage(
     configLocked: p.config_locked,
   }));
 }
+
+// ============================================================================
+// WebView Recovery
+// ============================================================================
+
+/** Check if a WebView recovery just occurred (one-shot: cleared after reading). */
+export async function checkRecoveryOccurred(): Promise<boolean> {
+  return invoke("check_recovery_occurred");
+}

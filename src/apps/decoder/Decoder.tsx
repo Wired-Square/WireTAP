@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
-import { useDecoderStore } from "../../stores/decoderStore";
+import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFrames, getFilteredFrames } from "../../stores/decoderStore";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOPickerHandlers } from '../../hooks/useIOPickerHandlers';
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
@@ -79,7 +79,13 @@ export default function Decoder() {
   const frames = useDecoderStore((state) => state.frames);
   const selectedFrames = useDecoderStore((state) => state.selectedFrames);
   const ioProfile = useDecoderStore((state) => state.ioProfile);
-  const decoded = useDecoderStore((state) => state.decoded);
+  // Version counter drives re-renders; actual data read via module-level getters
+  // (avoids creating new LRUMap/Array copies every 100ms — see decoderStore.ts)
+  const decodedVersion = useDecoderStore((state) => state.decodedVersion);
+  const decoded = getDecodedFrames();
+  const decodedPerSource = getDecodedPerSource();
+  const unmatchedFrames = getUnmatchedFrames();
+  const filteredFrames = getFilteredFrames();
   const startTime = useDecoderStore((state) => state.startTime);
   const endTime = useDecoderStore((state) => state.endTime);
   const currentTime = useDecoderStore((state) => state.currentTime);
@@ -93,9 +99,6 @@ export default function Decoder() {
   const viewMode = useDecoderStore((state) => state.viewMode);
   const hideUnseen = useDecoderStore((state) => state.hideUnseen);
   const streamStartTimeSeconds = useDecoderStore((state) => state.streamStartTimeSeconds);
-  const decodedPerSource = useDecoderStore((state) => state.decodedPerSource);
-  const unmatchedFrames = useDecoderStore((state) => state.unmatchedFrames);
-  const filteredFrames = useDecoderStore((state) => state.filteredFrames);
   const headerFieldFilters = useDecoderStore((state) => state.headerFieldFilters);
   const seenHeaderFieldValues = useDecoderStore((state) => state.seenHeaderFieldValues);
   const showAsciiGutter = useDecoderStore((state) => state.showAsciiGutter);
@@ -109,7 +112,7 @@ export default function Decoder() {
   const bulkSelectBus = useDecoderStore((state) => state.bulkSelectBus);
   const selectAllFrames = useDecoderStore((state) => state.selectAllFrames);
   const deselectAllFrames = useDecoderStore((state) => state.deselectAllFrames);
-  const decodeSignals = useDecoderStore((state) => state.decodeSignals);
+  const decodeSignalsBatch = useDecoderStore((state) => state.decodeSignalsBatch);
   const setIoProfile = useDecoderStore((state) => state.setIoProfile);
   const updateCurrentTime = useDecoderStore((state) => state.updateCurrentTime);
   const setCurrentFrameIndex = useDecoderStore((state) => state.setCurrentFrameIndex);
@@ -127,8 +130,8 @@ export default function Decoder() {
   const clearFilteredFrames = useDecoderStore((state) => state.clearFilteredFrames);
   const toggleViewMode = useDecoderStore((state) => state.toggleViewMode);
   const toggleHideUnseen = useDecoderStore((state) => state.toggleHideUnseen);
-  const addUnmatchedFrame = useDecoderStore((state) => state.addUnmatchedFrame);
-  const addFilteredFrame = useDecoderStore((state) => state.addFilteredFrame);
+
+
   const setMinFrameLength = useDecoderStore((state) => state.setMinFrameLength);
   const toggleHeaderFieldFilter = useDecoderStore((state) => state.toggleHeaderFieldFilter);
   const clearHeaderFieldFilter = useDecoderStore((state) => state.clearHeaderFieldFilter);
@@ -188,29 +191,21 @@ export default function Decoder() {
   const UI_UPDATE_INTERVAL_MS = 100; // 10 updates per second
 
   // Use refs for store functions to avoid stale closures in setTimeout
-  const decodeSignalsRef = useRef(decodeSignals);
+  const decodeSignalsBatchRef = useRef(decodeSignalsBatch);
   const updateCurrentTimeRef = useRef(updateCurrentTime);
   const selectedFramesRef = useRef(selectedFrames);
-  const addUnmatchedFrameRef = useRef(addUnmatchedFrame);
-  const addFilteredFrameRef = useRef(addFilteredFrame);
   const frameIdFilterSetRef = useRef(frameIdFilterSet);
 
   // Keep refs up to date
   useEffect(() => {
-    decodeSignalsRef.current = decodeSignals;
-  }, [decodeSignals]);
+    decodeSignalsBatchRef.current = decodeSignalsBatch;
+  }, [decodeSignalsBatch]);
   useEffect(() => {
     updateCurrentTimeRef.current = updateCurrentTime;
   }, [updateCurrentTime]);
   useEffect(() => {
     selectedFramesRef.current = selectedFrames;
   }, [selectedFrames]);
-  useEffect(() => {
-    addUnmatchedFrameRef.current = addUnmatchedFrame;
-  }, [addUnmatchedFrame]);
-  useEffect(() => {
-    addFilteredFrameRef.current = addFilteredFrame;
-  }, [addFilteredFrame]);
   useEffect(() => {
     frameIdFilterSetRef.current = frameIdFilterSet;
   }, [frameIdFilterSet]);
@@ -224,29 +219,17 @@ export default function Decoder() {
       pendingTimeRef.current = null;
     }
 
-    // Decode all pending frames (in order, so mux cases are processed correctly)
+    // Collect all pending data
     const framesToDecode = pendingFramesRef.current;
-    pendingFramesRef.current = [];
-
-    for (const { frameId, bytes, sourceAddress, timestamp } of framesToDecode) {
-      decodeSignalsRef.current(frameId, bytes, sourceAddress, timestamp);
-    }
-
-    // Add unmatched frames to store
     const unmatchedToAdd = pendingUnmatchedRef.current;
-    pendingUnmatchedRef.current = [];
-
-    for (const frame of unmatchedToAdd) {
-      addUnmatchedFrameRef.current(frame);
-    }
-
-    // Add filtered frames to store
     const filteredToAdd = pendingFilteredRef.current;
+    pendingFramesRef.current = [];
+    pendingUnmatchedRef.current = [];
     pendingFilteredRef.current = [];
 
-    for (const frame of filteredToAdd) {
-      addFilteredFrameRef.current(frame);
-    }
+    // Single batch call: creates LRU maps once and does one Zustand set()
+    // (replaces per-frame decodeSignals loop that copied maps N times)
+    decodeSignalsBatchRef.current(framesToDecode, unmatchedToAdd, filteredToAdd);
   }, []);
 
   // Callbacks for reader session
@@ -939,6 +922,7 @@ export default function Decoder() {
           selectedIds={selectedFrames}
           decoded={decoded}
           decodedPerSource={decodedPerSource}
+          decodedVersion={decodedVersion}
           viewMode={viewMode}
           displayFrameIdFormat={displayIdFormat}
           isDecoding={isDecoding}

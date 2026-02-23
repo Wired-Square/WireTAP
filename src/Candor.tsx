@@ -7,8 +7,10 @@ import "./Candor.css";
 import MainLayout from "./components/MainLayout";
 import { useUpdateStore } from "./stores/updateStore";
 import { useTheme } from "./hooks/useTheme";
-import { useAppErrorDialog } from "./stores/sessionStore";
+import { useAppErrorDialog, useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./apps/settings/stores/settingsStore";
+import { checkRecoveryOccurred } from "./api/io";
+import { tlog } from "./api/settings";
 import ErrorDialog from "./dialogs/ErrorDialog";
 import TelemetryConsentDialog from "./dialogs/TelemetryConsentDialog";
 
@@ -82,6 +84,20 @@ export default function Candor() {
       setSentryEnabled(telemetryEnabled);
     }
   }, [settingsLoaded, telemetryConsentGiven, telemetryEnabled]);
+
+  // Check if the page was reloaded by the watchdog after a WebView content
+  // process jettison (macOS reclaims WKWebView memory under pressure).
+  useEffect(() => {
+    checkRecoveryOccurred().then((recovered) => {
+      if (recovered) {
+        tlog.info("[recovery] WebView recovered from system memory event");
+        useSessionStore.getState().showAppError(
+          "Session Recovered",
+          "The system reclaimed memory from this window and the page was automatically reloaded. Your session has been reconnected.",
+        );
+      }
+    });
+  }, []);
 
   const handleConsentAccept = () => {
     setTelemetryEnabled(true);

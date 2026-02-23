@@ -31,6 +31,7 @@ export default function FilteredTabContent({
   bufferMetadata,
 }: Props) {
   const frames = useDiscoveryStore((s) => s.frames);
+  const frameVersion = useDiscoveryStore((s) => s.frameVersion);
   const seenIds = useDiscoveryStore((s) => s.seenIds);
   const selectedFrames = useDiscoveryStore((s) => s.selectedFrames);
   const bufferMode = useDiscoveryStore((s) => s.bufferMode);
@@ -107,7 +108,7 @@ export default function FilteredTabContent({
     }
 
     return matching;
-  }, [bufferMode.enabled, filteredOutIds, frames, isStreaming, pageSize]);
+  }, [bufferMode.enabled, filteredOutIds, frameVersion, isStreaming, pageSize]);
 
   // Paginate the local result
   const localPage = useMemo(() => {

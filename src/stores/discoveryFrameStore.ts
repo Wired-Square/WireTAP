@@ -12,6 +12,21 @@ import type { SelectionSet } from '../utils/selectionSets';
 let pendingFrames: FrameMessage[] = [];
 let flushTimeout: ReturnType<typeof setTimeout> | null = null;
 const FLUSH_INTERVAL_MS = 40;
+// Allow the frame buffer to temporarily overshoot maxBuffer by this many frames
+// before compacting. This avoids O(100k) splice every 40ms — compaction happens
+// once every few minutes instead of 25x/sec, dramatically reducing GC pressure.
+const COMPACT_THRESHOLD = 10_000;
+
+// Mutable frame buffer — avoids creating a new 100k-element array on every
+// 40ms flush, which caused JSC GC pressure that froze the main thread after
+// ~30 min of streaming. Components subscribe to `frameVersion` for reactivity
+// and read from this buffer via `getDiscoveryFrameBuffer()`.
+let _frameBuffer: FrameMessage[] = [];
+
+/** Direct access to the mutable frame buffer. Read-only. */
+export function getDiscoveryFrameBuffer(): FrameMessage[] {
+  return _frameBuffer;
+}
 
 export type FrameInfo = {
   len: number;
@@ -22,8 +37,8 @@ export type FrameInfo = {
 };
 
 interface DiscoveryFrameState {
-  // Frame data
-  frames: FrameMessage[];
+  // Frame data (actual frames live in _frameBuffer, not in state — see module comment)
+  frameVersion: number;
   frameInfoMap: Map<number, FrameInfo>;
   selectedFrames: Set<number>;
   seenIds: Set<number>;
@@ -72,7 +87,7 @@ interface DiscoveryFrameState {
 
 export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => ({
   // Initial state
-  frames: [],
+  frameVersion: 0,
   frameInfoMap: new Map(),
   selectedFrames: new Set(),
   seenIds: new Set(),
@@ -94,28 +109,29 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
 
         if (framesToProcess.length === 0) return;
 
-        const { frames, frameInfoMap, seenIds, selectedFrames, streamStartTimeUs } = get();
+        const { frameInfoMap, seenIds, selectedFrames, streamStartTimeUs, frameVersion } = get();
 
         if (streamStartTimeUs === null && framesToProcess.length > 0) {
-          const earliestTs = Math.min(...framesToProcess.map(f => f.timestamp_us));
+          // Use a loop instead of Math.min(...spread) to avoid stack overflow
+          // risk if a large batch accumulates during a GC pause
+          let earliestTs = framesToProcess[0].timestamp_us;
+          for (let i = 1; i < framesToProcess.length; i++) {
+            if (framesToProcess[i].timestamp_us < earliestTs) {
+              earliestTs = framesToProcess[i].timestamp_us;
+            }
+          }
           set({ streamStartTimeUs: earliestTs });
         }
 
-        let updatedFrames: FrameMessage[];
-        const totalNeeded = frames.length + framesToProcess.length;
-
-        if (totalNeeded <= maxBuffer) {
-          updatedFrames = frames.concat(framesToProcess);
-        } else {
-          const keepFromOld = Math.max(0, maxBuffer - framesToProcess.length);
-          if (keepFromOld === 0) {
-            updatedFrames = framesToProcess.slice(-maxBuffer);
-          } else {
-            updatedFrames = frames.slice(-keepFromOld).concat(framesToProcess);
-          }
+        // Mutate buffer in place — avoids creating a new 100k array every flush.
+        // Only compact when overshooting by COMPACT_THRESHOLD instead of splicing
+        // every flush. This avoids O(100k) element shifts 25x/sec.
+        _frameBuffer.push(...framesToProcess);
+        if (_frameBuffer.length > maxBuffer + COMPACT_THRESHOLD) {
+          _frameBuffer = _frameBuffer.slice(-maxBuffer);
         }
 
-        const stateUpdate: Partial<DiscoveryFrameState> = { frames: updatedFrames };
+        const stateUpdate: Partial<DiscoveryFrameState> = { frameVersion: frameVersion + 1 };
 
         // Skip frame picker updates if requested (e.g., serial mode before framing is accepted)
         if (!skipFramePicker) {
@@ -195,11 +211,12 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
 
   clearBuffer: () => {
     pendingFrames = [];
+    _frameBuffer = [];
     if (flushTimeout !== null) {
       clearTimeout(flushTimeout);
       flushTimeout = null;
     }
-    set({ frames: [], streamStartTimeUs: null });
+    set({ frameVersion: get().frameVersion + 1, streamStartTimeUs: null });
   },
 
   clearFramePicker: () => {
@@ -212,12 +229,13 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
 
   clearAll: () => {
     pendingFrames = [];
+    _frameBuffer = [];
     if (flushTimeout !== null) {
       clearTimeout(flushTimeout);
       flushTimeout = null;
     }
     set({
-      frames: [],
+      frameVersion: get().frameVersion + 1,
       frameInfoMap: new Map(),
       selectedFrames: new Set(),
       seenIds: new Set(),
@@ -226,12 +244,13 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   },
 
   setFrames: (frames) => {
-    set({ frames });
+    _frameBuffer = frames;
+    set({ frameVersion: get().frameVersion + 1 });
     get().rebuildFramePickerFromBuffer();
   },
 
   rebuildFramePickerFromBuffer: (activeSelectionSetSelectedIds = null) => {
-    const { frames } = get();
+    const frames = _frameBuffer;
     if (frames.length === 0) return;
 
     tlog.debug(`[discoveryFrameStore] Building frame picker from ${frames.length} frames`);
@@ -369,9 +388,10 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   // Buffer mode actions
   enableBufferMode: (totalFrames) => {
     tlog.debug(`[discoveryFrameStore] Enabling buffer mode with ${totalFrames} frames`);
+    _frameBuffer = [];
     set({
       bufferMode: { enabled: true, totalFrames, viewMode: "pagination" },
-      frames: [],
+      frameVersion: get().frameVersion + 1,
     });
   },
 

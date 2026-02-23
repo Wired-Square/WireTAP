@@ -44,6 +44,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
   // Get main frames store for real-time streaming with backend framing
   // During streaming, frames from backend framing go to the main frames store
   const mainFrames = useDiscoveryStore((s) => s.frames);
+  const mainFrameVersion = useDiscoveryStore((s) => s.frameVersion);
   const setFramingConfig = useDiscoverySerialStore((s) => s.setFramingConfig);
   const applyFrameIdMapping = useDiscoverySerialStore((s) => s.applyFrameIdMapping);
   const clearFrameIdMapping = useDiscoverySerialStore((s) => s.clearFrameIdMapping);
@@ -82,7 +83,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
     const filtered = mainFrames.filter(f => f.dlc >= minFrameLength);
     const excluded = mainFrames.filter(f => f.dlc < minFrameLength);
     return { filteredStreamingFrames: filtered, excludedStreamingFrames: excluded };
-  }, [isStreaming, framedData.length, mainFrames, minFrameLength]);
+  }, [isStreaming, framedData.length, mainFrameVersion, minFrameLength]);
 
   // Effective filtered count: use backend filteredFrameCount for client-side framing,
   // or computed excludedStreamingFrames.length for streaming

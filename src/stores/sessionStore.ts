@@ -56,11 +56,31 @@ import {
 } from "../apps/session-manager/stores/sessionLogStore";
 
 // ============================================================================
-// Debug: Log visibility changes (helps diagnose WebKit timer throttling)
+// Visibility: Log changes and send immediate heartbeats on wake.
+// When the display sleeps, WKWebView may throttle/suspend timers.
+// The Rust watchdog pauses the session after HEARTBEAT_TIMEOUT (30s).
+// When the display wakes, we immediately send heartbeats so the Rust
+// backend can resume the session before the grace period expires.
 // ============================================================================
 
 document.addEventListener("visibilitychange", () => {
   tlog.info(`[visibility] ${document.visibilityState}`);
+
+  if (document.visibilityState === "visible" && getEventListeners) {
+    // Page just became visible — immediately send heartbeats for all sessions
+    // to revive any sessions that were paused during display sleep / App Nap.
+    const eventListenersMap = getEventListeners();
+    for (const [sessionId, listeners] of Object.entries(eventListenersMap)) {
+      if (listeners.registeredListeners.size > 0) {
+        tlog.info(`[visibility] sending immediate heartbeats for session '${sessionId}' (${listeners.registeredListeners.size} listeners)`);
+        for (const lid of listeners.registeredListeners) {
+          registerSessionListener(sessionId, lid).catch((e) => {
+            tlog.info(`[visibility] heartbeat failed for ${sessionId}/${lid}: ${e}`);
+          });
+        }
+      }
+    }
+  }
 });
 
 // ============================================================================
@@ -185,6 +205,7 @@ function flushPendingFrames() {
       }
     }
   }
+
 }
 
 /** Schedule a flush with adaptive timing */
@@ -959,9 +980,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           updateSession
         );
 
-        // Start heartbeat interval to keep listeners alive in Rust backend
-        // The Rust watchdog removes listeners without heartbeat after 10 seconds
-        // We send heartbeats every 5 seconds to stay well within the timeout
+        // Start heartbeat interval to keep listeners alive in Rust backend.
+        // The Rust watchdog removes listeners without heartbeat after 30 seconds,
+        // then enters a 5-minute grace period (session paused, not destroyed).
+        // We send heartbeats every 5 seconds to stay well within the timeout.
         if (!eventListeners.heartbeatIntervalId) {
           const heartbeatSessionId = sessionId;
           eventListeners.heartbeatIntervalId = setInterval(async () => {

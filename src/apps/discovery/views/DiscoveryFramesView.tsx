@@ -129,6 +129,8 @@ function DiscoveryFramesView({
   const renderBuffer = useDiscoveryStore((s) => s.renderBuffer);
   const setRenderBuffer = useDiscoveryStore((s) => s.setRenderBuffer);
   const selectedFrames = useDiscoveryStore((s) => s.selectedFrames);
+  // frameVersion triggers re-renders when the mutable frame buffer changes
+  const frameVersion = useDiscoveryStore((s) => s.frameVersion);
   const seenIds = useDiscoveryStore((s) => s.seenIds);
   const bufferMode = useDiscoveryStore((s) => s.bufferMode);
   const setBufferViewMode = useDiscoveryStore((s) => s.setBufferViewMode);
@@ -269,7 +271,7 @@ function DiscoveryFramesView({
   const framesRef = useRef(frames);
   useEffect(() => {
     framesRef.current = frames;
-  }, [frames]);
+  }, [frameVersion]);
 
   // Handle timeline scrub in normal mode (frontend frames) - navigate to the page containing the target timestamp
   const handleNormalScrub = useCallback((timeUs: number) => {
@@ -365,7 +367,7 @@ function DiscoveryFramesView({
     }));
 
     return { visibleFrames: withHex, filteredCount: -1 };
-  }, [frames, selectedFrames, renderBuffer, isStreaming]);
+  }, [frameVersion, selectedFrames, renderBuffer, isStreaming]);
 
   // When stopped: defer heavy filtering to avoid blocking UI
   useEffect(() => {
@@ -428,7 +430,7 @@ function DiscoveryFramesView({
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [isStreaming, frames, selectedFrames, renderBuffer, currentPage]);
+  }, [isStreaming, frameVersion, selectedFrames, renderBuffer, currentPage]);
 
   // Buffer mode: fetch frames from backend on page change, filtered by selected frame IDs
   const fetchBufferPage = useCallback(async (page: number, pageSize: number, selectedIds: number[]) => {
@@ -601,7 +603,7 @@ function DiscoveryFramesView({
         el.scrollTop = el.scrollHeight;
       }
     });
-  }, [frames]);
+  }, [frameVersion]);
 
   // Check if we have any analysis results
   const hasAnalysisResults = toolboxResults.changesResults !== null || toolboxResults.messageOrderResults !== null || toolboxResults.checksumDiscoveryResults !== null;
@@ -688,7 +690,7 @@ function DiscoveryFramesView({
       };
     }
     return { show: false, minTimeUs: 0, maxTimeUs: 0, currentTimeUs: 0, onScrub: () => {}, disabled: true };
-  }, [useBufferFirstMode, bufferFrameView.timeRange, bufferMode.enabled, isBufferMode, isStreaming, bufferMetadata, frames, currentTimeUs, visibleFrames, handleBufferFirstScrub, handleBufferScrub, handleNormalScrub]);
+  }, [useBufferFirstMode, bufferFrameView.timeRange, bufferMode.enabled, isBufferMode, isStreaming, bufferMetadata, frameVersion, currentTimeUs, visibleFrames, handleBufferFirstScrub, handleBufferScrub, handleNormalScrub]);
 
   // Calculate which row to highlight based on current timestamp
   // Since frames can be filtered, we find the matching frame by timestamp rather than index

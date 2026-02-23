@@ -14,6 +14,25 @@ const MAX_DECODED_FRAMES = 500;
 const MAX_DECODED_PER_SOURCE = 2000;
 /** Maximum number of unique values to track per header field */
 const MAX_HEADER_FIELD_VALUES = 256;
+
+// Mutable decoded state — avoids creating new LRUMap/Array copies on every
+// 100ms decode flush, which causes JSC GC pressure that crashes the WebView
+// after ~2 hours of streaming. Components subscribe to `decodedVersion` for
+// reactivity and read from these via getter functions.
+let _decoded: LRUMap<number, DecodedFrame> = new LRUMap(MAX_DECODED_FRAMES);
+let _decodedPerSource: LRUMap<string, DecodedFrame> = new LRUMap(MAX_DECODED_PER_SOURCE);
+let _unmatchedFrames: UnmatchedFrame[] = [];
+let _filteredFrames: FilteredFrame[] = [];
+
+/** Direct access to the mutable decoded LRU map. Read-only. */
+export function getDecodedFrames(): LRUMap<number, DecodedFrame> { return _decoded; }
+/** Direct access to the mutable per-source decoded LRU map. Read-only. */
+export function getDecodedPerSource(): LRUMap<string, DecodedFrame> { return _decodedPerSource; }
+/** Direct access to the mutable unmatched frames array. Read-only. */
+export function getUnmatchedFrames(): UnmatchedFrame[] { return _unmatchedFrames; }
+/** Direct access to the mutable filtered frames array. Read-only. */
+export function getFilteredFrames(): FilteredFrame[] { return _filteredFrames; }
+
 import { saveCatalog } from '../api';
 import { buildFramesToml, type SerialFrameConfig } from '../utils/frameExport';
 import { formatFrameId } from '../utils/frameIds';
@@ -223,14 +242,10 @@ interface DecoderState {
   /** Fuzz window for mirror validation (ms) - frames must arrive within this window to compare */
   mirrorFuzzWindowMs: number;
 
-  // Decoding state
-  decoded: Map<number, DecodedFrame>;
-  /** Decoded frames keyed by "frameId:sourceAddress" for per-source view mode */
-  decodedPerSource: Map<string, DecodedFrame>;
-  /** Frames that don't match any frame ID in the catalog */
-  unmatchedFrames: UnmatchedFrame[];
-  /** Frames that were filtered out (e.g., too short) */
-  filteredFrames: FilteredFrame[];
+  // Decoding state (actual data lives in module-level mutables — see getters above)
+  /** Version counter for decoded data — bumped on every decode batch.
+   *  Components subscribe to this for reactivity and read data via getter functions. */
+  decodedVersion: number;
   ioProfile: string | null;
   showRawBytes: boolean;
   /** View mode: 'single' shows most recent per frame, 'per-source' shows by source address */
@@ -288,7 +303,7 @@ interface DecoderState {
   decodeSignals: (frameId: number, bytes: number[], sourceAddress?: number, frameTimestamp?: number) => void;
   /** Batch decode multiple frames in a single state update (for high-speed playback) */
   decodeSignalsBatch: (
-    framesToDecode: Array<{ frameId: number; bytes: number[]; sourceAddress?: number }>,
+    framesToDecode: Array<{ frameId: number; bytes: number[]; sourceAddress?: number; timestamp?: number }>,
     unmatchedFrames: UnmatchedFrame[],
     filteredFrames: FilteredFrame[]
   ) => void;
@@ -346,10 +361,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   mirrorSourceMap: new Map(),
   mirrorValidation: new Map(),
   mirrorFuzzWindowMs: 1000, // 1 second - generous to handle batching and varying frame rates
-  decoded: new LRUMap(MAX_DECODED_FRAMES),
-  decodedPerSource: new LRUMap(MAX_DECODED_PER_SOURCE),
-  unmatchedFrames: [],
-  filteredFrames: [],
+  decodedVersion: 0,
   ioProfile: null,
   showRawBytes: false,
   viewMode: 'single',
@@ -572,12 +584,13 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   clearFrames: () => {
     // Only clear session/buffer data, NOT the catalog frames
+    _decoded = new LRUMap(MAX_DECODED_FRAMES);
+    _decodedPerSource = new LRUMap(MAX_DECODED_PER_SOURCE);
+    _unmatchedFrames = [];
+    _filteredFrames = [];
     set({
       seenIds: new Set(),
-      decoded: new Map(),
-      decodedPerSource: new Map(),
-      unmatchedFrames: [],
-      filteredFrames: [],
+      decodedVersion: get().decodedVersion + 1,
       seenHeaderFieldValues: new Map(),
       headerFieldFilters: new Map(),
       streamStartTimeSeconds: null,
@@ -585,11 +598,12 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   },
 
   clearDecoded: () => {
+    _decoded = new LRUMap(MAX_DECODED_FRAMES);
+    _decodedPerSource = new LRUMap(MAX_DECODED_PER_SOURCE);
+    _unmatchedFrames = [];
+    _filteredFrames = [];
     set({
-      decoded: new LRUMap(MAX_DECODED_FRAMES),
-      decodedPerSource: new LRUMap(MAX_DECODED_PER_SOURCE),
-      unmatchedFrames: [],
-      filteredFrames: [],
+      decodedVersion: get().decodedVersion + 1,
       seenHeaderFieldValues: new Map(),
       headerFieldFilters: new Map(),
       streamStartTimeSeconds: null,
@@ -598,7 +612,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   // Decoding actions
   decodeSignals: (frameId, bytes, sourceAddress, frameTimestamp) => {
-    const { frames, decoded, decodedPerSource, protocol, canConfig, serialConfig } = get();
+    const { frames, protocol, canConfig, serialConfig } = get();
 
     // Apply frame_id_mask before catalog lookup
     // This allows matching on message type only (e.g., J1939 PGN without source address)
@@ -719,7 +733,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       : { signals: [], selectors: [] };
 
     // Merge new decoded values with existing ones (preserve values from other mux cases)
-    const existingFrame = decoded.get(frameId);
+    const existingFrame = _decoded.get(frameId);
     const existingSignals = existingFrame?.signals || [];
 
     // Helper to create a unique key for a signal
@@ -754,16 +768,15 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       muxSelectors: muxResult.selectors.length > 0 ? muxResult.selectors : undefined,
     };
 
-    const next = new LRUMap(MAX_DECODED_FRAMES, decoded);
+    // Mutate module-level LRU maps in place (avoids copying 500/2000-entry maps)
     // Store using masked ID to match catalog frame IDs
-    next.set(maskedFrameId, decodedFrame);
+    _decoded.set(maskedFrameId, decodedFrame);
 
     // Also store in per-source map if sourceAddress is provided (from backend or extracted from CAN ID)
-    const nextPerSource = new LRUMap(MAX_DECODED_PER_SOURCE, decodedPerSource);
     if (effectiveSourceAddress !== undefined) {
       // Use masked ID for consistency with decoded map
       const perSourceKey = `${maskedFrameId}:${effectiveSourceAddress}`;
-      nextPerSource.set(perSourceKey, decodedFrame);
+      _decodedPerSource.set(perSourceKey, decodedFrame);
     }
 
     // Accumulate header field values for filter options (persists across frame updates)
@@ -891,7 +904,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       updateValidationEntry(mirrorId, maskedFrameId, mirrorId, false);
     }
 
-    set({ decoded: next, decodedPerSource: nextPerSource, seenHeaderFieldValues: nextSeenValues, mirrorValidation: nextMirrorValidation });
+    set({ decodedVersion: get().decodedVersion + 1, seenHeaderFieldValues: nextSeenValues, mirrorValidation: nextMirrorValidation });
   },
 
   decodeSignalsBatch: (framesToDecode, unmatchedToAdd, filteredToAdd) => {
@@ -899,13 +912,28 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       return;
     }
 
-    const { frames, decoded, decodedPerSource, protocol, canConfig, serialConfig, unmatchedFrames, filteredFrames, seenHeaderFieldValues, streamStartTimeSeconds } = get();
+    const { frames, protocol, canConfig, serialConfig, seenHeaderFieldValues, streamStartTimeSeconds, mirrorSourceMap, mirrorValidation, mirrorFuzzWindowMs } = get();
 
-    // Start with current state, will mutate in place then set once at end
-    const nextDecoded = new LRUMap(MAX_DECODED_FRAMES, decoded);
-    const nextDecodedPerSource = new LRUMap(MAX_DECODED_PER_SOURCE, decodedPerSource);
+    // Mutate module-level LRU maps in place — avoids creating new 500/2000-entry
+    // Maps every 100ms flush, which caused JSC GC pressure that crashed the WebView
+    // after ~2 hours of streaming.
+    const nextDecoded = _decoded;
+    const nextDecodedPerSource = _decodedPerSource;
     const nextSeenValues = new Map(seenHeaderFieldValues);
+    const nextMirrorValidation = new Map(mirrorValidation);
     let newStreamStartTime = streamStartTimeSeconds;
+
+    // Pre-build reverse mirror map: sourceId → mirrorIds[]
+    // Converts per-frame O(mirrorSourceMap.size) scan to O(1) lookup
+    const reverseMirrorMap = new Map<number, number[]>();
+    for (const [mirrorId, sourceId] of mirrorSourceMap) {
+      const existing = reverseMirrorMap.get(sourceId);
+      if (existing) {
+        existing.push(mirrorId);
+      } else {
+        reverseMirrorMap.set(sourceId, [mirrorId]);
+      }
+    }
 
     // Determine default byte order from catalog config
     const defaultByteOrder: 'little' | 'big' =
@@ -924,7 +952,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       signal.muxValue !== undefined ? `${signal.muxValue}:${signal.name}` : signal.name;
 
     // Process all frames to decode
-    for (const { frameId, bytes, sourceAddress } of framesToDecode) {
+    for (const { frameId, bytes, sourceAddress, timestamp } of framesToDecode) {
       // Apply frame_id_mask before catalog lookup
       let maskedFrameId = frameId;
       const headerFields: HeaderFieldValue[] = [];
@@ -1048,60 +1076,147 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
           fieldMap.set(field.value, { display: field.display, count: 1 });
         }
       }
+
+      // Mirror validation: compare bytes between mirror and source frames
+      const mirrorSourceId = mirrorSourceMap.get(maskedFrameId);
+      const mirrorsOfThisSource = reverseMirrorMap.get(maskedFrameId) ?? [];
+
+      if (mirrorSourceId !== undefined || mirrorsOfThisSource.length > 0) {
+        const updateValidationEntry = (validationKey: number, sourceFrameId: number, mirrorFrameId: number, isMirrorFrame: boolean) => {
+          const sourceFrame = frames.get(sourceFrameId);
+          const frameInterval = sourceFrame?.interval ?? canConfig?.default_interval ?? mirrorFuzzWindowMs;
+          const effectiveFuzzWindow = frameInterval * 2;
+
+          let entry = nextMirrorValidation.get(validationKey);
+          if (!entry) {
+            const mirrorFrame = frames.get(mirrorFrameId);
+            const inheritedByteIndices = new Set<number>();
+            if (mirrorFrame) {
+              for (const signal of mirrorFrame.signals) {
+                if (signal._inherited && signal.start_bit !== undefined && signal.bit_length !== undefined) {
+                  const startByte = Math.floor(signal.start_bit / 8);
+                  const endByte = Math.floor((signal.start_bit + signal.bit_length - 1) / 8);
+                  for (let i = startByte; i <= endByte; i++) {
+                    inheritedByteIndices.add(i);
+                  }
+                }
+              }
+            }
+            entry = {
+              sourceFrameId, mirrorFrameId,
+              lastMirrorBytes: [], lastMirrorTimestamp: 0,
+              lastSourceBytes: [], lastSourceTimestamp: 0,
+              isValid: null, timeDeltaMs: 0,
+              inheritedByteIndices,
+              mismatchedByteIndices: new Set(),
+              consecutiveMismatches: 0,
+            };
+          }
+
+          const validationTimestamp = timestamp ?? now;
+          if (isMirrorFrame) {
+            entry.lastMirrorBytes = [...bytes];
+            entry.lastMirrorTimestamp = validationTimestamp;
+          } else {
+            entry.lastSourceBytes = [...bytes];
+            entry.lastSourceTimestamp = validationTimestamp;
+          }
+
+          const timeDelta = Math.abs(entry.lastMirrorTimestamp - entry.lastSourceTimestamp) * 1000;
+          entry.timeDeltaMs = timeDelta;
+
+          if (entry.lastMirrorBytes.length > 0 && entry.lastSourceBytes.length > 0) {
+            if (timeDelta <= effectiveFuzzWindow) {
+              const mismatched = new Set<number>();
+              for (const idx of entry.inheritedByteIndices) {
+                if (entry.lastMirrorBytes[idx] !== entry.lastSourceBytes[idx]) {
+                  mismatched.add(idx);
+                }
+              }
+              entry.mismatchedByteIndices = mismatched;
+
+              if (mismatched.size === 0) {
+                entry.consecutiveMismatches = 0;
+                entry.isValid = true;
+              } else {
+                entry.consecutiveMismatches++;
+                if (entry.consecutiveMismatches >= 3) {
+                  entry.isValid = false;
+                }
+              }
+            }
+          }
+
+          nextMirrorValidation.set(validationKey, entry);
+        };
+
+        if (mirrorSourceId !== undefined) {
+          updateValidationEntry(maskedFrameId, mirrorSourceId, maskedFrameId, true);
+        }
+        for (const mirrorId of mirrorsOfThisSource) {
+          updateValidationEntry(mirrorId, maskedFrameId, mirrorId, false);
+        }
+      }
     }
 
-    // Add unmatched frames (with limit)
-    let nextUnmatched = unmatchedFrames;
+    // Add unmatched frames in place (with limit)
     if (unmatchedToAdd.length > 0) {
-      nextUnmatched = [...unmatchedFrames, ...unmatchedToAdd];
-      if (nextUnmatched.length > MAX_UNMATCHED_FRAMES) {
-        nextUnmatched = nextUnmatched.slice(-MAX_UNMATCHED_FRAMES);
+      _unmatchedFrames.push(...unmatchedToAdd);
+      if (_unmatchedFrames.length > MAX_UNMATCHED_FRAMES) {
+        _unmatchedFrames = _unmatchedFrames.slice(-MAX_UNMATCHED_FRAMES);
       }
     }
 
-    // Add filtered frames (with limit)
-    let nextFiltered = filteredFrames;
+    // Add filtered frames in place (with limit)
     if (filteredToAdd.length > 0) {
-      nextFiltered = [...filteredFrames, ...filteredToAdd];
-      if (nextFiltered.length > MAX_FILTERED_FRAMES) {
-        nextFiltered = nextFiltered.slice(-MAX_FILTERED_FRAMES);
+      _filteredFrames.push(...filteredToAdd);
+      if (_filteredFrames.length > MAX_FILTERED_FRAMES) {
+        _filteredFrames = _filteredFrames.slice(-MAX_FILTERED_FRAMES);
       }
     }
 
-    // Single state update for all changes
+    // Single state update — version counter drives reactivity for decoded/unmatched/filtered
     set({
-      decoded: nextDecoded,
-      decodedPerSource: nextDecodedPerSource,
+      decodedVersion: get().decodedVersion + 1,
       seenHeaderFieldValues: nextSeenValues,
       streamStartTimeSeconds: newStreamStartTime,
-      unmatchedFrames: nextUnmatched,
-      filteredFrames: nextFiltered,
+      mirrorValidation: nextMirrorValidation,
     });
   },
 
   addUnmatchedFrame: (frame) => {
-    const { unmatchedFrames } = get();
-    const newFrames = [...unmatchedFrames, frame];
-    if (newFrames.length > MAX_UNMATCHED_FRAMES) {
-      newFrames.splice(0, newFrames.length - MAX_UNMATCHED_FRAMES);
+    _unmatchedFrames.push(frame);
+    if (_unmatchedFrames.length > MAX_UNMATCHED_FRAMES) {
+      _unmatchedFrames.splice(0, _unmatchedFrames.length - MAX_UNMATCHED_FRAMES);
     }
-    set({ unmatchedFrames: newFrames });
+    set({ decodedVersion: get().decodedVersion + 1 });
   },
 
-  clearUnmatchedFrames: () => set({ unmatchedFrames: [] }),
+  clearUnmatchedFrames: () => {
+    _unmatchedFrames = [];
+    set({ decodedVersion: get().decodedVersion + 1 });
+  },
 
   addFilteredFrame: (frame) => {
-    const { filteredFrames } = get();
-    const newFrames = [...filteredFrames, frame];
-    if (newFrames.length > MAX_FILTERED_FRAMES) {
-      newFrames.splice(0, newFrames.length - MAX_FILTERED_FRAMES);
+    _filteredFrames.push(frame);
+    if (_filteredFrames.length > MAX_FILTERED_FRAMES) {
+      _filteredFrames.splice(0, _filteredFrames.length - MAX_FILTERED_FRAMES);
     }
-    set({ filteredFrames: newFrames });
+    set({ decodedVersion: get().decodedVersion + 1 });
   },
 
-  clearFilteredFrames: () => set({ filteredFrames: [] }),
+  clearFilteredFrames: () => {
+    _filteredFrames = [];
+    set({ decodedVersion: get().decodedVersion + 1 });
+  },
 
-  setIoProfile: (profile) => set({ ioProfile: profile, decoded: new Map(), decodedPerSource: new Map(), unmatchedFrames: [], filteredFrames: [] }),
+  setIoProfile: (profile) => {
+    _decoded = new LRUMap(MAX_DECODED_FRAMES);
+    _decodedPerSource = new LRUMap(MAX_DECODED_PER_SOURCE);
+    _unmatchedFrames = [];
+    _filteredFrames = [];
+    set({ ioProfile: profile, decodedVersion: get().decodedVersion + 1 });
+  },
 
   toggleShowRawBytes: () => set((state) => ({ showRawBytes: !state.showRawBytes })),
   toggleHideUnseen: () => set((state) => ({ hideUnseen: !state.hideUnseen })),

@@ -9,7 +9,7 @@
 // - discoverySerialStore.ts - serial bytes, framing
 // - discoveryToolboxStore.ts - analysis tools, knowledge
 
-import { useDiscoveryFrameStore, type FrameInfo } from './discoveryFrameStore';
+import { useDiscoveryFrameStore, getDiscoveryFrameBuffer, type FrameInfo } from './discoveryFrameStore';
 import { useDiscoveryUIStore, type FrameMetadata, type PlaybackSpeed } from './discoveryUIStore';
 import { useDiscoverySerialStore } from './discoverySerialStore';
 import { useDiscoveryToolboxStore } from './discoveryToolboxStore';
@@ -41,7 +41,7 @@ export type {
 } from './discoveryToolboxStore';
 
 // Re-export sub-stores for direct access
-export { useDiscoveryFrameStore } from './discoveryFrameStore';
+export { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from './discoveryFrameStore';
 export { useDiscoveryUIStore } from './discoveryUIStore';
 export { useDiscoverySerialStore } from './discoverySerialStore';
 export { useDiscoveryToolboxStore } from './discoveryToolboxStore';
@@ -62,8 +62,9 @@ export type TimestampedByte = {
 
 // Combined state type for backward compatibility
 type CombinedDiscoveryState = {
-  // Frame store
+  // Frame store (frames is from mutable buffer, use frameVersion for reactivity)
   frames: FrameMessage[];
+  frameVersion: number;
   frameInfoMap: Map<number, FrameInfo>;
   selectedFrames: Set<number>;
   seenIds: Set<number>;
@@ -204,8 +205,9 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
 
   // Create wrapper actions that coordinate between stores
   const combinedState: CombinedDiscoveryState = {
-    // Frame store state
-    frames: frameStore.frames,
+    // Frame store state (frames is from mutable buffer, frameVersion triggers re-renders)
+    frames: getDiscoveryFrameBuffer(),
+    frameVersion: frameStore.frameVersion,
     frameInfoMap: frameStore.frameInfoMap,
     selectedFrames: frameStore.selectedFrames,
     seenIds: frameStore.seenIds,
@@ -306,8 +308,9 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         }
       }
       // Fall back to frames if no protocol in frameInfoMap
-      if (protocol === 'can' && frameStore.frames.length > 0) {
-        protocol = frameStore.frames[0].protocol || 'can';
+      const frameBuffer = getDiscoveryFrameBuffer();
+      if (protocol === 'can' && frameBuffer.length > 0) {
+        protocol = frameBuffer[0].protocol || 'can';
       }
       // Check serial mode
       if (serialStore.isSerialMode) {
@@ -363,7 +366,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
       } else if (hasStreamingFrames) {
         // Streaming mode: frames are already in mainFrames, just need to update frame info
         // Frames were added via addFrames() during streaming
-        const mainFrames = frameStore.frames;
+        const mainFrames = getDiscoveryFrameBuffer();
         if (mainFrames.length > 0) {
           // Apply extraction configs to update frame IDs/source addresses in the actual frames
           const { frameIdExtractionConfig, sourceExtractionConfig } = serialStore;
@@ -474,7 +477,8 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     // Combined runAnalysis that coordinates between stores
     runAnalysis: async () => {
       const { toolbox } = toolboxStore;
-      const { frames, selectedFrames, bufferMode, frameInfoMap } = frameStore;
+      const { selectedFrames, bufferMode, frameInfoMap } = frameStore;
+      const frames = getDiscoveryFrameBuffer();
       const { framedData, serialBytesBuffer, isSerialMode } = serialStore;
 
       // Handle serial framing analysis separately - only needs raw bytes
