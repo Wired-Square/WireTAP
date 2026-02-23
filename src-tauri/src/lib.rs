@@ -1,5 +1,6 @@
 #[macro_use]
 pub(crate) mod logging;
+mod buffer_db;
 mod buffer_store;
 mod buffers;
 mod catalog;
@@ -842,6 +843,13 @@ pub fn run() {
             // Initialise the centralised store manager
             if let Err(e) = store_manager::initialise(app.handle()) {
                 tlog!("[setup] Failed to initialise store manager: {}", e);
+            }
+
+            // Initialise the SQLite-backed buffer database
+            if let Ok(data_dir) = app.path().app_data_dir() {
+                if let Err(e) = buffer_db::initialise(&data_dir) {
+                    tlog!("[setup] Failed to initialise buffer database: {}", e);
+                }
             }
 
             // Restore dashboard window geometry from persisted state.

@@ -1,10 +1,10 @@
 // ui/src-tauri/src/io/timeline/buffer.rs
 //
-// Buffer Reader - streams CAN data from the shared in-memory buffer.
+// Buffer Reader - streams CAN data from the SQLite-backed buffer store.
 // Used for replaying imported CSV files across all apps.
+// Reads frames in chunks from SQLite instead of loading everything into memory.
 
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, Ordering},
     Arc,
@@ -14,14 +14,14 @@ use tauri::AppHandle;
 
 use super::base::{TimelineControl, TimelineReaderState};
 use crate::io::{emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition};
-use crate::buffer_store;
+use crate::{buffer_db, buffer_store};
 
 /// Sentinel value meaning "no seek requested"
 const NO_SEEK: i64 = i64::MIN;
 /// Sentinel value meaning "no frame seek requested"
 const NO_SEEK_FRAME: i64 = -1;
 
-/// Buffer Reader - streams frames from the shared memory buffer
+/// Buffer Reader - streams frames from the SQLite-backed buffer store
 pub struct BufferReader {
     app: AppHandle,
     /// Common timeline reader state (control, state, session_id, task_handle)
@@ -177,57 +177,6 @@ impl IODevice for BufferReader {
     }
 }
 
-/// Build a snapshot of the most recent frame for each unique frame ID
-/// up to and including the given index. This is used when seeking while paused
-/// to show the decoder what the state would be at that point in time.
-///
-/// The algorithm walks backwards from the seek position, collecting frames until
-/// we've seen all unique frame IDs that appear in the buffer, or we've walked
-/// back far enough (limited by a time window to avoid excessive work).
-fn build_snapshot(frames: &[FrameMessage], up_to_index: usize) -> Vec<FrameMessage> {
-    if frames.is_empty() || up_to_index >= frames.len() {
-        return Vec::new();
-    }
-
-    // First, find all unique frame IDs in the entire buffer
-    let mut all_frame_ids: std::collections::HashSet<u32> = std::collections::HashSet::new();
-    for f in frames.iter() {
-        all_frame_ids.insert(f.frame_id);
-    }
-
-    // Now walk backwards from up_to_index, collecting the most recent instance of each frame ID
-    let mut snapshot: HashMap<u32, FrameMessage> = HashMap::new();
-    let target_time_us = frames[up_to_index].timestamp_us;
-
-    // Walk backwards until we've found all frame IDs or hit the beginning
-    // Limit how far back we look to avoid pathological cases
-    let max_lookback_us: u64 = 120_000_000; // 2 minutes max lookback
-
-    for i in (0..=up_to_index).rev() {
-        let frame = &frames[i];
-
-        // Stop if we've gone back too far in time
-        if target_time_us > frame.timestamp_us
-            && target_time_us - frame.timestamp_us > max_lookback_us
-        {
-            break;
-        }
-
-        // Only keep the first (most recent) occurrence of each frame ID
-        snapshot.entry(frame.frame_id).or_insert_with(|| frame.clone());
-
-        // Early exit if we've found all frame IDs
-        if snapshot.len() == all_frame_ids.len() {
-            break;
-        }
-    }
-
-    // Convert to Vec, sorted by frame_id for consistent ordering
-    let mut result: Vec<FrameMessage> = snapshot.into_values().collect();
-    result.sort_by_key(|f| f.frame_id);
-    result
-}
-
 /// Step one frame forward or backward from the given timestamp.
 /// Returns the new timestamp after stepping, or None if at the boundary.
 /// Also emits the frame and a snapshot via events.
@@ -246,85 +195,75 @@ pub fn step_frame(
     backward: bool,
     filter_frame_ids: Option<&[u32]>,
 ) -> Result<Option<StepResult>, String> {
-    let frames = buffer_store::get_frames();
-    if frames.is_empty() {
+    let buf_id = buffer_store::find_frame_buffer_id()
+        .ok_or_else(|| "No frame buffer found".to_string())?;
+
+    let total_frames = buffer_store::get_buffer_count(&buf_id);
+    if total_frames == 0 {
         return Err("Buffer is empty".to_string());
     }
 
-    // Determine current index: use provided index, or find it from timestamp
-    let current_idx = if let Some(idx) = current_frame_index {
-        idx.min(frames.len().saturating_sub(1))
+    // Determine current rowid from frame index or timestamp
+    let current_rowid = if let Some(idx) = current_frame_index {
+        let clamped = idx.min(total_frames.saturating_sub(1));
+        match buffer_db::get_frame_at_index(&buf_id, clamped)? {
+            Some((rowid, _)) => rowid,
+            None => return Err("Frame index out of bounds".to_string()),
+        }
     } else if let Some(ts) = current_timestamp_us {
-        // Find frame index from timestamp using binary search
-        frames
-            .binary_search_by(|f| (f.timestamp_us as i64).cmp(&ts))
-            .unwrap_or_else(|i| i.min(frames.len().saturating_sub(1)))
+        match buffer_db::find_rowid_for_timestamp(&buf_id, ts as u64)? {
+            Some(rowid) => rowid,
+            None => {
+                // Fallback to start or end
+                let idx = if backward { total_frames.saturating_sub(1) } else { 0 };
+                match buffer_db::get_frame_at_index(&buf_id, idx)? {
+                    Some((rowid, _)) => rowid,
+                    None => return Err("Buffer empty".to_string()),
+                }
+            }
+        }
     } else {
         // No position info - start from beginning or end depending on direction
-        if backward { frames.len().saturating_sub(1) } else { 0 }
+        let idx = if backward { total_frames.saturating_sub(1) } else { 0 };
+        match buffer_db::get_frame_at_index(&buf_id, idx)? {
+            Some((rowid, _)) => rowid,
+            None => return Err("Buffer empty".to_string()),
+        }
     };
 
-    // Convert filter to a HashSet for fast lookup (if provided)
-    let filter_set: Option<std::collections::HashSet<u32>> = filter_frame_ids.map(|ids| ids.iter().copied().collect());
+    // Find next/prev frame using targeted SQLite query
+    let filter = filter_frame_ids.unwrap_or(&[]);
+    match buffer_db::get_next_filtered_frame(&buf_id, current_rowid, filter, backward)? {
+        Some((_, new_idx, frame)) => {
+            let new_timestamp_us = frame.timestamp_us as i64;
 
-    // Step through frames until we find one that matches the filter
-    let new_idx = if backward {
-        // Step backward, skipping frames that don't match the filter
-        let mut idx = current_idx;
-        loop {
-            if idx == 0 {
-                return Ok(None); // Already at the beginning
-            }
-            idx -= 1;
-            // If no filter, or frame matches filter, we found our target
-            if filter_set.as_ref().map_or(true, |set| set.contains(&frames[idx].frame_id)) {
-                break;
-            }
+            tlog!(
+                "[Buffer:{}] Step {} from rowid {} to frame {} (timestamp {}us, frame_id=0x{:X})",
+                session_id,
+                if backward { "backward" } else { "forward" },
+                current_rowid,
+                new_idx,
+                new_timestamp_us,
+                frame.frame_id
+            );
+
+            // Emit only the single stepped-to frame (not a full snapshot)
+            emit_frames(app, session_id, vec![frame]);
+
+            // Emit the new playback position
+            emit_to_session(app, "playback-time", session_id, PlaybackPosition {
+                timestamp_us: new_timestamp_us,
+                frame_index: new_idx,
+                frame_count: Some(total_frames),
+            });
+
+            Ok(Some(StepResult {
+                frame_index: new_idx,
+                timestamp_us: new_timestamp_us,
+            }))
         }
-        idx
-    } else {
-        // Step forward, skipping frames that don't match the filter
-        let mut idx = current_idx;
-        loop {
-            if idx >= frames.len() - 1 {
-                return Ok(None); // Already at the end
-            }
-            idx += 1;
-            // If no filter, or frame matches filter, we found our target
-            if filter_set.as_ref().map_or(true, |set| set.contains(&frames[idx].frame_id)) {
-                break;
-            }
-        }
-        idx
-    };
-
-    let frame = &frames[new_idx];
-    let new_timestamp_us = frame.timestamp_us as i64;
-
-    tlog!(
-        "[Buffer:{}] Step {} from frame {} to frame {} (timestamp {}us, frame_id=0x{:X})",
-        session_id,
-        if backward { "backward" } else { "forward" },
-        current_idx,
-        new_idx,
-        new_timestamp_us,
-        frame.frame_id
-    );
-
-    // Emit only the single stepped-to frame (not a full snapshot)
-    emit_frames(app, session_id, vec![frame.clone()]);
-
-    // Emit the new playback position
-    emit_to_session(app, "playback-time", session_id, PlaybackPosition {
-        timestamp_us: new_timestamp_us,
-        frame_index: new_idx,
-        frame_count: Some(frames.len()),
-    });
-
-    Ok(Some(StepResult {
-        frame_index: new_idx,
-        timestamp_us: new_timestamp_us,
-    }))
+        None => Ok(None), // At boundary
+    }
 }
 
 /// Spawn a buffer reader task
@@ -342,6 +281,169 @@ fn spawn_buffer_stream(
     })
 }
 
+/// Resolve the buffer ID to use for streaming.
+fn resolve_buffer_id(buffer_id: &Option<String>) -> Option<String> {
+    if let Some(id) = buffer_id {
+        Some(id.clone())
+    } else {
+        buffer_store::find_frame_buffer_id()
+    }
+}
+
+/// Load a chunk of frames from SQLite for the current playback direction.
+fn load_chunk(
+    buf_id: &str,
+    boundary_rowid: i64,
+    chunk_size: usize,
+    reverse: bool,
+) -> Vec<(i64, FrameMessage)> {
+    let result = if reverse {
+        buffer_db::read_frame_chunk_reverse(buf_id, boundary_rowid, chunk_size)
+    } else {
+        buffer_db::read_frame_chunk(buf_id, boundary_rowid, chunk_size)
+    };
+    result.unwrap_or_default()
+}
+
+/// Handle a seek operation (frame-based or timestamp-based).
+/// Returns true if a seek was handled.
+fn handle_seek(
+    app_handle: &AppHandle,
+    session_id: &str,
+    buf_id: &str,
+    total_frames: usize,
+    seek_target_frame: &AtomicI64,
+    seek_target_us: &AtomicI64,
+    control: &TimelineControl,
+    chunk: &mut Vec<(i64, FrameMessage)>,
+    chunk_idx: &mut usize,
+    frame_index: &mut usize,
+    last_consumed_rowid: &mut i64,
+    batch_buffer: &mut Vec<FrameMessage>,
+    playback_baseline_secs: &mut f64,
+    wall_clock_baseline: &mut std::time::Instant,
+    last_frame_time_secs: &mut Option<f64>,
+) -> bool {
+    // Check for frame-based seek (takes priority)
+    let seek_frame = seek_target_frame.load(Ordering::Relaxed);
+    if seek_frame != NO_SEEK_FRAME {
+        seek_target_frame.store(NO_SEEK_FRAME, Ordering::Relaxed);
+        let target_idx = (seek_frame as usize).min(total_frames.saturating_sub(1));
+        let is_paused = control.is_paused();
+
+        tlog!(
+            "[Buffer:{}] Seeking to frame {} (by index, paused={})",
+            session_id, target_idx, is_paused
+        );
+
+        if let Ok(Some((rowid, frame))) = buffer_db::get_frame_at_index(buf_id, target_idx) {
+            *frame_index = target_idx;
+            *last_consumed_rowid = rowid;
+
+            // Reload chunk from seek position
+            let is_reverse = control.is_reverse();
+            *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, 2000, is_reverse);
+            *chunk_idx = 0;
+
+            // Flush pending batch
+            if !batch_buffer.is_empty() {
+                emit_to_session(app_handle, "frame-message", session_id, batch_buffer.clone());
+                batch_buffer.clear();
+            }
+
+            // Reset timing baselines
+            let seek_time_secs = frame.timestamp_us as f64 / 1_000_000.0;
+            *playback_baseline_secs = seek_time_secs;
+            *wall_clock_baseline = std::time::Instant::now();
+            *last_frame_time_secs = None;
+
+            emit_to_session(app_handle, "playback-time", session_id, PlaybackPosition {
+                timestamp_us: frame.timestamp_us as i64,
+                frame_index: target_idx,
+                frame_count: Some(total_frames),
+            });
+
+            // When paused, emit a snapshot of the most recent frame for each frame ID
+            if is_paused {
+                let min_ts = frame.timestamp_us.saturating_sub(120_000_000);
+                if let Ok(snapshot) = buffer_db::build_snapshot(buf_id, rowid, min_ts) {
+                    if !snapshot.is_empty() {
+                        tlog!(
+                            "[Buffer:{}] Emitting snapshot of {} unique frames at seek position",
+                            session_id, snapshot.len()
+                        );
+                        emit_frames(app_handle, session_id, snapshot);
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // Check for timestamp-based seek
+    let seek_target = seek_target_us.load(Ordering::Relaxed);
+    if seek_target != NO_SEEK {
+        seek_target_us.store(NO_SEEK, Ordering::Relaxed);
+        let is_paused = control.is_paused();
+
+        if let Ok(Some(rowid)) = buffer_db::find_rowid_for_timestamp(buf_id, seek_target as u64) {
+            // Compute 0-based frame index for this rowid
+            let target_idx = buffer_db::count_frames_before_rowid(buf_id, rowid).unwrap_or(0);
+
+            tlog!(
+                "[Buffer:{}] Seeking to frame {} (timestamp {}us, paused={})",
+                session_id, target_idx, seek_target, is_paused
+            );
+
+            *frame_index = target_idx;
+            *last_consumed_rowid = rowid;
+
+            // Reload chunk from seek position
+            let is_reverse = control.is_reverse();
+            *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, 2000, is_reverse);
+            *chunk_idx = 0;
+
+            // Flush pending batch
+            if !batch_buffer.is_empty() {
+                emit_to_session(app_handle, "frame-message", session_id, batch_buffer.clone());
+                batch_buffer.clear();
+            }
+
+            // Get frame at this rowid for timing info
+            if let Some((_, ref frame)) = chunk.first() {
+                let seek_time_secs = frame.timestamp_us as f64 / 1_000_000.0;
+                *playback_baseline_secs = seek_time_secs;
+                *wall_clock_baseline = std::time::Instant::now();
+                *last_frame_time_secs = None;
+
+                emit_to_session(app_handle, "playback-time", session_id, PlaybackPosition {
+                    timestamp_us: frame.timestamp_us as i64,
+                    frame_index: target_idx,
+                    frame_count: Some(total_frames),
+                });
+
+                if is_paused {
+                    let min_ts = frame.timestamp_us.saturating_sub(120_000_000);
+                    if let Ok(snapshot) = buffer_db::build_snapshot(buf_id, rowid, min_ts) {
+                        if !snapshot.is_empty() {
+                            tlog!(
+                                "[Buffer:{}] Emitting snapshot of {} unique frames at seek position",
+                                session_id, snapshot.len()
+                            );
+                            emit_frames(app_handle, session_id, snapshot);
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    false
+}
+
 async fn run_buffer_stream(
     app_handle: AppHandle,
     session_id: String,
@@ -351,13 +453,22 @@ async fn run_buffer_stream(
     completed_flag: Arc<AtomicBool>,
     buffer_id: Option<String>,
 ) {
-    // Get frames from the specific buffer (if ID provided) or the active buffer
-    let frames = if let Some(ref id) = buffer_id {
-        buffer_store::get_frames_by_id(id)
-    } else {
-        buffer_store::get_frames()
+    // Resolve which buffer to read from
+    let buf_id = match resolve_buffer_id(&buffer_id) {
+        Some(id) => id,
+        None => {
+            emit_to_session(
+                &app_handle,
+                "session-error",
+                &session_id,
+                "No frame buffer found".to_string(),
+            );
+            return;
+        }
     };
-    if frames.is_empty() {
+
+    let total_frames = buffer_store::get_buffer_count(&buf_id);
+    if total_frames == 0 {
         emit_to_session(
             &app_handle,
             "session-error",
@@ -367,19 +478,33 @@ async fn run_buffer_stream(
         return;
     }
 
+    let (min_rowid, max_rowid) = match buffer_db::get_rowid_range(&buf_id) {
+        Ok(Some(range)) => range,
+        _ => {
+            emit_to_session(
+                &app_handle,
+                "session-error",
+                &session_id,
+                "Buffer has no data".to_string(),
+            );
+            return;
+        }
+    };
+
     let metadata = buffer_store::get_metadata();
     let initial_speed = control.read_speed();
     let initial_pacing = control.is_pacing_enabled();
     tlog!(
         "[Buffer:{}] Starting stream (frames: {}, speed: {}x, pacing: {}, source: '{}')",
         session_id,
-        frames.len(),
+        total_frames,
         initial_speed,
         initial_pacing,
         metadata.as_ref().map(|m| m.name.as_str()).unwrap_or("unknown")
     );
 
     // Streaming constants
+    const CHUNK_SIZE: usize = 2000;
     const HIGH_SPEED_BATCH_SIZE: usize = 50;
     const MIN_DELAY_MS: f64 = 1.0;
     const PACING_INTERVAL_MS: u64 = 50;
@@ -391,11 +516,22 @@ async fn run_buffer_stream(
     let mut total_wait_ms = 0u64;
     let mut wait_count = 0u64;
 
+    // Chunk state - frames loaded from SQLite
+    let mut chunk: Vec<(i64, FrameMessage)> = load_chunk(&buf_id, min_rowid - 1, CHUNK_SIZE, false);
+    let mut chunk_idx: usize = 0;
+    let mut last_consumed_rowid: i64 = min_rowid - 1;
+    if chunk.is_empty() {
+        emit_to_session(
+            &app_handle,
+            "session-error",
+            &session_id,
+            "Buffer is empty".to_string(),
+        );
+        return;
+    }
+
     // Get stream start time from first frame
-    let stream_start_secs = frames
-        .first()
-        .map(|f| f.timestamp_us as f64 / 1_000_000.0)
-        .unwrap_or(0.0);
+    let stream_start_secs = chunk[0].1.timestamp_us as f64 / 1_000_000.0;
 
     let mut last_frame_time_secs: Option<f64> = None;
     let mut batch_buffer: Vec<FrameMessage> = Vec::new();
@@ -412,152 +548,24 @@ async fn run_buffer_stream(
         session_id, stream_start_secs, last_reverse
     );
 
-    // Loop condition: check bounds based on direction
-    // Forward: frame_index < frames.len()
-    // Reverse: frame_index > 0 (we decrement after processing, so we check > 0)
-    // We use a unified loop that checks both conditions and exits appropriately
     loop {
-        let is_reverse = control.is_reverse();
-
-        // Check if we've reached the end (based on direction)
-        let at_end = if is_reverse {
-            frame_index == 0
-        } else {
-            frame_index >= frames.len()
-        };
-
-        if at_end {
-            break;
-        }
         // Check if cancelled
         if control.is_cancelled() {
             tlog!(
-                "[Buffer:{}] Stream cancelled, stopping immediately ({} remaining frames)",
-                session_id,
-                frames.len() - frame_index
+                "[Buffer:{}] Stream cancelled, stopping immediately",
+                session_id
             );
             break;
         }
 
-        // Check for frame-based seek request FIRST (takes priority over timestamp seek)
-        let seek_frame = seek_target_frame.load(Ordering::Relaxed);
-        if seek_frame != NO_SEEK_FRAME {
-            // Clear the seek request
-            seek_target_frame.store(NO_SEEK_FRAME, Ordering::Relaxed);
-
-            // Clamp to valid range
-            let target_idx = (seek_frame as usize).min(frames.len().saturating_sub(1));
-
-            let is_paused = control.is_paused();
-            tlog!(
-                "[Buffer:{}] Seeking to frame {} (by index, paused={})",
-                session_id, target_idx, is_paused
-            );
-
-            frame_index = target_idx;
-
-            // Flush any pending batch
-            if !batch_buffer.is_empty() {
-                emit_to_session(
-                    &app_handle,
-                    "frame-message",
-                    &session_id,
-                    batch_buffer.clone(),
-                );
-                batch_buffer.clear();
-            }
-
-            // Reset timing baselines after seek
-            if let Some(f) = frames.get(target_idx) {
-                let seek_time_secs = f.timestamp_us as f64 / 1_000_000.0;
-                playback_baseline_secs = seek_time_secs;
-                wall_clock_baseline = std::time::Instant::now();
-                last_frame_time_secs = None;
-
-                // Emit the new playback position
-                emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
-                    timestamp_us: f.timestamp_us as i64,
-                    frame_index: target_idx,
-                    frame_count: Some(frames.len()),
-                });
-
-                // When paused, emit a snapshot of the most recent frame for each frame ID
-                if is_paused {
-                    let snapshot = build_snapshot(&frames, target_idx);
-                    if !snapshot.is_empty() {
-                        tlog!(
-                            "[Buffer:{}] Emitting snapshot of {} unique frames at seek position",
-                            session_id,
-                            snapshot.len()
-                        );
-                        emit_frames(&app_handle, &session_id, snapshot);
-                    }
-                }
-            }
-
-            continue;
-        }
-
-        // Check for timestamp-based seek request (fallback for backwards compatibility)
-        let seek_target = seek_target_us.load(Ordering::Relaxed);
-        if seek_target != NO_SEEK {
-            // Clear the seek request
-            seek_target_us.store(NO_SEEK, Ordering::Relaxed);
-
-            // Binary search to find the frame closest to the target timestamp
-            let target_idx = frames
-                .binary_search_by(|f| (f.timestamp_us as i64).cmp(&seek_target))
-                .unwrap_or_else(|i| i.min(frames.len().saturating_sub(1)));
-
-            let is_paused = control.is_paused();
-            tlog!(
-                "[Buffer:{}] Seeking to frame {} (timestamp {}us, paused={})",
-                session_id, target_idx, seek_target, is_paused
-            );
-
-            frame_index = target_idx;
-
-            // Flush any pending batch
-            if !batch_buffer.is_empty() {
-                emit_to_session(
-                    &app_handle,
-                    "frame-message",
-                    &session_id,
-                    batch_buffer.clone(),
-                );
-                batch_buffer.clear();
-            }
-
-            // Reset timing baselines after seek
-            if let Some(f) = frames.get(target_idx) {
-                let seek_time_secs = f.timestamp_us as f64 / 1_000_000.0;
-                playback_baseline_secs = seek_time_secs;
-                wall_clock_baseline = std::time::Instant::now();
-                last_frame_time_secs = None;
-
-                // Emit the new playback position
-                emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
-                    timestamp_us: f.timestamp_us as i64,
-                    frame_index: target_idx,
-                    frame_count: Some(frames.len()),
-                });
-
-                // When paused, emit a snapshot of the most recent frame for each frame ID
-                // up to and including the seek position. This allows the decoder to show
-                // the state at this point in time.
-                if is_paused {
-                    let snapshot = build_snapshot(&frames, target_idx);
-                    if !snapshot.is_empty() {
-                        tlog!(
-                            "[Buffer:{}] Emitting snapshot of {} unique frames at seek position",
-                            session_id,
-                            snapshot.len()
-                        );
-                        emit_frames(&app_handle, &session_id, snapshot);
-                    }
-                }
-            }
-
+        // Handle seek requests (frame-based and timestamp-based)
+        if handle_seek(
+            &app_handle, &session_id, &buf_id, total_frames,
+            &seek_target_frame, &seek_target_us, &control,
+            &mut chunk, &mut chunk_idx, &mut frame_index, &mut last_consumed_rowid,
+            &mut batch_buffer, &mut playback_baseline_secs, &mut wall_clock_baseline,
+            &mut last_frame_time_secs,
+        ) {
             continue;
         }
 
@@ -567,37 +575,59 @@ async fn run_buffer_stream(
             continue;
         }
 
-        // Get current frame (for reverse, decrement first to get the frame at index-1)
-        let actual_index = if is_reverse {
-            frame_index - 1
-        } else {
-            frame_index
-        };
-        let frame = frames[actual_index].clone();
+        let is_reverse = control.is_reverse();
 
-        // Update index for next iteration
-        if is_reverse {
-            frame_index = frame_index.saturating_sub(1);
-        } else {
-            frame_index += 1;
-        }
-
-        let is_pacing = control.is_pacing_enabled();
-        let current_speed = control.read_speed();
-
-        // Check for direction change and reset timing baseline
+        // Handle direction change: reload chunk from current position
         if is_reverse != last_reverse {
             tlog!(
                 "[Buffer:{}] Direction changed to {}",
                 session_id,
                 if is_reverse { "reverse" } else { "forward" }
             );
+
+            // Reload chunk from the last consumed position in the new direction
+            chunk = load_chunk(
+                &buf_id,
+                last_consumed_rowid,
+                CHUNK_SIZE,
+                is_reverse,
+            );
+            chunk_idx = 0;
+
+            // Reset timing baseline
             if let Some(last_time) = last_frame_time_secs {
                 playback_baseline_secs = last_time;
                 wall_clock_baseline = std::time::Instant::now();
             }
             last_reverse = is_reverse;
         }
+
+        // Load next chunk if current one is exhausted
+        if chunk_idx >= chunk.len() {
+            let boundary = if is_reverse {
+                // In reverse, chunk is in DESC order — last element has the smallest rowid
+                chunk.last().map(|(r, _)| *r).unwrap_or(min_rowid)
+            } else {
+                // In forward, chunk is in ASC order — last element has the largest rowid
+                chunk.last().map(|(r, _)| *r).unwrap_or(max_rowid)
+            };
+            chunk = load_chunk(&buf_id, boundary, CHUNK_SIZE, is_reverse);
+            chunk_idx = 0;
+
+            if chunk.is_empty() {
+                break; // End of buffer
+            }
+        }
+
+        // Get current frame from chunk
+        let (rowid, frame) = chunk[chunk_idx].clone();
+        chunk_idx += 1;
+        last_consumed_rowid = rowid;
+
+        let actual_index = frame_index;
+
+        let is_pacing = control.is_pacing_enabled();
+        let current_speed = control.read_speed();
 
         // Check for speed change and reset timing baseline
         if is_pacing && (current_speed - last_speed).abs() > 0.001 {
@@ -634,6 +664,13 @@ async fn run_buffer_stream(
             total_emitted += 1;
             last_frame_time_secs = Some(frame_time_secs);
 
+            // Update frame_index
+            if is_reverse {
+                frame_index = frame_index.saturating_sub(1);
+            } else {
+                frame_index += 1;
+            }
+
             if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
                 emit_frames(&app_handle, &session_id, batch_buffer.clone());
                 batch_buffer.clear();
@@ -641,7 +678,7 @@ async fn run_buffer_stream(
                 emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
                     timestamp_us: playback_time_us,
                     frame_index: actual_index,
-                    frame_count: Some(frames.len()),
+                    frame_count: Some(total_frames),
                 });
 
                 tokio::time::sleep(Duration::from_millis(NO_LIMIT_YIELD_MS)).await;
@@ -664,6 +701,13 @@ async fn run_buffer_stream(
             // High-speed mode: batch frames
             batch_buffer.push(frame);
             total_emitted += 1;
+
+            // Update frame_index
+            if is_reverse {
+                frame_index = frame_index.saturating_sub(1);
+            } else {
+                frame_index += 1;
+            }
 
             let time_since_pacing = last_pacing_check.elapsed().as_millis() as u64;
             let should_emit = batch_buffer.len() >= HIGH_SPEED_BATCH_SIZE
@@ -692,7 +736,7 @@ async fn run_buffer_stream(
                 emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
                     timestamp_us: playback_time_us,
                     frame_index: actual_index,
-                    frame_count: Some(frames.len()),
+                    frame_count: Some(total_frames),
                 });
 
                 tokio::task::yield_now().await;
@@ -714,23 +758,30 @@ async fn run_buffer_stream(
 
             // Re-check pause after sleeping
             if control.is_paused() {
-                frame_index -= 1; // Re-process this frame after resume
+                chunk_idx -= 1; // Re-process this frame after resume
                 continue;
             }
 
-            // Emit single frame with active listener filtering
+            // Emit single frame
             emit_frames(&app_handle, &session_id, vec![frame]);
             total_emitted += 1;
+
+            // Update frame_index
+            if is_reverse {
+                frame_index = frame_index.saturating_sub(1);
+            } else {
+                frame_index += 1;
+            }
 
             emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
                 timestamp_us: playback_time_us,
                 frame_index: actual_index,
-                frame_count: Some(frames.len()),
+                frame_count: Some(total_frames),
             });
         }
     }
 
-    // Emit any remaining frames in batch buffer with active listener filtering
+    // Emit any remaining frames in batch buffer
     if !batch_buffer.is_empty() {
         emit_frames(&app_handle, &session_id, batch_buffer);
     }
