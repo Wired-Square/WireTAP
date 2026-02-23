@@ -16,6 +16,7 @@ import type { FrameMessage } from "../../types/frame";
 import type { PlaybackPosition } from "../../api/io";
 import type { CatalogMetadata } from "../../api/catalog";
 import { listCatalogs } from "../../api/catalog";
+import { listBuffers, type BufferMetadata } from "../../api/buffer";
 import { resolveDefaultCatalogPath } from "../../utils/catalogUtils";
 import { getFavoritesForProfile, type TimeRangeFavorite } from "../../utils/favorites";
 import { loadCatalog } from "../../utils/catalogParser";
@@ -54,6 +55,24 @@ export default function Query() {
 
   // Favourites state (bookmarks)
   const [favourites, setFavourites] = useState<TimeRangeFavorite[]>([]);
+
+  // Buffer sources state
+  const [buffers, setBuffers] = useState<BufferMetadata[]>([]);
+  const [selectedBufferId, setSelectedBufferId] = useState<string | null>(null);
+
+  // Load available buffers on mount
+  useEffect(() => {
+    const loadBuffers = async () => {
+      try {
+        const all = await listBuffers();
+        // Only show frame buffers with data
+        setBuffers(all.filter((b) => b.buffer_type === "frames" && b.count > 0));
+      } catch (e) {
+        console.error("Failed to load buffers:", e);
+      }
+    };
+    loadBuffers();
+  }, []);
 
   // Time bounds state (for query filtering)
   const [timeBounds, setTimeBounds] = useState<TimeBounds>({
@@ -174,6 +193,16 @@ export default function Query() {
     capabilities,
     session,
   } = manager;
+
+  // Determine active source — postgres profile or buffer (mutually exclusive)
+  const hasSource = !!sourceProfileId || !!selectedBufferId;
+
+  // Clear buffer selection when a postgres profile is selected, and vice versa
+  useEffect(() => {
+    if (sourceProfileId && selectedBufferId) {
+      setSelectedBufferId(null);
+    }
+  }, [sourceProfileId, selectedBufferId]);
 
   // Load favourites when source profile changes
   useEffect(() => {
@@ -303,11 +332,12 @@ export default function Query() {
     [queueCount, pendingCount, selectedQueryResultCount]
   );
 
-  // Protocol badge for PostgreSQL
-  const protocolBadges: ProtocolBadge[] = useMemo(
-    () => (sourceProfileId ? [{ label: "PostgreSQL", color: "blue" as const }] : []),
-    [sourceProfileId]
-  );
+  // Protocol badge for data source
+  const protocolBadges: ProtocolBadge[] = useMemo(() => {
+    if (selectedBufferId) return [{ label: "Buffer", color: "amber" as const }];
+    if (sourceProfileId) return [{ label: "PostgreSQL", color: "blue" as const }];
+    return [];
+  }, [sourceProfileId, selectedBufferId]);
 
   return (
     <AppLayout
@@ -321,7 +351,7 @@ export default function Query() {
           defaultCatalogFilename={settings?.default_catalog}
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
-          isStreaming={isStreaming || sourceProfileId !== null}
+          isStreaming={isStreaming || hasSource}
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
           onStop={handlers.handleStopWatch}
@@ -337,16 +367,19 @@ export default function Query() {
         onTabChange={setActiveTab}
         protocolLabel="DB"
         protocolBadges={protocolBadges}
-        isStreaming={isStreaming || sourceProfileId !== null}
+        isStreaming={isStreaming || hasSource}
         contentArea={{ className: "p-0" }}
       >
         {activeTab === "query" && (
           <QueryBuilderPanel
             profileId={sourceProfileId}
-            disabled={!sourceProfileId}
+            bufferId={selectedBufferId}
+            disabled={!hasSource}
             favourites={favourites}
             timeBounds={timeBounds}
             onTimeBoundsChange={handleTimeBoundsChangeWrapper}
+            buffers={buffers}
+            onSelectBuffer={setSelectedBufferId}
           />
         )}
         {activeTab === "queue" && (
@@ -364,7 +397,15 @@ export default function Query() {
             onBookmark={handleBookmarkQueryWrapper}
           />
         )}
-        {activeTab === "stats" && <StatsPanel profileId={sourceProfileId} />}
+        {activeTab === "stats" && (
+          selectedBufferId
+            ? <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <p className="text-xs text-[color:var(--text-muted)]">
+                  Stats are only available for PostgreSQL sources.
+                </p>
+              </div>
+            : <StatsPanel profileId={sourceProfileId} />
+        )}
       </AppTabView>
 
       {/* IO Reader Picker Dialog - connect mode for database selection */}

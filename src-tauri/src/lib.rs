@@ -1,6 +1,7 @@
 #[macro_use]
 pub(crate) mod logging;
 mod buffer_db;
+mod bufferquery;
 mod buffer_store;
 mod buffers;
 mod catalog;
@@ -847,7 +848,10 @@ pub fn run() {
 
             // Initialise the SQLite-backed buffer database
             if let Ok(data_dir) = app.path().app_data_dir() {
-                if let Err(e) = buffer_db::initialise(&data_dir) {
+                let clear_on_start = settings::load_settings_sync(app.handle())
+                    .map(|s| s.clear_buffers_on_start)
+                    .unwrap_or(true);
+                if let Err(e) = buffer_db::initialise(&data_dir, clear_on_start) {
                     tlog!("[setup] Failed to initialise buffer database: {}", e);
                 }
             }
@@ -1074,6 +1078,9 @@ pub fn run() {
             dbquery::db_query_activity,
             dbquery::db_cancel_backend,
             dbquery::db_terminate_backend,
+            bufferquery::buffer_query_byte_changes,
+            bufferquery::buffer_query_frame_changes,
+            bufferquery::buffer_query_mirror_validation,
         ]);
 
     // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)

@@ -26,7 +26,7 @@ import {
 } from '../../../utils/graphLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
+export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "buffers" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
 export interface DirectoryValidation {
@@ -134,6 +134,8 @@ interface AppSettings {
   // Privacy / telemetry
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
+  // Buffer persistence
+  clear_buffers_on_start?: boolean;
 }
 
 // Dialog types
@@ -285,13 +287,18 @@ interface SettingsState {
     themeColours: ThemeColours;
   };
 
+  // Buffer settings
+  buffers: {
+    clearBuffersOnStart: boolean;
+    discoveryHistoryBuffer: number;
+    queryResultLimit: number;
+    graphBufferSize: number;
+  };
+
   // General settings
   general: {
-    discoveryHistoryBuffer: number;
     defaultFrameType: DefaultFrameType;
-    queryResultLimit: number;
     sessionManagerStatsInterval: number;
-    graphBufferSize: number;
     preventIdleSleep: boolean;
     keepDisplayAwake: boolean;
     logLevel: string;
@@ -365,12 +372,15 @@ interface SettingsState {
   setThemeColour: (key: keyof ThemeColours, colour: string) => void;
   resetThemeColours: () => void;
 
-  // Actions - General
+  // Actions - Buffers
+  setClearBuffersOnStart: (value: boolean) => void;
   setDiscoveryHistoryBuffer: (buffer: number) => void;
-  setDefaultFrameType: (type: DefaultFrameType) => void;
   setQueryResultLimit: (limit: number) => void;
-  setSessionManagerStatsInterval: (interval: number) => void;
   setGraphBufferSize: (size: number) => void;
+
+  // Actions - General
+  setDefaultFrameType: (type: DefaultFrameType) => void;
+  setSessionManagerStatsInterval: (interval: number) => void;
   setPreventIdleSleep: (value: boolean) => void;
   setKeepDisplayAwake: (value: boolean) => void;
   setLogLevel: (value: string) => void;
@@ -432,12 +442,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     themeColours: { ...defaultThemeColours },
   },
 
-  general: {
+  buffers: {
+    clearBuffersOnStart: true,
     discoveryHistoryBuffer: 100000,
-    defaultFrameType: 'can',
     queryResultLimit: 10000,
-    sessionManagerStatsInterval: 60,
     graphBufferSize: 10000,
+  },
+
+  general: {
+    defaultFrameType: 'can',
+    sessionManagerStatsInterval: 60,
     preventIdleSleep: true,
     keepDisplayAwake: false,
     logLevel: "off",
@@ -541,6 +555,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Privacy / telemetry
         telemetry_enabled: settings.telemetry_enabled ?? false,
         telemetry_consent_given: settings.telemetry_consent_given ?? false,
+        // Buffer persistence
+        clear_buffers_on_start: settings.clear_buffers_on_start ?? true,
       };
 
       set({
@@ -600,12 +616,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             accentWarning: normalized.theme_accent_warning || defaultThemeColours.accentWarning,
           },
         },
-        general: {
+        buffers: {
+          clearBuffersOnStart: normalized.clear_buffers_on_start ?? true,
           discoveryHistoryBuffer: normalized.discovery_history_buffer ?? 100000,
-          defaultFrameType: normalized.default_frame_type ?? 'can',
           queryResultLimit: normalized.query_result_limit ?? 10000,
-          sessionManagerStatsInterval: normalized.session_manager_stats_interval ?? 60,
           graphBufferSize: normalized.graph_buffer_size ?? 10000,
+        },
+        general: {
+          defaultFrameType: normalized.default_frame_type ?? 'can',
+          sessionManagerStatsInterval: normalized.session_manager_stats_interval ?? 60,
           preventIdleSleep: normalized.prevent_idle_sleep ?? true,
           keepDisplayAwake: normalized.keep_display_awake ?? false,
           logLevel: normalized.log_level ?? "off",
@@ -679,7 +698,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (!get().hasUnsavedChanges()) return;
 
     try {
-      const { locations, ioProfiles, catalogs, display, general } = get();
+      const { locations, ioProfiles, catalogs, display, buffers, general } = get();
 
       const settings = {
         config_path: locations.configPath,
@@ -702,10 +721,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_one_colour: display.binaryOneColour,
         binary_zero_colour: display.binaryZeroColour,
         binary_unused_colour: display.binaryUnusedColour,
-        discovery_history_buffer: general.discoveryHistoryBuffer,
-        query_result_limit: general.queryResultLimit,
+        // Buffers
+        clear_buffers_on_start: buffers.clearBuffersOnStart,
+        discovery_history_buffer: buffers.discoveryHistoryBuffer,
+        query_result_limit: buffers.queryResultLimit,
+        graph_buffer_size: buffers.graphBufferSize,
         session_manager_stats_interval: general.sessionManagerStatsInterval,
-        graph_buffer_size: general.graphBufferSize,
         // Power management
         prevent_idle_sleep: general.preventIdleSleep,
         keep_display_awake: general.keepDisplayAwake,
@@ -750,7 +771,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   hasUnsavedChanges: () => {
-    const { locations, ioProfiles, catalogs, display, general, originalSettings } = get();
+    const { locations, ioProfiles, catalogs, display, buffers, general, originalSettings } = get();
     if (!originalSettings) return false;
 
     const currentSettings = {
@@ -774,10 +795,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       binary_one_colour: display.binaryOneColour,
       binary_zero_colour: display.binaryZeroColour,
       binary_unused_colour: display.binaryUnusedColour,
-      discovery_history_buffer: general.discoveryHistoryBuffer,
-      query_result_limit: general.queryResultLimit,
+      // Buffers
+      clear_buffers_on_start: buffers.clearBuffersOnStart,
+      discovery_history_buffer: buffers.discoveryHistoryBuffer,
+      query_result_limit: buffers.queryResultLimit,
+      graph_buffer_size: buffers.graphBufferSize,
       session_manager_stats_interval: general.sessionManagerStatsInterval,
-      graph_buffer_size: general.graphBufferSize,
       // Power management
       prevent_idle_sleep: general.preventIdleSleep,
       keep_display_awake: general.keepDisplayAwake,
@@ -1087,14 +1110,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     scheduleSave(get().saveSettings);
   },
 
-  // General actions
-  setDiscoveryHistoryBuffer: (buffer) => {
+  // Buffer actions
+  setClearBuffersOnStart: (value) => {
     set((state) => ({
-      general: { ...state.general, discoveryHistoryBuffer: buffer },
+      buffers: { ...state.buffers, clearBuffersOnStart: value },
     }));
     scheduleSave(get().saveSettings);
   },
 
+  setDiscoveryHistoryBuffer: (buffer) => {
+    set((state) => ({
+      buffers: { ...state.buffers, discoveryHistoryBuffer: buffer },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  // General actions
   setDefaultFrameType: (type) => {
     set((state) => ({
       general: { ...state.general, defaultFrameType: type },
@@ -1104,7 +1135,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setQueryResultLimit: (limit) => {
     set((state) => ({
-      general: { ...state.general, queryResultLimit: limit },
+      buffers: { ...state.buffers, queryResultLimit: limit },
     }));
     scheduleSave(get().saveSettings);
   },
@@ -1118,7 +1149,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setGraphBufferSize: (size) => {
     set((state) => ({
-      general: { ...state.general, graphBufferSize: size },
+      buffers: { ...state.buffers, graphBufferSize: size },
     }));
     scheduleSave(get().saveSettings);
   },

@@ -5,13 +5,14 @@ import { pickDirectory } from '../../api/dialogs';
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
 import AppSideBar, { type SideBarItem } from "../../components/AppSideBar";
-import { Cog, MapPin, Cable, BookOpen, Monitor, Bookmark, Star, LayoutGrid, Shield } from "lucide-react";
+import { Cog, MapPin, Cable, Database, BookOpen, Monitor, Bookmark, Star, LayoutGrid, Shield } from "lucide-react";
 import { bgDataView, borderDataView } from "../../styles/colourTokens";
 import LocationsView from './views/LocationsView';
 import DisplayView from './views/DisplayView';
 import CatalogsView from './views/CatalogsView';
 import DataIOView from './views/DataIOView';
 import GeneralView from './views/GeneralView';
+import BuffersView from './views/BuffersView';
 import BookmarksView from './views/BookmarksView';
 import SelectionSetsView from './views/SelectionSetsView';
 import GraphLayoutsView from './views/GraphLayoutsView';
@@ -83,15 +84,19 @@ export default function Settings() {
   const setThemeColour = useSettingsStore((s) => s.setThemeColour);
   const resetThemeColours = useSettingsStore((s) => s.resetThemeColours);
 
-  // General
-  const discoveryHistoryBuffer = useSettingsStore((s) => s.general.discoveryHistoryBuffer);
+  // Buffers
+  const clearBuffersOnStart = useSettingsStore((s) => s.buffers.clearBuffersOnStart);
+  const setClearBuffersOnStart = useSettingsStore((s) => s.setClearBuffersOnStart);
+  const discoveryHistoryBuffer = useSettingsStore((s) => s.buffers.discoveryHistoryBuffer);
   const setDiscoveryHistoryBuffer = useSettingsStore((s) => s.setDiscoveryHistoryBuffer);
+  const queryResultLimit = useSettingsStore((s) => s.buffers.queryResultLimit);
+  const setQueryResultLimit = useSettingsStore((s) => s.setQueryResultLimit);
+  const graphBufferSize = useSettingsStore((s) => s.buffers.graphBufferSize);
+  const setGraphBufferSize = useSettingsStore((s) => s.setGraphBufferSize);
+
+  // General
   const defaultFrameType = useSettingsStore((s) => s.general.defaultFrameType);
   const setDefaultFrameType = useSettingsStore((s) => s.setDefaultFrameType);
-  const queryResultLimit = useSettingsStore((s) => s.general.queryResultLimit);
-  const setQueryResultLimit = useSettingsStore((s) => s.setQueryResultLimit);
-  const graphBufferSize = useSettingsStore((s) => s.general.graphBufferSize);
-  const setGraphBufferSize = useSettingsStore((s) => s.setGraphBufferSize);
   const preventIdleSleep = useSettingsStore((s) => s.general.preventIdleSleep);
   const setPreventIdleSleep = useSettingsStore((s) => s.setPreventIdleSleep);
   const keepDisplayAwake = useSettingsStore((s) => s.general.keepDisplayAwake);
@@ -184,6 +189,7 @@ export default function Settings() {
     // Hide Storage on iOS - custom directory paths aren't supported
     ...(!isIOSPlatform ? [{ id: 'locations' as const, label: 'Storage', icon: MapPin }] : []),
     { id: 'data-io', label: 'Data IO', icon: Cable },
+    { id: 'buffers', label: 'Buffers', icon: Database },
     { id: 'catalogs', label: 'Catalogs', icon: BookOpen },
     { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
     { id: 'selection-sets', label: 'Selection Sets', icon: Star },
@@ -249,14 +255,8 @@ export default function Settings() {
 
           {currentSection === 'general' && (
             <GeneralView
-              discoveryHistoryBuffer={discoveryHistoryBuffer}
-              onChangeDiscoveryHistoryBuffer={setDiscoveryHistoryBuffer}
               defaultFrameType={defaultFrameType}
               onChangeDefaultFrameType={setDefaultFrameType}
-              queryResultLimit={queryResultLimit}
-              onChangeQueryResultLimit={setQueryResultLimit}
-              graphBufferSize={graphBufferSize}
-              onChangeGraphBufferSize={setGraphBufferSize}
               preventIdleSleep={preventIdleSleep}
               onChangePreventIdleSleep={setPreventIdleSleep}
               keepDisplayAwake={keepDisplayAwake}
@@ -264,6 +264,19 @@ export default function Settings() {
               logLevel={logLevel}
               onChangeLogLevel={setLogLevel}
               isIOS={isIOSPlatform}
+            />
+          )}
+
+          {currentSection === 'buffers' && (
+            <BuffersView
+              clearBuffersOnStart={clearBuffersOnStart}
+              onChangeClearBuffersOnStart={setClearBuffersOnStart}
+              discoveryHistoryBuffer={discoveryHistoryBuffer}
+              onChangeDiscoveryHistoryBuffer={setDiscoveryHistoryBuffer}
+              queryResultLimit={queryResultLimit}
+              onChangeQueryResultLimit={setQueryResultLimit}
+              graphBufferSize={graphBufferSize}
+              onChangeGraphBufferSize={setGraphBufferSize}
             />
           )}
 

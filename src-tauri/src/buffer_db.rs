@@ -54,7 +54,8 @@ CREATE INDEX IF NOT EXISTS idx_bytes_buffer_ts ON bytes (buffer_id, timestamp_us
 // ============================================================================
 
 /// Initialise the buffer database. Must be called once at app startup.
-pub fn initialise(app_data_dir: &Path) -> Result<(), String> {
+/// When `clear_on_start` is true, leftover data from previous sessions is deleted.
+pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), String> {
     std::fs::create_dir_all(app_data_dir)
         .map_err(|e| format!("Failed to create app data dir: {}", e))?;
 
@@ -79,13 +80,16 @@ pub fn initialise(app_data_dir: &Path) -> Result<(), String> {
     conn.execute_batch(SCHEMA_SQL)
         .map_err(|e| format!("Failed to create schema: {}", e))?;
 
-    // Clear leftover data from previous sessions (buffer data is ephemeral)
-    conn.execute("DELETE FROM frames", [])
-        .map_err(|e| format!("Failed to clear frames: {}", e))?;
-    conn.execute("DELETE FROM bytes", [])
-        .map_err(|e| format!("Failed to clear bytes: {}", e))?;
-
-    tlog!("[buffer_db] Initialised at {:?}", db_path);
+    // Conditionally clear leftover data from previous sessions
+    if clear_on_start {
+        conn.execute("DELETE FROM frames", [])
+            .map_err(|e| format!("Failed to clear frames: {}", e))?;
+        conn.execute("DELETE FROM bytes", [])
+            .map_err(|e| format!("Failed to clear bytes: {}", e))?;
+        tlog!("[buffer_db] Initialised at {:?} (cleared previous data)", db_path);
+    } else {
+        tlog!("[buffer_db] Initialised at {:?} (preserving previous data)", db_path);
+    }
 
     *DB.lock().unwrap() = Some(conn);
     Ok(())
@@ -920,6 +924,68 @@ pub fn get_byte_count(buffer_id: &str) -> Result<usize, String> {
         .map_err(|e| format!("Failed to count: {}", e))?;
 
     Ok(count as usize)
+}
+
+// ============================================================================
+// Raw query helpers (for bufferquery.rs)
+// ============================================================================
+
+/// Execute a raw SQL query returning (timestamp_us, prev_payload, payload) tuples.
+/// Used by buffer_query_byte_changes and buffer_query_frame_changes.
+pub fn query_raw(
+    sql: &str,
+    params: &[&dyn rusqlite::types::ToSql],
+) -> Result<Vec<(i64, Vec<u8>, Vec<u8>)>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(params), |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, Vec<u8>>(1)?,
+                row.get::<_, Vec<u8>>(2)?,
+            ))
+        })
+        .map_err(|e| format!("Failed to execute query: {}", e))?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+    }
+
+    Ok(results)
+}
+
+/// Execute a raw SQL query returning (timestamp_us, payload) tuples.
+/// Used by buffer_query_mirror_validation.
+pub fn query_raw_two_col(
+    sql: &str,
+    params: &[&dyn rusqlite::types::ToSql],
+) -> Result<Vec<(i64, Vec<u8>)>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(params), |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
+        })
+        .map_err(|e| format!("Failed to execute query: {}", e))?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+    }
+
+    Ok(results)
 }
 
 /// Find the byte offset for a given timestamp in a buffer.

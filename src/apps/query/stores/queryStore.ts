@@ -15,6 +15,11 @@ import {
   type DatabaseActivity,
   type DatabaseActivityResult,
 } from "../../../api/dbquery";
+import {
+  queryByteChangesBuffer,
+  queryFrameChangesBuffer,
+  queryMirrorValidationBuffer,
+} from "../../../api/bufferquery";
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { ParsedCatalog } from "../../../utils/catalogParser";
@@ -151,8 +156,10 @@ export interface QueuedQuery {
   queryType: QueryType;
   /** Query parameters at time of submission */
   queryParams: QueryParams;
-  /** Profile ID for the database connection */
+  /** Profile ID for the database connection (PostgreSQL queries) */
   profileId: string;
+  /** Buffer ID for buffer queries (when set, routes to SQLite instead of PostgreSQL) */
+  bufferId?: string;
   /** Current status */
   status: QueryStatus;
   /** When the query was submitted */
@@ -269,7 +276,7 @@ interface QueryState {
   reset: () => void;
 
   // Queue actions
-  enqueueQuery: (profileId: string, timeBounds?: TimeBounds | null, resultLimit?: number) => string;
+  enqueueQuery: (sourceId: string, sourceType: "postgres" | "buffer", timeBounds?: TimeBounds | null, resultLimit?: number) => string;
   updateQueueItem: (id: string, updates: Partial<QueuedQuery>) => void;
   removeQueueItem: (id: string) => void;
   clearQueue: () => void;
@@ -379,7 +386,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     }),
 
   // Queue actions
-  enqueueQuery: (profileId: string, inputBounds?: TimeBounds | null, resultLimit?: number) => {
+  enqueueQuery: (sourceId: string, sourceType: "postgres" | "buffer", inputBounds?: TimeBounds | null, resultLimit?: number) => {
     const { queryType, queryParams } = get();
     const id = `query_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -396,13 +403,14 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     const displayName = generateQueryDisplayName(queryType, queryParams, timeBounds);
 
     // Use provided limit or fall back to settings
-    const limit = resultLimit ?? useSettingsStore.getState().general.queryResultLimit;
+    const limit = resultLimit ?? useSettingsStore.getState().buffers.queryResultLimit;
 
     const newItem: QueuedQuery = {
       id,
       queryType,
       queryParams: { ...queryParams },
-      profileId,
+      profileId: sourceType === "postgres" ? sourceId : "",
+      bufferId: sourceType === "buffer" ? sourceId : undefined,
       status: "pending",
       submittedAt: Date.now(),
       results: null,
@@ -485,79 +493,149 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       let results: QueryResult = [];
       let stats: QueryStats | undefined;
 
-      const { profileId, queryType, queryParams, timeBounds, resultLimit } = nextQuery;
+      const { profileId, bufferId, queryType, queryParams, timeBounds, resultLimit } = nextQuery;
 
-      // Convert datetime-local format to ISO-8601 for the backend
-      // datetime-local is "YYYY-MM-DDTHH:mm" but backend needs full ISO timestamp
-      const toIsoTimestamp = (dt: string | undefined): string | undefined => {
-        if (!dt) return undefined;
-        try {
-          // Parse as local time and convert to ISO
-          const date = new Date(dt);
-          if (isNaN(date.getTime())) return undefined;
-          return date.toISOString();
-        } catch {
-          return undefined;
+      if (bufferId) {
+        // ── Buffer query path (SQLite) ──
+        // Convert ISO time bounds to microseconds for buffer queries
+        const toMicroseconds = (dt: string | undefined): number | undefined => {
+          if (!dt) return undefined;
+          try {
+            const date = new Date(dt);
+            if (isNaN(date.getTime())) return undefined;
+            return date.getTime() * 1000;
+          } catch {
+            return undefined;
+          }
+        };
+
+        const startTimeUs = toMicroseconds(timeBounds?.startTime);
+        const endTimeUs = toMicroseconds(timeBounds?.endTime);
+
+        switch (queryType) {
+          case "byte_changes": {
+            const response = await queryByteChangesBuffer(
+              bufferId,
+              queryParams.frameId,
+              queryParams.byteIndex,
+              queryParams.isExtended,
+              startTimeUs,
+              endTimeUs,
+              resultLimit,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "frame_changes": {
+            const response = await queryFrameChangesBuffer(
+              bufferId,
+              queryParams.frameId,
+              queryParams.isExtended,
+              startTimeUs,
+              endTimeUs,
+              resultLimit,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "mirror_validation": {
+            const response = await queryMirrorValidationBuffer(
+              bufferId,
+              queryParams.mirrorFrameId,
+              queryParams.sourceFrameId,
+              queryParams.isExtended,
+              queryParams.toleranceMs * 1000, // Convert ms → µs for buffer queries
+              startTimeUs,
+              endTimeUs,
+              resultLimit,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          default:
+            results = [];
+            break;
         }
-      };
+      } else {
+        // ── PostgreSQL query path ──
+        // Convert datetime-local format to ISO-8601 for the backend
+        // datetime-local is "YYYY-MM-DDTHH:mm" but backend needs full ISO timestamp
+        const toIsoTimestamp = (dt: string | undefined): string | undefined => {
+          if (!dt) return undefined;
+          try {
+            // Parse as local time and convert to ISO
+            const date = new Date(dt);
+            if (isNaN(date.getTime())) return undefined;
+            return date.toISOString();
+          } catch {
+            return undefined;
+          }
+        };
 
-      // Only pass non-empty time bounds to the backend (empty strings cause serialization errors)
-      const startTime = toIsoTimestamp(timeBounds?.startTime);
-      const endTime = toIsoTimestamp(timeBounds?.endTime);
+        // Only pass non-empty time bounds to the backend (empty strings cause serialization errors)
+        const startTime = toIsoTimestamp(timeBounds?.startTime);
+        const endTime = toIsoTimestamp(timeBounds?.endTime);
 
-      switch (queryType) {
-        case "byte_changes": {
-          const response = await queryByteChanges(
-            profileId,
-            queryParams.frameId,
-            queryParams.byteIndex,
-            queryParams.isExtended,
-            startTime,
-            endTime,
-            resultLimit,
-            nextQuery.id
-          );
-          results = response.results;
-          stats = response.stats;
-          break;
+        switch (queryType) {
+          case "byte_changes": {
+            const response = await queryByteChanges(
+              profileId,
+              queryParams.frameId,
+              queryParams.byteIndex,
+              queryParams.isExtended,
+              startTime,
+              endTime,
+              resultLimit,
+              nextQuery.id
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "frame_changes": {
+            const response = await queryFrameChanges(
+              profileId,
+              queryParams.frameId,
+              queryParams.isExtended,
+              startTime,
+              endTime,
+              resultLimit,
+              nextQuery.id
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "mirror_validation": {
+            const response = await queryMirrorValidation(
+              profileId,
+              queryParams.mirrorFrameId,
+              queryParams.sourceFrameId,
+              queryParams.isExtended,
+              queryParams.toleranceMs,
+              startTime,
+              endTime,
+              resultLimit,
+              nextQuery.id
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          default:
+            // Other query types not yet implemented
+            results = [];
+            break;
         }
-
-        case "frame_changes": {
-          const response = await queryFrameChanges(
-            profileId,
-            queryParams.frameId,
-            queryParams.isExtended,
-            startTime,
-            endTime,
-            resultLimit,
-            nextQuery.id
-          );
-          results = response.results;
-          stats = response.stats;
-          break;
-        }
-
-        case "mirror_validation": {
-          const response = await queryMirrorValidation(
-            profileId,
-            queryParams.mirrorFrameId,
-            queryParams.sourceFrameId,
-            queryParams.isExtended,
-            queryParams.toleranceMs,
-            startTime,
-            endTime,
-            resultLimit,
-            nextQuery.id
-          );
-          results = response.results;
-          stats = response.stats;
-          break;
-        }
-
-        default:
-          // Other query types not yet implemented
-          results = [];
-          break;
       }
 
       updateQueueItem(nextQuery.id, {

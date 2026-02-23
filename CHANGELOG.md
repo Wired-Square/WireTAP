@@ -6,6 +6,10 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Buffers settings tab**: Buffer-related settings (Discovery History Buffer, Query Result Limit, Graph Buffer Size) moved from General to a dedicated Buffers tab under Settings. New "Clear buffers on start" toggle controls whether `buffers.db` is wiped on launch (default: on, preserving current behaviour). When disabled, previous buffer data persists across restarts.
+
+- **Buffer query support**: The Query app can now run analytical queries (Byte Changes, Frame Changes, Mirror Validation) against local SQLite buffers in addition to PostgreSQL. A buffer source selector appears in the query form when buffers with data are available. SQL preview switches between PostgreSQL and SQLite flavours based on the selected source. Stats tab is hidden for buffer sources since `pg_stat_activity` doesn't apply.
+
 - **Timestamped CLI logging**: All backend log messages now include `HH:MM:SS.mmm` local timestamps via a `tlog!` macro, replacing bare `eprintln!` calls across the entire Rust codebase.
 
 - **File logging**: New "Log to file" setting under Settings → General → Diagnostics. When enabled, writes all backend logs to `~/Documents/CANdor/Reports/YYYYMMDD-HHmmss-CANdor.log`. A `CANdor.log` symlink (Unix) always points to the latest log file. File logging initialises early in the startup sequence so no messages are lost.
@@ -53,6 +57,8 @@ All notable changes to CANdor will be documented in this file.
 - **`iconButtonDanger` style token**: New button style with persistent red icon colour and danger hover background, for delete actions that should be visually distinct at rest.
 
 ### Changed
+
+- **Settings → General**: Discovery History Buffer, Query Result Limit, and Graph Buffer Size moved to the new Buffers tab.
 
 - **Graph panel overflow menu**: Panel header icons replaced with a persistent ellipsis (⋮) button that opens a hover dropdown menu. The dropdown renders via a portal so it is never clipped by small panels, and automatically repositions to stay within the window bounds. All panel actions (follow mode, stats, zoom reset, export, configure, clone, remove) are accessible from the menu regardless of panel size.
 

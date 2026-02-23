@@ -4,7 +4,7 @@
 // and context window settings. Supports favourite-based time bounds.
 
 import { useCallback, useState, useEffect, useMemo } from "react";
-import { ListPlus } from "lucide-react";
+import { ListPlus, HardDrive } from "lucide-react";
 import {
   useQueryStore,
   QUERY_TYPE_INFO,
@@ -15,6 +15,7 @@ import {
 import type { ResolvedSignal } from "../../../utils/catalogParser";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
+import type { BufferMetadata } from "../../../api/buffer";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
 import { primaryButtonBase, buttonBase } from "../../../styles/buttonStyles";
 import { inputBase } from "../../../styles/inputStyles";
@@ -24,18 +25,24 @@ import { bgSurface, borderDefault, textSecondary, textMuted } from "../../../sty
 
 interface Props {
   profileId: string | null;
+  bufferId?: string | null;
   disabled?: boolean;
   favourites: TimeRangeFavorite[];
   timeBounds: TimeBounds;
   onTimeBoundsChange: (bounds: TimeBounds) => void;
+  buffers?: BufferMetadata[];
+  onSelectBuffer?: (bufferId: string | null) => void;
 }
 
 export default function QueryBuilderPanel({
   profileId,
+  bufferId,
   disabled = false,
   favourites,
   timeBounds,
   onTimeBoundsChange,
+  buffers = [],
+  onSelectBuffer,
 }: Props) {
   // Store selectors
   const queryType = useQueryStore((s) => s.queryType);
@@ -45,7 +52,7 @@ export default function QueryBuilderPanel({
   const selectedSignal = useQueryStore((s) => s.selectedSignal);
 
   // Settings
-  const queryResultLimit = useSettingsStore((s) => s.general.queryResultLimit);
+  const queryResultLimit = useSettingsStore((s) => s.buffers.queryResultLimit);
 
   // Store actions
   const setQueryType = useQueryStore((s) => s.setQueryType);
@@ -162,11 +169,12 @@ export default function QueryBuilderPanel({
 
   // Add to queue handler
   const handleAddToQueue = useCallback(() => {
-    if (!profileId) return;
-
-    // Enqueue with time bounds directly (no longer using favourite object)
-    enqueueQuery(profileId, timeBounds, limitOverride);
-  }, [profileId, timeBounds, limitOverride, enqueueQuery]);
+    if (bufferId) {
+      enqueueQuery(bufferId, "buffer", timeBounds, limitOverride);
+    } else if (profileId) {
+      enqueueQuery(profileId, "postgres", timeBounds, limitOverride);
+    }
+  }, [profileId, bufferId, timeBounds, limitOverride, enqueueQuery]);
 
   // Handle query type change
   const handleQueryTypeChange = useCallback(
@@ -365,17 +373,81 @@ export default function QueryBuilderPanel({
   const showByteIndex = queryType === "byte_changes";
   const showMirrorValidation = queryType === "mirror_validation";
 
+  // Whether we're targeting a buffer (SQLite) vs PostgreSQL
+  const isBufferSource = !!bufferId;
+
   // Generate SQL query preview
   const sqlPreview = useMemo(() => {
     const frameId = queryParams.frameId;
     const byteIndex = queryParams.byteIndex;
 
-    // Extended filter: only include if explicitly set (not null)
+    if (isBufferSource) {
+      // SQLite-flavoured preview for buffer queries
+      const extendedClause = queryParams.isExtended !== null
+        ? ` AND is_extended = ${queryParams.isExtended ? 1 : 0}`
+        : "";
+
+      let timeConditions = "";
+      if (timeBounds.startTime) {
+        timeConditions += `\n     AND timestamp_us >= <start_us>`;
+      }
+      if (timeBounds.endTime) {
+        timeConditions += `\n     AND timestamp_us <= <end_us>`;
+      }
+
+      if (queryType === "byte_changes") {
+        return `-- SQLite buffer query
+WITH ordered AS (
+  SELECT timestamp_us, payload,
+    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload
+  FROM frames
+  WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+)
+SELECT timestamp_us, prev_payload, payload
+FROM ordered
+WHERE prev_payload IS NOT NULL
+  -- Filter in Rust: byte[${byteIndex}] changed
+LIMIT ${limitOverride.toLocaleString()}`;
+      }
+
+      if (queryType === "frame_changes") {
+        return `-- SQLite buffer query
+WITH ordered AS (
+  SELECT timestamp_us, payload,
+    LAG(payload) OVER (ORDER BY timestamp_us) AS prev_payload
+  FROM frames
+  WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+)
+SELECT timestamp_us, prev_payload, payload
+FROM ordered
+WHERE prev_payload IS NOT NULL
+  AND prev_payload != payload
+LIMIT ${limitOverride.toLocaleString()}`;
+      }
+
+      if (queryType === "mirror_validation") {
+        const { mirrorFrameId, sourceFrameId, toleranceMs } = queryParams;
+        return `-- SQLite buffer query (two-pointer match in Rust)
+-- Mirror frames:
+SELECT timestamp_us, payload FROM frames
+WHERE frame_id = ${mirrorFrameId}${extendedClause}${timeConditions}
+
+-- Source frames:
+SELECT timestamp_us, payload FROM frames
+WHERE frame_id = ${sourceFrameId}${extendedClause}${timeConditions}
+
+-- Tolerance: ${toleranceMs}ms (${toleranceMs * 1000}µs)
+LIMIT ${limitOverride.toLocaleString()}`;
+      }
+
+      return `-- Query type "${queryType}" not yet implemented for buffers`;
+    }
+
+    // PostgreSQL preview
     const extendedClause = queryParams.isExtended !== null
       ? ` AND extended = ${queryParams.isExtended}`
       : "";
 
-    // Format time bounds if set
     let timeConditions = "";
     if (timeBounds.startTime) {
       timeConditions += `\n     AND ts >= '${timeBounds.startTime}'::timestamptz`;
@@ -446,12 +518,34 @@ LIMIT ${limitOverride.toLocaleString()}`;
     }
 
     return `-- Query type "${queryType}" not yet implemented`;
-  }, [queryType, queryParams, timeBounds, limitOverride]);
+  }, [queryType, queryParams, timeBounds, limitOverride, isBufferSource]);
 
   return (
     <div className="flex flex-col h-full">
       {/* Scrollable form content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Buffer Source Selector (shown when buffers are available) */}
+        {buffers.length > 0 && (
+          <div>
+            <label className={labelSmallMuted}>Buffer Source</label>
+            <div className={`${flexRowGap2} mt-1`}>
+              <HardDrive className={`${iconSm} ${textSecondary} flex-shrink-0`} />
+              <select
+                value={bufferId ?? ""}
+                onChange={(e) => onSelectBuffer?.(e.target.value || null)}
+                className={`${inputBase} flex-1`}
+              >
+                <option value="">{profileId ? "Using PostgreSQL profile" : "— Select buffer —"}</option>
+                {buffers.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.count.toLocaleString()} frames)
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Query Type */}
         <div>
           <label className={labelSmallMuted}>Query Type</label>

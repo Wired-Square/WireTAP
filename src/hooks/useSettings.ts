@@ -118,6 +118,8 @@ export interface AppSettings {
   // Privacy / telemetry
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
+  // Buffer persistence
+  clear_buffers_on_start?: boolean;
 }
 
 /**
@@ -172,6 +174,8 @@ function normalizeSettings(
     // Privacy / telemetry
     telemetry_enabled: settings.telemetry_enabled ?? false,
     telemetry_consent_given: settings.telemetry_consent_given ?? false,
+    // Buffer persistence
+    clear_buffers_on_start: settings.clear_buffers_on_start ?? true,
   };
 }
 

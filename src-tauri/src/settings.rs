@@ -111,6 +111,10 @@ pub struct AppSettings {
     pub telemetry_enabled: bool,
     #[serde(default = "default_telemetry_consent_given")]
     pub telemetry_consent_given: bool,
+
+    // Buffer persistence
+    #[serde(default = "default_clear_buffers_on_start")]
+    pub clear_buffers_on_start: bool,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -236,6 +240,11 @@ fn default_telemetry_consent_given() -> bool {
     false
 }
 
+// Buffer persistence defaults
+fn default_clear_buffers_on_start() -> bool {
+    true
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         // Get platform-specific documents directory
@@ -297,6 +306,8 @@ impl Default for AppSettings {
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
             telemetry_consent_given: default_telemetry_consent_given(),
+            // Buffer persistence
+            clear_buffers_on_start: default_clear_buffers_on_start(),
         }
     }
 }
@@ -365,6 +376,8 @@ impl AppSettings {
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
             telemetry_consent_given: default_telemetry_consent_given(),
+            // Buffer persistence
+            clear_buffers_on_start: default_clear_buffers_on_start(),
         })
     }
 }
@@ -404,6 +417,21 @@ fn paths_are_stale(settings: &AppSettings, app: &AppHandle) -> bool {
     }
 
     false
+}
+
+/// Load settings synchronously (for use during app setup, before the async runtime
+/// is fully available). Does not perform migrations or first-run initialisation —
+/// those happen when the frontend calls `load_settings` via Tauri command.
+pub fn load_settings_sync(app: &AppHandle) -> Result<AppSettings, String> {
+    let settings_path = get_settings_path(app)?;
+    if settings_path.exists() {
+        let content = std::fs::read_to_string(&settings_path)
+            .map_err(|e| format!("Failed to read settings: {}", e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse settings: {}", e))
+    } else {
+        Ok(AppSettings::default())
+    }
 }
 
 #[tauri::command]
