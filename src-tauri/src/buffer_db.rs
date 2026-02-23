@@ -95,13 +95,6 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
     Ok(())
 }
 
-/// Shutdown: close the connection cleanly.
-pub fn shutdown() {
-    let mut guard = DB.lock().unwrap();
-    if guard.take().is_some() {
-        tlog!("[buffer_db] Connection closed");
-    }
-}
 
 // ============================================================================
 // Helper: row → FrameMessage
@@ -910,21 +903,6 @@ pub fn get_all_bytes(buffer_id: &str) -> Result<Vec<TimestampedByte>, String> {
     Ok(bytes)
 }
 
-/// Get total byte count for a buffer.
-pub fn get_byte_count(buffer_id: &str) -> Result<usize, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-
-    let count: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM bytes WHERE buffer_id = ?1",
-            params![buffer_id],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("Failed to count: {}", e))?;
-
-    Ok(count as usize)
-}
 
 // ============================================================================
 // Raw query helpers (for bufferquery.rs)
