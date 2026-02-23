@@ -71,6 +71,8 @@ pub async fn import_csv_with_mapping(
     file_path: String,
     mappings: Vec<io::CsvColumnMapping>,
     skip_first_row: bool,
+    timestamp_unit: io::TimestampUnit,
+    negate_timestamps: bool,
 ) -> Result<BufferMetadata, String> {
     let filename = std::path::Path::new(&file_path)
         .file_name()
@@ -78,7 +80,7 @@ pub async fn import_csv_with_mapping(
         .unwrap_or("unknown.csv")
         .to_string();
 
-    let frames = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row)?;
+    let frames = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps)?;
 
     if frames.is_empty() {
         return Err("CSV file contains no valid frames with the given column mapping".to_string());

@@ -132,6 +132,30 @@ pub struct CsvColumnMapping {
     pub role: CsvColumnRole,
 }
 
+/// Timestamp unit for CSV import — determines how raw integer timestamps
+/// are converted to microseconds.
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TimestampUnit {
+    Seconds,
+    Milliseconds,
+    Microseconds,
+    Nanoseconds,
+}
+
+impl TimestampUnit {
+    /// Convert a normalised (non-negative) timestamp in this unit to microseconds.
+    /// Returns `None` on overflow.
+    fn to_microseconds(self, value: u64) -> Option<u64> {
+        match self {
+            TimestampUnit::Seconds => value.checked_mul(1_000_000),
+            TimestampUnit::Milliseconds => value.checked_mul(1_000),
+            TimestampUnit::Microseconds => Some(value),
+            TimestampUnit::Nanoseconds => Some(value / 1_000),
+        }
+    }
+}
+
 /// Result of previewing a CSV file
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct CsvPreview {
@@ -145,6 +169,10 @@ pub struct CsvPreview {
     pub suggested_mappings: Vec<CsvColumnMapping>,
     /// Whether the first row appears to be a header
     pub has_header: bool,
+    /// Auto-detected timestamp unit based on sample data heuristics
+    pub suggested_timestamp_unit: TimestampUnit,
+    /// Whether the sample timestamps are all negative (suggests negate fix)
+    pub has_negative_timestamps: bool,
 }
 
 // ============================================================================
@@ -364,12 +392,32 @@ pub fn preview_csv_file(file_path: &str, max_rows: usize) -> Result<CsvPreview, 
     };
     let suggested = suggest_column_mappings(header_slice, &preview_rows, num_columns);
 
+    let ts_col = suggested
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::Timestamp))
+        .map(|m| m.column_index);
+    let suggested_unit = suggest_timestamp_unit(&preview_rows, ts_col);
+
+    // Detect whether sample timestamps are all negative
+    let has_negative_timestamps = ts_col
+        .map(|col| {
+            let parsed: Vec<i64> = preview_rows
+                .iter()
+                .filter_map(|row| row.get(col))
+                .filter_map(|s| s.parse::<i64>().ok())
+                .collect();
+            !parsed.is_empty() && parsed.iter().all(|&v| v < 0)
+        })
+        .unwrap_or(false);
+
     Ok(CsvPreview {
         headers,
         rows: preview_rows,
         total_rows: total_data_rows,
         suggested_mappings: suggested,
         has_header,
+        suggested_timestamp_unit: suggested_unit,
+        has_negative_timestamps,
     })
 }
 
@@ -378,6 +426,8 @@ pub fn parse_csv_with_mapping(
     file_path: &str,
     mappings: &[CsvColumnMapping],
     skip_first_row: bool,
+    timestamp_unit: TimestampUnit,
+    negate_timestamps: bool,
 ) -> Result<Vec<FrameMessage>, String> {
     let file = File::open(file_path)
         .map_err(|e| format!("Failed to open CSV file '{}': {}", file_path, e))?;
@@ -542,11 +592,32 @@ pub fn parse_csv_with_mapping(
         });
     }
 
-    // Normalise timestamps: offset so the minimum becomes 0, preserving order
+    // Normalise timestamps, then convert to microseconds.
     if !raw_i64_timestamps.is_empty() && frames.len() == raw_i64_timestamps.len() {
-        let min_ts = raw_i64_timestamps.iter().copied().min().unwrap_or(0);
-        for (frame, &raw_ts) in frames.iter_mut().zip(raw_i64_timestamps.iter()) {
-            frame.timestamp_us = (raw_ts - min_ts) as u64;
+        if negate_timestamps {
+            // Negative timestamps: use abs(first) as epoch anchor, accumulate deltas.
+            // Preserves real wall-clock time for logs that store negative epoch values.
+            let anchor = raw_i64_timestamps[0].unsigned_abs();
+            for (i, frame) in frames.iter_mut().enumerate() {
+                let delta = raw_i64_timestamps[i] - raw_i64_timestamps[0];
+                let raw_us = if delta >= 0 {
+                    anchor + delta as u64
+                } else {
+                    anchor.saturating_sub(delta.unsigned_abs())
+                };
+                frame.timestamp_us = timestamp_unit
+                    .to_microseconds(raw_us)
+                    .unwrap_or(u64::MAX);
+            }
+        } else {
+            // Positive/mixed timestamps: offset so the minimum becomes 0.
+            let min_ts = raw_i64_timestamps.iter().copied().min().unwrap_or(0);
+            for (frame, &raw_ts) in frames.iter_mut().zip(raw_i64_timestamps.iter()) {
+                let normalised = (raw_ts - min_ts) as u64;
+                frame.timestamp_us = timestamp_unit
+                    .to_microseconds(normalised)
+                    .unwrap_or(u64::MAX);
+            }
         }
     }
 
@@ -840,6 +911,69 @@ fn parse_space_separated_hex(s: &str) -> Vec<u8> {
             u8::from_str_radix(stripped, 16).ok()
         })
         .collect()
+}
+
+/// Analyse sample timestamp values and suggest the most likely unit.
+///
+/// Computes the median absolute diff between consecutive parsed timestamps,
+/// then picks the unit whose implied frame rate falls in the typical CAN bus
+/// range (1 Hz – 100 kHz). Iterates finest-to-coarsest to prefer the more
+/// granular unit when ambiguous. Defaults to `Microseconds` if no unit fits.
+fn suggest_timestamp_unit(
+    sample_rows: &[Vec<String>],
+    timestamp_col: Option<usize>,
+) -> TimestampUnit {
+    let col = match timestamp_col {
+        Some(c) => c,
+        None => return TimestampUnit::Microseconds,
+    };
+
+    let timestamps: Vec<i64> = sample_rows
+        .iter()
+        .filter_map(|row| row.get(col)?.trim().parse::<i64>().ok())
+        .collect();
+
+    if timestamps.len() < 2 {
+        return TimestampUnit::Microseconds;
+    }
+
+    // Absolute differences between consecutive timestamps (skip zero-diff duplicates)
+    let mut diffs: Vec<u64> = timestamps
+        .windows(2)
+        .map(|w| (w[1] - w[0]).unsigned_abs())
+        .filter(|&d| d > 0)
+        .collect();
+
+    if diffs.is_empty() {
+        return TimestampUnit::Microseconds;
+    }
+
+    diffs.sort_unstable();
+    let median_diff = diffs[diffs.len() / 2];
+
+    // Candidate units from finest to coarsest
+    let candidates = [
+        (TimestampUnit::Nanoseconds, 1_000_000_000.0),
+        (TimestampUnit::Microseconds, 1_000_000.0),
+        (TimestampUnit::Milliseconds, 1_000.0),
+        (TimestampUnit::Seconds, 1.0),
+    ];
+
+    const MIN_RATE: f64 = 1.0;
+    const MAX_RATE: f64 = 100_000.0;
+
+    for &(unit, divisor) in &candidates {
+        let interval_secs = median_diff as f64 / divisor;
+        if interval_secs <= 0.0 {
+            continue;
+        }
+        let rate = 1.0 / interval_secs;
+        if rate >= MIN_RATE && rate <= MAX_RATE {
+            return unit;
+        }
+    }
+
+    TimestampUnit::Microseconds
 }
 
 /// Spawn a CSV reader task with scoped events and pause support

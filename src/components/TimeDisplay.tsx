@@ -44,7 +44,7 @@ export default function TimeDisplay({
   const effectiveTimezone = override ?? settingsTimezone;
 
   const { formattedTime, formattedDate } = useMemo(() => {
-    if (!timestamp) {
+    if (timestamp == null) {
       return { formattedTime: '--:--:--', formattedDate: '' };
     }
 
@@ -60,20 +60,31 @@ export default function TimeDisplay({
       return { formattedTime: '--:--:--', formattedDate: '' };
     }
 
-    const tzOption = effectiveTimezone === 'utc' ? 'UTC' : undefined;
+    // Timestamps before year 2000 are treated as relative/elapsed (e.g. normalised
+    // CSV imports starting at 0). Force UTC so 0 shows as 00:00:00 and suppress
+    // the calendar date to avoid displaying "1 Jan 1970".
+    const isRelative =
+      typeof timestamp === 'number' && timestamp < 946684800;
+    const tzOption = isRelative
+      ? 'UTC'
+      : effectiveTimezone === 'utc'
+        ? 'UTC'
+        : undefined;
 
     const time = date.toLocaleTimeString('en-GB', {
       timeZone: tzOption,
       hour12: false,
     });
 
-    const dateStr = date.toLocaleDateString('en-GB', {
-      timeZone: tzOption,
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    const dateStr = isRelative
+      ? ''
+      : date.toLocaleDateString('en-GB', {
+          timeZone: tzOption,
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        });
 
     return { formattedTime: time, formattedDate: dateStr };
   }, [timestamp, effectiveTimezone]);

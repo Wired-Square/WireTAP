@@ -28,7 +28,7 @@ mod socketcan;
 pub use timeline::{step_frame, BufferReader, StepResult};
 pub use timeline::{
     parse_csv_file, parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
-    CsvReader, CsvReaderOptions,
+    CsvReader, CsvReaderOptions, TimestampUnit,
 };
 pub use timeline::{PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType};
 

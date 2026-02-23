@@ -77,6 +77,15 @@ export interface CsvColumnMapping {
 }
 
 /**
+ * Timestamp unit for CSV import
+ */
+export type TimestampUnit =
+  | "seconds"
+  | "milliseconds"
+  | "microseconds"
+  | "nanoseconds";
+
+/**
  * Preview data from a CSV file
  */
 export interface CsvPreview {
@@ -90,6 +99,10 @@ export interface CsvPreview {
   suggested_mappings: CsvColumnMapping[];
   /** Whether the first row was detected as a header */
   has_header: boolean;
+  /** Auto-detected timestamp unit based on sample data analysis */
+  suggested_timestamp_unit: TimestampUnit;
+  /** Whether sample timestamps are all negative (suggests negate fix) */
+  has_negative_timestamps: boolean;
 }
 
 /**
@@ -120,12 +133,16 @@ export async function previewCsv(
 export async function importCsvWithMapping(
   filePath: string,
   mappings: CsvColumnMapping[],
-  skipFirstRow: boolean
+  skipFirstRow: boolean,
+  timestampUnit: TimestampUnit,
+  negateTimestamps: boolean
 ): Promise<BufferMetadata> {
   return invoke("import_csv_with_mapping", {
     file_path: filePath,
     mappings,
     skip_first_row: skipFirstRow,
+    timestamp_unit: timestampUnit,
+    negate_timestamps: negateTimestamps,
   });
 }
 

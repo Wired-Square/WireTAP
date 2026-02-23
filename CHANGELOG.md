@@ -6,6 +6,12 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **CSV timestamp unit detection**: The CSV column mapper now auto-detects the timestamp unit (seconds, milliseconds, microseconds, nanoseconds) from sample data and pre-selects it in a new dropdown. An estimated capture duration is shown so the user can verify the guess at a glance. A "Negate timestamps" checkbox (auto-ticked when all sample timestamps are negative) converts negative epoch timestamps to their absolute value, preserving real wall-clock time.
+
+### Fixed
+
+- **Relative timestamp display**: Timestamps before year 2000 (normalised CSV imports starting at 0) no longer show "1970-01-01" in the frame list or session bar. The date portion is suppressed and only elapsed time is displayed.
+
 - **Buffers settings tab**: Buffer-related settings (Discovery History Buffer, Query Result Limit, Graph Buffer Size) moved from General to a dedicated Buffers tab under Settings. New "Clear buffers on start" toggle controls whether `buffers.db` is wiped on launch (default: on, preserving current behaviour). When disabled, previous buffer data persists across restarts.
 
 - **Buffer query support**: The Query app can now run analytical queries (Byte Changes, Frame Changes, Mirror Validation) against local SQLite buffers in addition to PostgreSQL. A buffer source selector appears in the query form when buffers with data are available. SQL preview switches between PostgreSQL and SQLite flavours based on the selected source. Stats tab is hidden for buffer sources since `pg_stat_activity` doesn't apply.
