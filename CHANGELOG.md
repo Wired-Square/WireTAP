@@ -58,6 +58,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **Settings tab order**: Sidebar tabs are now sorted alphabetically (Bookmarks, Buffers, Catalogs, Data IO, Display, General, Graph Layouts, Privacy, Selection Sets, Storage).
+
 - **Settings → General**: Discovery History Buffer, Query Result Limit, and Graph Buffer Size moved to the new Buffers tab.
 
 - **Graph panel overflow menu**: Panel header icons replaced with a persistent ellipsis (⋮) button that opens a hover dropdown menu. The dropdown renders via a portal so it is never clipped by small panels, and automatically repositions to stay within the window bounds. All panel actions (follow mode, stats, zoom reset, export, configure, clone, remove) are accessible from the menu regardless of panel size.

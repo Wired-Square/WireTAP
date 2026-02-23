@@ -184,17 +184,17 @@ export default function Settings() {
 
   // Sidebar items (Storage hidden on iOS due to sandboxing restrictions)
   const sidebarItems: SideBarItem[] = [
-    { id: 'general', label: 'General', icon: Cog },
-    { id: 'privacy', label: 'Privacy', icon: Shield },
-    // Hide Storage on iOS - custom directory paths aren't supported
-    ...(!isIOSPlatform ? [{ id: 'locations' as const, label: 'Storage', icon: MapPin }] : []),
-    { id: 'data-io', label: 'Data IO', icon: Cable },
+    { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
     { id: 'buffers', label: 'Buffers', icon: Database },
     { id: 'catalogs', label: 'Catalogs', icon: BookOpen },
-    { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
-    { id: 'selection-sets', label: 'Selection Sets', icon: Star },
-    { id: 'graph-layouts', label: 'Graph Layouts', icon: LayoutGrid },
+    { id: 'data-io', label: 'Data IO', icon: Cable },
     { id: 'display', label: 'Display', icon: Monitor },
+    { id: 'general', label: 'General', icon: Cog },
+    { id: 'graph-layouts', label: 'Graph Layouts', icon: LayoutGrid },
+    { id: 'privacy', label: 'Privacy', icon: Shield },
+    { id: 'selection-sets', label: 'Selection Sets', icon: Star },
+    // Hide Storage on iOS - custom directory paths aren't supported
+    ...(!isIOSPlatform ? [{ id: 'locations' as const, label: 'Storage', icon: MapPin }] : []),
   ];
 
   // Directory picker helper
