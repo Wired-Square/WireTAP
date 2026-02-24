@@ -40,8 +40,8 @@ export interface UseDiscoveryHandlersParams {
   ioProfile: string | null;
   sourceProfileId: string | null;
   playbackSpeed: PlaybackSpeed;
-  /** Buffer mode from session manager - used for play/resume logic */
-  sessionIsBufferMode: boolean;
+  /** Whether the session is stopped (used for play/resume/step logic) */
+  isStopped: boolean;
   /** Buffer mode from discovery store - used for UI display */
   bufferModeEnabled: boolean;
   bufferModeTotalFrames: number;
@@ -87,6 +87,7 @@ export interface UseDiscoveryHandlersParams {
   // Manager session switching methods
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
+  watchSingleSource: (profileId: string, options: ManagerIngestOptions) => Promise<void>;
   jumpToBookmark: (bookmark: TimeRangeFavorite, options?: Omit<ManagerIngestOptions, "startTime" | "endTime" | "maxFrames">) => Promise<void>;
 
   // Session actions
@@ -157,6 +158,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
   // in useIOPickerHandlers, called directly from Discovery.tsx.
   const sessionHandlers = useDiscoverySessionHandlers({
     selectProfile: params.selectProfile,
+    watchSingleSource: params.watchSingleSource,
     updateCurrentTime: params.updateCurrentTime,
     setCurrentFrameIndex: params.setCurrentFrameIndex,
     setMaxBuffer: params.setMaxBuffer,
@@ -185,7 +187,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     isPaused: params.isPaused,
     isStreaming: params.isStreaming,
     sessionReady: params.sessionReady,
-    isBufferMode: params.sessionIsBufferMode,
+    isStopped: params.isStopped,
     currentFrameIndex: params.currentFrameIndex,
     currentTimestampUs: params.currentTimestampUs,
     selectedFrameIds: params.selectedFrames,

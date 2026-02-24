@@ -29,6 +29,13 @@ import { setIOSScreenWake } from '../../../utils/platform';
 export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "buffers" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
+// Buffer setting defaults — single source of truth, referenced by settingsStore and useSettings
+export const DEFAULT_BUFFER_STORAGE = "sqlite";
+export const DEFAULT_CLEAR_BUFFERS_ON_START = true;
+export const DEFAULT_DISCOVERY_HISTORY_BUFFER = 100_000;
+export const DEFAULT_QUERY_RESULT_LIMIT = 10_000;
+export const DEFAULT_GRAPH_BUFFER_SIZE = 10_000;
+
 export interface DirectoryValidation {
   exists: boolean;
   writable: boolean;
@@ -136,6 +143,7 @@ interface AppSettings {
   telemetry_consent_given?: boolean;
   // Buffer persistence
   clear_buffers_on_start?: boolean;
+  buffer_storage?: string;
 }
 
 // Dialog types
@@ -290,6 +298,7 @@ interface SettingsState {
   // Buffer settings
   buffers: {
     clearBuffersOnStart: boolean;
+    bufferStorage: string;
     discoveryHistoryBuffer: number;
     queryResultLimit: number;
     graphBufferSize: number;
@@ -374,6 +383,7 @@ interface SettingsState {
 
   // Actions - Buffers
   setClearBuffersOnStart: (value: boolean) => void;
+  setBufferStorage: (value: string) => void;
   setDiscoveryHistoryBuffer: (buffer: number) => void;
   setQueryResultLimit: (limit: number) => void;
   setGraphBufferSize: (size: number) => void;
@@ -443,10 +453,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   buffers: {
-    clearBuffersOnStart: true,
-    discoveryHistoryBuffer: 100000,
-    queryResultLimit: 10000,
-    graphBufferSize: 10000,
+    clearBuffersOnStart: DEFAULT_CLEAR_BUFFERS_ON_START,
+    bufferStorage: DEFAULT_BUFFER_STORAGE,
+    discoveryHistoryBuffer: DEFAULT_DISCOVERY_HISTORY_BUFFER,
+    queryResultLimit: DEFAULT_QUERY_RESULT_LIMIT,
+    graphBufferSize: DEFAULT_GRAPH_BUFFER_SIZE,
   },
 
   general: {
@@ -522,10 +533,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_one_colour: settings.binary_one_colour || '#14b8a6',
         binary_zero_colour: settings.binary_zero_colour || '#94a3b8',
         binary_unused_colour: settings.binary_unused_colour || '#64748b',
-        discovery_history_buffer: settings.discovery_history_buffer ?? 100000,
-        query_result_limit: settings.query_result_limit ?? 10000,
+        discovery_history_buffer: settings.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
+        query_result_limit: settings.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
         session_manager_stats_interval: settings.session_manager_stats_interval ?? 60,
-        graph_buffer_size: settings.graph_buffer_size ?? 10000,
+        graph_buffer_size: settings.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
         default_frame_type: (settings.default_frame_type as DefaultFrameType) ?? 'can',
         // Theme settings
         theme_mode: (settings.theme_mode as ThemeMode) ?? 'auto',
@@ -556,7 +567,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         telemetry_enabled: settings.telemetry_enabled ?? false,
         telemetry_consent_given: settings.telemetry_consent_given ?? false,
         // Buffer persistence
-        clear_buffers_on_start: settings.clear_buffers_on_start ?? true,
+        clear_buffers_on_start: settings.clear_buffers_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
+        buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
       };
 
       set({
@@ -617,10 +629,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           },
         },
         buffers: {
-          clearBuffersOnStart: normalized.clear_buffers_on_start ?? true,
-          discoveryHistoryBuffer: normalized.discovery_history_buffer ?? 100000,
-          queryResultLimit: normalized.query_result_limit ?? 10000,
-          graphBufferSize: normalized.graph_buffer_size ?? 10000,
+          clearBuffersOnStart: normalized.clear_buffers_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
+          bufferStorage: normalized.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
+          discoveryHistoryBuffer: normalized.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
+          queryResultLimit: normalized.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
+          graphBufferSize: normalized.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
         },
         general: {
           defaultFrameType: normalized.default_frame_type ?? 'can',
@@ -723,6 +736,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_unused_colour: display.binaryUnusedColour,
         // Buffers
         clear_buffers_on_start: buffers.clearBuffersOnStart,
+        buffer_storage: buffers.bufferStorage,
         discovery_history_buffer: buffers.discoveryHistoryBuffer,
         query_result_limit: buffers.queryResultLimit,
         graph_buffer_size: buffers.graphBufferSize,
@@ -1114,6 +1128,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setClearBuffersOnStart: (value) => {
     set((state) => ({
       buffers: { ...state.buffers, clearBuffersOnStart: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setBufferStorage: (value) => {
+    set((state) => ({
+      buffers: { ...state.buffers, bufferStorage: value },
     }));
     scheduleSave(get().saveSettings);
   },

@@ -150,12 +150,20 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
         owning_session_id: None,
     };
 
-    let buffer = NamedBuffer { metadata };
+    let buffer = NamedBuffer { metadata: metadata.clone() };
     registry.buffers.insert(id.clone(), buffer);
 
     if set_streaming {
         registry.streaming_id = Some(id.clone());
         registry.active_id = Some(id.clone());
+    }
+
+    // Drop registry lock before touching SQLite
+    drop(registry);
+
+    // Persist initial metadata to SQLite
+    if let Err(e) = buffer_db::save_buffer_metadata(&metadata) {
+        tlog!("[BufferStore] Failed to persist buffer metadata: {}", e);
     }
 
     tlog!(
@@ -174,11 +182,21 @@ pub fn finalize_buffer() -> Option<BufferMetadata> {
 
     if let Some(id) = registry.streaming_id.take() {
         if let Some(buffer) = registry.buffers.get(&id) {
+            let meta = buffer.metadata.clone();
             tlog!(
                 "[BufferStore] Finalized buffer '{}' with {} items",
-                id, buffer.metadata.count
+                id, meta.count
             );
-            return Some(buffer.metadata.clone());
+
+            // Drop registry lock before touching SQLite
+            drop(registry);
+
+            // Persist final metadata (count/timestamps are now settled)
+            if let Err(e) = buffer_db::save_buffer_metadata(&meta) {
+                tlog!("[BufferStore] Failed to persist finalized buffer metadata: {}", e);
+            }
+
+            return Some(meta);
         }
     }
     None
@@ -254,6 +272,9 @@ pub fn delete_buffer(id: &str) -> Result<(), String> {
         if let Err(e) = buffer_db::delete_buffer_data(id) {
             tlog!("[BufferStore] Failed to delete buffer data from SQLite: {}", e);
         }
+        if let Err(e) = buffer_db::delete_buffer_metadata(id) {
+            tlog!("[BufferStore] Failed to delete buffer metadata from SQLite: {}", e);
+        }
         tlog!("[BufferStore] Deleted buffer '{}'", id);
         Ok(())
     } else {
@@ -294,6 +315,101 @@ pub fn set_active_buffer(buffer_id: &str) -> Result<(), String> {
     }
 }
 
+/// Rename a buffer.
+/// Updates both the in-memory registry and SQLite metadata.
+pub fn rename_buffer(id: &str, new_name: &str) -> Result<BufferMetadata, String> {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    let buffer = registry.buffers.get_mut(id)
+        .ok_or_else(|| format!("Buffer '{}' not found", id))?;
+
+    buffer.metadata.name = new_name.to_string();
+    let meta = buffer.metadata.clone();
+
+    // Drop registry lock before touching SQLite
+    drop(registry);
+
+    if let Err(e) = buffer_db::update_buffer_name(id, new_name) {
+        tlog!("[BufferStore] Failed to persist buffer rename: {}", e);
+    }
+
+    tlog!("[BufferStore] Renamed buffer '{}' to '{}'", id, new_name);
+    Ok(meta)
+}
+
+/// Hydrate the in-memory buffer registry from persisted SQLite metadata.
+/// Called on startup when `clear_buffers_on_start` is false.
+/// Verifies that data actually exists in SQLite for each metadata entry.
+pub fn hydrate_from_db() {
+    let metadata_rows = match buffer_db::load_all_buffer_metadata() {
+        Ok(rows) => rows,
+        Err(e) => {
+            tlog!("[BufferStore] Failed to load buffer metadata from DB: {}", e);
+            return;
+        }
+    };
+
+    if metadata_rows.is_empty() {
+        tlog!("[BufferStore] No persisted buffer metadata to hydrate");
+        return;
+    }
+
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    let mut hydrated = 0u32;
+    let mut max_id = 0u32;
+
+    for meta in metadata_rows {
+        // Parse the numeric ID from "buf_N" to track next_id
+        if let Some(num_str) = meta.id.strip_prefix("buf_") {
+            if let Ok(num) = num_str.parse::<u32>() {
+                if num >= max_id {
+                    max_id = num;
+                }
+            }
+        }
+
+        // Verify data actually exists in SQLite (skip orphaned metadata)
+        let has_data = match meta.buffer_type {
+            BufferType::Frames => {
+                buffer_db::get_frame_count(&meta.id).unwrap_or(0) > 0
+            }
+            BufferType::Bytes => {
+                // Check byte count via paginated query (limit 1 is enough to verify existence)
+                buffer_db::get_bytes_paginated(&meta.id, 0, 1)
+                    .map(|(_, total)| total > 0)
+                    .unwrap_or(false)
+            }
+        };
+
+        if !has_data {
+            tlog!("[BufferStore] Skipping metadata for '{}' — no data in SQLite", meta.id);
+            // Clean up the orphaned metadata row
+            let _ = buffer_db::delete_buffer_metadata(&meta.id);
+            continue;
+        }
+
+        tlog!(
+            "[BufferStore] Hydrating buffer '{}' ({:?}, '{}', {} items)",
+            meta.id, meta.buffer_type, meta.name, meta.count
+        );
+
+        let buffer = NamedBuffer {
+            metadata: BufferMetadata {
+                is_streaming: false,
+                ..meta
+            },
+        };
+        registry.buffers.insert(buffer.metadata.id.clone(), buffer);
+        hydrated += 1;
+    }
+
+    // Ensure next_id won't collide with existing buffer IDs
+    if max_id >= registry.next_id {
+        registry.next_id = max_id + 1;
+    }
+
+    tlog!("[BufferStore] Hydrated {} buffer(s) from SQLite", hydrated);
+}
+
 // ============================================================================
 // Public API - Session Ownership
 // ============================================================================
@@ -301,16 +417,28 @@ pub fn set_active_buffer(buffer_id: &str) -> Result<(), String> {
 /// Assign a buffer to a session.
 /// The buffer will only be accessible through this session until orphaned.
 pub fn set_buffer_owner(buffer_id: &str, session_id: &str) -> Result<(), String> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
-    if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
-        buffer.metadata.owning_session_id = Some(session_id.to_string());
-        tlog!(
-            "[BufferStore] Assigned buffer '{}' to session '{}'",
-            buffer_id, session_id
-        );
-        Ok(())
-    } else {
-        Err(format!("Buffer '{}' not found", buffer_id))
+    let meta = {
+        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
+            buffer.metadata.owning_session_id = Some(session_id.to_string());
+            tlog!(
+                "[BufferStore] Assigned buffer '{}' to session '{}'",
+                buffer_id, session_id
+            );
+            Some(buffer.metadata.clone())
+        } else {
+            None
+        }
+    };
+
+    match meta {
+        Some(m) => {
+            if let Err(e) = buffer_db::save_buffer_metadata(&m) {
+                tlog!("[BufferStore] Failed to persist buffer owner: {}", e);
+            }
+            Ok(())
+        }
+        None => Err(format!("Buffer '{}' not found", buffer_id)),
     }
 }
 
@@ -327,18 +455,31 @@ pub struct OrphanedBufferInfo {
 /// Called when a session is destroyed or restarted.
 /// Returns list of orphaned buffer info for event emission.
 pub fn orphan_buffers_for_session(session_id: &str) -> Vec<OrphanedBufferInfo> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
-    let mut orphaned = Vec::new();
+    let (orphaned, metas_to_persist) = {
+        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        let mut orphaned = Vec::new();
+        let mut metas = Vec::new();
 
-    for buffer in registry.buffers.values_mut() {
-        if buffer.metadata.owning_session_id.as_deref() == Some(session_id) {
-            buffer.metadata.owning_session_id = None;
-            orphaned.push(OrphanedBufferInfo {
-                buffer_id: buffer.metadata.id.clone(),
-                buffer_name: buffer.metadata.name.clone(),
-                buffer_type: buffer.metadata.buffer_type.clone(),
-                count: buffer.metadata.count,
-            });
+        for buffer in registry.buffers.values_mut() {
+            if buffer.metadata.owning_session_id.as_deref() == Some(session_id) {
+                buffer.metadata.owning_session_id = None;
+                orphaned.push(OrphanedBufferInfo {
+                    buffer_id: buffer.metadata.id.clone(),
+                    buffer_name: buffer.metadata.name.clone(),
+                    buffer_type: buffer.metadata.buffer_type.clone(),
+                    count: buffer.metadata.count,
+                });
+                metas.push(buffer.metadata.clone());
+            }
+        }
+
+        (orphaned, metas)
+    };
+
+    // Persist ownership changes outside the registry lock
+    for meta in &metas_to_persist {
+        if let Err(e) = buffer_db::save_buffer_metadata(meta) {
+            tlog!("[BufferStore] Failed to persist orphan for '{}': {}", meta.id, e);
         }
     }
 
@@ -396,7 +537,7 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
     };
 
     // Create new buffer entry in registry
-    let id = {
+    let (id, metadata) = {
         let mut registry = BUFFER_REGISTRY.write().unwrap();
 
         let id = format!("buf_{}", registry.next_id);
@@ -419,13 +560,18 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
             owning_session_id: None,
         };
 
-        let buffer = NamedBuffer { metadata };
+        let buffer = NamedBuffer { metadata: metadata.clone() };
         registry.buffers.insert(id.clone(), buffer);
-        id
+        (id, metadata)
     };
 
     // Copy data in SQLite (INSERT INTO ... SELECT — no memory spike)
     let count = buffer_db::copy_buffer_data(source_buffer_id, &id)?;
+
+    // Persist metadata for the new buffer
+    if let Err(e) = buffer_db::save_buffer_metadata(&metadata) {
+        tlog!("[BufferStore] Failed to persist copied buffer metadata: {}", e);
+    }
 
     tlog!(
         "[BufferStore] Copied buffer '{}' -> '{}' ('{}', {} items)",

@@ -6,6 +6,12 @@ import { loadSettings as loadSettingsApi, tlog } from '../api/settings';
 import { getOrCreateDefaultDirs } from '../utils/defaultPaths';
 import { WINDOW_EVENTS } from '../events/registry';
 import { getTraitsForKind } from '../utils/profileTraits';
+import {
+  DEFAULT_BUFFER_STORAGE,
+  DEFAULT_CLEAR_BUFFERS_ON_START,
+  DEFAULT_DISCOVERY_HISTORY_BUFFER,
+  DEFAULT_QUERY_RESULT_LIMIT,
+} from '../apps/settings/stores/settingsStore';
 
 export interface IOProfile {
   id: string;
@@ -120,6 +126,8 @@ export interface AppSettings {
   telemetry_consent_given?: boolean;
   // Buffer persistence
   clear_buffers_on_start?: boolean;
+  /** Buffer storage backend ("sqlite" is the only option for now) */
+  buffer_storage?: string;
 }
 
 /**
@@ -149,8 +157,8 @@ function normalizeSettings(
     binary_one_colour: settings.binary_one_colour || "#14b8a6",
     binary_zero_colour: settings.binary_zero_colour || "#94a3b8",
     binary_unused_colour: settings.binary_unused_colour || "#64748b",
-    discovery_history_buffer: settings.discovery_history_buffer ?? 100000,
-    query_result_limit: settings.query_result_limit ?? 10000,
+    discovery_history_buffer: settings.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
+    query_result_limit: settings.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
     // Theme settings
     theme_mode: settings.theme_mode ?? "auto",
     theme_bg_primary_light: settings.theme_bg_primary_light || "#ffffff",
@@ -175,7 +183,8 @@ function normalizeSettings(
     telemetry_enabled: settings.telemetry_enabled ?? false,
     telemetry_consent_given: settings.telemetry_consent_given ?? false,
     // Buffer persistence
-    clear_buffers_on_start: settings.clear_buffers_on_start ?? true,
+    clear_buffers_on_start: settings.clear_buffers_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
+    buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
   };
 }
 

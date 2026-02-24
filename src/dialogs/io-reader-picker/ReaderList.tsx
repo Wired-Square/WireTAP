@@ -12,6 +12,17 @@ import { borderDivider, bgSurface } from "../../styles";
 import type { ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 
+/**
+ * Map buffer device type to a human-readable storage backend label.
+ * Extensible for future buffer mechanisms (e.g., "parquet", "memory").
+ */
+function getBufferStorageLabel(_deviceType: string): string {
+  // Currently all buffers use SQLite. When new buffer backends are added,
+  // the backend should report a storage_type field on ActiveSessionInfo
+  // and this function should switch on it.
+  return "sqlite";
+}
+
 /** Status for a profile that may be disabled */
 export interface ProfileDisabledStatus {
   canTransmit: boolean;
@@ -50,6 +61,10 @@ type Props = {
   allowMultiSelect?: boolean;
   /** Profile usage info - which sessions are using each profile */
   profileUsage?: Map<string, ProfileUsageInfo>;
+  /** Content to render after the Active Sessions section (e.g., BufferList) */
+  renderAfterSessions?: ReactNode;
+  /** Map of buffer ID to display name (for resolving buffer source names in active sessions) */
+  bufferNames?: Map<string, string>;
 };
 
 export default function ReaderList({
@@ -71,6 +86,8 @@ export default function ReaderList({
   validationError,
   allowMultiSelect = true,
   profileUsage,
+  renderAfterSessions,
+  bufferNames,
 }: Props) {
   // All profiles are read profiles now (mode field removed), separate by type
   const readProfiles = ioProfiles;
@@ -99,6 +116,11 @@ export default function ReaderList({
     return undefined;
   };
 
+  // Get profile info for a session ID
+  const getProfileForSession = (sessionId: string): IOProfile | null => {
+    return readProfiles.find((p) => p.id === sessionId) || null;
+  };
+
   // When a single reader is selected (not multi-bus) and not ingesting, show collapsed view
   // Multi-bus mode (checkedReaderIds.length > 0) always shows full list
   if (checkedReaderId && checkedReaderIds.length === 0 && !isIngesting) {
@@ -107,11 +129,26 @@ export default function ReaderList({
     let subtitle: string;
     let icon: ReactNode = null;
 
+    // Session type detection for styling
+    const isBufferSession = checkedMultiSourceSession?.deviceType === "buffer";
+    const isMultiSource = checkedMultiSourceSession?.deviceType === "multi_source";
+
     if (isCsvSelected) {
       displayName = "CSV";
       subtitle = "Import from file";
-    } else if (checkedMultiSourceSession) {
-      // Active session selected - show session ID as name, sources with bus mappings below
+    } else if (isBufferSession && checkedMultiSourceSession) {
+      // Buffer session — show buffer ID + source name from buffer metadata
+      displayName = checkedMultiSourceSession.sessionId;
+      const storageBackend = getBufferStorageLabel(checkedMultiSourceSession.deviceType);
+      // Resolve buffer name from metadata (e.g., "f_bc38de") via bufferId or sourceProfileIds
+      const bufferId = checkedMultiSourceSession.bufferId
+        ?? (checkedMultiSourceSession.sourceProfileIds ?? [])[0];
+      const bufferName = bufferId ? bufferNames?.get(bufferId) : undefined;
+      const profileName = bufferName || storageBackend;
+      subtitle = `└─ ${profileName} (${storageBackend})`;
+      icon = <Database className={`${iconMd} text-[color:var(--text-cyan)]`} />;
+    } else if (isMultiSource && checkedMultiSourceSession) {
+      // Multi-source session - show session ID as name, sources with bus mappings below
       displayName = checkedMultiSourceSession.sessionId;
       const sourceDetails = checkedMultiSourceSession.multiSourceConfigs
         ?.map((c) => {
@@ -128,6 +165,14 @@ export default function ReaderList({
         .join(" + ") || "";
       subtitle = sourceDetails ? `└─ ${sourceDetails}` : "";
       icon = <GitMerge className={`${iconMd} text-[color:var(--text-purple)]`} />;
+    } else if (checkedMultiSourceSession) {
+      // Other session types (e.g., single-source recorded sessions like PostgreSQL)
+      displayName = checkedMultiSourceSession.sessionId;
+      const profile = getProfileForSession(checkedMultiSourceSession.sessionId);
+      const profileName = profile?.name || checkedMultiSourceSession.deviceType;
+      const deviceKind = profile?.kind || checkedMultiSourceSession.deviceType;
+      subtitle = `└─ ${profileName} (${deviceKind})`;
+      icon = <Database className={`${iconMd} text-[color:var(--text-green)]`} />;
     } else if (checkedProfile) {
       displayName = checkedProfile.name;
       subtitle = checkedProfile.kind;
@@ -136,19 +181,34 @@ export default function ReaderList({
       subtitle = checkedReaderId;
     }
 
-    // Use purple styling for active sessions, blue for profiles
-    const isActiveSession = checkedMultiSourceSession !== null;
-    const bgClass = isActiveSession
+    // Styling: purple for multi-source, cyan for buffer, green for recorded, blue for profiles
+    const bgClass = isMultiSource
       ? "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)]"
+      : isBufferSession
+      ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
+      : checkedMultiSourceSession
+      ? "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)]"
       : "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]";
-    const indicatorClass = isActiveSession
+    const indicatorClass = isMultiSource
       ? "border-[color:var(--text-purple)]"
+      : isBufferSession
+      ? "border-[color:var(--text-cyan)]"
+      : checkedMultiSourceSession
+      ? "border-[color:var(--text-green)]"
       : "border-[color:var(--status-info-text)]";
-    const dotClass = isActiveSession
+    const dotClass = isMultiSource
       ? "bg-[var(--text-purple)]"
+      : isBufferSession
+      ? "bg-[var(--text-cyan)]"
+      : checkedMultiSourceSession
+      ? "bg-[var(--text-green)]"
       : "bg-[var(--status-info-text)]";
-    const changeClass = isActiveSession
+    const changeClass = isMultiSource
       ? "text-[color:var(--text-purple)]"
+      : isBufferSession
+      ? "text-[color:var(--text-cyan)]"
+      : checkedMultiSourceSession
+      ? "text-[color:var(--text-green)]"
       : "text-[color:var(--status-info-text)]";
 
     return (
@@ -186,11 +246,6 @@ export default function ReaderList({
     (s) => s.state === "running" || s.state === "starting" || s.state === "paused" || s.state === "stopped"
   );
 
-  // Get profile info for single-profile sessions
-  const getProfileForSession = (sessionId: string): IOProfile | null => {
-    return readProfiles.find((p) => p.id === sessionId) || null;
-  };
-
   // Get display info for a session
   const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
     const isMultiSource = session.deviceType === "multi_source";
@@ -226,18 +281,17 @@ export default function ReaderList({
         dotColour: "bg-[var(--text-purple)]",
       };
     } else if (isBuffer) {
-      // Buffer replay session (stopped live session switched to buffer playback)
-      // Look up original profile from session's source profiles
-      const sourceProfileIds = session.sourceProfileIds ?? [];
-      const originalProfile = sourceProfileIds.length > 0
-        ? readProfiles.find((p) => sourceProfileIds.includes(p.id))
-        : null;
-      const profileName = originalProfile?.name || "Buffer";
+      // Buffer session — cyan database icon, resolve name from buffer metadata
+      const storageBackend = getBufferStorageLabel(session.deviceType);
+      const bufferId = session.bufferId
+        ?? (session.sourceProfileIds ?? [])[0];
+      const bufferName = bufferId ? bufferNames?.get(bufferId) : undefined;
+      const profileName = bufferName || storageBackend;
       return {
         displayName,
         subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
-        sourceDetails: `${profileName} (buffer replay)`,
-        icon: Play,
+        sourceDetails: `${profileName} (${storageBackend})`,
+        icon: Database,
         iconColour: "text-[color:var(--text-cyan)]",
         bgSelected: "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]",
         bgHover: `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--text-cyan)]`,
@@ -246,7 +300,11 @@ export default function ReaderList({
       };
     } else {
       // Single-source session (e.g., PostgreSQL)
-      const profile = getProfileForSession(session.sessionId);
+      // Look up profile via sourceProfileIds (session IDs like t_XXXXX differ from profile IDs)
+      const sourceProfileIds = session.sourceProfileIds ?? [];
+      const profile = sourceProfileIds.length > 0
+        ? readProfiles.find((p) => sourceProfileIds.includes(p.id))
+        : getProfileForSession(session.sessionId);
       const profileName = profile?.name || session.deviceType;
       const deviceKind = profile?.kind || session.deviceType;
       return {
@@ -265,10 +323,6 @@ export default function ReaderList({
 
   return (
     <div className={borderDivider}>
-      <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
-        IO Reader
-      </div>
-
       {/* Active Sessions (all types combined - join existing) */}
       {joinableSessions.length > 0 && onSelectMultiSourceSession && (
         <div className="border-b border-[color:var(--border-default)]">
@@ -341,6 +395,70 @@ export default function ReaderList({
         </div>
       )}
 
+      {/* Slot for BufferList (rendered between Active Sessions and source lists) */}
+      {renderAfterSessions}
+
+      {/* External Sources */}
+      {!hideExternal && (
+        <div className="border-b border-[color:var(--border-default)]">
+          <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
+            <FolderOpen className={iconXs} />
+            <span>External</span>
+          </div>
+          <div className="px-3 pb-2 space-y-1">
+            <button
+              onClick={() => onSelectReader(isCsvSelected ? null : CSV_EXTERNAL_ID)}
+              disabled={isIngesting}
+              className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors disabled:opacity-50 ${
+                isCsvSelected
+                  ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
+                  : "hover:bg-[var(--hover-bg)] border border-transparent"
+              }`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                  isCsvSelected
+                    ? "border-[color:var(--status-info-text)]"
+                    : "border-[color:var(--border-default)]"
+                }`}
+              >
+                {isCsvSelected && <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className={textMedium}>CSV</span>
+                <div className={caption}>Import from file</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Recorded Sources */}
+      {!hideRecorded && recordedProfiles.length > 0 && (
+        <div className="border-b border-[color:var(--border-default)]">
+          <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
+            <Database className={iconXs} />
+            <span>Recorded</span>
+          </div>
+          <div className="px-3 pb-2 space-y-1">
+            {recordedProfiles.map((profile) => (
+              <ReaderButton
+                key={profile.id}
+                profile={profile}
+                isChecked={checkedReaderId === profile.id}
+                isDefault={profile.id === defaultId}
+                isIngesting={isIngesting}
+                isLive={isProfileLive?.(profile.id) ?? false}
+                sessionState={getSessionForProfile?.(profile.id)?.ioState}
+                onSelect={onSelectReader}
+                usageInfo={profileUsage?.get(profile.id)}
+                isRealtime={false}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Real-time Sources */}
       {realtimeProfiles.length > 0 && (
         <div className="border-b border-[color:var(--border-default)]">
@@ -397,72 +515,13 @@ export default function ReaderList({
                     isDisabled={isDisabled}
                     disabledReason={disabledReason}
                     usageInfo={usage}
+                    isRealtime
                   />
                   {/* Render extra content (e.g., bus config) inline below selected profile */}
                   {isProfileChecked && renderProfileExtra?.(profile.id)}
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* Recorded Sources */}
-      {!hideRecorded && recordedProfiles.length > 0 && (
-        <div className="border-b border-[color:var(--border-default)]">
-          <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
-            <Database className={iconXs} />
-            <span>Recorded</span>
-          </div>
-          <div className="px-3 pb-2 space-y-1">
-            {recordedProfiles.map((profile) => (
-              <ReaderButton
-                key={profile.id}
-                profile={profile}
-                isChecked={checkedReaderId === profile.id}
-                isDefault={profile.id === defaultId}
-                isIngesting={isIngesting}
-                isLive={isProfileLive?.(profile.id) ?? false}
-                sessionState={getSessionForProfile?.(profile.id)?.ioState}
-                onSelect={onSelectReader}
-                usageInfo={profileUsage?.get(profile.id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* External Sources */}
-      {!hideExternal && (
-        <div>
-          <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
-            <FolderOpen className={iconXs} />
-            <span>External</span>
-          </div>
-          <div className="px-3 pb-2 space-y-1">
-            <button
-              onClick={() => onSelectReader(isCsvSelected ? null : CSV_EXTERNAL_ID)}
-              disabled={isIngesting}
-              className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors disabled:opacity-50 ${
-                isCsvSelected
-                  ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
-                  : "hover:bg-[var(--hover-bg)] border border-transparent"
-              }`}
-            >
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  isCsvSelected
-                    ? "border-[color:var(--status-info-text)]"
-                    : "border-[color:var(--border-default)]"
-                }`}
-              >
-                {isCsvSelected && <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className={textMedium}>CSV</span>
-                <div className={caption}>Import from file</div>
-              </div>
-            </button>
           </div>
         </div>
       )}
@@ -490,6 +549,7 @@ function ReaderButton({
   isDisabled = false,
   disabledReason,
   usageInfo,
+  isRealtime = false,
 }: {
   profile: IOProfile;
   isChecked: boolean;
@@ -503,6 +563,7 @@ function ReaderButton({
   isDisabled?: boolean;
   disabledReason?: string;
   usageInfo?: ProfileUsageInfo;
+  isRealtime?: boolean;
 }) {
   // Determine badge text and colors based on session state
   const isStopped = sessionState === "stopped";
@@ -599,18 +660,21 @@ function ReaderButton({
           {isDisabled && disabledReason ? (
             <span>{profile.kind} · <span className="text-[color:var(--text-muted)]">{disabledReason}</span></span>
           ) : usageInfo && usageInfo.sessionCount > 0 ? (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span>{profile.kind}</span>
-              <span className="text-[color:var(--text-muted)]">·</span>
               {usageInfo.configLocked && (
                 <span title="Config locked (in use by multiple sessions)">
                   <Lock className={`${iconXs} text-[color:var(--text-amber)]`} />
                 </span>
               )}
-              <span className="text-[color:var(--text-purple)]">
-                in use: {usageInfo.sessionIds.slice(0, 2).join(", ")}
-                {usageInfo.sessionCount > 2 && ` +${usageInfo.sessionCount - 2}`}
-              </span>
+              {usageInfo.sessionIds.slice(0, 2).map((sid) => (
+                <span key={sid} className={isRealtime ? badgeSmallPurple : badgeSmallSuccess}>
+                  {sid}
+                </span>
+              ))}
+              {usageInfo.sessionCount > 2 && (
+                <span className="text-[color:var(--text-muted)]">+{usageInfo.sessionCount - 2}</span>
+              )}
             </span>
           ) : (
             profile.kind

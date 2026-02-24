@@ -268,14 +268,43 @@ export function useBufferFrameView(
   // FOLLOW MODE: Auto-navigate to page containing followTimeUs during buffer playback
   // The hook owns the page state, so follow logic lives here (not in external effects)
   const followPendingRef = useRef(false);
+  // Track the latest followTimeUs that was skipped while a navigation was pending.
+  // When the pending navigation resolves, we re-check with this value so the page
+  // catches up even if React already processed the latest followTimeUs change.
+  const lastSkippedFollowRef = useRef<number | null>(null);
   // Use a ref for the "already on page" check so that manual page navigation
   // (which changes frames) doesn't re-trigger follow and snap the page back.
   const framesRef = useRef(frames);
   useEffect(() => { framesRef.current = frames; }, [frames]);
 
+  // Shared follow-navigate helper used by both the effect and the catchup path
+  const doFollowNavigate = useCallback((timeUs: number) => {
+    const timeUsInt = Math.round(timeUs);
+    findBufferOffsetForTimestamp(timeUsInt, selectedIdsRef.current)
+      .then((offset) => {
+        const targetPage = Math.floor(offset / pageSizeRef.current);
+        setCurrentPage(targetPage);
+      })
+      .catch((e) => console.error("[useBufferFrameView] follow navigation error:", e))
+      .finally(() => {
+        followPendingRef.current = false;
+        // If timestamps were skipped while this navigation was pending, catch up
+        const skipped = lastSkippedFollowRef.current;
+        if (skipped != null) {
+          lastSkippedFollowRef.current = null;
+          followPendingRef.current = true;
+          doFollowNavigate(skipped);
+        }
+      });
+  }, []);
+
   useEffect(() => {
     if (followTimeUs == null || !bufferId || !isBufferPlayback) return;
-    if (followPendingRef.current) return;
+    if (followPendingRef.current) {
+      // A navigation is in flight — record the latest timestamp so we can catch up
+      lastSkippedFollowRef.current = followTimeUs;
+      return;
+    }
 
     // If we have frames, check whether the timestamp is already on the current page
     const currentFrames = framesRef.current;
@@ -287,15 +316,9 @@ export function useBufferFrameView(
 
     // Timestamp is outside the current page (or no frames loaded yet) — navigate
     followPendingRef.current = true;
-    const timeUsInt = Math.round(followTimeUs);
-    findBufferOffsetForTimestamp(timeUsInt, selectedIdsRef.current)
-      .then((offset) => {
-        const targetPage = Math.floor(offset / pageSizeRef.current);
-        setCurrentPage(targetPage);
-      })
-      .catch((e) => console.error("[useBufferFrameView] follow navigation error:", e))
-      .finally(() => { followPendingRef.current = false; });
-  }, [followTimeUs, bufferId, isBufferPlayback]);
+    lastSkippedFollowRef.current = null;
+    doFollowNavigate(followTimeUs);
+  }, [followTimeUs, bufferId, isBufferPlayback, doFollowNavigate]);
 
   // Track previous selection to detect actual changes
   const prevSelectedFramesRef = useRef<Set<number>>(selectedFrames);

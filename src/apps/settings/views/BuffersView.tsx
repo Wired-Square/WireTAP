@@ -1,12 +1,15 @@
 // ui/src/apps/settings/views/BuffersView.tsx
 
 import Input from "../../../components/forms/Input";
+import Select from "../../../components/forms/Select";
 import { labelDefault, helpText } from "../../../styles";
 import { textPrimary } from "../../../styles/colourTokens";
 
 type BuffersViewProps = {
   clearBuffersOnStart: boolean;
   onChangeClearBuffersOnStart: (value: boolean) => void;
+  bufferStorage: string;
+  onChangeBufferStorage: (value: string) => void;
   discoveryHistoryBuffer: number;
   onChangeDiscoveryHistoryBuffer: (value: number) => void;
   queryResultLimit: number;
@@ -18,6 +21,8 @@ type BuffersViewProps = {
 export default function BuffersView({
   clearBuffersOnStart,
   onChangeClearBuffersOnStart,
+  bufferStorage,
+  onChangeBufferStorage,
   discoveryHistoryBuffer,
   onChangeDiscoveryHistoryBuffer,
   queryResultLimit,
@@ -29,9 +34,23 @@ export default function BuffersView({
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Buffers</h2>
 
-      {/* Persistence Section */}
+      {/* Storage Section */}
       <div className="space-y-4">
-        <h3 className={`text-lg font-medium ${textPrimary}`}>Persistence</h3>
+        <h3 className={`text-lg font-medium ${textPrimary}`}>Storage</h3>
+
+        <div className="space-y-2">
+          <label className={labelDefault}>Buffer Storage</label>
+          <p className={helpText}>
+            Storage backend for captured frame data and imported buffers.
+          </p>
+          <Select
+            value={bufferStorage}
+            onChange={(e) => onChangeBufferStorage(e.target.value)}
+          >
+            <option value="sqlite">SQLite</option>
+          </Select>
+        </div>
+
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"

@@ -115,6 +115,10 @@ pub struct AppSettings {
     // Buffer persistence
     #[serde(default = "default_clear_buffers_on_start")]
     pub clear_buffers_on_start: bool,
+
+    /// Buffer storage backend ("sqlite" is the only option for now)
+    #[serde(default = "default_buffer_storage")]
+    pub buffer_storage: String,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -244,6 +248,9 @@ fn default_telemetry_consent_given() -> bool {
 fn default_clear_buffers_on_start() -> bool {
     true
 }
+fn default_buffer_storage() -> String {
+    "sqlite".to_string()
+}
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -308,6 +315,7 @@ impl Default for AppSettings {
             telemetry_consent_given: default_telemetry_consent_given(),
             // Buffer persistence
             clear_buffers_on_start: default_clear_buffers_on_start(),
+            buffer_storage: default_buffer_storage(),
         }
     }
 }
@@ -378,6 +386,7 @@ impl AppSettings {
             telemetry_consent_given: default_telemetry_consent_given(),
             // Buffer persistence
             clear_buffers_on_start: default_clear_buffers_on_start(),
+            buffer_storage: default_buffer_storage(),
         })
     }
 }

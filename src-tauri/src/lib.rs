@@ -854,6 +854,11 @@ pub fn run() {
                 if let Err(e) = buffer_db::initialise(&data_dir, clear_on_start) {
                     tlog!("[setup] Failed to initialise buffer database: {}", e);
                 }
+
+                // Hydrate the buffer registry from SQLite when not clearing on start
+                if !clear_on_start {
+                    buffer_store::hydrate_from_db();
+                }
             }
 
             // Restore dashboard window geometry from persisted state.
@@ -1027,6 +1032,7 @@ pub fn run() {
             buffers::get_buffer_bytes_count,
             buffers::get_buffer_bytes_paginated_by_id,
             buffers::find_buffer_bytes_offset_for_timestamp,
+            buffers::rename_buffer,
             // Session-aware buffer API
             buffers::list_orphaned_buffers,
             // Backend framing

@@ -23,7 +23,7 @@ export interface UsePlaybackHandlersParams {
   isPaused: boolean;
   isStreaming: boolean;
   sessionReady: boolean;
-  isBufferMode?: boolean;
+  isStopped?: boolean;
 
   // Current position (for step operations) - need either frame index or timestamp
   currentFrameIndex?: number | null;
@@ -51,7 +51,7 @@ export function usePlaybackHandlers({
   isPaused,
   isStreaming,
   sessionReady,
-  isBufferMode,
+  isStopped,
   currentFrameIndex,
   currentTimestampUs,
   selectedFrameIds,
@@ -124,8 +124,8 @@ export function usePlaybackHandlers({
   const handleStepBackward = useCallback(async () => {
     tlog.debug(`[PlaybackHandlers] handleStepBackward called ${JSON.stringify({ isPaused, currentFrameIndex, currentTimestampUs, sessionId })}`);
 
-    // Allow stepping when paused, or when stopped in buffer mode (before first play / after completion)
-    const canStep = isPaused || (!isStreaming && isBufferMode);
+    // Allow stepping when paused, or when stopped (before first play / after completion)
+    const canStep = isPaused || isStopped;
     if (!canStep || (currentFrameIndex == null && currentTimestampUs == null)) {
       tlog.debug('[PlaybackHandlers] handleStepBackward early return - guard condition met');
       return;
@@ -144,14 +144,14 @@ export function usePlaybackHandlers({
     } catch (e) {
       tlog.debug(`[PlaybackHandlers] Failed to step backward: ${e}`);
     }
-  }, [sessionId, isPaused, isStreaming, isBufferMode, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
+  }, [sessionId, isPaused, isStopped, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
 
   // Handle step forward (one frame later, respecting filter)
   const handleStepForward = useCallback(async () => {
     tlog.debug(`[PlaybackHandlers] handleStepForward called ${JSON.stringify({ isPaused, currentFrameIndex, currentTimestampUs, sessionId })}`);
 
-    // Allow stepping when paused, or when stopped in buffer mode (before first play / after completion)
-    const canStep = isPaused || (!isStreaming && isBufferMode);
+    // Allow stepping when paused, or when stopped (before first play / after completion)
+    const canStep = isPaused || isStopped;
     if (!canStep || (currentFrameIndex == null && currentTimestampUs == null)) {
       tlog.debug('[PlaybackHandlers] handleStepForward early return - guard condition met');
       return;
@@ -170,7 +170,7 @@ export function usePlaybackHandlers({
     } catch (e) {
       tlog.debug(`[PlaybackHandlers] Failed to step forward: ${e}`);
     }
-  }, [sessionId, isPaused, isStreaming, isBufferMode, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
+  }, [sessionId, isPaused, isStopped, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
 
   return {
     handlePlay,

@@ -499,6 +499,7 @@ export default function Decoder() {
     stopWatch,
     resumeWithNewBuffer,
     selectProfile,
+    watchSingleSource,
     // Bookmark methods
     jumpToBookmark,
   } = manager;
@@ -520,7 +521,6 @@ export default function Decoder() {
     seek,
     seekByFrame,
     switchToBufferReplay,
-    reinitialize,
   } = session;
 
   // Merged buffer metadata using session values for cross-app timeline sync
@@ -551,8 +551,7 @@ export default function Decoder() {
 
   // Use the orchestrator hook for all handlers
   const handlers = useDecoderHandlers({
-    // Session actions (low-level, for buffer reinitialize and playback)
-    reinitialize,
+    // Session actions (low-level, for playback)
     start,
     stop: stopWatch, // Use manager's stopWatch for buffer switch on timeline sources
     pause,
@@ -567,7 +566,7 @@ export default function Decoder() {
     isPaused,
     isStreaming,
     sessionReady: isReady,
-    isBufferMode,
+    isStopped,
     capabilities,
     currentFrameIndex,
     currentTimestampUs: currentTime !== null ? currentTime * 1_000_000 : null,
@@ -601,6 +600,7 @@ export default function Decoder() {
     // Manager session switching methods
     stopWatch,
     selectProfile,
+    watchSingleSource,
     jumpToBookmark,
 
     // Dialog controls

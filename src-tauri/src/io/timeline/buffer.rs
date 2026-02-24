@@ -343,11 +343,13 @@ fn handle_seek(
         );
 
         if let Ok(Some((rowid, frame))) = buffer_db::get_frame_at_index(buf_id, target_idx) {
-            *frame_index = target_idx;
+            let is_reverse = control.is_reverse();
+            // In reverse mode, the main loop pre-decrements before capturing actual_index,
+            // so set frame_index one higher so pre-decrement yields target_idx.
+            *frame_index = if is_reverse { target_idx + 1 } else { target_idx };
             *last_consumed_rowid = rowid;
 
             // Reload chunk from seek position
-            let is_reverse = control.is_reverse();
             *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, 2000, is_reverse);
             *chunk_idx = 0;
 
@@ -402,11 +404,13 @@ fn handle_seek(
                 session_id, target_idx, seek_target, is_paused
             );
 
-            *frame_index = target_idx;
+            let is_reverse = control.is_reverse();
+            // In reverse mode, the main loop pre-decrements before capturing actual_index,
+            // so set frame_index one higher so pre-decrement yields target_idx.
+            *frame_index = if is_reverse { target_idx + 1 } else { target_idx };
             *last_consumed_rowid = rowid;
 
             // Reload chunk from seek position
-            let is_reverse = control.is_reverse();
             *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, 2000, is_reverse);
             *chunk_idx = 0;
 
@@ -592,6 +596,16 @@ async fn run_buffer_stream(
                 if is_reverse { "reverse" } else { "forward" }
             );
 
+            // Adjust frame_index for the direction change:
+            // - After forward: frame_index is one-past-last-consumed (post-increment convention)
+            // - After reverse: frame_index is at-last-consumed (pre-decrement convention)
+            // Compensate so the first frame in the new direction gets the correct index.
+            if is_reverse {
+                frame_index = frame_index.saturating_sub(1);
+            } else {
+                frame_index += 1;
+            }
+
             // Reload chunk from the last consumed position in the new direction
             chunk = load_chunk(
                 &buf_id,
@@ -631,7 +645,16 @@ async fn run_buffer_stream(
         chunk_idx += 1;
         last_consumed_rowid = rowid;
 
+        // Pre-decrement for reverse so actual_index reflects the correct buffer position.
+        // Forward: actual_index = frame_index (then post-increment for next frame).
+        // Reverse: decrement first (backing up to this frame's position), then capture.
+        if is_reverse {
+            frame_index = frame_index.saturating_sub(1);
+        }
         let actual_index = frame_index;
+        if !is_reverse {
+            frame_index += 1;
+        }
 
         let is_pacing = control.is_pacing_enabled();
         let current_speed = control.read_speed();
@@ -671,13 +694,6 @@ async fn run_buffer_stream(
             total_emitted += 1;
             last_frame_time_secs = Some(frame_time_secs);
 
-            // Update frame_index
-            if is_reverse {
-                frame_index = frame_index.saturating_sub(1);
-            } else {
-                frame_index += 1;
-            }
-
             if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
                 emit_frames(&app_handle, &session_id, batch_buffer.clone());
                 batch_buffer.clear();
@@ -708,13 +724,6 @@ async fn run_buffer_stream(
             // High-speed mode: batch frames
             batch_buffer.push(frame);
             total_emitted += 1;
-
-            // Update frame_index
-            if is_reverse {
-                frame_index = frame_index.saturating_sub(1);
-            } else {
-                frame_index += 1;
-            }
 
             let time_since_pacing = last_pacing_check.elapsed().as_millis() as u64;
             let should_emit = batch_buffer.len() >= HIGH_SPEED_BATCH_SIZE
@@ -766,19 +775,14 @@ async fn run_buffer_stream(
             // Re-check pause after sleeping
             if control.is_paused() {
                 chunk_idx -= 1; // Re-process this frame after resume
+                // Undo the frame_index update so re-processing gets the correct index
+                if is_reverse { frame_index += 1; } else { frame_index -= 1; }
                 continue;
             }
 
             // Emit single frame
             emit_frames(&app_handle, &session_id, vec![frame]);
             total_emitted += 1;
-
-            // Update frame_index
-            if is_reverse {
-                frame_index = frame_index.saturating_sub(1);
-            } else {
-                frame_index += 1;
-            }
 
             emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
                 timestamp_us: playback_time_us,
@@ -794,13 +798,15 @@ async fn run_buffer_stream(
         batch_buffer.clear();
 
         // Emit final position so frontend highlights the last frame.
-        // frame_index was already incremented past the last consumed frame,
-        // so saturating_sub(1) gives the correct 0-based index.
+        // Forward: frame_index is one-past-end (post-increment), subtract 1.
+        // Reverse: frame_index IS the last consumed position (pre-decrement), use directly.
         if let Some(last_time) = last_frame_time_secs {
+            let is_reverse = control.is_reverse();
+            let final_index = if is_reverse { frame_index } else { frame_index.saturating_sub(1) };
             let playback_time_us = (last_time * 1_000_000.0) as i64;
             emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
                 timestamp_us: playback_time_us,
-                frame_index: frame_index.saturating_sub(1),
+                frame_index: final_index,
                 frame_count: Some(total_frames),
             });
         }
@@ -816,9 +822,10 @@ async fn run_buffer_stream(
     completed_flag.store(true, Ordering::Relaxed);
     control.pause();
     emit_to_session(&app_handle, "stream-complete", &session_id, "paused".to_string());
+    let final_pos = if control.is_reverse() { frame_index } else { frame_index.saturating_sub(1) };
     tlog!(
         "[Buffer:{}] Stream reached end of data, pausing at final position (frame_index: {})",
-        session_id, frame_index
+        session_id, final_pos
     );
 
     // Post-completion pause-wait loop: stay alive for step/seek/resume
@@ -845,6 +852,16 @@ async fn run_buffer_stream(
 
         // Resumed — reload chunk from current position and re-enter main loop
         let is_reverse = control.is_reverse();
+
+        // Adjust frame_index if direction changed during post-completion pause
+        if is_reverse != last_reverse {
+            if is_reverse {
+                frame_index = frame_index.saturating_sub(1);
+            } else {
+                frame_index += 1;
+            }
+        }
+
         chunk = load_chunk(&buf_id, last_consumed_rowid, CHUNK_SIZE, is_reverse);
         chunk_idx = 0;
 

@@ -8,6 +8,14 @@ All notable changes to CANdor will be documented in this file.
 
 - **CSV timestamp unit detection**: The CSV column mapper now auto-detects the timestamp unit (seconds, milliseconds, microseconds, nanoseconds) from sample data and pre-selects it in a new dropdown. An estimated capture duration is shown so the user can verify the guess at a glance. A "Negate timestamps" checkbox (auto-ticked when all sample timestamps are negative) converts negative epoch timestamps to their absolute value, preserving real wall-clock time.
 
+- **Buffers as session inputs**: Buffers (from captures or CSV imports) are now first-class session sources. The Rust backend registers the buffer ID as a source profile, so buffer sessions appear with proper source edges in the Session Manager graph. Buffer source nodes display with a cyan icon to distinguish them from realtime (purple) and recorded (green) sources.
+
+- **Persistent buffer metadata**: Buffer metadata (name, count, time range, owning session) is now stored in a `buffer_metadata` table in `buffers.db`. When "Clear buffers on start" is disabled, buffers are hydrated from the database on startup and appear in the Data Source picker without re-importing.
+
+- **Buffer rename**: Buffers can be renamed inline via a pencil icon in the Data Source picker's buffer list. The new name persists in SQLite metadata.
+
+- **Buffer storage setting**: A "Buffer Storage" dropdown under Settings → Buffers prepares for future storage backends (currently SQLite only).
+
 ### Changed
 
 - **Unified buffer playback**: Buffer mode now uses a single data path (`useBufferFrameView`) for all display — no more dual in-memory/paginated frame sources or playback/pagination toggle. Playback controls and pagination always appear together in buffer mode. The toolbar layout is reorganised into three zones: transport buttons on the left, frame counter and page navigation in the centre, speed selector and page size on the right.
@@ -15,6 +23,10 @@ All notable changes to CANdor will be documented in this file.
 - **Buffer # column**: The frame table's # column now shows each frame's original buffer position (1-based SQLite rowid). When a CAN ID filter is active, the column displays positions with gaps (e.g. 1, 4, 7, 15) reflecting the true buffer layout. A toggleable Hash button in the tab bar controls column visibility.
 
 - **0.125x playback speed**: Added 0.125x (⅛ speed) to the playback speed options for slow-motion analysis of fast CAN bus traffic.
+
+- **Data Source picker layout**: Section order is now Active Sessions → Buffers → External → Recorded → Realtime. Buffers owned by active sessions show a cyan database icon and session ID badge. IO sources in use show session ID badges (green for recorded, purple for realtime) instead of inline text.
+
+- **Buffer session via Watch**: Selecting a buffer in the Data Source picker now creates a proper session via `watchSingleSource` instead of reinitialising the existing session in-place. This gives the buffer session full lifecycle support (listeners, capabilities, session graph edges).
 
 ### Fixed
 
@@ -27,6 +39,10 @@ All notable changes to CANdor will be documented in this file.
 - **CSV frames sorted on import**: Imported CSV frames are now sorted by timestamp before insertion into the buffer, ensuring correct playback order regardless of the original file's row ordering.
 
 - **Seek timestamp rounding**: `seekReaderSession` now rounds the timestamp to an integer before passing it to the backend, preventing floating-point precision issues in SQLite queries.
+
+- **Streaming # column stays at 1–20**: During live Watch mode the frame table's # column now advances with the stream, showing each frame's position in the in-memory buffer. Previously it was stuck at 1–20 because position indices were only supplied in buffer-first mode.
+
+- **Reverse playback frame indices**: The buffer reader now reports correct frame positions during reverse playback. Pre-decrement indexing, direction-change compensation, and pause-during-pacing corrections ensure the # column matches the actual buffer row throughout forward, reverse, and direction-change sequences.
 
 - **Buffer database disk reclamation**: `buffers.db` now VACUUMs on startup when "Clear buffers on start" is enabled, reclaiming disk space from deleted data. Previously the file stayed at its peak size (e.g. 477 MB) across restarts because SQLite `DELETE` only marks pages as free without shrinking the file.
 

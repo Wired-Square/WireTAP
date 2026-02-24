@@ -78,6 +78,7 @@ export function useIOPickerHandlers({
   const {
     ioProfile,
     isStreaming,
+    isBufferMode,
     watchFrameCount,
     isIngesting,
     ingestProfileId,
@@ -192,9 +193,10 @@ export function useIOPickerHandlers({
   return {
     // State props for the dialog
     // Note: Uses isStreaming (session is running) rather than isWatching (app initiated watch)
-    // so the dialog correctly shows streaming state even when joined to another app's session
-    isIngesting: isIngesting || isStreaming,
-    ingestProfileId: isIngesting ? ingestProfileId : (isStreaming ? ioProfile : null),
+    // so the dialog correctly shows streaming state even when joined to another app's session.
+    // Buffer sessions are excluded — buffer playback is not ingestion.
+    isIngesting: isIngesting || (isStreaming && !isBufferMode),
+    ingestProfileId: isIngesting ? ingestProfileId : (isStreaming && !isBufferMode ? ioProfile : null),
     ingestFrameCount: isIngesting ? ingestFrameCount : watchFrameCount,
     ingestError: ingestError ?? null,
     // Handlers

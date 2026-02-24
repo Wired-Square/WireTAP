@@ -796,34 +796,52 @@ pub async fn destroy_reader_session(session_id: String) -> Result<(), String> {
     destroy_session(&session_id).await
 }
 
-/// Create a reader session for the shared buffer
+/// Create a reader session for a buffer.
+/// When `buffer_id` is provided, the buffer is registered as a source profile
+/// so it appears in `sourceProfileIds` and the session manager graph.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn create_buffer_reader_session(
     app: tauri::AppHandle,
     session_id: String,
+    buffer_id: Option<String>,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
     if !buffer_store::has_data() {
         return Err("No data in buffer. Please import a CSV file first.".to_string());
     }
 
-    let reader = BufferReader::new(
-        app.clone(),
-        session_id.clone(),
-        speed.unwrap_or(0.0), // 0 = no limit by default
-    );
+    // Register buffer as a source profile so it appears in sourceProfileIds
+    if let Some(ref bid) = buffer_id {
+        register_session_profile(&session_id, bid);
+    }
+
+    let reader = match buffer_id {
+        Some(bid) => BufferReader::new_with_buffer(
+            app.clone(),
+            session_id.clone(),
+            bid,
+            speed.unwrap_or(0.0), // 0 = no limit by default
+        ),
+        None => BufferReader::new(
+            app.clone(),
+            session_id.clone(),
+            speed.unwrap_or(0.0),
+        ),
+    };
 
     let result = create_session(app, session_id, Box::new(reader), None, None, None).await;
     Ok(result.capabilities)
 }
 
-/// Transition an existing session to use the shared buffer for replay
+/// Transition an existing session to use a buffer for replay.
 /// This is used when a streaming source (GVRET, PostgreSQL) ends and
 /// the user wants to replay the captured frames.
+/// When `buffer_id` is provided, the buffer is registered as a source profile.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn transition_to_buffer_reader(
     app: tauri::AppHandle,
     session_id: String,
+    buffer_id: Option<String>,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
     // Stop and destroy current session
@@ -834,12 +852,24 @@ pub async fn transition_to_buffer_reader(
         return Err("No data in buffer for replay".to_string());
     }
 
-    // Create BufferReader with the captured frames
-    let reader = BufferReader::new(
-        app.clone(),
-        session_id.clone(),
-        speed.unwrap_or(1.0), // Default to 1x speed for replay
-    );
+    // Register buffer as a source profile so it appears in sourceProfileIds
+    if let Some(ref bid) = buffer_id {
+        register_session_profile(&session_id, bid);
+    }
+
+    let reader = match buffer_id {
+        Some(bid) => BufferReader::new_with_buffer(
+            app.clone(),
+            session_id.clone(),
+            bid,
+            speed.unwrap_or(1.0), // Default to 1x speed for replay
+        ),
+        None => BufferReader::new(
+            app.clone(),
+            session_id.clone(),
+            speed.unwrap_or(1.0),
+        ),
+    };
 
     let result = create_session(app, session_id, Box::new(reader), None, None, None).await;
     Ok(result.capabilities)

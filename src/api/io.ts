@@ -227,6 +227,8 @@ export interface CreateIOSessionOptions {
   listenerId?: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName?: string;
+  /** Buffer ID for buffer reader sessions (e.g., "buf_1") */
+  bufferId?: string;
 }
 
 /**
@@ -240,6 +242,7 @@ export async function createIOSession(
   if (options.useBuffer) {
     return invoke("create_buffer_reader_session", {
       session_id: options.sessionId,
+      buffer_id: options.bufferId,
       speed: options.speed,
     });
   }
@@ -639,16 +642,18 @@ export function parseStateString(stateStr: string): IOStateType {
 }
 
 /**
- * Transition an existing session to use the shared buffer for replay.
+ * Transition an existing session to use a buffer for replay.
  * This is used after a streaming source (GVRET, PostgreSQL) ends to replay captured frames.
  * @param sessionId The session ID
  * @param speed Initial playback speed (default: 1.0)
+ * @param bufferId Optional buffer ID to register as session source
  */
 export async function transitionToBufferReader(
   sessionId: string,
-  speed?: number
+  speed?: number,
+  bufferId?: string
 ): Promise<IOCapabilities> {
-  return invoke("transition_to_buffer_reader", { session_id: sessionId, speed });
+  return invoke("transition_to_buffer_reader", { session_id: sessionId, buffer_id: bufferId, speed });
 }
 
 /**

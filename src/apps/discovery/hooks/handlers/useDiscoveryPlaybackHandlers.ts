@@ -24,7 +24,7 @@ export interface UseDiscoveryPlaybackHandlersParams {
   isPaused: boolean;
   isStreaming: boolean;
   sessionReady: boolean;
-  isBufferMode?: boolean;
+  isStopped?: boolean;
 
   // Current position (for step operations)
   currentFrameIndex?: number | null;
@@ -64,7 +64,7 @@ export function useDiscoveryPlaybackHandlers({
   isPaused,
   isStreaming,
   sessionReady,
-  isBufferMode,
+  isStopped,
   currentFrameIndex,
   currentTimestampUs,
   selectedFrameIds,
@@ -89,7 +89,7 @@ export function useDiscoveryPlaybackHandlers({
     isPaused,
     isStreaming,
     sessionReady,
-    isBufferMode,
+    isStopped,
     currentFrameIndex,
     currentTimestampUs,
     selectedFrameIds,

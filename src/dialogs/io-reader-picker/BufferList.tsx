@@ -2,11 +2,14 @@
 //
 // Shows buffers available for replay (from completed sessions or CSV imports).
 
-import { Check, FileText, Trash2, Archive } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Check, FileText, Trash2, Archive, Pencil, Database } from "lucide-react";
 import { iconMd, iconSm, iconXs } from "../../styles/spacing";
+import { badgeSmallInfo } from "../../styles/badgeStyles";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
 import type { BufferMetadata } from "../../api/buffer";
+import { renameBuffer } from "../../api/buffer";
 
 type Props = {
   buffers: BufferMetadata[];
@@ -17,6 +20,10 @@ type Props = {
   onSelectBuffer: (bufferId: string) => void;
   onDeleteBuffer: (bufferId: string) => void;
   onClearAllBuffers: () => void;
+  /** Called after a buffer is renamed so the parent can refresh */
+  onBufferRenamed?: () => void;
+  /** Map of buffer ID to session ID for buffers owned by active sessions */
+  activeSessionBufferMap?: Map<string, string>;
 };
 
 export default function BufferList({
@@ -27,7 +34,44 @@ export default function BufferList({
   onSelectBuffer,
   onDeleteBuffer,
   onClearAllBuffers,
+  onBufferRenamed,
+  activeSessionBufferMap = new Map(),
 }: Props) {
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input when entering rename mode
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingId]);
+
+  const startRename = (buffer: BufferMetadata) => {
+    setRenamingId(buffer.id);
+    setRenameValue(buffer.name);
+  };
+
+  const commitRename = async () => {
+    if (!renamingId || !renameValue.trim()) {
+      setRenamingId(null);
+      return;
+    }
+    try {
+      await renameBuffer(renamingId, renameValue.trim());
+      onBufferRenamed?.();
+    } catch (e) {
+      console.error("[BufferList] Failed to rename buffer:", e);
+    }
+    setRenamingId(null);
+  };
+
+  const cancelRename = () => {
+    setRenamingId(null);
+  };
+
   if (buffers.length === 0) {
     return null;
   }
@@ -54,30 +98,54 @@ export default function BufferList({
       <div className="p-3 space-y-2">
         {buffers.map((buffer) => {
           const isThisBufferSelected = selectedBufferId === buffer.id && !checkedReaderId && checkedReaderIds.length === 0;
+          const isRenaming = renamingId === buffer.id;
+          const sessionId = activeSessionBufferMap.get(buffer.id);
+          const isInSession = sessionId !== undefined;
           return (
             <div
               key={buffer.id}
-              onClick={() => onSelectBuffer(buffer.id)}
+              onClick={() => !isRenaming && onSelectBuffer(buffer.id)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && onSelectBuffer(buffer.id)}
+              onKeyDown={(e) => !isRenaming && e.key === "Enter" && onSelectBuffer(buffer.id)}
               className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer ${
                 isThisBufferSelected
                   ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
                   : `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--status-info-text)]`
               }`}
             >
-              <FileText
-                className={`${iconMd} flex-shrink-0 ${
-                  buffer.buffer_type === "bytes"
-                    ? "text-[color:var(--text-purple)]"
-                    : "text-[color:var(--status-info-text)]"
-                }`}
-              />
+              {isInSession ? (
+                <Database className={`${iconMd} flex-shrink-0 text-[color:var(--text-cyan)]`} />
+              ) : (
+                <FileText
+                  className={`${iconMd} flex-shrink-0 ${
+                    buffer.buffer_type === "bytes"
+                      ? "text-[color:var(--text-purple)]"
+                      : "text-[color:var(--status-info-text)]"
+                  }`}
+                />
+              )}
               <div className="flex-1 min-w-0">
-                <div className={`${textMedium} truncate`}>
-                  {buffer.buffer_type === "bytes" ? "Bytes" : "Frames"}: {buffer.name}
-                </div>
+                {isRenaming ? (
+                  <input
+                    ref={renameInputRef}
+                    type="text"
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === "Enter") commitRename();
+                      if (e.key === "Escape") cancelRename();
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`${textMedium} w-full bg-transparent border-b border-[color:var(--status-info-text)] outline-none`}
+                  />
+                ) : (
+                  <div className={`${textMedium} truncate`}>
+                    {buffer.buffer_type === "bytes" ? "Bytes" : "Frames"}: {buffer.name}
+                  </div>
+                )}
                 <div className={`${caption} flex items-center gap-2`}>
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
                     {buffer.id}
@@ -85,11 +153,24 @@ export default function BufferList({
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
                     {buffer.count.toLocaleString()} {buffer.buffer_type}
                   </span>
+                  {isInSession && (
+                    <span className={badgeSmallInfo}>{sessionId}</span>
+                  )}
                 </div>
               </div>
               {isThisBufferSelected && (
                 <Check className={`${iconMd} text-[color:var(--status-info-text)] flex-shrink-0`} />
               )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startRename(buffer);
+                }}
+                className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                title="Rename buffer"
+              >
+                <Pencil className={iconSm} />
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();

@@ -28,11 +28,13 @@ export interface SessionGraphData {
 }
 
 /**
- * Transform session data into React Flow nodes and edges
+ * Transform session data into React Flow nodes and edges.
+ * @param bufferNames Optional map of buffer_id → display name for buffer source nodes.
  */
 export function buildSessionGraph(
   sessions: ActiveSessionInfo[],
-  profiles: IOProfile[]
+  profiles: IOProfile[],
+  bufferNames?: Map<string, string>,
 ): SessionGraphData {
   const nodes: FlowNode[] = [];
   const edges: Edge[] = [];
@@ -75,6 +77,28 @@ export function buildSessionGraph(
 
     nodes.push({
       id: `source-${profile.id}`,
+      type: "source",
+      position: { x: START_X, y: START_Y + index * ROW_SPACING },
+      data: nodeData,
+    });
+  });
+
+  // Column 1b: Buffer source nodes (buffer IDs that aren't IOProfiles)
+  const profileIdSet = new Set(profiles.map((p) => p.id));
+  const bufferSourceIds = [...activeProfileIds].filter(
+    (id) => !profileIdSet.has(id) && /^buf_\d+$/.test(id)
+  );
+  bufferSourceIds.forEach((bufferId, i) => {
+    const index = activeProfiles.length + i;
+    const nodeData: SourceNodeData = {
+      profileId: bufferId,
+      profileName: bufferNames?.get(bufferId) ?? bufferId,
+      deviceType: "sqlite",
+      isRealtime: false,
+      isActive: true,
+    };
+    nodes.push({
+      id: `source-${bufferId}`,
       type: "source",
       position: { x: START_X, y: START_Y + index * ROW_SPACING },
       data: nodeData,

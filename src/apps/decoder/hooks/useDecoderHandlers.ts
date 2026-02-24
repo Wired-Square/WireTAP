@@ -31,26 +31,7 @@ import type { TimeRangeFavorite } from "../../../utils/favorites";
 import type { SelectionSet } from "../../../utils/selectionSets";
 
 export interface UseDecoderHandlersParams {
-  // Session actions (low-level, for buffer reinitialize and playback)
-  reinitialize: (
-    profileId?: string,
-    options?: {
-      useBuffer?: boolean;
-      speed?: number;
-      startTime?: string;
-      endTime?: string;
-      limit?: number;
-      framingEncoding?: "slip" | "modbus_rtu" | "delimiter" | "raw";
-      frameIdStartByte?: number;
-      frameIdBytes?: number;
-      frameIdBigEndian?: boolean;
-      sourceAddressStartByte?: number;
-      sourceAddressBytes?: number;
-      sourceAddressBigEndian?: boolean;
-      minFrameLength?: number;
-      emitRawBytes?: boolean;
-    }
-  ) => Promise<void>;
+  // Session actions (low-level, for playback)
   start: () => Promise<void>;
   stop: () => Promise<void>;
   pause: () => Promise<void>;
@@ -65,7 +46,7 @@ export interface UseDecoderHandlersParams {
   isPaused: boolean;
   isStreaming: boolean;
   sessionReady: boolean;
-  isBufferMode?: boolean;
+  isStopped?: boolean;
   capabilities: IOCapabilities | null;
   currentFrameIndex?: number | null;
   currentTimestampUs?: number | null;
@@ -99,6 +80,7 @@ export interface UseDecoderHandlersParams {
   // Manager session switching methods
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
+  watchSingleSource: (profileId: string, options: ManagerIngestOptions) => Promise<void>;
   jumpToBookmark: (bookmark: TimeRangeFavorite, options?: Omit<ManagerIngestOptions, "startTime" | "endTime" | "maxFrames">) => Promise<void>;
 
   // Dialog controls
@@ -132,9 +114,9 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
   // Session handlers (stop watch, IO profile change)
   // Dialog handlers (start/stop ingest, join, skip) are now in useIOPickerHandlers
   const sessionHandlers = useDecoderSessionHandlers({
-    reinitialize: params.reinitialize,
     stopWatch: params.stopWatch,
     selectProfile: params.selectProfile,
+    watchSingleSource: params.watchSingleSource,
     playbackSpeed: params.playbackSpeed,
     setBufferMetadata: params.setBufferMetadata,
     updateCurrentTime: params.updateCurrentTime,
@@ -152,7 +134,7 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
     isPaused: params.isPaused,
     isStreaming: params.isStreaming,
     sessionReady: params.sessionReady,
-    isBufferMode: params.isBufferMode,
+    isStopped: params.isStopped,
     currentFrameIndex: params.currentFrameIndex,
     currentTimestampUs: params.currentTimestampUs,
     selectedFrameIds: params.selectedFrames,

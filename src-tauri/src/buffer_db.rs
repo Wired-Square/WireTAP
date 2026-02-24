@@ -12,7 +12,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::buffer_store::{BufferFrameInfo, TimestampedByte};
+use crate::buffer_store::{BufferFrameInfo, BufferMetadata, BufferType, TimestampedByte};
 use crate::io::FrameMessage;
 
 /// Global database connection, protected by a Mutex.
@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS bytes (
     byte_val INTEGER NOT NULL,
     timestamp_us INTEGER NOT NULL,
     bus INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS buffer_metadata (
+    buffer_id TEXT PRIMARY KEY,
+    buffer_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    start_time_us INTEGER,
+    end_time_us INTEGER,
+    created_at INTEGER NOT NULL,
+    owning_session_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_frames_buffer_ts ON frames (buffer_id, timestamp_us);
@@ -77,6 +88,8 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
             .map_err(|e| format!("Failed to clear frames: {}", e))?;
         conn.execute("DELETE FROM bytes", [])
             .map_err(|e| format!("Failed to clear bytes: {}", e))?;
+        conn.execute("DELETE FROM buffer_metadata", [])
+            .map_err(|e| format!("Failed to clear buffer metadata: {}", e))?;
         conn.execute_batch("VACUUM;")
             .map_err(|e| format!("Failed to vacuum database: {}", e))?;
         tlog!("[buffer_db] Initialised at {:?} (cleared and vacuumed)", db_path);
@@ -522,7 +535,7 @@ pub fn delete_buffer_data(buffer_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Delete all data from both tables.
+/// Delete all data from all tables (frames, bytes, and metadata).
 pub fn delete_all_data() -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
@@ -531,6 +544,8 @@ pub fn delete_all_data() -> Result<(), String> {
         .map_err(|e| format!("Failed to delete frames: {}", e))?;
     conn.execute("DELETE FROM bytes", [])
         .map_err(|e| format!("Failed to delete bytes: {}", e))?;
+    conn.execute("DELETE FROM buffer_metadata", [])
+        .map_err(|e| format!("Failed to delete buffer metadata: {}", e))?;
 
     Ok(())
 }
@@ -996,4 +1011,104 @@ pub fn find_bytes_offset_for_timestamp(
         .map_err(|e| format!("Failed to count: {}", e))?;
 
     Ok(count as usize)
+}
+
+// ============================================================================
+// Buffer Metadata Persistence
+// ============================================================================
+
+/// Upsert buffer metadata into SQLite.
+pub fn save_buffer_metadata(meta: &BufferMetadata) -> Result<(), String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    let type_str = match &meta.buffer_type {
+        BufferType::Frames => "frames",
+        BufferType::Bytes => "bytes",
+    };
+
+    conn.execute(
+        "INSERT OR REPLACE INTO buffer_metadata (buffer_id, buffer_type, name, count, start_time_us, end_time_us, created_at, owning_session_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            &meta.id,
+            type_str,
+            &meta.name,
+            meta.count as i64,
+            meta.start_time_us.map(|v| v as i64),
+            meta.end_time_us.map(|v| v as i64),
+            meta.created_at as i64,
+            &meta.owning_session_id,
+        ],
+    )
+    .map_err(|e| format!("Failed to save buffer metadata: {}", e))?;
+
+    Ok(())
+}
+
+/// Load all buffer metadata from SQLite.
+pub fn load_all_buffer_metadata() -> Result<Vec<BufferMetadata>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    let mut stmt = conn
+        .prepare("SELECT buffer_id, buffer_type, name, count, start_time_us, end_time_us, created_at, owning_session_id FROM buffer_metadata")
+        .map_err(|e| format!("Failed to prepare: {}", e))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let type_str: String = row.get("buffer_type")?;
+            let buffer_type = if type_str == "bytes" {
+                BufferType::Bytes
+            } else {
+                BufferType::Frames
+            };
+
+            Ok(BufferMetadata {
+                id: row.get("buffer_id")?,
+                buffer_type,
+                name: row.get("name")?,
+                count: row.get::<_, i64>("count")? as usize,
+                start_time_us: row.get::<_, Option<i64>>("start_time_us")?.map(|v| v as u64),
+                end_time_us: row.get::<_, Option<i64>>("end_time_us")?.map(|v| v as u64),
+                created_at: row.get::<_, i64>("created_at")? as u64,
+                is_streaming: false,
+                owning_session_id: row.get("owning_session_id")?,
+            })
+        })
+        .map_err(|e| format!("Failed to query: {}", e))?;
+
+    let mut result = Vec::new();
+    for row in rows {
+        result.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+    }
+    Ok(result)
+}
+
+/// Update the name of a buffer in SQLite.
+pub fn update_buffer_name(buffer_id: &str, new_name: &str) -> Result<(), String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    conn.execute(
+        "UPDATE buffer_metadata SET name = ?2 WHERE buffer_id = ?1",
+        params![buffer_id, new_name],
+    )
+    .map_err(|e| format!("Failed to update buffer name: {}", e))?;
+
+    Ok(())
+}
+
+/// Delete metadata for a specific buffer.
+pub fn delete_buffer_metadata(buffer_id: &str) -> Result<(), String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    conn.execute(
+        "DELETE FROM buffer_metadata WHERE buffer_id = ?1",
+        params![buffer_id],
+    )
+    .map_err(|e| format!("Failed to delete buffer metadata: {}", e))?;
+
+    Ok(())
 }

@@ -6,37 +6,17 @@
 
 import { useCallback } from "react";
 import type { PlaybackSpeed } from "../../../../components/TimeController";
-import { isBufferProfileId } from "../../../../hooks/useIOSessionManager";
+import { isBufferProfileId, type IngestOptions } from "../../../../hooks/useIOSessionManager";
 import { useBufferSession } from "../../../../hooks/useBufferSession";
 import type { BufferMetadata } from "../../../../api/buffer";
 
 export interface UseDecoderSessionHandlersParams {
-  // Session manager actions (for buffer reinitialize only)
-  reinitialize: (
-    profileId?: string,
-    options?: {
-      useBuffer?: boolean;
-      speed?: number;
-      startTime?: string;
-      endTime?: string;
-      limit?: number;
-      framingEncoding?: "slip" | "modbus_rtu" | "delimiter" | "raw";
-      frameIdStartByte?: number;
-      frameIdBytes?: number;
-      frameIdBigEndian?: boolean;
-      sourceAddressStartByte?: number;
-      sourceAddressBytes?: number;
-      sourceAddressBigEndian?: boolean;
-      minFrameLength?: number;
-      emitRawBytes?: boolean;
-    }
-  ) => Promise<void>;
-
   // Manager session switching methods
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
+  watchSingleSource: (profileId: string, options: IngestOptions) => Promise<void>;
 
-  // Playback (for buffer reinitialize)
+  // Playback (for buffer session speed)
   playbackSpeed: PlaybackSpeed;
 
   // Buffer state (for centralized buffer handler)
@@ -46,9 +26,9 @@ export interface UseDecoderSessionHandlersParams {
 }
 
 export function useDecoderSessionHandlers({
-  reinitialize,
   stopWatch,
   selectProfile,
+  watchSingleSource,
   playbackSpeed,
   setBufferMetadata,
   updateCurrentTime,
@@ -70,18 +50,18 @@ export function useDecoderSessionHandlers({
   // Handle IO profile change - manager handles common logic, app handles buffer mode
   const handleIoProfileChange = useCallback(
     async (profileId: string | null) => {
-      // Manager handles: clear multi-bus, set profile, default speed
-      selectProfile(profileId);
-
-      // Buffer profiles need additional setup for playback
       if (isBufferProfileId(profileId)) {
-        // Use centralized handler to fetch metadata and reset playback state
+        // Create a proper session for the buffer so it appears in the session manager
+        // and has playback/timeline controls
+        await watchSingleSource(profileId!, { speed: playbackSpeed });
+        // Load buffer metadata for the UI
         await switchToBuffer(profileId!);
-        // Create BufferReader session for playback
-        await reinitialize(profileId!, { useBuffer: true, speed: playbackSpeed });
+      } else {
+        // Manager handles: clear multi-bus, set profile, default speed
+        selectProfile(profileId);
       }
     },
-    [selectProfile, switchToBuffer, reinitialize, playbackSpeed]
+    [selectProfile, watchSingleSource, switchToBuffer, playbackSpeed]
   );
 
   return {

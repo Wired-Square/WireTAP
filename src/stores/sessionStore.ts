@@ -448,7 +448,7 @@ export interface SessionStore {
   /** Seek to frame index (preferred for buffer playback) */
   seekSessionByFrame: (sessionId: string, frameIndex: number) => Promise<void>;
   /** Switch to buffer replay mode */
-  switchToBuffer: (sessionId: string, speed?: number) => Promise<void>;
+  switchToBuffer: (sessionId: string, speed?: number, bufferId?: string) => Promise<void>;
 
   // ---- Actions: Transmission ----
   /** Transmit a CAN frame through a session */
@@ -855,6 +855,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       const createOptions: CreateIOSessionOptions = {
         sessionId,
         profileId: isBufferMode ? undefined : profileId, // Don't pass fake profile ID for buffer mode
+        bufferId: isBufferMode ? profileId : undefined, // Pass buffer ID so Rust registers it as source
         startTime: options.startTime,
         endTime: options.endTime,
         // For buffer mode, default to 1x speed (paced playback) instead of 0 (no pacing)
@@ -1617,8 +1618,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     });
   },
 
-  switchToBuffer: async (sessionId, speed) => {
-    const capabilities = await transitionToBufferReader(sessionId, speed);
+  switchToBuffer: async (sessionId, speed, bufferId) => {
+    const capabilities = await transitionToBufferReader(sessionId, speed, bufferId);
     set((s) => ({
       sessions: {
         ...s.sessions,

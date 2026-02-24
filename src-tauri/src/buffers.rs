@@ -325,6 +325,12 @@ pub async fn find_buffer_bytes_offset_for_timestamp(
 // Session-Aware Buffer Commands
 // ============================================================================
 
+/// Rename a buffer.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn rename_buffer(buffer_id: String, new_name: String) -> Result<BufferMetadata, String> {
+    buffer_store::rename_buffer(&buffer_id, &new_name)
+}
+
 /// List only orphaned buffers (no owning session).
 /// These are buffers available for standalone selection in the IO picker.
 /// Includes CSV imports and buffers from destroyed sessions.

@@ -87,6 +87,8 @@ export default function Settings() {
   // Buffers
   const clearBuffersOnStart = useSettingsStore((s) => s.buffers.clearBuffersOnStart);
   const setClearBuffersOnStart = useSettingsStore((s) => s.setClearBuffersOnStart);
+  const bufferStorage = useSettingsStore((s) => s.buffers.bufferStorage);
+  const setBufferStorage = useSettingsStore((s) => s.setBufferStorage);
   const discoveryHistoryBuffer = useSettingsStore((s) => s.buffers.discoveryHistoryBuffer);
   const setDiscoveryHistoryBuffer = useSettingsStore((s) => s.setDiscoveryHistoryBuffer);
   const queryResultLimit = useSettingsStore((s) => s.buffers.queryResultLimit);
@@ -271,6 +273,8 @@ export default function Settings() {
             <BuffersView
               clearBuffersOnStart={clearBuffersOnStart}
               onChangeClearBuffersOnStart={setClearBuffersOnStart}
+              bufferStorage={bufferStorage}
+              onChangeBufferStorage={setBufferStorage}
               discoveryHistoryBuffer={discoveryHistoryBuffer}
               onChangeDiscoveryHistoryBuffer={setDiscoveryHistoryBuffer}
               queryResultLimit={queryResultLimit}

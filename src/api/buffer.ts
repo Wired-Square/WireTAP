@@ -366,6 +366,17 @@ export async function deleteBuffer(bufferId: string): Promise<void> {
 }
 
 /**
+ * Rename a buffer.
+ *
+ * @param bufferId - The buffer ID to rename
+ * @param newName - The new display name
+ * @returns Updated buffer metadata
+ */
+export async function renameBuffer(bufferId: string, newName: string): Promise<BufferMetadata> {
+  return invoke("rename_buffer", { buffer_id: bufferId, new_name: newName });
+}
+
+/**
  * Get metadata for a specific buffer by ID.
  *
  * @param bufferId - The buffer ID to look up

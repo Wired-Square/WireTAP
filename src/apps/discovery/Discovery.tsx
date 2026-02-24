@@ -374,6 +374,7 @@ export default function Discovery() {
     stopWatch,
     resumeWithNewBuffer,
     selectProfile,
+    watchSingleSource,
     // Bookmark methods
     jumpToBookmark,
   } = manager;
@@ -615,7 +616,7 @@ export default function Discovery() {
     ioProfile,
     sourceProfileId,
     playbackSpeed,
-    sessionIsBufferMode: isBufferMode,
+    isStopped,
     bufferModeEnabled: bufferMode.enabled,
     bufferModeTotalFrames: bufferMode.totalFrames,
 
@@ -660,6 +661,7 @@ export default function Discovery() {
     // Manager session switching methods
     stopWatch,
     selectProfile,
+    watchSingleSource,
     jumpToBookmark,
 
     // Session actions
@@ -848,7 +850,6 @@ export default function Discovery() {
             onScrub={handlers.handleScrub}
             bufferMetadata={effectiveBufferMetadata}
             isRecorded={isRecorded}
-            isBufferMode={isBufferMode}
             // Playback controls
             playbackState={isStreaming && !isPaused ? "playing" : "paused"}
             playbackDirection={playbackDirection}

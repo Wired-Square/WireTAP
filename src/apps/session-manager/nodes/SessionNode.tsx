@@ -125,7 +125,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
             {session.bufferFrameCount.toLocaleString()} frames buffered
           </div>
         )}
-        <div className="text-[10px] opacity-70">{session.deviceType}</div>
+        <div className="text-[10px] opacity-70">{session.deviceType === "buffer" ? "sqlite" : session.deviceType}</div>
       </div>
 
       {/* Output handle - connects to listeners */}

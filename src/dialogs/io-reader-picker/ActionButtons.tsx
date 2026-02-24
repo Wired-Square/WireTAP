@@ -3,6 +3,7 @@
 import { Download, Eye, Loader2, Upload, Check, Plug, Play, GitMerge, Unplug, RotateCcw } from "lucide-react";
 import type { IOProfile } from "../../hooks/useSettings";
 import { CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
+import { isBufferProfileId } from "../../hooks/useIOSessionManager";
 import { primaryButtonBase, successButtonBase, panelFooter, errorBoxCompact, dangerButtonBase } from "../../styles";
 import { iconMd, iconSm } from "../../styles/spacing";
 
@@ -170,6 +171,18 @@ export default function ActionButtons({
           >
             <Plug className={iconMd} />
             <span>Connect</span>
+          </button>
+          {releaseButton}
+        </div>
+      ) : checkedReaderId && isBufferProfileId(checkedReaderId) ? (
+        // Buffer session selected — just show Join (no Resume/Ingest/Watch)
+        <div className="flex gap-2">
+          <button
+            onClick={onJoinClick ?? onClose}
+            className={`flex-1 ${successButtonBase}`}
+          >
+            <Plug className={iconMd} />
+            <span>Join</span>
           </button>
           {releaseButton}
         </div>

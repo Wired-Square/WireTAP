@@ -349,8 +349,8 @@ export default function IoReaderPickerDialog({
       setSelectedSpeed(externalIngestSpeed && externalIngestSpeed > 0 ? externalIngestSpeed : 1);
       setFramingConfig(null);
       // If currently ingesting, pre-select that profile; otherwise use currently selected profile
-      // But don't pre-select buffer profile as checkedReaderId (it's shown separately)
-      const initialReaderId = ingestProfileId ?? (isBufferProfileId(selectedId) ? null : selectedId);
+      // Buffer profiles are treated as regular sessions (shown in collapsed view like other sessions)
+      const initialReaderId = ingestProfileId ?? selectedId;
       setCheckedReaderId(initialReaderId);
       setImportError(null);
 
@@ -1218,24 +1218,13 @@ export default function IoReaderPickerDialog({
         />
 
         <div className="max-h-[60vh] overflow-y-auto">
-          {!hideBuffers && (
-            <BufferList
-              buffers={buffers}
-              selectedBufferId={selectedBufferId}
-              checkedReaderId={checkedReaderId}
-              checkedReaderIds={checkedReaderIds}
-              onSelectBuffer={handleSelectBuffer}
-              onDeleteBuffer={handleDeleteBuffer}
-              onClearAllBuffers={handleClearAllBuffers}
-            />
-          )}
-
           <ReaderList
             ioProfiles={ioProfiles}
             checkedReaderId={checkedReaderId}
             checkedReaderIds={checkedReaderIds}
             defaultId={defaultId}
             isIngesting={isIngesting}
+            bufferNames={new Map(buffers.map((b) => [b.id, b.name]))}
             onSelectReader={(id) => {
               setCheckedReaderId(id);
               // Clear multi-bus selection when selecting a single profile
@@ -1350,6 +1339,27 @@ export default function IoReaderPickerDialog({
             hideExternal={hideBuffers}
             hideRecorded={hideBuffers}
             profileUsage={profileUsage}
+            renderAfterSessions={!hideBuffers ? (
+              <BufferList
+                buffers={buffers}
+                selectedBufferId={selectedBufferId}
+                checkedReaderId={checkedReaderId}
+                checkedReaderIds={checkedReaderIds}
+                onSelectBuffer={handleSelectBuffer}
+                onDeleteBuffer={handleDeleteBuffer}
+                onClearAllBuffers={handleClearAllBuffers}
+                onBufferRenamed={() => listOrphanedBuffers().then(setBuffers).catch(console.error)}
+                activeSessionBufferMap={new Map(
+                  activeMultiSourceSessions
+                    .filter((s) => s.deviceType === "buffer")
+                    .flatMap((s) => {
+                      const entries: [string, string][] = [[s.sessionId, s.sessionId]];
+                      if (s.bufferId) entries.push([s.bufferId, s.sessionId]);
+                      return entries;
+                    })
+                )}
+              />
+            ) : undefined}
           />
 
           {/* Show ingest options when creating a new session */}

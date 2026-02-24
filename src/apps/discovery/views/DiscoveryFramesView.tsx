@@ -61,9 +61,6 @@ type Props = {
   // Whether the data source is recorded (e.g., PostgreSQL, CSV) vs live
   isRecorded?: boolean;
 
-  // Whether in buffer mode (from session manager - used for timeline controls visibility)
-  isBufferMode?: boolean;
-
   // Playback controls (for buffer replay)
   playbackState?: PlaybackState;
   playbackDirection?: "forward" | "backward";
@@ -109,7 +106,6 @@ function DiscoveryFramesView({
   onScrub,
   bufferMetadata,
   isRecorded = false,
-  isBufferMode = false,
   playbackState = "paused",
   playbackDirection = "forward",
   capabilities,
@@ -142,8 +138,8 @@ function DiscoveryFramesView({
   const effectiveBufferId = bufferId ?? bufferMetadata?.id ?? null;
   const useBufferFirstMode = effectiveBufferId !== null;
 
-  // Buffer playback = pagination mode (not tail-follow). True for: buf_N profile, paused stream, or store-level buffer mode (after ingest)
-  const isBufferPlayback = isBufferMode || isStreamPaused || bufferMode.enabled;
+  // Buffer playback = pagination mode (not tail-follow). True for: recorded source, paused stream, or store-level buffer mode (after ingest)
+  const isBufferPlayback = isRecorded || isStreamPaused || bufferMode.enabled;
 
   const bufferFrameView = useBufferFrameView({
     bufferId: effectiveBufferId,
@@ -281,16 +277,19 @@ function DiscoveryFramesView({
     // During streaming: iterate backwards, collect up to renderBuffer matching frames
     const limit = renderBuffer === -1 ? frames.length : renderBuffer;
     const result: FrameMessage[] = [];
+    const indices: number[] = [];
 
     for (let i = frames.length - 1; i >= 0 && result.length < limit; i--) {
       const frame = frames[i];
       if (selectedFrames.has(frame.frame_id)) {
         result.push(frame);
+        indices.push(i + 1); // 1-based position in the in-memory buffer
       }
     }
 
     // Reverse to get chronological order
     result.reverse();
+    indices.reverse();
 
     // Pre-compute hex bytes for visible frames only
     const withHex = result.map(frame => ({
@@ -298,7 +297,7 @@ function DiscoveryFramesView({
       hexBytes: frame.bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()),
     }));
 
-    return { visibleFrames: withHex, filteredCount: -1 };
+    return { visibleFrames: withHex, filteredCount: -1, indices };
   }, [frameVersion, selectedFrames, renderBuffer, isStreaming]);
 
   // When stopped: defer heavy filtering to avoid blocking UI
@@ -370,6 +369,7 @@ function DiscoveryFramesView({
   let effectiveCurrentPage: number;
   let effectiveTotalPages: number;
   let isBufferFirstLoading = false;
+  let streamingIndices: number[] | undefined;
 
   // Keep stable reference to hook's setCurrentPage
   const hookSetCurrentPageRef = useRef(bufferFrameView.setCurrentPage);
@@ -425,11 +425,12 @@ function DiscoveryFramesView({
     isBufferFirstLoading = bufferFrameView.isLoading;
   } else if (isStreaming) {
     // Active streaming (no buffer) - show tail of in-memory frames
-    const result = streamingResult ?? { visibleFrames: [], filteredCount: -1 };
+    const result = streamingResult ?? { visibleFrames: [], filteredCount: -1, indices: [] };
     visibleFrames = result.visibleFrames;
     filteredCount = result.filteredCount;
     effectiveCurrentPage = currentPage;
     effectiveTotalPages = 1;
+    streamingIndices = result.indices;
   } else {
     // Stopped without buffer - deferred filtered in-memory frames
     const result = deferredResult ?? { visibleFrames: [], filteredCount: 0 };
@@ -457,6 +458,7 @@ function DiscoveryFramesView({
     if (firstTs > lastTs) {
       // Frames are in descending order, reverse to get ascending
       visibleFrames = [...visibleFrames].reverse();
+      if (streamingIndices) streamingIndices = [...streamingIndices].reverse();
       framesWereReversed = true;
     }
   }
@@ -690,17 +692,12 @@ function DiscoveryFramesView({
   ) : undefined;
 
   // Playback controls for toolbar center
-  // In buffer mode, buffer reader always supports seek, speed control, pause, and reverse
-  // Only show when: in buffer mode (from session), recorded source, or buffer mode enabled when NOT streaming
-  // For timeline sources (isRecorded), also show during live streaming (with only stop enabled)
-  // The `bufferMode.enabled` check only applies when not streaming to avoid stale state during live streams
-  const inBufferPlaybackMode = isBufferMode || (!isStreaming && bufferMode.enabled);
-  const showPlaybackControls = inBufferPlaybackMode || isRecorded || isLiveStreaming;
+  // Show playback controls for recorded sources (including buffers), live streaming, or after ingest
+  const showPlaybackControls = isRecorded || isLiveStreaming || (!isStreaming && bufferMode.enabled);
   // In buffer-first mode, never fall back to frameCount (frames.length) which may be stale
   // from the streaming array and differ from the actual buffer count.
   const effectiveTotalFrames = bufferFrameView.totalCount || bufferMetadata?.count || bufferMode.totalFrames || (!useBufferFirstMode ? frameCount : undefined) || undefined;
   effectiveTotalFramesRef.current = effectiveTotalFrames;
-  const supportsSpeedControl = inBufferPlaybackMode || (capabilities?.supports_speed_control ?? false);
 
   // Wrapped play handlers: auto-seek to start/end when at boundary so playback has
   // frames to traverse (the buffer reader re-pauses immediately at the boundary otherwise)
@@ -726,11 +723,11 @@ function DiscoveryFramesView({
     <PlaybackControls
       playbackState={playbackState}
       playbackDirection={playbackDirection}
-      isReady={inBufferPlaybackMode || isRecorded || isLiveStreaming}
-      canPause={inBufferPlaybackMode || (capabilities?.can_pause ?? false)}
-      supportsSeek={inBufferPlaybackMode || (capabilities?.supports_seek ?? false)}
-      supportsSpeedControl={supportsSpeedControl}
-      supportsReverse={inBufferPlaybackMode || (capabilities?.supports_reverse ?? false)}
+      isReady={isRecorded || isLiveStreaming || (!isStreaming && bufferMode.enabled)}
+      canPause={capabilities?.can_pause ?? false}
+      supportsSeek={capabilities?.supports_seek ?? false}
+      supportsSpeedControl={capabilities?.supports_speed_control ?? false}
+      supportsReverse={capabilities?.supports_reverse ?? false}
       isLiveStreaming={isLiveStreaming}
       isStreamPaused={isStreamPaused}
       playbackSpeed={playbackSpeed}
@@ -753,23 +750,37 @@ function DiscoveryFramesView({
 
   // Frame counter for the toolbar center info zone
   const frameCounterInfo = (() => {
-    if (!showPlaybackControls || currentFrameIndex == null || !effectiveTotalFrames) return null;
-    const totalStr = effectiveTotalFrames.toLocaleString();
-    const currentStr = (Math.max(0, Math.min(currentFrameIndex, effectiveTotalFrames - 1)) + 1).toLocaleString();
-    // Stable min-width based on widest possible text to prevent layout shift
-    const maxChars = totalStr.length * 2 + 4;
-    return (
-      <span
-        className="px-1.5 text-xs font-mono text-gray-400 tabular-nums text-center"
-        style={{ minWidth: `${maxChars}ch` }}
-      >
-        {currentStr} of {totalStr}
-      </span>
-    );
+    // During playback: show "X of Y" with current position
+    if (showPlaybackControls && currentFrameIndex != null && effectiveTotalFrames) {
+      const totalStr = effectiveTotalFrames.toLocaleString();
+      const currentStr = (Math.max(0, Math.min(currentFrameIndex, effectiveTotalFrames - 1)) + 1).toLocaleString();
+      // Stable min-width based on widest possible text to prevent layout shift
+      const maxChars = totalStr.length * 2 + 4;
+      return (
+        <span
+          className="px-1.5 text-xs font-mono text-gray-400 tabular-nums text-center"
+          style={{ minWidth: `${maxChars}ch` }}
+        >
+          {currentStr} of {totalStr}
+        </span>
+      );
+    }
+    // During live streaming: show total frame count
+    if (isStreaming && !isStreamPaused) {
+      const count = useBufferFirstMode ? bufferFrameView.totalCount : frames.length;
+      if (count > 0) {
+        return (
+          <span className="px-1.5 text-xs font-mono text-gray-400 tabular-nums text-center">
+            {count.toLocaleString()}
+          </span>
+        );
+      }
+    }
+    return null;
   })();
 
   // Speed selector for the toolbar right zone
-  const speedSelector = showPlaybackControls && supportsSpeedControl && onSpeedChange ? (
+  const speedSelector = showPlaybackControls && (capabilities?.supports_speed_control ?? false) && onSpeedChange ? (
     <select
       value={playbackSpeed}
       onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
@@ -807,7 +818,7 @@ function DiscoveryFramesView({
               onPageChange: setCurrentPageStable,
               onPageSizeChange: handlePageSizeChange,
               loading: (!useBufferFirstMode && isFiltering) || isBufferFirstLoading,
-              disabled: isStreaming && !isStreamPaused && !inBufferPlaybackMode,
+              disabled: isStreaming && !isStreamPaused && !isRecorded,
               leftContent: timeRangeInputs,
               centerContent: playbackControls,
               infoContent: frameCounterInfo,
@@ -856,7 +867,7 @@ function DiscoveryFramesView({
           pageStartIndex={effectivePageStartIndex}
           framesReversed={framesWereReversed}
           pageFrameCount={visibleFrames.length}
-          bufferIndices={useBufferFirstMode ? bufferFrameView.bufferIndices : undefined}
+          bufferIndices={useBufferFirstMode ? bufferFrameView.bufferIndices : streamingIndices}
         />
       )}
 
