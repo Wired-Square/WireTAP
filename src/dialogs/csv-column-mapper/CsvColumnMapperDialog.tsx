@@ -27,6 +27,7 @@ import {
   bgSurface,
   borderDefault,
   textSecondary,
+  textDataPurple,
 } from "../../styles";
 import { iconMd } from "../../styles/spacing";
 
@@ -52,6 +53,7 @@ export default function CsvColumnMapperDialog({
   const [error, setError] = useState<string | null>(null);
   const [timestampUnit, setTimestampUnit] = useState<TimestampUnit>("microseconds");
   const [negateTimestamps, setNegateTimestamps] = useState(false);
+  const [showImportedTs, setShowImportedTs] = useState(false);
 
   // Extract filename from path
   const filename = filePath.split(/[/\\]/).pop() ?? filePath;
@@ -265,11 +267,21 @@ export default function CsvColumnMapperDialog({
               mappings={mappings}
               hasHeader={hasHeader}
               onMappingChange={handleMappingChange}
+              timestampUnit={timestampUnit}
+              negateTimestamps={negateTimestamps}
+              showImportedTs={showImportedTs}
             />
 
             {/* Timestamp options */}
             {hasTimestamp && (
               <div className={`flex items-center gap-3 flex-wrap ${bgSurface} border ${borderDefault} rounded px-3 py-2`}>
+                <button
+                  type="button"
+                  onClick={() => setShowImportedTs((v) => !v)}
+                  className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${showImportedTs ? textDataPurple : textMuted} hover:brightness-90 transition-colors`}
+                >
+                  {showImportedTs ? "Raw" : "Preview"}
+                </button>
                 <label className={`text-xs ${textSecondary} whitespace-nowrap`}>
                   Timestamp unit
                 </label>

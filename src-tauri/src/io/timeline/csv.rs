@@ -915,10 +915,20 @@ fn parse_space_separated_hex(s: &str) -> Vec<u8> {
 
 /// Analyse sample timestamp values and suggest the most likely unit.
 ///
-/// Computes the median absolute diff between consecutive parsed timestamps,
-/// then picks the unit whose implied frame rate falls in the typical CAN bus
-/// range (1 Hz – 100 kHz). Iterates finest-to-coarsest to prefer the more
-/// granular unit when ambiguous. Defaults to `Microseconds` if no unit fits.
+/// Two-pass heuristic:
+///
+/// 1. **Epoch magnitude check** — if the absolute timestamp values look like
+///    Unix epoch values in a specific unit (year 2000–2036), return that unit
+///    immediately. This handles the very common case of epoch-based CAN logs
+///    and avoids mis-detection when CAN bus bursts produce tiny inter-frame
+///    diffs.
+///
+/// 2. **Frame-rate check** — computes the median absolute diff between
+///    consecutive timestamps and picks the unit whose implied frame rate
+///    falls in the typical CAN bus range (1 Hz – 100 kHz). Iterates
+///    finest-to-coarsest to prefer the more granular unit when ambiguous.
+///
+/// Defaults to `Microseconds` if neither heuristic matches.
 fn suggest_timestamp_unit(
     sample_rows: &[Vec<String>],
     timestamp_col: Option<usize>,
@@ -937,7 +947,36 @@ fn suggest_timestamp_unit(
         return TimestampUnit::Microseconds;
     }
 
-    // Absolute differences between consecutive timestamps (skip zero-diff duplicates)
+    // Candidate units from finest to coarsest
+    let candidates: [(TimestampUnit, f64); 4] = [
+        (TimestampUnit::Nanoseconds, 1_000_000_000.0),
+        (TimestampUnit::Microseconds, 1_000_000.0),
+        (TimestampUnit::Milliseconds, 1_000.0),
+        (TimestampUnit::Seconds, 1.0),
+    ];
+
+    // --- Pass 1: epoch magnitude check ---
+    // Plausible Unix epoch range: 2000-01-01 to 2036-01-01 in seconds.
+    const EPOCH_MIN: f64 = 946_684_800.0;
+    const EPOCH_MAX: f64 = 2_082_758_400.0;
+
+    let mut abs_values: Vec<u64> = timestamps.iter().map(|t| t.unsigned_abs()).collect();
+    abs_values.sort_unstable();
+    let median_abs = abs_values[abs_values.len() / 2] as f64;
+
+    let mut epoch_match: Option<TimestampUnit> = None;
+    for &(unit, divisor) in &candidates {
+        let as_secs = median_abs / divisor;
+        if as_secs >= EPOCH_MIN && as_secs <= EPOCH_MAX {
+            epoch_match = Some(unit);
+            break; // Finest matching unit wins
+        }
+    }
+    if let Some(unit) = epoch_match {
+        return unit;
+    }
+
+    // --- Pass 2: frame-rate heuristic (original logic) ---
     let mut diffs: Vec<u64> = timestamps
         .windows(2)
         .map(|w| (w[1] - w[0]).unsigned_abs())
@@ -950,14 +989,6 @@ fn suggest_timestamp_unit(
 
     diffs.sort_unstable();
     let median_diff = diffs[diffs.len() / 2];
-
-    // Candidate units from finest to coarsest
-    let candidates = [
-        (TimestampUnit::Nanoseconds, 1_000_000_000.0),
-        (TimestampUnit::Microseconds, 1_000_000.0),
-        (TimestampUnit::Milliseconds, 1_000.0),
-        (TimestampUnit::Seconds, 1.0),
-    ];
 
     const MIN_RATE: f64 = 1.0;
     const MAX_RATE: f64 = 100_000.0;

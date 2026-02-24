@@ -6,6 +6,10 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **CSV timestamp preview**: A Preview/Raw toggle in the CSV column mapper's timestamp options bar shows how timestamps will look after import — offset-from-zero values with microsecond precision (e.g. `0.247,307 s`). Updates reactively when the timestamp unit or negate checkbox changes, making it easy to verify the correct unit at a glance.
+
+- **CSV table scroll indicators**: The CSV column mapper preview table now shows gradient shadows on the left/right edges when content overflows horizontally, cueing the user to scroll.
+
 - **CSV timestamp unit detection**: The CSV column mapper now auto-detects the timestamp unit (seconds, milliseconds, microseconds, nanoseconds) from sample data and pre-selects it in a new dropdown. An estimated capture duration is shown so the user can verify the guess at a glance. A "Negate timestamps" checkbox (auto-ticked when all sample timestamps are negative) converts negative epoch timestamps to their absolute value, preserving real wall-clock time.
 
 - **Buffers as session inputs**: Buffers (from captures or CSV imports) are now first-class session sources. The Rust backend registers the buffer ID as a source profile, so buffer sessions appear with proper source edges in the Session Manager graph. Buffer source nodes display with a cyan icon to distinguish them from realtime (purple) and recorded (green) sources.
@@ -17,6 +21,8 @@ All notable changes to CANdor will be documented in this file.
 - **Buffer storage setting**: A "Buffer Storage" dropdown under Settings → Buffers prepares for future storage backends (currently SQLite only).
 
 ### Changed
+
+- **CSV timestamp unit detection**: Added an epoch magnitude heuristic that checks whether absolute timestamp values correspond to a plausible Unix epoch (2000–2036) before falling back to the frame-rate heuristic. Fixes mis-detection of microsecond epoch timestamps as milliseconds when CAN bus burst patterns produce very small inter-frame diffs.
 
 - **Unified buffer playback**: Buffer mode now uses a single data path (`useBufferFrameView`) for all display — no more dual in-memory/paginated frame sources or playback/pagination toggle. Playback controls and pagination always appear together in buffer mode. The toolbar layout is reorganised into three zones: transport buttons on the left, frame counter and page navigation in the centre, speed selector and page size on the right.
 
