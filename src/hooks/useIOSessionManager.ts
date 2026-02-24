@@ -631,21 +631,23 @@ export function useIOSessionManager(
   const joinerCount = session.joinerCount;
 
   // ---- Handlers ----
-  // Detach from session with a copy of the buffer
-  // After detaching, the app views the copied buffer (standalone, not detached state)
+  // Leave session, keeping a reference to the buffer data.
+  // When other listeners remain, we copy the buffer so the session's buffer stays intact.
+  // When we're the last listener, we skip the copy — leaving the session orphans the
+  // buffer automatically, and we can reference it directly.
   const handleDetach = useCallback(async () => {
     let bufferId = session.bufferId;
 
     // No buffer yet - try to create one by suspending first
     if (!bufferId && session.sessionId) {
       if (joinerCount <= 1) {
-        // Sole listener: suspend to create a buffer, then copy and leave
+        // Sole listener: suspend to create a buffer, then leave
         await session.suspend();
         // Read buffer ID from store (suspendSession sets it synchronously)
         const storeSession = useSessionStore.getState().sessions[session.sessionId];
         bufferId = storeSession?.buffer?.id ?? null;
       } else {
-        // Multiple listeners: just leave, clear state
+        // Multiple listeners and no buffer: just leave, clear state
         await session.leave();
         setMultiBusProfiles([]);
         setIoProfile(null);
@@ -656,16 +658,20 @@ export function useIOSessionManager(
     }
 
     if (bufferId) {
-      const { copyBufferForDetach } = await import("../api/io");
-      const copyName = `${ioProfileName || "detached"}-${Date.now()}`;
-      const copiedBufferId = await copyBufferForDetach(bufferId, copyName);
-
-      // Leave the session (others keep streaming)
-      await session.leave();
-
-      // Clear multi-bus state and switch to the copied buffer
-      setMultiBusProfiles([]);
-      setIoProfile(copiedBufferId);
+      if (joinerCount > 1) {
+        // Other listeners still need the session's buffer — copy it for ourselves
+        const { copyBufferForDetach } = await import("../api/io");
+        const copyName = `${ioProfileName || "detached"}-${Date.now()}`;
+        const copiedBufferId = await copyBufferForDetach(bufferId, copyName);
+        await session.leave();
+        setMultiBusProfiles([]);
+        setIoProfile(copiedBufferId);
+      } else {
+        // Last listener — leaving will orphan the buffer, so just use it directly
+        await session.leave();
+        setMultiBusProfiles([]);
+        setIoProfile(bufferId);
+      }
       setIsWatching(false);
       setIsDetached(false);
     } else {
@@ -940,7 +946,8 @@ export function useIOSessionManager(
     streamCompletedRef.current = false;
   }, [session, onBeforeWatch, resetWatchFrameCount]);
 
-  // Detach from session with a copy of the buffer
+  // Detach from session, keeping the buffer data.
+  // Copies the buffer only when other listeners still need the session's buffer.
   const detachWithBufferCopy = useCallback(async () => {
     const bufferId = session.bufferId;
     if (!bufferId) {
@@ -948,14 +955,18 @@ export function useIOSessionManager(
       return;
     }
 
-    // Import the copy function
-    const { copyBufferForDetach } = await import("../api/io");
+    let targetBufferId: string;
+    if (joinerCount > 1) {
+      // Other listeners remain — copy so the session's buffer stays intact
+      const { copyBufferForDetach } = await import("../api/io");
+      const copyName = `${ioProfileName}-detached-${Date.now()}`;
+      targetBufferId = await copyBufferForDetach(bufferId, copyName);
+    } else {
+      // Last listener — leaving orphans the buffer, use it directly
+      targetBufferId = bufferId;
+    }
 
-    // Create a copy of the buffer for this app
-    const copyName = `${ioProfileName}-detached-${Date.now()}`;
-    const copiedBufferId = await copyBufferForDetach(bufferId, copyName);
-
-    // Leave the session (others keep streaming)
+    // Leave the session
     await session.leave();
 
     // Clear multi-bus state - we're now viewing a standalone buffer
@@ -966,9 +977,9 @@ export function useIOSessionManager(
     setIsDetached(false);
     setIsWatching(false);
 
-    // Switch to the copied buffer
-    await session.reinitialize(copiedBufferId, { useBuffer: true });
-  }, [session, ioProfileName, setMultiBusProfiles]);
+    // Switch to the target buffer
+    await session.reinitialize(targetBufferId, { useBuffer: true });
+  }, [session, ioProfileName, joinerCount, setMultiBusProfiles]);
 
   // Ingest a single source: fast ingest without rendering, auto-transitions to buffer reader
   // Apps join the session but frames are counted only (not rendered) until ingest completes.

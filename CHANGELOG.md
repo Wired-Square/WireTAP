@@ -10,6 +10,10 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Buffer database disk reclamation**: `buffers.db` now VACUUMs on startup when "Clear buffers on start" is enabled, reclaiming disk space from deleted data. Previously the file stayed at its peak size (e.g. 477 MB) across restarts because SQLite `DELETE` only marks pages as free without shrinking the file.
+
+- **Avoid unnecessary buffer copies on session leave**: When multiple apps (e.g. Discovery + Decoder) share a session, the last listener to leave now reuses the original buffer instead of copying it. Previously each listener created its own copy, tripling memory and disk usage for large captures.
+
 - **Relative timestamp display**: Timestamps before year 2000 (normalised CSV imports starting at 0) no longer show "1970-01-01" in the frame list or session bar. The date portion is suppressed and only elapsed time is displayed.
 
 - **Buffers settings tab**: Buffer-related settings (Discovery History Buffer, Query Result Limit, Graph Buffer Size) moved from General to a dedicated Buffers tab under Settings. New "Clear buffers on start" toggle controls whether `buffers.db` is wiped on launch (default: on, preserving current behaviour). When disabled, previous buffer data persists across restarts.

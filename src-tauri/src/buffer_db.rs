@@ -63,33 +63,36 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
     let conn = Connection::open(&db_path)
         .map_err(|e| format!("Failed to open buffer database: {}", e))?;
 
-    // WAL mode for concurrent read/write
-    conn.execute_batch("PRAGMA journal_mode=WAL;")
-        .map_err(|e| format!("Failed to set WAL mode: {}", e))?;
-    // Synchronous NORMAL is safe with WAL and faster than FULL
-    conn.execute_batch("PRAGMA synchronous=NORMAL;")
-        .map_err(|e| format!("Failed to set synchronous mode: {}", e))?;
-    // 64 MB page cache for better read performance
-    conn.execute_batch("PRAGMA cache_size=-65536;")
-        .map_err(|e| format!("Failed to set cache size: {}", e))?;
-    // Temp store in memory
-    conn.execute_batch("PRAGMA temp_store=MEMORY;")
-        .map_err(|e| format!("Failed to set temp store: {}", e))?;
-
-    // Create tables and indexes
+    // Create tables and indexes first (idempotent — IF NOT EXISTS)
     conn.execute_batch(SCHEMA_SQL)
         .map_err(|e| format!("Failed to create schema: {}", e))?;
 
-    // Conditionally clear leftover data from previous sessions
+    // Conditionally clear leftover data and reclaim disk space
     if clear_on_start {
+        // The database file persists WAL mode from the previous session.
+        // VACUUM cannot shrink a WAL-mode database, so switch to DELETE mode first.
+        conn.execute_batch("PRAGMA journal_mode=DELETE;")
+            .map_err(|e| format!("Failed to switch to DELETE journal mode: {}", e))?;
         conn.execute("DELETE FROM frames", [])
             .map_err(|e| format!("Failed to clear frames: {}", e))?;
         conn.execute("DELETE FROM bytes", [])
             .map_err(|e| format!("Failed to clear bytes: {}", e))?;
-        tlog!("[buffer_db] Initialised at {:?} (cleared previous data)", db_path);
+        conn.execute_batch("VACUUM;")
+            .map_err(|e| format!("Failed to vacuum database: {}", e))?;
+        tlog!("[buffer_db] Initialised at {:?} (cleared and vacuumed)", db_path);
     } else {
         tlog!("[buffer_db] Initialised at {:?} (preserving previous data)", db_path);
     }
+
+    // Set WAL mode and performance pragmas after vacuum (VACUUM resets journal mode)
+    conn.execute_batch("PRAGMA journal_mode=WAL;")
+        .map_err(|e| format!("Failed to set WAL mode: {}", e))?;
+    conn.execute_batch("PRAGMA synchronous=NORMAL;")
+        .map_err(|e| format!("Failed to set synchronous mode: {}", e))?;
+    conn.execute_batch("PRAGMA cache_size=-65536;")
+        .map_err(|e| format!("Failed to set cache size: {}", e))?;
+    conn.execute_batch("PRAGMA temp_store=MEMORY;")
+        .map_err(|e| format!("Failed to set temp store: {}", e))?;
 
     *DB.lock().unwrap() = Some(conn);
     Ok(())
