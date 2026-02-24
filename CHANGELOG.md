@@ -10,6 +10,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Freeze rendering**: A snowflake toggle in the Discovery tab bar freezes the frame table display while capture continues in the background. A refresh button appears alongside to peek at the latest frames without unfreezing. Auto-unfreezes when streaming stops.
 
+- **Help menu**: New Help menu in the menu bar with links to Documentation (GitHub Wiki), Report an Issue (GitHub Issues), and Source Code (GitHub repository).
+
 ## [0.4.4] - 2026-02-24
 
 ### Added

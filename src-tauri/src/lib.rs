@@ -24,6 +24,8 @@ use tauri::menu::*;
 use tauri::{AppHandle, Emitter, Manager, State};
 #[cfg(not(target_os = "ios"))]
 use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent, Wry};
+#[cfg(not(target_os = "ios"))]
+use tauri_plugin_opener::OpenerExt;
 
 // ============================================================================
 // Platform-Aware Serial/Slcan Commands
@@ -686,6 +688,18 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
         .fullscreen()
         .build()?;
 
+    // Create Help menu
+    let help_issues_item = MenuItemBuilder::with_id("help-issues", "Report an Issue…").build(app)?;
+    let help_wiki_item = MenuItemBuilder::with_id("help-wiki", "Documentation…").build(app)?;
+    let help_source_item = MenuItemBuilder::with_id("help-source", "Source Code…").build(app)?;
+
+    let help_menu = SubmenuBuilder::new(app, "Help")
+        .item(&help_wiki_item)
+        .item(&help_issues_item)
+        .separator()
+        .item(&help_source_item)
+        .build()?;
+
     // Create main menu
     let menu = MenuBuilder::new(app)
         .items(&[
@@ -695,6 +709,7 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
             &session_menu,
             &bookmarks_menu,
             &view_menu,
+            &help_menu,
         ])
         .build()?;
 
@@ -786,6 +801,16 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
                 // Jump to specific bookmark - extract ID and emit to focused window
                 let bookmark_id = id.strip_prefix("bookmark-jump-").unwrap_or("");
                 emit_to_focused_window(app, "menu-jump-to-bookmark", bookmark_id.to_string());
+            }
+            // Help menu items - open URLs in default browser
+            "help-issues" => {
+                let _ = app.opener().open_url("https://github.com/Wired-Square/CANdor/issues", None::<&str>);
+            }
+            "help-wiki" => {
+                let _ = app.opener().open_url("https://github.com/Wired-Square/CANdor/wiki", None::<&str>);
+            }
+            "help-source" => {
+                let _ = app.opener().open_url("https://github.com/Wired-Square/CANdor", None::<&str>);
             }
             _ => {
                 // Unknown menu item - ignore
