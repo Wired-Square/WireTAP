@@ -2,6 +2,14 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Discovery context menu**: Right-click a frame row in the Discovery Frames tab to Filter (deselect the frame ID) or Inspect (send payload to Frame Calculator).
+
+- **Freeze rendering**: A snowflake toggle in the Discovery tab bar freezes the frame table display while capture continues in the background. A refresh button appears alongside to peek at the latest frames without unfreezing. Auto-unfreezes when streaming stops.
+
 ## [0.4.4] - 2026-02-24
 
 ### Added

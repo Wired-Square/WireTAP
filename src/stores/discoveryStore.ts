@@ -70,6 +70,7 @@ type CombinedDiscoveryState = {
   seenIds: Set<number>;
   streamStartTimeUs: number | null;
   bufferMode: { enabled: boolean; totalFrames: number };
+  renderFrozen: boolean;
 
   // UI store
   maxBuffer: number;
@@ -135,6 +136,8 @@ type CombinedDiscoveryState = {
   applySelectionSet: (selectionSet: SelectionSet) => void;
   selectAllFrames: () => void;
   deselectAllFrames: () => void;
+  setRenderFrozen: (frozen: boolean) => void;
+  refreshFrozenView: () => void;
   enableBufferMode: (totalFrames: number) => void;
   disableBufferMode: () => void;
   setFrameInfoFromBuffer: (frameInfoList: Array<{
@@ -212,6 +215,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     seenIds: frameStore.seenIds,
     streamStartTimeUs: frameStore.streamStartTimeUs,
     bufferMode: frameStore.bufferMode,
+    renderFrozen: frameStore.renderFrozen,
 
     // UI store state
     maxBuffer: uiStore.maxBuffer,
@@ -278,6 +282,8 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         new Set(selectionSet.selectedIds ?? selectionSet.frameIds)
       );
     },
+    setRenderFrozen: frameStore.setRenderFrozen,
+    refreshFrozenView: frameStore.refreshFrozenView,
     enableBufferMode: frameStore.enableBufferMode,
     disableBufferMode: frameStore.disableBufferMode,
     setFrameInfoFromBuffer: frameStore.setFrameInfoFromBuffer,

@@ -1,7 +1,7 @@
 // ui/src/apps/discovery/views/DiscoveryFramesView.tsx
 import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "react";
-import { FileText, Hash, Network } from "lucide-react";
-import { iconSm, flexRowGap2 } from "../../../styles/spacing";
+import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw } from "lucide-react";
+import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { useDiscoveryStore } from "../../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
@@ -18,6 +18,10 @@ import { bgDataView, textDataSecondary, bgSurface, textMuted, textPrimary, textS
 import type { FrameMessage } from "../../../types/frame";
 import type { IOCapabilities } from "../../../api/io";
 import { useBufferFrameView } from "../hooks/useBufferFrameView";
+import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
+import { bytesToHex } from "../../../utils/byteUtils";
+import { sendHexDataToCalculator } from "../../../utils/windowCommunication";
+import type { FrameRow } from "../components/FrameDataTable";
 
 const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 60];
 
@@ -132,6 +136,24 @@ function DiscoveryFramesView({
   const seenIds = useDiscoveryStore((s) => s.seenIds);
   const bufferMode = useDiscoveryStore((s) => s.bufferMode);
   const toolboxResults = useDiscoveryStore((s) => s.toolbox);
+  const toggleFrameSelection = useDiscoveryStore((s) => s.toggleFrameSelection);
+  const renderFrozen = useDiscoveryStore((s) => s.renderFrozen);
+  const setRenderFrozen = useDiscoveryStore((s) => s.setRenderFrozen);
+  const refreshFrozenView = useDiscoveryStore((s) => s.refreshFrozenView);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    frame: FrameRow;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleContextMenu = useCallback((frame: FrameRow, position: { x: number; y: number }) => {
+    setContextMenu({ frame, position });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
 
   // Use buffer-first hook when bufferId is available
   // This provides a unified interface for streaming (tail poll) and stopped (pagination)
@@ -179,6 +201,13 @@ function DiscoveryFramesView({
       setCurrentPage(0);
     }
   }, [isStreaming, setRenderBuffer]);
+
+  // Auto-unfreeze when streaming stops
+  React.useEffect(() => {
+    if (!isStreaming && renderFrozen) {
+      setRenderFrozen(false);
+    }
+  }, [isStreaming, renderFrozen, setRenderFrozen]);
 
   // Keep stable references for scrub handler to avoid callback identity changes
   const selectedFramesRef = useRef(selectedFrames);
@@ -475,6 +504,28 @@ function DiscoveryFramesView({
     }
   }, [validPage, currentPage, isStreaming]);
 
+  // Close context menu when page or visible frames change
+  useEffect(() => {
+    setContextMenu(null);
+  }, [effectiveCurrentPage, visibleFrames]);
+
+  const contextMenuItems: ContextMenuItem[] = useMemo(() => {
+    if (!contextMenu) return [];
+    const { frame } = contextMenu;
+    return [
+      {
+        label: 'Filter',
+        icon: <Filter className={iconXs} />,
+        onClick: () => toggleFrameSelection(frame.frame_id),
+      },
+      {
+        label: 'Inspect',
+        icon: <Calculator className={iconXs} />,
+        onClick: () => sendHexDataToCalculator(bytesToHex(frame.bytes)),
+      },
+    ];
+  }, [contextMenu, toggleFrameSelection]);
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollPending = useRef(false);
 
@@ -688,6 +739,30 @@ function DiscoveryFramesView({
       >
         <FileText className={iconSm} />
       </button>
+      {isStreaming && (
+        <>
+          <button
+            onClick={() => setRenderFrozen(!renderFrozen)}
+            className={`p-1.5 rounded transition-colors ${
+              renderFrozen
+                ? 'bg-blue-600 text-white hover:bg-blue-500'
+                : `${bgSurface} ${textSecondary} hover:brightness-95`
+            }`}
+            title={renderFrozen ? 'Unfreeze display' : 'Freeze display'}
+          >
+            <Snowflake className={iconSm} />
+          </button>
+          {renderFrozen && (
+            <button
+              onClick={refreshFrozenView}
+              className={`p-1.5 rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
+              title="Refresh to latest frames"
+            >
+              <RefreshCw className={iconSm} />
+            </button>
+          )}
+        </>
+      )}
     </div>
   ) : undefined;
 
@@ -796,6 +871,7 @@ function DiscoveryFramesView({
   ) : null;
 
   return (
+    <>
     <AppTabView
       // Tab bar
       tabs={tabs}
@@ -868,6 +944,7 @@ function DiscoveryFramesView({
           framesReversed={framesWereReversed}
           pageFrameCount={visibleFrames.length}
           bufferIndices={useBufferFirstMode ? bufferFrameView.bufferIndices : streamingIndices}
+          onContextMenu={handleContextMenu}
         />
       )}
 
@@ -894,6 +971,15 @@ function DiscoveryFramesView({
         </div>
       )}
     </AppTabView>
+
+    {contextMenu && (
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenu.position}
+        onClose={closeContextMenu}
+      />
+    )}
+    </>
   );
 }
 

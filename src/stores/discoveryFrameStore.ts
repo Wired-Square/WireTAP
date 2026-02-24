@@ -70,6 +70,11 @@ interface DiscoveryFrameState {
   deselectAllFrames: (activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
   applySelectionSet: (selectionSet: SelectionSet, setActiveId: (id: string | null) => void, setDirty: (dirty: boolean) => void) => void;
 
+  // Actions - Render freeze (pause UI updates while capture continues)
+  renderFrozen: boolean;
+  setRenderFrozen: (frozen: boolean) => void;
+  refreshFrozenView: () => void;
+
   // Actions - Buffer mode
   enableBufferMode: (totalFrames: number) => void;
   disableBufferMode: () => void;
@@ -90,6 +95,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   seenIds: new Set(),
   streamStartTimeUs: null,
   bufferMode: { enabled: false, totalFrames: 0 },
+  renderFrozen: false,
 
   // Stream timing actions
   setStreamStartTimeUs: (timeUs) => set({ streamStartTimeUs: timeUs }),
@@ -128,7 +134,9 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
           _frameBuffer = _frameBuffer.slice(-maxBuffer);
         }
 
-        const stateUpdate: Partial<DiscoveryFrameState> = { frameVersion: frameVersion + 1 };
+        const stateUpdate: Partial<DiscoveryFrameState> = {
+          frameVersion: get().renderFrozen ? frameVersion : frameVersion + 1,
+        };
 
         // Skip frame picker updates if requested (e.g., serial mode before framing is accepted)
         if (!skipFramePicker) {
@@ -380,6 +388,21 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
     });
     setActiveId(selectionSet.id);
     setDirty(false);
+  },
+
+  // Render freeze actions
+  setRenderFrozen: (frozen) => {
+    if (frozen) {
+      set({ renderFrozen: true });
+    } else {
+      // Unfreeze and bump frameVersion to immediately show latest data
+      set({ renderFrozen: false, frameVersion: get().frameVersion + 1 });
+    }
+  },
+
+  refreshFrozenView: () => {
+    // One-shot render: bump frameVersion without changing renderFrozen
+    set({ frameVersion: get().frameVersion + 1 });
   },
 
   // Buffer mode actions

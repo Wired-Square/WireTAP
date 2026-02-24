@@ -82,6 +82,8 @@ export interface FrameDataTableProps {
   highlightedRowIndex?: number | null;
   /** Called when a row is clicked (receives row index within visible frames) */
   onRowClick?: (rowIndex: number) => void;
+  /** Called when a row is right-clicked (receives frame data and mouse position) */
+  onContextMenu?: (frame: FrameRow, position: { x: number; y: number }) => void;
   /** Starting frame index for the current page (for tooltip display) */
   pageStartIndex?: number;
   /** Whether frames were reversed for display (affects frame index calculation) */
@@ -115,6 +117,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   autoScroll = true,
   highlightedRowIndex,
   onRowClick,
+  onContextMenu,
   pageStartIndex = 0,
   framesReversed = false,
   pageFrameCount = 0,
@@ -237,6 +240,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 className={`${isCurrentFrame ? '' : hoverDataRow} ${frame.incomplete ? 'opacity-60' : ''} ${isCurrentFrame ? 'ring-1 ring-[color:var(--status-cyan-border)]' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
                 title={`Frame ${displayIndex}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
                 onClick={onRowClick ? () => onRowClick(idx) : undefined}
+                onContextMenu={onContextMenu ? (e) => { e.preventDefault(); onContextMenu(frame, { x: e.clientX, y: e.clientY }); } : undefined}
               >
                 {onBookmark && (
                   <td className={`px-1 py-0.5 ${cellHighlight}`}>
