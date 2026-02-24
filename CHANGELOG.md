@@ -8,7 +8,25 @@ All notable changes to CANdor will be documented in this file.
 
 - **CSV timestamp unit detection**: The CSV column mapper now auto-detects the timestamp unit (seconds, milliseconds, microseconds, nanoseconds) from sample data and pre-selects it in a new dropdown. An estimated capture duration is shown so the user can verify the guess at a glance. A "Negate timestamps" checkbox (auto-ticked when all sample timestamps are negative) converts negative epoch timestamps to their absolute value, preserving real wall-clock time.
 
+### Changed
+
+- **Unified buffer playback**: Buffer mode now uses a single data path (`useBufferFrameView`) for all display — no more dual in-memory/paginated frame sources or playback/pagination toggle. Playback controls and pagination always appear together in buffer mode. The toolbar layout is reorganised into three zones: transport buttons on the left, frame counter and page navigation in the centre, speed selector and page size on the right.
+
+- **Buffer # column**: The frame table's # column now shows each frame's original buffer position (1-based SQLite rowid). When a CAN ID filter is active, the column displays positions with gaps (e.g. 1, 4, 7, 15) reflecting the true buffer layout. A toggleable Hash button in the tab bar controls column visibility.
+
+- **0.125x playback speed**: Added 0.125x (⅛ speed) to the playback speed options for slow-motion analysis of fast CAN bus traffic.
+
 ### Fixed
+
+- **Buffer playback stops at second-to-last frame**: The buffer reader's batched playback paths (no-pacing and high-speed) now emit a final `PlaybackPosition` event after flushing the remaining batch at end-of-buffer. Previously the last position update was skipped, so the frontend never highlighted the final frame.
+
+- **Stream Error after LEAVE**: Stepping or scrubbing after leaving a real-time session no longer triggers a "Session not found" error dialog. `seekByFrame` and `seek` now silently ignore stale session IDs, and Discovery falls back to direct buffer lookups when no active session exists.
+
+- **Buffer reader stays alive after playback ends**: The buffer stream task now pauses at the end position instead of stopping, keeping the task alive for subsequent step/seek/resume operations. Pressing play after completion resumes from the current position rather than restarting from scratch.
+
+- **CSV frames sorted on import**: Imported CSV frames are now sorted by timestamp before insertion into the buffer, ensuring correct playback order regardless of the original file's row ordering.
+
+- **Seek timestamp rounding**: `seekReaderSession` now rounds the timestamp to an integer before passing it to the backend, preventing floating-point precision issues in SQLite queries.
 
 - **Buffer database disk reclamation**: `buffers.db` now VACUUMs on startup when "Clear buffers on start" is enabled, reclaiming disk space from deleted data. Previously the file stayed at its peak size (e.g. 477 MB) across restarts because SQLite `DELETE` only marks pages as free without shrinking the file.
 

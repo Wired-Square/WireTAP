@@ -22,6 +22,12 @@ interface DataViewTimelineSectionProps {
   streamStartTimeUs?: number | null;
   /** Whether scrubbing is disabled */
   disabled?: boolean;
+  /** Total frames in buffer (enables frame-based mode when provided) */
+  totalFrames?: number;
+  /** Current frame index (0-based, for frame mode) */
+  currentFrameIndex?: number;
+  /** Called when user scrubs to a new frame index (for frame mode) */
+  onFrameChange?: (frameIndex: number) => void;
 }
 
 export default function DataViewTimelineSection({
@@ -33,6 +39,9 @@ export default function DataViewTimelineSection({
   displayTimeFormat,
   streamStartTimeUs,
   disabled = false,
+  totalFrames,
+  currentFrameIndex,
+  onFrameChange,
 }: DataViewTimelineSectionProps) {
   if (!show) {
     return null;
@@ -45,6 +54,9 @@ export default function DataViewTimelineSection({
         maxTimeUs={maxTimeUs}
         currentTimeUs={currentTimeUs}
         onPositionChange={onPositionChange}
+        totalFrames={totalFrames}
+        currentFrameIndex={currentFrameIndex}
+        onFrameChange={onFrameChange}
         disabled={disabled}
         showLabels={true}
         displayTimeFormat={displayTimeFormat}

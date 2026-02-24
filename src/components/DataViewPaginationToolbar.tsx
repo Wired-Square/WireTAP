@@ -1,8 +1,12 @@
 // ui/src/components/DataViewPaginationToolbar.tsx
 //
 // Shared pagination toolbar for data views (Discovery, Decoder, etc.).
+//
+// Layout: [left + center] — [info + page-counter + page-nav] — [right + page-size]
+// This three-zone layout keeps buttons stable on the left and selectors on the right,
+// with informational displays (frame counter, page counter) centered between them.
 
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import {
   bgDataToolbar,
@@ -26,12 +30,17 @@ interface DataViewPaginationToolbarProps {
   pageSizeOptions: PageSizeOption[];
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+  /** @deprecated No longer rendered — kept for backward compatibility */
   isLoading?: boolean;
   disabled?: boolean;
-  /** Additional content to show on the left side of the toolbar */
+  /** Additional content to show on the left side of the toolbar (e.g., time range inputs) */
   leftContent?: React.ReactNode;
-  /** Additional content to show before the pagination controls */
+  /** Content to show after leftContent (e.g., playback transport buttons) */
   centerContent?: React.ReactNode;
+  /** Informational content for the center zone (e.g., frame counter) */
+  infoContent?: React.ReactNode;
+  /** Content for the right zone, before the page size selector (e.g., speed selector) */
+  rightContent?: React.ReactNode;
   /** Hide pagination buttons (still shows page size selector) */
   hidePagination?: boolean;
   /** Hide page size selector (use when pagination is not applicable at all) */
@@ -43,9 +52,6 @@ export const FRAME_PAGE_SIZE_OPTIONS: PageSizeOption[] = [
   { value: 20, label: "20" },
   { value: 50, label: "50" },
   { value: 100, label: "100" },
-  { value: 1000, label: "1000" },
-  { value: 10000, label: "10000" },
-  { value: -1, label: "All" },
 ];
 
 /** Page size options for byte-based views (ByteView) */
@@ -64,10 +70,12 @@ export default function DataViewPaginationToolbar({
   pageSizeOptions,
   onPageChange,
   onPageSizeChange,
-  isLoading = false,
+  isLoading: _isLoading = false,
   disabled = false,
   leftContent,
   centerContent,
+  infoContent,
+  rightContent,
   hidePagination = false,
   hidePageSize = false,
 }: DataViewPaginationToolbarProps) {
@@ -75,25 +83,20 @@ export default function DataViewPaginationToolbar({
 
   return (
     <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDataView} ${bgDataToolbar} flex items-center ${gapDefault}`}>
-      {/* Left content slot */}
+      {/* LEFT ZONE: content slots */}
       {leftContent}
+      {centerContent}
 
       <div className="flex-1" />
 
-      {/* Center content slot */}
-      {centerContent}
+      {/* CENTER ZONE: info displays + page navigation */}
+      {infoContent}
 
-      {/* Loading indicator */}
-      {isLoading && (
-        <div className="flex items-center gap-1">
-          <Loader2 className={`${iconSm} animate-spin ${textDataSecondary}`} />
-          <span className={`text-xs ${textDataSecondary}`}>Loading...</span>
-        </div>
-      )}
-
-      {/* Pagination controls - to the left of page size selector */}
-      {showPagination && !isLoading && (
+      {showPagination && (
         <div className="flex items-center gap-0.5">
+          <span className={`text-xs ${textDataSecondary} px-1 tabular-nums`}>
+            {currentPage + 1} / {totalPages}
+          </span>
           <button
             onClick={() => onPageChange(0)}
             disabled={disabled || currentPage === 0}
@@ -110,9 +113,6 @@ export default function DataViewPaginationToolbar({
           >
             <ChevronLeft className={iconSm} />
           </button>
-          <span className={`text-xs ${textDataSecondary} px-1`}>
-            {currentPage + 1} / {totalPages}
-          </span>
           <button
             onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))}
             disabled={disabled || currentPage >= totalPages - 1}
@@ -132,7 +132,11 @@ export default function DataViewPaginationToolbar({
         </div>
       )}
 
-      {/* Page size selector - at the extreme right, never disabled (only pagination buttons are) */}
+      <div className="flex-1" />
+
+      {/* RIGHT ZONE: selectors */}
+      {rightContent}
+
       {!hidePageSize && (
         <select
           value={pageSize}

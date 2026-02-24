@@ -485,7 +485,7 @@ export async function seekReaderSession(
   sessionId: string,
   timestampUs: number
 ): Promise<void> {
-  return invoke("seek_reader_session", { session_id: sessionId, timestamp_us: timestampUs });
+  return invoke("seek_reader_session", { session_id: sessionId, timestamp_us: Math.round(timestampUs) });
 }
 
 /**

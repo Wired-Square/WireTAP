@@ -72,6 +72,8 @@ export interface FrameDataTableProps {
   showAscii?: boolean;
   /** Show bus number column (default: false) */
   showBus?: boolean;
+  /** Show frame reference # column (default: true) */
+  showRef?: boolean;
   /** Show frame ID column (default: true) - set to false for serial frames */
   showId?: boolean;
   /** Auto-scroll to bottom when new frames arrive (default: true) */
@@ -86,6 +88,8 @@ export interface FrameDataTableProps {
   framesReversed?: boolean;
   /** Total frames on this page (needed when reversed to calculate correct index) */
   pageFrameCount?: number;
+  /** 1-based original buffer positions for each frame. When provided, used for # column instead of computed page offset. */
+  bufferIndices?: number[];
 }
 
 // ============================================================================
@@ -104,6 +108,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   emptyMessage = 'No frames to display',
   sourceByteCount = 2,
   renderBytes,
+  showRef = true,
   showAscii = false,
   showBus = false,
   showId = true,
@@ -113,6 +118,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   pageStartIndex = 0,
   framesReversed = false,
   pageFrameCount = 0,
+  bufferIndices,
 }, ref) => {
   // Internal ref for scrolling (use forwarded ref if provided, otherwise internal)
   const internalRef = useRef<HTMLDivElement>(null);
@@ -187,6 +193,9 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             {onBookmark && (
               <th className={`px-1 py-1.5 w-6 border-b ${borderDataView}`}></th>
             )}
+            {showRef && (
+              <th className={`text-right px-2 py-1.5 w-14 border-b ${borderDataView} ${textDataSecondary}`}>#</th>
+            )}
             <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Time</th>
             {showId && (
               <th className={`text-right px-2 py-1.5 border-b ${borderDataView}`}>ID</th>
@@ -216,6 +225,8 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             const frameIndex = framesReversed
               ? pageStartIndex + pageFrameCount - 1 - idx
               : pageStartIndex + idx;
+            // Use buffer index (1-based buffer position) when available, otherwise fall back to page offset
+            const displayIndex = bufferIndices?.[idx] ?? (frameIndex + 1);
             // Cell highlight class - apply to each td for consistent rendering across browsers
             const cellHighlight = isCurrentFrame ? bgCyan : '';
 
@@ -224,7 +235,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 ref={isCurrentFrame ? highlightedRowRef : undefined}
                 key={`${frame.timestamp_us}-${frame.frame_id}-${idx}`}
                 className={`${isCurrentFrame ? '' : hoverDataRow} ${frame.incomplete ? 'opacity-60' : ''} ${isCurrentFrame ? 'ring-1 ring-[color:var(--status-cyan-border)]' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
-                title={`Frame ${frameIndex + 1}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
+                title={`Frame ${displayIndex}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
                 onClick={onRowClick ? () => onRowClick(idx) : undefined}
               >
                 {onBookmark && (
@@ -236,6 +247,11 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                     >
                       <Bookmark className={`${iconXs} ${textDataAmber}`} />
                     </button>
+                  </td>
+                )}
+                {showRef && (
+                  <td className={`px-2 py-0.5 text-right tabular-nums ${textDataTertiary} ${cellHighlight}`}>
+                    {displayIndex.toLocaleString()}
                   </td>
                 )}
                 <td

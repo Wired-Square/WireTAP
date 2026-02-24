@@ -595,16 +595,11 @@ pub fn parse_csv_with_mapping(
     // Normalise timestamps, then convert to microseconds.
     if !raw_i64_timestamps.is_empty() && frames.len() == raw_i64_timestamps.len() {
         if negate_timestamps {
-            // Negative timestamps: use abs(first) as epoch anchor, accumulate deltas.
-            // Preserves real wall-clock time for logs that store negative epoch values.
-            let anchor = raw_i64_timestamps[0].unsigned_abs();
+            // Negative timestamps: take the absolute value to recover the real epoch time.
+            // Logs that store negative epoch values (e.g., -1767062175875212 for 2025-12-30)
+            // simply need their sign stripped — the magnitude IS the epoch timestamp.
             for (i, frame) in frames.iter_mut().enumerate() {
-                let delta = raw_i64_timestamps[i] - raw_i64_timestamps[0];
-                let raw_us = if delta >= 0 {
-                    anchor + delta as u64
-                } else {
-                    anchor.saturating_sub(delta.unsigned_abs())
-                };
+                let raw_us = raw_i64_timestamps[i].unsigned_abs();
                 frame.timestamp_us = timestamp_unit
                     .to_microseconds(raw_us)
                     .unwrap_or(u64::MAX);
@@ -619,6 +614,11 @@ pub fn parse_csv_with_mapping(
                     .unwrap_or(u64::MAX);
             }
         }
+
+        // Sort frames by timestamp to ensure chronological order in the buffer.
+        // CSV files may have rows in arbitrary order (e.g., reverse chronological),
+        // but the buffer expects ascending timestamp order for correct playback.
+        frames.sort_by_key(|f| f.timestamp_us);
     }
 
     Ok(frames)

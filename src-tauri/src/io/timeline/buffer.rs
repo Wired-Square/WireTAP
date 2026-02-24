@@ -40,7 +40,7 @@ pub struct BufferReader {
 impl BufferReader {
     pub fn new(app: AppHandle, session_id: String, speed: f64) -> Self {
         // Extract buffer_id from session_id if it matches the buffer_N pattern
-        let buffer_id = if session_id.starts_with("buffer_") {
+        let buffer_id = if session_id.starts_with("buf_") {
             Some(session_id.clone())
         } else {
             None
@@ -78,10 +78,9 @@ impl IODevice for BufferReader {
     }
 
     async fn start(&mut self) -> Result<(), String> {
-        // If the stream completed naturally, reset state so we can restart
+        // If the stream completed naturally (paused at end), resume instead of restarting
         if self.completed_flag.load(Ordering::Relaxed) {
-            self.reader_state.state = IOState::Stopped;
-            self.completed_flag.store(false, Ordering::Relaxed);
+            return self.resume().await;
         }
 
         self.reader_state.check_can_start()?;
@@ -117,6 +116,13 @@ impl IODevice for BufferReader {
     }
 
     async fn resume(&mut self) -> Result<(), String> {
+        // If stream completed naturally (paused at end), clear the flag and resume
+        if self.completed_flag.load(Ordering::Relaxed) {
+            self.completed_flag.store(false, Ordering::Relaxed);
+            self.reader_state.control.resume();
+            self.reader_state.state = IOState::Running;
+            return Ok(());
+        }
         self.reader_state.resume()
     }
 
@@ -161,9 +167,9 @@ impl IODevice for BufferReader {
     }
 
     fn state(&self) -> IOState {
-        // If stream completed naturally, report as stopped so start() can be called to restart
+        // If stream completed naturally, report as paused (stream stays alive at end position)
         if self.completed_flag.load(Ordering::Relaxed) {
-            return IOState::Stopped;
+            return IOState::Paused;
         }
         self.reader_state.state()
     }
@@ -548,6 +554,7 @@ async fn run_buffer_stream(
         session_id, stream_start_secs, last_reverse
     );
 
+    'outer: loop {
     loop {
         // Check if cancelled
         if control.is_cancelled() {
@@ -555,7 +562,7 @@ async fn run_buffer_stream(
                 "[Buffer:{}] Stream cancelled, stopping immediately",
                 session_id
             );
-            break;
+            break 'outer;
         }
 
         // Handle seek requests (frame-based and timestamp-based)
@@ -783,25 +790,88 @@ async fn run_buffer_stream(
 
     // Emit any remaining frames in batch buffer
     if !batch_buffer.is_empty() {
-        emit_frames(&app_handle, &session_id, batch_buffer);
+        emit_frames(&app_handle, &session_id, batch_buffer.clone());
+        batch_buffer.clear();
+
+        // Emit final position so frontend highlights the last frame.
+        // frame_index was already incremented past the last consumed frame,
+        // so saturating_sub(1) gives the correct 0-based index.
+        if let Some(last_time) = last_frame_time_secs {
+            let playback_time_us = (last_time * 1_000_000.0) as i64;
+            emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
+                timestamp_us: playback_time_us,
+                frame_index: frame_index.saturating_sub(1),
+                frame_count: Some(total_frames),
+            });
+        }
     }
 
-    // Check if we completed naturally (not cancelled)
-    let was_cancelled = control.is_cancelled();
-    let reason = if was_cancelled { "stopped" } else { "complete" };
-
-    if !was_cancelled {
-        // Mark as completed so start() knows it can restart
-        completed_flag.store(true, Ordering::Relaxed);
-        // Emit stream-complete event so frontend knows playback finished
-        emit_to_session(&app_handle, "stream-complete", &session_id, true);
+    // If cancelled, exit the outer loop entirely
+    if control.is_cancelled() {
+        break;
     }
+
+    // Natural completion — pause at end position instead of stopping.
+    // This keeps the stream task alive so step/seek/resume work after playback ends.
+    completed_flag.store(true, Ordering::Relaxed);
+    control.pause();
+    emit_to_session(&app_handle, "stream-complete", &session_id, "paused".to_string());
+    tlog!(
+        "[Buffer:{}] Stream reached end of data, pausing at final position (frame_index: {})",
+        session_id, frame_index
+    );
+
+    // Post-completion pause-wait loop: stay alive for step/seek/resume
+    loop {
+        if control.is_cancelled() {
+            break 'outer;
+        }
+
+        // Handle seek requests while paused at end
+        if handle_seek(
+            &app_handle, &session_id, &buf_id, total_frames,
+            &seek_target_frame, &seek_target_us, &control,
+            &mut chunk, &mut chunk_idx, &mut frame_index, &mut last_consumed_rowid,
+            &mut batch_buffer, &mut playback_baseline_secs, &mut wall_clock_baseline,
+            &mut last_frame_time_secs,
+        ) {
+            continue;
+        }
+
+        if control.is_paused() {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            continue;
+        }
+
+        // Resumed — reload chunk from current position and re-enter main loop
+        let is_reverse = control.is_reverse();
+        chunk = load_chunk(&buf_id, last_consumed_rowid, CHUNK_SIZE, is_reverse);
+        chunk_idx = 0;
+
+        if chunk.is_empty() {
+            // Still at boundary in this direction, re-pause
+            control.pause();
+            completed_flag.store(true, Ordering::Relaxed);
+            continue;
+        }
+
+        // Reset timing baselines for resumed playback
+        wall_clock_baseline = std::time::Instant::now();
+        if let Some(last_time) = last_frame_time_secs {
+            playback_baseline_secs = last_time;
+        }
+        last_reverse = is_reverse;
+        last_speed = control.read_speed();
+        tlog!("[Buffer:{}] Resuming playback from post-completion pause", session_id);
+        break; // Break post-completion loop → re-enter main streaming via 'outer
+    }
+    } // end 'outer
 
     // Calculate stats
     let total_wall_time_ms = wall_clock_baseline.elapsed().as_millis();
     let data_duration_secs = last_frame_time_secs.unwrap_or(stream_start_secs) - stream_start_secs;
     tlog!(
-        "[Buffer:{}] Stream ended (reason: {}, count: {}, wall_time: {}ms, data_duration: {:.1}s, waits: {} totaling {}ms)",
-        session_id, reason, total_emitted, total_wall_time_ms, data_duration_secs, wait_count, total_wait_ms
+        "[Buffer:{}] Stream ended (reason: stopped, count: {}, wall_time: {}ms, data_duration: {:.1}s, waits: {} totaling {}ms)",
+        session_id, total_emitted, total_wall_time_ms, data_duration_secs, wait_count, total_wait_ms
     );
 }

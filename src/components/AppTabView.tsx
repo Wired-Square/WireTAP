@@ -27,6 +27,8 @@ interface ToolbarConfig {
   disabled?: boolean;
   leftContent?: ReactNode;
   centerContent?: ReactNode;
+  infoContent?: ReactNode;
+  rightContent?: ReactNode;
   hidePagination?: boolean;
   hidePageSize?: boolean;
 }
@@ -42,6 +44,12 @@ interface TimelineConfig {
   displayTimeFormat: "delta-last" | "delta-start" | "timestamp" | "human";
   streamStartTimeUs?: number | null;
   disabled?: boolean;
+  /** Total frames in buffer (enables frame-based scrubber mode) */
+  totalFrames?: number;
+  /** Current frame index (0-based, for frame-based scrubber) */
+  currentFrameIndex?: number;
+  /** Called when user scrubs to a new frame index */
+  onFrameChange?: (frameIndex: number) => void;
 }
 
 /**
@@ -199,6 +207,8 @@ export default function AppTabView({
         toolbarDisabled={toolbar?.disabled}
         toolbarLeftContent={toolbar?.leftContent}
         toolbarCenterContent={toolbar?.centerContent}
+        toolbarInfoContent={toolbar?.infoContent}
+        toolbarRightContent={toolbar?.rightContent}
         hidePagination={toolbar?.hidePagination}
         hidePageSize={toolbar?.hidePageSize}
         // Timeline
@@ -210,6 +220,9 @@ export default function AppTabView({
         displayTimeFormat={timeline?.displayTimeFormat ?? "human"}
         streamStartTimeUs={timeline?.streamStartTimeUs}
         timelineDisabled={timeline?.disabled}
+        timelineTotalFrames={timeline?.totalFrames}
+        timelineCurrentFrameIndex={timeline?.currentFrameIndex}
+        timelineOnFrameChange={timeline?.onFrameChange}
       />
 
       {/* Content Area */}

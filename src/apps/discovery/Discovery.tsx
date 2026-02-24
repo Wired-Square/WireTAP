@@ -28,7 +28,7 @@ import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
 import { isBufferProfileId } from "../../hooks/useIOSessionManager";
 import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
-import { clearBuffer as clearBackendBuffer, getBufferMetadata, getBufferFramesPaginated, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
+import { clearBuffer as clearBackendBuffer, getBufferMetadata, getBufferFramesPaginated, getBufferFramesPaginatedFiltered, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
 import { WINDOW_EVENTS } from "../../events/registry";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import ToolboxDialog from "../../dialogs/ToolboxDialog";
@@ -159,6 +159,8 @@ export default function Discovery() {
   // Ref to track paused state (used by callbacks that can't access manager state directly)
   // When paused, frame emissions are from stepping - position updates, not new data
   const isPausedRef = useRef(false);
+  // Ref to track buffer mode (when true, useBufferFrameView handles display - don't accumulate)
+  const inBufferModeRef = useRef(false);
 
   // NOTE: Auto-join buffer on mount and BUFFER_CHANGED events removed.
   // Discovery should NOT automatically join buffer sessions.
@@ -170,6 +172,8 @@ export default function Discovery() {
     // Only add frames when actively running (not paused). When paused, frame emissions
     // are from stepping (position updates), not new data to accumulate.
     if (isPausedRef.current) return;
+    // In buffer mode, useBufferFrameView handles display — don't accumulate frames in memory
+    if (inBufferModeRef.current) return;
     // In serial mode, skip frame picker updates until framing is accepted
     // The frame picker will be populated with correct IDs when acceptFraming is called
     const skipFramePicker = isSerialMode && !framingAccepted;
@@ -254,15 +258,12 @@ export default function Discovery() {
           console.error("Failed to load bytes from buffer:", e);
         }
       } else {
-        const totalFrames = payload.count;
-        const BUFFER_MODE_THRESHOLD = 100000;
-
         clearBuffer();
 
         // Always enable buffer mode so playback controls appear
         // (Session is now in buffer replay mode after ingest)
-        console.log(`[Discovery] Ingest complete (${totalFrames} frames) - enabling buffer mode for playback controls`);
-        enableBufferMode(totalFrames);
+        console.log(`[Discovery] Ingest complete (${payload.count} frames) - enabling buffer mode for playback controls`);
+        enableBufferMode(payload.count);
 
         // Load frame info for the frame picker
         try {
@@ -273,24 +274,7 @@ export default function Discovery() {
           console.error("Failed to load frame info from buffer:", e);
         }
 
-        // For smaller ingests, also load frames into memory for display
-        if (totalFrames <= BUFFER_MODE_THRESHOLD) {
-          console.log(`[Discovery] Loading ${totalFrames} frames from backend buffer for display`);
-
-          if (totalFrames > maxBuffer) {
-            setMaxBuffer(totalFrames);
-          }
-
-          try {
-            const response = await getBufferFramesPaginated(0, totalFrames);
-            if (response.frames.length > 0) {
-              addFrames(response.frames as FrameMessage[]);
-            }
-            console.log(`[Discovery] Loaded ${response.frames.length} frames`);
-          } catch (e) {
-            console.error("Failed to load frames from buffer:", e);
-          }
-        }
+        // No need to load frames into memory — useBufferFrameView handles display via pagination
       }
 
       // NOTE: Don't switch ioProfile to buffer ID - session stays at ingest_xxxxx
@@ -305,9 +289,6 @@ export default function Discovery() {
     clearBuffer,
     enableBufferMode,
     setFrameInfoFromBuffer,
-    maxBuffer,
-    setMaxBuffer,
-    addFrames,
   ]);
 
   // Callback for when session is reconfigured (e.g., bookmark jump)
@@ -452,6 +433,11 @@ export default function Discovery() {
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
+
+  // Keep buffer mode ref in sync (useBufferFrameView handles display in buffer mode)
+  useEffect(() => {
+    inBufferModeRef.current = isBufferMode || bufferMode.enabled;
+  }, [isBufferMode, bufferMode.enabled]);
 
   // Centralised IO picker handlers - ensures consistent behavior with other apps
   const ioPickerProps = useIOPickerHandlers({
@@ -726,6 +712,27 @@ export default function Discovery() {
     closeExportDialog: dialogs.export.close,
   });
 
+  // Buffer-level frame change: when there's no active session (after LEAVE),
+  // derive the timestamp from the buffer so the timeline updates during stepping.
+  const handleFrameChangeWithBuffer = useCallback(async (frameIndex: number) => {
+    setCurrentFrameIndex(frameIndex);
+    if (sessionId && capabilities?.supports_seek) {
+      // Active session: delegate to backend seek (emits position event)
+      await seekByFrame(frameIndex);
+    } else {
+      // Buffer-only mode: look up timestamp from buffer
+      const selectedIds = Array.from(selectedFrames);
+      try {
+        const response = await getBufferFramesPaginatedFiltered(frameIndex, 1, selectedIds);
+        if (response.frames.length > 0) {
+          updateCurrentTime(response.frames[0].timestamp_us / 1_000_000);
+        }
+      } catch {
+        // Best effort — timestamp syncs when page loads
+      }
+    }
+  }, [sessionId, capabilities, seekByFrame, selectedFrames, setCurrentFrameIndex, updateCurrentTime]);
+
   // ── Menu session control ──
   const bookmarkProfileId = sourceProfileId || ioProfile;
   useMenuSessionControl({
@@ -861,10 +868,10 @@ export default function Discovery() {
             onStepBackward={handlers.handleStepBackward}
             onStepForward={handlers.handleStepForward}
             onSpeedChange={handlers.handleSpeedChange}
-            onFrameChange={handlers.handleFrameChange}
+            onFrameChange={handleFrameChangeWithBuffer}
             // Timeline source streaming controls
-            isLiveStreaming={isRecorded && isStreaming && !isPaused}
-            isStreamPaused={isRecorded && isPaused}
+            isLiveStreaming={isRecorded && isStreaming && !isPaused && !isBufferMode}
+            isStreamPaused={isRecorded && isPaused && !isBufferMode}
             onResumeStream={resume}
           />
         )}

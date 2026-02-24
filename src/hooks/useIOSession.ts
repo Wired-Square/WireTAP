@@ -489,13 +489,18 @@ export function useIOSession(
       unlistenFns.push(unlistenPosition);
 
       // Stream complete
-      const unlistenComplete = await listen<boolean>(
+      const unlistenComplete = await listen<string | boolean>(
         `stream-complete:${effectiveSessionId}`,
-        () => {
+        (event) => {
           // Clear expectedStateRef so this state update takes effect
           expectedStateRef.current = null;
+          // Buffer readers emit "paused" to indicate they stay alive at end position.
+          // Other readers emit true/boolean and should transition to "stopped".
+          const newState = typeof event.payload === "string"
+            ? event.payload
+            : "stopped";
           setLocalState((prev) =>
-            prev ? { ...prev, ioState: "stopped" } : null
+            prev ? { ...prev, ioState: newState as IOStateType } : null
           );
         }
       );
@@ -1037,6 +1042,7 @@ export function useIOSession(
         await seekSession(effectiveSessionId, timestampUs);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("not found")) return;
         callbacksRef.current.onError?.(msg);
       }
     },
@@ -1050,6 +1056,9 @@ export function useIOSession(
         await seekSessionByFrame(effectiveSessionId, frameIndex);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        // Silently ignore "not found" — session may have been destroyed
+        // but the callback still holds a stale session ID
+        if (msg.includes("not found")) return;
         callbacksRef.current.onError?.(msg);
       }
     },

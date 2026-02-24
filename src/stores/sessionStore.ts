@@ -581,10 +581,15 @@ async function setupSessionEventListeners(
   unlistenFunctions.push(unlistenPlaybackTime);
 
   // Stream complete (buffer reader finished)
-  const unlistenStreamComplete = await listen<boolean>(
+  const unlistenStreamComplete = await listen<string | boolean>(
     `stream-complete:${sessionId}`,
-    () => {
-      updateSession(sessionId, { ioState: "stopped" });
+    (event) => {
+      // Buffer readers emit "paused" to indicate they stay alive at end position.
+      // Other readers emit true/boolean and should transition to "stopped".
+      const newState = typeof event.payload === "string"
+        ? event.payload
+        : "stopped";
+      updateSession(sessionId, { ioState: newState as IOStateType });
       invokeCallbacks(eventListeners, "onStreamComplete", undefined as never);
     }
   );

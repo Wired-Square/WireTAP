@@ -54,6 +54,7 @@ interface DiscoveryUIState {
   framesViewActiveTab: 'frames' | 'filtered' | 'analysis';
 
   // CAN frame view display options
+  showRefColumn: boolean;
   showAsciiColumn: boolean;
   showBusColumn: boolean;
 
@@ -92,6 +93,7 @@ interface DiscoveryUIState {
   setFramesViewActiveTab: (tab: 'frames' | 'filtered' | 'analysis') => void;
 
   // Actions - CAN frame view display options
+  toggleShowRefColumn: () => void;
   toggleShowAsciiColumn: () => void;
   toggleShowBusColumn: () => void;
   setShowBusColumn: (show: boolean) => void;
@@ -120,6 +122,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
   selectionSetDirty: false,
   activeSelectionSetSelectedIds: null,
   framesViewActiveTab: 'frames',
+  showRefColumn: true,
   showAsciiColumn: false,
   showBusColumn: false,
 
@@ -244,6 +247,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
   setFramesViewActiveTab: (tab) => set({ framesViewActiveTab: tab }),
 
   // CAN frame view display options
+  toggleShowRefColumn: () => set((state) => ({ showRefColumn: !state.showRefColumn })),
   toggleShowAsciiColumn: () => set((state) => ({ showAsciiColumn: !state.showAsciiColumn })),
   toggleShowBusColumn: () => set((state) => ({ showBusColumn: !state.showBusColumn })),
   setShowBusColumn: (show) => set({ showBusColumn: show }),

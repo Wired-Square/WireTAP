@@ -15,7 +15,7 @@ import {
 } from "../styles";
 import { iconSm, iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
 
-export type PlaybackSpeed = 0.25 | 0.5 | 1 | 2 | 10 | 30 | 60;
+export type PlaybackSpeed = 0.125 | 0.25 | 0.5 | 1 | 2 | 10 | 30 | 60;
 export type PlaybackState = "playing" | "paused";
 
 export interface TimeControllerProps {

@@ -15,6 +15,9 @@ pub struct PaginatedFramesResponse {
     pub total_count: usize,
     pub offset: usize,
     pub limit: usize,
+    /// 1-based original buffer position (rowid) for each frame.
+    /// Parallel to `frames` — `buffer_indices[i]` is the position of `frames[i]`.
+    pub buffer_indices: Vec<usize>,
 }
 
 /// Response for paginated buffer bytes
@@ -120,12 +123,13 @@ pub async fn get_buffer_frames_paginated(
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedFramesResponse, String> {
-    let (frames, total_count) = buffer_store::get_frames_paginated(offset, limit);
+    let (frames, buffer_indices, total_count) = buffer_store::get_frames_paginated(offset, limit);
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
         offset,
         limit,
+        buffer_indices,
     })
 }
 
@@ -137,12 +141,13 @@ pub async fn get_buffer_frames_paginated_filtered(
     selected_ids: Vec<u32>,
 ) -> Result<PaginatedFramesResponse, String> {
     let selected_set: std::collections::HashSet<u32> = selected_ids.into_iter().collect();
-    let (frames, total_count) = buffer_store::get_frames_paginated_filtered(offset, limit, &selected_set);
+    let (frames, buffer_indices, total_count) = buffer_store::get_frames_paginated_filtered(offset, limit, &selected_set);
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
         offset,
         limit,
+        buffer_indices,
     })
 }
 
@@ -249,12 +254,13 @@ pub async fn get_buffer_frames_paginated_by_id(
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedFramesResponse, String> {
-    let (frames, total_count) = buffer_store::get_buffer_frames_paginated(&buffer_id, offset, limit);
+    let (frames, buffer_indices, total_count) = buffer_store::get_buffer_frames_paginated(&buffer_id, offset, limit);
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
         offset,
         limit,
+        buffer_indices,
     })
 }
 

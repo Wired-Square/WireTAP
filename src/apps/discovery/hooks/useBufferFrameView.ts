@@ -40,6 +40,8 @@ export interface UseBufferFrameViewOptions {
 export interface UseBufferFrameViewResult {
   /** Frames to display (either tail or current page) */
   frames: FrameWithHex[];
+  /** 1-based original buffer position for each frame, parallel to `frames`. */
+  bufferIndices: number[];
   /** Total filtered frame count (for pagination info) */
   totalCount: number;
   /** Whether loading is in progress */
@@ -94,6 +96,7 @@ export function useBufferFrameView(
   } = options;
 
   const [frames, setFrames] = useState<FrameWithHex[]>([]);
+  const [bufferIndices, setBufferIndices] = useState<number[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
@@ -122,6 +125,7 @@ export function useBufferFrameView(
   useEffect(() => {
     if (prevBufferIdRef.current !== bufferId) {
       setFrames([]);
+      setBufferIndices([]);
       setTotalCount(0);
       setCurrentPage(0);
       setTimeRange(null);
@@ -170,6 +174,7 @@ export function useBufferFrameView(
 
         const withHex = addHexBytes(response.frames);
         setFrames(withHex);
+        setBufferIndices(response.buffer_indices);
         setTotalCount(response.total_filtered_count);
 
         // Update time range end if we have new data
@@ -219,6 +224,7 @@ export function useBufferFrameView(
 
         const withHex = addHexBytes(response.frames);
         setFrames(withHex);
+        setBufferIndices(response.buffer_indices);
         setTotalCount(response.total_count);
       } catch (e) {
         console.error("[useBufferFrameView] page fetch error:", e);
@@ -262,15 +268,20 @@ export function useBufferFrameView(
   // FOLLOW MODE: Auto-navigate to page containing followTimeUs during buffer playback
   // The hook owns the page state, so follow logic lives here (not in external effects)
   const followPendingRef = useRef(false);
+  // Use a ref for the "already on page" check so that manual page navigation
+  // (which changes frames) doesn't re-trigger follow and snap the page back.
+  const framesRef = useRef(frames);
+  useEffect(() => { framesRef.current = frames; }, [frames]);
 
   useEffect(() => {
     if (followTimeUs == null || !bufferId || !isBufferPlayback) return;
     if (followPendingRef.current) return;
 
     // If we have frames, check whether the timestamp is already on the current page
-    if (frames.length > 0) {
-      const firstTs = frames[0].timestamp_us;
-      const lastTs = frames[frames.length - 1].timestamp_us;
+    const currentFrames = framesRef.current;
+    if (currentFrames.length > 0) {
+      const firstTs = currentFrames[0].timestamp_us;
+      const lastTs = currentFrames[currentFrames.length - 1].timestamp_us;
       if (followTimeUs >= firstTs && followTimeUs <= lastTs) return;
     }
 
@@ -284,7 +295,7 @@ export function useBufferFrameView(
       })
       .catch((e) => console.error("[useBufferFrameView] follow navigation error:", e))
       .finally(() => { followPendingRef.current = false; });
-  }, [followTimeUs, bufferId, isBufferPlayback, frames]);
+  }, [followTimeUs, bufferId, isBufferPlayback]);
 
   // Track previous selection to detect actual changes
   const prevSelectedFramesRef = useRef<Set<number>>(selectedFrames);
@@ -310,6 +321,7 @@ export function useBufferFrameView(
 
   return {
     frames,
+    bufferIndices,
     totalCount,
     isLoading,
     currentPage,

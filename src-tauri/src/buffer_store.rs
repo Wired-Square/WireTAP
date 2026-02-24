@@ -555,41 +555,45 @@ pub fn get_buffer_frames(id: &str) -> Option<Vec<FrameMessage>> {
 }
 
 /// Get a page of frames from a specific buffer.
-/// Returns (frames, total_count).
-pub fn get_buffer_frames_paginated(id: &str, offset: usize, limit: usize) -> (Vec<FrameMessage>, usize) {
+/// Returns (frames, buffer_indices, total_count).
+pub fn get_buffer_frames_paginated(id: &str, offset: usize, limit: usize) -> (Vec<FrameMessage>, Vec<usize>, usize) {
     let total = {
         let registry = BUFFER_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
             Some(b) if b.metadata.buffer_type == BufferType::Frames => b.metadata.count,
-            _ => return (Vec::new(), 0),
+            _ => return (Vec::new(), Vec::new(), 0),
         }
     };
 
     if offset >= total {
-        return (Vec::new(), total);
+        return (Vec::new(), Vec::new(), total);
     }
 
     match buffer_db::get_frames_paginated(id, offset, limit) {
-        Ok(frames) => (frames, total),
+        Ok((frames, rowids)) => {
+            let indices = rowids.into_iter().map(|r| r as usize).collect();
+            (frames, indices, total)
+        }
         Err(e) => {
             tlog!("[BufferStore] Failed to get paginated frames: {}", e);
-            (Vec::new(), total)
+            (Vec::new(), Vec::new(), total)
         }
     }
 }
 
 /// Get a page of frames filtered by selected IDs.
+/// Returns (frames, buffer_indices, total_filtered_count).
 pub fn get_buffer_frames_paginated_filtered(
     id: &str,
     offset: usize,
     limit: usize,
     selected_ids: &std::collections::HashSet<u32>,
-) -> (Vec<FrameMessage>, usize) {
+) -> (Vec<FrameMessage>, Vec<usize>, usize) {
     {
         let registry = BUFFER_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
             Some(b) if b.metadata.buffer_type == BufferType::Frames => {},
-            _ => return (Vec::new(), 0),
+            _ => return (Vec::new(), Vec::new(), 0),
         }
     }
 
@@ -599,10 +603,13 @@ pub fn get_buffer_frames_paginated_filtered(
 
     let frame_ids: Vec<u32> = selected_ids.iter().copied().collect();
     match buffer_db::get_frames_paginated_filtered(id, offset, limit, &frame_ids) {
-        Ok((frames, total)) => (frames, total),
+        Ok((frames, rowids, total)) => {
+            let indices = rowids.into_iter().map(|r| r as usize).collect();
+            (frames, indices, total)
+        }
         Err(e) => {
             tlog!("[BufferStore] Failed to get filtered paginated frames: {}", e);
-            (Vec::new(), 0)
+            (Vec::new(), Vec::new(), 0)
         }
     }
 }
@@ -611,6 +618,8 @@ pub fn get_buffer_frames_paginated_filtered(
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct TailResponse {
     pub frames: Vec<FrameMessage>,
+    /// 1-based original buffer position (rowid) for each frame, parallel to `frames`.
+    pub buffer_indices: Vec<usize>,
     pub total_filtered_count: usize,
     pub buffer_end_time_us: Option<u64>,
 }
@@ -628,6 +637,7 @@ pub fn get_buffer_frames_tail(
             Some(b) if b.metadata.buffer_type == BufferType::Frames => {},
             _ => return TailResponse {
                 frames: Vec::new(),
+                buffer_indices: Vec::new(),
                 total_filtered_count: 0,
                 buffer_end_time_us: None,
             },
@@ -636,15 +646,20 @@ pub fn get_buffer_frames_tail(
 
     let frame_ids: Vec<u32> = selected_ids.iter().copied().collect();
     match buffer_db::get_frames_tail(id, limit, &frame_ids) {
-        Ok((frames, total, end_time_us)) => TailResponse {
-            frames,
-            total_filtered_count: total,
-            buffer_end_time_us: end_time_us,
-        },
+        Ok((frames, rowids, total, end_time_us)) => {
+            let indices = rowids.into_iter().map(|r| r as usize).collect();
+            TailResponse {
+                frames,
+                buffer_indices: indices,
+                total_filtered_count: total,
+                buffer_end_time_us: end_time_us,
+            }
+        }
         Err(e) => {
             tlog!("[BufferStore] Failed to get tail frames: {}", e);
             TailResponse {
                 frames: Vec::new(),
+                buffer_indices: Vec::new(),
                 total_filtered_count: 0,
                 buffer_end_time_us: None,
             }
@@ -931,10 +946,10 @@ pub fn clear_buffer() -> Result<(), String> {
 }
 
 /// Get paginated frames from the active buffer (or first frame buffer as fallback).
-pub fn get_frames_paginated(offset: usize, limit: usize) -> (Vec<FrameMessage>, usize) {
+pub fn get_frames_paginated(offset: usize, limit: usize) -> (Vec<FrameMessage>, Vec<usize>, usize) {
     match find_frame_buffer_id() {
         Some(id) => get_buffer_frames_paginated(&id, offset, limit),
-        None => (Vec::new(), 0),
+        None => (Vec::new(), Vec::new(), 0),
     }
 }
 
@@ -943,10 +958,10 @@ pub fn get_frames_paginated_filtered(
     offset: usize,
     limit: usize,
     selected_ids: &std::collections::HashSet<u32>,
-) -> (Vec<FrameMessage>, usize) {
+) -> (Vec<FrameMessage>, Vec<usize>, usize) {
     match find_frame_buffer_id() {
         Some(id) => get_buffer_frames_paginated_filtered(&id, offset, limit, selected_ids),
-        None => (Vec::new(), 0),
+        None => (Vec::new(), Vec::new(), 0),
     }
 }
 

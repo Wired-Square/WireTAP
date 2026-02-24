@@ -1008,7 +1008,7 @@ export default function DecoderFramesView({
     </div>
   ) : null;
 
-  // Playback controls for the toolbar center
+  // Playback controls for the toolbar left zone (transport buttons only)
   const playbackControls = (
     <PlaybackControls
       playbackState={playbackState}
@@ -1035,6 +1035,38 @@ export default function DecoderFramesView({
     />
   );
 
+  // Frame counter for the toolbar center info zone
+  const frameCounterInfo = (() => {
+    if (currentFrameIndex == null || !totalFrames) return null;
+    const totalStr = totalFrames.toLocaleString();
+    const currentStr = (Math.max(0, Math.min(currentFrameIndex, totalFrames - 1)) + 1).toLocaleString();
+    const maxChars = totalStr.length * 2 + 4;
+    return (
+      <span
+        className="px-1.5 text-xs font-mono text-gray-400 tabular-nums text-center"
+        style={{ minWidth: `${maxChars}ch` }}
+      >
+        {currentStr} of {totalStr}
+      </span>
+    );
+  })();
+
+  // Speed selector for the toolbar right zone
+  const speedSelector = supportsSpeedControl && onSpeedChange ? (
+    <select
+      value={playbackSpeed}
+      onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
+      className="px-2 py-0.5 text-xs rounded border border-gray-600 bg-gray-700 text-gray-200"
+      title="Playback speed"
+    >
+      {([0.125, 0.25, 0.5, 1, 2, 10, 30, 60] as PlaybackSpeed[]).map((s) => (
+        <option key={s} value={s}>
+          {s === 1 ? "1x (realtime)" : `${s}x`}
+        </option>
+      ))}
+    </select>
+  ) : null;
+
   return (
     <AppTabView
       // Tab bar
@@ -1059,6 +1091,8 @@ export default function DecoderFramesView({
               onPageSizeChange: () => {},
               leftContent: timeRangeInputs,
               centerContent: playbackControls,
+              infoContent: frameCounterInfo,
+              rightContent: speedSelector,
               hidePagination: true,
               hidePageSize: true,
             }

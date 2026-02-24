@@ -2,6 +2,9 @@
 //
 // Reusable playback controls for timeline readers (Buffer, CSV, PostgreSQL).
 // Used by Discovery and Decoder when viewing recorded/buffered data.
+//
+// Renders only transport buttons. Frame counter and speed selector are
+// rendered separately by the parent and placed in the toolbar's info/right slots.
 
 import { ChevronLeft, ChevronRight, FastForward, Play, RefreshCw, Rewind, SkipBack, SkipForward, Square } from "lucide-react";
 import { iconSm } from "../styles/spacing";
@@ -56,7 +59,7 @@ export interface PlaybackControlsProps {
   onResumeStream?: () => void;
 }
 
-const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.25, 0.5, 1, 2, 10, 30, 60];
+const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 60];
 /** Default number of frames to skip for 10-second jumps when we can't calculate from timestamps */
 const DEFAULT_SKIP_FRAMES = 100;
 
@@ -74,8 +77,8 @@ export function PlaybackControls({
   isLiveStreaming = false,
   isStreamPaused = false,
   playbackDirection = "forward",
-  playbackSpeed = 1,
-  speedOptions = DEFAULT_SPEED_OPTIONS,
+  playbackSpeed: _playbackSpeed = 1,
+  speedOptions: _speedOptions = DEFAULT_SPEED_OPTIONS,
   minTimeUs,
   maxTimeUs,
   currentTimeUs,
@@ -88,7 +91,7 @@ export function PlaybackControls({
   onStepForward,
   onScrub,
   onFrameChange,
-  onSpeedChange,
+  onSpeedChange: _onSpeedChange,
   onResumeStream,
 }: PlaybackControlsProps) {
   const isPlaying = playbackState === "playing";
@@ -247,15 +250,6 @@ export function PlaybackControls({
         );
       })()}
 
-      {/* Frame index display (when stepping is available, we have frame info, and buffer controls enabled) */}
-      {bufferControlsEnabled && (onStepBackward || onStepForward) && currentFrameIndex != null && (
-        <span className="px-1.5 text-xs font-mono text-gray-400 tabular-nums">
-          {totalFrames != null && totalFrames > 0
-            ? `${(Math.max(0, Math.min(currentFrameIndex, totalFrames - 1)) + 1).toLocaleString()} of ${totalFrames.toLocaleString()}`
-            : (Math.max(0, currentFrameIndex) + 1).toLocaleString()}
-        </span>
-      )}
-
       {/* Step forward (when paused and not at end, only when buffer controls enabled) */}
       {onStepForward && bufferControlsEnabled && (() => {
         const atEnd = currentFrameIndex != null && totalFrames != null && currentFrameIndex >= totalFrames - 1;
@@ -328,22 +322,6 @@ export function PlaybackControls({
         >
           <RefreshCw className={iconSm} />
         </button>
-      )}
-
-      {/* Speed selector */}
-      {supportsSpeedControl && onSpeedChange && (
-        <select
-          value={playbackSpeed}
-          onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
-          className="ml-1 px-2 py-0.5 text-xs rounded border border-gray-600 bg-gray-700 text-gray-200"
-          title="Playback speed"
-        >
-          {speedOptions.map((s) => (
-            <option key={s} value={s}>
-              {s === 1 ? "1x (realtime)" : `${s}x`}
-            </option>
-          ))}
-        </select>
       )}
     </div>
   );

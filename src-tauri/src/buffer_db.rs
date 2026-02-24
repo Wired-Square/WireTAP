@@ -223,12 +223,12 @@ pub fn insert_bytes(buffer_id: &str, bytes: &[TimestampedByte]) -> Result<(), St
 // Cold-Path Reads (on-demand, frontend-initiated)
 // ============================================================================
 
-/// Get paginated frames for a buffer.
+/// Get paginated frames for a buffer. Returns (frames, rowids).
 pub fn get_frames_paginated(
     buffer_id: &str,
     offset: usize,
     limit: usize,
-) -> Result<Vec<FrameMessage>, String> {
+) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
@@ -241,28 +241,31 @@ pub fn get_frames_paginated(
 
     let rows = stmt
         .query_map(params![buffer_id, limit as i64, offset as i64], |row| {
-            row_to_frame(row)
+            row_to_frame_with_rowid(row)
         })
         .map_err(|e| format!("Failed to query: {}", e))?;
 
     let mut frames = Vec::with_capacity(limit);
+    let mut rowids = Vec::with_capacity(limit);
     for row in rows {
-        frames.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+        let (rowid, frame) = row.map_err(|e| format!("Failed to read row: {}", e))?;
+        rowids.push(rowid);
+        frames.push(frame);
     }
-    Ok(frames)
+    Ok((frames, rowids))
 }
 
-/// Get paginated frames filtered by frame ID set. Returns (frames, total_filtered_count).
+/// Get paginated frames filtered by frame ID set. Returns (frames, rowids, total_filtered_count).
 pub fn get_frames_paginated_filtered(
     buffer_id: &str,
     offset: usize,
     limit: usize,
     frame_ids: &[u32],
-) -> Result<(Vec<FrameMessage>, usize), String> {
+) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
     if frame_ids.is_empty() {
-        let frames = get_frames_paginated(buffer_id, offset, limit)?;
+        let (frames, rowids) = get_frames_paginated(buffer_id, offset, limit)?;
         let total = get_frame_count(buffer_id)?;
-        return Ok((frames, total));
+        return Ok((frames, rowids, total));
     }
 
     let guard = DB.lock().unwrap();
@@ -299,25 +302,28 @@ pub fn get_frames_paginated_filtered(
 
     let rows = stmt
         .query_map(params![buffer_id, limit as i64, offset as i64], |row| {
-            row_to_frame(row)
+            row_to_frame_with_rowid(row)
         })
         .map_err(|e| format!("Failed to query: {}", e))?;
 
     let mut frames = Vec::with_capacity(limit);
+    let mut rowids = Vec::with_capacity(limit);
     for row in rows {
-        frames.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+        let (rowid, frame) = row.map_err(|e| format!("Failed to read row: {}", e))?;
+        rowids.push(rowid);
+        frames.push(frame);
     }
 
-    Ok((frames, total))
+    Ok((frames, rowids, total))
 }
 
-/// Get the last N frames for a buffer, optionally filtered. Returns (frames, total_filtered_count).
+/// Get the last N frames for a buffer, optionally filtered. Returns (frames, rowids, total_filtered_count, end_time).
 /// Frames are returned in chronological order (oldest first).
 pub fn get_frames_tail(
     buffer_id: &str,
     limit: usize,
     frame_ids: &[u32],
-) -> Result<(Vec<FrameMessage>, usize, Option<u64>), String> {
+) -> Result<(Vec<FrameMessage>, Vec<i64>, usize, Option<u64>), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
@@ -368,18 +374,22 @@ pub fn get_frames_tail(
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id, limit as i64], |row| row_to_frame(row))
+        .query_map(params![buffer_id, limit as i64], |row| row_to_frame_with_rowid(row))
         .map_err(|e| format!("Failed to query: {}", e))?;
 
     let mut frames = Vec::with_capacity(limit);
+    let mut rowids = Vec::with_capacity(limit);
     for row in rows {
-        frames.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+        let (rowid, frame) = row.map_err(|e| format!("Failed to read row: {}", e))?;
+        rowids.push(rowid);
+        frames.push(frame);
     }
 
     // Results came in DESC order, reverse to chronological
     frames.reverse();
+    rowids.reverse();
 
-    Ok((frames, total, end_time_us))
+    Ok((frames, rowids, total, end_time_us))
 }
 
 /// Get total frame count for a buffer.

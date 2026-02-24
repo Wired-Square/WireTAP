@@ -44,6 +44,10 @@ interface DataViewControllerProps {
   toolbarLeftContent?: React.ReactNode;
   /** Content to show in the center of the toolbar (before loading indicator) */
   toolbarCenterContent?: React.ReactNode;
+  /** Informational content for the center zone (e.g., frame counter) */
+  toolbarInfoContent?: React.ReactNode;
+  /** Content for the right zone, before the page size selector (e.g., speed selector) */
+  toolbarRightContent?: React.ReactNode;
   /** Hide pagination buttons but still show page size selector */
   hidePagination?: boolean;
   /** Hide page size selector (use when pagination is not applicable at all) */
@@ -58,6 +62,12 @@ interface DataViewControllerProps {
   displayTimeFormat: "delta-last" | "delta-start" | "timestamp" | "human";
   streamStartTimeUs?: number | null;
   timelineDisabled?: boolean;
+  /** Total frames in buffer (enables frame-based timeline mode) */
+  timelineTotalFrames?: number;
+  /** Current frame index (0-based, for frame-based timeline) */
+  timelineCurrentFrameIndex?: number;
+  /** Called when user scrubs to a new frame index */
+  timelineOnFrameChange?: (frameIndex: number) => void;
 }
 
 /**
@@ -97,6 +107,8 @@ export default function DataViewController({
   toolbarDisabled = false,
   toolbarLeftContent,
   toolbarCenterContent,
+  toolbarInfoContent,
+  toolbarRightContent,
   hidePagination = false,
   hidePageSize = false,
 
@@ -109,6 +121,9 @@ export default function DataViewController({
   displayTimeFormat,
   streamStartTimeUs,
   timelineDisabled = false,
+  timelineTotalFrames,
+  timelineCurrentFrameIndex,
+  timelineOnFrameChange,
 }: DataViewControllerProps) {
   return (
     <>
@@ -142,6 +157,8 @@ export default function DataViewController({
           disabled={toolbarDisabled}
           leftContent={toolbarLeftContent}
           centerContent={toolbarCenterContent}
+          infoContent={toolbarInfoContent}
+          rightContent={toolbarRightContent}
           hidePagination={hidePagination}
           hidePageSize={hidePageSize}
         />
@@ -154,6 +171,9 @@ export default function DataViewController({
         maxTimeUs={maxTimeUs}
         currentTimeUs={currentTimeUs}
         onPositionChange={onTimelineScrub}
+        totalFrames={timelineTotalFrames}
+        currentFrameIndex={timelineCurrentFrameIndex}
+        onFrameChange={timelineOnFrameChange}
         displayTimeFormat={displayTimeFormat}
         streamStartTimeUs={streamStartTimeUs}
         disabled={timelineDisabled}

@@ -51,7 +51,7 @@ export function usePlaybackHandlers({
   isPaused,
   isStreaming,
   sessionReady,
-  isBufferMode: _isBufferMode,
+  isBufferMode,
   currentFrameIndex,
   currentTimestampUs,
   selectedFrameIds,
@@ -124,8 +124,9 @@ export function usePlaybackHandlers({
   const handleStepBackward = useCallback(async () => {
     tlog.debug(`[PlaybackHandlers] handleStepBackward called ${JSON.stringify({ isPaused, currentFrameIndex, currentTimestampUs, sessionId })}`);
 
-    // Need to be paused and have some position info (frame index or timestamp)
-    if (!isPaused || (currentFrameIndex == null && currentTimestampUs == null)) {
+    // Allow stepping when paused, or when stopped in buffer mode (before first play / after completion)
+    const canStep = isPaused || (!isStreaming && isBufferMode);
+    if (!canStep || (currentFrameIndex == null && currentTimestampUs == null)) {
       tlog.debug('[PlaybackHandlers] handleStepBackward early return - guard condition met');
       return;
     }
@@ -143,14 +144,15 @@ export function usePlaybackHandlers({
     } catch (e) {
       tlog.debug(`[PlaybackHandlers] Failed to step backward: ${e}`);
     }
-  }, [sessionId, isPaused, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
+  }, [sessionId, isPaused, isStreaming, isBufferMode, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
 
   // Handle step forward (one frame later, respecting filter)
   const handleStepForward = useCallback(async () => {
     tlog.debug(`[PlaybackHandlers] handleStepForward called ${JSON.stringify({ isPaused, currentFrameIndex, currentTimestampUs, sessionId })}`);
 
-    // Need to be paused and have some position info (frame index or timestamp)
-    if (!isPaused || (currentFrameIndex == null && currentTimestampUs == null)) {
+    // Allow stepping when paused, or when stopped in buffer mode (before first play / after completion)
+    const canStep = isPaused || (!isStreaming && isBufferMode);
+    if (!canStep || (currentFrameIndex == null && currentTimestampUs == null)) {
       tlog.debug('[PlaybackHandlers] handleStepForward early return - guard condition met');
       return;
     }
@@ -168,7 +170,7 @@ export function usePlaybackHandlers({
     } catch (e) {
       tlog.debug(`[PlaybackHandlers] Failed to step forward: ${e}`);
     }
-  }, [sessionId, isPaused, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
+  }, [sessionId, isPaused, isStreaming, isBufferMode, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
 
   return {
     handlePlay,

@@ -194,6 +194,8 @@ export interface PaginatedFramesResponse {
   total_count: number;
   offset: number;
   limit: number;
+  /** 1-based original buffer position (rowid) for each frame, parallel to `frames`. */
+  buffer_indices: number[];
 }
 
 /**
@@ -235,6 +237,8 @@ export async function getBufferFramesPaginatedFiltered(
  */
 export interface TailResponse {
   frames: BufferFrame[];
+  /** 1-based original buffer position (rowid) for each frame, parallel to `frames`. */
+  buffer_indices: number[];
   total_filtered_count: number;
   buffer_end_time_us: number | null;
 }

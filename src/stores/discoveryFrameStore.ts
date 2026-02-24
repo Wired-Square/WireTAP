@@ -50,8 +50,6 @@ interface DiscoveryFrameState {
   bufferMode: {
     enabled: boolean;
     totalFrames: number;
-    /** View mode: pagination = manual page navigation, playback = timeline-controlled */
-    viewMode: "pagination" | "playback";
   };
 
   // Actions - Stream timing
@@ -75,7 +73,6 @@ interface DiscoveryFrameState {
   // Actions - Buffer mode
   enableBufferMode: (totalFrames: number) => void;
   disableBufferMode: () => void;
-  setBufferViewMode: (mode: "pagination" | "playback") => void;
   setFrameInfoFromBuffer: (frameInfoList: Array<{
     frame_id: number;
     max_dlc: number;
@@ -92,7 +89,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   selectedFrames: new Set(),
   seenIds: new Set(),
   streamStartTimeUs: null,
-  bufferMode: { enabled: false, totalFrames: 0, viewMode: "pagination" },
+  bufferMode: { enabled: false, totalFrames: 0 },
 
   // Stream timing actions
   setStreamStartTimeUs: (timeUs) => set({ streamStartTimeUs: timeUs }),
@@ -390,7 +387,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
     tlog.debug(`[discoveryFrameStore] Enabling buffer mode with ${totalFrames} frames`);
     _frameBuffer = [];
     set({
-      bufferMode: { enabled: true, totalFrames, viewMode: "pagination" },
+      bufferMode: { enabled: true, totalFrames },
       frameVersion: get().frameVersion + 1,
     });
   },
@@ -398,14 +395,8 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   disableBufferMode: () => {
     tlog.debug("[discoveryFrameStore] Disabling buffer mode");
     set({
-      bufferMode: { enabled: false, totalFrames: 0, viewMode: "pagination" },
+      bufferMode: { enabled: false, totalFrames: 0 },
     });
-  },
-
-  setBufferViewMode: (mode) => {
-    set((state) => ({
-      bufferMode: { ...state.bufferMode, viewMode: mode },
-    }));
   },
 
   setFrameInfoFromBuffer: (frameInfoList, protocol, activeSelectionSetSelectedIds = null) => {
