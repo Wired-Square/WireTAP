@@ -4,9 +4,21 @@ All notable changes to CANdor will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Expanded Discovery context menu**: Right-click a frame row now offers Copy ID, Copy Data, Filter, Solo (show only this frame ID), Inspect, Send to Transmit, Graph (open a Flow panel for the frame), and Bookmark. Items are grouped with separators.
+
+- **Filtered tab context menu**: Right-click a frame in the Filtered tab to Unfilter (re-select the frame ID), Copy ID, Copy Data, or Inspect.
+
+- **Header column context menu**: Right-click the table header row in Discovery (Frames or Filtered tab) to toggle column visibility (#, Bus, ASCII) via a checkmark menu.
+
 ### Changed
 
 - **Checksum deduplication**: Refactored CRC algorithm implementations in the Rust backend to delegate to the parameterised `crc8_parameterised` and `crc16_parameterised` functions instead of each hand-rolling the CRC loop. Reduces ~135 lines of duplicated code with identical behaviour.
+
+### Removed
+
+- **Calculator column button**: Removed the inline "Send to Frame Calculator" button from Discovery frame rows — the same action is available via the right-click context menu (Inspect).
 
 ## [0.4.5] - 2026-02-24
 

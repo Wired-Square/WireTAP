@@ -4,11 +4,18 @@
 // Shows frames whose IDs are in seenIds but NOT in selectedFrames.
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { Filter, Calculator, Copy, ClipboardCopy } from "lucide-react";
 import { useDiscoveryStore } from "../../../stores/discoveryStore";
+import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
 import { getBufferFramesPaginatedFiltered } from "../../../api/buffer";
 import { FrameDataTable, FRAME_PAGE_SIZE_OPTIONS } from "../components";
 import { PaginationToolbar } from "../components";
+import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import { bgDataView, textDataSecondary } from "../../../styles";
+import { iconXs } from "../../../styles/spacing";
+import { bytesToHex } from "../../../utils/byteUtils";
+import { formatFrameId } from "../../../utils/frameIds";
+import { sendHexDataToCalculator } from "../../../utils/windowCommunication";
 import type { FrameMessage } from "../../../types/frame";
 import type { FrameRow } from "../components";
 import type { BufferMetadata } from "../../../api/buffer";
@@ -35,6 +42,15 @@ export default function FilteredTabContent({
   const seenIds = useDiscoveryStore((s) => s.seenIds);
   const selectedFrames = useDiscoveryStore((s) => s.selectedFrames);
   const bufferMode = useDiscoveryStore((s) => s.bufferMode);
+  const toggleFrameSelection = useDiscoveryStore((s) => s.toggleFrameSelection);
+
+  // Column visibility (for header context menu)
+  const showRefColumn = useDiscoveryUIStore((s) => s.showRefColumn);
+  const showAsciiColumn = useDiscoveryUIStore((s) => s.showAsciiColumn);
+  const showBusColumn = useDiscoveryUIStore((s) => s.showBusColumn);
+  const toggleShowRefColumn = useDiscoveryUIStore((s) => s.toggleShowRefColumn);
+  const toggleShowAsciiColumn = useDiscoveryUIStore((s) => s.toggleShowAsciiColumn);
+  const toggleShowBusColumn = useDiscoveryUIStore((s) => s.toggleShowBusColumn);
 
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
@@ -43,6 +59,33 @@ export default function FilteredTabContent({
   const [bufferFrames, setBufferFrames] = useState<FrameRow[]>([]);
   const [bufferTotalCount, setBufferTotalCount] = useState(0);
   const [bufferLoading, setBufferLoading] = useState(false);
+
+  // Context menu state (frame rows)
+  const [contextMenu, setContextMenu] = useState<{
+    frame: FrameRow;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleContextMenu = useCallback((frame: FrameRow, position: { x: number; y: number }) => {
+    setHeaderContextMenu(null);
+    setContextMenu({ frame, position });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  // Context menu state (header columns)
+  const [headerContextMenu, setHeaderContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleHeaderContextMenu = useCallback((position: { x: number; y: number }) => {
+    setContextMenu(null);
+    setHeaderContextMenu(position);
+  }, []);
+
+  const closeHeaderContextMenu = useCallback(() => {
+    setHeaderContextMenu(null);
+  }, []);
 
   // Compute filtered-out IDs: in seenIds but NOT in selectedFrames
   const filteredOutIds = useMemo(() => {
@@ -176,6 +219,12 @@ export default function FilteredTabContent({
 
   // Determine which data to display
   const displayFrames = bufferMode.enabled ? bufferFrames : localPage.frames;
+
+  // Close context menus on page change
+  useEffect(() => {
+    setContextMenu(null);
+    setHeaderContextMenu(null);
+  }, [currentPage, displayFrames]);
   const totalCount = bufferMode.enabled ? bufferTotalCount : localPage.totalCount;
   const totalPages = totalCount > 0 && pageSize > 0 ? Math.ceil(totalCount / pageSize) : 1;
   const loading = bufferMode.enabled ? bufferLoading : false;
@@ -184,6 +233,44 @@ export default function FilteredTabContent({
     setPageSize(size);
     setCurrentPage(0);
   }, []);
+
+  // Frame context menu items
+  const contextMenuItems: ContextMenuItem[] = useMemo(() => {
+    if (!contextMenu) return [];
+    const { frame } = contextMenu;
+    const hexData = (frame.hexBytes ?? frame.bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase())).join(' ');
+    return [
+      {
+        label: 'Copy ID',
+        icon: <Copy className={iconXs} />,
+        onClick: () => navigator.clipboard.writeText(formatFrameId(frame.frame_id, displayFrameIdFormat, frame.is_extended)),
+      },
+      {
+        label: 'Copy Data',
+        icon: <ClipboardCopy className={iconXs} />,
+        onClick: () => navigator.clipboard.writeText(hexData),
+      },
+      { separator: true, label: '', onClick: () => {} },
+      {
+        label: 'Unfilter',
+        icon: <Filter className={iconXs} />,
+        onClick: () => toggleFrameSelection(frame.frame_id),
+      },
+      { separator: true, label: '', onClick: () => {} },
+      {
+        label: 'Inspect',
+        icon: <Calculator className={iconXs} />,
+        onClick: () => sendHexDataToCalculator(bytesToHex(frame.bytes)),
+      },
+    ];
+  }, [contextMenu, toggleFrameSelection, displayFrameIdFormat]);
+
+  // Header context menu items
+  const headerContextMenuItems: ContextMenuItem[] = useMemo(() => [
+    { label: '# Column', checked: showRefColumn, onClick: toggleShowRefColumn },
+    { label: 'Bus Column', checked: showBusColumn, onClick: toggleShowBusColumn },
+    { label: 'ASCII Column', checked: showAsciiColumn, onClick: toggleShowAsciiColumn },
+  ], [showRefColumn, showBusColumn, showAsciiColumn, toggleShowRefColumn, toggleShowBusColumn, toggleShowAsciiColumn]);
 
   if (filteredOutIds.length === 0) {
     return (
@@ -196,6 +283,7 @@ export default function FilteredTabContent({
   }
 
   return (
+    <>
     <div className="flex-1 min-h-0 flex flex-col">
       {/* Toolbar - only show when not streaming */}
       {!isStreaming && (
@@ -214,8 +302,30 @@ export default function FilteredTabContent({
         frames={displayFrames}
         displayFrameIdFormat={displayFrameIdFormat}
         formatTime={formatTime}
+        showRef={showRefColumn}
+        showAscii={showAsciiColumn}
+        showBus={showBusColumn}
         emptyMessage={loading ? "Loading filtered frames..." : "No filtered frames to display"}
+        onContextMenu={handleContextMenu}
+        onHeaderContextMenu={handleHeaderContextMenu}
       />
     </div>
+
+    {contextMenu && (
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenu.position}
+        onClose={closeContextMenu}
+      />
+    )}
+
+    {headerContextMenu && (
+      <ContextMenu
+        items={headerContextMenuItems}
+        position={headerContextMenu}
+        onClose={closeHeaderContextMenu}
+      />
+    )}
+    </>
   );
 }

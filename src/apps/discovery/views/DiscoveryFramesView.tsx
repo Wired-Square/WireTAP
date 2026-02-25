@@ -1,6 +1,6 @@
 // ui/src/apps/discovery/views/DiscoveryFramesView.tsx
 import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "react";
-import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw } from "lucide-react";
+import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw, Copy, ClipboardCopy, Target, Send, BarChart3, Bookmark } from "lucide-react";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { useDiscoveryStore } from "../../../stores/discoveryStore";
@@ -20,7 +20,10 @@ import type { IOCapabilities } from "../../../api/io";
 import { useBufferFrameView } from "../hooks/useBufferFrameView";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import { bytesToHex } from "../../../utils/byteUtils";
-import { sendHexDataToCalculator } from "../../../utils/windowCommunication";
+import { formatFrameId } from "../../../utils/frameIds";
+import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
+import { useTransmitStore } from "../../../stores/transmitStore";
+import { useGraphStore } from "../../../stores/graphStore";
 import type { FrameRow } from "../components/FrameDataTable";
 
 const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 60];
@@ -137,22 +140,36 @@ function DiscoveryFramesView({
   const bufferMode = useDiscoveryStore((s) => s.bufferMode);
   const toolboxResults = useDiscoveryStore((s) => s.toolbox);
   const toggleFrameSelection = useDiscoveryStore((s) => s.toggleFrameSelection);
+  const deselectAllFrames = useDiscoveryStore((s) => s.deselectAllFrames);
   const renderFrozen = useDiscoveryStore((s) => s.renderFrozen);
   const setRenderFrozen = useDiscoveryStore((s) => s.setRenderFrozen);
   const refreshFrozenView = useDiscoveryStore((s) => s.refreshFrozenView);
 
-  // Context menu state
+  // Context menu state (frame rows)
   const [contextMenu, setContextMenu] = useState<{
     frame: FrameRow;
     position: { x: number; y: number };
   } | null>(null);
 
   const handleContextMenu = useCallback((frame: FrameRow, position: { x: number; y: number }) => {
+    setHeaderContextMenu(null);
     setContextMenu({ frame, position });
   }, []);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
+  }, []);
+
+  // Context menu state (header columns)
+  const [headerContextMenu, setHeaderContextMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const handleHeaderContextMenu = useCallback((position: { x: number; y: number }) => {
+    setContextMenu(null);
+    setHeaderContextMenu(position);
+  }, []);
+
+  const closeHeaderContextMenu = useCallback(() => {
+    setHeaderContextMenu(null);
   }, []);
 
   // Use buffer-first hook when bufferId is available
@@ -512,19 +529,79 @@ function DiscoveryFramesView({
   const contextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!contextMenu) return [];
     const { frame } = contextMenu;
-    return [
+    const hexData = (frame.hexBytes ?? frame.bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase())).join(' ');
+    const items: ContextMenuItem[] = [
+      {
+        label: 'Copy ID',
+        icon: <Copy className={iconXs} />,
+        onClick: () => navigator.clipboard.writeText(formatFrameId(frame.frame_id, displayFrameIdFormat, frame.is_extended)),
+      },
+      {
+        label: 'Copy Data',
+        icon: <ClipboardCopy className={iconXs} />,
+        onClick: () => navigator.clipboard.writeText(hexData),
+      },
+      { separator: true, label: '', onClick: () => {} },
       {
         label: 'Filter',
         icon: <Filter className={iconXs} />,
         onClick: () => toggleFrameSelection(frame.frame_id),
       },
       {
+        label: 'Solo',
+        icon: <Target className={iconXs} />,
+        onClick: () => { deselectAllFrames(); toggleFrameSelection(frame.frame_id); },
+      },
+      { separator: true, label: '', onClick: () => {} },
+      {
         label: 'Inspect',
         icon: <Calculator className={iconXs} />,
         onClick: () => sendHexDataToCalculator(bytesToHex(frame.bytes)),
       },
+      {
+        label: 'Send to Transmit',
+        icon: <Send className={iconXs} />,
+        onClick: () => {
+          useTransmitStore.getState().updateCanEditor({
+            frameId: frame.frame_id.toString(16).toUpperCase(),
+            dlc: frame.dlc,
+            data: [...frame.bytes],
+            isExtended: frame.is_extended ?? false,
+            bus: frame.bus ?? 0,
+          });
+          openPanel("transmit");
+        },
+      },
+      {
+        label: 'Graph',
+        icon: <BarChart3 className={iconXs} />,
+        onClick: () => {
+          const store = useGraphStore.getState();
+          store.addPanel('flow');
+          const newPanel = store.panels[store.panels.length - 1];
+          store.updatePanel(newPanel.id, { targetFrameId: frame.frame_id });
+          openPanel("graph");
+        },
+      },
     ];
-  }, [contextMenu, toggleFrameSelection]);
+    if (onBookmark) {
+      items.push(
+        { separator: true, label: '', onClick: () => {} },
+        {
+          label: 'Bookmark',
+          icon: <Bookmark className={iconXs} />,
+          onClick: () => onBookmark(frame.frame_id, frame.timestamp_us),
+        },
+      );
+    }
+    return items;
+  }, [contextMenu, toggleFrameSelection, deselectAllFrames, displayFrameIdFormat, onBookmark]);
+
+  const headerContextMenuItems: ContextMenuItem[] = useMemo(() => [
+    { label: '# Column', checked: showRefColumn, onClick: toggleShowRefColumn },
+    { label: 'Bus Column', checked: showBusColumn, onClick: toggleShowBusColumn },
+    { label: 'ASCII Column', checked: showAsciiColumn, onClick: toggleShowAsciiColumn },
+  ], [showRefColumn, showBusColumn, showAsciiColumn, toggleShowRefColumn, toggleShowBusColumn, toggleShowAsciiColumn]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const scrollPending = useRef(false);
@@ -935,6 +1012,7 @@ function DiscoveryFramesView({
               ? (isBufferFirstLoading ? 'Loading frames...' : 'No frames in buffer')
               : (isStreaming ? 'Waiting for frames...' : 'No frames to display')
           }
+          showCalculator={false}
           showRef={showRefColumn}
           showAscii={showAsciiColumn}
           showBus={showBusColumn}
@@ -945,6 +1023,7 @@ function DiscoveryFramesView({
           pageFrameCount={visibleFrames.length}
           bufferIndices={useBufferFirstMode ? bufferFrameView.bufferIndices : streamingIndices}
           onContextMenu={handleContextMenu}
+          onHeaderContextMenu={handleHeaderContextMenu}
         />
       )}
 
@@ -977,6 +1056,14 @@ function DiscoveryFramesView({
         items={contextMenuItems}
         position={contextMenu.position}
         onClose={closeContextMenu}
+      />
+    )}
+
+    {headerContextMenu && (
+      <ContextMenu
+        items={headerContextMenuItems}
+        position={headerContextMenu}
+        onClose={closeHeaderContextMenu}
       />
     )}
     </>

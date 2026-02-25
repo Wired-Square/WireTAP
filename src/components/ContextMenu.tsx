@@ -4,12 +4,18 @@
 // Renders a positioned dropdown at mouse coordinates with item actions.
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { Check } from 'lucide-react';
 import { bgSurface, borderDefault, textPrimary } from '../styles';
+import { iconXs } from '../styles/spacing';
 
 export interface ContextMenuItem {
   label: string;
   icon?: ReactNode;
   onClick: () => void;
+  /** When defined, renders a checkmark toggle indicator */
+  checked?: boolean;
+  /** Renders a horizontal divider instead of a button (label/onClick ignored) */
+  separator?: boolean;
 }
 
 interface ContextMenuProps {
@@ -50,16 +56,26 @@ export default function ContextMenu({ items, position, onClose }: ContextMenuPro
       className={`fixed py-1 min-w-[160px] ${bgSurface} border ${borderDefault} ${textPrimary} rounded-lg shadow-xl z-50`}
       style={{ left: position.x, top: position.y }}
     >
-      {items.map((item, idx) => (
-        <button
-          key={idx}
-          onClick={() => { item.onClick(); onClose(); }}
-          className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm ${textPrimary} hover:bg-[var(--hover-bg)] transition-colors`}
-        >
-          {item.icon}
-          <span>{item.label}</span>
-        </button>
-      ))}
+      {items.map((item, idx) => {
+        if (item.separator) {
+          return <div key={idx} className={`my-1 border-t ${borderDefault}`} />;
+        }
+        const hasCheckIndicator = item.checked !== undefined;
+        return (
+          <button
+            key={idx}
+            onClick={() => { item.onClick(); onClose(); }}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm ${textPrimary} hover:bg-[var(--hover-bg)] transition-colors`}
+          >
+            {hasCheckIndicator ? (
+              item.checked
+                ? <Check className={iconXs} />
+                : <span className={`${iconXs} inline-block`} />
+            ) : item.icon}
+            <span>{item.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

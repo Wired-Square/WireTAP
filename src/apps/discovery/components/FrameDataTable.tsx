@@ -84,6 +84,8 @@ export interface FrameDataTableProps {
   onRowClick?: (rowIndex: number) => void;
   /** Called when a row is right-clicked (receives frame data and mouse position) */
   onContextMenu?: (frame: FrameRow, position: { x: number; y: number }) => void;
+  /** Called when the header row is right-clicked */
+  onHeaderContextMenu?: (position: { x: number; y: number }) => void;
   /** Starting frame index for the current page (for tooltip display) */
   pageStartIndex?: number;
   /** Whether frames were reversed for display (affects frame index calculation) */
@@ -118,6 +120,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   highlightedRowIndex,
   onRowClick,
   onContextMenu,
+  onHeaderContextMenu,
   pageStartIndex = 0,
   framesReversed = false,
   pageFrameCount = 0,
@@ -192,7 +195,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
     >
       <table className="w-full">
         <thead className={`sticky top-0 z-10 ${bgDataView} ${textDataSecondary}`}>
-          <tr>
+          <tr onContextMenu={onHeaderContextMenu ? (e) => { e.preventDefault(); onHeaderContextMenu({ x: e.clientX, y: e.clientY }); } : undefined}>
             {onBookmark && (
               <th className={`px-1 py-1.5 w-6 border-b ${borderDataView}`}></th>
             )}
