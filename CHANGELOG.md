@@ -2,6 +2,12 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Checksum deduplication**: Refactored CRC algorithm implementations in the Rust backend to delegate to the parameterised `crc8_parameterised` and `crc16_parameterised` functions instead of each hand-rolling the CRC loop. Reduces ~135 lines of duplicated code with identical behaviour.
+
 ## [0.4.5] - 2026-02-24
 
 ### Added

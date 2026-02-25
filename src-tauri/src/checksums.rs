@@ -121,195 +121,7 @@ pub fn resolve_byte_index(index: i32, frame_length: usize) -> usize {
 }
 
 // ============================================================================
-// Low-Level Algorithm Implementations
-// ============================================================================
-
-/// XOR of all bytes.
-/// Simple but effective for detecting single-bit errors.
-pub fn xor_checksum(data: &[u8]) -> u8 {
-    let mut result: u8 = 0;
-    for &byte in data {
-        result ^= byte;
-    }
-    result
-}
-
-/// Simple modulo-256 sum of bytes (8-bit sum).
-pub fn sum8_checksum(data: &[u8]) -> u8 {
-    let mut sum: u8 = 0;
-    for &byte in data {
-        sum = sum.wrapping_add(byte);
-    }
-    sum
-}
-
-/// CRC-8 with polynomial 0x07 (ITU/SMBUS).
-/// Common in many embedded protocols.
-pub fn crc8_checksum(data: &[u8]) -> u8 {
-    let mut crc: u8 = 0;
-    for &byte in data {
-        crc ^= byte;
-        for _ in 0..8 {
-            if crc & 0x80 != 0 {
-                crc = (crc << 1) ^ 0x07;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    crc
-}
-
-/// CRC-8 SAE-J1850 with polynomial 0x1D.
-/// Used in automotive OBD-II and CAN protocols.
-/// Init: 0xFF, XOR out: 0xFF, Not reflected
-pub fn crc8_sae_j1850_checksum(data: &[u8]) -> u8 {
-    const POLY: u8 = 0x1D;
-    let mut crc: u8 = 0xFF; // init
-    for &byte in data {
-        crc ^= byte;
-        for _ in 0..8 {
-            if crc & 0x80 != 0 {
-                crc = (crc << 1) ^ POLY;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    crc ^ 0xFF // xorout
-}
-
-/// CRC-8 AUTOSAR with polynomial 0x2F.
-/// Used in AUTOSAR E2E protection.
-/// Init: 0xFF, XOR out: 0xFF, Not reflected
-pub fn crc8_autosar_checksum(data: &[u8]) -> u8 {
-    const POLY: u8 = 0x2F;
-    let mut crc: u8 = 0xFF; // init
-    for &byte in data {
-        crc ^= byte;
-        for _ in 0..8 {
-            if crc & 0x80 != 0 {
-                crc = (crc << 1) ^ POLY;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    crc ^ 0xFF // xorout
-}
-
-/// CRC-8 Maxim with polynomial 0x31.
-/// Used in Dallas/Maxim 1-Wire devices.
-/// Init: 0x00, XOR out: 0x00, Reflected (LSB-first)
-pub fn crc8_maxim_checksum(data: &[u8]) -> u8 {
-    // Reflected polynomial: 0x31 reversed = 0x8C
-    let mut crc: u8 = 0x00; // init
-    for &byte in data {
-        crc ^= byte;
-        for _ in 0..8 {
-            if crc & 0x01 != 0 {
-                crc = (crc >> 1) ^ 0x8C;
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
-    crc
-}
-
-/// CRC-8 CDMA2000 with polynomial 0x9B.
-/// Used in telecom protocols.
-/// Init: 0xFF, XOR out: 0x00, Not reflected
-pub fn crc8_cdma2000_checksum(data: &[u8]) -> u8 {
-    const POLY: u8 = 0x9B;
-    let mut crc: u8 = 0xFF; // init
-    for &byte in data {
-        crc ^= byte;
-        for _ in 0..8 {
-            if crc & 0x80 != 0 {
-                crc = (crc << 1) ^ POLY;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    crc // xorout 0x00
-}
-
-/// CRC-8 DVB-S2 with polynomial 0xD5.
-/// Used in satellite communications.
-/// Init: 0x00, XOR out: 0x00, Not reflected
-pub fn crc8_dvb_s2_checksum(data: &[u8]) -> u8 {
-    const POLY: u8 = 0xD5;
-    let mut crc: u8 = 0x00; // init
-    for &byte in data {
-        crc ^= byte;
-        for _ in 0..8 {
-            if crc & 0x80 != 0 {
-                crc = (crc << 1) ^ POLY;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    crc // xorout 0x00
-}
-
-/// CRC-8 Nissan with polynomial 0x85.
-/// Used in Nissan LEAF CAN bus.
-/// Init: 0x00, XOR out: 0x00, Not reflected
-pub fn crc8_nissan_checksum(data: &[u8]) -> u8 {
-    const POLY: u8 = 0x85;
-    let mut crc: u8 = 0x00; // init
-    for &byte in data {
-        crc ^= byte;
-        for _ in 0..8 {
-            if crc & 0x80 != 0 {
-                crc = (crc << 1) ^ POLY;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    crc // xorout 0x00
-}
-
-/// CRC-16 Modbus polynomial (0xA001, reflected).
-/// Used by Modbus RTU protocol.
-pub fn crc16_modbus_checksum(data: &[u8]) -> u16 {
-    let mut crc: u16 = 0xFFFF;
-    for &byte in data {
-        crc ^= byte as u16;
-        for _ in 0..8 {
-            if crc & 0x0001 != 0 {
-                crc = (crc >> 1) ^ 0xA001;
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
-    crc
-}
-
-/// CRC-16 CCITT polynomial (0x1021, non-reflected).
-/// Common in telecommunications and some industrial protocols.
-pub fn crc16_ccitt_checksum(data: &[u8]) -> u16 {
-    let mut crc: u16 = 0xFFFF;
-    for &byte in data {
-        crc ^= (byte as u16) << 8;
-        for _ in 0..8 {
-            if crc & 0x8000 != 0 {
-                crc = (crc << 1) ^ 0x1021;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    crc
-}
-
-// ============================================================================
-// Parameterised CRC Functions (for Discovery)
+// Reflection Helpers
 // ============================================================================
 
 /// Reflect (reverse) the bits of a byte.
@@ -331,6 +143,10 @@ fn reflect16(mut value: u16) -> u16 {
     }
     result
 }
+
+// ============================================================================
+// Parameterised CRC Functions (Canonical Implementations)
+// ============================================================================
 
 /// CRC-8 with arbitrary parameters.
 ///
@@ -436,6 +252,89 @@ pub fn crc16_parameterised(
     };
 
     final_crc ^ xor_out
+}
+
+// ============================================================================
+// Named Checksum Functions
+// ============================================================================
+
+/// XOR of all bytes.
+/// Simple but effective for detecting single-bit errors.
+pub fn xor_checksum(data: &[u8]) -> u8 {
+    let mut result: u8 = 0;
+    for &byte in data {
+        result ^= byte;
+    }
+    result
+}
+
+/// Simple modulo-256 sum of bytes (8-bit sum).
+pub fn sum8_checksum(data: &[u8]) -> u8 {
+    let mut sum: u8 = 0;
+    for &byte in data {
+        sum = sum.wrapping_add(byte);
+    }
+    sum
+}
+
+/// CRC-8 with polynomial 0x07 (ITU/SMBUS).
+/// Common in many embedded protocols.
+pub fn crc8_checksum(data: &[u8]) -> u8 {
+    crc8_parameterised(data, 0x07, 0x00, 0x00, false)
+}
+
+/// CRC-8 SAE-J1850 with polynomial 0x1D.
+/// Used in automotive OBD-II and CAN protocols.
+/// Init: 0xFF, XOR out: 0xFF, Not reflected
+pub fn crc8_sae_j1850_checksum(data: &[u8]) -> u8 {
+    crc8_parameterised(data, 0x1D, 0xFF, 0xFF, false)
+}
+
+/// CRC-8 AUTOSAR with polynomial 0x2F.
+/// Used in AUTOSAR E2E protection.
+/// Init: 0xFF, XOR out: 0xFF, Not reflected
+pub fn crc8_autosar_checksum(data: &[u8]) -> u8 {
+    crc8_parameterised(data, 0x2F, 0xFF, 0xFF, false)
+}
+
+/// CRC-8 Maxim with polynomial 0x31.
+/// Used in Dallas/Maxim 1-Wire devices.
+/// Init: 0x00, XOR out: 0x00, Reflected (LSB-first)
+pub fn crc8_maxim_checksum(data: &[u8]) -> u8 {
+    crc8_parameterised(data, 0x31, 0x00, 0x00, true)
+}
+
+/// CRC-8 CDMA2000 with polynomial 0x9B.
+/// Used in telecom protocols.
+/// Init: 0xFF, XOR out: 0x00, Not reflected
+pub fn crc8_cdma2000_checksum(data: &[u8]) -> u8 {
+    crc8_parameterised(data, 0x9B, 0xFF, 0x00, false)
+}
+
+/// CRC-8 DVB-S2 with polynomial 0xD5.
+/// Used in satellite communications.
+/// Init: 0x00, XOR out: 0x00, Not reflected
+pub fn crc8_dvb_s2_checksum(data: &[u8]) -> u8 {
+    crc8_parameterised(data, 0xD5, 0x00, 0x00, false)
+}
+
+/// CRC-8 Nissan with polynomial 0x85.
+/// Used in Nissan LEAF CAN bus.
+/// Init: 0x00, XOR out: 0x00, Not reflected
+pub fn crc8_nissan_checksum(data: &[u8]) -> u8 {
+    crc8_parameterised(data, 0x85, 0x00, 0x00, false)
+}
+
+/// CRC-16 Modbus polynomial (0x8005, reflected).
+/// Used by Modbus RTU protocol.
+pub fn crc16_modbus_checksum(data: &[u8]) -> u16 {
+    crc16_parameterised(data, 0x8005, 0xFFFF, 0x0000, true, true)
+}
+
+/// CRC-16 CCITT polynomial (0x1021, non-reflected).
+/// Common in telecommunications and some industrial protocols.
+pub fn crc16_ccitt_checksum(data: &[u8]) -> u16 {
+    crc16_parameterised(data, 0x1021, 0xFFFF, 0x0000, false, false)
 }
 
 // ============================================================================
@@ -921,11 +820,7 @@ mod tests {
         // Sample from Nissan LEAF code: {0x6E, 0x0F, 0x0F, 0xFD, 0x08, 0xC0, 0xC3}
         // This produces a checksum that can be verified against actual Nissan CAN data
         let data = [0x6E, 0x0F, 0x0F, 0xFD, 0x08, 0xC0, 0xC3];
-        let checksum = crc8_nissan_checksum(&data);
-        // The result should be consistent (we'll verify the value)
-        assert!(checksum <= 0xFF);
-        // Store the actual computed value for reference
-        // If we have real Nissan data, we can verify this is correct
+        assert_eq!(crc8_nissan_checksum(&data), 0x3E);
     }
 
     #[test]
@@ -935,10 +830,7 @@ mod tests {
 
     #[test]
     fn test_crc8_nissan_basic() {
-        // Basic test to ensure consistent output
-        let data = [0x01, 0x02, 0x03];
-        let result = crc8_nissan_checksum(&data);
-        assert!(result <= 0xFF);
+        assert_eq!(crc8_nissan_checksum(&[0x01, 0x02, 0x03]), 0x5A);
     }
 
     // ========================================================================
@@ -986,10 +878,9 @@ mod tests {
         let data = [0x01, 0x02, 0x03];
         assert_eq!(calculate_checksum_simple(ChecksumAlgorithm::Xor, &data), 0x00);
         assert_eq!(calculate_checksum_simple(ChecksumAlgorithm::Sum8, &data), 0x06);
-        // Just verify these return a number (exact values depend on algorithm)
-        assert!(calculate_checksum_simple(ChecksumAlgorithm::Crc8, &data) <= 0xFF);
-        assert!(calculate_checksum_simple(ChecksumAlgorithm::Crc16Modbus, &data) <= 0xFFFF);
-        assert!(calculate_checksum_simple(ChecksumAlgorithm::Crc16Ccitt, &data) <= 0xFFFF);
+        assert_eq!(calculate_checksum_simple(ChecksumAlgorithm::Crc8, &data), 0x48);
+        assert_eq!(calculate_checksum_simple(ChecksumAlgorithm::Crc16Modbus, &data), 0x6161);
+        assert_eq!(calculate_checksum_simple(ChecksumAlgorithm::Crc16Ccitt, &data), 0xADAD);
     }
 
     // ========================================================================
