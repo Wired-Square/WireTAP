@@ -6,6 +6,14 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Decoder frame context menu**: Right-click a frame header in the Decoder to Copy ID, Copy Data, Filter, Solo, Inspect, Send to Transmit, Graph All Signals (charts every numeric signal), or Edit in Catalog (navigates to the frame definition in the Catalog Editor).
+
+- **Decoder signal context menu**: Right-click an individual decoded signal row to Graph Signal, Copy Signal Name, or Copy Value.
+
+- **Decoder unmatched frame context menu**: Right-click a row in the Unmatched tab to Copy ID, Copy Data, Inspect, Send to Transmit, or Graph.
+
+- **Deselected frames in Filtered tab**: Frames removed via the Filter context menu action now appear as full decoded FrameCards in the Decoder's Filtered tab, alongside processing-filtered frames. The tab badge count includes both.
+
 - **Expanded Discovery context menu**: Right-click a frame row now offers Copy ID, Copy Data, Filter, Solo (show only this frame ID), Inspect, Send to Transmit, Graph (open a Flow panel for the frame), and Bookmark. Items are grouped with separators.
 
 - **Filtered tab context menu**: Right-click a frame in the Filtered tab to Unfilter (re-select the frame ID), Copy ID, Copy Data, or Inspect.
@@ -29,6 +37,8 @@ All notable changes to CANdor will be documented in this file.
 - **Shared Analysis tab**: Replaced by per-tool output tabs. Each tool now opens its own named tab instead of overwriting a shared view.
 
 - **Calculator column button**: Removed the inline "Send to Frame Calculator" button from Discovery frame rows — the same action is available via the right-click context menu (Inspect).
+
+- **Unmatched tab calculator button**: Removed the inline calculator button from Decoder unmatched frame rows — replaced by the Inspect context menu item.
 
 ## [0.4.5] - 2026-02-24
 

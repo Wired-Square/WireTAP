@@ -1,7 +1,7 @@
 // ui/src/apps/decoder/views/DecoderFramesView.tsx
 
-import { useRef, useEffect, useState, useMemo } from "react";
-import { Calculator, Star, Clock, Check, X, Layers } from "lucide-react";
+import { useRef, useEffect, useState, useMemo, useCallback } from "react";
+import { Calculator, Star, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter, Target, Send, BarChart3, Pencil } from "lucide-react";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
 import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
@@ -11,15 +11,21 @@ import { caption, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted,
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId } from "../../../utils/frameIds";
-import { sendHexDataToCalculator } from "../../../utils/windowCommunication";
+import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
 import AppTabView, { type TabDefinition, type ProtocolBadge } from "../../../components/AppTabView";
 import HeaderFieldFilter from "../../../components/HeaderFieldFilter";
+import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import type { DecodedFrame, DecodedSignal, DecoderViewMode, UnmatchedFrame, FilteredFrame, MirrorValidationEntry } from "../../../stores/decoderStore";
-import { MAX_UNMATCHED_FRAMES, MAX_FILTERED_FRAMES } from "../../../stores/decoderStore";
+import { useDecoderStore, MAX_UNMATCHED_FRAMES, MAX_FILTERED_FRAMES } from "../../../stores/decoderStore";
+import { useTransmitStore } from "../../../stores/transmitStore";
+import { useGraphStore } from "../../../stores/graphStore";
+import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { FrameDetail, SignalDef } from "../../../types/decoder";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
+import { bytesToHex } from "../../../utils/byteUtils";
 import type { SerialFrameConfig } from "../../../utils/frameExport";
 import type { TimeFormat } from "../../../hooks/useSettings";
+import type { TomlNode } from "../../catalog/types";
 
 /**
  * Get the byte indices that a signal covers based on start_bit and bit_length.
@@ -261,6 +267,46 @@ function brightenColour(colour: string, amount: number): string {
 }
 
 /**
+ * Navigate to a frame's definition in the Catalog Editor.
+ * Searches tree nodes recursively for a matching frame by numeric ID.
+ */
+function navigateToCatalogFrame(frameId: number) {
+  const store = useCatalogEditorStore.getState();
+  const { nodes, expandedIds } = store.tree;
+
+  function findFrameNode(nodeList: TomlNode[]): TomlNode | null {
+    for (const node of nodeList) {
+      if (
+        (node.type === 'can-frame' || node.type === 'serial-frame') &&
+        node.metadata?.idValue
+      ) {
+        const numericId = parseCanId(node.metadata.idValue);
+        if (numericId === frameId) return node;
+      }
+      if (node.children) {
+        const found = findFrameNode(node.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  const matchingNode = findFrameNode(nodes);
+  if (!matchingNode) return;
+
+  // Expand parent nodes so the frame is visible in the tree
+  for (let i = 1; i < matchingNode.path.length; i++) {
+    const parentPath = matchingNode.path.slice(0, i).join('.');
+    if (!expandedIds.has(parentPath)) {
+      store.toggleExpanded(parentPath);
+    }
+  }
+
+  store.setSelectedPath(matchingNode.path);
+  openPanel("catalog-editor");
+}
+
+/**
  * Component for a single frame card with flash effect on update.
  */
 // Minimum time between flashes (ms) - ensures consistent flash rate across all frames
@@ -279,6 +325,8 @@ function FrameCard({
   onToggleHeaderFieldFilter,
   startTimeSeconds,
   mirrorValidation,
+  onFrameContextMenu,
+  onSignalContextMenu,
 }: {
   frame: FrameDetail;
   decodedFrame: DecodedFrame | undefined;
@@ -303,6 +351,10 @@ function FrameCard({
   startTimeSeconds?: number;
   /** Mirror validation result for this frame (if it's a mirror frame) */
   mirrorValidation?: MirrorValidationEntry;
+  /** Context menu handler for frame header right-click */
+  onFrameContextMenu?: (frame: FrameDetail, decodedFrame: DecodedFrame | undefined, position: { x: number; y: number }) => void;
+  /** Context menu handler for signal row right-click */
+  onSignalContextMenu?: (frame: FrameDetail, signal: DecodedSignal, position: { x: number; y: number }) => void;
 }) {
   // Track which byte indices are currently "bright" (recently changed)
   const [brightByteIndices, setBrightByteIndices] = useState<Set<number>>(new Set());
@@ -515,7 +567,13 @@ function FrameCard({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 text-sm font-semibold text-[color:var(--text-primary)]">
+      <div
+        className="flex items-center gap-3 text-sm font-semibold text-[color:var(--text-primary)]"
+        onContextMenu={onFrameContextMenu ? (e) => {
+          e.preventDefault();
+          onFrameContextMenu(frame, decodedFrame, { x: e.clientX, y: e.clientY });
+        } : undefined}
+      >
         <span className="font-mono">{renderFrameId(frame.id, frame.isExtended)}</span>
         <span className={caption}>len {frame.len}</span>
         {/* Mirror frame badge */}
@@ -666,6 +724,10 @@ function FrameCard({
               <div
                 key={`${decoded.muxValue ?? 'plain'}-${decoded.name}-${idx}`}
                 className={`px-3 py-2 text-sm ${rowBg} flex items-center justify-between transition-colors duration-200`}
+                onContextMenu={onSignalContextMenu ? (e) => {
+                  e.preventDefault();
+                  onSignalContextMenu(frame, decoded, { x: e.clientX, y: e.clientY });
+                } : undefined}
               >
                 <div className="flex items-center gap-3">
                   {timestampStr && (
@@ -830,6 +892,7 @@ export default function DecoderFramesView({
   void _onToggleRawBytes; // Silence unused variable warning
   void _frameIdFilter; // Frame ID filtering is done at processing level in Decoder.tsx
   const selectedFrames = frames.filter((f) => selectedIds.has(f.id));
+  const deselectedFrames = frames.filter((f) => !selectedIds.has(f.id));
 
   // Use stream start time for delta-start calculation (passed from store)
   const startTimeSeconds = streamStartTimeSeconds ?? undefined;
@@ -934,9 +997,9 @@ export default function DecoderFramesView({
     return [
       { id: 'signals', label: 'Signals', count: selectedFrames.length, countColor: 'green' as const },
       { id: 'unmatched', label: 'Unmatched', count: unmatchedFrames.length, countColor: 'orange' as const, countPrefix: unmatchedAtMax ? '>' : undefined },
-      { id: 'filtered', label: 'Filtered', count: filteredFrames.length, countColor: 'purple' as const, countPrefix: filteredAtMax ? '>' : undefined },
+      { id: 'filtered', label: 'Filtered', count: filteredFrames.length + deselectedFrames.length, countColor: 'purple' as const, countPrefix: filteredAtMax ? '>' : undefined },
     ];
-  }, [selectedFrames.length, unmatchedFrames.length, filteredFrames.length]);
+  }, [selectedFrames.length, unmatchedFrames.length, filteredFrames.length, deselectedFrames.length]);
 
   // Track active tab - use prop if provided, otherwise local state
   const [localActiveTab, setLocalActiveTab] = useState<string>('signals');
@@ -948,6 +1011,229 @@ export default function DecoderFramesView({
 
   // Whether timeline should be shown
   const showTimeline = hasBufferData && minTimeUs != null && maxTimeUs != null && minTimeUs < maxTimeUs;
+
+  // ── Context menu state ──
+
+  const [frameContextMenu, setFrameContextMenu] = useState<{
+    frame: FrameDetail;
+    decodedFrame: DecodedFrame | undefined;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleFrameContextMenu = useCallback(
+    (frame: FrameDetail, decodedFrame: DecodedFrame | undefined, position: { x: number; y: number }) => {
+      setSignalContextMenu(null);
+      setUnmatchedContextMenu(null);
+      setFrameContextMenu({ frame, decodedFrame, position });
+    },
+    []
+  );
+
+  const closeFrameContextMenu = useCallback(() => {
+    setFrameContextMenu(null);
+  }, []);
+
+  const [signalContextMenu, setSignalContextMenu] = useState<{
+    frame: FrameDetail;
+    signal: DecodedSignal;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleSignalContextMenu = useCallback(
+    (frame: FrameDetail, signal: DecodedSignal, position: { x: number; y: number }) => {
+      setFrameContextMenu(null);
+      setUnmatchedContextMenu(null);
+      setSignalContextMenu({ frame, signal, position });
+    },
+    []
+  );
+
+  const closeSignalContextMenu = useCallback(() => {
+    setSignalContextMenu(null);
+  }, []);
+
+  const [unmatchedContextMenu, setUnmatchedContextMenu] = useState<{
+    frame: UnmatchedFrame;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleUnmatchedContextMenu = useCallback(
+    (e: React.MouseEvent, frame: UnmatchedFrame) => {
+      e.preventDefault();
+      setFrameContextMenu(null);
+      setSignalContextMenu(null);
+      setUnmatchedContextMenu({ frame, position: { x: e.clientX, y: e.clientY } });
+    },
+    []
+  );
+
+  const closeUnmatchedContextMenu = useCallback(() => {
+    setUnmatchedContextMenu(null);
+  }, []);
+
+  // ── Context menu items ──
+
+  const frameContextMenuItems: ContextMenuItem[] = useMemo(() => {
+    if (!frameContextMenu) return [];
+    const { frame, decodedFrame } = frameContextMenu;
+    const formattedId = formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended);
+    const rawBytes = decodedFrame?.rawBytes ?? [];
+    const hexData = rawBytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+
+    return [
+      {
+        label: 'Copy ID',
+        icon: <Copy className={iconXs} />,
+        onClick: () => { navigator.clipboard.writeText(formattedId); },
+      },
+      {
+        label: 'Copy Data',
+        icon: <ClipboardCopy className={iconXs} />,
+        onClick: () => { navigator.clipboard.writeText(hexData); },
+      },
+      { separator: true, label: '', onClick: () => {} },
+      {
+        label: 'Filter',
+        icon: <Filter className={iconXs} />,
+        onClick: () => { useDecoderStore.getState().toggleFrameSelection(frame.id); },
+      },
+      {
+        label: 'Solo',
+        icon: <Target className={iconXs} />,
+        onClick: () => {
+          const store = useDecoderStore.getState();
+          store.deselectAllFrames();
+          store.toggleFrameSelection(frame.id);
+        },
+      },
+      { separator: true, label: '', onClick: () => {} },
+      {
+        label: 'Inspect',
+        icon: <Calculator className={iconXs} />,
+        onClick: () => { sendHexDataToCalculator(bytesToHex(rawBytes)); },
+      },
+      {
+        label: 'Send to Transmit',
+        icon: <Send className={iconXs} />,
+        onClick: () => {
+          useTransmitStore.getState().updateCanEditor({
+            frameId: frame.id.toString(16).toUpperCase(),
+            dlc: frame.len,
+            data: [...rawBytes],
+            isExtended: frame.isExtended ?? false,
+            bus: frame.bus ?? 0,
+          });
+          openPanel("transmit");
+        },
+      },
+      {
+        label: 'Graph All Signals',
+        icon: <BarChart3 className={iconXs} />,
+        onClick: () => {
+          const allSignals = getAllFrameSignals(frame);
+          const numericSignals = allSignals.filter(s => {
+            const fmt = s.format;
+            return !fmt || !['enum', 'ascii', 'utf8', 'hex'].includes(fmt);
+          });
+          if (numericSignals.length === 0) return;
+
+          const gStore = useGraphStore.getState();
+          gStore.addPanel('line-chart');
+          const newPanel = gStore.panels[gStore.panels.length - 1];
+          for (const signal of numericSignals) {
+            if (signal.name) {
+              gStore.addSignalToPanel(newPanel.id, frame.id, signal.name, signal.unit);
+            }
+          }
+          openPanel("graph");
+        },
+      },
+      {
+        label: 'Edit in Catalog',
+        icon: <Pencil className={iconXs} />,
+        onClick: () => { navigateToCatalogFrame(frame.id); },
+      },
+    ];
+  }, [frameContextMenu, displayFrameIdFormat]);
+
+  const signalContextMenuItems: ContextMenuItem[] = useMemo(() => {
+    if (!signalContextMenu) return [];
+    const { frame, signal } = signalContextMenu;
+
+    return [
+      {
+        label: 'Graph Signal',
+        icon: <BarChart3 className={iconXs} />,
+        onClick: () => {
+          const gStore = useGraphStore.getState();
+          gStore.addPanel('line-chart');
+          const newPanel = gStore.panels[gStore.panels.length - 1];
+          gStore.addSignalToPanel(newPanel.id, frame.id, signal.name, signal.unit);
+          openPanel("graph");
+        },
+      },
+      {
+        label: 'Copy Signal Name',
+        icon: <Copy className={iconXs} />,
+        onClick: () => { navigator.clipboard.writeText(signal.name); },
+      },
+      {
+        label: 'Copy Value',
+        icon: <ClipboardCopy className={iconXs} />,
+        onClick: () => { navigator.clipboard.writeText(formatSignalValue(signal)); },
+      },
+    ];
+  }, [signalContextMenu]);
+
+  const unmatchedContextMenuItems: ContextMenuItem[] = useMemo(() => {
+    if (!unmatchedContextMenu) return [];
+    const { frame } = unmatchedContextMenu;
+    const isExtended = frame.frameId > 0x7FF;
+    const formattedId = formatFrameId(frame.frameId, displayFrameIdFormat, isExtended);
+    const hexData = frame.bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+
+    return [
+      {
+        label: 'Copy ID',
+        icon: <Copy className={iconXs} />,
+        onClick: () => { navigator.clipboard.writeText(formattedId); },
+      },
+      {
+        label: 'Copy Data',
+        icon: <ClipboardCopy className={iconXs} />,
+        onClick: () => { navigator.clipboard.writeText(hexData); },
+      },
+      { separator: true, label: '', onClick: () => {} },
+      {
+        label: 'Inspect',
+        icon: <Calculator className={iconXs} />,
+        onClick: () => { sendHexDataToCalculator(hexData.replace(/\s+/g, '')); },
+      },
+      {
+        label: 'Send to Transmit',
+        icon: <Send className={iconXs} />,
+        onClick: () => {
+          useTransmitStore.getState().updateCanEditor({
+            frameId: frame.frameId.toString(16).toUpperCase(),
+            dlc: frame.bytes.length,
+            data: [...frame.bytes],
+            isExtended,
+            bus: 0,
+          });
+          openPanel("transmit");
+        },
+      },
+      {
+        label: 'Graph',
+        icon: <BarChart3 className={iconXs} />,
+        onClick: () => {
+          const gStore = useGraphStore.getState();
+          gStore.addPanel('flow');
+          openPanel("graph");
+        },
+      },
+    ];
+  }, [unmatchedContextMenu, displayFrameIdFormat]);
 
   // Tab bar controls (right side buttons)
   const tabBarControls = (
@@ -1068,6 +1354,7 @@ export default function DecoderFramesView({
   ) : null;
 
   return (
+    <>
     <AppTabView
       // Tab bar
       tabs={tabs}
@@ -1157,6 +1444,8 @@ export default function DecoderFramesView({
                     onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
                     startTimeSeconds={startTimeSeconds}
                     mirrorValidation={mirrorValidation?.get(f.id)}
+                    onFrameContextMenu={handleFrameContextMenu}
+                    onSignalContextMenu={handleSignalContextMenu}
                   />
                 ))
             ) : (
@@ -1223,6 +1512,8 @@ export default function DecoderFramesView({
                         onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
                         startTimeSeconds={startTimeSeconds}
                         mirrorValidation={mirrorValidation?.get(f.id)}
+                        onFrameContextMenu={handleFrameContextMenu}
+                        onSignalContextMenu={handleSignalContextMenu}
                       />
                     ))}
                   </div>
@@ -1254,6 +1545,7 @@ export default function DecoderFramesView({
                   <div
                     key={`${frame.timestamp}-${frame.frameId}-${idx}`}
                     className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
+                    onContextMenu={(e) => handleUnmatchedContextMenu(e, frame)}
                   >
                     <span className={`${textMuted} text-xs`}>{timeStr}</span>
                     <span className={`${textDataPurple} font-semibold`}>{idStr}</span>
@@ -1265,67 +1557,106 @@ export default function DecoderFramesView({
                     {showAsciiGutter && (
                       <span className={`${textDataYellow} text-xs font-mono`}>{asciiStr}</span>
                     )}
-                    <button
-                      onClick={() => sendHexDataToCalculator(bytesHex.replace(/\s+/g, ''))}
-                      className={`p-1 rounded ${hoverBg} transition-colors`}
-                      title="Send to Frame Calculator"
-                    >
-                      <Calculator className={`${iconSm} ${textDataOrange}`} />
-                    </button>
                   </div>
                 );
               })
             )}
           </div>
         ) : activeTab === 'filtered' ? (
-          // Filtered frames tab content - frames filtered by length or ID
-          <div className="space-y-1">
-            {filteredFrames.length === 0 ? (
-              <div className={`text-sm ${textMuted}`}>No filtered frames.</div>
-            ) : (
-              filteredFrames.slice(-100).reverse().map((frame, idx) => {
-                const date = new Date(frame.timestamp * 1000);
-                const timeStr = date.toLocaleTimeString('en-US', {
-                  hour12: false,
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
-                const isExtended = frame.frameId > 0x7FF;
-                const idStr = formatFrameId(frame.frameId, displayFrameIdFormat, isExtended);
-                const bytesHex = frame.bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
-                const asciiStr = frame.bytes.map(byteToAscii).join('');
-                return (
-                  <div
-                    key={`${frame.timestamp}-${frame.frameId}-${idx}`}
-                    className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
-                  >
-                    <span className={`${textMuted} text-xs`}>{timeStr}</span>
-                    <span className={`${textDataPurple} font-semibold`}>{idStr}</span>
-                    {frame.sourceAddress !== undefined && (
-                      <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
-                    )}
-                    <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
-                    <span className={`${textDataPrimary} flex-1`}>{bytesHex}</span>
-                    {showAsciiGutter && (
-                      <span className={`${textDataYellow} text-xs font-mono`}>{asciiStr}</span>
-                    )}
-                    <span className={`${textDataAmber} text-xs`}>
-                      {frame.reason === 'id_filter' ? 'ID filter' : 'too short'}
-                    </span>
-                    <button
-                      onClick={() => sendHexDataToCalculator(bytesHex.replace(/\s+/g, ''))}
-                      className={`p-1 rounded ${hoverBg} transition-colors`}
-                      title="Send to Frame Calculator"
-                    >
-                      <Calculator className={`${iconSm} ${textDataOrange}`} />
-                    </button>
-                  </div>
-                );
-              })
+          // Filtered frames tab content - deselected frames + processing-filtered frames
+          <>
+            {deselectedFrames.length === 0 && filteredFrames.length === 0 && (
+              <div className={emptyStateText}>No filtered frames.</div>
             )}
-          </div>
+            {deselectedFrames.map((f) => (
+              <FrameCard
+                key={f.id}
+                frame={f}
+                decodedFrame={decoded.get(f.id)}
+                displayFrameIdFormat={displayFrameIdFormat}
+                showRawBytes={showRawBytes}
+                showAsciiGutter={showAsciiGutter}
+                signalColours={signalColours}
+                serialConfig={serialConfig}
+                displayTimeFormat={displayTimeFormat}
+                onToggleHeaderFieldFilter={onToggleHeaderFieldFilter}
+                startTimeSeconds={startTimeSeconds}
+                mirrorValidation={mirrorValidation?.get(f.id)}
+                onFrameContextMenu={handleFrameContextMenu}
+                onSignalContextMenu={handleSignalContextMenu}
+              />
+            ))}
+            {filteredFrames.length > 0 && (
+              <div className="space-y-1">
+                {filteredFrames.slice(-100).reverse().map((frame, idx) => {
+                  const date = new Date(frame.timestamp * 1000);
+                  const timeStr = date.toLocaleTimeString('en-US', {
+                    hour12: false,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  }) + '.' + String(date.getMilliseconds()).padStart(3, '0');
+                  const isExtended = frame.frameId > 0x7FF;
+                  const idStr = formatFrameId(frame.frameId, displayFrameIdFormat, isExtended);
+                  const bytesHex = frame.bytes.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+                  const asciiStr = frame.bytes.map(byteToAscii).join('');
+                  return (
+                    <div
+                      key={`${frame.timestamp}-${frame.frameId}-${idx}`}
+                      className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
+                    >
+                      <span className={`${textMuted} text-xs`}>{timeStr}</span>
+                      <span className={`${textDataPurple} font-semibold`}>{idStr}</span>
+                      {frame.sourceAddress !== undefined && (
+                        <span className={`${textDataCyan} text-xs`}>src: 0x{frame.sourceAddress.toString(16).toUpperCase()}</span>
+                      )}
+                      <span className={`${textMuted} text-xs`}>[{frame.bytes.length}]</span>
+                      <span className={`${textDataPrimary} flex-1`}>{bytesHex}</span>
+                      {showAsciiGutter && (
+                        <span className={`${textDataYellow} text-xs font-mono`}>{asciiStr}</span>
+                      )}
+                      <span className={`${textDataAmber} text-xs`}>
+                        {frame.reason === 'id_filter' ? 'ID filter' : 'too short'}
+                      </span>
+                      <button
+                        onClick={() => sendHexDataToCalculator(bytesHex.replace(/\s+/g, ''))}
+                        className={`p-1 rounded ${hoverBg} transition-colors`}
+                        title="Send to Frame Calculator"
+                      >
+                        <Calculator className={`${iconSm} ${textDataOrange}`} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         ) : null}
     </AppTabView>
+
+    {frameContextMenu && (
+      <ContextMenu
+        items={frameContextMenuItems}
+        position={frameContextMenu.position}
+        onClose={closeFrameContextMenu}
+      />
+    )}
+
+    {signalContextMenu && (
+      <ContextMenu
+        items={signalContextMenuItems}
+        position={signalContextMenu.position}
+        onClose={closeSignalContextMenu}
+      />
+    )}
+
+    {unmatchedContextMenu && (
+      <ContextMenu
+        items={unmatchedContextMenuItems}
+        position={unmatchedContextMenu.position}
+        onClose={closeUnmatchedContextMenu}
+      />
+    )}
+    </>
   );
 }
