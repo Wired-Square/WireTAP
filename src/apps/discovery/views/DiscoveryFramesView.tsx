@@ -577,9 +577,8 @@ function DiscoveryFramesView({
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
           const store = useGraphStore.getState();
-          store.addPanel('flow');
-          const newPanel = store.panels[store.panels.length - 1];
-          store.updatePanel(newPanel.id, { targetFrameId: frame.frame_id });
+          const panelId = store.addPanel('flow');
+          store.updatePanel(panelId, { targetFrameId: frame.frame_id, title: formatFrameId(frame.frame_id, displayFrameIdFormat, frame.is_extended) });
           openPanel("graph");
         },
       },

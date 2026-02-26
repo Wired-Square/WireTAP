@@ -120,22 +120,17 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
       const chunk = candidates.slice(i, i + chunkSize);
 
       // Create a new line-chart panel
-      addPanel("line-chart");
-
-      // Get the newly created panel (last one added)
-      const store = useGraphStore.getState();
-      const newPanel = store.panels[store.panels.length - 1];
-      if (!newPanel) continue;
+      const panelId = addPanel("line-chart");
 
       // Set a descriptive title
       const rangeLabel = chunk.length === 1
         ? chunk[0].label
         : `${chunk[0].label} … ${chunk[chunk.length - 1].label}`;
-      updatePanel(newPanel.id, { title: `Candidates: ${rangeLabel}` });
+      updatePanel(panelId, { title: `Candidates: ${rangeLabel}` });
 
       // Add each candidate signal
       for (const candidate of chunk) {
-        addSignalToPanel(newPanel.id, frameId, candidate.signalName);
+        addSignalToPanel(panelId, frameId, candidate.signalName);
       }
     }
 

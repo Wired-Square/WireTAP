@@ -235,7 +235,7 @@ interface GraphState {
   setBufferCapacity: (capacity: number) => void;
 
   // Panel management
-  addPanel: (type: PanelType) => void;
+  addPanel: (type: PanelType) => string;
   clonePanel: (panelId: string) => void;
   removePanel: (panelId: string) => void;
   updatePanel: (panelId: string, updates: Partial<Pick<GraphPanel, 'title' | 'minValue' | 'maxValue' | 'primarySignalIndex' | 'targetFrameId' | 'byteCount' | 'histogramBins'>>) => void;
@@ -423,6 +423,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       layout: [...layout, newLayoutItem],
     });
     scheduleAutoSave();
+    return id;
   },
 
   clonePanel: (panelId) => {

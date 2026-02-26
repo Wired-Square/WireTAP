@@ -1127,6 +1127,16 @@ export default function DecoderFramesView({
         },
       },
       {
+        label: 'Graph Frame',
+        icon: <BarChart3 className={iconXs} />,
+        onClick: () => {
+          const gStore = useGraphStore.getState();
+          const panelId = gStore.addPanel('flow');
+          gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
+          openPanel("graph");
+        },
+      },
+      {
         label: 'Graph All Signals',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
@@ -1138,11 +1148,11 @@ export default function DecoderFramesView({
           if (numericSignals.length === 0) return;
 
           const gStore = useGraphStore.getState();
-          gStore.addPanel('line-chart');
-          const newPanel = gStore.panels[gStore.panels.length - 1];
+          const panelId = gStore.addPanel('line-chart');
+          gStore.updatePanel(panelId, { title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
           for (const signal of numericSignals) {
             if (signal.name) {
-              gStore.addSignalToPanel(newPanel.id, frame.id, signal.name, signal.unit);
+              gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
             }
           }
           openPanel("graph");
@@ -1162,13 +1172,22 @@ export default function DecoderFramesView({
 
     return [
       {
+        label: 'Graph Frame',
+        icon: <BarChart3 className={iconXs} />,
+        onClick: () => {
+          const gStore = useGraphStore.getState();
+          const panelId = gStore.addPanel('flow');
+          gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
+          openPanel("graph");
+        },
+      },
+      {
         label: 'Graph Signal',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
           const gStore = useGraphStore.getState();
-          gStore.addPanel('line-chart');
-          const newPanel = gStore.panels[gStore.panels.length - 1];
-          gStore.addSignalToPanel(newPanel.id, frame.id, signal.name, signal.unit);
+          const panelId = gStore.addPanel('line-chart');
+          gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
           openPanel("graph");
         },
       },
@@ -1183,7 +1202,7 @@ export default function DecoderFramesView({
         onClick: () => { navigator.clipboard.writeText(formatSignalValue(signal)); },
       },
     ];
-  }, [signalContextMenu]);
+  }, [signalContextMenu, displayFrameIdFormat]);
 
   const unmatchedContextMenuItems: ContextMenuItem[] = useMemo(() => {
     if (!unmatchedContextMenu) return [];
@@ -1224,11 +1243,12 @@ export default function DecoderFramesView({
         },
       },
       {
-        label: 'Graph',
+        label: 'Graph Frame',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
           const gStore = useGraphStore.getState();
-          gStore.addPanel('flow');
+          const panelId = gStore.addPanel('flow');
+          gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formattedId });
           openPanel("graph");
         },
       },
@@ -1604,6 +1624,7 @@ export default function DecoderFramesView({
                     <div
                       key={`${frame.timestamp}-${frame.frameId}-${idx}`}
                       className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
+                      onContextMenu={(e) => handleUnmatchedContextMenu(e, frame)}
                     >
                       <span className={`${textMuted} text-xs`}>{timeStr}</span>
                       <span className={`${textDataPurple} font-semibold`}>{idStr}</span>

@@ -6,11 +6,13 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
-- **Decoder frame context menu**: Right-click a frame header in the Decoder to Copy ID, Copy Data, Filter, Solo, Inspect, Send to Transmit, Graph All Signals (charts every numeric signal), or Edit in Catalog (navigates to the frame definition in the Catalog Editor).
+- **Decoder frame context menu**: Right-click a frame header in the Decoder to Copy ID, Copy Data, Filter, Solo, Inspect, Send to Transmit, Graph Frame (flow panel), Graph All Signals (charts every numeric signal), or Edit in Catalog (navigates to the frame definition in the Catalog Editor).
 
-- **Decoder signal context menu**: Right-click an individual decoded signal row to Graph Signal, Copy Signal Name, or Copy Value.
+- **Decoder signal context menu**: Right-click an individual decoded signal row to Graph Frame (flow panel for the parent frame), Graph Signal, Copy Signal Name, or Copy Value.
 
-- **Decoder unmatched frame context menu**: Right-click a row in the Unmatched tab to Copy ID, Copy Data, Inspect, Send to Transmit, or Graph.
+- **Decoder unmatched frame context menu**: Right-click a row in the Unmatched tab to Copy ID, Copy Data, Inspect, Send to Transmit, or Graph Frame. Right-clicking a row in the Filtered tab opens the same menu.
+
+- **Named graph panels**: Graph panels created from context menus are now titled with the frame ID (e.g. `0x014`) or signal name instead of generic defaults like "Flow View" or "Line Chart".
 
 - **Deselected frames in Filtered tab**: Frames removed via the Filter context menu action now appear as full decoded FrameCards in the Decoder's Filtered tab, alongside processing-filtered frames. The tab badge count includes both.
 
@@ -39,6 +41,10 @@ All notable changes to CANdor will be documented in this file.
 - **Calculator column button**: Removed the inline "Send to Frame Calculator" button from Discovery frame rows — the same action is available via the right-click context menu (Inspect).
 
 - **Unmatched tab calculator button**: Removed the inline calculator button from Decoder unmatched frame rows — replaced by the Inspect context menu item.
+
+### Fixed
+
+- **Graph panel configuration from context menus**: Fixed a stale-state bug where `addPanel` callers read the panel ID from a snapshot taken before the state update, causing the subsequent `updatePanel`/`addSignalToPanel` calls to target the wrong panel. `addPanel` now returns the new panel ID directly.
 
 ## [0.4.5] - 2026-02-24
 
