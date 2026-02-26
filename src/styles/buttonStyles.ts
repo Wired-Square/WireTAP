@@ -240,6 +240,12 @@ export const iconButtonDanger =
   "p-2 text-[color:var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors";
 
 /**
+ * Compact icon button with persistent danger colour — for close/dismiss in headers
+ */
+export const iconButtonDangerCompact =
+  "p-1 text-[color:var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] rounded transition-colors";
+
+/**
  * Compact icon button with hover - for tight layouts (star buttons, inline actions)
  */
 export const iconButtonHoverCompact =

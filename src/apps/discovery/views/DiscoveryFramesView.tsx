@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "
 import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw, Copy, ClipboardCopy, Target, Send, BarChart3, Bookmark } from "lucide-react";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
-import { useDiscoveryStore } from "../../../stores/discoveryStore";
+import { useDiscoveryStore, TOOL_TAB_CONFIG } from "../../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
 import { type BufferMetadata } from "../../../api/buffer";
 import { FrameDataTable, type TabDefinition, FRAME_PAGE_SIZE_OPTIONS } from "../components";
@@ -14,7 +14,7 @@ import ChangesResultView from "./tools/ChangesResultView";
 import MessageOrderResultView from "./tools/MessageOrderResultView";
 import ChecksumDiscoveryResultView from "./tools/ChecksumDiscoveryResultView";
 import FilteredTabContent from "./FilteredTabContent";
-import { bgDataView, textDataSecondary, bgSurface, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
+import { bgDataView, bgSurface, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import type { IOCapabilities } from "../../../api/io";
 import { useBufferFrameView } from "../hooks/useBufferFrameView";
@@ -622,9 +622,6 @@ function DiscoveryFramesView({
     });
   }, [frameVersion]);
 
-  // Check if we have any analysis results
-  const hasAnalysisResults = toolboxResults.changesResults !== null || toolboxResults.messageOrderResults !== null || toolboxResults.checksumDiscoveryResults !== null;
-
   // Compute count of filtered-out frame IDs (seen but not selected)
   const filteredOutCount = useMemo(() => {
     let count = 0;
@@ -634,16 +631,40 @@ function DiscoveryFramesView({
     return count;
   }, [seenIds, selectedFrames]);
 
-  // Build tab definitions for shared tab bar
+  // Build tab definitions: static tabs + dynamic tool output tabs
   const frameCount = filteredCount > 0 ? filteredCount : frames.length;
   const tabs: TabDefinition[] = useMemo(() => {
     const result: TabDefinition[] = [
       { id: 'frames', label: 'Frames', count: frameCount, countColor: 'green' as const },
+      { id: 'filtered', label: 'Filtered', count: filteredOutCount, countColor: 'orange' as const },
     ];
-    result.push({ id: 'filtered', label: 'Filtered', count: filteredOutCount, countColor: 'orange' as const });
-    result.push({ id: 'analysis', label: 'Analysis', hasIndicator: hasAnalysisResults });
+    if (toolboxResults.messageOrderResults) {
+      result.push({ id: TOOL_TAB_CONFIG['message-order'].tabId, label: TOOL_TAB_CONFIG['message-order'].label, closeable: true });
+    }
+    if (toolboxResults.changesResults) {
+      result.push({ id: TOOL_TAB_CONFIG['changes'].tabId, label: TOOL_TAB_CONFIG['changes'].label, closeable: true });
+    }
+    if (toolboxResults.checksumDiscoveryResults) {
+      result.push({ id: TOOL_TAB_CONFIG['checksum-discovery'].tabId, label: TOOL_TAB_CONFIG['checksum-discovery'].label, closeable: true });
+    }
     return result;
-  }, [frameCount, filteredOutCount, hasAnalysisResults]);
+  }, [frameCount, filteredOutCount, toolboxResults.messageOrderResults, toolboxResults.changesResults, toolboxResults.checksumDiscoveryResults]);
+
+  // Handle closing a tool output tab
+  const clearToolResult = useDiscoveryStore((s) => s.clearToolResult);
+  const handleTabClose = useCallback((tabId: string) => {
+    clearToolResult(tabId);
+    if (activeTab === tabId) {
+      setActiveTab('frames');
+    }
+  }, [clearToolResult, activeTab, setActiveTab]);
+
+  // Safety: fall back to 'frames' if active tab is a tool tab that no longer exists
+  useEffect(() => {
+    if (activeTab.startsWith('tool:') && !tabs.some(t => t.id === activeTab)) {
+      setActiveTab('frames');
+    }
+  }, [activeTab, tabs, setActiveTab]);
 
   // Handle page size change - reset to page 0
   const handlePageSizeChange = useCallback((size: number) => {
@@ -953,7 +974,8 @@ function DiscoveryFramesView({
       // Tab bar
       tabs={tabs}
       activeTab={activeTab}
-      onTabChange={(id) => setActiveTab(id as 'frames' | 'filtered' | 'analysis')}
+      onTabChange={(id) => setActiveTab(id)}
+      onTabClose={handleTabClose}
       protocolLabel={protocol.toUpperCase()}
       isStreaming={isStreaming}
       timestamp={timestamp}
@@ -1037,16 +1059,21 @@ function DiscoveryFramesView({
         />
       )}
 
-      {activeTab === 'analysis' && (
+      {activeTab === TOOL_TAB_CONFIG['message-order'].tabId && toolboxResults.messageOrderResults && (
         <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDataView} p-4`}>
-          {toolboxResults.changesResults && <ChangesResultView />}
-          {toolboxResults.messageOrderResults && <MessageOrderResultView />}
-          {toolboxResults.checksumDiscoveryResults && <ChecksumDiscoveryResultView />}
-          {!hasAnalysisResults && (
-            <div className={`${textDataSecondary} text-center py-8`}>
-              No analysis results. Use the Toolbox to run analysis tools.
-            </div>
-          )}
+          <MessageOrderResultView onClose={() => handleTabClose(TOOL_TAB_CONFIG['message-order'].tabId)} />
+        </div>
+      )}
+
+      {activeTab === TOOL_TAB_CONFIG['changes'].tabId && toolboxResults.changesResults && (
+        <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDataView} p-4`}>
+          <ChangesResultView onClose={() => handleTabClose(TOOL_TAB_CONFIG['changes'].tabId)} />
+        </div>
+      )}
+
+      {activeTab === TOOL_TAB_CONFIG['checksum-discovery'].tabId && toolboxResults.checksumDiscoveryResults && (
+        <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDataView} p-4`}>
+          <ChecksumDiscoveryResultView onClose={() => handleTabClose(TOOL_TAB_CONFIG['checksum-discovery'].tabId)} />
         </div>
       )}
     </AppTabView>

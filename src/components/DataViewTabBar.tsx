@@ -3,13 +3,16 @@
 // Shared tab bar component for data views (Discovery, Decoder, etc.).
 // Provides consistent dark-themed tabbed interface with status display and controls.
 
-import { ReactNode } from 'react';
+import { ReactNode, useState, useCallback } from 'react';
+import { X } from 'lucide-react';
 import TimeDisplay from './TimeDisplay';
 import ProtocolBadge, { type StreamingStatus } from './ProtocolBadge';
+import ContextMenu from './ContextMenu';
 import {
   bgDataToolbar,
   borderDataView,
 } from '../styles';
+import { iconXs } from '../styles/spacing';
 import {
   dataViewTabClass,
   badgeColorClass,
@@ -28,6 +31,8 @@ export interface TabDefinition {
   countPrefix?: string;
   /** Show purple dot indicator when true and tab is not active */
   hasIndicator?: boolean;
+  /** When true, tab can be closed via right-click context menu */
+  closeable?: boolean;
 }
 
 /** Badge to display next to the protocol label */
@@ -67,6 +72,8 @@ export interface DataViewTabBarProps {
 
   /** Additional control buttons rendered on the right */
   controls?: ReactNode;
+  /** Called when a closeable tab is closed (via context menu or programmatically) */
+  onTabClose?: (tabId: string) => void;
 }
 
 // ============================================================================
@@ -88,7 +95,18 @@ export default function DataViewTabBar({
   frameIndex,
   totalFrames,
   controls,
+  onTabClose,
 }: DataViewTabBarProps) {
+  // Context menu state for closeable tabs
+  const [contextMenu, setContextMenu] = useState<{ tabId: string; position: { x: number; y: number } } | null>(null);
+
+  const handleTabContextMenu = useCallback((e: React.MouseEvent, tabId: string) => {
+    e.preventDefault();
+    setContextMenu({ tabId, position: { x: e.clientX, y: e.clientY } });
+  }, []);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
   return (
     <div className={`flex-shrink-0 flex items-center border-b ${borderDataView} ${bgDataToolbar}`}>
       {/* Protocol badge with status light */}
@@ -147,6 +165,7 @@ export default function DataViewTabBar({
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
+            onContextMenu={tab.closeable ? (e) => handleTabContextMenu(e, tab.id) : undefined}
             className={dataViewTabClass(isActive, tab.hasIndicator)}
           >
             {tab.label}
@@ -170,6 +189,19 @@ export default function DataViewTabBar({
         <div className="flex items-center gap-1.5 px-2">
           {controls}
         </div>
+      )}
+
+      {/* Context menu for closeable tabs */}
+      {contextMenu && (
+        <ContextMenu
+          items={[{
+            label: 'Close tab',
+            icon: <X className={iconXs} />,
+            onClick: () => onTabClose?.(contextMenu.tabId),
+          }]}
+          position={contextMenu.position}
+          onClose={closeContextMenu}
+        />
       )}
     </div>
   );

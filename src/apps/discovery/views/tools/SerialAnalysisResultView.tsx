@@ -4,13 +4,23 @@
 import { useState } from "react";
 import { useDiscoveryStore, type FramingConfig } from "../../../../stores/discoveryStore";
 import type { FramingCandidate, CandidateChecksum, CandidateSourceAddress } from "../../../../utils/analysis/serialFrameAnalysis";
-import { Hash, Shield, Info, CheckCircle2, AlertCircle, Check, Layers, Radio, MapPin } from "lucide-react";
+import { Hash, Shield, Info, CheckCircle2, AlertCircle, Check, Layers, Radio, MapPin, X } from "lucide-react";
 import { iconMd, iconXs, iconLg, icon2xl, flexRowGap2 } from "../../../../styles/spacing";
+import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { caption, captionMuted, textMedium, sectionHeaderText } from "../../../../styles";
 
-export default function SerialAnalysisResultView() {
-  const framingResults = useDiscoveryStore((s) => s.toolbox.serialFramingResults);
-  const payloadResults = useDiscoveryStore((s) => s.toolbox.serialPayloadResults);
+type Props = {
+  /** Which results to display. When omitted, shows whichever results exist. */
+  mode?: 'framing' | 'payload';
+  onClose?: () => void;
+};
+
+export default function SerialAnalysisResultView({ mode, onClose }: Props) {
+  const allFramingResults = useDiscoveryStore((s) => s.toolbox.serialFramingResults);
+  const allPayloadResults = useDiscoveryStore((s) => s.toolbox.serialPayloadResults);
+  // Gate results by mode prop
+  const framingResults = mode !== 'payload' ? allFramingResults : null;
+  const payloadResults = mode !== 'framing' ? allPayloadResults : null;
   const applyFrameIdMapping = useDiscoveryStore((s) => s.applyFrameIdMapping);
   const clearFrameIdMapping = useDiscoveryStore((s) => s.clearFrameIdMapping);
   const applySourceMapping = useDiscoveryStore((s) => s.applySourceMapping);
@@ -174,6 +184,16 @@ export default function SerialAnalysisResultView() {
               Analyzed {framingResult.byteCount.toLocaleString()} raw bytes
             </p>
           </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className={iconButtonDangerCompact}
+              title="Close"
+            >
+              <X className={iconXs} />
+            </button>
+          )}
         </div>
 
         {/* General Notes */}
@@ -337,6 +357,16 @@ export default function SerialAnalysisResultView() {
               : ` (${analysisResult.minLength} bytes)`}
           </p>
         </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className={iconButtonDangerCompact}
+            title="Close"
+          >
+            <X className={iconXs} />
+          </button>
+        )}
       </div>
 
       {/* General Notes */}

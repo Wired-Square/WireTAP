@@ -9,9 +9,10 @@ import { iconSm, iconXs } from '../../../../styles/spacing';
 import { bgSurface, textSecondary } from '../../../../styles';
 import { DiscoveryTabBar, type TabDefinition } from '../../components';
 import type { FramingConfig } from '../../../../stores/discoveryStore';
+import { TOOL_TAB_CONFIG } from '../../../../stores/discoveryToolboxStore';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
 
-export type TabId = 'raw' | 'framed' | 'filtered' | 'analysis';
+export type TabId = string;
 
 interface TabBarProps {
   activeTab: TabId;
@@ -23,7 +24,10 @@ interface TabBarProps {
   framingConfig: FramingConfig | null;
   /** Independent minimum frame length filter (0 = no filter) */
   minFrameLength: number;
-  hasAnalysisResults: boolean;
+  /** Whether serial framing analysis results exist */
+  hasSerialFramingResults: boolean;
+  /** Whether serial payload analysis results exist */
+  hasSerialPayloadResults: boolean;
   isStreaming?: boolean;
   isRecorded?: boolean;
   onOpenRawBytesViewDialog: () => void;
@@ -33,6 +37,8 @@ interface TabBarProps {
   framingAccepted?: boolean;
   /** Whether the session emits raw bytes (from capabilities) - defaults to true for standalone serial */
   emitsRawBytes?: boolean;
+  /** Called when a closeable tab's close button is clicked */
+  onTabClose?: (tabId: string) => void;
 }
 
 export default function TabBar({
@@ -43,7 +49,8 @@ export default function TabBar({
   filteredCount,
   framingConfig,
   minFrameLength,
-  hasAnalysisResults,
+  hasSerialFramingResults,
+  hasSerialPayloadResults,
   isStreaming = false,
   isRecorded = false,
   onOpenRawBytesViewDialog,
@@ -51,6 +58,7 @@ export default function TabBar({
   onOpenFilterDialog,
   framingAccepted = false,
   emitsRawBytes = true, // Default true for standalone serial sessions
+  onTabClose,
 }: TabBarProps) {
   // Column visibility toggles from UI store (shared with CAN view)
   const showBusColumn = useDiscoveryUIStore((s) => s.showBusColumn);
@@ -85,13 +93,19 @@ export default function TabBar({
       result.push({ id: 'filtered', label: 'Filtered', count: filteredCount, countColor: 'orange' as const });
     }
 
-    result.push({ id: 'analysis', label: 'Analysis', hasIndicator: hasAnalysisResults });
+    // Dynamic tool output tabs
+    if (hasSerialFramingResults) {
+      result.push({ id: TOOL_TAB_CONFIG['serial-framing'].tabId, label: TOOL_TAB_CONFIG['serial-framing'].label, closeable: true });
+    }
+    if (hasSerialPayloadResults) {
+      result.push({ id: TOOL_TAB_CONFIG['serial-payload'].tabId, label: TOOL_TAB_CONFIG['serial-payload'].label, closeable: true });
+    }
 
     return result;
-  }, [byteCount, frameCount, filteredCount, hasAnalysisResults, framingAccepted, emitsRawBytes]);
+  }, [byteCount, frameCount, filteredCount, hasSerialFramingResults, hasSerialPayloadResults, framingAccepted, emitsRawBytes]);
 
   // Serial-specific control buttons (compact styling)
-  // Only show controls on raw and framed tabs, not on analysis tab
+  // Only show controls on raw and framed tabs, not on tool output tabs
   const serialControls = (activeTab === 'raw' || activeTab === 'framed') ? (
     <>
       {/* Column visibility toggles */}
@@ -168,11 +182,12 @@ export default function TabBar({
     <DiscoveryTabBar
       tabs={tabs}
       activeTab={activeTab}
-      onTabChange={(id) => onTabChange(id as TabId)}
+      onTabChange={(id) => onTabChange(id)}
       protocolLabel="Serial"
       isStreaming={isStreaming}
       isRecorded={isRecorded}
       controls={serialControls}
+      onTabClose={onTabClose}
     />
   );
 }

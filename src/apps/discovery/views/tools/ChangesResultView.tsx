@@ -1,8 +1,9 @@
 // ui/src/apps/discovery/views/tools/ChangesResultView.tsx
 
 import { useState, useMemo } from "react";
-import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Layers, Thermometer, Type, Ruler, Copy, GitMerge, Download } from "lucide-react";
+import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Layers, Thermometer, Type, Ruler, Copy, GitMerge, Download, X } from "lucide-react";
 import { iconSm, iconXs, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
+import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardDefault } from "../../../../styles/cardStyles";
 import { caption, captionMuted, borderDivider, bgSurface, sectionHeaderText } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
@@ -43,9 +44,10 @@ function countByteRoles(byteStats: ByteStats[], multiBytePatterns: MultiBytePatt
 
 type Props = {
   embedded?: boolean;
+  onClose?: () => void;
 };
 
-export default function ChangesResultView({ embedded = false }: Props) {
+export default function ChangesResultView({ embedded = false, onClose }: Props) {
   const results = useDiscoveryStore((s) => s.toolbox.changesResults);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const { settings } = useSettings();
@@ -112,7 +114,7 @@ export default function ChangesResultView({ embedded = false }: Props) {
 
     return (
       <div className={`h-full flex flex-col ${bgSurface} rounded-lg border border-[color:var(--border-default)]`}>
-        <Header onExport={() => {}} hasResults={false} />
+        <Header onExport={() => {}} hasResults={false} onClose={onClose} />
         {content}
       </div>
     );
@@ -204,7 +206,7 @@ export default function ChangesResultView({ embedded = false }: Props) {
 
   return (
     <div className={`h-full flex flex-col ${bgSurface} rounded-lg border border-[color:var(--border-default)]`}>
-      <Header onExport={() => setShowExportDialog(true)} hasResults={true} />
+      <Header onExport={() => setShowExportDialog(true)} hasResults={true} onClose={onClose} />
       {mainContent}
     </div>
   );
@@ -217,9 +219,10 @@ export default function ChangesResultView({ embedded = false }: Props) {
 type HeaderProps = {
   onExport: () => void;
   hasResults?: boolean;
+  onClose?: () => void;
 };
 
-function Header({ onExport, hasResults = false }: HeaderProps) {
+function Header({ onExport, hasResults = false, onClose }: HeaderProps) {
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider}`}>
       <GitCompare className={`${iconLg} text-[color:var(--text-purple)]`} />
@@ -240,6 +243,16 @@ function Header({ onExport, hasResults = false }: HeaderProps) {
         >
           <Download className={iconSm} />
           Export
+        </button>
+      )}
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className={iconButtonDangerCompact}
+          title="Close"
+        >
+          <X className={iconXs} />
         </button>
       )}
     </div>

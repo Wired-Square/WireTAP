@@ -39,6 +39,7 @@ export type {
   SerialPayloadResult,
   ToolboxState,
 } from './discoveryToolboxStore';
+export { TOOL_TAB_CONFIG } from './discoveryToolboxStore';
 
 // Re-export sub-stores for direct access
 export { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from './discoveryFrameStore';
@@ -185,6 +186,7 @@ type CombinedDiscoveryState = {
   closeInfoView: () => void;
   resetKnowledge: () => void;
   clearAnalysisResults: () => void;
+  clearToolResult: (toolTabId: string) => void;
   runAnalysis: () => Promise<void>;
 };
 
@@ -477,6 +479,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     closeInfoView: toolboxStore.closeInfoView,
     resetKnowledge: toolboxStore.resetKnowledge,
     clearAnalysisResults: toolboxStore.clearAnalysisResults,
+    clearToolResult: toolboxStore.clearToolResult,
 
     // Combined runAnalysis that coordinates between stores
     runAnalysis: async () => {

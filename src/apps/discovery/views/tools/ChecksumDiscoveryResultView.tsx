@@ -1,8 +1,9 @@
 // ui/src/apps/discovery/views/tools/ChecksumDiscoveryResultView.tsx
 
 import { useState } from "react";
-import { ShieldCheck, ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
-import { iconMd, iconSm, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
+import { ShieldCheck, ChevronDown, ChevronRight, Copy, Check, X } from "lucide-react";
+import { iconXs, iconMd, iconSm, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
+import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardDefault } from "../../../../styles/cardStyles";
 import { caption } from "../../../../styles/typography";
 import { borderDivider, hoverLight, bgSurface, textPrimary, textSecondary, textMuted } from "../../../../styles";
@@ -13,16 +14,17 @@ import type { ChecksumCandidate } from "../../../../utils/analysis/checksumDisco
 
 type Props = {
   embedded?: boolean;
+  onClose?: () => void;
 };
 
-export default function ChecksumDiscoveryResultView({ embedded = false }: Props) {
+export default function ChecksumDiscoveryResultView({ embedded = false, onClose }: Props) {
   const results = useDiscoveryStore((s) => s.toolbox.checksumDiscoveryResults);
   const { settings } = useSettings();
 
   if (!results) {
     return (
       <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
-        {!embedded && <Header />}
+        {!embedded && <Header onClose={onClose} />}
         <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
           <ShieldCheck className="w-12 h-12 text-[color:var(--text-muted)] mb-4" />
           <p className={`text-sm ${textSecondary} mb-2`}>
@@ -41,7 +43,7 @@ export default function ChecksumDiscoveryResultView({ embedded = false }: Props)
 
   return (
     <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
-      {!embedded && <Header />}
+      {!embedded && <Header onClose={onClose} />}
 
       {/* Stats Summary */}
       <div className={`px-4 py-2 ${borderDivider} bg-[var(--bg-surface)]`}>
@@ -93,13 +95,23 @@ export default function ChecksumDiscoveryResultView({ embedded = false }: Props)
   );
 }
 
-function Header() {
+function Header({ onClose }: { onClose?: () => void }) {
   return (
     <div className={`px-4 py-2 ${borderDivider} flex items-center justify-between`}>
       <div className={flexRowGap2}>
         <ShieldCheck className={`${iconMd} text-green-400`} />
         <span className={`font-medium ${textPrimary}`}>Checksum Discovery</span>
       </div>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className={iconButtonDangerCompact}
+          title="Close"
+        >
+          <X className={iconXs} />
+        </button>
+      )}
     </div>
   );
 }

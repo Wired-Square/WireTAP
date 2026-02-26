@@ -51,7 +51,7 @@ interface DiscoveryUIState {
   activeSelectionSetSelectedIds: Set<number> | null;
 
   // Frame view tab state
-  framesViewActiveTab: 'frames' | 'filtered' | 'analysis';
+  framesViewActiveTab: string;
 
   // CAN frame view display options
   showRefColumn: boolean;
@@ -90,7 +90,7 @@ interface DiscoveryUIState {
   setActiveSelectionSetSelectedIds: (ids: Set<number> | null) => void;
 
   // Actions - Frame view tabs
-  setFramesViewActiveTab: (tab: 'frames' | 'filtered' | 'analysis') => void;
+  setFramesViewActiveTab: (tab: string) => void;
 
   // Actions - CAN frame view display options
   toggleShowRefColumn: () => void;

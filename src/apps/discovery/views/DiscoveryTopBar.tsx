@@ -56,8 +56,8 @@ type Props = {
   serialBytesCount?: number;
   /** True when framing has been accepted in serial mode */
   framingAccepted?: boolean;
-  /** Active tab in serial mode: 'raw', 'framed', 'filtered', or 'analysis' */
-  serialActiveTab?: 'raw' | 'framed' | 'filtered' | 'analysis';
+  /** Active tab in serial mode */
+  serialActiveTab?: string;
   /** Called when user wants to undo framing acceptance */
   onUndoFraming?: () => void;
 

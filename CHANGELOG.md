@@ -12,11 +12,19 @@ All notable changes to CANdor will be documented in this file.
 
 - **Header column context menu**: Right-click the table header row in Discovery (Frames or Filtered tab) to toggle column visibility (#, Bus, ASCII) via a checkmark menu.
 
+- **Per-tool output tabs**: Discovery analysis tools (Frame Order, Payload Changes, Checksums, Serial Framing, Serial Payload) now each open their own named output tab instead of sharing a single "Analysis" tab. Tabs are closeable via right-click context menu or a close button inside the result header. Multiple tool results can be viewed side-by-side by switching between tabs.
+
+- **Closeable tab support**: `DataViewTabBar` now supports closeable tabs with a right-click context menu. Used by Discovery tool output tabs.
+
+- **`iconButtonDangerCompact` style token**: Compact danger-styled icon button for inline close actions, using CSS variable theming.
+
 ### Changed
 
 - **Checksum deduplication**: Refactored CRC algorithm implementations in the Rust backend to delegate to the parameterised `crc8_parameterised` and `crc16_parameterised` functions instead of each hand-rolling the CRC loop. Reduces ~135 lines of duplicated code with identical behaviour.
 
 ### Removed
+
+- **Shared Analysis tab**: Replaced by per-tool output tabs. Each tool now opens its own named tab instead of overwriting a shared view.
 
 - **Calculator column button**: Removed the inline "Send to Frame Calculator" button from Discovery frame rows — the same action is available via the right-click context menu (Inspect).
 

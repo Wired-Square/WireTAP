@@ -5,8 +5,8 @@
 // - Framed Bytes tab: frames after framing is applied
 // - Toolbar with framing controls
 
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { useDiscoveryStore, useDiscoverySerialStore } from '../../../stores/discoveryStore';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useDiscoveryStore, useDiscoverySerialStore, TOOL_TAB_CONFIG } from '../../../stores/discoveryStore';
 import {
   ByteView,
   FramedDataView,
@@ -184,6 +184,27 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
     acceptFraming();
   };
 
+  // Handle closing a tool output tab
+  const clearToolResult = useDiscoveryStore((s) => s.clearToolResult);
+  const handleTabClose = useCallback((tabId: string) => {
+    clearToolResult(tabId);
+    if (activeTab === tabId) {
+      setActiveTab('framed');
+    }
+  }, [clearToolResult, activeTab, setActiveTab]);
+
+  // Safety: fall back to 'framed' if active tab is a tool tab that no longer exists
+  useEffect(() => {
+    if (activeTab.startsWith('tool:')) {
+      const hasTab =
+        (activeTab === TOOL_TAB_CONFIG['serial-framing'].tabId && serialFramingResults !== null) ||
+        (activeTab === TOOL_TAB_CONFIG['serial-payload'].tabId && serialPayloadResults !== null);
+      if (!hasTab) {
+        setActiveTab('framed');
+      }
+    }
+  }, [activeTab, serialFramingResults, serialPayloadResults, setActiveTab]);
+
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border border-gray-700">
       {/* Tab Bar with Controls */}
@@ -199,7 +220,8 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
         filteredCount={effectiveFilteredCount}
         framingConfig={framingConfig}
         minFrameLength={minFrameLength}
-        hasAnalysisResults={serialFramingResults !== null || serialPayloadResults !== null}
+        hasSerialFramingResults={serialFramingResults !== null}
+        hasSerialPayloadResults={serialPayloadResults !== null}
         isStreaming={isStreaming}
         isRecorded={isRecorded}
         onOpenRawBytesViewDialog={() => setShowRawBytesViewDialog(true)}
@@ -207,6 +229,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
         onOpenFilterDialog={() => setShowFilterDialog(true)}
         framingAccepted={framingAccepted}
         emitsRawBytes={emitsRawBytes}
+        onTabClose={handleTabClose}
       />
 
       {/* Tab Content */}
@@ -240,8 +263,11 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
             )}
           </div>
         )}
-        {activeTab === 'analysis' && (
-          <SerialAnalysisResultView />
+        {activeTab === TOOL_TAB_CONFIG['serial-framing'].tabId && serialFramingResults && (
+          <SerialAnalysisResultView mode="framing" onClose={() => handleTabClose(TOOL_TAB_CONFIG['serial-framing'].tabId)} />
+        )}
+        {activeTab === TOOL_TAB_CONFIG['serial-payload'].tabId && serialPayloadResults && (
+          <SerialAnalysisResultView mode="payload" onClose={() => handleTabClose(TOOL_TAB_CONFIG['serial-payload'].tabId)} />
         )}
       </div>
 

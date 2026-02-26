@@ -29,6 +29,8 @@ interface DataViewControllerProps {
   totalFrames?: number | null;
   /** Custom controls to show in the tab bar (e.g., ASCII toggle button) */
   tabBarControls?: React.ReactNode;
+  /** Called when a closeable tab's close button is clicked */
+  onTabClose?: (tabId: string) => void;
 
   // Toolbar props
   showToolbar?: boolean;
@@ -94,6 +96,7 @@ export default function DataViewController({
   frameIndex,
   totalFrames,
   tabBarControls,
+  onTabClose,
 
   // Toolbar
   showToolbar = true,
@@ -142,6 +145,7 @@ export default function DataViewController({
         frameIndex={frameIndex}
         totalFrames={totalFrames}
         controls={tabBarControls}
+        onTabClose={onTabClose}
       />
 
       {/* Pagination Toolbar */}

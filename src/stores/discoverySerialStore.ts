@@ -58,8 +58,8 @@ export type ByteExtractionConfig = {
   endianness: 'big' | 'little';
 };
 
-/** Serial view tab IDs */
-export type SerialTabId = 'raw' | 'framed' | 'filtered' | 'analysis';
+/** Serial view tab IDs (string to support dynamic tool output tabs) */
+export type SerialTabId = string;
 
 // Buffer limits
 const MAX_SERIAL_BYTES = 100000;

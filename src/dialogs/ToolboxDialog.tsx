@@ -3,7 +3,7 @@
 import { X, ListOrdered, GitCompare, Play, Loader2, Radio, Binary, ShieldCheck } from "lucide-react";
 import { iconMd, iconLg } from "../styles/spacing";
 import Dialog from "../components/Dialog";
-import { useDiscoveryStore, type ToolboxView } from "../stores/discoveryStore";
+import { useDiscoveryStore, TOOL_TAB_CONFIG, type ToolboxView } from "../stores/discoveryStore";
 import {
   cardElevated,
   h3,
@@ -164,11 +164,14 @@ export default function ToolboxDialog({
   const handleRunAnalysis = async () => {
     if (effectiveSelectedCount === 0 || isRunning || !activeTool) return;
     await runAnalysis();
-    // Close dialog - results will appear in the Analysis tab within Discovery
+    // Close dialog - results will appear in tool-specific tabs within Discovery
     onClose();
-    // For serial analysis, switch to the Analysis tab within the Serial Discovery view
+    // For serial analysis, switch to the tool-specific tab within the Serial Discovery view
     if (activeTool === "serial-framing" || activeTool === "serial-payload") {
-      setSerialActiveTab("analysis");
+      const config = TOOL_TAB_CONFIG[activeTool];
+      if (config) {
+        setSerialActiveTab(config.tabId);
+      }
     }
   };
 

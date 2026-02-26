@@ -1,8 +1,9 @@
 // ui/src/apps/discovery/views/tools/MessageOrderResultView.tsx
 
 import { useState } from "react";
-import { ListOrdered, Clock, Layers, Play, Shuffle, Zap, GitBranch, Download } from "lucide-react";
-import { iconMd, iconSm, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
+import { ListOrdered, Clock, Layers, Play, Shuffle, Zap, GitBranch, Download, X } from "lucide-react";
+import { iconXs, iconMd, iconSm, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
+import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardDefault } from "../../../../styles/cardStyles";
 import { labelSmall, caption, captionMuted, sectionHeaderText } from "../../../../styles/typography";
 import { borderDivider, hoverLight, bgSurface } from "../../../../styles";
@@ -19,9 +20,10 @@ import { getFilterForFormat, type ExportFormat } from "../../../../utils/reportE
 
 type Props = {
   embedded?: boolean;
+  onClose?: () => void;
 };
 
-export default function MessageOrderResultView({ embedded = false }: Props) {
+export default function MessageOrderResultView({ embedded = false, onClose }: Props) {
   const results = useDiscoveryStore((s) => s.toolbox.messageOrderResults);
   const updateOptions = useDiscoveryStore((s) => s.updateMessageOrderOptions);
   const runAnalysis = useDiscoveryStore((s) => s.runAnalysis);
@@ -53,7 +55,7 @@ export default function MessageOrderResultView({ embedded = false }: Props) {
   if (!results) {
     return (
       <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
-        {!embedded && <Header onExport={() => {}} hasResults={false} />}
+        {!embedded && <Header onExport={() => {}} hasResults={false} onClose={onClose} />}
         <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
           <ListOrdered className="w-12 h-12 text-[color:var(--text-muted)] mb-4" />
           <p className="text-sm text-[color:var(--text-secondary)] mb-2">
@@ -69,7 +71,7 @@ export default function MessageOrderResultView({ embedded = false }: Props) {
 
   return (
     <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
-      {!embedded && <Header onExport={() => setShowExportDialog(true)} hasResults={true} />}
+      {!embedded && <Header onExport={() => setShowExportDialog(true)} hasResults={true} onClose={onClose} />}
 
       {/* Stats Summary */}
       <div className={`px-4 py-2 ${borderDivider} bg-[var(--bg-surface)]`}>
@@ -134,9 +136,10 @@ export default function MessageOrderResultView({ embedded = false }: Props) {
 type HeaderProps = {
   onExport: () => void;
   hasResults: boolean;
+  onClose?: () => void;
 };
 
-function Header({ onExport, hasResults }: HeaderProps) {
+function Header({ onExport, hasResults, onClose }: HeaderProps) {
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider}`}>
       <ListOrdered className={`${iconLg} text-[color:var(--text-purple)]`} />
@@ -157,6 +160,16 @@ function Header({ onExport, hasResults }: HeaderProps) {
         >
           <Download className={iconSm} />
           <span>Export</span>
+        </button>
+      )}
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className={iconButtonDangerCompact}
+          title="Close"
+        >
+          <X className={iconXs} />
         </button>
       )}
     </div>

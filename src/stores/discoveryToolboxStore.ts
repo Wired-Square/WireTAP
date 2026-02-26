@@ -25,6 +25,15 @@ import { useDiscoveryUIStore } from './discoveryUIStore';
 // Toolbox types
 export type ToolboxView = 'frames' | 'message-order' | 'changes' | 'serial-framing' | 'serial-payload' | 'checksum-discovery';
 
+/** Tab ID and label for each analysis tool's output tab */
+export const TOOL_TAB_CONFIG: Record<string, { tabId: string; label: string }> = {
+  'message-order':      { tabId: 'tool:message-order',      label: 'Frame Order' },
+  'changes':            { tabId: 'tool:changes',            label: 'Payload Changes' },
+  'checksum-discovery': { tabId: 'tool:checksum-discovery',  label: 'Checksums' },
+  'serial-framing':     { tabId: 'tool:serial-framing',      label: 'Serial Framing' },
+  'serial-payload':     { tabId: 'tool:serial-payload',      label: 'Serial Payload' },
+};
+
 export type MessageOrderOptions = {
   startMessageId: number | null;
 };
@@ -86,6 +95,7 @@ interface DiscoveryToolboxState {
   setSerialPayloadResults: (results: SerialPayloadResult | null) => void;
   setChecksumDiscoveryResults: (results: ChecksumDiscoveryResult | null) => void;
   clearAnalysisResults: () => void;
+  clearToolResult: (toolTabId: string) => void;
 
   // Actions - Knowledge
   openInfoView: (frameInfoMap: Map<number, FrameInfo>) => void;
@@ -222,6 +232,30 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     }));
   },
 
+  clearToolResult: (toolTabId) => {
+    set((state) => {
+      const toolbox = { ...state.toolbox };
+      switch (toolTabId) {
+        case TOOL_TAB_CONFIG['message-order'].tabId:
+          toolbox.messageOrderResults = null;
+          break;
+        case TOOL_TAB_CONFIG['changes'].tabId:
+          toolbox.changesResults = null;
+          break;
+        case TOOL_TAB_CONFIG['checksum-discovery'].tabId:
+          toolbox.checksumDiscoveryResults = null;
+          break;
+        case TOOL_TAB_CONFIG['serial-framing'].tabId:
+          toolbox.serialFramingResults = null;
+          break;
+        case TOOL_TAB_CONFIG['serial-payload'].tabId:
+          toolbox.serialPayloadResults = null;
+          break;
+      }
+      return { toolbox };
+    });
+  },
+
   // Knowledge actions
   openInfoView: (frameInfoMap) => {
     const { knowledge } = get();
@@ -297,8 +331,8 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
       },
     }));
 
-    // Switch to analysis tab to show results
-    useDiscoveryUIStore.getState().setFramesViewActiveTab('analysis');
+    // Switch to tool-specific tab to show results
+    useDiscoveryUIStore.getState().setFramesViewActiveTab(TOOL_TAB_CONFIG['message-order'].tabId);
 
     return messageOrderResults;
   },
@@ -379,8 +413,8 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
       },
     }));
 
-    // Switch to analysis tab to show results
-    useDiscoveryUIStore.getState().setFramesViewActiveTab('analysis');
+    // Switch to tool-specific tab to show results
+    useDiscoveryUIStore.getState().setFramesViewActiveTab(TOOL_TAB_CONFIG['changes'].tabId);
 
     return changesResults;
   },
@@ -456,8 +490,8 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
       },
     }));
 
-    // Switch to analysis tab to show results
-    useDiscoveryUIStore.getState().setFramesViewActiveTab('analysis');
+    // Switch to tool-specific tab to show results
+    useDiscoveryUIStore.getState().setFramesViewActiveTab(TOOL_TAB_CONFIG['checksum-discovery'].tabId);
 
     return checksumDiscoveryResults;
   },

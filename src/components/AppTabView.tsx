@@ -96,6 +96,8 @@ interface AppTabViewProps {
   totalFrames?: number | null;
   /** Custom controls for the tab bar (e.g., column toggle buttons) */
   tabBarControls?: ReactNode;
+  /** Called when a closeable tab's close button is clicked */
+  onTabClose?: (tabId: string) => void;
 
   // === Toolbar (optional - omit to hide) ===
   toolbar?: ToolbarConfig;
@@ -154,6 +156,7 @@ export default function AppTabView({
   frameIndex,
   totalFrames,
   tabBarControls,
+  onTabClose,
   // Toolbar (optional)
   toolbar,
   // Timeline (optional)
@@ -195,6 +198,7 @@ export default function AppTabView({
         frameIndex={frameIndex}
         totalFrames={totalFrames}
         tabBarControls={tabBarControls}
+        onTabClose={onTabClose}
         // Toolbar
         showToolbar={toolbar !== undefined}
         currentPage={toolbar?.currentPage ?? 0}
