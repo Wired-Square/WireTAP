@@ -6,6 +6,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **GVRET protocol documentation**: Added `docs/gvret-protocol.md` documenting the full GVRET binary serial protocol — packet structure, command reference, packet formats, checksums, and state machine — along with a detailed breakdown of what CANdor implements, what it omits, and where it deviates from upstream.
+
 - **Decoder frame context menu**: Right-click a frame header in the Decoder to Copy ID, Copy Data, Filter, Solo, Inspect, Send to Transmit, Graph Frame (flow panel), Graph All Signals (charts every numeric signal), or Edit in Catalog (navigates to the frame definition in the Catalog Editor).
 
 - **Decoder signal context menu**: Right-click an individual decoded signal row to Graph Frame (flow panel for the parent frame), Graph Signal, Copy Signal Name, or Copy Value.
