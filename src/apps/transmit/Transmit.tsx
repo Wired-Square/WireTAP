@@ -20,6 +20,7 @@ import {
   textDataSecondary,
 } from "../../styles/colourTokens";
 import { dataViewTabClass, tabCountColorClass } from "../../styles/buttonStyles";
+import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../styles/typography";
 import ProtocolBadge from "../../components/ProtocolBadge";
 import AppLayout from "../../components/AppLayout";
 import TransmitTopBar from "./views/TransmitTopBar";
@@ -297,21 +298,21 @@ export default function Transmit() {
 
       {/* Loading / No Profiles State */}
       {isLoading && profiles.length === 0 && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className={`${textDataSecondary} text-sm`}>Loading profiles...</div>
+        <div className={emptyStateContainer}>
+          <p className={emptyStateText}>Loading profiles...</p>
         </div>
       )}
 
       {!isLoading && transmitProfiles.length === 0 && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
+        <div className={emptyStateContainer}>
           <Send size={48} className={textDataSecondary} />
-          <div className={`${textDataSecondary} text-center`}>
-            <p className="text-lg font-medium">No Transmit-Capable Profiles</p>
-            <p className="text-sm mt-2">
+          <div className={emptyStateText}>
+            <p className={emptyStateHeading}>No Transmit-Capable Profiles</p>
+            <p className={emptyStateDescription}>
               Add an IO profile (slcan, GVRET TCP, SocketCAN, or Serial) in
               Settings to enable transmission.
             </p>
-            <p className="text-sm mt-1 text-gray-500">
+            <p className={emptyStateHint}>
               Note: slcan profiles in silent mode (M1) cannot transmit.
             </p>
           </div>

@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, useMemo } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { useGraphStore, buildAlignedData, type GraphPanel, type SignalRef } from "../../../../../stores/graphStore";
-import { textSecondary } from "../../../../../styles/colourTokens";
+import { emptyStateText } from "../../../../../styles/typography";
 import { formatValue } from "../../../utils/graphFormat";
 import { tooltipPlugin, wheelZoomPlugin, panPlugin, measurementPlugin } from "../line-chart/chartPlugins";
 
@@ -237,9 +237,7 @@ export default function FlowViewPanel({ panel, canvasRef }: Props) {
   if (panel.targetFrameId == null) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={`text-xs ${textSecondary}`}>
-          Select a frame ID in Configure Panel
-        </p>
+        <p className={emptyStateText}>Select a frame ID in Configure Panel</p>
       </div>
     );
   }
@@ -247,9 +245,7 @@ export default function FlowViewPanel({ panel, canvasRef }: Props) {
   if (signals.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={`text-xs ${textSecondary}`}>
-          Waiting for frames...
-        </p>
+        <p className={emptyStateText}>Waiting for frames...</p>
       </div>
     );
   }

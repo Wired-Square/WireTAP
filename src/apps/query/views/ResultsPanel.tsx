@@ -16,7 +16,7 @@ import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { formatHumanUs } from "../../../utils/timeFormat";
 import DataViewPaginationToolbar, { FRAME_PAGE_SIZE_OPTIONS } from "../../../components/DataViewPaginationToolbar";
 import { iconButtonBase, buttonBase } from "../../../styles/buttonStyles";
-import { monoBody } from "../../../styles/typography";
+import { monoBody, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
 import { borderDivider, hoverBg, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple, textDanger } from "../../../styles/colourTokens";
 
@@ -130,12 +130,14 @@ export default function ResultsPanel({
   // Render empty state (no query selected)
   if (!selectedQuery) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className={`h-full ${emptyStateContainer}`}>
         <Database className={`${iconXl} ${textMuted} mb-4`} />
-        <h3 className={`text-sm font-medium ${textPrimary} mb-2`}>No Query Selected</h3>
-        <p className={`text-xs ${textSecondary} max-w-xs`}>
-          Select a completed query from the Queue tab to view its results.
-        </p>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>No Query Selected</p>
+          <p className={emptyStateDescription}>
+            Select a completed query from the Queue tab to view its results.
+          </p>
+        </div>
       </div>
     );
   }
@@ -143,12 +145,14 @@ export default function ResultsPanel({
   // Render empty state (query has no results yet)
   if (!results && !isRunning && !error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className={`h-full ${emptyStateContainer}`}>
         <Database className={`${iconXl} ${textMuted} mb-4`} />
-        <h3 className={`text-sm font-medium ${textPrimary} mb-2`}>No Results</h3>
-        <p className={`text-xs ${textSecondary} max-w-xs`}>
-          This query has not been run yet or returned no data.
-        </p>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>No Results</p>
+          <p className={emptyStateDescription}>
+            This query has not been run yet or returned no data.
+          </p>
+        </div>
       </div>
     );
   }
@@ -156,12 +160,14 @@ export default function ResultsPanel({
   // Render loading state
   if (isRunning) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className={`h-full ${emptyStateContainer}`}>
         <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <h3 className={`text-sm font-medium ${textPrimary} mb-2`}>Running Query</h3>
-        <p className={`text-xs ${textSecondary}`}>
-          Searching for {queryInfo.label.toLowerCase()}...
-        </p>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>Running Query</p>
+          <p className={emptyStateDescription}>
+            Searching for {queryInfo.label.toLowerCase()}...
+          </p>
+        </div>
       </div>
     );
   }
@@ -169,10 +175,12 @@ export default function ResultsPanel({
   // Render error state
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-        <AlertCircle className={`${iconXl} text-red-400 mb-4`} />
-        <h3 className={`text-sm font-medium ${textPrimary} mb-2`}>Query Failed</h3>
-        <p className={`text-xs text-red-400 max-w-xs`}>{error}</p>
+      <div className={`h-full ${emptyStateContainer}`}>
+        <AlertCircle className={`${iconXl} ${textDanger} mb-4`} />
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>Query Failed</p>
+          <p className={`${emptyStateDescription} ${textDanger}`}>{error}</p>
+        </div>
       </div>
     );
   }
@@ -180,18 +188,20 @@ export default function ResultsPanel({
   // Render empty results
   if (results && resultCount === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className={`h-full ${emptyStateContainer}`}>
         <Database className={`${iconXl} ${textMuted} mb-4`} />
-        <h3 className={`text-sm font-medium ${textPrimary} mb-2`}>No Matches Found</h3>
-        <p className={`text-xs ${textSecondary} max-w-xs mb-3`}>
-          No {queryInfo.label.toLowerCase()} were found matching your criteria.
-          Try adjusting the frame ID or time range.
-        </p>
-        {lastQueryStats && (
-          <p className={`text-xs ${textMuted}`}>
-            Scanned {lastQueryStats.rows_scanned.toLocaleString()} rows in {lastQueryStats.execution_time_ms.toLocaleString()}ms
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>No Matches Found</p>
+          <p className={`${emptyStateDescription} mb-3`}>
+            No {queryInfo.label.toLowerCase()} were found matching your criteria.
+            Try adjusting the frame ID or time range.
           </p>
-        )}
+          {lastQueryStats && (
+            <p className={`text-xs ${textMuted}`}>
+              Scanned {lastQueryStats.rows_scanned.toLocaleString()} rows in {lastQueryStats.execution_time_ms.toLocaleString()}ms
+            </p>
+          )}
+        </div>
       </div>
     );
   }

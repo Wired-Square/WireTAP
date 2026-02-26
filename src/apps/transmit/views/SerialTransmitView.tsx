@@ -17,6 +17,7 @@ import {
 } from "../../../styles/colourTokens";
 import { buttonBase, toggleChipClass } from "../../../styles/buttonStyles";
 import { flexRowGap2 } from "../../../styles/spacing";
+import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../../styles/typography";
 import { byteToHex, hexToBytes } from "../../../utils/byteUtils";
 
 export default function SerialTransmitView() {
@@ -146,10 +147,10 @@ export default function SerialTransmitView() {
   // If not connected
   if (!isConnected) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDataSecondary} text-center`}>
-          <p className="text-lg font-medium">Not Connected</p>
-          <p className="text-sm mt-2">
+      <div className={emptyStateContainer}>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>Not Connected</p>
+          <p className={emptyStateDescription}>
             Connect to an interface to transmit serial bytes.
           </p>
         </div>
@@ -160,13 +161,13 @@ export default function SerialTransmitView() {
   // If profile doesn't support serial
   if (!canTransmit) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDataSecondary} text-center`}>
-          <p className="text-lg font-medium">Serial Not Supported</p>
-          <p className="text-sm mt-2">
+      <div className={emptyStateContainer}>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>Serial Not Supported</p>
+          <p className={emptyStateDescription}>
             This profile does not support serial byte transmission.
           </p>
-          <p className="text-xs mt-1 text-gray-500">
+          <p className={emptyStateHint}>
             Only serial profiles support raw byte transmission.
           </p>
         </div>

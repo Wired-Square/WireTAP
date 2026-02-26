@@ -24,6 +24,7 @@ import {
   textDataCyan,
   bgCyan,
 } from '../../../styles';
+import { emptyStateText } from '../../../styles/typography';
 import { tableIconButtonDark } from '../../../styles/buttonStyles';
 
 // ============================================================================
@@ -313,7 +314,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
         </tbody>
       </table>
       {frames.length === 0 ? (
-        <div className={`${textDataTertiary} text-center py-8`}>
+        <div className={`${emptyStateText} py-8`}>
           {emptyMessage}
         </div>
       ) : (

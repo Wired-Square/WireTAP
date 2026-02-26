@@ -1,6 +1,9 @@
 // ui/src/apps/catalog/views/EmptySelectionView.tsx
 
 import { FileText } from "lucide-react";
+import { textMuted } from "../../../styles/colourTokens";
+import { iconXl } from "../../../styles/spacing";
+import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 
 export type EmptySelectionViewProps = {
   title?: string;
@@ -12,11 +15,11 @@ export default function EmptySelectionView({
   subtitle = "Select a node from the structure tree to view its content",
 }: EmptySelectionViewProps) {
   return (
-    <div className="flex items-center justify-center h-full text-[color:var(--text-muted)]">
-      <div className="text-center">
-        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-        <p className="font-medium text-[color:var(--text-secondary)]">{title}</p>
-        <p className="text-sm mt-1">{subtitle}</p>
+    <div className={`h-full ${emptyStateContainer}`}>
+      <FileText className={`${iconXl} ${textMuted} mb-4 opacity-50`} />
+      <div className={emptyStateText}>
+        <p className={emptyStateHeading}>{title}</p>
+        <p className={emptyStateDescription}>{subtitle}</p>
       </div>
     </div>
   );

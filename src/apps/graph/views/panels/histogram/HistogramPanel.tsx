@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, useMemo } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { useGraphStore, readTimeSeries, getSignalLabel, type GraphPanel } from "../../../../../stores/graphStore";
-import { textSecondary } from "../../../../../styles/colourTokens";
+import { emptyStateText } from "../../../../../styles/typography";
 import { computeHistogram } from "../../../utils/graphHistogram";
 
 interface Props {
@@ -187,9 +187,7 @@ export default function HistogramPanel({ panel, canvasRef }: Props) {
   if (panel.signals.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={`text-xs ${textSecondary}`}>
-          Click + to add signals
-        </p>
+        <p className={emptyStateText}>Click + to add signals</p>
       </div>
     );
   }

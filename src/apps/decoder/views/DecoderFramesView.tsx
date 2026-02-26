@@ -7,7 +7,7 @@ import { PlaybackControls } from "../../../components/PlaybackControls";
 import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
 import { badgeDarkPanelInfo, badgeDarkPanelSuccess, badgeDarkPanelDanger, badgeDarkPanelPurple, badgeDarkPanelCyan } from "../../../styles/badgeStyles";
 import { parseCanId } from "../../../utils/catalogParser";
-import { caption, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault, hoverBg, textSecondary } from "../../../styles";
+import { caption, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault, hoverBg, textSecondary } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId } from "../../../utils/frameIds";
@@ -1229,14 +1229,14 @@ export default function DecoderFramesView({
                 ))
             )}
             {selectedFrames.length === 0 && (
-              <div className={`text-sm ${textMuted}`}>No frames selected.</div>
+              <div className={emptyStateText}>No frames selected.</div>
             )}
           </>
         ) : activeTab === 'unmatched' ? (
           // Unmatched frames tab content - timestamped list of raw frames
           <div className="space-y-1">
             {unmatchedFrames.length === 0 ? (
-              <div className={`text-sm ${textMuted}`}>No unmatched frames.</div>
+              <div className={emptyStateText}>No unmatched frames.</div>
             ) : (
               unmatchedFrames.slice(-100).reverse().map((frame, idx) => {
                 const date = new Date(frame.timestamp * 1000);

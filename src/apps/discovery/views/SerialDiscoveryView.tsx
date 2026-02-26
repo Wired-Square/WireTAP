@@ -16,6 +16,8 @@ import {
   RawBytesViewDialog,
 } from './serial';
 import SerialAnalysisResultView from './tools/SerialAnalysisResultView';
+import { textWarning } from '../../../styles/colourTokens';
+import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from '../../../styles/typography';
 
 interface SerialDiscoveryViewProps {
   isStreaming?: boolean;
@@ -252,14 +254,14 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
           />
         )}
         {activeTab === 'filtered' && (
-          <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+          <div className={emptyStateContainer}>
             {effectiveFilteredCount > 0 ? (
-              <div className="text-center">
-                <p className="text-amber-400 font-medium">{effectiveFilteredCount} frames filtered out</p>
-                <p className="text-gray-500 mt-1">Frames shorter than {minFrameLength} bytes</p>
+              <div className={emptyStateText}>
+                <p className={`${emptyStateHeading} ${textWarning}`}>{effectiveFilteredCount} frames filtered out</p>
+                <p className={emptyStateDescription}>Frames shorter than {minFrameLength} bytes</p>
               </div>
             ) : (
-              <p>No filtered frames. Adjust the minimum frame length filter to see excluded frames.</p>
+              <p className={emptyStateText}>No filtered frames. Adjust the minimum frame length filter to see excluded frames.</p>
             )}
           </div>
         )}

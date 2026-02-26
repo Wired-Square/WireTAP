@@ -25,6 +25,7 @@ import {
 } from "../../../styles/buttonStyles";
 import { toolbarSelect } from "../../../styles/inputStyles";
 import { flexRowGap2 } from "../../../styles/spacing";
+import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, emptyStateHint } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
 import { formatBusLabel } from "../../../utils/busFormat";
 
@@ -173,13 +174,13 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
   // Empty state
   if (queue.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDataSecondary} text-center`}>
-          <p className="text-lg font-medium">Queue Empty</p>
-          <p className="text-sm mt-2">
+      <div className={emptyStateContainer}>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>Queue Empty</p>
+          <p className={emptyStateDescription}>
             Add frames from the CAN or Serial tab to build a transmit queue.
           </p>
-          <p className="text-xs mt-1 text-gray-500">
+          <p className={emptyStateHint}>
             Queue items can repeat at configurable intervals.
           </p>
         </div>

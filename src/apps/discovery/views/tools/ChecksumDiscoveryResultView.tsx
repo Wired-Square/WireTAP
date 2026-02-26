@@ -5,7 +5,7 @@ import { ShieldCheck, ChevronDown, ChevronRight, Copy, Check, X } from "lucide-r
 import { iconXs, iconMd, iconSm, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
 import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardDefault } from "../../../../styles/cardStyles";
-import { caption } from "../../../../styles/typography";
+import { caption, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../../styles/typography";
 import { borderDivider, hoverLight, bgSurface, textPrimary, textSecondary, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import { useSettings, getDisplayFrameIdFormat } from "../../../../hooks/useSettings";
@@ -25,14 +25,14 @@ export default function ChecksumDiscoveryResultView({ embedded = false, onClose 
     return (
       <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
         {!embedded && <Header onClose={onClose} />}
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-          <ShieldCheck className="w-12 h-12 text-[color:var(--text-muted)] mb-4" />
-          <p className={`text-sm ${textSecondary} mb-2`}>
-            No results yet
-          </p>
-          <p className={`text-xs ${textMuted}`}>
-            Select frames and click "Run Analysis" to detect checksum patterns.
-          </p>
+        <div className={emptyStateContainer}>
+          <ShieldCheck className={`w-12 h-12 ${textMuted} mb-4`} />
+          <div className={emptyStateText}>
+            <p className={emptyStateHeading}>No results yet</p>
+            <p className={emptyStateDescription}>
+              Select frames and click "Run Analysis" to detect checksum patterns.
+            </p>
+          </div>
         </div>
       </div>
     );

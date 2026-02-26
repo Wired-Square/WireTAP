@@ -5,8 +5,8 @@ import { ListOrdered, Clock, Layers, Play, Shuffle, Zap, GitBranch, Download, X 
 import { iconXs, iconMd, iconSm, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
 import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardDefault } from "../../../../styles/cardStyles";
-import { labelSmall, caption, captionMuted, sectionHeaderText } from "../../../../styles/typography";
-import { borderDivider, hoverLight, bgSurface } from "../../../../styles";
+import { labelSmall, caption, captionMuted, sectionHeaderText, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../../styles/typography";
+import { borderDivider, hoverLight, bgSurface, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import type { DetectedPattern, IntervalGroup, StartIdCandidate, MultiplexedFrame, BurstFrame, MultiBusFrame } from "../../../../utils/analysis/messageOrderAnalysis";
 import { useSettings } from "../../../../hooks/useSettings";
@@ -56,14 +56,14 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
     return (
       <div className={`h-full flex flex-col ${embedded ? "" : `${bgSurface} rounded-lg border border-[color:var(--border-default)]`}`}>
         {!embedded && <Header onExport={() => {}} hasResults={false} onClose={onClose} />}
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-          <ListOrdered className="w-12 h-12 text-[color:var(--text-muted)] mb-4" />
-          <p className="text-sm text-[color:var(--text-secondary)] mb-2">
-            No results yet
-          </p>
-          <p className="text-xs text-[color:var(--text-muted)]">
-            Select frames and click "Run Analysis" to detect message order patterns.
-          </p>
+        <div className={emptyStateContainer}>
+          <ListOrdered className={`w-12 h-12 ${textMuted} mb-4`} />
+          <div className={emptyStateText}>
+            <p className={emptyStateHeading}>No results yet</p>
+            <p className={emptyStateDescription}>
+              Select frames and click "Run Analysis" to detect message order patterns.
+            </p>
+          </div>
         </div>
       </div>
     );

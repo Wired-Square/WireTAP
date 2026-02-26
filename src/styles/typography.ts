@@ -94,11 +94,11 @@ export const emptyStateContainer = "flex-1 flex flex-col items-center justify-ce
 /** Empty state text wrapper - applies muted colour and centering */
 export const emptyStateText = "text-[color:var(--text-secondary)] text-center";
 
-/** Empty state heading - larger, medium weight */
-export const emptyStateHeading = "text-lg font-medium";
+/** Empty state heading - medium weight, base size */
+export const emptyStateHeading = "text-base font-medium";
 
 /** Empty state description - smaller, with top margin */
 export const emptyStateDescription = "text-sm mt-2";
 
-/** Empty state hint - extra small, for additional context */
-export const emptyStateHint = "text-xs mt-1 text-[color:var(--text-secondary)] opacity-60";
+/** Empty state hint - extra small, for additional context (inherits colour from emptyStateText) */
+export const emptyStateHint = "text-xs mt-1 opacity-60";

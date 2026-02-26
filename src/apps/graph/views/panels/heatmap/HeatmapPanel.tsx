@@ -2,7 +2,7 @@
 
 import { useRef, useCallback } from "react";
 import { useGraphStore, type GraphPanel } from "../../../../../stores/graphStore";
-import { textSecondary } from "../../../../../styles/colourTokens";
+import { emptyStateText } from "../../../../../styles/typography";
 
 interface Props {
   panel: GraphPanel;
@@ -44,9 +44,7 @@ export default function HeatmapPanel({ panel, svgRef: svgRefProp }: Props) {
   if (panel.targetFrameId == null) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={`text-xs ${textSecondary}`}>
-          Select a frame ID in Configure Panel
-        </p>
+        <p className={emptyStateText}>Select a frame ID in Configure Panel</p>
       </div>
     );
   }

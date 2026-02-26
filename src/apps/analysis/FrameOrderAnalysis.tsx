@@ -3,18 +3,18 @@
 
 import { useDiscoveryStore } from "../../stores/discoveryStore";
 import MessageOrderResultView from "../discovery/views/tools/MessageOrderResultView";
+import { bgSurface } from "../../styles/colourTokens";
+import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../styles/typography";
 
 export default function FrameOrderAnalysis() {
   const results = useDiscoveryStore((s) => s.toolbox.messageOrderResults);
 
   if (!results) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[var(--bg-surface)] text-center p-8">
-        <div className="max-w-md">
-          <h2 className="text-lg font-semibold text-[color:var(--text-secondary)] mb-2">
-            No Frame Order Analysis Results
-          </h2>
-          <p className="text-sm text-[color:var(--text-muted)]">
+      <div className={`h-full ${emptyStateContainer} ${bgSurface}`}>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>No Frame Order Analysis Results</p>
+          <p className={emptyStateDescription}>
             Run the Frame Order Analysis tool from Discovery to see results here.
           </p>
         </div>

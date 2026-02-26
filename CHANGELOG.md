@@ -20,6 +20,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **Standardised placeholder text**: All empty state / placeholder messages across apps now use shared typography tokens (`emptyStateText`, `emptyStateHeading`, `emptyStateDescription`, `emptyStateHint`) for consistent colour, size, and weight. Replaced hardcoded `text-gray-*` classes that broke in light mode with theme-aware CSS variable tokens. Affected apps: Discovery, Decoder, Transmit, Analysis, Catalog, Graph, and Query.
+
 - **Checksum deduplication**: Refactored CRC algorithm implementations in the Rust backend to delegate to the parameterised `crc8_parameterised` and `crc16_parameterised` functions instead of each hand-rolling the CRC loop. Reduces ~135 lines of duplicated code with identical behaviour.
 
 ### Removed

@@ -2,7 +2,7 @@
 
 import { useGraphStore, getSignalLabel, getConfidenceColour, type GraphPanel } from "../../../../../stores/graphStore";
 import { useSettings } from "../../../../../hooks/useSettings";
-import { textSecondary } from "../../../../../styles/colourTokens";
+import { emptyStateText } from "../../../../../styles/typography";
 import { formatValue } from "../../../utils/graphFormat";
 import PanelTooltip from "../PanelTooltip";
 
@@ -30,9 +30,7 @@ export default function ListPanel({ panel }: Props) {
   if (panel.signals.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className={`text-xs ${textSecondary}`}>
-          Click + to add signals
-        </p>
+        <p className={emptyStateText}>Click + to add signals</p>
       </div>
     );
   }

@@ -5,7 +5,7 @@ import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Laye
 import { iconSm, iconXs, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
 import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
 import { cardDefault } from "../../../../styles/cardStyles";
-import { caption, captionMuted, borderDivider, bgSurface, sectionHeaderText } from "../../../../styles";
+import { caption, captionMuted, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription, borderDivider, bgSurface, sectionHeaderText, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import type { PayloadAnalysisResult, ByteStats, MuxCaseAnalysis, MultiBytePattern, MirrorGroup } from "../../../../utils/analysis/payloadAnalysis";
 import { formatMuxValue } from "../../../../utils/analysis/muxDetection";
@@ -97,14 +97,14 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
 
   if (!results) {
     const content = (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-        <GitCompare className="w-12 h-12 text-[color:var(--text-muted)] mb-4" />
-        <p className="text-sm text-[color:var(--text-secondary)] mb-2">
-          No results yet
-        </p>
-        <p className="text-xs text-[color:var(--text-muted)]">
-          Select frames in the sidebar and click "Run Analysis" to detect payload patterns.
-        </p>
+      <div className={emptyStateContainer}>
+        <GitCompare className={`w-12 h-12 ${textMuted} mb-4`} />
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>No results yet</p>
+          <p className={emptyStateDescription}>
+            Select frames in the sidebar and click "Run Analysis" to detect payload patterns.
+          </p>
+        </div>
       </div>
     );
 

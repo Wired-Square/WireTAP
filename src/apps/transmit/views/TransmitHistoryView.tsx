@@ -15,6 +15,7 @@ import {
 } from "../../../styles/colourTokens";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { buttonBase } from "../../../styles/buttonStyles";
+import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { formatBusLabel } from "../../../utils/busFormat";
@@ -167,10 +168,10 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
   // Empty state
   if (history.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-        <div className={`${textDataSecondary} text-center`}>
-          <p className="text-lg font-medium">No History</p>
-          <p className="text-sm mt-2">
+      <div className={emptyStateContainer}>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>No History</p>
+          <p className={emptyStateDescription}>
             Transmitted packets will appear here.
           </p>
         </div>

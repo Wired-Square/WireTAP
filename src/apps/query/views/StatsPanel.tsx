@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useQueryStore, type DatabaseActivity } from "../stores/queryStore";
 import { buttonBase, iconButtonBase } from "../../../styles/buttonStyles";
-import { monoBody } from "../../../styles/typography";
+import { monoBody, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
 import {
   borderDivider,
@@ -101,12 +101,14 @@ export default function StatsPanel({ profileId }: Props) {
   // Render empty state if no profile
   if (!profileId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <div className={`h-full ${emptyStateContainer}`}>
         <Database className={`${iconXl} ${textMuted} mb-4`} />
-        <h3 className={`text-sm font-medium ${textPrimary} mb-2`}>No Database Selected</h3>
-        <p className={`text-xs ${textSecondary} max-w-xs`}>
-          Select a PostgreSQL profile to view database activity.
-        </p>
+        <div className={emptyStateText}>
+          <p className={emptyStateHeading}>No Database Selected</p>
+          <p className={emptyStateDescription}>
+            Select a PostgreSQL profile to view database activity.
+          </p>
+        </div>
       </div>
     );
   }

@@ -11,7 +11,8 @@ import { getBufferFramesPaginatedFiltered } from "../../../api/buffer";
 import { FrameDataTable, FRAME_PAGE_SIZE_OPTIONS } from "../components";
 import { PaginationToolbar } from "../components";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
-import { bgDataView, textDataSecondary } from "../../../styles";
+import { bgDataView } from "../../../styles";
+import { emptyStateText } from "../../../styles/typography";
 import { iconXs } from "../../../styles/spacing";
 import { bytesToHex } from "../../../utils/byteUtils";
 import { formatFrameId } from "../../../utils/frameIds";
@@ -275,7 +276,7 @@ export default function FilteredTabContent({
   if (filteredOutIds.length === 0) {
     return (
       <div className={`flex-1 min-h-0 flex items-center justify-center ${bgDataView}`}>
-        <p className={`${textDataSecondary} text-center py-8`}>
+        <p className={`${emptyStateText} py-8`}>
           No filtered frames. All discovered frame IDs are currently selected.
         </p>
       </div>
