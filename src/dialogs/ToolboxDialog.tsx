@@ -71,6 +71,8 @@ type Props = {
   frameCount: number;
   /** True when in serial mode - filters available tools and uses serial frame data */
   isSerialMode?: boolean;
+  /** True when the Filtered tab is active — analysis will target filtered-out IDs */
+  isFilteredView?: boolean;
   /** Number of serial frames (framedData + frames) available for analysis */
   serialFrameCount?: number;
   /** Number of raw serial bytes available (before framing) */
@@ -83,6 +85,7 @@ export default function ToolboxDialog({
   selectedCount,
   frameCount,
   isSerialMode = false,
+  isFilteredView = false,
   serialFrameCount = 0,
   serialBytesCount = 0,
 }: Props) {
@@ -243,7 +246,7 @@ export default function ToolboxDialog({
               <div className={`text-sm ${textTertiary}`}>
                 {activeTool === "serial-framing"
                   ? `${effectiveSelectedCount.toLocaleString()} byte${effectiveSelectedCount !== 1 ? "s" : ""} available for analysis`
-                  : `${effectiveSelectedCount.toLocaleString()} frame${effectiveSelectedCount !== 1 ? "s" : ""} ${isSerialMode ? "available" : "selected"} for analysis`}
+                  : `${effectiveSelectedCount.toLocaleString()} ${isFilteredView ? "filtered" : ""} frame${effectiveSelectedCount !== 1 ? "s" : ""} ${isSerialMode ? "available" : "selected"} for analysis`}
               </div>
               <button
                 type="button"

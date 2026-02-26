@@ -18,6 +18,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Deselected frames in Filtered tab**: Frames removed via the Filter context menu action now appear as full decoded FrameCards in the Decoder's Filtered tab, alongside processing-filtered frames. The tab badge count includes both.
 
+- **Analysis respects Filtered tab**: When the Filtered tab is active in Discovery, analysis tools (Frame Order, Payload Change, Checksum Discovery) now target the filtered-out IDs instead of the selected ones, saving resources when analysing a specific subset.
+
 - **Expanded Discovery context menu**: Right-click a frame row now offers Copy ID, Copy Data, Filter, Solo (show only this frame ID), Inspect, Send to Transmit, Graph (open a Flow panel for the frame), and Bookmark. Items are grouped with separators.
 
 - **Filtered tab context menu**: Right-click a frame in the Filtered tab to Unfilter (re-select the frame ID), Copy ID, Copy Data, or Inspect.

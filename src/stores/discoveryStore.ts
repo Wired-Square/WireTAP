@@ -536,6 +536,20 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
       }
 
       // For CAN analysis tools, get selected frame data
+      // When the Filtered tab is active, analyse filtered-out IDs instead of selected ones
+      const { framesViewActiveTab } = useDiscoveryUIStore.getState();
+      const isFilteredTab = framesViewActiveTab === 'filtered';
+      let targetIds: Set<number>;
+      if (isFilteredTab) {
+        const { seenIds } = frameStore;
+        targetIds = new Set<number>();
+        for (const id of seenIds) {
+          if (!selectedFrames.has(id)) targetIds.add(id);
+        }
+      } else {
+        targetIds = selectedFrames;
+      }
+
       let selectedFrameData: FrameMessage[];
 
       if (isSerialMode) {
@@ -543,7 +557,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         if (selectedFrameData.length === 0) return;
       } else if (bufferMode.enabled) {
         const { getBufferFramesPaginatedFiltered } = await import('../api/buffer');
-        const selectedIds = Array.from(selectedFrames);
+        const selectedIds = Array.from(targetIds);
         if (selectedIds.length === 0) return;
 
         toolboxStore.setIsRunning(true);
@@ -570,7 +584,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           return;
         }
       } else {
-        selectedFrameData = frames.filter((f) => selectedFrames.has(f.frame_id));
+        selectedFrameData = frames.filter((f) => targetIds.has(f.frame_id));
         if (selectedFrameData.length === 0) return;
       }
 

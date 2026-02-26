@@ -64,6 +64,8 @@ export default function Discovery() {
   const selectionSetDirty = useDiscoveryStore((state) => state.selectionSetDirty);
   const streamStartTimeUs = useDiscoveryStore((state) => state.streamStartTimeUs);
 
+  const seenIds = useDiscoveryStore((state) => state.seenIds);
+  const framesViewActiveTab = useDiscoveryUIStore((state) => state.framesViewActiveTab);
   const setShowBusColumn = useDiscoveryUIStore((state) => state.setShowBusColumn);
 
   // Global error dialog
@@ -981,9 +983,10 @@ export default function Discovery() {
       <ToolboxDialog
         isOpen={dialogs.toolbox.isOpen}
         onClose={() => dialogs.toolbox.close()}
-        selectedCount={selectedFrames.size}
+        selectedCount={framesViewActiveTab === 'filtered' ? seenIds.size - selectedFrames.size : selectedFrames.size}
         frameCount={frameList.length}
         isSerialMode={isSerialMode}
+        isFilteredView={framesViewActiveTab === 'filtered'}
         serialFrameCount={backendFrameCount > 0 ? backendFrameCount : (framedData.length + frames.length)}
         serialBytesCount={backendByteCount > 0 ? backendByteCount : serialBytesBuffer.length}
       />
