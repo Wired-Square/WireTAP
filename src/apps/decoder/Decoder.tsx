@@ -17,6 +17,7 @@ import { buildCatalogPath } from "../../utils/catalogUtils";
 import { tlog } from "../../api/settings";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { clearBuffer } from "../../api/buffer";
+import { UI_UPDATE_INTERVAL_MS, COPY_FEEDBACK_TIMEOUT_MS, REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
 import AppLayout from "../../components/AppLayout";
 import DecoderTopBar from "./views/DecoderTopBar";
@@ -195,7 +196,7 @@ export default function Decoder() {
   const pendingFilteredRef = useRef<Array<{ frameId: number; bytes: number[]; timestamp: number; sourceAddress?: number; reason: 'too_short' | 'id_filter' }>>([]);
   const pendingTimeRef = useRef<number | null>(null);
   const flushScheduledRef = useRef<boolean>(false);
-  const UI_UPDATE_INTERVAL_MS = 100; // 10 updates per second
+  // UI_UPDATE_INTERVAL_MS imported from constants
 
   // Use refs for store functions to avoid stale closures in setTimeout
   const decodeSignalsBatchRef = useRef(decodeSignalsBatch);
@@ -779,7 +780,7 @@ export default function Decoder() {
     setRealtimeClock(Date.now() / 1000);
     const interval = setInterval(() => {
       setRealtimeClock(Date.now() / 1000);
-    }, 1000);
+    }, REALTIME_CLOCK_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [isDecoding, isRealtime]);
 
@@ -875,7 +876,7 @@ export default function Decoder() {
             } catch (error) {
               console.error('Failed to reload catalog:', error);
             }
-            setTimeout(() => setCatalogNotification(null), 2000);
+            setTimeout(() => setCatalogNotification(null), COPY_FEEDBACK_TIMEOUT_MS);
           }
         }
       );

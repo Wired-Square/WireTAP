@@ -16,6 +16,16 @@ type BuffersViewProps = {
   onChangeQueryResultLimit: (value: number) => void;
   graphBufferSize: number;
   onChangeGraphBufferSize: (value: number) => void;
+  decoderMaxUnmatchedFrames: number;
+  onChangeDecoderMaxUnmatchedFrames: (value: number) => void;
+  decoderMaxFilteredFrames: number;
+  onChangeDecoderMaxFilteredFrames: (value: number) => void;
+  decoderMaxDecodedFrames: number;
+  onChangeDecoderMaxDecodedFrames: (value: number) => void;
+  decoderMaxDecodedPerSource: number;
+  onChangeDecoderMaxDecodedPerSource: (value: number) => void;
+  transmitMaxHistory: number;
+  onChangeTransmitMaxHistory: (value: number) => void;
 };
 
 export default function BuffersView({
@@ -29,6 +39,16 @@ export default function BuffersView({
   onChangeQueryResultLimit,
   graphBufferSize,
   onChangeGraphBufferSize,
+  decoderMaxUnmatchedFrames,
+  onChangeDecoderMaxUnmatchedFrames,
+  decoderMaxFilteredFrames,
+  onChangeDecoderMaxFilteredFrames,
+  decoderMaxDecodedFrames,
+  onChangeDecoderMaxDecodedFrames,
+  decoderMaxDecodedPerSource,
+  onChangeDecoderMaxDecodedPerSource,
+  transmitMaxHistory,
+  onChangeTransmitMaxHistory,
 }: BuffersViewProps) {
   return (
     <div className="space-y-6">
@@ -129,6 +149,118 @@ export default function BuffersView({
                 const value = Number(e.target.value);
                 if (value >= 1000 && value <= 100000) {
                   onChangeGraphBufferSize(value);
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Decoder Limits Section */}
+      <div className="pt-4 border-t border-[color:var(--border-default)]">
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Decoder Limits</h3>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className={labelDefault}>Max Unmatched Frames</label>
+            <p className={helpText}>
+              Maximum frames kept in the unmatched (no catalog match) list
+            </p>
+            <Input
+              type="number"
+              min={100}
+              max={10000}
+              step={100}
+              value={decoderMaxUnmatchedFrames}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value >= 100 && value <= 10000) {
+                  onChangeDecoderMaxUnmatchedFrames(value);
+                }
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className={labelDefault}>Max Filtered Frames</label>
+            <p className={helpText}>
+              Maximum frames kept in the filtered (excluded by selection set) list
+            </p>
+            <Input
+              type="number"
+              min={100}
+              max={10000}
+              step={100}
+              value={decoderMaxFilteredFrames}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value >= 100 && value <= 10000) {
+                  onChangeDecoderMaxFilteredFrames(value);
+                }
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className={labelDefault}>Max Decoded Frames</label>
+            <p className={helpText}>
+              Maximum decoded frames displayed in the Decoder view
+            </p>
+            <Input
+              type="number"
+              min={100}
+              max={5000}
+              step={100}
+              value={decoderMaxDecodedFrames}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value >= 100 && value <= 5000) {
+                  onChangeDecoderMaxDecodedFrames(value);
+                }
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className={labelDefault}>Max Decoded Per Source</label>
+            <p className={helpText}>
+              Maximum decoded frames cached per unique source address. Higher values keep more history but use more memory.
+            </p>
+            <Input
+              type="number"
+              min={500}
+              max={20000}
+              step={500}
+              value={decoderMaxDecodedPerSource}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value >= 500 && value <= 20000) {
+                  onChangeDecoderMaxDecodedPerSource(value);
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Transmit Section */}
+      <div className="pt-4 border-t border-[color:var(--border-default)]">
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Transmit</h3>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className={labelDefault}>Max History Items</label>
+            <p className={helpText}>
+              Maximum number of transmitted frames to keep in the Transmit history log
+            </p>
+            <Input
+              type="number"
+              min={100}
+              max={10000}
+              step={100}
+              value={transmitMaxHistory}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                if (value >= 100 && value <= 10000) {
+                  onChangeTransmitMaxHistory(value);
                 }
               }}
             />

@@ -1085,12 +1085,8 @@ async fn run_csv_stream(
         frames.len()
     );
 
-    // Buffer settings (similar to PostgreSQL reader)
-    const HIGH_SPEED_BATCH_SIZE: usize = 50;
-    const MIN_DELAY_MS: f64 = 1.0;
-    const PACING_INTERVAL_MS: u64 = 50;
-    const NO_LIMIT_BATCH_SIZE: usize = 1000;
-    const NO_LIMIT_YIELD_MS: u64 = 10;
+    // Buffer settings (shared with buffer and PostgreSQL readers)
+    use super::pacing::*;
 
     let mut total_emitted = 0i64;
 

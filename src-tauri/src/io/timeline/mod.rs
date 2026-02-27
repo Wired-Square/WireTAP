@@ -6,6 +6,7 @@
 mod base;
 mod buffer;
 mod csv;
+mod pacing;
 mod postgres;
 
 // Re-export public items

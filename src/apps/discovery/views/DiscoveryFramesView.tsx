@@ -17,6 +17,7 @@ import FilteredTabContent from "./FilteredTabContent";
 import { bgDataView, bgSurface, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import type { IOCapabilities } from "../../../api/io";
+import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
 import { useBufferFrameView } from "../hooks/useBufferFrameView";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import { bytesToHex } from "../../../utils/byteUtils";
@@ -187,7 +188,7 @@ function DiscoveryFramesView({
     selectedFrames,
     pageSize: renderBuffer === -1 ? 1000 : renderBuffer,
     tailSize: renderBuffer === -1 ? 100 : renderBuffer,
-    pollIntervalMs: 200,
+    pollIntervalMs: BUFFER_POLL_INTERVAL_MS,
     isBufferPlayback,
     // During buffer playback, the hook follows the playback position and auto-navigates pages
     followTimeUs: isBufferPlayback ? currentTimeUs : null,

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { useSettingsStore } from '../apps/settings/stores/settingsStore';
+import { LOCALE_TIME_24H } from '../constants';
 import { badgeSmallNeutral, badgeSmallInfo } from '../styles/badgeStyles';
 import { caption } from '../styles/typography';
 
@@ -71,14 +72,14 @@ export default function TimeDisplay({
         ? 'UTC'
         : undefined;
 
-    const time = date.toLocaleTimeString('en-GB', {
+    const time = date.toLocaleTimeString(LOCALE_TIME_24H, {
       timeZone: tzOption,
       hour12: false,
     });
 
     const dateStr = isRelative
       ? ''
-      : date.toLocaleDateString('en-GB', {
+      : date.toLocaleDateString(LOCALE_TIME_24H, {
           timeZone: tzOption,
           weekday: 'short',
           year: 'numeric',

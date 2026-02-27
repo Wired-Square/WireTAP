@@ -514,12 +514,8 @@ async fn run_buffer_stream(
     );
 
     // Streaming constants
+    use super::pacing::*;
     const CHUNK_SIZE: usize = 2000;
-    const HIGH_SPEED_BATCH_SIZE: usize = 50;
-    const MIN_DELAY_MS: f64 = 1.0;
-    const PACING_INTERVAL_MS: u64 = 50;
-    const NO_LIMIT_BATCH_SIZE: usize = 1000;
-    const NO_LIMIT_YIELD_MS: u64 = 10;
 
     let mut total_emitted = 0i64;
     let mut frame_index = 0usize;

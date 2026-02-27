@@ -3,24 +3,32 @@
 import { create } from 'zustand';
 import { tlog } from '../api/settings';
 import { LRUMap } from '../utils/LRUMap';
+import {
+  useSettingsStore,
+  DEFAULT_DECODER_MAX_DECODED_FRAMES,
+  DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+} from '../apps/settings/stores/settingsStore';
 
-/** Maximum number of unmatched frames to keep in buffer */
-export const MAX_UNMATCHED_FRAMES = 1000;
-/** Maximum number of filtered frames to keep in buffer */
-export const MAX_FILTERED_FRAMES = 1000;
-/** Maximum number of decoded frames to keep (per frame ID) */
-const MAX_DECODED_FRAMES = 500;
-/** Maximum number of decoded frames to keep (per source address) */
-const MAX_DECODED_PER_SOURCE = 2000;
 /** Maximum number of unique values to track per header field */
 const MAX_HEADER_FIELD_VALUES = 256;
+
+/** Read current decoder buffer limits from the settings store. */
+function getDecoderLimits() {
+  const { buffers } = useSettingsStore.getState();
+  return {
+    maxUnmatched: buffers.decoderMaxUnmatchedFrames,
+    maxFiltered: buffers.decoderMaxFilteredFrames,
+    maxDecoded: buffers.decoderMaxDecodedFrames,
+    maxDecodedPerSource: buffers.decoderMaxDecodedPerSource,
+  };
+}
 
 // Mutable decoded state — avoids creating new LRUMap/Array copies on every
 // 100ms decode flush, which causes JSC GC pressure that crashes the WebView
 // after ~2 hours of streaming. Components subscribe to `decodedVersion` for
 // reactivity and read from these via getter functions.
-let _decoded: LRUMap<number, DecodedFrame> = new LRUMap(MAX_DECODED_FRAMES);
-let _decodedPerSource: LRUMap<string, DecodedFrame> = new LRUMap(MAX_DECODED_PER_SOURCE);
+let _decoded: LRUMap<number, DecodedFrame> = new LRUMap(DEFAULT_DECODER_MAX_DECODED_FRAMES);
+let _decodedPerSource: LRUMap<string, DecodedFrame> = new LRUMap(DEFAULT_DECODER_MAX_DECODED_PER_SOURCE);
 let _unmatchedFrames: UnmatchedFrame[] = [];
 let _filteredFrames: FilteredFrame[] = [];
 
@@ -581,8 +589,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   clearFrames: () => {
     // Only clear session/buffer data, NOT the catalog frames
-    _decoded = new LRUMap(MAX_DECODED_FRAMES);
-    _decodedPerSource = new LRUMap(MAX_DECODED_PER_SOURCE);
+    const limits = getDecoderLimits();
+    _decoded = new LRUMap(limits.maxDecoded);
+    _decodedPerSource = new LRUMap(limits.maxDecodedPerSource);
     _unmatchedFrames = [];
     _filteredFrames = [];
     set({
@@ -595,8 +604,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   },
 
   clearDecoded: () => {
-    _decoded = new LRUMap(MAX_DECODED_FRAMES);
-    _decodedPerSource = new LRUMap(MAX_DECODED_PER_SOURCE);
+    const limits = getDecoderLimits();
+    _decoded = new LRUMap(limits.maxDecoded);
+    _decodedPerSource = new LRUMap(limits.maxDecodedPerSource);
     _unmatchedFrames = [];
     _filteredFrames = [];
     set({
@@ -1157,18 +1167,19 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     }
 
     // Add unmatched frames in place (with limit)
+    const limits = getDecoderLimits();
     if (unmatchedToAdd.length > 0) {
       _unmatchedFrames.push(...unmatchedToAdd);
-      if (_unmatchedFrames.length > MAX_UNMATCHED_FRAMES) {
-        _unmatchedFrames = _unmatchedFrames.slice(-MAX_UNMATCHED_FRAMES);
+      if (_unmatchedFrames.length > limits.maxUnmatched) {
+        _unmatchedFrames = _unmatchedFrames.slice(-limits.maxUnmatched);
       }
     }
 
     // Add filtered frames in place (with limit)
     if (filteredToAdd.length > 0) {
       _filteredFrames.push(...filteredToAdd);
-      if (_filteredFrames.length > MAX_FILTERED_FRAMES) {
-        _filteredFrames = _filteredFrames.slice(-MAX_FILTERED_FRAMES);
+      if (_filteredFrames.length > limits.maxFiltered) {
+        _filteredFrames = _filteredFrames.slice(-limits.maxFiltered);
       }
     }
 
@@ -1183,8 +1194,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   addUnmatchedFrame: (frame) => {
     _unmatchedFrames.push(frame);
-    if (_unmatchedFrames.length > MAX_UNMATCHED_FRAMES) {
-      _unmatchedFrames.splice(0, _unmatchedFrames.length - MAX_UNMATCHED_FRAMES);
+    const maxUnmatched = getDecoderLimits().maxUnmatched;
+    if (_unmatchedFrames.length > maxUnmatched) {
+      _unmatchedFrames.splice(0, _unmatchedFrames.length - maxUnmatched);
     }
     set({ decodedVersion: get().decodedVersion + 1 });
   },
@@ -1196,8 +1208,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   addFilteredFrame: (frame) => {
     _filteredFrames.push(frame);
-    if (_filteredFrames.length > MAX_FILTERED_FRAMES) {
-      _filteredFrames.splice(0, _filteredFrames.length - MAX_FILTERED_FRAMES);
+    const maxFiltered = getDecoderLimits().maxFiltered;
+    if (_filteredFrames.length > maxFiltered) {
+      _filteredFrames.splice(0, _filteredFrames.length - maxFiltered);
     }
     set({ decodedVersion: get().decodedVersion + 1 });
   },
@@ -1208,8 +1221,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   },
 
   setIoProfile: (profile) => {
-    _decoded = new LRUMap(MAX_DECODED_FRAMES);
-    _decodedPerSource = new LRUMap(MAX_DECODED_PER_SOURCE);
+    const limits = getDecoderLimits();
+    _decoded = new LRUMap(limits.maxDecoded);
+    _decodedPerSource = new LRUMap(limits.maxDecodedPerSource);
     _unmatchedFrames = [];
     _filteredFrames = [];
     set({ ioProfile: profile, decodedVersion: get().decodedVersion + 1 });

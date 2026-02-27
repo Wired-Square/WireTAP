@@ -16,7 +16,8 @@ import AppTabView, { type TabDefinition, type ProtocolBadge } from "../../../com
 import HeaderFieldFilter from "../../../components/HeaderFieldFilter";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import type { DecodedFrame, DecodedSignal, DecoderViewMode, UnmatchedFrame, FilteredFrame, MirrorValidationEntry } from "../../../stores/decoderStore";
-import { useDecoderStore, MAX_UNMATCHED_FRAMES, MAX_FILTERED_FRAMES } from "../../../stores/decoderStore";
+import { useDecoderStore } from "../../../stores/decoderStore";
+import { useSettingsStore } from "../../../apps/settings/stores/settingsStore";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useGraphStore } from "../../../stores/graphStore";
 import { useSessionStore } from "../../../stores/sessionStore";
@@ -985,8 +986,9 @@ export default function DecoderFramesView({
   // Tab definitions - Signals tab always, plus Unmatched/Filtered tabs always visible
   // Show ">" prefix when buffer is at maximum capacity
   const tabs: TabDefinition[] = useMemo(() => {
-    const unmatchedAtMax = unmatchedFrames.length >= MAX_UNMATCHED_FRAMES;
-    const filteredAtMax = filteredFrames.length >= MAX_FILTERED_FRAMES;
+    const { decoderMaxUnmatchedFrames, decoderMaxFilteredFrames } = useSettingsStore.getState().buffers;
+    const unmatchedAtMax = unmatchedFrames.length >= decoderMaxUnmatchedFrames;
+    const filteredAtMax = filteredFrames.length >= decoderMaxFilteredFrames;
     return [
       { id: 'signals', label: 'Signals', count: selectedFrames.length, countColor: 'green' as const },
       { id: 'unmatched', label: 'Unmatched', count: unmatchedFrames.length, countColor: 'orange' as const, countPrefix: unmatchedAtMax ? '>' : undefined },

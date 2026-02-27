@@ -126,8 +126,7 @@ export interface SerialEditorState {
   delimiter: number[];
 }
 
-/** Maximum history items to keep */
-const MAX_HISTORY_ITEMS = 1000;
+import { useSettingsStore } from '../apps/settings/stores/settingsStore';
 
 // ============================================================================
 // Store
@@ -920,7 +919,8 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const newItem: TransmitHistoryItem = { ...item, id };
 
     // Prepend to history, cap at max
-    const history = [newItem, ...state.history].slice(0, MAX_HISTORY_ITEMS);
+    const maxHistory = useSettingsStore.getState().buffers.transmitMaxHistory;
+    const history = [newItem, ...state.history].slice(0, maxHistory);
     set({ history });
   },
 

@@ -10,6 +10,7 @@ import { borderDivider, hoverLight, bgSurface, textPrimary, textSecondary, textM
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
 import { useSettings, getDisplayFrameIdFormat } from "../../../../hooks/useSettings";
 import { formatFrameId } from "../../../../utils/frameIds";
+import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../../constants";
 import type { ChecksumCandidate } from "../../../../utils/analysis/checksumDiscovery";
 
 type Props = {
@@ -134,7 +135,7 @@ function FrameCard({
     const info = formatCandidateForCopy(bestCandidate);
     navigator.clipboard.writeText(info);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT_MS);
   };
 
   return (

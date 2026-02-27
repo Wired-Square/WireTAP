@@ -13,6 +13,15 @@ use crate::buffer_store::{self, TimestampedByte};
 use crate::io::types::{RawBytesPayload, SourceMessage};
 use crate::io::{emit_device_connected, emit_frames, emit_session_error, emit_stream_ended, emit_to_session, FrameMessage};
 
+/// Minimum pending frames before emission.
+const FRAME_BATCH_THRESHOLD: usize = 100;
+/// Minimum pending bytes before emission.
+const BYTE_BATCH_THRESHOLD: usize = 256;
+/// Maximum time (ms) between forced emissions.
+const MERGE_EMIT_INTERVAL_MS: u64 = 50;
+/// Interval (s) between per-bus frame count log messages.
+const BUS_LOG_INTERVAL_SECS: u64 = 5;
+
 /// Main merge task that spawns sub-readers and combines their frames/bytes
 pub(super) async fn run_merge_task(
     app: AppHandle,
@@ -111,7 +120,7 @@ pub(super) async fn run_merge_task(
     // Main merge loop
     while !stop_flag.load(Ordering::SeqCst) && active_sources > 0 {
         // Use timeout to allow periodic emission even with slow sources
-        match tokio::time::timeout(std::time::Duration::from_millis(50), rx.recv()).await {
+        match tokio::time::timeout(std::time::Duration::from_millis(MERGE_EMIT_INTERVAL_MS), rx.recv()).await {
             Ok(Some(msg)) => match msg {
                 SourceMessage::Frames(_source_idx, frames) => {
                     // Track frames per bus
@@ -179,7 +188,7 @@ pub(super) async fn run_merge_task(
         }
 
         // Periodically log frames per bus (every 5 seconds)
-        if last_bus_log.elapsed().as_secs() >= 5 && !frames_per_bus.is_empty() {
+        if last_bus_log.elapsed().as_secs() >= BUS_LOG_INTERVAL_SECS && !frames_per_bus.is_empty() {
             let mut bus_counts: Vec<_> = frames_per_bus.iter().collect();
             bus_counts.sort_by_key(|(bus, _)| *bus);
             let counts_str: Vec<String> = bus_counts
@@ -196,9 +205,9 @@ pub(super) async fn run_merge_task(
         // Emit data if we have any and either:
         // - We have a decent batch (>= 100 items)
         // - It's been more than 50ms since last emit
-        let should_emit = last_emit.elapsed().as_millis() >= 50
-            || pending_frames.len() >= 100
-            || pending_bytes.len() >= 256;
+        let should_emit = last_emit.elapsed().as_millis() >= MERGE_EMIT_INTERVAL_MS as u128
+            || pending_frames.len() >= FRAME_BATCH_THRESHOLD
+            || pending_bytes.len() >= BYTE_BATCH_THRESHOLD;
 
         if should_emit {
             // Emit frames if we have any

@@ -21,6 +21,7 @@ import {
 } from '../utils/decoderKnowledge';
 import type { FrameInfo } from './discoveryStore';
 import { useDiscoveryUIStore } from './discoveryUIStore';
+import { ANALYSIS_YIELD_MS } from '../constants';
 
 // Toolbox types
 export type ToolboxView = 'frames' | 'message-order' | 'changes' | 'serial-framing' | 'serial-payload' | 'checksum-discovery';
@@ -298,7 +299,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
     // Allow React to render
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, ANALYSIS_YIELD_MS));
 
     // Lazy load analysis module
     const { analyzeMessageOrder } = await import('../utils/analysis/messageOrderAnalysis');
@@ -342,7 +343,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
 
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, ANALYSIS_YIELD_MS));
 
     const { analyzePayloadsWithMuxDetection, detectMirrorFrames } = await import('../utils/analysis/payloadAnalysis');
 
@@ -422,7 +423,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
   runSerialFramingAnalysis: async (rawBytes) => {
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, ANALYSIS_YIELD_MS));
 
     const { detectFraming } = await import('../utils/analysis/serialFrameAnalysis');
 
@@ -446,7 +447,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
   runSerialPayloadAnalysis: async (frames) => {
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, ANALYSIS_YIELD_MS));
 
     const { analyzeSerialFrameStructure } = await import('../utils/analysis/serialFrameAnalysis');
 
@@ -475,7 +476,7 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     set((state) => ({ toolbox: { ...state.toolbox, isRunning: true } }));
 
     // Allow React to render
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, ANALYSIS_YIELD_MS));
 
     // Lazy load analysis module
     const { discoverChecksums } = await import('../utils/analysis/checksumDiscovery');

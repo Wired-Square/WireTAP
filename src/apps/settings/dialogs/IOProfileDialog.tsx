@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ArrowLeft, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
 import { iconButtonHover } from "../../../styles/buttonStyles";
+import { PROBE_DEBOUNCE_MS } from "../../../constants";
 import Dialog from "../../../components/Dialog";
 import type { IOProfile } from "../stores/settingsStore";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -234,7 +235,7 @@ export default function IOProfileDialog({
       // Debounce to avoid probing while user is still changing settings
       const timer = setTimeout(() => {
         probeSlcan();
-      }, 500);
+      }, PROBE_DEBOUNCE_MS);
       return () => clearTimeout(timer);
     } else if (profileForm.kind === "slcan") {
       setSlcanProbeState("idle");
@@ -318,7 +319,7 @@ export default function IOProfileDialog({
     if (profileForm.kind === "gs_usb" && (platformIsWindows || platformIsMacos) && (profileForm.connection.bus || profileForm.connection.address)) {
       const timer = setTimeout(() => {
         probeGsUsb();
-      }, 500);
+      }, PROBE_DEBOUNCE_MS);
       return () => clearTimeout(timer);
     } else if (profileForm.kind === "gs_usb") {
       setGsUsbProbeState("idle");

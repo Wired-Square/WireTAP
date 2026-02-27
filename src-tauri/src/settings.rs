@@ -119,6 +119,20 @@ pub struct AppSettings {
     /// Buffer storage backend ("sqlite" is the only option for now)
     #[serde(default = "default_buffer_storage")]
     pub buffer_storage: String,
+
+    // Decoder buffer limits
+    #[serde(default = "default_decoder_max_unmatched_frames")]
+    pub decoder_max_unmatched_frames: u32,
+    #[serde(default = "default_decoder_max_filtered_frames")]
+    pub decoder_max_filtered_frames: u32,
+    #[serde(default = "default_decoder_max_decoded_frames")]
+    pub decoder_max_decoded_frames: u32,
+    #[serde(default = "default_decoder_max_decoded_per_source")]
+    pub decoder_max_decoded_per_source: u32,
+
+    // Transmit limits
+    #[serde(default = "default_transmit_max_history")]
+    pub transmit_max_history: u32,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -252,6 +266,25 @@ fn default_buffer_storage() -> String {
     "sqlite".to_string()
 }
 
+// Decoder buffer limit defaults
+fn default_decoder_max_unmatched_frames() -> u32 {
+    1000
+}
+fn default_decoder_max_filtered_frames() -> u32 {
+    1000
+}
+fn default_decoder_max_decoded_frames() -> u32 {
+    500
+}
+fn default_decoder_max_decoded_per_source() -> u32 {
+    2000
+}
+
+// Transmit limit defaults
+fn default_transmit_max_history() -> u32 {
+    1000
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         // Get platform-specific documents directory
@@ -315,6 +348,13 @@ impl Default for AppSettings {
             // Buffer persistence
             clear_buffers_on_start: default_clear_buffers_on_start(),
             buffer_storage: default_buffer_storage(),
+            // Decoder buffer limits
+            decoder_max_unmatched_frames: default_decoder_max_unmatched_frames(),
+            decoder_max_filtered_frames: default_decoder_max_filtered_frames(),
+            decoder_max_decoded_frames: default_decoder_max_decoded_frames(),
+            decoder_max_decoded_per_source: default_decoder_max_decoded_per_source(),
+            // Transmit limits
+            transmit_max_history: default_transmit_max_history(),
         }
     }
 }
@@ -385,6 +425,13 @@ impl AppSettings {
             // Buffer persistence
             clear_buffers_on_start: default_clear_buffers_on_start(),
             buffer_storage: default_buffer_storage(),
+            // Decoder buffer limits
+            decoder_max_unmatched_frames: default_decoder_max_unmatched_frames(),
+            decoder_max_filtered_frames: default_decoder_max_filtered_frames(),
+            decoder_max_decoded_frames: default_decoder_max_decoded_frames(),
+            decoder_max_decoded_per_source: default_decoder_max_decoded_per_source(),
+            // Transmit limits
+            transmit_max_history: default_transmit_max_history(),
         })
     }
 }

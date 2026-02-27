@@ -14,6 +14,9 @@ use std::sync::{mpsc as std_mpsc, Arc, Mutex};
 use tauri::AppHandle;
 use tokio::sync::mpsc;
 
+/// Capacity for the async frame/bytes channel between source readers and the merge task.
+const SOURCE_CHANNEL_CAPACITY: usize = 1024;
+
 use super::gvret::{encode_gvret_frame, validate_gvret_frame};
 #[cfg(not(target_os = "ios"))]
 use super::slcan::encode_transmit_frame as encode_slcan_frame;
@@ -110,7 +113,7 @@ impl MultiSourceReader {
 
         let session_traits = validation.session_traits.unwrap();
 
-        let (tx, rx) = mpsc::channel(1024);
+        let (tx, rx) = mpsc::channel(SOURCE_CHANNEL_CAPACITY);
 
         // Build transmit routing table: output_bus -> (source_idx, device_bus, kind)
         let mut transmit_routes = HashMap::new();
@@ -361,7 +364,7 @@ impl IODevice for MultiSourceReader {
                 "[MultiSourceReader] Receiver was consumed, recreating channel for session '{}'",
                 self.session_id
             );
-            let (tx, rx) = mpsc::channel(1024);
+            let (tx, rx) = mpsc::channel(SOURCE_CHANNEL_CAPACITY);
             self.tx = tx;
             self.rx = Some(rx);
         }
@@ -471,7 +474,7 @@ impl IODevice for MultiSourceReader {
         }
 
         // Recreate the channel so the session can be started again
-        let (tx, rx) = mpsc::channel(1024);
+        let (tx, rx) = mpsc::channel(SOURCE_CHANNEL_CAPACITY);
         self.tx = tx;
         self.rx = Some(rx);
 

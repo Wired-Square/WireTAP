@@ -6,11 +6,17 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **Centralise hard-coded constants**: Extract 9 duplicated frontend constants (timing intervals, locales, debounce values) into `constants.ts` and update ~12 consuming files. Extract 5 duplicated Rust playback-pacing constants into `io/timeline/pacing.rs` and update `buffer.rs`/`csv.rs`. Name inline magic numbers in `merge.rs`, `multi_source/mod.rs`, and `nusb_driver.rs`.
+
 - **Centralise duplicated utilities**: Replace local `byteToAscii` in Decoder with shared import from `byteUtils`, use `formatFrameId` in Transmit history instead of inline hex formatting, and remove redundant selection handler wrappers in Decoder and Discovery (now call `useSelectionSetHandlers` directly).
 
 - **CSV exports use shared builder**: Transmit history, frame dump, serial bytes, and graph panel CSV exports now use the centralised `csvBuilder` utility for proper field escaping. Previously these paths built CSV manually, risking malformed output if fields contained commas or quotes.
 
 ### Added
+
+- **Configurable decoder and transmit buffer limits**: Five new settings under Settings → Buffers: max unmatched frames, max filtered frames, max decoded frames, max decoded per source, and transmit max history. Decoder and Transmit stores now read limits from settings instead of hard-coded constants.
+
+- **Hard-coded values audit**: Reference document at `src/docs/hardcoded-values-audit.md` cataloguing all hard-coded values across the codebase, organised into four tiers (duplicates addressed, standalone constants, future setting candidates, protocol constants).
 
 - **Query CSV export**: Export button in the Query app now saves results as CSV via the native file dialog. All 9 query types have dedicated CSV formatters using the new shared `csvBuilder` utility.
 

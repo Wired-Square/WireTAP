@@ -32,6 +32,7 @@ import {
   borderDefault,
   hoverBg,
 } from "../../../styles";
+import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 
 /** Format timestamp as HH:MM:SS.mmm */
 function formatTime(timestamp: number): string {
@@ -81,7 +82,7 @@ export default function SessionLogView() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT_MS);
     } catch (e) {
       console.error("Failed to copy log:", e);
     }

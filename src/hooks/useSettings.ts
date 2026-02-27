@@ -11,6 +11,11 @@ import {
   DEFAULT_CLEAR_BUFFERS_ON_START,
   DEFAULT_DISCOVERY_HISTORY_BUFFER,
   DEFAULT_QUERY_RESULT_LIMIT,
+  DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
+  DEFAULT_DECODER_MAX_FILTERED_FRAMES,
+  DEFAULT_DECODER_MAX_DECODED_FRAMES,
+  DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+  DEFAULT_TRANSMIT_MAX_HISTORY,
 } from '../apps/settings/stores/settingsStore';
 
 export interface IOProfile {
@@ -128,6 +133,13 @@ export interface AppSettings {
   clear_buffers_on_start?: boolean;
   /** Buffer storage backend ("sqlite" is the only option for now) */
   buffer_storage?: string;
+  // Decoder buffer limits
+  decoder_max_unmatched_frames?: number;
+  decoder_max_filtered_frames?: number;
+  decoder_max_decoded_frames?: number;
+  decoder_max_decoded_per_source?: number;
+  // Transmit limits
+  transmit_max_history?: number;
 }
 
 /**
@@ -184,6 +196,13 @@ function normalizeSettings(
     // Buffer persistence
     clear_buffers_on_start: settings.clear_buffers_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
     buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
+    // Decoder buffer limits
+    decoder_max_unmatched_frames: settings.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
+    decoder_max_filtered_frames: settings.decoder_max_filtered_frames ?? DEFAULT_DECODER_MAX_FILTERED_FRAMES,
+    decoder_max_decoded_frames: settings.decoder_max_decoded_frames ?? DEFAULT_DECODER_MAX_DECODED_FRAMES,
+    decoder_max_decoded_per_source: settings.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+    // Transmit limits
+    transmit_max_history: settings.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
   };
 }
 

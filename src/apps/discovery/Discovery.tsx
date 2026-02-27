@@ -11,6 +11,7 @@ import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed } from "../../
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
 import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
+import { REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import AppLayout from "../../components/AppLayout";
 import DiscoveryTopBar from "./views/DiscoveryTopBar";
 import DiscoveryFramesView from "./views/DiscoveryFramesView";
@@ -511,7 +512,7 @@ export default function Discovery() {
     setRealtimeClock(Date.now() / 1000);
     const interval = setInterval(() => {
       setRealtimeClock(Date.now() / 1000);
-    }, 1000);
+    }, REALTIME_CLOCK_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [isStreaming, isRealtime]);
 

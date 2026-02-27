@@ -4,6 +4,7 @@
 // results display, and query queue.
 
 import { create } from "zustand";
+import { REFRESH_ACTIVITY_DELAY_MS } from "../../../constants";
 import {
   queryByteChanges,
   queryFrameChanges,
@@ -954,7 +955,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       const success = await cancelBackend(profileId, pid);
       if (success) {
         // Refresh activity to show updated state
-        setTimeout(() => get().refreshActivity(profileId), 500);
+        setTimeout(() => get().refreshActivity(profileId), REFRESH_ACTIVITY_DELAY_MS);
       }
       return success;
     } catch (e) {
@@ -968,7 +969,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       const success = await terminateBackend(profileId, pid);
       if (success) {
         // Refresh activity to show updated state
-        setTimeout(() => get().refreshActivity(profileId), 500);
+        setTimeout(() => get().refreshActivity(profileId), REFRESH_ACTIVITY_DELAY_MS);
       }
       return success;
     } catch (e) {

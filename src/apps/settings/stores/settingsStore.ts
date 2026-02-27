@@ -35,6 +35,11 @@ export const DEFAULT_CLEAR_BUFFERS_ON_START = true;
 export const DEFAULT_DISCOVERY_HISTORY_BUFFER = 100_000;
 export const DEFAULT_QUERY_RESULT_LIMIT = 10_000;
 export const DEFAULT_GRAPH_BUFFER_SIZE = 10_000;
+export const DEFAULT_DECODER_MAX_UNMATCHED_FRAMES = 1000;
+export const DEFAULT_DECODER_MAX_FILTERED_FRAMES = 1000;
+export const DEFAULT_DECODER_MAX_DECODED_FRAMES = 500;
+export const DEFAULT_DECODER_MAX_DECODED_PER_SOURCE = 2000;
+export const DEFAULT_TRANSMIT_MAX_HISTORY = 1000;
 
 export interface DirectoryValidation {
   exists: boolean;
@@ -113,6 +118,11 @@ interface AppSettings {
   query_result_limit?: number;
   session_manager_stats_interval?: number;
   graph_buffer_size?: number;
+  decoder_max_unmatched_frames?: number;
+  decoder_max_filtered_frames?: number;
+  decoder_max_decoded_frames?: number;
+  decoder_max_decoded_per_source?: number;
+  transmit_max_history?: number;
   // Theme settings
   theme_mode?: ThemeMode;
   theme_bg_primary_light?: string;
@@ -301,6 +311,11 @@ interface SettingsState {
     discoveryHistoryBuffer: number;
     queryResultLimit: number;
     graphBufferSize: number;
+    decoderMaxUnmatchedFrames: number;
+    decoderMaxFilteredFrames: number;
+    decoderMaxDecodedFrames: number;
+    decoderMaxDecodedPerSource: number;
+    transmitMaxHistory: number;
   };
 
   // General settings
@@ -385,6 +400,11 @@ interface SettingsState {
   setDiscoveryHistoryBuffer: (buffer: number) => void;
   setQueryResultLimit: (limit: number) => void;
   setGraphBufferSize: (size: number) => void;
+  setDecoderMaxUnmatchedFrames: (value: number) => void;
+  setDecoderMaxFilteredFrames: (value: number) => void;
+  setDecoderMaxDecodedFrames: (value: number) => void;
+  setDecoderMaxDecodedPerSource: (value: number) => void;
+  setTransmitMaxHistory: (value: number) => void;
 
   // Actions - General
   setDefaultFrameType: (type: DefaultFrameType) => void;
@@ -455,6 +475,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     discoveryHistoryBuffer: DEFAULT_DISCOVERY_HISTORY_BUFFER,
     queryResultLimit: DEFAULT_QUERY_RESULT_LIMIT,
     graphBufferSize: DEFAULT_GRAPH_BUFFER_SIZE,
+    decoderMaxUnmatchedFrames: DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
+    decoderMaxFilteredFrames: DEFAULT_DECODER_MAX_FILTERED_FRAMES,
+    decoderMaxDecodedFrames: DEFAULT_DECODER_MAX_DECODED_FRAMES,
+    decoderMaxDecodedPerSource: DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+    transmitMaxHistory: DEFAULT_TRANSMIT_MAX_HISTORY,
   },
 
   general: {
@@ -533,6 +558,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         query_result_limit: settings.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
         session_manager_stats_interval: settings.session_manager_stats_interval ?? 60,
         graph_buffer_size: settings.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
+        decoder_max_unmatched_frames: settings.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
+        decoder_max_filtered_frames: settings.decoder_max_filtered_frames ?? DEFAULT_DECODER_MAX_FILTERED_FRAMES,
+        decoder_max_decoded_frames: settings.decoder_max_decoded_frames ?? DEFAULT_DECODER_MAX_DECODED_FRAMES,
+        decoder_max_decoded_per_source: settings.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+        transmit_max_history: settings.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
         default_frame_type: (settings.default_frame_type as DefaultFrameType) ?? 'can',
         // Theme settings
         theme_mode: (settings.theme_mode as ThemeMode) ?? 'auto',
@@ -629,6 +659,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           discoveryHistoryBuffer: normalized.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
           queryResultLimit: normalized.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
           graphBufferSize: normalized.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
+          decoderMaxUnmatchedFrames: normalized.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
+          decoderMaxFilteredFrames: normalized.decoder_max_filtered_frames ?? DEFAULT_DECODER_MAX_FILTERED_FRAMES,
+          decoderMaxDecodedFrames: normalized.decoder_max_decoded_frames ?? DEFAULT_DECODER_MAX_DECODED_FRAMES,
+          decoderMaxDecodedPerSource: normalized.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+          transmitMaxHistory: normalized.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
         },
         general: {
           defaultFrameType: normalized.default_frame_type ?? 'can',
@@ -734,6 +769,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         discovery_history_buffer: buffers.discoveryHistoryBuffer,
         query_result_limit: buffers.queryResultLimit,
         graph_buffer_size: buffers.graphBufferSize,
+        decoder_max_unmatched_frames: buffers.decoderMaxUnmatchedFrames,
+        decoder_max_filtered_frames: buffers.decoderMaxFilteredFrames,
+        decoder_max_decoded_frames: buffers.decoderMaxDecodedFrames,
+        decoder_max_decoded_per_source: buffers.decoderMaxDecodedPerSource,
+        transmit_max_history: buffers.transmitMaxHistory,
         session_manager_stats_interval: general.sessionManagerStatsInterval,
         // Power management
         prevent_idle_sleep: general.preventIdleSleep,
@@ -807,6 +847,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       discovery_history_buffer: buffers.discoveryHistoryBuffer,
       query_result_limit: buffers.queryResultLimit,
       graph_buffer_size: buffers.graphBufferSize,
+      decoder_max_unmatched_frames: buffers.decoderMaxUnmatchedFrames,
+      decoder_max_filtered_frames: buffers.decoderMaxFilteredFrames,
+      decoder_max_decoded_frames: buffers.decoderMaxDecodedFrames,
+      decoder_max_decoded_per_source: buffers.decoderMaxDecodedPerSource,
+      transmit_max_history: buffers.transmitMaxHistory,
       session_manager_stats_interval: general.sessionManagerStatsInterval,
       // Power management
       prevent_idle_sleep: general.preventIdleSleep,
@@ -1157,6 +1202,41 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setGraphBufferSize: (size) => {
     set((state) => ({
       buffers: { ...state.buffers, graphBufferSize: size },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setDecoderMaxUnmatchedFrames: (value) => {
+    set((state) => ({
+      buffers: { ...state.buffers, decoderMaxUnmatchedFrames: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setDecoderMaxFilteredFrames: (value) => {
+    set((state) => ({
+      buffers: { ...state.buffers, decoderMaxFilteredFrames: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setDecoderMaxDecodedFrames: (value) => {
+    set((state) => ({
+      buffers: { ...state.buffers, decoderMaxDecodedFrames: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setDecoderMaxDecodedPerSource: (value) => {
+    set((state) => ({
+      buffers: { ...state.buffers, decoderMaxDecodedPerSource: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setTransmitMaxHistory: (value) => {
+    set((state) => ({
+      buffers: { ...state.buffers, transmitMaxHistory: value },
     }));
     scheduleSave(get().saveSettings);
   },

@@ -2,6 +2,7 @@
 
 import type { Endianness, SignalFormat } from "../types/catalog";
 import { extractBits } from "./bits";
+import { LOCALE_ISO_LIKE } from "../constants";
 import Decimal from "decimal.js-light";
 
 export type SignalDefinition = {
@@ -178,7 +179,7 @@ export function decodeSignal(
         display = `Invalid (${timestamp})`;
       } else {
         // Format as ISO-like local time: YYYY-MM-DD HH:MM:SS
-        display = date.toLocaleString("sv-SE").replace("T", " ");
+        display = date.toLocaleString(LOCALE_ISO_LIKE).replace("T", " ");
       }
     } catch {
       display = `Invalid (${timestamp})`;

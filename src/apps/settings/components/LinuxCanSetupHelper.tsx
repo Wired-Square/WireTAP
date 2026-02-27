@@ -8,6 +8,7 @@ import { Copy, Check, Terminal } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { getCanSetupCommand } from "../../../api/gs_usb";
 import { alertWarning, helpText } from "../../../styles";
+import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 
 interface Props {
   /** CAN interface name (e.g., "can0") */
@@ -36,7 +37,7 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
     try {
       await navigator.clipboard.writeText(setupCommand);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT_MS);
     } catch {
       // Fallback for older browsers
       const textArea = document.createElement("textarea");
@@ -46,7 +47,7 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
       document.execCommand("copy");
       document.body.removeChild(textArea);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), COPY_FEEDBACK_TIMEOUT_MS);
     }
   };
 

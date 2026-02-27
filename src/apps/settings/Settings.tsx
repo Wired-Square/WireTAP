@@ -95,6 +95,16 @@ export default function Settings() {
   const setQueryResultLimit = useSettingsStore((s) => s.setQueryResultLimit);
   const graphBufferSize = useSettingsStore((s) => s.buffers.graphBufferSize);
   const setGraphBufferSize = useSettingsStore((s) => s.setGraphBufferSize);
+  const decoderMaxUnmatchedFrames = useSettingsStore((s) => s.buffers.decoderMaxUnmatchedFrames);
+  const setDecoderMaxUnmatchedFrames = useSettingsStore((s) => s.setDecoderMaxUnmatchedFrames);
+  const decoderMaxFilteredFrames = useSettingsStore((s) => s.buffers.decoderMaxFilteredFrames);
+  const setDecoderMaxFilteredFrames = useSettingsStore((s) => s.setDecoderMaxFilteredFrames);
+  const decoderMaxDecodedFrames = useSettingsStore((s) => s.buffers.decoderMaxDecodedFrames);
+  const setDecoderMaxDecodedFrames = useSettingsStore((s) => s.setDecoderMaxDecodedFrames);
+  const decoderMaxDecodedPerSource = useSettingsStore((s) => s.buffers.decoderMaxDecodedPerSource);
+  const setDecoderMaxDecodedPerSource = useSettingsStore((s) => s.setDecoderMaxDecodedPerSource);
+  const transmitMaxHistory = useSettingsStore((s) => s.buffers.transmitMaxHistory);
+  const setTransmitMaxHistory = useSettingsStore((s) => s.setTransmitMaxHistory);
 
   // General
   const defaultFrameType = useSettingsStore((s) => s.general.defaultFrameType);
@@ -280,6 +290,16 @@ export default function Settings() {
               onChangeQueryResultLimit={setQueryResultLimit}
               graphBufferSize={graphBufferSize}
               onChangeGraphBufferSize={setGraphBufferSize}
+              decoderMaxUnmatchedFrames={decoderMaxUnmatchedFrames}
+              onChangeDecoderMaxUnmatchedFrames={setDecoderMaxUnmatchedFrames}
+              decoderMaxFilteredFrames={decoderMaxFilteredFrames}
+              onChangeDecoderMaxFilteredFrames={setDecoderMaxFilteredFrames}
+              decoderMaxDecodedFrames={decoderMaxDecodedFrames}
+              onChangeDecoderMaxDecodedFrames={setDecoderMaxDecodedFrames}
+              decoderMaxDecodedPerSource={decoderMaxDecodedPerSource}
+              onChangeDecoderMaxDecodedPerSource={setDecoderMaxDecodedPerSource}
+              transmitMaxHistory={transmitMaxHistory}
+              onChangeTransmitMaxHistory={setTransmitMaxHistory}
             />
           )}
 

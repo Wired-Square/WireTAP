@@ -12,6 +12,7 @@ import {
   getBufferMetadataById,
   type BufferFrame,
 } from "../../../api/buffer";
+import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
 import type { FrameMessage } from "../../../types/frame";
 
 /** Frame with pre-computed hex bytes for display */
@@ -90,7 +91,7 @@ export function useBufferFrameView(
     selectedFrames,
     pageSize,
     tailSize = 50,
-    pollIntervalMs = 200,
+    pollIntervalMs = BUFFER_POLL_INTERVAL_MS,
     isBufferPlayback = false,
     followTimeUs,
   } = options;

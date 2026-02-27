@@ -13,6 +13,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc as std_mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+/// Timeout for USB bulk-in transfer reads.
+const BULK_TRANSFER_TIMEOUT: Duration = Duration::from_millis(50);
 use tauri::AppHandle;
 
 use super::{
@@ -625,7 +628,7 @@ async fn run_gs_usb_stream(
 
         // Wait for next transfer completion with timeout
         let read_result = tokio::time::timeout(
-            Duration::from_millis(50),
+            BULK_TRANSFER_TIMEOUT,
             bulk_in.next_complete(),
         )
         .await;
@@ -1152,7 +1155,7 @@ pub async fn run_source(
     // Read loop
     while !stop_flag.load(Ordering::Relaxed) {
         let read_result =
-            tokio::time::timeout(Duration::from_millis(50), bulk_in.next_complete()).await;
+            tokio::time::timeout(BULK_TRANSFER_TIMEOUT, bulk_in.next_complete()).await;
 
         match read_result {
             Ok(completion) => match completion.status {

@@ -12,6 +12,7 @@ import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { mergeSerialConfig } from "../../utils/sessionConfigMerge";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { tlog } from "../../api/settings";
+import { UI_UPDATE_INTERVAL_MS } from "../../constants";
 import { catalogFilenameFromPath } from "../../utils/graphLayouts";
 import { onStoreChanged } from "../../api/store";
 import AppLayout from "../../components/AppLayout";
@@ -133,7 +134,7 @@ export default function Graph() {
   const pendingValuesRef = useRef<SignalValueEntry[]>([]);
   const flushScheduledRef = useRef(false);
   const pushSignalValuesRef = useRef(pushSignalValues);
-  const UI_UPDATE_INTERVAL_MS = 100;
+  // UI_UPDATE_INTERVAL_MS imported from constants
 
   useEffect(() => {
     pushSignalValuesRef.current = pushSignalValues;
