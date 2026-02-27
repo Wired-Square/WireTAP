@@ -126,6 +126,22 @@ export interface SignalValueEntry {
   timestamp: number;
 }
 
+/** Parameters for a hypothesis candidate signal */
+export interface HypothesisParams {
+  /** Bit-level start offset within the frame payload */
+  startBit: number;
+  /** Number of bits to extract */
+  bitLength: number;
+  /** Endianness for extraction */
+  endianness: 'little' | 'big';
+  /** Whether the extracted value is signed */
+  signed: boolean;
+  /** Scale factor: physicalValue = rawValue * factor + offset */
+  factor: number;
+  /** Offset: physicalValue = rawValue * factor + offset */
+  offset: number;
+}
+
 // ─────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────
@@ -176,12 +192,13 @@ let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function scheduleAutoSave() {
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(async () => {
-    const { panels, layout, catalogPath } = useGraphStore.getState();
+    const { panels, layout, catalogPath, candidateRegistry } = useGraphStore.getState();
     if (panels.length > 0) {
       await storeSet(AUTO_SAVE_KEY, {
         catalogFilename: catalogFilenameFromPath(catalogPath),
         panels,
         layout,
+        candidateRegistry: Array.from(candidateRegistry.entries()),
         savedAt: Date.now(),
       });
     }
@@ -227,6 +244,9 @@ interface GraphState {
   /** Bit change counters for heatmap panels: key = frameId */
   bitChangeCounts: Map<number, { counts: Uint32Array; lastBytes: Uint8Array; totalFrames: number }>;
 
+  /** Registry of hypothesis signal parameters, keyed by hyp_* signal name */
+  candidateRegistry: Map<string, HypothesisParams>;
+
   // ── Actions ──
   loadCatalog: (path: string) => Promise<void>;
   initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
@@ -266,6 +286,10 @@ interface GraphState {
   // Raw byte tracking (flow view / heatmap)
   recordFrameId: (frameId: number) => void;
   recordBitChanges: (frameId: number, bytes: number[]) => void;
+
+  // Hypothesis candidate registry
+  registerHypotheses: (entries: Array<{ signalName: string; params: HypothesisParams }>) => void;
+  clearHypothesisRegistry: () => void;
 }
 
 export const useGraphStore = create<GraphState>((set, get) => ({
@@ -290,6 +314,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   zoomResetVersion: 0,
   discoveredFrameIds: new Set(),
   bitChangeCounts: new Map(),
+  candidateRegistry: new Map(),
 
   // ── Actions ──
 
@@ -680,9 +705,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   saveCurrentLayout: async (name) => {
-    const { catalogPath, panels, layout } = get();
+    const { catalogPath, panels, layout, candidateRegistry } = get();
     const filename = catalogFilenameFromPath(catalogPath);
-    await saveGraphLayout(name, filename, panels, layout);
+    await saveGraphLayout(name, filename, panels, layout, candidateRegistry);
     const layouts = await getAllGraphLayouts();
     set({ savedLayouts: layouts });
   },
@@ -695,6 +720,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       dataVersion: 0,
       discoveredFrameIds: new Set(),
       bitChangeCounts: new Map(),
+      candidateRegistry: savedLayout.candidateRegistry
+        ? new Map(savedLayout.candidateRegistry)
+        : new Map(),
     });
     scheduleAutoSave();
   },
@@ -706,11 +734,18 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   restoreLastSession: async () => {
-    const saved = await storeGet<{ panels: GraphPanel[]; layout: LayoutItem[] }>(AUTO_SAVE_KEY);
+    const saved = await storeGet<{
+      panels: GraphPanel[];
+      layout: LayoutItem[];
+      candidateRegistry?: [string, HypothesisParams][];
+    }>(AUTO_SAVE_KEY);
     if (saved && saved.panels.length > 0) {
       set({
         panels: saved.panels,
         layout: saved.layout,
+        candidateRegistry: saved.candidateRegistry
+          ? new Map(saved.candidateRegistry)
+          : new Map(),
       });
     }
   },
@@ -807,6 +842,21 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       entry.lastBytes[byteIdx] = bytes[byteIdx];
     }
     entry.totalFrames++;
+  },
+
+  registerHypotheses: (entries) => {
+    const { candidateRegistry } = get();
+    const next = new Map(candidateRegistry);
+    for (const { signalName, params } of entries) {
+      next.set(signalName, params);
+    }
+    set({ candidateRegistry: next });
+    scheduleAutoSave();
+  },
+
+  clearHypothesisRegistry: () => {
+    set({ candidateRegistry: new Map() });
+    scheduleAutoSave();
   },
 }));
 

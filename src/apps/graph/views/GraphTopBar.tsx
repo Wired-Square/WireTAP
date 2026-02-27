@@ -1,6 +1,6 @@
 // ui/src/apps/graph/views/GraphTopBar.tsx
 
-import { BarChart3, Plus, LineChart, Gauge, List, Save, Layout, X, AlertTriangle, Glasses, Waves, Grid3X3, BarChart2, Sparkles } from "lucide-react";
+import { BarChart3, Plus, LineChart, Gauge, List, Save, Layout, X, AlertTriangle, Glasses, Waves, Grid3X3, BarChart2, Sparkles, FlaskConical } from "lucide-react";
 import AppTopBar from "../../../components/AppTopBar";
 import { iconButtonBase, iconButtonHoverDanger, toggleButtonClass } from "../../../styles/buttonStyles";
 import { inputBase } from "../../../styles/inputStyles";
@@ -57,6 +57,7 @@ interface Props {
 
   // Candidate signals
   onOpenCandidates?: () => void;
+  onOpenHypothesisExplorer?: () => void;
 }
 
 export default function GraphTopBar({
@@ -86,12 +87,17 @@ export default function GraphTopBar({
   rawViewMode,
   onToggleRawView,
   onOpenCandidates,
+  onOpenHypothesisExplorer,
 }: Props) {
   const addPanel = useGraphStore((s) => s.addPanel);
 
   // Add panel menu
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
+
+  // Candidate signals menu
+  const [candidateMenuOpen, setCandidateMenuOpen] = useState(false);
+  const candidateMenuRef = useRef<HTMLDivElement>(null);
 
   // Layout menu
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
@@ -101,7 +107,7 @@ export default function GraphTopBar({
 
   // Close menus on outside click
   useEffect(() => {
-    if (!addMenuOpen && !layoutMenuOpen) return;
+    if (!addMenuOpen && !layoutMenuOpen && !candidateMenuOpen) return;
     const handler = (e: MouseEvent) => {
       if (addMenuOpen && addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
         setAddMenuOpen(false);
@@ -111,10 +117,13 @@ export default function GraphTopBar({
         setIsSaving(false);
         setSaveName("");
       }
+      if (candidateMenuOpen && candidateMenuRef.current && !candidateMenuRef.current.contains(e.target as Node)) {
+        setCandidateMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [addMenuOpen, layoutMenuOpen]);
+  }, [addMenuOpen, layoutMenuOpen, candidateMenuOpen]);
 
   const handleAddPanel = (type: PanelType) => {
     addPanel(type);
@@ -303,15 +312,45 @@ export default function GraphTopBar({
         )}
       </div>
 
-      {/* Candidate signals wizard */}
-      {onOpenCandidates && (
-        <button
-          onClick={onOpenCandidates}
-          className={iconButtonBase}
-          title="Generate candidate signal panels"
-        >
-          <Sparkles className={iconMd} />
-        </button>
+      {/* Candidate signals dropdown */}
+      {(onOpenCandidates || onOpenHypothesisExplorer) && (
+        <div ref={candidateMenuRef} className="relative">
+          <button
+            onClick={() => setCandidateMenuOpen(!candidateMenuOpen)}
+            className={iconButtonBase}
+            title="Generate candidate signal panels"
+          >
+            <Sparkles className={iconMd} />
+          </button>
+          {candidateMenuOpen && (
+            <div className={menuContainer}>
+              {onOpenCandidates && (
+                <button
+                  onClick={() => {
+                    setCandidateMenuOpen(false);
+                    onOpenCandidates();
+                  }}
+                  className={menuItem}
+                >
+                  <Sparkles className={iconSm} />
+                  Quick Candidates
+                </button>
+              )}
+              {onOpenHypothesisExplorer && (
+                <button
+                  onClick={() => {
+                    setCandidateMenuOpen(false);
+                    onOpenHypothesisExplorer();
+                  }}
+                  className={menuItem}
+                >
+                  <FlaskConical className={iconSm} />
+                  Hypothesis Explorer
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Raw view toggle */}

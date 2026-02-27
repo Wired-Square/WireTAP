@@ -4,7 +4,7 @@
 // Uses the centralised store API (ui-state.json) for multi-window safety.
 
 import { storeGet, storeSet } from '../api/store';
-import type { GraphPanel, LayoutItem } from '../stores/graphStore';
+import type { GraphPanel, LayoutItem, HypothesisParams } from '../stores/graphStore';
 
 const GRAPH_LAYOUTS_KEY = 'graph.layouts';
 
@@ -15,6 +15,8 @@ export interface GraphLayout {
   catalogFilename: string;
   panels: GraphPanel[];
   layout: LayoutItem[];
+  /** Hypothesis candidate registry for hyp_* signals */
+  candidateRegistry?: [string, HypothesisParams][];
   createdAt: number;
   updatedAt: number;
 }
@@ -41,6 +43,7 @@ export async function saveGraphLayout(
   catalogFilename: string,
   panels: GraphPanel[],
   layout: LayoutItem[],
+  candidateRegistry?: Map<string, HypothesisParams>,
 ): Promise<GraphLayout> {
   const layouts = await getAllGraphLayouts();
   const newLayout: GraphLayout = {
@@ -49,6 +52,9 @@ export async function saveGraphLayout(
     catalogFilename,
     panels: structuredClone(panels),
     layout: structuredClone(layout),
+    candidateRegistry: candidateRegistry && candidateRegistry.size > 0
+      ? Array.from(candidateRegistry.entries())
+      : undefined,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

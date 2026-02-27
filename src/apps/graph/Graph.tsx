@@ -23,6 +23,7 @@ import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
 import SignalPickerDialog from "./dialogs/SignalPickerDialog";
 import PanelConfigDialog from "./dialogs/PanelConfigDialog";
 import CandidateSignalsDialog from "./dialogs/CandidateSignalsDialog";
+import HypothesisExplorerDialog from "./dialogs/HypothesisExplorerDialog";
 import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { decodeSignal } from "../../utils/signalDecode";
@@ -51,6 +52,7 @@ export default function Graph() {
     'signalPicker',
     'panelConfig',
     'candidateSignals',
+    'hypothesisExplorer',
     'decoderConflict',
   ] as const);
   const [decoderConflictOptions, setDecoderConflictOptions] = useState<DecoderConflictOption[]>([]);
@@ -220,6 +222,30 @@ export default function Graph() {
             value,
             timestamp,
           });
+        }
+      }
+
+      // Hypothesis signal decode (hyp_* prefix — uses candidateRegistry)
+      if (store.candidateRegistry.size > 0) {
+        for (const panel of store.panels) {
+          if (panel.type !== 'line-chart' && panel.type !== 'histogram') continue;
+          for (const sig of panel.signals) {
+            if (sig.frameId !== maskedFrameId) continue;
+            if (!sig.signalName.startsWith('hyp_')) continue;
+            const params = store.candidateRegistry.get(sig.signalName);
+            if (!params) continue;
+            if (params.startBit + params.bitLength > f.bytes.length * 8) continue;
+            const raw = extractBits(f.bytes, params.startBit, params.bitLength, params.endianness, params.signed);
+            const value = raw * params.factor + params.offset;
+            if (isFinite(value)) {
+              pendingValuesRef.current.push({
+                frameId: maskedFrameId,
+                signalName: sig.signalName,
+                value,
+                timestamp,
+              });
+            }
+          }
         }
       }
 
@@ -505,6 +531,7 @@ export default function Graph() {
           rawViewMode={rawViewMode}
           onToggleRawView={handleToggleRawView}
           onOpenCandidates={() => dialogs.candidateSignals.open()}
+          onOpenHypothesisExplorer={() => dialogs.hypothesisExplorer.open()}
         />
       }
     >
@@ -562,6 +589,11 @@ export default function Graph() {
       <CandidateSignalsDialog
         isOpen={dialogs.candidateSignals.isOpen}
         onClose={() => dialogs.candidateSignals.close()}
+      />
+
+      <HypothesisExplorerDialog
+        isOpen={dialogs.hypothesisExplorer.isOpen}
+        onClose={() => dialogs.hypothesisExplorer.close()}
       />
 
       <DecoderConflictDialog
