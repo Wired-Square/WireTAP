@@ -22,6 +22,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **CAN frame header cleanup**: Removed redundant "Configure CAN frame properties" subheader and duplicate frame ID from the CAN frame detail view. Edit and delete buttons moved to the top-level selection header beside the frame title. Shortened mux case action buttons to "+ Signal" and "+ Nested Mux".
+
 - **Inline mux display in frame view**: Selecting a CAN frame with a mux now shows the mux selector as an editable/deletable purple-bordered card, with all mux cases and their signals listed inline below. BitPreview renders for all frames with any signal content (including mux-only frames). "+ Case" and "+ Signal" buttons in the frame header.
 
 - **Mux selector view**: Redesigned with BitPreview byte layout, compact "+ Case" button, and cases showing signal counts and names inline with icons.

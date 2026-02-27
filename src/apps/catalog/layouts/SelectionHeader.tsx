@@ -1,12 +1,15 @@
 // ui/src/apps/catalog/layout/SelectionHeader.tsx
 
-import { Link2, Layers } from "lucide-react";
-import { iconXl, flexRowGap2 } from "../../../styles/spacing";
+import { Link2, Layers, Pencil, Trash2 } from "lucide-react";
+import { iconMd, iconXl, flexRowGap2 } from "../../../styles/spacing";
+import { iconButtonHover, iconButtonHoverDanger } from "../../../styles";
 import type { TomlNode } from "../types";
 
 export type SelectionHeaderProps = {
   selectedNode: TomlNode;
   formatFrameId?: (id: string) => { primary: string; secondary?: string };
+  onEdit?: () => void;
+  onDelete?: () => void;
 };
 
 function labelForNodeType(type: TomlNode["type"]): string {
@@ -40,34 +43,50 @@ function labelForNodeType(type: TomlNode["type"]): string {
   }
 }
 
-export default function SelectionHeader({ selectedNode, formatFrameId }: SelectionHeaderProps) {
+export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, onDelete }: SelectionHeaderProps) {
   const isCanFrame = selectedNode.type === "can-frame";
   const idLabel = isCanFrame && formatFrameId ? formatFrameId(selectedNode.key) : null;
 
   return (
     <div className="mb-6">
-      <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2 flex items-center gap-3">
-        {selectedNode.metadata?.isCopy && (
-          <span title={`Copied from ${selectedNode.metadata?.copyFrom}`}>
-            <Link2 className={`${iconXl} text-[color:var(--accent-primary)]`} />
-          </span>
-        )}
-        {selectedNode.metadata?.isMirror && (
-          <span title={`Mirror of ${selectedNode.metadata?.mirrorOf}`}>
-            <Layers className={`${iconXl} text-[color:var(--accent-purple)]`} />
-          </span>
-        )}
-        {idLabel ? (
-          <span className={flexRowGap2}>
-            <span>{idLabel.primary}</span>
-            {idLabel.secondary && (
-              <span className="text-[color:var(--text-muted)] text-lg">({idLabel.secondary})</span>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] flex items-center gap-3">
+          {selectedNode.metadata?.isCopy && (
+            <span title={`Copied from ${selectedNode.metadata?.copyFrom}`}>
+              <Link2 className={`${iconXl} text-[color:var(--accent-primary)]`} />
+            </span>
+          )}
+          {selectedNode.metadata?.isMirror && (
+            <span title={`Mirror of ${selectedNode.metadata?.mirrorOf}`}>
+              <Layers className={`${iconXl} text-[color:var(--accent-purple)]`} />
+            </span>
+          )}
+          {idLabel ? (
+            <span className={flexRowGap2}>
+              <span>{idLabel.primary}</span>
+              {idLabel.secondary && (
+                <span className="text-[color:var(--text-muted)] text-lg">({idLabel.secondary})</span>
+              )}
+            </span>
+          ) : (
+            selectedNode.key
+          )}
+        </h2>
+        {(onEdit || onDelete) && (
+          <div className="flex gap-2">
+            {onEdit && (
+              <button onClick={onEdit} className={iconButtonHover} title="Edit frame">
+                <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
+              </button>
             )}
-          </span>
-        ) : (
-          selectedNode.key
+            {onDelete && (
+              <button onClick={onDelete} className={iconButtonHoverDanger} title="Delete frame">
+                <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
+              </button>
+            )}
+          </div>
         )}
-      </h2>
+      </div>
 
       <div className={`${flexRowGap2} text-sm text-[color:var(--text-muted)]`}>
         <span className="px-2 py-1 bg-[var(--bg-surface)] rounded">{labelForNodeType(selectedNode.type)}</span>

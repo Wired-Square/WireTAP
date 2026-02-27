@@ -134,7 +134,7 @@ export default function MuxCaseView({
             className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
             title="Add signal"
           >
-            + Add Signal
+            + Signal
           </button>
 
           <button
@@ -142,7 +142,7 @@ export default function MuxCaseView({
             className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
             title="Add nested mux"
           >
-            + Add Nested Mux
+            + Nested Mux
           </button>
 
           {onEditCase && (

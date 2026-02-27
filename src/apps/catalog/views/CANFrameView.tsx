@@ -19,10 +19,6 @@ export type CANFrameViewProps = {
   editingId: boolean;
   editingSignal: boolean;
 
-  // Frame actions
-  onEditFrame: (node: TomlNode) => void;
-  onRequestDeleteFrame: (idKey: string) => void;
-
   // Signal actions
   onAddSignal: (idKey: string) => void;
   onEditSignal: (idKey: string, signalIndex: number, signal: any, parentPath?: string[]) => void;
@@ -41,8 +37,6 @@ export default function CANFrameView({
   catalogContent,
   editingId,
   editingSignal,
-  onEditFrame,
-  onRequestDeleteFrame,
   onAddSignal,
   onEditSignal,
   onRequestDeleteSignal,
@@ -124,39 +118,6 @@ export default function CANFrameView({
 
   return (
     <div className="space-y-6">
-      {/* Header actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <p className="text-sm text-[color:var(--text-secondary)]">Configure CAN frame properties</p>
-          <div className="text-lg font-bold text-[color:var(--text-primary)] flex items-center gap-2">
-            <span>{formattedId.primary}</span>
-            {formattedId.secondary && (
-              <span className="text-[color:var(--text-muted)] text-sm">({formattedId.secondary})</span>
-            )}
-          </div>
-        </div>
-        {!editingId && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => onEditFrame(selectedNode)}
-              className={iconButtonHover}
-              title="Edit frame"
-            >
-              <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
-            </button>
-
-            {/* Pattern A delete */}
-            <button
-              onClick={() => onRequestDeleteFrame(idKey)}
-              className={iconButtonHoverDanger}
-              title="Delete frame"
-            >
-              <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Summary cards (non-edit only) */}
       {!editingId && (
         <div className="grid grid-cols-2 gap-4">

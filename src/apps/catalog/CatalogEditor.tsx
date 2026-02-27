@@ -470,6 +470,8 @@ export default function CatalogEditor() {
                   <SelectionHeader
                     selectedNode={selectedNode}
                     formatFrameId={formatFrameIdForDisplay}
+                    onEdit={selectedNode.type === "can-frame" && !forms.editingId ? () => handlers.handleEditId(selectedNode) : undefined}
+                    onDelete={selectedNode.type === "can-frame" && !forms.editingId ? () => handlers.handleDeleteId(selectedNode.metadata?.idValue || selectedNode.key) : undefined}
                   />
 
                   <EditorViewRouter
@@ -485,8 +487,6 @@ export default function CatalogEditor() {
                       displayFrameIdFormat,
                       editingId: forms.editingId,
                       editingSignal: forms.editingSignal,
-                      onEditFrame: handlers.handleEditId,
-                      onRequestDeleteFrame: handlers.handleDeleteId,
                       onAddSignal: handlers.handleAddSignal,
                       onEditSignal: handlers.handleEditSignal,
                       onRequestDeleteSignal: handlers.requestDeleteSignal,
