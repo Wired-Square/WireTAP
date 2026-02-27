@@ -1,7 +1,7 @@
 // ui/src/hooks/useSelectionSetHandlers.ts
 //
 // Shared selection set handlers: save, load, clear selection sets.
-// Used by Decoder and Discovery via thin app-specific wrappers.
+// Used by Decoder and Discovery directly.
 
 import { useCallback } from "react";
 import {

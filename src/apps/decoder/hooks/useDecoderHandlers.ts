@@ -15,9 +15,9 @@ import {
   type DecoderTimeHandlers,
 } from "./handlers/useDecoderTimeHandlers";
 import {
-  useDecoderSelectionHandlers,
-  type DecoderSelectionHandlers,
-} from "./handlers/useDecoderSelectionHandlers";
+  useSelectionSetHandlers,
+  type SelectionSetHandlers,
+} from "../../../hooks/useSelectionSetHandlers";
 import {
   useDecoderCatalogHandlers,
   type DecoderCatalogHandlers,
@@ -107,7 +107,7 @@ export interface UseDecoderHandlersParams {
 export type DecoderHandlers = DecoderSessionHandlers &
   DecoderPlaybackHandlers &
   DecoderTimeHandlers &
-  DecoderSelectionHandlers &
+  SelectionSetHandlers &
   DecoderCatalogHandlers;
 
 export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHandlers {
@@ -162,15 +162,15 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
   });
 
   // Selection handlers (save, load, clear selection sets)
-  const selectionHandlers = useDecoderSelectionHandlers({
-    frames: params.frames,
+  const selectionHandlers = useSelectionSetHandlers({
+    frameMap: params.frames,
     selectedFrames: params.selectedFrames,
     activeSelectionSetId: params.activeSelectionSetId,
     selectionSetDirty: params.selectionSetDirty,
     setActiveSelectionSet: params.setActiveSelectionSet,
     setSelectionSetDirty: params.setSelectionSetDirty,
     applySelectionSet: params.applySelectionSet,
-    openSaveSelectionSet: params.openSaveSelectionSet,
+    openSaveDialog: params.openSaveSelectionSet,
     onAfterMutate: params.onAfterSelectionSetMutate,
   });
 

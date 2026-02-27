@@ -20,9 +20,9 @@ import {
   type DiscoveryBookmarkHandlers,
 } from "./handlers/useDiscoveryBookmarkHandlers";
 import {
-  useDiscoverySelectionHandlers,
-  type DiscoverySelectionHandlers,
-} from "./handlers/useDiscoverySelectionHandlers";
+  useSelectionSetHandlers,
+  type SelectionSetHandlers,
+} from "../../../hooks/useSelectionSetHandlers";
 import { useTimeHandlers, type TimeHandlers } from "../../../hooks/useTimeHandlers";
 import type { PlaybackSpeed, FrameMessage } from "../../../stores/discoveryStore";
 import type { BufferMetadata, TimestampedByte } from "../../../api/buffer";
@@ -147,7 +147,7 @@ export type DiscoveryHandlers = DiscoverySessionHandlers &
   TimeHandlers &
   DiscoveryExportHandlers &
   DiscoveryBookmarkHandlers &
-  DiscoverySelectionHandlers & {
+  SelectionSetHandlers & {
     handleClearDiscoveredFrames: () => Promise<void>;
     handleExportClick: () => void;
   };
@@ -250,15 +250,15 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
   });
 
   // Selection handlers
-  const selectionHandlers = useDiscoverySelectionHandlers({
-    frameInfoMap: params.frameInfoMap,
+  const selectionHandlers = useSelectionSetHandlers({
+    frameMap: params.frameInfoMap,
     selectedFrames: params.selectedFrames,
     activeSelectionSetId: params.activeSelectionSetId,
     selectionSetDirty: params.selectionSetDirty,
     setActiveSelectionSet: params.setActiveSelectionSet,
     setSelectionSetDirty: params.setSelectionSetDirty,
     applySelectionSet: params.applySelectionSet,
-    openSaveSelectionSetDialog: params.openSaveSelectionSetDialog,
+    openSaveDialog: params.openSaveSelectionSetDialog,
     onAfterMutate: params.onAfterSelectionSetMutate,
   });
 

@@ -18,6 +18,7 @@ import { buttonBase } from "../../../styles/buttonStyles";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
 import { buildCsv } from "../../../utils/csvBuilder";
+import { formatFrameId } from "../../../utils/frameIds";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { formatBusLabel } from "../../../utils/busFormat";
 
@@ -90,9 +91,7 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
   const formatHistoryItem = (item: (typeof history)[0]) => {
     if (item.type === "can" && item.frame) {
       const frame = item.frame;
-      const idStr = frame.is_extended
-        ? `0x${frame.frame_id.toString(16).toUpperCase().padStart(8, "0")}`
-        : `0x${frame.frame_id.toString(16).toUpperCase().padStart(3, "0")}`;
+      const idStr = formatFrameId(frame.frame_id, "hex", frame.is_extended);
       const dataStr = frame.data.map(byteToHex).join(" ");
       return {
         type: "CAN",

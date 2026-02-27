@@ -23,7 +23,7 @@ import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { FrameDetail, SignalDef } from "../../../types/decoder";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
-import { bytesToHex } from "../../../utils/byteUtils";
+import { bytesToHex, byteToAscii } from "../../../utils/byteUtils";
 import type { SerialFrameConfig } from "../../../utils/frameExport";
 import type { TimeFormat } from "../../../hooks/useSettings";
 import type { TomlNode } from "../../catalog/types";
@@ -47,14 +47,6 @@ function getSignalByteIndices(signal: SignalDef): Set<number> {
   }
 
   return indices;
-}
-
-
-/**
- * Convert byte to ASCII character (printable) or dot.
- */
-function byteToAscii(b: number): string {
-  return b >= 0x20 && b <= 0x7E ? String.fromCharCode(b) : '.';
 }
 
 type Props = {

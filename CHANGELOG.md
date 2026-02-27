@@ -6,6 +6,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **Centralise duplicated utilities**: Replace local `byteToAscii` in Decoder with shared import from `byteUtils`, use `formatFrameId` in Transmit history instead of inline hex formatting, and remove redundant selection handler wrappers in Decoder and Discovery (now call `useSelectionSetHandlers` directly).
+
 - **CSV exports use shared builder**: Transmit history, frame dump, serial bytes, and graph panel CSV exports now use the centralised `csvBuilder` utility for proper field escaping. Previously these paths built CSV manually, risking malformed output if fields contained commas or quotes.
 
 ### Added
