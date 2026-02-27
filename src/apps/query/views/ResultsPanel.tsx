@@ -12,7 +12,14 @@ import {
   type MirrorValidationResult,
   type QueuedQuery,
 } from "../stores/queryStore";
-import type { MuxStatisticsResult } from "../../../api/dbquery";
+import type {
+  MuxStatisticsResult,
+  FirstLastResult,
+  FrequencyBucket,
+  DistributionResult,
+  GapResult,
+  PatternSearchResult,
+} from "../../../api/dbquery";
 import MuxStatisticsView from "./MuxStatisticsView";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { formatHumanUs } from "../../../utils/timeFormat";
@@ -20,7 +27,7 @@ import DataViewPaginationToolbar, { FRAME_PAGE_SIZE_OPTIONS } from "../../../com
 import { iconButtonBase, buttonBase } from "../../../styles/buttonStyles";
 import { monoBody, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { iconSm, iconMd, iconXl } from "../../../styles/spacing";
-import { borderDivider, hoverBg, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple, textDanger } from "../../../styles/colourTokens";
+import { bgSurface, borderDefault, borderDivider, hoverBg, textPrimary, textSecondary, textMuted, textDataAmber, textDataGreen, textDataPurple, textDataCyan, textDanger } from "../../../styles/colourTokens";
 
 interface Props {
   selectedQuery: QueuedQuery | null;
@@ -49,7 +56,9 @@ export default function ResultsPanel({
   const resultCount = results
     ? Array.isArray(results)
       ? results.length
-      : (results as MuxStatisticsResult).cases?.length ?? 0
+      : queryType === "first_last"
+        ? ((results as FirstLastResult).total_count > 0 ? 1 : 0)
+        : (results as MuxStatisticsResult).cases?.length ?? 0
     : 0;
   const lastQueryStats = selectedQuery?.stats ?? null;
   const isRunning = selectedQuery?.status === "running";
@@ -63,7 +72,7 @@ export default function ResultsPanel({
       return { paginatedResults: [], totalPages: 0 };
     }
 
-    const allResults = results as (ByteChangeResult | FrameChangeResult | MirrorValidationResult)[];
+    const allResults = results as (ByteChangeResult | FrameChangeResult | MirrorValidationResult | FrequencyBucket | DistributionResult | GapResult | PatternSearchResult)[];
 
     // If pageSize is -1 (All), show all results
     if (pageSize === -1) {
@@ -223,6 +232,80 @@ export default function ResultsPanel({
     );
   }
 
+  // First/last results — summary view, not paginated
+  if (queryType === "first_last" && results && !Array.isArray(results)) {
+    const fl = results as FirstLastResult;
+    const formatPayload = (bytes: number[]) =>
+      bytes.map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
+
+    return (
+      <div className="flex flex-col h-full">
+        <div className={`flex items-center justify-between px-4 py-2 ${borderDivider}`}>
+          <div className="flex-1 min-w-0">
+            <h2 className={`text-sm font-semibold ${textPrimary} truncate`}>
+              {selectedQuery.displayName}
+            </h2>
+            <p className={`text-xs ${textSecondary}`}>
+              {fl.total_count.toLocaleString()} total frames
+              {lastQueryStats && (
+                <span className={textMuted}>
+                  {" "}· {lastQueryStats.rows_scanned.toLocaleString()} rows in {lastQueryStats.execution_time_ms.toLocaleString()}ms
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={onExport} className={iconButtonBase} title="Export results to CSV">
+              <FileDown className={iconMd} />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-4 space-y-3">
+          {/* First occurrence */}
+          <div className={`${bgSurface} ${borderDefault} rounded-lg p-3`}>
+            <div className={`text-xs font-medium ${textSecondary} mb-1`}>First Occurrence</div>
+            <div className={`${monoBody} text-xs`}>
+              <span className={textDataAmber} title={formatTimestampFull(fl.first_timestamp_us)}>
+                {formatTimestamp(fl.first_timestamp_us)}
+              </span>
+            </div>
+            <div className={`${monoBody} text-xs ${textMuted} mt-1`}>
+              {formatPayload(fl.first_payload)}
+            </div>
+            <button
+              onClick={() => onIngestEvent(fl.first_timestamp_us)}
+              className={`${buttonBase} mt-2`}
+              title="Ingest frames around first occurrence"
+            >
+              <PlayCircle className={iconSm} />
+              <span className="text-xs">Ingest</span>
+            </button>
+          </div>
+          {/* Last occurrence */}
+          <div className={`${bgSurface} ${borderDefault} rounded-lg p-3`}>
+            <div className={`text-xs font-medium ${textSecondary} mb-1`}>Last Occurrence</div>
+            <div className={`${monoBody} text-xs`}>
+              <span className={textDataAmber} title={formatTimestampFull(fl.last_timestamp_us)}>
+                {formatTimestamp(fl.last_timestamp_us)}
+              </span>
+            </div>
+            <div className={`${monoBody} text-xs ${textMuted} mt-1`}>
+              {formatPayload(fl.last_payload)}
+            </div>
+            <button
+              onClick={() => onIngestEvent(fl.last_timestamp_us)}
+              className={`${buttonBase} mt-2`}
+              title="Ingest frames around last occurrence"
+            >
+              <PlayCircle className={iconSm} />
+              <span className="text-xs">Ingest</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Render results
   return (
     <div className="flex flex-col h-full">
@@ -304,8 +387,10 @@ export default function ResultsPanel({
 }
 
 // Individual result row component
+type AnyRowResult = ByteChangeResult | FrameChangeResult | MirrorValidationResult | FrequencyBucket | DistributionResult | GapResult | PatternSearchResult;
+
 interface ResultRowProps {
-  result: ByteChangeResult | FrameChangeResult | MirrorValidationResult;
+  result: AnyRowResult;
   queryType: string;
   formatTimestamp: (us: number) => string;
   formatTimestampFull: (us: number) => string;
@@ -417,6 +502,126 @@ function ResultRow({
           onClick={handleIngestClick}
           className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`}
           title="Ingest frames around this event"
+        >
+          <PlayCircle className={iconSm} />
+          <span className="text-xs">Ingest</span>
+        </button>
+      </div>
+    );
+  }
+
+  // Render frequency bucket
+  if (queryType === "frequency") {
+    const bucket = result as FrequencyBucket;
+    return (
+      <div className={`flex items-center gap-3 px-4 py-2 ${hoverBg}`}>
+        <span
+          className={`${monoBody} text-xs ${textDataAmber} w-36 flex-shrink-0`}
+          title={formatTimestampFull(bucket.bucket_start_us)}
+        >
+          {formatTimestamp(bucket.bucket_start_us)}
+        </span>
+        <span className={`${monoBody} text-xs ${textDataGreen} w-16`}>
+          {bucket.frame_count}
+        </span>
+        <span className={`${monoBody} text-xs ${textSecondary} flex-1`}>
+          interval: {(bucket.min_interval_us / 1000).toFixed(1)}–{(bucket.max_interval_us / 1000).toFixed(1)}ms
+          <span className={textMuted}> avg {(bucket.avg_interval_us / 1000).toFixed(1)}ms</span>
+        </span>
+      </div>
+    );
+  }
+
+  // Render distribution result
+  if (queryType === "distribution") {
+    const dist = result as DistributionResult;
+    return (
+      <div className={`flex items-center gap-3 px-4 py-2 ${hoverBg}`}>
+        <span className={`${monoBody} text-xs ${textDataPurple} w-16 flex-shrink-0`}>
+          {formatByte(dist.value)}
+        </span>
+        <span className={`${monoBody} text-xs ${textDataGreen} w-16`}>
+          {dist.count.toLocaleString()}
+        </span>
+        <div className="flex-1 flex items-center gap-2">
+          <div className="flex-1 h-2 bg-[var(--bg-surface)] rounded overflow-hidden">
+            <div
+              className="h-full bg-[var(--text-data-green)] rounded"
+              style={{ width: `${Math.min(dist.percentage, 100)}%` }}
+            />
+          </div>
+          <span className={`text-xs ${textMuted} w-14 text-right`}>
+            {dist.percentage.toFixed(1)}%
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Render gap analysis result
+  if (queryType === "gap_analysis") {
+    const gap = result as GapResult;
+    return (
+      <div className={`flex items-center gap-3 px-4 py-2 ${hoverBg} group`}>
+        <span
+          className={`${monoBody} text-xs ${textDataAmber} w-36 flex-shrink-0`}
+          title={formatTimestampFull(gap.gap_start_us)}
+        >
+          {formatTimestamp(gap.gap_start_us)}
+        </span>
+        <span className={`${monoBody} text-xs ${textSecondary} flex-1`}>
+          <span className={textDanger}>{gap.duration_ms.toFixed(1)}ms</span>
+          <span className={textMuted}> gap → </span>
+          <span title={formatTimestampFull(gap.gap_end_us)}>
+            {formatTimestamp(gap.gap_end_us)}
+          </span>
+        </span>
+        <button
+          onClick={() => onIngest(gap.gap_start_us)}
+          className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
+          title="Ingest frames around this gap"
+        >
+          <PlayCircle className={iconSm} />
+          <span className="text-xs">Ingest</span>
+        </button>
+      </div>
+    );
+  }
+
+  // Render pattern search result
+  if (queryType === "pattern_search") {
+    const pat = result as PatternSearchResult;
+    const formatPayloadWithMatches = (payload: number[], matchPositions: number[]) => {
+      return payload.map((byte, idx) => {
+        const hex = byte.toString(16).toUpperCase().padStart(2, "0");
+        const isMatch = matchPositions.includes(idx);
+        return (
+          <span key={idx} className={isMatch ? textDataCyan : textMuted}>
+            {hex}{idx < payload.length - 1 ? " " : ""}
+          </span>
+        );
+      });
+    };
+
+    return (
+      <div className={`flex items-center gap-3 px-4 py-2 ${hoverBg} group`}>
+        <span
+          className={`${monoBody} text-xs ${textDataAmber} w-36 flex-shrink-0`}
+          title={formatTimestampFull(pat.timestamp_us)}
+        >
+          {formatTimestamp(pat.timestamp_us)}
+        </span>
+        <span className={`${monoBody} text-xs ${textDataPurple} w-16 flex-shrink-0`}>
+          0x{pat.frame_id.toString(16).toUpperCase().padStart(3, "0")}
+          {pat.is_extended ? "x" : ""}
+        </span>
+        <span className={`${monoBody} text-xs flex-1 min-w-0 truncate`}>
+          {formatPayloadWithMatches(pat.payload, pat.match_positions)}
+        </span>
+        <button
+          onClick={() => onIngest(pat.timestamp_us)}
+          className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`}
+          title="Ingest frames around this match"
         >
           <PlayCircle className={iconSm} />
           <span className="text-xs">Ingest</span>

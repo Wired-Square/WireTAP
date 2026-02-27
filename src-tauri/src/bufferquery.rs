@@ -4,13 +4,15 @@
 // Mirrors the PostgreSQL query commands in dbquery.rs but operates on the
 // local buffer_db instead.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::buffer_db;
 use crate::dbquery::{
-    ByteChangeQueryResult, ByteChangeResult, FrameChangeQueryResult, FrameChangeResult,
-    MirrorValidationQueryResult, MirrorValidationResult, MuxStatisticsQueryResult, QueryStats,
-    compute_mux_statistics,
+    ByteChangeQueryResult, ByteChangeResult, DistributionQueryResult, DistributionResult,
+    FirstLastQueryResult, FirstLastResult, FrameChangeQueryResult, FrameChangeResult,
+    FrequencyBucket, FrequencyQueryResult, GapAnalysisQueryResult, GapResult,
+    MirrorValidationQueryResult, MirrorValidationResult, MuxStatisticsQueryResult,
+    PatternSearchQueryResult, PatternSearchResult, QueryStats, compute_mux_statistics,
 };
 
 /// Query for byte changes in a specific frame within a buffer.
@@ -480,5 +482,530 @@ pub fn buffer_query_mux_statistics(
             execution_time_ms: elapsed.as_millis() as u64,
         },
         results: result,
+    })
+}
+
+/// Query the first and last frames for a given frame ID within a buffer.
+///
+/// Returns the first timestamp/payload, last timestamp/payload, and total count.
+/// Time bounds are in microseconds (matching buffer timestamp_us).
+#[tauri::command]
+pub fn buffer_query_first_last(
+    buffer_id: String,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    start_time_us: Option<i64>,
+    end_time_us: Option<i64>,
+) -> Result<FirstLastQueryResult, String> {
+    let query_start = std::time::Instant::now();
+
+    tlog!(
+        "[bufferquery] first_last: buffer_id='{}', frame_id={}, is_extended={:?}",
+        buffer_id, frame_id, is_extended
+    );
+
+    // Build the shared WHERE clause for all three queries
+    let mut where_clause = String::from("WHERE buffer_id = ?1 AND frame_id = ?2");
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(frame_id as i64));
+
+    let mut param_idx = 3;
+
+    if let Some(ext) = is_extended {
+        where_clause.push_str(&format!(" AND is_extended = ?{}", param_idx));
+        params.push(Box::new(ext as i32));
+        param_idx += 1;
+    }
+    if let Some(start) = start_time_us {
+        where_clause.push_str(&format!(" AND timestamp_us >= ?{}", param_idx));
+        params.push(Box::new(start));
+        param_idx += 1;
+    }
+    if let Some(end) = end_time_us {
+        where_clause.push_str(&format!(" AND timestamp_us < ?{}", param_idx));
+        params.push(Box::new(end));
+        param_idx += 1;
+    }
+    let _ = param_idx; // suppress unused warning
+
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+    // Query 1: first frame (ASC)
+    let first_sql = format!(
+        "SELECT timestamp_us, payload FROM frames {} ORDER BY rowid ASC LIMIT 1",
+        where_clause
+    );
+    let first_rows = buffer_db::query_raw_two_col(&first_sql, &param_refs)?;
+
+    // Query 2: last frame (DESC)
+    let last_sql = format!(
+        "SELECT timestamp_us, payload FROM frames {} ORDER BY rowid DESC LIMIT 1",
+        where_clause
+    );
+    let last_rows = buffer_db::query_raw_two_col(&last_sql, &param_refs)?;
+
+    // Query 3: total count
+    let count_sql = format!("SELECT COUNT(*), x'00' FROM frames {}", where_clause);
+    let count_rows = buffer_db::query_raw_two_col(&count_sql, &param_refs)?;
+    let total_count = count_rows.first().map(|(c, _)| *c).unwrap_or(0);
+
+    let rows_scanned = 2 + 1; // 2 LIMIT-1 queries + 1 count query (logical)
+
+    let (first_timestamp_us, first_payload) = first_rows
+        .first()
+        .map(|(ts, p)| (*ts, p.clone()))
+        .ok_or_else(|| "No frames found for the given filters".to_string())?;
+
+    let (last_timestamp_us, last_payload) = last_rows
+        .first()
+        .map(|(ts, p)| (*ts, p.clone()))
+        .ok_or_else(|| "No frames found for the given filters".to_string())?;
+
+    let elapsed = query_start.elapsed();
+
+    tlog!(
+        "[bufferquery] first_last: count={}, first_ts={}, last_ts={} in {}ms",
+        total_count, first_timestamp_us, last_timestamp_us, elapsed.as_millis()
+    );
+
+    Ok(FirstLastQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: 1,
+            execution_time_ms: elapsed.as_millis() as u64,
+        },
+        results: FirstLastResult {
+            first_timestamp_us,
+            first_payload,
+            last_timestamp_us,
+            last_payload,
+            total_count,
+        },
+    })
+}
+
+/// Query frame frequency / interval statistics bucketed over time.
+///
+/// Groups frames into time buckets and computes min/max/avg inter-frame intervals
+/// within each bucket. Useful for detecting jitter, dropouts, and timing drift.
+#[tauri::command]
+pub fn buffer_query_frequency(
+    buffer_id: String,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    bucket_size_ms: u32,
+    start_time_us: Option<i64>,
+    end_time_us: Option<i64>,
+    limit: Option<i64>,
+) -> Result<FrequencyQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let result_limit = limit.unwrap_or(100_000);
+
+    tlog!(
+        "[bufferquery] frequency: buffer_id='{}', frame_id={}, bucket_size_ms={}, is_extended={:?}, limit={}",
+        buffer_id, frame_id, bucket_size_ms, is_extended, result_limit
+    );
+
+    // Build SQL to fetch timestamps (use query_raw_two_col, ignore payload)
+    let mut sql = String::from(
+        "SELECT timestamp_us, payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+    );
+
+    let mut param_idx = 3;
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(frame_id as i64));
+
+    if let Some(ext) = is_extended {
+        sql.push_str(&format!(" AND is_extended = ?{}", param_idx));
+        params.push(Box::new(ext as i32));
+        param_idx += 1;
+    }
+    if let Some(start) = start_time_us {
+        sql.push_str(&format!(" AND timestamp_us >= ?{}", param_idx));
+        params.push(Box::new(start));
+        param_idx += 1;
+    }
+    if let Some(end) = end_time_us {
+        sql.push_str(&format!(" AND timestamp_us < ?{}", param_idx));
+        params.push(Box::new(end));
+        param_idx += 1;
+    }
+
+    sql.push_str(&format!(" ORDER BY rowid LIMIT ?{}", param_idx));
+    params.push(Box::new(result_limit));
+
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+    let rows = buffer_db::query_raw_two_col(&sql, &param_refs)?;
+    let rows_scanned = rows.len();
+
+    // Extract just timestamps
+    let timestamps: Vec<i64> = rows.iter().map(|(ts, _)| *ts).collect();
+
+    // Compute intervals and group by bucket
+    let bucket_us = bucket_size_ms as i64 * 1000;
+    let mut bucket_map: BTreeMap<i64, Vec<f64>> = BTreeMap::new();
+
+    for window in timestamps.windows(2) {
+        let interval_us = (window[1] - window[0]) as f64;
+        let bucket_start = (window[1] / bucket_us) * bucket_us;
+        bucket_map.entry(bucket_start).or_default().push(interval_us);
+    }
+
+    // Build results
+    let mut results = Vec::with_capacity(bucket_map.len());
+    for (bucket_start_us, intervals) in &bucket_map {
+        let frame_count = intervals.len() as i64 + 1; // +1 because intervals = frames - 1
+        let min_interval_us = intervals.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_interval_us = intervals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let avg_interval_us = intervals.iter().sum::<f64>() / intervals.len() as f64;
+
+        results.push(FrequencyBucket {
+            bucket_start_us: *bucket_start_us,
+            frame_count,
+            min_interval_us,
+            max_interval_us,
+            avg_interval_us,
+        });
+    }
+
+    let elapsed = query_start.elapsed();
+
+    tlog!(
+        "[bufferquery] frequency: {} buckets from {} rows in {}ms",
+        results.len(),
+        rows_scanned,
+        elapsed.as_millis()
+    );
+
+    Ok(FrequencyQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: results.len(),
+            execution_time_ms: elapsed.as_millis() as u64,
+        },
+        results,
+    })
+}
+
+/// Query byte value distribution for a specific byte position in a frame.
+///
+/// Counts how often each byte value (0-255) appears at the given byte index,
+/// returning value, count, and percentage.
+#[tauri::command]
+pub fn buffer_query_distribution(
+    buffer_id: String,
+    frame_id: u32,
+    byte_index: u8,
+    is_extended: Option<bool>,
+    start_time_us: Option<i64>,
+    end_time_us: Option<i64>,
+) -> Result<DistributionQueryResult, String> {
+    let query_start = std::time::Instant::now();
+
+    tlog!(
+        "[bufferquery] distribution: buffer_id='{}', frame_id={}, byte_index={}, is_extended={:?}",
+        buffer_id, frame_id, byte_index, is_extended
+    );
+
+    // Build SQL to fetch payloads
+    let mut sql = String::from(
+        "SELECT payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+    );
+
+    let mut param_idx = 3;
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(frame_id as i64));
+
+    if let Some(ext) = is_extended {
+        sql.push_str(&format!(" AND is_extended = ?{}", param_idx));
+        params.push(Box::new(ext as i32));
+        param_idx += 1;
+    }
+    if let Some(start) = start_time_us {
+        sql.push_str(&format!(" AND timestamp_us >= ?{}", param_idx));
+        params.push(Box::new(start));
+        param_idx += 1;
+    }
+    if let Some(end) = end_time_us {
+        sql.push_str(&format!(" AND timestamp_us < ?{}", param_idx));
+        params.push(Box::new(end));
+        param_idx += 1;
+    }
+    let _ = param_idx; // suppress unused warning
+
+    sql.push_str(" ORDER BY rowid");
+
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+    let payloads = buffer_db::query_payloads(&sql, &param_refs)?;
+
+    let rows_scanned = payloads.len();
+    let byte_idx = byte_index as usize;
+
+    // Count occurrences of each byte value
+    let mut counts: HashMap<u8, i64> = HashMap::new();
+    let mut total: i64 = 0;
+
+    for payload in &payloads {
+        if let Some(&val) = payload.get(byte_idx) {
+            *counts.entry(val).or_insert(0) += 1;
+            total += 1;
+        }
+    }
+
+    // Build results sorted by value
+    let mut results: Vec<DistributionResult> = counts
+        .into_iter()
+        .map(|(value, count)| DistributionResult {
+            value,
+            count,
+            percentage: if total > 0 {
+                (count as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            },
+        })
+        .collect();
+    results.sort_by_key(|r| r.value);
+
+    let elapsed = query_start.elapsed();
+
+    tlog!(
+        "[bufferquery] distribution: {} distinct values from {} rows in {}ms",
+        results.len(),
+        rows_scanned,
+        elapsed.as_millis()
+    );
+
+    Ok(DistributionQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: results.len(),
+            execution_time_ms: elapsed.as_millis() as u64,
+        },
+        results,
+    })
+}
+
+/// Analyse gaps in frame transmission for a given frame ID.
+///
+/// Finds inter-frame intervals that exceed the specified threshold, returning
+/// them sorted by duration (longest first). Useful for detecting dropouts.
+#[tauri::command]
+pub fn buffer_query_gap_analysis(
+    buffer_id: String,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    gap_threshold_ms: f64,
+    start_time_us: Option<i64>,
+    end_time_us: Option<i64>,
+    limit: Option<i64>,
+) -> Result<GapAnalysisQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let result_limit = limit.unwrap_or(10000);
+
+    tlog!(
+        "[bufferquery] gap_analysis: buffer_id='{}', frame_id={}, threshold_ms={}, is_extended={:?}, limit={}",
+        buffer_id, frame_id, gap_threshold_ms, is_extended, result_limit
+    );
+
+    // Build SQL to fetch timestamps (use query_raw_two_col, ignore payload)
+    let mut sql = String::from(
+        "SELECT timestamp_us, payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+    );
+
+    let mut param_idx = 3;
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(frame_id as i64));
+
+    if let Some(ext) = is_extended {
+        sql.push_str(&format!(" AND is_extended = ?{}", param_idx));
+        params.push(Box::new(ext as i32));
+        param_idx += 1;
+    }
+    if let Some(start) = start_time_us {
+        sql.push_str(&format!(" AND timestamp_us >= ?{}", param_idx));
+        params.push(Box::new(start));
+        param_idx += 1;
+    }
+    if let Some(end) = end_time_us {
+        sql.push_str(&format!(" AND timestamp_us < ?{}", param_idx));
+        params.push(Box::new(end));
+        param_idx += 1;
+    }
+    let _ = param_idx; // suppress unused warning
+
+    sql.push_str(" ORDER BY rowid");
+
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+    let rows = buffer_db::query_raw_two_col(&sql, &param_refs)?;
+    let rows_scanned = rows.len();
+
+    // Extract timestamps and find gaps exceeding threshold
+    let threshold_us = gap_threshold_ms * 1000.0;
+    let mut results: Vec<GapResult> = Vec::new();
+
+    let timestamps: Vec<i64> = rows.iter().map(|(ts, _)| *ts).collect();
+
+    for window in timestamps.windows(2) {
+        let gap_us = (window[1] - window[0]) as f64;
+        if gap_us > threshold_us {
+            results.push(GapResult {
+                gap_start_us: window[0],
+                gap_end_us: window[1],
+                duration_ms: gap_us / 1000.0,
+            });
+        }
+    }
+
+    // Sort by duration descending (longest gaps first)
+    results.sort_by(|a, b| b.duration_ms.partial_cmp(&a.duration_ms).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Apply limit
+    results.truncate(result_limit as usize);
+
+    let elapsed = query_start.elapsed();
+
+    tlog!(
+        "[bufferquery] gap_analysis: {} gaps from {} rows in {}ms",
+        results.len(),
+        rows_scanned,
+        elapsed.as_millis()
+    );
+
+    Ok(GapAnalysisQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: results.len(),
+            execution_time_ms: elapsed.as_millis() as u64,
+        },
+        results,
+    })
+}
+
+/// Search for a byte pattern across all frames in a buffer using a mask.
+///
+/// For each frame, checks if the pattern matches anywhere in the payload.
+/// A position `p` matches if for all `i` in `0..pattern.len()`,
+/// `(payload[p+i] & mask[i]) == (pattern[i] & mask[i])`.
+/// No frame_id filter — searches across ALL frame IDs.
+#[tauri::command]
+pub fn buffer_query_pattern_search(
+    buffer_id: String,
+    pattern: Vec<u8>,
+    pattern_mask: Vec<u8>,
+    start_time_us: Option<i64>,
+    end_time_us: Option<i64>,
+    limit: Option<i64>,
+) -> Result<PatternSearchQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let result_limit = limit.unwrap_or(10000);
+
+    tlog!(
+        "[bufferquery] pattern_search: buffer_id='{}', pattern_len={}, mask_len={}, limit={}",
+        buffer_id, pattern.len(), pattern_mask.len(), result_limit
+    );
+
+    if pattern.len() != pattern_mask.len() {
+        return Err("Pattern and mask must have the same length".to_string());
+    }
+    if pattern.is_empty() {
+        return Err("Pattern must not be empty".to_string());
+    }
+
+    // Build SQL — no frame_id filter, search across all frames
+    let mut sql = String::from(
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE buffer_id = ?1",
+    );
+
+    let mut param_idx = 2;
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    params.push(Box::new(buffer_id.clone()));
+
+    if let Some(start) = start_time_us {
+        sql.push_str(&format!(" AND timestamp_us >= ?{}", param_idx));
+        params.push(Box::new(start));
+        param_idx += 1;
+    }
+    if let Some(end) = end_time_us {
+        sql.push_str(&format!(" AND timestamp_us < ?{}", param_idx));
+        params.push(Box::new(end));
+        param_idx += 1;
+    }
+    let _ = param_idx; // suppress unused warning
+
+    sql.push_str(" ORDER BY rowid");
+
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+
+    let rows = buffer_db::query_raw_four_col(&sql, &param_refs)?;
+    let rows_scanned = rows.len();
+
+    // Pre-compute masked pattern for comparison
+    let masked_pattern: Vec<u8> = pattern
+        .iter()
+        .zip(pattern_mask.iter())
+        .map(|(&p, &m)| p & m)
+        .collect();
+    let pat_len = pattern.len();
+
+    let mut results: Vec<PatternSearchResult> = Vec::new();
+
+    for (timestamp_us, frame_id_val, is_ext, payload) in &rows {
+        if payload.len() < pat_len {
+            continue;
+        }
+
+        let mut match_positions = Vec::new();
+
+        for p in 0..=(payload.len() - pat_len) {
+            let mut matches = true;
+            for i in 0..pat_len {
+                if (payload[p + i] & pattern_mask[i]) != masked_pattern[i] {
+                    matches = false;
+                    break;
+                }
+            }
+            if matches {
+                match_positions.push(p);
+            }
+        }
+
+        if !match_positions.is_empty() {
+            results.push(PatternSearchResult {
+                timestamp_us: *timestamp_us,
+                frame_id: *frame_id_val as u32,
+                is_extended: *is_ext,
+                payload: payload.clone(),
+                match_positions,
+            });
+
+            if results.len() >= result_limit as usize {
+                break;
+            }
+        }
+    }
+
+    let elapsed = query_start.elapsed();
+
+    tlog!(
+        "[bufferquery] pattern_search: {} matches from {} rows in {}ms",
+        results.len(),
+        rows_scanned,
+        elapsed.as_millis()
+    );
+
+    Ok(PatternSearchQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: results.len(),
+            execution_time_ms: elapsed.as_millis() as u64,
+        },
+        results,
     })
 }

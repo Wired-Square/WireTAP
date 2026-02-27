@@ -125,6 +125,9 @@ export default function QueryBuilderPanel({
     `0x${queryParams.sourceFrameId.toString(16).toUpperCase()}`
   );
 
+  // Local state for pattern search (hex string like "AA ?? BB")
+  const [patternText, setPatternText] = useState("");
+
   // Local state for result limit (allows per-query override)
   const [limitOverride, setLimitOverride] = useState(queryResultLimit);
 
@@ -166,6 +169,32 @@ export default function QueryBuilderPanel({
   useEffect(() => {
     setLimitOverride(queryResultLimit);
   }, [queryResultLimit]);
+
+  // Handle pattern text change — parse "AA ?? BB" into pattern + mask arrays
+  const handlePatternTextChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const text = e.target.value;
+      setPatternText(text);
+
+      const tokens = text.trim().split(/\s+/).filter(Boolean);
+      const pattern: number[] = [];
+      const mask: number[] = [];
+      for (const tok of tokens) {
+        if (tok === "??" || tok === "**") {
+          pattern.push(0);
+          mask.push(0); // wildcard
+        } else {
+          const val = parseInt(tok, 16);
+          if (!isNaN(val) && val >= 0 && val <= 255) {
+            pattern.push(val);
+            mask.push(0xff);
+          }
+        }
+      }
+      updateQueryParams({ pattern, patternMask: mask });
+    },
+    [updateQueryParams]
+  );
 
   // Add to queue handler
   const handleAddToQueue = useCallback(() => {
@@ -359,9 +388,14 @@ export default function QueryBuilderPanel({
   );
 
   const queryInfo = QUERY_TYPE_INFO[queryType];
-  const showByteIndex = queryType === "byte_changes";
+  const showByteIndex = queryType === "byte_changes" || queryType === "distribution";
   const showMirrorValidation = queryType === "mirror_validation";
   const showMuxStatistics = queryType === "mux_statistics";
+  const showGapAnalysis = queryType === "gap_analysis";
+  const showFrequency = queryType === "frequency";
+  const showPatternSearch = queryType === "pattern_search";
+  // These types don't need a frame ID input (or use their own specialised inputs)
+  const hideFrameId = showMirrorValidation || showPatternSearch;
 
   // Handle limit override change
   // Mux statistics scans raw frames for aggregation, so allow a higher ceiling
@@ -454,6 +488,55 @@ LIMIT ${limitOverride.toLocaleString()}
 -- Group by payload[${muxSelectorByte}], compute stats in Rust`;
       }
 
+      if (queryType === "first_last") {
+        return `-- SQLite buffer query
+SELECT timestamp_us, payload FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid ASC LIMIT 1
+-- + ORDER BY rowid DESC LIMIT 1 + COUNT(*)`;
+      }
+
+      if (queryType === "frequency") {
+        const bucketUs = queryParams.bucketSizeMs * 1000;
+        return `-- SQLite buffer query (intervals computed in Rust)
+SELECT timestamp_us FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid
+LIMIT ${limitOverride.toLocaleString()}
+-- Bucket size: ${queryParams.bucketSizeMs}ms (${bucketUs}µs)`;
+      }
+
+      if (queryType === "distribution") {
+        return `-- SQLite buffer query (distribution computed in Rust)
+SELECT payload FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid
+-- Extract byte[${byteIndex}], count distinct values`;
+      }
+
+      if (queryType === "gap_analysis") {
+        const thresholdUs = queryParams.gapThresholdMs * 1000;
+        return `-- SQLite buffer query (gaps detected in Rust)
+SELECT timestamp_us FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid
+-- Find gaps > ${queryParams.gapThresholdMs}ms (${thresholdUs}µs)
+LIMIT ${limitOverride.toLocaleString()}`;
+      }
+
+      if (queryType === "pattern_search") {
+        const patternStr = queryParams.pattern
+          .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
+          .join(" ") || "(empty)";
+        return `-- SQLite buffer query (pattern matching in Rust)
+SELECT timestamp_us, frame_id, is_extended, payload
+FROM frames
+WHERE buffer_id = ?${timeConditions}
+ORDER BY rowid
+LIMIT ${limitOverride.toLocaleString()}
+-- Pattern: ${patternStr}`;
+      }
+
       return `-- Query type "${queryType}" not yet implemented for buffers`;
     }
 
@@ -540,6 +623,67 @@ FROM can_frame
 WHERE id = ${frameId}${extendedClause}${timeConditions}
 LIMIT ${limitOverride.toLocaleString()}
 -- Group by mux_value, compute per-byte stats in Rust`;
+    }
+
+    if (queryType === "first_last") {
+      return `-- First occurrence:
+SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8, data_bytes
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY ts ASC LIMIT 1
+
+-- Last occurrence:
+SELECT ... ORDER BY ts DESC LIMIT 1
+
+-- Total count:
+SELECT COUNT(*) FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}`;
+    }
+
+    if (queryType === "frequency") {
+      const bucketUs = queryParams.bucketSizeMs * 1000;
+      return `-- Intervals computed in Rust, bucketed by ${queryParams.bucketSizeMs}ms
+SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY ts
+LIMIT ${limitOverride.toLocaleString()}
+-- Bucket size: ${queryParams.bucketSizeMs}ms (${bucketUs}µs)`;
+    }
+
+    if (queryType === "distribution") {
+      return `SELECT
+  get_byte_safe(data_bytes, ${byteIndex}) as value,
+  COUNT(*) as count
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+GROUP BY value
+ORDER BY count DESC`;
+    }
+
+    if (queryType === "gap_analysis") {
+      const thresholdUs = queryParams.gapThresholdMs * 1000;
+      return `-- Gaps detected in Rust from ordered timestamps
+SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY ts
+-- Find gaps > ${queryParams.gapThresholdMs}ms (${thresholdUs}µs)
+LIMIT ${limitOverride.toLocaleString()}`;
+    }
+
+    if (queryType === "pattern_search") {
+      const patternStr = queryParams.pattern
+        .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
+        .join(" ") || "(empty)";
+      return `-- Pattern matching in Rust
+SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8,
+  id, extended, data_bytes
+FROM can_frame
+WHERE 1=1${timeConditions}
+ORDER BY ts
+LIMIT ${limitOverride.toLocaleString()}
+-- Pattern: ${patternStr}`;
     }
 
     return `-- Query type "${queryType}" not yet implemented`;
@@ -683,6 +827,26 @@ LIMIT ${limitOverride.toLocaleString()}
               </div>
             </div>
           </div>
+        ) : showPatternSearch ? (
+          /* Pattern Search — no frame ID, just a hex pattern input */
+          <div className="space-y-2">
+            <div>
+              <label className={labelSmallMuted}>Byte Pattern (hex, ?? = wildcard)</label>
+              <input
+                type="text"
+                value={patternText}
+                onChange={handlePatternTextChange}
+                disabled={disabled}
+                placeholder="AA ?? BB CC"
+                className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed font-mono`}
+              />
+              <p className={`text-xs ${textMuted} mt-1`}>
+                {queryParams.pattern.length > 0
+                  ? `${queryParams.pattern.length} bytes, ${queryParams.patternMask.filter((m) => m === 0).length} wildcards`
+                  : "Enter hex bytes separated by spaces"}
+              </p>
+            </div>
+          </div>
         ) : (
           /* Frame Selection - Catalog picker or manual input */
           hasCatalogFrames ? (
@@ -705,7 +869,7 @@ LIMIT ${limitOverride.toLocaleString()}
                 </select>
               </div>
 
-              {/* Signal Picker (for byte_changes) */}
+              {/* Signal Picker (for byte_changes / distribution) */}
               {showByteIndex && currentFrameSignals.length > 0 && (
                 <div>
                   <label className={labelSmallMuted}>Signal</label>
@@ -798,10 +962,56 @@ LIMIT ${limitOverride.toLocaleString()}
                   </label>
                 </div>
               )}
+
+              {/* Gap Analysis Parameters */}
+              {showGapAnalysis && (
+                <div>
+                  <label className={labelSmallMuted}>Gap Threshold</label>
+                  <div className={`${flexRowGap2} mt-1`}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60000}
+                      value={queryParams.gapThresholdMs}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 1) updateQueryParams({ gapThresholdMs: v });
+                      }}
+                      disabled={disabled}
+                      className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    />
+                    <span className={`text-xs ${textMuted}`}>ms — minimum gap duration to report</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Frequency Parameters */}
+              {showFrequency && (
+                <div>
+                  <label className={labelSmallMuted}>Bucket Size</label>
+                  <div className={`${flexRowGap2} mt-1`}>
+                    <input
+                      type="number"
+                      min={10}
+                      max={60000}
+                      step={100}
+                      value={queryParams.bucketSizeMs}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 10) updateQueryParams({ bucketSizeMs: v });
+                      }}
+                      disabled={disabled}
+                      className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    />
+                    <span className={`text-xs ${textMuted}`}>ms — time bucket width</span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <>
               {/* Manual Frame ID Input */}
+              {!hideFrameId && (
               <div>
                 <label className={labelSmallMuted}>Frame ID (hex or decimal)</label>
                 <div className={`${flexRowGap2} mt-1`}>
@@ -825,8 +1035,9 @@ LIMIT ${limitOverride.toLocaleString()}
                   </label>
                 </div>
               </div>
+              )}
 
-              {/* Byte Index (only for byte_changes query) */}
+              {/* Byte Index (for byte_changes / distribution) */}
               {showByteIndex && (
                 <div>
                   <label className={labelSmallMuted}>Byte Index</label>
@@ -885,6 +1096,51 @@ LIMIT ${limitOverride.toLocaleString()}
                     />
                     Include 16-bit word statistics (LE &amp; BE)
                   </label>
+                </div>
+              )}
+
+              {/* Gap Analysis Parameters */}
+              {showGapAnalysis && (
+                <div>
+                  <label className={labelSmallMuted}>Gap Threshold</label>
+                  <div className={`${flexRowGap2} mt-1`}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60000}
+                      value={queryParams.gapThresholdMs}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 1) updateQueryParams({ gapThresholdMs: v });
+                      }}
+                      disabled={disabled}
+                      className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    />
+                    <span className={`text-xs ${textMuted}`}>ms — minimum gap duration to report</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Frequency Parameters */}
+              {showFrequency && (
+                <div>
+                  <label className={labelSmallMuted}>Bucket Size</label>
+                  <div className={`${flexRowGap2} mt-1`}>
+                    <input
+                      type="number"
+                      min={10}
+                      max={60000}
+                      step={100}
+                      value={queryParams.bucketSizeMs}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 10) updateQueryParams({ bucketSizeMs: v });
+                      }}
+                      disabled={disabled}
+                      className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    />
+                    <span className={`text-xs ${textMuted}`}>ms — time bucket width</span>
+                  </div>
                 </div>
               )}
             </>

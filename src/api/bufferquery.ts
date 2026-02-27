@@ -9,6 +9,11 @@ import type {
   FrameChangeQueryResult,
   MirrorValidationQueryResult,
   MuxStatisticsQueryResult,
+  FirstLastQueryResult,
+  FrequencyQueryResult,
+  DistributionQueryResult,
+  GapAnalysisQueryResult,
+  PatternSearchQueryResult,
 } from "./dbquery";
 
 /**
@@ -110,6 +115,113 @@ export async function queryMuxStatisticsBuffer(
     isExtended,
     include16bit: include16bit,
     payloadLength,
+    startTimeUs,
+    endTimeUs,
+    limit,
+  });
+}
+
+/**
+ * Query for first and last occurrence of a frame within a buffer.
+ */
+export async function queryFirstLastBuffer(
+  bufferId: string,
+  frameId: number,
+  isExtended: boolean | null,
+  startTimeUs?: number,
+  endTimeUs?: number,
+): Promise<FirstLastQueryResult> {
+  return invoke("buffer_query_first_last", {
+    bufferId,
+    frameId,
+    isExtended,
+    startTimeUs,
+    endTimeUs,
+  });
+}
+
+/**
+ * Query frame transmission frequency within a buffer.
+ */
+export async function queryFrequencyBuffer(
+  bufferId: string,
+  frameId: number,
+  isExtended: boolean | null,
+  bucketSizeMs: number,
+  startTimeUs?: number,
+  endTimeUs?: number,
+  limit?: number,
+): Promise<FrequencyQueryResult> {
+  return invoke("buffer_query_frequency", {
+    bufferId,
+    frameId,
+    isExtended,
+    bucketSizeMs,
+    startTimeUs,
+    endTimeUs,
+    limit,
+  });
+}
+
+/**
+ * Query byte value distribution within a buffer.
+ */
+export async function queryDistributionBuffer(
+  bufferId: string,
+  frameId: number,
+  byteIndex: number,
+  isExtended: boolean | null,
+  startTimeUs?: number,
+  endTimeUs?: number,
+): Promise<DistributionQueryResult> {
+  return invoke("buffer_query_distribution", {
+    bufferId,
+    frameId,
+    byteIndex,
+    isExtended,
+    startTimeUs,
+    endTimeUs,
+  });
+}
+
+/**
+ * Query for transmission gaps within a buffer.
+ */
+export async function queryGapAnalysisBuffer(
+  bufferId: string,
+  frameId: number,
+  isExtended: boolean | null,
+  gapThresholdMs: number,
+  startTimeUs?: number,
+  endTimeUs?: number,
+  limit?: number,
+): Promise<GapAnalysisQueryResult> {
+  return invoke("buffer_query_gap_analysis", {
+    bufferId,
+    frameId,
+    isExtended,
+    gapThresholdMs,
+    startTimeUs,
+    endTimeUs,
+    limit,
+  });
+}
+
+/**
+ * Search for a byte pattern across all frame IDs within a buffer.
+ */
+export async function queryPatternSearchBuffer(
+  bufferId: string,
+  pattern: number[],
+  patternMask: number[],
+  startTimeUs?: number,
+  endTimeUs?: number,
+  limit?: number,
+): Promise<PatternSearchQueryResult> {
+  return invoke("buffer_query_pattern_search", {
+    bufferId,
+    pattern,
+    patternMask,
     startTimeUs,
     endTimeUs,
     limit,

@@ -211,6 +211,204 @@ export async function queryMuxStatistics(
   });
 }
 
+// ── First/Last Occurrence ──
+
+/** Result of a first/last occurrence query */
+export interface FirstLastResult {
+  first_timestamp_us: number;
+  first_payload: number[];
+  last_timestamp_us: number;
+  last_payload: number[];
+  total_count: number;
+}
+
+/** Wrapper for first/last query results with stats */
+export interface FirstLastQueryResult {
+  results: FirstLastResult;
+  stats: QueryStats;
+}
+
+/**
+ * Query for the first and last occurrence of a frame.
+ */
+export async function queryFirstLast(
+  profileId: string,
+  frameId: number,
+  isExtended: boolean | null,
+  startTime?: string,
+  endTime?: string,
+  queryId?: string,
+): Promise<FirstLastQueryResult> {
+  return invoke("db_query_first_last", {
+    profileId,
+    frameId,
+    isExtended,
+    startTime,
+    endTime,
+    queryId,
+  });
+}
+
+// ── Frame Frequency ──
+
+/** A single frequency bucket result */
+export interface FrequencyBucket {
+  bucket_start_us: number;
+  frame_count: number;
+  min_interval_us: number;
+  max_interval_us: number;
+  avg_interval_us: number;
+}
+
+/** Wrapper for frequency query results with stats */
+export interface FrequencyQueryResult {
+  results: FrequencyBucket[];
+  stats: QueryStats;
+}
+
+/**
+ * Query frame transmission frequency over time buckets.
+ */
+export async function queryFrequency(
+  profileId: string,
+  frameId: number,
+  isExtended: boolean | null,
+  bucketSizeMs: number,
+  startTime?: string,
+  endTime?: string,
+  limit?: number,
+  queryId?: string,
+): Promise<FrequencyQueryResult> {
+  return invoke("db_query_frequency", {
+    profileId,
+    frameId,
+    isExtended,
+    bucketSizeMs,
+    startTime,
+    endTime,
+    limit,
+    queryId,
+  });
+}
+
+// ── Value Distribution ──
+
+/** A single distribution result */
+export interface DistributionResult {
+  value: number;
+  count: number;
+  percentage: number;
+}
+
+/** Wrapper for distribution query results with stats */
+export interface DistributionQueryResult {
+  results: DistributionResult[];
+  stats: QueryStats;
+}
+
+/**
+ * Query byte value distribution for a specific byte in a frame.
+ */
+export async function queryDistribution(
+  profileId: string,
+  frameId: number,
+  byteIndex: number,
+  isExtended: boolean | null,
+  startTime?: string,
+  endTime?: string,
+  queryId?: string,
+): Promise<DistributionQueryResult> {
+  return invoke("db_query_distribution", {
+    profileId,
+    frameId,
+    byteIndex,
+    isExtended,
+    startTime,
+    endTime,
+    queryId,
+  });
+}
+
+// ── Gap Analysis ──
+
+/** A single gap result */
+export interface GapResult {
+  gap_start_us: number;
+  gap_end_us: number;
+  duration_ms: number;
+}
+
+/** Wrapper for gap analysis query results with stats */
+export interface GapAnalysisQueryResult {
+  results: GapResult[];
+  stats: QueryStats;
+}
+
+/**
+ * Query for transmission gaps longer than a threshold.
+ */
+export async function queryGapAnalysis(
+  profileId: string,
+  frameId: number,
+  isExtended: boolean | null,
+  gapThresholdMs: number,
+  startTime?: string,
+  endTime?: string,
+  limit?: number,
+  queryId?: string,
+): Promise<GapAnalysisQueryResult> {
+  return invoke("db_query_gap_analysis", {
+    profileId,
+    frameId,
+    isExtended,
+    gapThresholdMs,
+    startTime,
+    endTime,
+    limit,
+    queryId,
+  });
+}
+
+// ── Pattern Search ──
+
+/** A single pattern search result */
+export interface PatternSearchResult {
+  timestamp_us: number;
+  frame_id: number;
+  is_extended: boolean;
+  payload: number[];
+  match_positions: number[];
+}
+
+/** Wrapper for pattern search query results with stats */
+export interface PatternSearchQueryResult {
+  results: PatternSearchResult[];
+  stats: QueryStats;
+}
+
+/**
+ * Search for a byte pattern across all frame IDs.
+ */
+export async function queryPatternSearch(
+  profileId: string,
+  pattern: number[],
+  patternMask: number[],
+  startTime?: string,
+  endTime?: string,
+  limit?: number,
+  queryId?: string,
+): Promise<PatternSearchQueryResult> {
+  return invoke("db_query_pattern_search", {
+    profileId,
+    pattern,
+    patternMask,
+    startTime,
+    endTime,
+    limit,
+    queryId,
+  });
+}
+
 /**
  * Cancel a running database query.
  *

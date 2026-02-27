@@ -1020,6 +1020,39 @@ pub fn query_payloads(
     Ok(results)
 }
 
+/// Execute a raw SQL query returning (timestamp_us, frame_id, is_extended, payload) tuples.
+/// Used by buffer_query_pattern_search.
+pub fn query_raw_four_col(
+    sql: &str,
+    params: &[&dyn rusqlite::types::ToSql],
+) -> Result<Vec<(i64, i64, bool, Vec<u8>)>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(params), |row| {
+            let is_ext: i32 = row.get(2)?;
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                is_ext != 0,
+                row.get::<_, Vec<u8>>(3)?,
+            ))
+        })
+        .map_err(|e| format!("Failed to execute query: {}", e))?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+    }
+
+    Ok(results)
+}
+
 /// Find the byte offset for a given timestamp in a buffer.
 pub fn find_bytes_offset_for_timestamp(
     buffer_id: &str,

@@ -9,6 +9,11 @@ import {
   queryFrameChanges,
   queryMirrorValidation,
   queryMuxStatistics,
+  queryFirstLast,
+  queryFrequency,
+  queryDistribution,
+  queryGapAnalysis,
+  queryPatternSearch,
   cancelQuery,
   queryActivity,
   cancelBackend,
@@ -16,18 +21,28 @@ import {
   type DatabaseActivity,
   type DatabaseActivityResult,
   type MuxStatisticsResult,
+  type FirstLastResult,
+  type FrequencyBucket,
+  type DistributionResult,
+  type GapResult,
+  type PatternSearchResult,
 } from "../../../api/dbquery";
 import {
   queryByteChangesBuffer,
   queryFrameChangesBuffer,
   queryMirrorValidationBuffer,
   queryMuxStatisticsBuffer,
+  queryFirstLastBuffer,
+  queryFrequencyBuffer,
+  queryDistributionBuffer,
+  queryGapAnalysisBuffer,
+  queryPatternSearchBuffer,
 } from "../../../api/bufferquery";
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { ParsedCatalog } from "../../../utils/catalogParser";
 
-export type { DatabaseActivity, DatabaseActivityResult };
+export type { DatabaseActivity, DatabaseActivityResult, FirstLastResult, FrequencyBucket, DistributionResult, GapResult, PatternSearchResult };
 
 /** Available query types */
 export type QueryType =
@@ -116,7 +131,16 @@ export interface QueryStats {
 }
 
 /** Union type for query results */
-export type QueryResult = ByteChangeResult[] | FrameChangeResult[] | MirrorValidationResult[] | MuxStatisticsResult;
+export type QueryResult =
+  | ByteChangeResult[]
+  | FrameChangeResult[]
+  | MirrorValidationResult[]
+  | MuxStatisticsResult
+  | FirstLastResult
+  | FrequencyBucket[]
+  | DistributionResult[]
+  | GapResult[]
+  | PatternSearchResult[];
 
 /** Query parameters */
 export interface QueryParams {
@@ -132,6 +156,13 @@ export interface QueryParams {
   muxSelectorByte: number;
   include16Bit: boolean;
   payloadLength: number;
+  // Gap analysis params
+  gapThresholdMs: number;
+  // Frequency params
+  bucketSizeMs: number;
+  // Pattern search params
+  pattern: number[];
+  patternMask: number[];
 }
 
 /** Context window configuration for ingesting around events */
@@ -210,13 +241,24 @@ function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams
     const mirrorHex = formatFrameId(queryParams.mirrorFrameId, queryParams.isExtended);
     const sourceHex = formatFrameId(queryParams.sourceFrameId, queryParams.isExtended);
     name = `${typeLabel} - ${mirrorHex} ↔ ${sourceHex}`;
+  } else if (queryType === "pattern_search") {
+    const patternHex = queryParams.pattern.length > 0
+      ? queryParams.pattern
+          .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
+          .join(" ")
+      : "(empty)";
+    name = `${typeLabel} - ${patternHex}`;
   } else {
     const frameHex = formatFrameId(queryParams.frameId, queryParams.isExtended);
     name = `${typeLabel} - ${frameHex}`;
-    if (queryType === "byte_changes") {
+    if (queryType === "byte_changes" || queryType === "distribution") {
       name += ` [byte ${queryParams.byteIndex}]`;
     } else if (queryType === "mux_statistics") {
       name += ` [mux byte ${queryParams.muxSelectorByte}]`;
+    } else if (queryType === "gap_analysis") {
+      name += ` [>${queryParams.gapThresholdMs}ms]`;
+    } else if (queryType === "frequency") {
+      name += ` [${queryParams.bucketSizeMs}ms buckets]`;
     }
     if (queryParams.isExtended) {
       name += " (ext)";
@@ -319,6 +361,10 @@ const initialQueryParams: QueryParams = {
   muxSelectorByte: 0,
   include16Bit: true,
   payloadLength: 8,
+  gapThresholdMs: 100,
+  bucketSizeMs: 1000,
+  pattern: [],
+  patternMask: [],
 };
 
 const initialContextWindow: ContextWindow = {
@@ -596,9 +642,76 @@ export const useQueryStore = create<QueryState>((set, get) => ({
             break;
           }
 
-          default:
-            results = [];
+          case "first_last": {
+            const response = await queryFirstLastBuffer(
+              bufferId,
+              queryParams.frameId,
+              queryParams.isExtended,
+              startTimeUs,
+              endTimeUs,
+            );
+            results = response.results;
+            stats = response.stats;
             break;
+          }
+
+          case "frequency": {
+            const response = await queryFrequencyBuffer(
+              bufferId,
+              queryParams.frameId,
+              queryParams.isExtended,
+              queryParams.bucketSizeMs,
+              startTimeUs,
+              endTimeUs,
+              resultLimit,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "distribution": {
+            const response = await queryDistributionBuffer(
+              bufferId,
+              queryParams.frameId,
+              queryParams.byteIndex,
+              queryParams.isExtended,
+              startTimeUs,
+              endTimeUs,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "gap_analysis": {
+            const response = await queryGapAnalysisBuffer(
+              bufferId,
+              queryParams.frameId,
+              queryParams.isExtended,
+              queryParams.gapThresholdMs,
+              startTimeUs,
+              endTimeUs,
+              resultLimit,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "pattern_search": {
+            const response = await queryPatternSearchBuffer(
+              bufferId,
+              queryParams.pattern,
+              queryParams.patternMask,
+              startTimeUs,
+              endTimeUs,
+              resultLimit,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
         }
       } else {
         // ── PostgreSQL query path ──
@@ -687,10 +800,81 @@ export const useQueryStore = create<QueryState>((set, get) => ({
             break;
           }
 
-          default:
-            // Other query types not yet implemented
-            results = [];
+          case "first_last": {
+            const response = await queryFirstLast(
+              profileId,
+              queryParams.frameId,
+              queryParams.isExtended,
+              startTime,
+              endTime,
+              nextQuery.id,
+            );
+            results = response.results;
+            stats = response.stats;
             break;
+          }
+
+          case "frequency": {
+            const response = await queryFrequency(
+              profileId,
+              queryParams.frameId,
+              queryParams.isExtended,
+              queryParams.bucketSizeMs,
+              startTime,
+              endTime,
+              resultLimit,
+              nextQuery.id,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "distribution": {
+            const response = await queryDistribution(
+              profileId,
+              queryParams.frameId,
+              queryParams.byteIndex,
+              queryParams.isExtended,
+              startTime,
+              endTime,
+              nextQuery.id,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "gap_analysis": {
+            const response = await queryGapAnalysis(
+              profileId,
+              queryParams.frameId,
+              queryParams.isExtended,
+              queryParams.gapThresholdMs,
+              startTime,
+              endTime,
+              resultLimit,
+              nextQuery.id,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "pattern_search": {
+            const response = await queryPatternSearch(
+              profileId,
+              queryParams.pattern,
+              queryParams.patternMask,
+              startTime,
+              endTime,
+              resultLimit,
+              nextQuery.id,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
         }
       }
 

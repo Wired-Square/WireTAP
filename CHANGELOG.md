@@ -6,6 +6,18 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Query CSV export**: Export button in the Query app now saves results as CSV via the native file dialog. All 9 query types have dedicated CSV formatters using the new shared `csvBuilder` utility.
+
+- **First/Last query**: Find the first and last occurrence of a frame ID, showing timestamps, payloads, and total count. Summary card view with ingest buttons.
+
+- **Frequency query**: Analyse frame transmission frequency over configurable time buckets. Shows frame count and min/max/avg inter-frame intervals per bucket.
+
+- **Distribution query**: Byte value distribution for a specific byte index within a frame. Shows value counts with percentage bars.
+
+- **Gap Analysis query**: Detect transmission gaps exceeding a configurable threshold. Results sorted by duration (longest first) with ingest buttons.
+
+- **Pattern Search query**: Search across all frame IDs for a byte pattern with wildcard support (`AA ?? BB`). Matched bytes highlighted in cyan in the results view.
+
 - **Mux Statistics query**: New query type in the Query app that groups frame payloads by a mux selector byte and computes per-byte MIN/MAX/AVG/distinct-count statistics for each mux case. Optionally includes 16-bit word statistics in both little-endian and big-endian interpretations. Works with both buffer (SQLite) and PostgreSQL data sources, with a dedicated results view showing per-case breakdowns. Supports a higher scan limit (up to 10M rows) since the query aggregates raw payloads rather than returning individual results.
 
 - **Remove all panels button**: Red bin icon in the Graph toolbar to delete all panels at once. Disabled when no panels exist.

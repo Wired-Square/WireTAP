@@ -201,6 +201,87 @@ pub struct MuxStatisticsQueryResult {
     pub stats: QueryStats,
 }
 
+/// Result of a first/last query
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FirstLastResult {
+    pub first_timestamp_us: i64,
+    pub first_payload: Vec<u8>,
+    pub last_timestamp_us: i64,
+    pub last_payload: Vec<u8>,
+    pub total_count: i64,
+}
+
+/// Wrapper for first/last query results with stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FirstLastQueryResult {
+    pub results: FirstLastResult,
+    pub stats: QueryStats,
+}
+
+/// A single frequency bucket with interval statistics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrequencyBucket {
+    pub bucket_start_us: i64,
+    pub frame_count: i64,
+    pub min_interval_us: f64,
+    pub max_interval_us: f64,
+    pub avg_interval_us: f64,
+}
+
+/// Wrapper for frequency query results with stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrequencyQueryResult {
+    pub results: Vec<FrequencyBucket>,
+    pub stats: QueryStats,
+}
+
+/// A single byte value distribution entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistributionResult {
+    pub value: u8,
+    pub count: i64,
+    pub percentage: f64,
+}
+
+/// Wrapper for distribution query results with stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistributionQueryResult {
+    pub results: Vec<DistributionResult>,
+    pub stats: QueryStats,
+}
+
+/// A detected gap in frame transmission
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GapResult {
+    pub gap_start_us: i64,
+    pub gap_end_us: i64,
+    pub duration_ms: f64,
+}
+
+/// Wrapper for gap analysis query results with stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GapAnalysisQueryResult {
+    pub results: Vec<GapResult>,
+    pub stats: QueryStats,
+}
+
+/// A frame matching a byte pattern search
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatternSearchResult {
+    pub timestamp_us: i64,
+    pub frame_id: u32,
+    pub is_extended: bool,
+    pub payload: Vec<u8>,
+    pub match_positions: Vec<usize>,
+}
+
+/// Wrapper for pattern search query results with stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatternSearchQueryResult {
+    pub results: Vec<PatternSearchResult>,
+    pub stats: QueryStats,
+}
+
 /// Compute per-mux-case statistics from grouped payloads.
 /// `payloads_by_mux` maps mux selector value -> list of raw frame payloads.
 /// `mux_byte` is the byte index of the mux selector (used to skip it in stats).
@@ -1365,5 +1446,754 @@ pub async fn db_query_mux_statistics(
             execution_time_ms: elapsed.as_millis() as u64,
         },
         results: result,
+    })
+}
+
+/// Query for the first and last frame of a given ID, plus total count.
+///
+/// Returns the earliest payload, latest payload, their timestamps, and the
+/// total number of frames matching the filter.
+#[tauri::command]
+pub async fn db_query_first_last(
+    app: AppHandle,
+    profile_id: String,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    query_id: Option<String>,
+) -> Result<FirstLastQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let query_id = query_id.unwrap_or_else(|| format!("first_last_{}", query_start.elapsed().as_nanos()));
+
+    tlog!("[dbquery] db_query_first_last: profile='{}', frame_id={}, is_extended={:?}",
+        profile_id, frame_id, is_extended);
+
+    // Load settings to get profile
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    // Get password and connect
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| {
+            tlog!("[dbquery] Connection failed: {:?}", e);
+            format!("Failed to connect to database: {}", e)
+        })?;
+
+    let cancel_token = client.cancel_token();
+    register_query(&query_id, "first_last", &profile_id, cancel_token).await;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            tlog!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Set application name
+    client
+        .execute("SET application_name = 'CANdor Query'", &[])
+        .await
+        .ok();
+
+    let frame_id_i32 = frame_id as i32;
+
+    // Build WHERE clause (shared by all three queries)
+    let mut where_clause = String::from("WHERE id = $1::int4");
+    let mut param_idx = 2;
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32];
+
+    let is_extended_bool: bool;
+    if let Some(ext) = is_extended {
+        is_extended_bool = ext;
+        where_clause.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        param_idx += 1;
+        params.push(&is_extended_bool);
+    }
+
+    if let Some(ref start) = start_time {
+        where_clause.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        param_idx += 1;
+        params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+    if let Some(ref end) = end_time {
+        where_clause.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
+        params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+
+    // Query 1: first frame
+    let first_query = format!(
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us, data_bytes FROM public.can_frame {} ORDER BY ts ASC LIMIT 1",
+        where_clause
+    );
+
+    tlog!("[dbquery] first_last: executing first query");
+    let first_rows = client
+        .query(&first_query, &params)
+        .await
+        .map_err(|e| format!("First query failed: {}", e))?;
+
+    if first_rows.is_empty() {
+        unregister_query(&query_id).await;
+        return Err("No frames found matching the filter".to_string());
+    }
+
+    let first_timestamp_us: f64 = first_rows[0].get("timestamp_us");
+    let first_payload: Vec<u8> = first_rows[0].get("data_bytes");
+
+    // Query 2: last frame
+    let last_query = format!(
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us, data_bytes FROM public.can_frame {} ORDER BY ts DESC LIMIT 1",
+        where_clause
+    );
+
+    tlog!("[dbquery] first_last: executing last query");
+    let last_rows = client
+        .query(&last_query, &params)
+        .await
+        .map_err(|e| format!("Last query failed: {}", e))?;
+
+    let last_timestamp_us: f64 = last_rows[0].get("timestamp_us");
+    let last_payload: Vec<u8> = last_rows[0].get("data_bytes");
+
+    // Query 3: count
+    let count_query = format!(
+        "SELECT COUNT(*) as count FROM public.can_frame {}",
+        where_clause
+    );
+
+    tlog!("[dbquery] first_last: executing count query");
+    let count_rows = client
+        .query(&count_query, &params)
+        .await
+        .map_err(|e| format!("Count query failed: {}", e))?;
+
+    let total_count: i64 = count_rows[0].get("count");
+
+    let execution_time_ms = query_start.elapsed().as_millis() as u64;
+    tlog!("[dbquery] first_last: frame=0x{:X} ext={:?} | count={}, {}ms",
+        frame_id, is_extended, total_count, execution_time_ms);
+
+    unregister_query(&query_id).await;
+
+    Ok(FirstLastQueryResult {
+        stats: QueryStats {
+            rows_scanned: 3, // 3 queries executed
+            results_count: 1,
+            execution_time_ms,
+        },
+        results: FirstLastResult {
+            first_timestamp_us: first_timestamp_us as i64,
+            first_payload,
+            last_timestamp_us: last_timestamp_us as i64,
+            last_payload,
+            total_count,
+        },
+    })
+}
+
+/// Query frame frequency / interval statistics bucketed over time.
+///
+/// Fetches timestamps for the given frame ID, computes inter-frame intervals
+/// in Rust, then groups them into time buckets with min/max/avg statistics.
+#[tauri::command]
+pub async fn db_query_frequency(
+    app: AppHandle,
+    profile_id: String,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    bucket_size_ms: u32,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    limit: Option<u32>,
+    query_id: Option<String>,
+) -> Result<FrequencyQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let result_limit = limit.unwrap_or(500_000);
+    let query_id = query_id.unwrap_or_else(|| format!("frequency_{}", query_start.elapsed().as_nanos()));
+
+    tlog!("[dbquery] db_query_frequency: profile='{}', frame_id={}, bucket_size_ms={}, is_extended={:?}, limit={}",
+        profile_id, frame_id, bucket_size_ms, is_extended, result_limit);
+
+    // Load settings to get profile
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| {
+            tlog!("[dbquery] Connection failed: {:?}", e);
+            format!("Failed to connect to database: {}", e)
+        })?;
+
+    let cancel_token = client.cancel_token();
+    register_query(&query_id, "frequency", &profile_id, cancel_token).await;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            tlog!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Set application name
+    client
+        .execute("SET application_name = 'CANdor Query'", &[])
+        .await
+        .ok();
+
+    let frame_id_i32 = frame_id as i32;
+
+    // Build query to fetch timestamps ordered
+    let mut param_idx = 1;
+    let frame_id_param = param_idx;
+    param_idx += 1;
+
+    let mut query = format!(
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us FROM public.can_frame WHERE id = ${}::int4",
+        frame_id_param
+    );
+
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32];
+
+    let is_extended_bool: bool;
+    if let Some(ext) = is_extended {
+        is_extended_bool = ext;
+        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        param_idx += 1;
+        params.push(&is_extended_bool);
+    }
+
+    if let Some(ref start) = start_time {
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        param_idx += 1;
+        params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+    if let Some(ref end) = end_time {
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
+        params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+
+    query.push_str(&format!(" ORDER BY ts LIMIT {}", result_limit));
+
+    tlog!("[dbquery] frequency query:\n{}", query);
+
+    let rows = client
+        .query(&query, &params)
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    let rows_scanned = rows.len();
+    tlog!("[dbquery] frequency: {} rows fetched", rows_scanned);
+
+    // Extract timestamps
+    let timestamps: Vec<i64> = rows
+        .iter()
+        .map(|row| {
+            let ts: f64 = row.get("timestamp_us");
+            ts as i64
+        })
+        .collect();
+
+    // Compute intervals and bucket them
+    let bucket_us = bucket_size_ms as i64 * 1000;
+    let mut buckets: BTreeMap<i64, Vec<f64>> = BTreeMap::new();
+
+    for i in 1..timestamps.len() {
+        let interval_us = (timestamps[i] - timestamps[i - 1]) as f64;
+        // Bucket based on the second timestamp (the one that created the interval)
+        let bucket_start = (timestamps[i] / bucket_us) * bucket_us;
+        buckets.entry(bucket_start).or_default().push(interval_us);
+    }
+
+    // Compute statistics per bucket
+    let mut results = Vec::new();
+    for (bucket_start, intervals) in &buckets {
+        let frame_count = intervals.len() as i64;
+        let min_interval_us = intervals.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_interval_us = intervals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let avg_interval_us: f64 = intervals.iter().sum::<f64>() / frame_count as f64;
+
+        results.push(FrequencyBucket {
+            bucket_start_us: *bucket_start,
+            frame_count,
+            min_interval_us,
+            max_interval_us,
+            avg_interval_us,
+        });
+    }
+
+    let execution_time_ms = query_start.elapsed().as_millis() as u64;
+    tlog!("[dbquery] frequency: frame=0x{:X} ext={:?} | {} buckets from {} timestamps, {}ms",
+        frame_id, is_extended, results.len(), rows_scanned, execution_time_ms);
+
+    unregister_query(&query_id).await;
+
+    Ok(FrequencyQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: results.len(),
+            execution_time_ms,
+        },
+        results,
+    })
+}
+
+/// Query byte value distribution for a specific byte position in a frame.
+///
+/// Returns the count and percentage of each distinct byte value observed
+/// at the given byte index, ordered by frequency.
+#[tauri::command]
+pub async fn db_query_distribution(
+    app: AppHandle,
+    profile_id: String,
+    frame_id: u32,
+    byte_index: u8,
+    is_extended: Option<bool>,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    query_id: Option<String>,
+) -> Result<DistributionQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let query_id = query_id.unwrap_or_else(|| format!("distribution_{}", query_start.elapsed().as_nanos()));
+
+    tlog!("[dbquery] db_query_distribution: profile='{}', frame_id={}, byte_index={}, is_extended={:?}",
+        profile_id, frame_id, byte_index, is_extended);
+
+    // Load settings to get profile
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| {
+            tlog!("[dbquery] Connection failed: {:?}", e);
+            format!("Failed to connect to database: {}", e)
+        })?;
+
+    let cancel_token = client.cancel_token();
+    register_query(&query_id, "distribution", &profile_id, cancel_token).await;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            tlog!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Set application name
+    client
+        .execute("SET application_name = 'CANdor Query'", &[])
+        .await
+        .ok();
+
+    let frame_id_i32 = frame_id as i32;
+    let byte_index_i32 = byte_index as i32;
+
+    // Build query
+    let mut param_idx = 1;
+    let frame_id_param = param_idx;
+    param_idx += 1;
+    let byte_index_param = param_idx;
+    param_idx += 1;
+
+    let mut query = format!(
+        "SELECT public.get_byte_safe(data_bytes, ${}::int4) as value, COUNT(*) as count FROM public.can_frame WHERE id = ${}::int4",
+        byte_index_param, frame_id_param
+    );
+
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32, &byte_index_i32];
+
+    let is_extended_bool: bool;
+    if let Some(ext) = is_extended {
+        is_extended_bool = ext;
+        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        param_idx += 1;
+        params.push(&is_extended_bool);
+    }
+
+    if let Some(ref start) = start_time {
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        param_idx += 1;
+        params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+    if let Some(ref end) = end_time {
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
+        params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+
+    query.push_str(" GROUP BY value ORDER BY count DESC");
+
+    tlog!("[dbquery] distribution query:\n{}", query);
+
+    let rows = client
+        .query(&query, &params)
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    let rows_scanned = rows.len();
+    tlog!("[dbquery] distribution: {} distinct values", rows_scanned);
+
+    // Parse results and compute percentages
+    let mut results: Vec<DistributionResult> = Vec::new();
+    let mut total_count: i64 = 0;
+
+    for row in &rows {
+        let value: i32 = row.get("value");
+        let count: i64 = row.get("count");
+        total_count += count;
+        results.push(DistributionResult {
+            value: value as u8,
+            count,
+            percentage: 0.0, // computed below
+        });
+    }
+
+    // Compute percentages
+    if total_count > 0 {
+        for result in &mut results {
+            result.percentage = (result.count as f64 / total_count as f64) * 100.0;
+        }
+    }
+
+    let execution_time_ms = query_start.elapsed().as_millis() as u64;
+    tlog!("[dbquery] distribution: frame=0x{:X} byte={} ext={:?} | {} values, total={}, {}ms",
+        frame_id, byte_index, is_extended, results.len(), total_count, execution_time_ms);
+
+    unregister_query(&query_id).await;
+
+    Ok(DistributionQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: results.len(),
+            execution_time_ms,
+        },
+        results,
+    })
+}
+
+/// Query for gaps in frame transmission exceeding a threshold.
+///
+/// Fetches timestamps for the given frame ID, finds consecutive pairs where
+/// the interval exceeds the threshold, and returns them sorted by duration
+/// (longest gaps first).
+#[tauri::command]
+pub async fn db_query_gap_analysis(
+    app: AppHandle,
+    profile_id: String,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    gap_threshold_ms: f64,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    limit: Option<u32>,
+    query_id: Option<String>,
+) -> Result<GapAnalysisQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let result_limit = limit.unwrap_or(10000) as usize;
+    let query_id = query_id.unwrap_or_else(|| format!("gap_analysis_{}", query_start.elapsed().as_nanos()));
+
+    tlog!("[dbquery] db_query_gap_analysis: profile='{}', frame_id={}, threshold={}ms, is_extended={:?}",
+        profile_id, frame_id, gap_threshold_ms, is_extended);
+
+    // Load settings to get profile
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| {
+            tlog!("[dbquery] Connection failed: {:?}", e);
+            format!("Failed to connect to database: {}", e)
+        })?;
+
+    let cancel_token = client.cancel_token();
+    register_query(&query_id, "gap_analysis", &profile_id, cancel_token).await;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            tlog!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Set application name
+    client
+        .execute("SET application_name = 'CANdor Query'", &[])
+        .await
+        .ok();
+
+    let frame_id_i32 = frame_id as i32;
+
+    // Build query to fetch all timestamps ordered
+    let mut param_idx = 1;
+    let frame_id_param = param_idx;
+    param_idx += 1;
+
+    let mut query = format!(
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us FROM public.can_frame WHERE id = ${}::int4",
+        frame_id_param
+    );
+
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32];
+
+    let is_extended_bool: bool;
+    if let Some(ext) = is_extended {
+        is_extended_bool = ext;
+        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        param_idx += 1;
+        params.push(&is_extended_bool);
+    }
+
+    if let Some(ref start) = start_time {
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        param_idx += 1;
+        params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+    if let Some(ref end) = end_time {
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
+        params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+
+    query.push_str(" ORDER BY ts");
+
+    tlog!("[dbquery] gap_analysis query:\n{}", query);
+
+    let rows = client
+        .query(&query, &params)
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    let rows_scanned = rows.len();
+    tlog!("[dbquery] gap_analysis: {} rows fetched", rows_scanned);
+
+    // Extract timestamps and find gaps exceeding threshold
+    let threshold_us = gap_threshold_ms * 1000.0;
+    let mut results: Vec<GapResult> = Vec::new();
+
+    let mut prev_ts: Option<i64> = None;
+    for row in &rows {
+        let ts: f64 = row.get("timestamp_us");
+        let ts_i64 = ts as i64;
+
+        if let Some(prev) = prev_ts {
+            let gap_us = (ts_i64 - prev) as f64;
+            if gap_us > threshold_us {
+                results.push(GapResult {
+                    gap_start_us: prev,
+                    gap_end_us: ts_i64,
+                    duration_ms: gap_us / 1000.0,
+                });
+            }
+        }
+        prev_ts = Some(ts_i64);
+    }
+
+    // Sort by duration descending (longest gaps first)
+    results.sort_by(|a, b| b.duration_ms.partial_cmp(&a.duration_ms).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Apply limit
+    results.truncate(result_limit);
+
+    let execution_time_ms = query_start.elapsed().as_millis() as u64;
+    tlog!("[dbquery] gap_analysis: frame=0x{:X} ext={:?} threshold={}ms | {} gaps found, {}ms",
+        frame_id, is_extended, gap_threshold_ms, results.len(), execution_time_ms);
+
+    unregister_query(&query_id).await;
+
+    Ok(GapAnalysisQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: results.len(),
+            execution_time_ms,
+        },
+        results,
+    })
+}
+
+/// Search for frames whose payload matches a byte pattern with a mask.
+///
+/// For each frame, checks all positions where the pattern could fit within
+/// the payload. A byte matches if `(payload[i] & mask[i]) == (pattern[i] & mask[i])`.
+/// Records matching start positions in `match_positions`.
+#[tauri::command]
+pub async fn db_query_pattern_search(
+    app: AppHandle,
+    profile_id: String,
+    pattern: Vec<u8>,
+    pattern_mask: Vec<u8>,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    limit: Option<u32>,
+    query_id: Option<String>,
+) -> Result<PatternSearchQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let result_limit = limit.unwrap_or(10000) as usize;
+    let query_id = query_id.unwrap_or_else(|| format!("pattern_search_{}", query_start.elapsed().as_nanos()));
+
+    if pattern.len() != pattern_mask.len() {
+        return Err("Pattern and mask must have the same length".to_string());
+    }
+    if pattern.is_empty() {
+        return Err("Pattern must not be empty".to_string());
+    }
+
+    tlog!("[dbquery] db_query_pattern_search: profile='{}', pattern_len={}, limit={}",
+        profile_id, pattern.len(), result_limit);
+
+    // Load settings to get profile
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| {
+            tlog!("[dbquery] Connection failed: {:?}", e);
+            format!("Failed to connect to database: {}", e)
+        })?;
+
+    let cancel_token = client.cancel_token();
+    register_query(&query_id, "pattern_search", &profile_id, cancel_token).await;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            tlog!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Set application name
+    client
+        .execute("SET application_name = 'CANdor Query'", &[])
+        .await
+        .ok();
+
+    // Build query — fetch all frames in the time range, filter in Rust
+    let mut param_idx = 1;
+    let mut query = String::from(
+        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us, id as frame_id, extended, data_bytes FROM public.can_frame WHERE true"
+    );
+
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = Vec::new();
+
+    if let Some(ref start) = start_time {
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        param_idx += 1;
+        params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+    if let Some(ref end) = end_time {
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
+        params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+
+    query.push_str(" ORDER BY ts");
+
+    tlog!("[dbquery] pattern_search query:\n{}", query);
+
+    let rows = client
+        .query(&query, &params)
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    let rows_scanned = rows.len();
+    tlog!("[dbquery] pattern_search: {} rows fetched, filtering in Rust", rows_scanned);
+
+    // Filter rows by pattern match
+    let pattern_len = pattern.len();
+    let mut results: Vec<PatternSearchResult> = Vec::new();
+
+    for row in &rows {
+        let timestamp_us: f64 = row.get("timestamp_us");
+        let frame_id_val: i32 = row.get("frame_id");
+        let extended: bool = row.get("extended");
+        let data_bytes: Vec<u8> = row.get("data_bytes");
+
+        if data_bytes.len() < pattern_len {
+            // Payload too short for pattern at position 0 — check all positions anyway
+            // (no positions will fit if payload < pattern)
+            continue;
+        }
+
+        // Check all positions where the pattern could fit
+        let mut match_positions: Vec<usize> = Vec::new();
+        let max_start = data_bytes.len().saturating_sub(pattern_len);
+
+        for start_pos in 0..=max_start {
+            let mut matches = true;
+            for j in 0..pattern_len {
+                if (data_bytes[start_pos + j] & pattern_mask[j]) != (pattern[j] & pattern_mask[j]) {
+                    matches = false;
+                    break;
+                }
+            }
+            if matches {
+                match_positions.push(start_pos);
+            }
+        }
+
+        if !match_positions.is_empty() {
+            results.push(PatternSearchResult {
+                timestamp_us: timestamp_us as i64,
+                frame_id: frame_id_val as u32,
+                is_extended: extended,
+                payload: data_bytes,
+                match_positions,
+            });
+
+            if results.len() >= result_limit {
+                break;
+            }
+        }
+    }
+
+    let execution_time_ms = query_start.elapsed().as_millis() as u64;
+    tlog!("[dbquery] pattern_search: pattern_len={} | {} matches from {} rows, {}ms",
+        pattern_len, results.len(), rows_scanned, execution_time_ms);
+
+    unregister_query(&query_id).await;
+
+    Ok(PatternSearchQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: results.len(),
+            execution_time_ms,
+        },
+        results,
     })
 }
