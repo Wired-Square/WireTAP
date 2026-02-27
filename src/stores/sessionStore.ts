@@ -497,6 +497,14 @@ export interface SessionStore {
   closeAppError: () => void;
   /** Set the decoder catalog path for a session (frontend-only, shared across apps) */
   setSessionCatalogPath: (sessionId: string, catalogPath: string | null) => void;
+
+  // ---- Cross-App Session Join ----
+  /** Pending session joins keyed by app name (e.g., "transmit", "graph") */
+  pendingJoins: Record<string, { sessionId: string }>;
+  /** Request that an app auto-joins a session (called by source apps) */
+  requestSessionJoin: (appName: string, sessionId: string) => void;
+  /** Clear a pending join for an app (consumed by useIOSessionManager) */
+  clearPendingJoin: (appName: string) => void;
 }
 
 // ============================================================================
@@ -749,6 +757,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: {},
   activeSessionId: null,
   _eventListeners: {},
+  pendingJoins: {},
   appErrorDialog: {
     isOpen: false,
     title: "",
@@ -1747,6 +1756,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         [sessionId]: { ...s.sessions[sessionId], catalogPath },
       },
     }));
+  },
+
+  // ---- Cross-App Session Join ----
+  requestSessionJoin: (appName, sessionId) => {
+    set((state) => ({
+      pendingJoins: { ...state.pendingJoins, [appName]: { sessionId } },
+    }));
+  },
+
+  clearPendingJoin: (appName) => {
+    set((state) => {
+      const { [appName]: _, ...rest } = state.pendingJoins;
+      return { pendingJoins: rest };
+    });
   },
 }));
 

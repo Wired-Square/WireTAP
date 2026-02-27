@@ -6,6 +6,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Auto-join session on cross-app commands**: "Graph Signal", "Graph Frame", "Graph All Signals", and "Send to Transmit" context menu actions now automatically join the source app's session if the target panel has no session yet. Eliminates the need to manually pick the same IO source in the Graph or Transmit panel after using a context menu shortcut. The mechanism is centralised in `sessionStore` and `useIOSessionManager`, so any app using the session manager gets auto-join support automatically.
+
 - **Session-level decoder**: The active decoder catalog is now stored on the session, not the IO profile. When an app picks a decoder, all apps sharing the same session see the change immediately. The Session Manager's decoder dropdown reads and writes the session decoder.
 
 - **Auto-load from profile**: IO profiles have a `preferred_catalog` field (editable in Settings) that auto-loads when a session starts. Multi-source sessions with conflicting preferred decoders show a disambiguation dialog.

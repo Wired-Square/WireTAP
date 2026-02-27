@@ -24,6 +24,7 @@ import { formatFrameId } from "../../../utils/frameIds";
 import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useGraphStore } from "../../../stores/graphStore";
+import { useSessionStore } from "../../../stores/sessionStore";
 import type { FrameRow } from "../components/FrameDataTable";
 
 const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 60];
@@ -562,6 +563,7 @@ function DiscoveryFramesView({
         label: 'Send to Transmit',
         icon: <Send className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
           useTransmitStore.getState().updateCanEditor({
             frameId: frame.frame_id.toString(16).toUpperCase(),
             dlc: frame.dlc,
@@ -569,6 +571,7 @@ function DiscoveryFramesView({
             isExtended: frame.is_extended ?? false,
             bus: frame.bus ?? 0,
           });
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
           openPanel("transmit");
         },
       },
@@ -576,9 +579,11 @@ function DiscoveryFramesView({
         label: 'Graph',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
           const store = useGraphStore.getState();
           const panelId = store.addPanel('flow');
           store.updatePanel(panelId, { targetFrameId: frame.frame_id, title: formatFrameId(frame.frame_id, displayFrameIdFormat, frame.is_extended) });
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
           openPanel("graph");
         },
       },

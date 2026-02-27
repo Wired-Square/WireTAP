@@ -399,6 +399,10 @@ export function useIOSessionManager(
   const [ingestFrameCount, setIngestFrameCount] = useState(0);
   const [ingestError, setIngestError] = useState<string | null>(null);
 
+  // ---- Auto-Join from Cross-App Commands ----
+  const pendingJoin = useSessionStore((s) => s.pendingJoins[appName]);
+  const clearPendingJoin = useSessionStore((s) => s.clearPendingJoin);
+
   // ---- Multi-Session ID State ----
   // Generated dynamically when starting a multi-source session to avoid collisions
   // between multiple windows of the same app type
@@ -1338,6 +1342,17 @@ export function useIOSessionManager(
     }
     setIoProfile(null);
   }, [setMultiBusProfiles, session, setIoProfile]);
+
+  // ---- Auto-Join from Cross-App Commands ----
+  // When a source app (Decoder, Discovery) requests this app to join its session,
+  // the pending join is consumed here. Only joins if the app has no active session.
+  useEffect(() => {
+    if (!pendingJoin) return;
+    clearPendingJoin(appName);
+    if (ioProfile) return;
+    if (!useSessionStore.getState().sessions[pendingJoin.sessionId]) return;
+    joinSession(pendingJoin.sessionId).catch(console.error);
+  }, [pendingJoin, ioProfile, clearPendingJoin, appName, joinSession]);
 
   // ---- Clear Watch State on Stream End ----
   useEffect(() => {

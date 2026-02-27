@@ -19,6 +19,7 @@ import type { DecodedFrame, DecodedSignal, DecoderViewMode, UnmatchedFrame, Filt
 import { useDecoderStore, MAX_UNMATCHED_FRAMES, MAX_FILTERED_FRAMES } from "../../../stores/decoderStore";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useGraphStore } from "../../../stores/graphStore";
+import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { FrameDetail, SignalDef } from "../../../types/decoder";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
@@ -1116,6 +1117,7 @@ export default function DecoderFramesView({
         label: 'Send to Transmit',
         icon: <Send className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDecoderStore.getState().ioProfile;
           useTransmitStore.getState().updateCanEditor({
             frameId: frame.id.toString(16).toUpperCase(),
             dlc: frame.len,
@@ -1123,6 +1125,7 @@ export default function DecoderFramesView({
             isExtended: frame.isExtended ?? false,
             bus: frame.bus ?? 0,
           });
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
           openPanel("transmit");
         },
       },
@@ -1130,9 +1133,11 @@ export default function DecoderFramesView({
         label: 'Graph Frame',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useGraphStore.getState();
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
           openPanel("graph");
         },
       },
@@ -1140,6 +1145,7 @@ export default function DecoderFramesView({
         label: 'Graph All Signals',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDecoderStore.getState().ioProfile;
           const allSignals = getAllFrameSignals(frame);
           const numericSignals = allSignals.filter(s => {
             const fmt = s.format;
@@ -1155,6 +1161,7 @@ export default function DecoderFramesView({
               gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
             }
           }
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
           openPanel("graph");
         },
       },
@@ -1175,9 +1182,11 @@ export default function DecoderFramesView({
         label: 'Graph Frame',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useGraphStore.getState();
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
           openPanel("graph");
         },
       },
@@ -1185,9 +1194,11 @@ export default function DecoderFramesView({
         label: 'Graph Signal',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useGraphStore.getState();
           const panelId = gStore.addPanel('line-chart');
           gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
           openPanel("graph");
         },
       },
@@ -1232,6 +1243,7 @@ export default function DecoderFramesView({
         label: 'Send to Transmit',
         icon: <Send className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDecoderStore.getState().ioProfile;
           useTransmitStore.getState().updateCanEditor({
             frameId: frame.frameId.toString(16).toUpperCase(),
             dlc: frame.bytes.length,
@@ -1239,6 +1251,7 @@ export default function DecoderFramesView({
             isExtended,
             bus: 0,
           });
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("transmit", sourceSessionId);
           openPanel("transmit");
         },
       },
@@ -1246,9 +1259,11 @@ export default function DecoderFramesView({
         label: 'Graph Frame',
         icon: <BarChart3 className={iconXs} />,
         onClick: () => {
+          const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useGraphStore.getState();
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formattedId });
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
           openPanel("graph");
         },
       },
