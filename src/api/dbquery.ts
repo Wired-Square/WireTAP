@@ -138,6 +138,79 @@ export async function queryMirrorValidation(
   });
 }
 
+/** Statistics for a single byte position within a mux case */
+export interface BytePositionStats {
+  byte_index: number;
+  min: number;
+  max: number;
+  avg: number;
+  distinct_count: number;
+  sample_count: number;
+}
+
+/** Statistics for a reconstructed 16-bit value from two adjacent bytes */
+export interface Word16Stats {
+  start_byte: number;
+  endianness: "le" | "be";
+  min: number;
+  max: number;
+  avg: number;
+  distinct_count: number;
+}
+
+/** Statistics for a single mux case */
+export interface MuxCaseStats {
+  mux_value: number;
+  frame_count: number;
+  byte_stats: BytePositionStats[];
+  word16_stats: Word16Stats[];
+}
+
+/** Full result of a mux statistics query */
+export interface MuxStatisticsResult {
+  mux_byte: number;
+  total_frames: number;
+  cases: MuxCaseStats[];
+}
+
+/** Wrapper for mux statistics query results with stats */
+export interface MuxStatisticsQueryResult {
+  results: MuxStatisticsResult;
+  stats: QueryStats;
+}
+
+/**
+ * Query mux statistics for a multiplexed frame.
+ *
+ * Groups payloads by mux selector byte and computes per-byte and optional
+ * 16-bit word statistics for each mux case.
+ */
+export async function queryMuxStatistics(
+  profileId: string,
+  frameId: number,
+  muxSelectorByte: number,
+  isExtended: boolean | null,
+  include16bit: boolean,
+  payloadLength: number,
+  startTime?: string,
+  endTime?: string,
+  limit?: number,
+  queryId?: string
+): Promise<MuxStatisticsQueryResult> {
+  return invoke("db_query_mux_statistics", {
+    profileId,
+    frameId,
+    muxSelectorByte,
+    isExtended,
+    include16bit: include16bit,
+    payloadLength,
+    startTime,
+    endTime,
+    limit,
+    queryId,
+  });
+}
+
 /**
  * Cancel a running database query.
  *

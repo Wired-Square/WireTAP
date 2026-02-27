@@ -12,6 +12,8 @@ import {
   type MirrorValidationResult,
   type QueuedQuery,
 } from "../stores/queryStore";
+import type { MuxStatisticsResult } from "../../../api/dbquery";
+import MuxStatisticsView from "./MuxStatisticsView";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { formatHumanUs } from "../../../utils/timeFormat";
 import DataViewPaginationToolbar, { FRAME_PAGE_SIZE_OPTIONS } from "../../../components/DataViewPaginationToolbar";
@@ -44,16 +46,20 @@ export default function ResultsPanel({
   // Extract data from selected query
   const queryType = selectedQuery?.queryType ?? "byte_changes";
   const results = selectedQuery?.results ?? null;
-  const resultCount = results ? (results as unknown[]).length : 0;
+  const resultCount = results
+    ? Array.isArray(results)
+      ? results.length
+      : (results as MuxStatisticsResult).cases?.length ?? 0
+    : 0;
   const lastQueryStats = selectedQuery?.stats ?? null;
   const isRunning = selectedQuery?.status === "running";
   const error = selectedQuery?.errorMessage ?? null;
 
   const queryInfo = QUERY_TYPE_INFO[queryType];
 
-  // Calculate paginated results
+  // Calculate paginated results (only for array-based query types)
   const { paginatedResults, totalPages } = useMemo(() => {
-    if (!results || resultCount === 0) {
+    if (!results || resultCount === 0 || !Array.isArray(results)) {
       return { paginatedResults: [], totalPages: 0 };
     }
 
@@ -203,6 +209,17 @@ export default function ResultsPanel({
           )}
         </div>
       </div>
+    );
+  }
+
+  // Mux statistics results — delegate to dedicated view
+  if (queryType === "mux_statistics" && results && !Array.isArray(results)) {
+    return (
+      <MuxStatisticsView
+        results={results as MuxStatisticsResult}
+        stats={lastQueryStats}
+        displayName={selectedQuery.displayName}
+      />
     );
   }
 

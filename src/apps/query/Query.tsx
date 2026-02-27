@@ -92,7 +92,9 @@ export default function Query() {
   const pendingCount = queue.filter((q) => q.status === "pending").length;
   const selectedQuery = queue.find((q) => q.id === selectedQueryId) ?? null;
   const selectedQueryResultCount = selectedQuery?.results
-    ? (selectedQuery.results as unknown[]).length
+    ? Array.isArray(selectedQuery.results)
+      ? selectedQuery.results.length
+      : (selectedQuery.results as { cases: unknown[] }).cases?.length ?? 0
     : 0;
 
   // Dialog management
@@ -299,9 +301,10 @@ export default function Query() {
 
   // Get time range from selected query results for bookmarking
   const getSelectedQueryTimeRange = useCallback(() => {
-    if (!selectedQuery?.results || (selectedQuery.results as unknown[]).length === 0) {
-      return null;
-    }
+    if (!selectedQuery?.results) return null;
+    // Mux statistics results are an object, not a timestamped array
+    if (!Array.isArray(selectedQuery.results)) return null;
+    if (selectedQuery.results.length === 0) return null;
     const results = selectedQuery.results as { timestamp_us: number }[];
     const timestamps = results.map((r) => r.timestamp_us);
     return {

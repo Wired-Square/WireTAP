@@ -6,6 +6,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Mux Statistics query**: New query type in the Query app that groups frame payloads by a mux selector byte and computes per-byte MIN/MAX/AVG/distinct-count statistics for each mux case. Optionally includes 16-bit word statistics in both little-endian and big-endian interpretations. Works with both buffer (SQLite) and PostgreSQL data sources, with a dedicated results view showing per-case breakdowns. Supports a higher scan limit (up to 10M rows) since the query aggregates raw payloads rather than returning individual results.
+
 - **Remove all panels button**: Red bin icon in the Graph toolbar to delete all panels at once. Disabled when no panels exist.
 
 - **Hypothesis Explorer**: New signal hypothesis tool in the Graph app (Sparkles dropdown → Hypothesis Explorer) for fuzzy reverse engineering. Specify bit-level offsets, bit lengths (8/12/16/24/32), endianness, signed/unsigned, and scale/offset, then auto-generate candidate signal plots for one or all discovered frame IDs. Candidates are ranked by interest score using Discovery's payload analysis results (byte role, multi-byte patterns, variance, trend strength). Hypothesis signals persist across sessions and named layouts.

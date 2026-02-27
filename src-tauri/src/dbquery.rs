@@ -4,7 +4,7 @@
 // against PostgreSQL data sources to find historical patterns and changes.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, LazyLock};
 use tauri::AppHandle;
 use tokio::sync::Mutex;
@@ -153,6 +153,194 @@ pub struct MirrorValidationResult {
 pub struct MirrorValidationQueryResult {
     pub results: Vec<MirrorValidationResult>,
     pub stats: QueryStats,
+}
+
+/// Statistics for a single byte position within a mux case
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BytePositionStats {
+    pub byte_index: u8,
+    pub min: u8,
+    pub max: u8,
+    pub avg: f64,
+    pub distinct_count: u32,
+    pub sample_count: u64,
+}
+
+/// Statistics for a reconstructed 16-bit value from two adjacent bytes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Word16Stats {
+    pub start_byte: u8,
+    pub endianness: String,
+    pub min: u16,
+    pub max: u16,
+    pub avg: f64,
+    pub distinct_count: u32,
+}
+
+/// Statistics for a single mux case
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MuxCaseStats {
+    pub mux_value: u16,
+    pub frame_count: u64,
+    pub byte_stats: Vec<BytePositionStats>,
+    pub word16_stats: Vec<Word16Stats>,
+}
+
+/// Full result of a mux statistics query
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MuxStatisticsResult {
+    pub mux_byte: u8,
+    pub total_frames: u64,
+    pub cases: Vec<MuxCaseStats>,
+}
+
+/// Wrapper for mux statistics query results with stats
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MuxStatisticsQueryResult {
+    pub results: MuxStatisticsResult,
+    pub stats: QueryStats,
+}
+
+/// Compute per-mux-case statistics from grouped payloads.
+/// `payloads_by_mux` maps mux selector value -> list of raw frame payloads.
+/// `mux_byte` is the byte index of the mux selector (used to skip it in stats).
+/// `payload_length` is the expected payload width for byte iteration.
+pub fn compute_mux_statistics(
+    payloads_by_mux: &BTreeMap<u16, Vec<Vec<u8>>>,
+    include_16bit: bool,
+    mux_byte: u8,
+    payload_length: u8,
+) -> MuxStatisticsResult {
+    let mut total_frames: u64 = 0;
+    let mut cases = Vec::new();
+    let start_byte = (mux_byte + 1) as usize;
+    let end_byte = payload_length as usize;
+
+    for (&mux_value, payloads) in payloads_by_mux {
+        let frame_count = payloads.len() as u64;
+        total_frames += frame_count;
+
+        // Per-byte statistics
+        let mut byte_stats = Vec::new();
+        for byte_idx in start_byte..end_byte {
+            let mut min: u8 = 255;
+            let mut max: u8 = 0;
+            let mut sum: f64 = 0.0;
+            let mut distinct = HashSet::new();
+            let mut count: u64 = 0;
+
+            for payload in payloads {
+                if byte_idx < payload.len() {
+                    let val = payload[byte_idx];
+                    if val < min {
+                        min = val;
+                    }
+                    if val > max {
+                        max = val;
+                    }
+                    sum += val as f64;
+                    distinct.insert(val);
+                    count += 1;
+                }
+            }
+
+            if count > 0 {
+                byte_stats.push(BytePositionStats {
+                    byte_index: byte_idx as u8,
+                    min,
+                    max,
+                    avg: sum / count as f64,
+                    distinct_count: distinct.len() as u32,
+                    sample_count: count,
+                });
+            }
+        }
+
+        // 16-bit word statistics (LE and BE for each adjacent pair)
+        let mut word16_stats = Vec::new();
+        if include_16bit {
+            let mut byte_idx = start_byte;
+            while byte_idx + 1 < end_byte {
+                // Little-endian: low byte first
+                let mut le_min: u16 = u16::MAX;
+                let mut le_max: u16 = 0;
+                let mut le_sum: f64 = 0.0;
+                let mut le_distinct = HashSet::new();
+
+                // Big-endian: high byte first
+                let mut be_min: u16 = u16::MAX;
+                let mut be_max: u16 = 0;
+                let mut be_sum: f64 = 0.0;
+                let mut be_distinct = HashSet::new();
+
+                let mut word_count: u64 = 0;
+
+                for payload in payloads {
+                    if byte_idx + 1 < payload.len() {
+                        let lo = payload[byte_idx] as u16;
+                        let hi = payload[byte_idx + 1] as u16;
+
+                        let le_val = lo | (hi << 8);
+                        let be_val = (lo << 8) | hi;
+
+                        if le_val < le_min {
+                            le_min = le_val;
+                        }
+                        if le_val > le_max {
+                            le_max = le_val;
+                        }
+                        le_sum += le_val as f64;
+                        le_distinct.insert(le_val);
+
+                        if be_val < be_min {
+                            be_min = be_val;
+                        }
+                        if be_val > be_max {
+                            be_max = be_val;
+                        }
+                        be_sum += be_val as f64;
+                        be_distinct.insert(be_val);
+
+                        word_count += 1;
+                    }
+                }
+
+                if word_count > 0 {
+                    word16_stats.push(Word16Stats {
+                        start_byte: byte_idx as u8,
+                        endianness: "le".to_string(),
+                        min: le_min,
+                        max: le_max,
+                        avg: le_sum / word_count as f64,
+                        distinct_count: le_distinct.len() as u32,
+                    });
+                    word16_stats.push(Word16Stats {
+                        start_byte: byte_idx as u8,
+                        endianness: "be".to_string(),
+                        min: be_min,
+                        max: be_max,
+                        avg: be_sum / word_count as f64,
+                        distinct_count: be_distinct.len() as u32,
+                    });
+                }
+
+                byte_idx += 2;
+            }
+        }
+
+        cases.push(MuxCaseStats {
+            mux_value,
+            frame_count,
+            byte_stats,
+            word16_stats,
+        });
+    }
+
+    MuxStatisticsResult {
+        mux_byte,
+        total_frames,
+        cases,
+    }
 }
 
 /// A running query or session from pg_stat_activity
@@ -1041,4 +1229,141 @@ pub async fn db_terminate_backend(
     tlog!("[dbquery] pg_terminate_backend({}) returned: {}", pid, terminated);
 
     Ok(terminated)
+}
+
+/// Query mux statistics for a multiplexed frame.
+///
+/// Fetches payloads from PostgreSQL, groups by mux selector byte, and computes
+/// per-byte and optional 16-bit word statistics for each mux case.
+#[tauri::command]
+pub async fn db_query_mux_statistics(
+    app: AppHandle,
+    profile_id: String,
+    frame_id: u32,
+    mux_selector_byte: u8,
+    is_extended: Option<bool>,
+    include_16bit: bool,
+    payload_length: u8,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    limit: Option<u32>,
+    query_id: Option<String>,
+) -> Result<MuxStatisticsQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let result_limit = limit.unwrap_or(500_000);
+    let query_id = query_id.unwrap_or_else(|| format!("mux_stats_{}", query_start.elapsed().as_nanos()));
+
+    tlog!("[dbquery] db_query_mux_statistics: profile='{}', frame_id={}, mux_byte={}, limit={}",
+        profile_id, frame_id, mux_selector_byte, result_limit);
+
+    let settings = load_settings(app).await.map_err(|e| format!("Failed to load settings: {}", e))?;
+    let profile = find_profile(&settings, &profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+
+    let password = get_profile_password(&profile);
+    let conn_str = build_connection_string(&profile, password);
+
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+
+    let cancel_token = client.cancel_token();
+    register_query(&query_id, "mux_statistics", &profile_id, cancel_token).await;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            tlog!("PostgreSQL connection error: {}", e);
+        }
+    });
+
+    // Build SQL to fetch mux value + raw payload
+    let frame_id_i32 = frame_id as i32;
+    let mux_byte_i32 = mux_selector_byte as i32;
+
+    let mut param_idx = 1;
+    let frame_id_param = param_idx;
+    param_idx += 1;
+    let mux_byte_param = param_idx;
+    param_idx += 1;
+
+    let mut query = format!(
+        r#"SELECT
+            public.get_byte_safe(data_bytes, ${}::int4) as mux_value,
+            data_bytes
+        FROM public.can_frame
+        WHERE id = ${}::int4"#,
+        mux_byte_param, frame_id_param
+    );
+
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32, &mux_byte_i32];
+
+    let is_extended_bool: bool;
+    if let Some(ext) = is_extended {
+        is_extended_bool = ext;
+        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        param_idx += 1;
+        params.push(&is_extended_bool);
+    }
+
+    if let Some(ref start) = start_time {
+        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        param_idx += 1;
+        params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+    if let Some(ref end) = end_time {
+        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
+        // param_idx not needed after last use
+        params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
+    }
+
+    // No ORDER BY — rows arrive in natural (time) order so the LIMIT samples
+    // evenly across all mux cases rather than exhausting case 0 first.
+    query.push_str(&format!(" LIMIT {}", result_limit));
+
+    tlog!("[dbquery] mux_statistics query:\n{}", query);
+
+    let rows = client
+        .query(&query, &params)
+        .await
+        .map_err(|e| {
+            let err = format!("Query failed: {}", e);
+            tlog!("[dbquery] {}", err);
+            err
+        })?;
+
+    // Unregister before processing (query is done)
+    unregister_query(&query_id).await;
+
+    let rows_scanned = rows.len();
+    tlog!("[dbquery] mux_statistics: {} rows fetched", rows_scanned);
+
+    // Group payloads by mux value
+    let mut payloads_by_mux: BTreeMap<u16, Vec<Vec<u8>>> = BTreeMap::new();
+    for row in &rows {
+        let mux_value: i32 = row.get("mux_value");
+        let data_bytes: Vec<u8> = row.get("data_bytes");
+        payloads_by_mux
+            .entry(mux_value as u16)
+            .or_default()
+            .push(data_bytes);
+    }
+
+    let result = compute_mux_statistics(&payloads_by_mux, include_16bit, mux_selector_byte, payload_length);
+    let elapsed = query_start.elapsed();
+
+    tlog!("[dbquery] mux_statistics: {} cases, {} total frames in {}ms",
+        result.cases.len(), result.total_frames, elapsed.as_millis());
+
+    Ok(MuxStatisticsQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: result.cases.len(),
+            execution_time_ms: elapsed.as_millis() as u64,
+        },
+        results: result,
+    })
 }

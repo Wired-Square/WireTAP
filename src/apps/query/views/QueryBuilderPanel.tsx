@@ -358,20 +358,24 @@ export default function QueryBuilderPanel({
     [contextWindow, setContextWindow]
   );
 
-  // Handle limit override change
-  const handleLimitChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const limit = parseInt(e.target.value, 10);
-      if (!isNaN(limit) && limit >= 100 && limit <= 100000) {
-        setLimitOverride(limit);
-      }
-    },
-    []
-  );
-
   const queryInfo = QUERY_TYPE_INFO[queryType];
   const showByteIndex = queryType === "byte_changes";
   const showMirrorValidation = queryType === "mirror_validation";
+  const showMuxStatistics = queryType === "mux_statistics";
+
+  // Handle limit override change
+  // Mux statistics scans raw frames for aggregation, so allow a higher ceiling
+  const maxLimit = showMuxStatistics ? 10_000_000 : 100_000;
+
+  const handleLimitChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const limit = parseInt(e.target.value, 10);
+      if (!isNaN(limit) && limit >= 100 && limit <= maxLimit) {
+        setLimitOverride(limit);
+      }
+    },
+    [maxLimit]
+  );
 
   // Whether we're targeting a buffer (SQLite) vs PostgreSQL
   const isBufferSource = !!bufferId;
@@ -438,6 +442,16 @@ WHERE frame_id = ${sourceFrameId}${extendedClause}${timeConditions}
 
 -- Tolerance: ${toleranceMs}ms (${toleranceMs * 1000}µs)
 LIMIT ${limitOverride.toLocaleString()}`;
+      }
+
+      if (queryType === "mux_statistics") {
+        const { muxSelectorByte } = queryParams;
+        return `-- SQLite buffer query
+SELECT payload FROM frames
+WHERE frame_id = ${frameId}${extendedClause}${timeConditions}
+ORDER BY rowid
+LIMIT ${limitOverride.toLocaleString()}
+-- Group by payload[${muxSelectorByte}], compute stats in Rust`;
       }
 
       return `-- Query type "${queryType}" not yet implemented for buffers`;
@@ -515,6 +529,17 @@ JOIN source_frames s
 WHERE m.data_bytes IS DISTINCT FROM s.data_bytes
 ORDER BY m.ts
 LIMIT ${limitOverride.toLocaleString()}`;
+    }
+
+    if (queryType === "mux_statistics") {
+      const { muxSelectorByte } = queryParams;
+      return `SELECT
+  get_byte_safe(data_bytes, ${muxSelectorByte}) as mux_value,
+  data_bytes
+FROM can_frame
+WHERE id = ${frameId}${extendedClause}${timeConditions}
+LIMIT ${limitOverride.toLocaleString()}
+-- Group by mux_value, compute per-byte stats in Rust`;
     }
 
     return `-- Query type "${queryType}" not yet implemented`;
@@ -727,6 +752,52 @@ LIMIT ${limitOverride.toLocaleString()}`;
                   />
                 </div>
               )}
+
+              {/* Mux Statistics Parameters */}
+              {showMuxStatistics && (
+                <div className="space-y-2">
+                  <div>
+                    <label className={labelSmallMuted}>Mux Selector Byte</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={7}
+                      value={queryParams.muxSelectorByte}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 0 && v < 64) updateQueryParams({ muxSelectorByte: v });
+                      }}
+                      disabled={disabled}
+                      className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelSmallMuted}>Payload Length (bytes)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={64}
+                      value={queryParams.payloadLength}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 1 && v <= 64) updateQueryParams({ payloadLength: v });
+                      }}
+                      disabled={disabled}
+                      className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    />
+                  </div>
+                  <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={queryParams.include16Bit}
+                      onChange={(e) => updateQueryParams({ include16Bit: e.target.checked })}
+                      disabled={disabled}
+                      className="disabled:cursor-not-allowed"
+                    />
+                    Include 16-bit word statistics (LE &amp; BE)
+                  </label>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -768,6 +839,52 @@ LIMIT ${limitOverride.toLocaleString()}`;
                     disabled={disabled}
                     className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                   />
+                </div>
+              )}
+
+              {/* Mux Statistics Parameters */}
+              {showMuxStatistics && (
+                <div className="space-y-2">
+                  <div>
+                    <label className={labelSmallMuted}>Mux Selector Byte</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={7}
+                      value={queryParams.muxSelectorByte}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 0 && v < 64) updateQueryParams({ muxSelectorByte: v });
+                      }}
+                      disabled={disabled}
+                      className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelSmallMuted}>Payload Length (bytes)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={64}
+                      value={queryParams.payloadLength}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 1 && v <= 64) updateQueryParams({ payloadLength: v });
+                      }}
+                      disabled={disabled}
+                      className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    />
+                  </div>
+                  <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={queryParams.include16Bit}
+                      onChange={(e) => updateQueryParams({ include16Bit: e.target.checked })}
+                      disabled={disabled}
+                      className="disabled:cursor-not-allowed"
+                    />
+                    Include 16-bit word statistics (LE &amp; BE)
+                  </label>
                 </div>
               )}
             </>
@@ -862,16 +979,16 @@ LIMIT ${limitOverride.toLocaleString()}`;
       <div className="flex-shrink-0 p-4 pt-0 space-y-2">
         {/* Result limit input */}
         <div className="flex items-center justify-center gap-2">
-          <label className={`text-xs ${textMuted}`}>Limit results to</label>
+          <label className={`text-xs ${textMuted}`}>{showMuxStatistics ? "Scan up to" : "Limit results to"}</label>
           <input
             type="number"
             min={100}
-            max={100000}
-            step={1000}
+            max={maxLimit}
+            step={showMuxStatistics ? 100000 : 1000}
             value={limitOverride}
             onChange={handleLimitChange}
             disabled={disabled}
-            className={`${inputBase} w-24 text-xs text-center disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`${inputBase} ${showMuxStatistics ? "w-32" : "w-24"} text-xs text-center disabled:opacity-50 disabled:cursor-not-allowed`}
           />
           <span className={`text-xs ${textMuted}`}>rows</span>
         </div>

@@ -8,17 +8,20 @@ import {
   queryByteChanges,
   queryFrameChanges,
   queryMirrorValidation,
+  queryMuxStatistics,
   cancelQuery,
   queryActivity,
   cancelBackend,
   terminateBackend,
   type DatabaseActivity,
   type DatabaseActivityResult,
+  type MuxStatisticsResult,
 } from "../../../api/dbquery";
 import {
   queryByteChangesBuffer,
   queryFrameChangesBuffer,
   queryMirrorValidationBuffer,
+  queryMuxStatisticsBuffer,
 } from "../../../api/bufferquery";
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
@@ -31,6 +34,7 @@ export type QueryType =
   | "byte_changes"
   | "frame_changes"
   | "mirror_validation"
+  | "mux_statistics"
   | "first_last"
   | "frequency"
   | "distribution"
@@ -50,6 +54,10 @@ export const QUERY_TYPE_INFO: Record<QueryType, { label: string; description: st
   mirror_validation: {
     label: "Mirror Validation",
     description: "Find timestamps where mirror frames don't match their source",
+  },
+  mux_statistics: {
+    label: "Mux Statistics",
+    description: "Per-mux-case MIN/MAX/AVG statistics for each byte position",
   },
   first_last: {
     label: "First/Last Occurrence",
@@ -108,7 +116,7 @@ export interface QueryStats {
 }
 
 /** Union type for query results */
-export type QueryResult = ByteChangeResult[] | FrameChangeResult[] | MirrorValidationResult[];
+export type QueryResult = ByteChangeResult[] | FrameChangeResult[] | MirrorValidationResult[] | MuxStatisticsResult;
 
 /** Query parameters */
 export interface QueryParams {
@@ -120,6 +128,10 @@ export interface QueryParams {
   mirrorFrameId: number;
   sourceFrameId: number;
   toleranceMs: number;
+  // Mux statistics params
+  muxSelectorByte: number;
+  include16Bit: boolean;
+  payloadLength: number;
 }
 
 /** Context window configuration for ingesting around events */
@@ -203,12 +215,14 @@ function generateQueryDisplayName(queryType: QueryType, queryParams: QueryParams
     name = `${typeLabel} - ${frameHex}`;
     if (queryType === "byte_changes") {
       name += ` [byte ${queryParams.byteIndex}]`;
+    } else if (queryType === "mux_statistics") {
+      name += ` [mux byte ${queryParams.muxSelectorByte}]`;
     }
     if (queryParams.isExtended) {
       name += " (ext)";
     }
   }
-  if (timeBounds) {
+  if (timeBounds?.favouriteName) {
     name += ` · ${timeBounds.favouriteName}`;
   }
   return name;
@@ -302,6 +316,9 @@ const initialQueryParams: QueryParams = {
   mirrorFrameId: 0,
   sourceFrameId: 0,
   toleranceMs: 50,
+  muxSelectorByte: 0,
+  include16Bit: true,
+  payloadLength: 8,
 };
 
 const initialContextWindow: ContextWindow = {
@@ -359,7 +376,11 @@ export const useQueryStore = create<QueryState>((set, get) => ({
   setResults: (results, stats) =>
     set({
       results,
-      resultCount: Array.isArray(results) ? results.length : 0,
+      resultCount: Array.isArray(results)
+        ? results.length
+        : results && typeof results === "object" && "cases" in results
+          ? (results as MuxStatisticsResult).cases.length
+          : 0,
       lastQueryStats: stats ?? null,
       isRunning: false,
       error: null,
@@ -490,7 +511,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
     });
 
     try {
-      let results: QueryResult = [];
+      let results: QueryResult | null = null;
       let stats: QueryStats | undefined;
 
       const { profileId, bufferId, queryType, queryParams, timeBounds, resultLimit } = nextQuery;
@@ -549,6 +570,23 @@ export const useQueryStore = create<QueryState>((set, get) => ({
               queryParams.sourceFrameId,
               queryParams.isExtended,
               queryParams.toleranceMs * 1000, // Convert ms → µs for buffer queries
+              startTimeUs,
+              endTimeUs,
+              resultLimit,
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "mux_statistics": {
+            const response = await queryMuxStatisticsBuffer(
+              bufferId,
+              queryParams.frameId,
+              queryParams.muxSelectorByte,
+              queryParams.isExtended,
+              queryParams.include16Bit,
+              queryParams.payloadLength,
               startTimeUs,
               endTimeUs,
               resultLimit,
@@ -621,6 +659,24 @@ export const useQueryStore = create<QueryState>((set, get) => ({
               queryParams.sourceFrameId,
               queryParams.isExtended,
               queryParams.toleranceMs,
+              startTime,
+              endTime,
+              resultLimit,
+              nextQuery.id
+            );
+            results = response.results;
+            stats = response.stats;
+            break;
+          }
+
+          case "mux_statistics": {
+            const response = await queryMuxStatistics(
+              profileId,
+              queryParams.frameId,
+              queryParams.muxSelectorByte,
+              queryParams.isExtended,
+              queryParams.include16Bit,
+              queryParams.payloadLength,
               startTime,
               endTime,
               resultLimit,

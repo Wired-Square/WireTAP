@@ -4,10 +4,13 @@
 // Mirrors the PostgreSQL query commands in dbquery.rs but operates on the
 // local buffer_db instead.
 
+use std::collections::BTreeMap;
+
 use crate::buffer_db;
 use crate::dbquery::{
     ByteChangeQueryResult, ByteChangeResult, FrameChangeQueryResult, FrameChangeResult,
-    MirrorValidationQueryResult, MirrorValidationResult, QueryStats,
+    MirrorValidationQueryResult, MirrorValidationResult, MuxStatisticsQueryResult, QueryStats,
+    compute_mux_statistics,
 };
 
 /// Query for byte changes in a specific frame within a buffer.
@@ -389,5 +392,93 @@ pub fn buffer_query_mirror_validation(
             execution_time_ms: elapsed.as_millis() as u64,
         },
         results,
+    })
+}
+
+/// Query mux statistics for a multiplexed frame within a buffer.
+///
+/// Fetches payloads from the SQLite buffer, groups by mux selector byte, and
+/// computes per-byte and optional 16-bit word statistics for each mux case.
+#[tauri::command]
+pub fn buffer_query_mux_statistics(
+    buffer_id: String,
+    frame_id: u32,
+    mux_selector_byte: u8,
+    is_extended: Option<bool>,
+    include_16bit: bool,
+    payload_length: u8,
+    start_time_us: Option<i64>,
+    end_time_us: Option<i64>,
+    limit: Option<i64>,
+) -> Result<MuxStatisticsQueryResult, String> {
+    let query_start = std::time::Instant::now();
+    let result_limit = limit.unwrap_or(500_000);
+
+    tlog!(
+        "[bufferquery] mux_statistics: buffer_id='{}', frame_id={}, mux_byte={}, limit={}",
+        buffer_id, frame_id, mux_selector_byte, result_limit
+    );
+
+    // Build SQL to fetch payloads
+    let mut sql = String::from(
+        "SELECT payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+    );
+
+    let mut param_idx = 3;
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(frame_id as i64));
+
+    if let Some(ext) = is_extended {
+        sql.push_str(&format!(" AND is_extended = ?{}", param_idx));
+        params.push(Box::new(ext as i32));
+        param_idx += 1;
+    }
+    if let Some(start) = start_time_us {
+        sql.push_str(&format!(" AND timestamp_us >= ?{}", param_idx));
+        params.push(Box::new(start));
+        param_idx += 1;
+    }
+    if let Some(end) = end_time_us {
+        sql.push_str(&format!(" AND timestamp_us < ?{}", param_idx));
+        params.push(Box::new(end));
+        param_idx += 1;
+    }
+
+    sql.push_str(&format!(" ORDER BY rowid LIMIT ?{}", param_idx));
+    params.push(Box::new(result_limit));
+
+    // Execute query and collect payloads
+    let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+    let rows: Vec<Vec<u8>> = buffer_db::query_payloads(&sql, &param_refs)?;
+
+    let rows_scanned = rows.len();
+    tlog!("[bufferquery] mux_statistics: fetched {} payloads", rows_scanned);
+
+    // Group by mux selector byte
+    let mux_idx = mux_selector_byte as usize;
+    let mut payloads_by_mux: BTreeMap<u16, Vec<Vec<u8>>> = BTreeMap::new();
+    for payload in rows {
+        if mux_idx < payload.len() {
+            let mux_value = payload[mux_idx] as u16;
+            payloads_by_mux.entry(mux_value).or_default().push(payload);
+        }
+    }
+
+    let result = compute_mux_statistics(&payloads_by_mux, include_16bit, mux_selector_byte, payload_length);
+    let elapsed = query_start.elapsed();
+
+    tlog!(
+        "[bufferquery] mux_statistics: {} cases, {} total frames in {}ms",
+        result.cases.len(), result.total_frames, elapsed.as_millis()
+    );
+
+    Ok(MuxStatisticsQueryResult {
+        stats: QueryStats {
+            rows_scanned,
+            results_count: result.cases.len(),
+            execution_time_ms: elapsed.as_millis() as u64,
+        },
+        results: result,
     })
 }

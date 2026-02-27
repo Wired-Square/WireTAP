@@ -8,6 +8,7 @@ import type {
   ByteChangeQueryResult,
   FrameChangeQueryResult,
   MirrorValidationQueryResult,
+  MuxStatisticsQueryResult,
 } from "./dbquery";
 
 /**
@@ -79,6 +80,36 @@ export async function queryMirrorValidationBuffer(
     sourceFrameId,
     isExtended,
     toleranceUs,
+    startTimeUs,
+    endTimeUs,
+    limit,
+  });
+}
+
+/**
+ * Query mux statistics for a multiplexed frame within a buffer.
+ *
+ * Groups payloads by mux selector byte and computes per-byte and optional
+ * 16-bit word statistics for each mux case.
+ */
+export async function queryMuxStatisticsBuffer(
+  bufferId: string,
+  frameId: number,
+  muxSelectorByte: number,
+  isExtended: boolean | null,
+  include16bit: boolean,
+  payloadLength: number,
+  startTimeUs?: number,
+  endTimeUs?: number,
+  limit?: number,
+): Promise<MuxStatisticsQueryResult> {
+  return invoke("buffer_query_mux_statistics", {
+    bufferId,
+    frameId,
+    muxSelectorByte,
+    isExtended,
+    include16bit: include16bit,
+    payloadLength,
     startTimeUs,
     endTimeUs,
     limit,

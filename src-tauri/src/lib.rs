@@ -1108,6 +1108,7 @@ pub fn run() {
             dbquery::db_query_byte_changes,
             dbquery::db_query_frame_changes,
             dbquery::db_query_mirror_validation,
+            dbquery::db_query_mux_statistics,
             dbquery::db_cancel_query,
             dbquery::db_query_activity,
             dbquery::db_cancel_backend,
@@ -1115,6 +1116,7 @@ pub fn run() {
             bufferquery::buffer_query_byte_changes,
             bufferquery::buffer_query_frame_changes,
             bufferquery::buffer_query_mirror_validation,
+            bufferquery::buffer_query_mux_statistics,
         ]);
 
     // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)

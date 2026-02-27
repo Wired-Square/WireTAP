@@ -123,7 +123,11 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
   );
 
   const isRunning = query.status === "running";
-  const resultCount = query.results ? (query.results as unknown[]).length : 0;
+  const resultCount = query.results
+    ? Array.isArray(query.results)
+      ? query.results.length
+      : (query.results as { cases: unknown[] }).cases?.length ?? 0
+    : 0;
 
   return (
     <div

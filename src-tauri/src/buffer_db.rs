@@ -994,6 +994,32 @@ pub fn query_raw_two_col(
     Ok(results)
 }
 
+/// Query payloads only (single BLOB column) from the buffer database.
+pub fn query_payloads(
+    sql: &str,
+    params: &[&dyn rusqlite::types::ToSql],
+) -> Result<Vec<Vec<u8>>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("Failed to prepare query: {}", e))?;
+
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(params), |row| {
+            row.get::<_, Vec<u8>>(0)
+        })
+        .map_err(|e| format!("Failed to execute query: {}", e))?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
+    }
+
+    Ok(results)
+}
+
 /// Find the byte offset for a given timestamp in a buffer.
 pub fn find_bytes_offset_for_timestamp(
     buffer_id: &str,
