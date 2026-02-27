@@ -805,6 +805,8 @@ export function useIOSessionManager(
     // Clear frontend state before joining (fixes frame count showing stale data)
     onBeforeWatch?.();
     resetWatchFrameCount();
+    // Reset multiSessionId when switching sessions so effectiveSessionId updates cleanly
+    setMultiSessionId(null);
 
     // Join the session and set up heartbeats
     await joinMultiSourceSession({
@@ -1345,14 +1347,15 @@ export function useIOSessionManager(
 
   // ---- Auto-Join from Cross-App Commands ----
   // When a source app (Decoder, Discovery) requests this app to join its session,
-  // the pending join is consumed here. Only joins if the app has no active session.
+  // the pending join is consumed here. Skips if already on the requested session.
   useEffect(() => {
     if (!pendingJoin) return;
     clearPendingJoin(appName);
-    if (ioProfile) return;
+    // Skip if already on the requested session — no need to re-join
+    if (effectiveSessionId === pendingJoin.sessionId) return;
     if (!useSessionStore.getState().sessions[pendingJoin.sessionId]) return;
     joinSession(pendingJoin.sessionId).catch(console.error);
-  }, [pendingJoin, ioProfile, clearPendingJoin, appName, joinSession]);
+  }, [pendingJoin, effectiveSessionId, clearPendingJoin, appName, joinSession]);
 
   // ---- Clear Watch State on Stream End ----
   useEffect(() => {

@@ -55,7 +55,7 @@ export default function SessionDetailPanel({
       const session = sessions.find((s) => s.sessionId === sessionId);
       if (!session) return <p className="text-sm text-[color:var(--text-muted)]">Session not found</p>;
 
-      return <SessionDetails session={session} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} />;
+      return <SessionDetails session={session} profiles={profiles} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} />;
     }
 
     if (selectedNode.type === "source") {
@@ -99,6 +99,7 @@ export default function SessionDetailPanel({
 // Session details sub-component
 function SessionDetails({
   session,
+  profiles,
   onStart,
   onStop,
   onPause,
@@ -107,6 +108,7 @@ function SessionDetails({
   onAddSource,
 }: {
   session: ActiveSessionInfo;
+  profiles: IOProfile[];
   onStart: (id: string) => void;
   onStop: (id: string) => void;
   onPause: (id: string) => void;
@@ -155,6 +157,26 @@ function SessionDetails({
           {session.deviceType}
         </p>
       </div>
+
+      {/* Sources */}
+      {session.sourceProfileIds.length > 0 && (
+        <div>
+          <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+            Sources
+          </label>
+          <div className="mt-1 space-y-0.5">
+            {session.sourceProfileIds.map((id) => {
+              const profile = profiles.find((p) => p.id === id);
+              return (
+                <p key={id} className="text-sm text-[color:var(--text-primary)]">
+                  {profile?.name ?? id}
+                  {profile && <span className="text-[color:var(--text-muted)] ml-1">({profile.kind})</span>}
+                </p>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Listeners */}
       <div>

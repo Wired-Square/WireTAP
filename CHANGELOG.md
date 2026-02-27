@@ -4,6 +4,20 @@ All notable changes to CANdor will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Preferred catalog not auto-loading**: IO profiles with a `preferred_catalog` failed to auto-load when starting a session because the settings store was only populated when the Settings panel was opened. The store is now loaded eagerly at app startup.
+
+- **Session Manager missing source nodes**: The visual session graph showed no source nodes because it read IO profiles from the unpopulated settings store. Fixed by the same eager-load change above.
+
+- **Graph not populating from cross-app commands**: "Graph Signal" and related context menu actions from the Decoder sometimes created an empty chart because the Graph's catalog hadn't loaded before frames arrived. The Decoder now pre-loads its catalog into the Graph store before requesting the session join, eliminating the race condition.
+
+- **Cross-app join skipped when Graph already had a session**: The auto-join guard rejected all pending joins if the target app had any active session, even a different one. Now only skips if already on the requested session, allowing session switching via cross-app commands.
+
+### Added
+
+- **Sources in Session Details**: The Session Details panel now shows the source profile names feeding the session.
+
 ### Changed
 
 - **Centralise hard-coded constants**: Extract 9 duplicated frontend constants (timing intervals, locales, debounce values) into `constants.ts` and update ~12 consuming files. Extract 5 duplicated Rust playback-pacing constants into `io/timeline/pacing.rs` and update `buffer.rs`/`csv.rs`. Name inline magic numbers in `merge.rs`, `multi_source/mod.rs`, and `nusb_driver.rs`.

@@ -1129,6 +1129,11 @@ export default function DecoderFramesView({
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useGraphStore.getState();
+          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
+          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
+            gStore.loadCatalog(decoderCatalogPath);
+          }
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
@@ -1148,6 +1153,11 @@ export default function DecoderFramesView({
           if (numericSignals.length === 0) return;
 
           const gStore = useGraphStore.getState();
+          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
+          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
+            gStore.loadCatalog(decoderCatalogPath);
+          }
           const panelId = gStore.addPanel('line-chart');
           gStore.updatePanel(panelId, { title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
           for (const signal of numericSignals) {
@@ -1178,6 +1188,11 @@ export default function DecoderFramesView({
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useGraphStore.getState();
+          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
+          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
+            gStore.loadCatalog(decoderCatalogPath);
+          }
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
@@ -1190,6 +1205,11 @@ export default function DecoderFramesView({
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useGraphStore.getState();
+          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
+          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
+            gStore.loadCatalog(decoderCatalogPath);
+          }
           const panelId = gStore.addPanel('line-chart');
           gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
@@ -1255,6 +1275,11 @@ export default function DecoderFramesView({
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const gStore = useGraphStore.getState();
+          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const decoderCatalogPath = useDecoderStore.getState().catalogPath;
+          if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
+            gStore.loadCatalog(decoderCatalogPath);
+          }
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formattedId });
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);

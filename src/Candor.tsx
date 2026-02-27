@@ -46,6 +46,13 @@ export default function Candor() {
   // Global app error dialog state
   const { isOpen: appErrorOpen, title: appErrorTitle, message: appErrorMessage, details: appErrorDetails, closeAppError } = useAppErrorDialog();
 
+  // Load settings store eagerly so all apps have access to IO profiles,
+  // preferred catalogs, etc. without requiring the Settings panel to be open.
+  const loadSettingsStore = useSettingsStore((s) => s.loadSettings);
+  useEffect(() => {
+    loadSettingsStore();
+  }, [loadSettingsStore]);
+
   // Telemetry consent state
   const settingsLoaded = useSettingsStore((s) => s.originalSettings !== null);
   const telemetryEnabled = useSettingsStore((s) => s.general.telemetryEnabled);
