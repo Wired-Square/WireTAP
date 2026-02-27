@@ -223,8 +223,8 @@ export default function CANFrameView({
       {/* Signals + Bit preview */}
       {!editingId && !editingSignal && (
         <div className="mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-[color:var(--text-primary)] shrink-0">
               Signals ({(selectedNode.metadata?.signals?.length || 0) + (selectedNode.metadata?.muxSignalCount || 0)})
               {selectedNode.metadata?.hasMux && (
                 <span className="ml-2 text-xs font-normal text-[color:var(--text-purple)] inline-flex items-center gap-2">
@@ -234,7 +234,7 @@ export default function CANFrameView({
               )}
             </h3>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
               <span className={caption}>
                 {selectedNode.metadata?.length ? `${selectedNode.metadata.length} bytes total` : ""}
               </span>
@@ -242,17 +242,17 @@ export default function CANFrameView({
               {!selectedNode.metadata?.hasMux && (
                 <button
                   onClick={() => onAddMux(idKey)}
-                  className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
+                  className="px-2 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
                 >
-                  + Add Mux
+                  + Mux
                 </button>
               )}
 
               <button
                 onClick={() => onAddSignal(idKey)}
-                className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
+                className="px-2 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
               >
-                + Add Signal
+                + Signal
               </button>
             </div>
           </div>
@@ -314,17 +314,17 @@ export default function CANFrameView({
                         key={idx}
                         className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} transition-colors`}
                       >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 flex gap-3">
+                        <div className="flex items-start justify-between min-w-0">
+                          <div className="flex-1 min-w-0 flex gap-3">
                             <div
-                              className={`w-2 h-6 rounded-sm mt-1 ${
+                              className={`w-2 h-6 rounded-sm mt-1 shrink-0 ${
                                 signalColor(signal) || "bg-[var(--bg-surface)]"
                               }`}
                             />
-                            <div>
-                              <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
-                                <span>⚡</span>
-                                {signal.name}
+                            <div className="min-w-0">
+                              <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2 min-w-0">
+                                <span className="shrink-0">⚡</span>
+                                <span className="truncate">{signal.name}</span>
                                 {signal._inherited && (
                                   <span
                                     className="text-xs text-[color:var(--accent-purple)] flex items-center gap-1"
@@ -352,7 +352,7 @@ export default function CANFrameView({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 ml-4">
+                          <div className="flex items-center gap-2 ml-4 shrink-0">
                             <button
                               onClick={() => onEditSignal(idKey, idx, signal, ["frame", "can", idKey])}
                               className="p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"

@@ -13,7 +13,13 @@ export interface BitRange {
 const BASE_BIT_HEIGHT = 32;
 const BASE_BIT_WIDTH = 40;
 const MIN_BIT_HEIGHT = 16;
+const MIN_BIT_WIDTH = 20;
 const DEFAULT_MAX_HEIGHT = 400;
+
+// Full-size label widths
+const BASE_LABEL_WIDTH = 22;      // byte index badge
+const BASE_LABEL_WIDTH_MULTI = 22; // byte index badge (multi-column)
+const BASE_RANGE_WIDTH = 40;      // "0-7"
 
 interface ScalingResult {
   scale: number;
@@ -22,67 +28,103 @@ interface ScalingResult {
   bitWidth: number;
   fontSize: number;
   gap: number;
+  labelWidth: number;
+  rangeWidth: number;
 }
 
 /**
- * Calculate optimal scaling for BitPreview based on byte count.
+ * Compute the actual rendered row width from pixel-snapped ScalingResult values.
+ */
+function computeRenderedRowWidth(s: ScalingResult): number {
+  const bitGap = Math.max(1, s.gap / 2);
+  if (s.bytesPerRow === 1) {
+    return s.labelWidth + s.gap + 8 * s.bitWidth + 7 * bitGap + s.gap + s.rangeWidth;
+  }
+  const perByte = s.labelWidth + s.gap + 8 * s.bitWidth + 7 * bitGap;
+  return s.bytesPerRow * perByte + (s.bytesPerRow - 1) * s.gap * 2;
+}
+
+/**
+ * Compute the full-size row width (all elements at scale 1) for a given bytesPerRow.
+ */
+function computeFullRowWidth(bytesPerRow: number): number {
+  const gap = 4;
+  const bitGap = 2;
+  if (bytesPerRow === 1) {
+    return BASE_LABEL_WIDTH + gap + 8 * BASE_BIT_WIDTH + 7 * bitGap + gap + BASE_RANGE_WIDTH;
+  }
+  const perByte = BASE_LABEL_WIDTH_MULTI + gap + 8 * BASE_BIT_WIDTH + 7 * bitGap;
+  return bytesPerRow * perByte + (bytesPerRow - 1) * gap * 2;
+}
+
+/**
+ * Apply a uniform scale to all dimensions and return a ScalingResult.
+ */
+function applyScale(s: number, bytesPerRow: number): ScalingResult {
+  return {
+    scale: s,
+    bytesPerRow,
+    bitHeight: Math.max(MIN_BIT_HEIGHT, Math.floor(BASE_BIT_HEIGHT * s)),
+    bitWidth: Math.max(MIN_BIT_WIDTH, Math.floor(BASE_BIT_WIDTH * s)),
+    fontSize: Math.max(8, Math.round(12 * s)),
+    gap: Math.max(2, Math.round(4 * s)),
+    labelWidth: Math.floor((bytesPerRow > 1 ? BASE_LABEL_WIDTH_MULTI : BASE_LABEL_WIDTH) * s),
+    rangeWidth: Math.floor(BASE_RANGE_WIDTH * s),
+  };
+}
+
+/**
+ * Calculate optimal scaling for BitPreview based on byte count and available space.
  * Returns scale factor, bytes per row, and computed dimensions.
  */
-function calculateScaling(numBytes: number, maxHeight: number): ScalingResult {
-  // For small frames (1-8 bytes), use full size, 1 byte per row
-  if (numBytes <= 8) {
-    return {
-      scale: 1,
-      bytesPerRow: 1,
-      bitHeight: BASE_BIT_HEIGHT,
-      bitWidth: BASE_BIT_WIDTH,
-      fontSize: 12,
-      gap: 4,
-    };
-  }
-
-  // Row height includes bit height + gap
-  const rowGap = 8;
-
-  // For medium frames (9-32 bytes), scale down but keep 1 byte per row
-  if (numBytes <= 32) {
-    const totalHeight = numBytes * (BASE_BIT_HEIGHT + rowGap);
-    const scale = Math.min(1, maxHeight / totalHeight);
-    const clampedScale = Math.max(scale, MIN_BIT_HEIGHT / BASE_BIT_HEIGHT);
-    return {
-      scale: clampedScale,
-      bytesPerRow: 1,
-      bitHeight: Math.round(BASE_BIT_HEIGHT * clampedScale),
-      bitWidth: Math.round(BASE_BIT_WIDTH * clampedScale),
-      fontSize: Math.max(8, Math.round(12 * clampedScale)),
-      gap: Math.max(2, Math.round(4 * clampedScale)),
-    };
-  }
-
-  // For large frames (33+ bytes), use multi-column layout
-  // 2 bytes/row for 33-64, 4 bytes/row for 65-128, 8 bytes/row for 129+
+function calculateScaling(numBytes: number, maxHeight: number, containerWidth?: number): ScalingResult {
+  let heightScale: number;
   let bytesPerRow: number;
-  if (numBytes <= 64) {
-    bytesPerRow = 2;
-  } else if (numBytes <= 128) {
-    bytesPerRow = 4;
+
+  if (numBytes <= 8) {
+    heightScale = 1;
+    bytesPerRow = 1;
+  } else if (numBytes <= 32) {
+    const rowGap = 8;
+    const totalHeight = numBytes * (BASE_BIT_HEIGHT + rowGap);
+    heightScale = Math.max(MIN_BIT_HEIGHT / BASE_BIT_HEIGHT, Math.min(1, maxHeight / totalHeight));
+    bytesPerRow = 1;
   } else {
-    bytesPerRow = 8;
+    if (numBytes <= 64) {
+      bytesPerRow = 2;
+    } else if (numBytes <= 128) {
+      bytesPerRow = 4;
+    } else {
+      bytesPerRow = 8;
+    }
+    const rowGap = 8;
+    const rows = Math.ceil(numBytes / bytesPerRow);
+    const targetRowHeight = maxHeight / rows;
+    heightScale = Math.max(MIN_BIT_HEIGHT / BASE_BIT_HEIGHT, Math.min(1, targetRowHeight / (BASE_BIT_HEIGHT + rowGap)));
   }
 
-  const rows = Math.ceil(numBytes / bytesPerRow);
-  const targetRowHeight = maxHeight / rows;
-  const scale = Math.min(1, targetRowHeight / (BASE_BIT_HEIGHT + rowGap));
-  const clampedScale = Math.max(scale, MIN_BIT_HEIGHT / BASE_BIT_HEIGHT);
+  // Width-based scale: shrink all elements uniformly to fit container
+  let widthScale = 1;
+  if (containerWidth != null && containerWidth > 0) {
+    const fullWidth = computeFullRowWidth(bytesPerRow);
+    if (fullWidth > containerWidth) {
+      widthScale = containerWidth / fullWidth;
+    }
+  }
 
-  return {
-    scale: clampedScale,
-    bytesPerRow,
-    bitHeight: Math.round(BASE_BIT_HEIGHT * clampedScale),
-    bitWidth: Math.round(BASE_BIT_WIDTH * clampedScale),
-    fontSize: Math.max(8, Math.round(12 * clampedScale)),
-    gap: Math.max(2, Math.round(4 * clampedScale)),
-  };
+  const finalScale = Math.max(MIN_BIT_WIDTH / BASE_BIT_WIDTH, Math.min(heightScale, widthScale));
+  const result = applyScale(finalScale, bytesPerRow);
+
+  // Pixel-perfect adjustment: rounding can cause the rendered row to exceed
+  // the container by a few pixels. Shave off bit width until it fits.
+  if (containerWidth != null && containerWidth > 0) {
+    while (computeRenderedRowWidth(result) > containerWidth && result.bitWidth > MIN_BIT_WIDTH) {
+      result.bitWidth -= 1;
+      result.bitHeight = Math.max(MIN_BIT_HEIGHT, Math.floor(BASE_BIT_HEIGHT * (result.bitWidth / BASE_BIT_WIDTH)));
+    }
+  }
+
+  return result;
 }
 
 interface BitPreviewProps {
@@ -122,14 +164,31 @@ export default function BitPreview({
   // Use prop if provided, otherwise fall back to settings, then default
   const binaryZeroColour = binaryZeroColourProp ?? settings?.binary_zero_colour ?? "#94a3b8";
 
-  // Calculate scaling based on byte count and max height
+  // Measure container width so we can shrink bit cells to fit
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        if (w > 0) setContainerWidth(w);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Calculate scaling based on byte count, max height, and available width
   const scaling = useMemo(() => {
-    const result = calculateScaling(numBytes, compact ? maxHeight * 0.5 : maxHeight);
+    const result = calculateScaling(numBytes, compact ? maxHeight * 0.5 : maxHeight, containerWidth);
     if (bytesPerRowOverride !== undefined) {
       return { ...result, bytesPerRow: bytesPerRowOverride };
     }
     return result;
-  }, [numBytes, maxHeight, compact, bytesPerRowOverride]);
+  }, [numBytes, maxHeight, compact, bytesPerRowOverride, containerWidth]);
 
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragEnd, setDragEnd] = useState<number | null>(null);
@@ -281,10 +340,10 @@ export default function BitPreview({
     return (
       <div key={byteIdx} className="flex items-center" style={{ gap: `${scaling.gap}px` }}>
         <div
-          className="font-mono text-[color:var(--text-muted)] shrink-0"
-          style={{ fontSize: `${scaling.fontSize}px`, width: scaling.bytesPerRow > 1 ? '36px' : '50px' }}
+          className="font-mono text-[color:var(--text-muted)] shrink-0 flex items-center justify-center rounded bg-[var(--bg-muted)]"
+          style={{ fontSize: `${scaling.fontSize}px`, width: `${scaling.labelWidth}px`, height: `${scaling.bitHeight}px` }}
         >
-          {scaling.bytesPerRow > 1 ? `${byteIdx}:` : `Byte ${byteIdx}:`}
+          {byteIdx}
         </div>
 
         <div className="flex" style={{ gap: `${Math.max(1, scaling.gap / 2)}px` }}>
@@ -396,8 +455,8 @@ export default function BitPreview({
 
         {scaling.bytesPerRow === 1 && (
           <div
-            className="font-mono text-[color:var(--text-muted)] shrink-0 text-right"
-            style={{ fontSize: `${scaling.fontSize}px`, width: '40px' }}
+            className="font-mono text-[color:var(--text-muted)] shrink-0 text-right overflow-hidden"
+            style={{ fontSize: `${scaling.fontSize}px`, width: `${scaling.rangeWidth}px` }}
           >
             {startBit}-{endBit - 1}
           </div>
@@ -408,8 +467,9 @@ export default function BitPreview({
 
   return (
     <div
-      className="select-none"
-      style={{ display: 'flex', flexDirection: 'column', gap: `${scaling.gap * 2}px` }}
+      ref={containerRef}
+      className="select-none overflow-hidden"
+      style={{ display: 'flex', flexDirection: 'column', gap: `${scaling.gap}px` }}
       onMouseUp={handleMouseUp}
       onMouseLeave={() => {
         if (isMouseDown) {
@@ -421,7 +481,7 @@ export default function BitPreview({
         <div
           key={rowIdx}
           className="flex flex-wrap items-center"
-          style={{ gap: `${scaling.gap * 2}px` }}
+          style={{ gap: `${scaling.gap}px` }}
         >
           {bytesInRow.map(byteIdx => renderByte(byteIdx))}
         </div>

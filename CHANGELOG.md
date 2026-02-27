@@ -20,6 +20,12 @@ All notable changes to CANdor will be documented in this file.
 
 - **Preferred decoder in Settings**: IO Profile edit dialog includes a "Preferred Decoder" dropdown to set or clear the decoder for any source profile.
 
+### Changed
+
+- **Responsive BitPreview**: The byte layout grid in the Catalog Editor now scales proportionally to fit the available panel width. Byte row labels are compact number badges instead of "Byte N:" text, and vertical row spacing is tighter. The detail scroll area no longer overflows horizontally.
+
+- **Responsive signal cards**: Signal names in the Catalog Editor frame view truncate with ellipsis when the panel is narrow. Action buttons stay visible and the signals header wraps gracefully.
+
 ### Removed
 
 - **Global default catalog**: The `default_catalog` setting and its star badge in the Catalogs view have been removed. Decoders are now selected per-session, either manually or via the profile's preferred decoder.

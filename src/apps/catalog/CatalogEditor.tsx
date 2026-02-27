@@ -418,7 +418,7 @@ export default function CatalogEditor() {
               />
             </>
           ) : (
-            <div className="flex-1 p-6 overflow-y-auto bg-[var(--bg-primary)]">
+            <div className="flex-1 p-6 overflow-y-auto overflow-x-hidden bg-[var(--bg-primary)]">
               {!catalogPath ? (
                 <div className="flex items-center justify-center h-full text-[color:var(--text-muted)]">
                   <div className="text-center">
