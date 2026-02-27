@@ -63,7 +63,7 @@ export function buildSessionGraph(
     .filter((p) => activeProfileIds.has(p.id))
     .sort((a, b) => (profileOutputBus.get(a.id) ?? 0) - (profileOutputBus.get(b.id) ?? 0));
   activeProfiles.forEach((profile, index) => {
-    const isRealtime = ["gvret_tcp", "gvret_usb", "slcan", "socketcan", "gs_usb", "mqtt"].includes(
+    const isRealtime = ["gvret_tcp", "gvret_usb", "slcan", "socketcan", "gs_usb", "mqtt", "modbus_tcp"].includes(
       profile.kind
     );
 

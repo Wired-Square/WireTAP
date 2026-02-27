@@ -81,6 +81,8 @@ export interface IngestOptions {
   perInterfaceFraming?: Map<string, PerInterfaceFramingConfig>;
   /** Override session ID (for ingest mode where we need to set refs before async work) */
   sessionIdOverride?: string;
+  /** Modbus TCP poll groups as JSON string (catalog-derived, for modbus_tcp profiles) */
+  modbusPollsJson?: string;
 }
 
 /** Store interface for apps that manage ioProfile in their store */
@@ -877,6 +879,7 @@ export function useIOSessionManager(
       emitRawBytes: opts.emitRawBytes,
       busOverride: opts.busOverride,
       sessionIdOverride: sessionId,
+      modbusPollsJson: opts.modbusPollsJson,
     });
 
     // Clear multi-bus state when switching to a recorded source

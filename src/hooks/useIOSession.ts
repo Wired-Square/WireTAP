@@ -247,6 +247,8 @@ export interface UseIOSessionResult {
       skipAutoStart?: boolean;
       // Override session ID (for recorded sources that need unique IDs per instance)
       sessionIdOverride?: string;
+      // Modbus TCP poll groups as JSON string
+      modbusPollsJson?: string;
     }
   ) => Promise<void>;
   /** Switch to buffer replay mode (after stream ends with buffer data) */
@@ -1089,6 +1091,7 @@ export function useIOSession(
         busOverride?: number;
         skipAutoStart?: boolean;
         sessionIdOverride?: string;
+        modbusPollsJson?: string;
       }
     ) => {
       // For reinitialize, use new profile ID if provided, else current
@@ -1144,6 +1147,7 @@ export function useIOSession(
             emitRawBytes: opts?.emitRawBytes,
             busOverride: opts?.busOverride,
             skipAutoStart: opts?.skipAutoStart,
+            modbusPollsJson: opts?.modbusPollsJson,
           }
         );
 

@@ -69,7 +69,7 @@ type Props = {
   /** @deprecated Use timestamp instead */
   displayTime?: string | null;
   /** Protocol type from catalog (default_frame) */
-  protocol?: "can" | "serial";
+  protocol?: "can" | "serial" | "modbus";
   /** Serial frame configuration from catalog (for badges display) */
   serialConfig?: SerialFrameConfig | null;
   /** Frames that don't match any frame ID in the catalog */

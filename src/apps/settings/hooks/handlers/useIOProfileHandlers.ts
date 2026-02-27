@@ -139,6 +139,12 @@ export function useIOProfileHandlers() {
         return;
       }
     }
+    if (profileForm.kind === 'modbus_tcp') {
+      if (!profileForm.connection.host) {
+        showAppError('Validation Error', 'Host is required for Modbus TCP.');
+        return;
+      }
+    }
 
     // Apply default connection values
     const processedForm = applyConnectionDefaults(profileForm);
@@ -285,6 +291,11 @@ function applyConnectionDefaults(profile: IOProfile): IOProfile {
       break;
     case 'socketcan':
       if (!processed.connection.interface) processed.connection.interface = 'can0';
+      break;
+    case 'modbus_tcp':
+      if (!processed.connection.host) processed.connection.host = '192.168.1.100';
+      if (!processed.connection.port) processed.connection.port = '502';
+      if (!processed.connection.unit_id) processed.connection.unit_id = '1';
       break;
     case 'serial':
       if (!processed.connection.baud_rate) processed.connection.baud_rate = '115200';

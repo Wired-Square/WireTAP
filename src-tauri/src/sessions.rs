@@ -18,6 +18,7 @@ use crate::{
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
         CsvReader, CsvReaderOptions,
         GvretDeviceInfo, probe_gvret_tcp,
+        ModbusTcpConfig, ModbusTcpReader,
         MqttConfig, MqttReader,
         MultiSourceReader, SourceConfig,
         PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
@@ -397,6 +398,8 @@ pub async fn create_reader_session(
     listener_id: Option<String>,
     // Human-readable app name (e.g., "discovery", "decoder")
     app_name: Option<String>,
+    // Modbus TCP poll groups (JSON-serialised from frontend catalog)
+    modbus_polls: Option<String>,
 ) -> Result<IOCapabilities, String> {
     let settings = settings::load_settings(app.clone())
         .await
@@ -542,6 +545,51 @@ pub async fn create_reader_session(
 
             Box::new(CsvReader::new(app.clone(), session_id.clone(), options))
         }
+        "modbus_tcp" => {
+            let host = profile
+                .connection
+                .get("host")
+                .and_then(|v| v.as_str())
+                .unwrap_or("127.0.0.1")
+                .to_string();
+
+            let port = profile
+                .connection
+                .get("port")
+                .and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse().ok())
+                        .or_else(|| v.as_i64().map(|n| n as u16))
+                })
+                .unwrap_or(502);
+
+            let unit_id = profile
+                .connection
+                .get("unit_id")
+                .and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse().ok())
+                        .or_else(|| v.as_i64().map(|n| n as u8))
+                })
+                .unwrap_or(1);
+
+            // Parse poll groups from frontend (catalog-derived JSON)
+            let polls: Vec<crate::io::PollGroup> = match &modbus_polls {
+                Some(json) => serde_json::from_str(json).map_err(|e| {
+                    format!("Failed to parse Modbus poll groups: {}", e)
+                })?,
+                None => Vec::new(),
+            };
+
+            let config = ModbusTcpConfig {
+                host,
+                port,
+                unit_id,
+                polls,
+            };
+
+            Box::new(ModbusTcpReader::new(app.clone(), session_id.clone(), config))
+        }
         "mqtt" => {
             let host = profile
                 .connection
@@ -606,7 +654,7 @@ pub async fn create_reader_session(
         }
         kind => {
             return Err(format!(
-                "Unsupported reader type '{}'. Supported: mqtt, gvret_tcp, gvret_usb, postgres, csv_file, serial, slcan, socketcan, gs_usb",
+                "Unsupported reader type '{}'. Supported: modbus_tcp, mqtt, gvret_tcp, gvret_usb, postgres, csv_file, serial, slcan, socketcan, gs_usb",
                 kind
             ));
         }

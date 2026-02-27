@@ -52,6 +52,7 @@ import type { SelectionSet } from '../utils/selectionSets';
 import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
 import { loadCatalog as loadCatalogFromPath, parseCanId } from '../utils/catalogParser';
+import { buildPollsFromCatalog } from '../utils/modbusPollBuilder';
 
 
 // Re-export for consumers that import from decoderStore
@@ -238,11 +239,13 @@ interface DecoderState {
   selectedFrames: Set<number>;
   seenIds: Set<number>;
   /** Protocol type from catalog meta (default_frame) */
-  protocol: 'can' | 'serial';
+  protocol: 'can' | 'serial' | 'modbus';
   /** CAN config from [frame.can.config] - used for frame ID masking and source address extraction */
   canConfig: CanConfig | null;
   /** Serial config from [frame.serial.config] - used for frame ID/source address extraction */
   serialConfig: SerialFrameConfig | null;
+  /** Pre-built Modbus poll groups JSON (from catalog load, for session creation) */
+  modbusPollsJson: string | null;
   /** Map of mirror frame ID to source frame ID for mirror validation */
   mirrorSourceMap: Map<number, number>;
   /** Mirror validation results - keyed by mirror frame ID */
@@ -366,6 +369,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   protocol: 'can',
   canConfig: null,
   serialConfig: null,
+  modbusPollsJson: null,
   mirrorSourceMap: new Map(),
   mirrorValidation: new Map(),
   mirrorFuzzWindowMs: 1000, // 1 second - generous to handle batching and varying frame rates
@@ -511,6 +515,10 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         }
       }
 
+      // Pre-build Modbus poll groups from catalog (before converting to FrameDetail)
+      const modbusPolls = buildPollsFromCatalog(catalog.frames, catalog.modbusConfig ?? null);
+      const modbusPollsJson = modbusPolls.length > 0 ? JSON.stringify(modbusPolls) : null;
+
       set({
         frames: frameMap,
         selectedFrames: newSelected,
@@ -519,6 +527,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         protocol: catalog.protocol,
         canConfig,
         serialConfig,
+        modbusPollsJson,
         mirrorSourceMap,
       });
     } catch (e) {
@@ -708,9 +717,11 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     if (!frame) return;
 
     // Determine default byte order from catalog config
-    // CAN config takes precedence, then serial config, then fall back to 'little'
+    // CAN/serial fall back to 'little', Modbus defaults to 'big' (standard Modbus convention)
     const defaultByteOrder: 'little' | 'big' =
-      (protocol === 'can' ? canConfig?.default_byte_order : serialConfig?.default_byte_order) || 'little';
+      protocol === 'modbus'
+        ? 'big'
+        : (protocol === 'can' ? canConfig?.default_byte_order : serialConfig?.default_byte_order) || 'little';
 
     // Capture current timestamp for signals
     const now = Date.now() / 1000; // epoch seconds
@@ -943,8 +954,11 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     }
 
     // Determine default byte order from catalog config
+    // CAN/serial fall back to 'little', Modbus defaults to 'big' (standard Modbus convention)
     const defaultByteOrder: 'little' | 'big' =
-      (protocol === 'can' ? canConfig?.default_byte_order : serialConfig?.default_byte_order) || 'little';
+      protocol === 'modbus'
+        ? 'big'
+        : (protocol === 'can' ? canConfig?.default_byte_order : serialConfig?.default_byte_order) || 'little';
 
     // Capture current timestamp for signals
     const now = Date.now() / 1000;

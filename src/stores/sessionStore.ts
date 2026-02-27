@@ -346,6 +346,8 @@ export interface CreateSessionOptions {
   busOverride?: number;
   /** Skip auto-starting playback sources (postgres, csv) - for connect-only mode */
   skipAutoStart?: boolean;
+  /** Modbus TCP poll groups as JSON string (catalog-derived, for modbus_tcp profiles) */
+  modbusPollsJson?: string;
 }
 
 /** Payload for session-reconfigured event */
@@ -884,6 +886,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         busOverride: options.busOverride,
         listenerId, // For session logging
         appName, // Human-readable app name
+        modbusPollsJson: options.modbusPollsJson,
       };
 
       try {

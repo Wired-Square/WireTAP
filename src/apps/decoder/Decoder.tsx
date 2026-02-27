@@ -697,7 +697,13 @@ export default function Decoder() {
   const ioPickerProps = useIOPickerHandlers({
     manager,
     closeDialog: () => dialogs.ioReaderPicker.close(),
-    mergeOptions: (options) => mergeSerialConfigForWatch(useDecoderStore.getState().serialConfig, options),
+    mergeOptions: (options) => {
+      const state = useDecoderStore.getState();
+      const merged = mergeSerialConfigForWatch(state.serialConfig, options);
+      // Inject Modbus poll groups if a Modbus catalog is loaded
+      if (state.modbusPollsJson) merged.modbusPollsJson = state.modbusPollsJson;
+      return merged;
+    },
   });
 
   // ── Menu session control ──

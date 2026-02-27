@@ -213,7 +213,7 @@ interface GraphState {
   // ── Catalog ──
   catalogPath: string | null;
   frames: Map<number, FrameDetail>;
-  protocol: 'can' | 'serial';
+  protocol: 'can' | 'serial' | 'modbus';
   canConfig: CanProtocolConfig | null;
   serialConfig: SerialFrameConfig | null;
   /** Default byte order from catalog */

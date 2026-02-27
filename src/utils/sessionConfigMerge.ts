@@ -1,6 +1,6 @@
 // ui/src/utils/sessionConfigMerge.ts
 //
-// Shared utility for merging catalog serial config into IO session ingest options.
+// Shared utility for merging catalog config into IO session ingest options.
 // Used by Decoder, Graph, and any app that loads a catalog and starts a session.
 
 import type { IngestOptions as ManagerIngestOptions } from "../hooks/useIOSessionManager";

@@ -4,6 +4,10 @@ All notable changes to CANdor will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Modbus TCP support**: New IO driver for polling registers from Modbus TCP servers (PLCs, sensors, motor controllers). Catalog-driven: define registers in `[frame.modbus.*]` sections and the driver automatically builds poll groups. Supports holding registers, input registers, coils, and discrete inputs (FC01–FC04, read-only). Includes profile creation with host/port/unit ID, traditional and IEC register addressing, and signal decoding with big-endian default byte order.
+
 ### Fixed
 
 - **Catalog editor signal view pencil icon not opening editor**: The edit button on the signal detail view silently failed because `locateSignal()` re-parsed the TOML and searched by property matching, which was fragile. Simplified to read `signalIndex` and `properties` directly from the tree node metadata, matching how the frame view's pencil already works.

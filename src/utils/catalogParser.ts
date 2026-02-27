@@ -14,7 +14,7 @@ import { isMuxCaseKey } from './muxCaseMatch';
 export interface CatalogMetadata {
   name: string;
   version: number;
-  default_frame?: 'can' | 'serial';
+  default_frame?: 'can' | 'serial' | 'modbus';
 }
 
 export interface HeaderFieldConfig {
@@ -98,15 +98,31 @@ export interface ResolvedFrame {
   mux?: MuxDef;
   mirrorOf?: string;
   copyFrom?: string;
+  /** Modbus-specific: register type (holding, input, coil, discrete) */
+  modbusRegisterType?: 'holding' | 'input' | 'coil' | 'discrete';
+  /** Modbus-specific: number of registers (not bytes) */
+  modbusRegisterCount?: number;
+}
+
+export interface ModbusProtocolConfig {
+  /** Default Modbus device/slave address (1-247) */
+  device_address?: number;
+  /** Register addressing base: 0 = IEC (0-based), 1 = traditional (1-based with type prefix) */
+  register_base?: 0 | 1;
+  /** Default poll interval in milliseconds */
+  default_interval?: number;
+  /** Default byte order for multi-register values */
+  default_byte_order?: 'big' | 'little';
 }
 
 export interface ParsedCatalog {
   metadata: CatalogMetadata;
   canConfig: CanProtocolConfig | null;
   serialConfig: SerialProtocolConfig | null;
+  modbusConfig: ModbusProtocolConfig | null;
   frames: Map<number, ResolvedFrame>;
   rawToml: string;
-  protocol: 'can' | 'serial';
+  protocol: 'can' | 'serial' | 'modbus';
 }
 
 // =============================================================================
@@ -464,6 +480,35 @@ export function parseSerialConfig(parsed: any): SerialProtocolConfig | null {
   return Object.keys(config).length > 0 ? config : null;
 }
 
+/**
+ * Parse [meta.modbus] section if present.
+ */
+export function parseModbusConfig(parsed: any): ModbusProtocolConfig | null {
+  const configSection = parsed?.meta?.modbus;
+  if (!configSection || typeof configSection !== 'object') return null;
+
+  const config: ModbusProtocolConfig = {};
+
+  if (typeof configSection.device_address === 'number') {
+    config.device_address = configSection.device_address;
+  }
+
+  if (configSection.register_base === 0 || configSection.register_base === 1) {
+    config.register_base = configSection.register_base;
+  }
+
+  if (typeof configSection.default_interval === 'number') {
+    config.default_interval = configSection.default_interval;
+  }
+
+  const byteOrder = configSection.default_byte_order ?? configSection.byte_order;
+  if (byteOrder === 'big' || byteOrder === 'little') {
+    config.default_byte_order = byteOrder;
+  }
+
+  return Object.keys(config).length > 0 ? config : null;
+}
+
 // =============================================================================
 // Mirror/Copy Resolution
 // =============================================================================
@@ -599,6 +644,7 @@ export function parseCatalogText(toml: string): ParsedCatalog {
   // Parse protocol configs
   const canConfig = parseCanConfig(parsed);
   const serialConfig = parseSerialConfig(parsed);
+  const modbusConfig = parseModbusConfig(parsed);
 
   // Parse CAN frames
   const canFrames = parsed?.frame?.can || {};
@@ -672,20 +718,60 @@ export function parseCatalogText(toml: string): ParsedCatalog {
     });
   }
 
+  // Parse Modbus frames
+  const modbusFrames = parsed?.frame?.modbus || {};
+  for (const [key, body] of Object.entries<any>(modbusFrames)) {
+    if (key === 'config') continue;
+
+    const registerNumber = body?.register_number;
+    if (typeof registerNumber !== 'number') continue;
+
+    const registerCount = body?.length ?? 1;
+    // Length in bytes: registers are 16-bit (2 bytes each)
+    // Coils/discrete are packed into bytes by the driver
+    const registerType = body?.register_type ?? 'holding';
+    const isCoilType = registerType === 'coil' || registerType === 'discrete';
+    const lengthBytes = isCoilType ? Math.ceil(registerCount / 8) : registerCount * 2;
+
+    const interval = body?.tx?.interval ?? body?.tx?.interval_ms
+      ?? modbusConfig?.default_interval;
+
+    const plainSignals = Array.isArray(body?.signals) ? normaliseSignals(body.signals) : [];
+    const mux = body?.mux ? parseMux(body.mux) : undefined;
+
+    frameMap.set(registerNumber, {
+      frameId: registerNumber,
+      protocol: 'modbus',
+      length: lengthBytes,
+      transmitter: body?.transmitter,
+      interval,
+      signals: plainSignals as SignalDef[],
+      mux,
+      modbusRegisterType: registerType,
+      modbusRegisterCount: registerCount,
+    });
+  }
+
   // Determine protocol
   const hasSerialFrames = Object.keys(serialFrames).filter(k => k !== 'config').length > 0;
   const hasCanFrames = Object.keys(canFrames).filter(k => k !== 'config').length > 0;
-  let protocol: 'can' | 'serial';
-  if (metadata.default_frame === 'serial' || metadata.default_frame === 'can') {
+  const hasModbusFrames = Object.keys(modbusFrames).filter(k => k !== 'config').length > 0;
+  let protocol: 'can' | 'serial' | 'modbus';
+  if (metadata.default_frame === 'modbus' || metadata.default_frame === 'serial' || metadata.default_frame === 'can') {
     protocol = metadata.default_frame;
+  } else if (hasModbusFrames && !hasCanFrames && !hasSerialFrames) {
+    protocol = 'modbus';
+  } else if (hasSerialFrames && !hasCanFrames) {
+    protocol = 'serial';
   } else {
-    protocol = hasSerialFrames && !hasCanFrames ? 'serial' : 'can';
+    protocol = 'can';
   }
 
   return {
     metadata,
     canConfig,
     serialConfig,
+    modbusConfig,
     frames: frameMap,
     rawToml: toml,
     protocol,

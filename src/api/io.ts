@@ -229,6 +229,8 @@ export interface CreateIOSessionOptions {
   appName?: string;
   /** Buffer ID for buffer reader sessions (e.g., "buf_1") */
   bufferId?: string;
+  /** Modbus TCP poll groups as JSON string (catalog-derived, for modbus_tcp profiles) */
+  modbusPollsJson?: string;
 }
 
 /**
@@ -276,6 +278,8 @@ export async function createIOSession(
     listener_id: options.listenerId,
     // Human-readable app name
     app_name: options.appName,
+    // Modbus TCP poll groups (catalog-derived)
+    modbus_polls: options.modbusPollsJson,
   });
 }
 

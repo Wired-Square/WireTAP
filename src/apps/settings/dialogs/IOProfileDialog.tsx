@@ -375,6 +375,7 @@ export default function IOProfileDialog({
               {availableKinds.includes("gs_usb") && <option value="gs_usb">gs_usb (candleLight)</option>}
               {availableKinds.includes("gvret_tcp") && <option value="gvret_tcp">GVRET TCP</option>}
               {availableKinds.includes("gvret_usb") && <option value="gvret_usb">GVRET USB (Serial)</option>}
+              {availableKinds.includes("modbus_tcp") && <option value="modbus_tcp">Modbus TCP</option>}
               {availableKinds.includes("mqtt") && <option value="mqtt">MQTT</option>}
               {availableKinds.includes("postgres") && <option value="postgres">PostgreSQL</option>}
               {availableKinds.includes("serial") && <option value="serial">Serial Port</option>}
@@ -536,6 +537,43 @@ export default function IOProfileDialog({
                   </FormField>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Modbus TCP */}
+          {profileForm.kind === "modbus_tcp" && (
+            <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
+              <h3 className={h3}>Modbus TCP Connection</h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Host" variant="default">
+                  <Input
+                    variant="default"
+                    value={profileForm.connection.host || ""}
+                    onChange={(e) => onUpdateConnectionField("host", e.target.value)}
+                    placeholder="192.168.1.100"
+                  />
+                </FormField>
+                <FormField label="Port" variant="default">
+                  <Input
+                    variant="default"
+                    type="number"
+                    value={profileForm.connection.port || ""}
+                    onChange={(e) => onUpdateConnectionField("port", e.target.value)}
+                    placeholder="502"
+                  />
+                </FormField>
+              </div>
+
+              <FormField label="Unit ID (1-247)" variant="default">
+                <Input
+                  variant="default"
+                  type="number"
+                  value={profileForm.connection.unit_id || ""}
+                  onChange={(e) => onUpdateConnectionField("unit_id", e.target.value)}
+                  placeholder="1"
+                />
+              </FormField>
             </div>
           )}
 

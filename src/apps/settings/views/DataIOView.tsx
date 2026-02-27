@@ -55,6 +55,8 @@ const getIOKindLabel = (kind: IOProfile["kind"]) => {
       return "SocketCAN";
     case "gs_usb":
       return "gs_usb";
+    case "modbus_tcp":
+      return "Modbus TCP";
     default:
       return kind;
   }

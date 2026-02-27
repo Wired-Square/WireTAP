@@ -114,6 +114,13 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     platforms: ["windows", "macos", "linux", "ios"],
     isMultiSourceCapable: false,
   },
+  modbus_tcp: {
+    temporalMode: "realtime",
+    protocols: ["modbus"],
+    canTransmit: false,
+    platforms: ["windows", "macos", "linux", "ios"],
+    isMultiSourceCapable: false,
+  },
 };
 
 // ============================================================================

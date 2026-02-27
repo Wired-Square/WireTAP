@@ -543,6 +543,7 @@ dependencies = [
  "tauri-plugin-os",
  "tauri-plugin-store",
  "tokio",
+ "tokio-modbus",
  "tokio-postgres",
  "toml 0.8.2",
  "windows-sys 0.59.0",
@@ -5537,6 +5538,23 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.116",
+]
+
+[[package]]
+name = "tokio-modbus"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "033b1b9843d693c3543e6b9c656a566ea45d2564e72ad5447e83233b9e2f3fe1"
+dependencies = [
+ "async-trait",
+ "byteorder",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "log",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
