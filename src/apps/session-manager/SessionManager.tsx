@@ -18,7 +18,7 @@ import {
   type ActiveSessionInfo,
 } from "../../api/io";
 import Dialog from "../../components/Dialog";
-import { useSettings } from "../../hooks/useSettings";
+import { useSettingsStore } from "../settings/stores/settingsStore";
 import { useSessionManagerStore } from "./stores/sessionManagerStore";
 import { useSessionLogStore } from "./stores/sessionLogStore";
 import { useSessionLogSubscription } from "./hooks/useSessionLogSubscription";
@@ -30,7 +30,6 @@ import SessionDetailPanel from "./views/SessionDetailPanel";
 import SessionLogView from "./views/SessionLogView";
 
 export default function SessionManager() {
-  const { settings } = useSettings();
   const [sessions, setSessions] = useState<ActiveSessionInfo[]>([]);
   const [activeTab, setActiveTab] = useState<string>("log");
   const autoRefresh = useSessionManagerStore((s) => s.autoRefresh);
@@ -41,7 +40,9 @@ export default function SessionManager() {
   // Initialise session log subscription
   useSessionLogSubscription();
 
-  const profiles = settings?.io_profiles ?? [];
+  // Read profiles from settingsStore (in-memory) so we see preferred_catalog
+  // updates immediately, before the debounced save to backend completes.
+  const profiles = useSettingsStore((s) => s.ioProfiles.profiles);
 
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(

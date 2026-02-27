@@ -1,21 +1,3 @@
-import type { CatalogMetadata } from "../api/catalog";
-
-/**
- * Find the default catalog from a loaded catalogs list.
- * Returns the full path if found, null otherwise.
- */
-export function resolveDefaultCatalogPath(
-  defaultCatalogFilename: string | null | undefined,
-  catalogs: CatalogMetadata[]
-): string | null {
-  if (!defaultCatalogFilename || catalogs.length === 0) {
-    return null;
-  }
-
-  const catalog = catalogs.find((c) => c.filename === defaultCatalogFilename);
-  return catalog?.path ?? null;
-}
-
 /**
  * Build a catalog path from decoder_dir and filename.
  * Handles both absolute paths and relative paths.

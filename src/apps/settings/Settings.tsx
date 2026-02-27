@@ -117,7 +117,6 @@ export default function Settings() {
 
   // Catalogs
   const catalogs = useSettingsStore((s) => s.catalogs.list);
-  const defaultCatalog = useSettingsStore((s) => s.catalogs.defaultCatalog);
 
   // Bookmarks
   const bookmarks = useSettingsStore((s) => s.bookmarks);
@@ -309,8 +308,6 @@ export default function Settings() {
             <CatalogsView
               catalogs={catalogs}
               decoderDir={decoderDir}
-              defaultCatalog={defaultCatalog}
-              onSetDefaultCatalog={handlers.handleSetDefaultCatalog}
               onDuplicateCatalog={handlers.handleDuplicateCatalog}
               onEditCatalog={handlers.handleEditCatalog}
               onDeleteCatalog={handlers.handleDeleteCatalog}

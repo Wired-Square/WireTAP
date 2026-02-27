@@ -1,7 +1,7 @@
 // ui/src/apps/catalog/dialogs/CatalogPickerDialog.tsx
 
-import { Check, FilePlus, Import, Star, X } from "lucide-react";
-import { iconMd, iconSm, iconLg, flexRowGap2 } from "../../../styles/spacing";
+import { Check, FilePlus, Import, X } from "lucide-react";
+import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, textMedium } from "../../../styles/typography";
 import { borderDivider, hoverLight, bgSurface, dialogOptionButton } from "../../../styles";
 import Dialog from "../../../components/Dialog";
@@ -14,7 +14,6 @@ type Props = {
   onClose: () => void;
   catalogs: CatalogMetadata[];
   selectedPath: string | null;
-  defaultFilename?: string | null;
   decoderDir?: string | null;
   onSelect: (path: string) => void;
   onImport?: (path: string, content: string) => void;
@@ -27,7 +26,6 @@ export default function CatalogPickerDialog({
   onClose,
   catalogs,
   selectedPath,
-  defaultFilename,
   decoderDir,
   onSelect,
   onImport,
@@ -104,7 +102,6 @@ export default function CatalogPickerDialog({
             <div className="py-1">
               {catalogs.map((catalog) => {
                 const isSelected = catalog.path === selectedPath;
-                const isDefault = catalog.filename === defaultFilename;
                 return (
                   <button
                     key={catalog.path}
@@ -114,14 +111,9 @@ export default function CatalogPickerDialog({
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className={flexRowGap2}>
-                        {isDefault && (
-                          <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
-                        )}
-                        <span className={`${textMedium} truncate`}>
-                          {catalog.name}
-                        </span>
-                      </div>
+                      <span className={`${textMedium} truncate`}>
+                        {catalog.name}
+                      </span>
                       <div className={`${caption} truncate`}>
                         {catalog.filename}
                       </div>

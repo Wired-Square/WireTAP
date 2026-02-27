@@ -47,6 +47,7 @@ export interface IOProfile {
   name: string;
   kind: 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'csv_file' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb';
   connection: Record<string, any>;
+  preferred_catalog?: string;
 }
 
 export interface CatalogFile {
@@ -96,7 +97,6 @@ interface AppSettings {
   io_profiles: IOProfile[];
   default_read_profile?: string | null;
   default_write_profiles?: string[];
-  default_catalog?: string | null;
   display_frame_id_format?: 'hex' | 'decimal';
   save_frame_id_format?: 'hex' | 'decimal';
   display_time_format?: 'delta-last' | 'delta-start' | 'timestamp' | 'human';
@@ -269,7 +269,6 @@ interface SettingsState {
   // Catalogs
   catalogs: {
     list: CatalogFile[];
-    defaultCatalog: string | null;
   };
 
   // Bookmarks
@@ -359,7 +358,6 @@ interface SettingsState {
 
   // Actions - Catalogs
   setCatalogList: (catalogs: CatalogFile[]) => void;
-  setDefaultCatalog: (filename: string | null) => void;
 
   // Actions - Bookmarks
   setBookmarks: (bookmarks: TimeRangeFavorite[]) => void;
@@ -430,7 +428,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   catalogs: {
     list: [],
-    defaultCatalog: null,
   },
 
   bookmarks: [],
@@ -521,7 +518,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         io_profiles: settings.io_profiles || [],
         default_read_profile: settings.default_read_profile ?? null,
         default_write_profiles: settings.default_write_profiles ?? [],
-        default_catalog: settings.default_catalog ?? null,
         display_frame_id_format: settings.display_frame_id_format === 'decimal' ? 'decimal' : 'hex',
         save_frame_id_format: settings.save_frame_id_format === 'decimal' ? 'decimal' : 'hex',
         display_time_format: settings.display_time_format ?? 'human',
@@ -588,7 +584,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         },
         catalogs: {
           ...get().catalogs,
-          defaultCatalog: normalized.default_catalog || null,
         },
         display: {
           frameIdFormat: normalized.display_frame_id_format === 'decimal' ? 'decimal' : 'hex',
@@ -711,7 +706,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (!get().hasUnsavedChanges()) return;
 
     try {
-      const { locations, ioProfiles, catalogs, display, buffers, general } = get();
+      const { locations, ioProfiles, display, buffers, general } = get();
 
       const settings = {
         config_path: locations.configPath,
@@ -721,7 +716,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         io_profiles: ioProfiles.profiles,
         default_read_profile: ioProfiles.defaultReadProfile,
         default_write_profiles: ioProfiles.defaultWriteProfiles,
-        default_catalog: catalogs.defaultCatalog,
         display_frame_id_format: display.frameIdFormat,
         save_frame_id_format: display.saveFrameIdFormat,
         display_time_format: display.timeFormat,
@@ -785,7 +779,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   hasUnsavedChanges: () => {
-    const { locations, ioProfiles, catalogs, display, buffers, general, originalSettings } = get();
+    const { locations, ioProfiles, display, buffers, general, originalSettings } = get();
     if (!originalSettings) return false;
 
     const currentSettings = {
@@ -796,7 +790,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       io_profiles: ioProfiles.profiles,
       default_read_profile: ioProfiles.defaultReadProfile,
       default_write_profiles: ioProfiles.defaultWriteProfiles,
-      default_catalog: catalogs.defaultCatalog,
       display_frame_id_format: display.frameIdFormat,
       save_frame_id_format: display.saveFrameIdFormat,
       display_time_format: display.timeFormat,
@@ -995,13 +988,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setCatalogList: (catalogs) => set((state) => ({
     catalogs: { ...state.catalogs, list: catalogs },
   })),
-
-  setDefaultCatalog: (filename) => {
-    set((state) => ({
-      catalogs: { ...state.catalogs, defaultCatalog: filename },
-    }));
-    scheduleSave(get().saveSettings);
-  },
 
   // Bookmark actions
   setBookmarks: (bookmarks) => set({ bookmarks }),

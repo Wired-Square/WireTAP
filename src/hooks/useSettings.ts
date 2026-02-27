@@ -18,6 +18,7 @@ export interface IOProfile {
   name: string;
   kind: 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'csv_file' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb';
   connection: Record<string, any>;
+  preferred_catalog?: string;
 }
 
 /** Protocol types that a reader can provide */
@@ -79,7 +80,6 @@ export interface AppSettings {
   io_profiles: IOProfile[];
   default_read_profile?: string | null;
   default_write_profiles?: string[];
-  default_catalog?: string | null;
   display_frame_id_format?: FrameIdFormat;
   save_frame_id_format?: FrameIdFormat;
   display_time_format?: TimeFormat;
@@ -145,7 +145,6 @@ function normalizeSettings(
     io_profiles: settings.io_profiles || [],
     default_read_profile: settings.default_read_profile ?? null,
     default_write_profiles: settings.default_write_profiles ?? [],
-    default_catalog: settings.default_catalog ?? null,
     display_frame_id_format: settings.display_frame_id_format === "decimal" ? "decimal" : "hex",
     save_frame_id_format: settings.save_frame_id_format === "decimal" ? "decimal" : "hex",
     display_time_format: settings.display_time_format ?? "human",

@@ -367,7 +367,6 @@ export default function CatalogEditor() {
           hasUnsavedChanges={hasUnsavedChanges}
           validationState={validationState}
           catalogs={catalogs}
-          defaultCatalogFilename={settings?.default_catalog}
           onOpenPicker={handleOpenCatalogPicker}
           onSave={handlers.handleSave}
           onReload={handlers.handleReload}
@@ -634,7 +633,6 @@ export default function CatalogEditor() {
         onClose={() => setShowCatalogPicker(false)}
         catalogs={catalogs}
         selectedPath={catalogPath}
-        defaultFilename={settings?.default_catalog}
         decoderDir={decoderDir}
         onSelect={handleSelectCatalog}
         onImport={(path, content) => openSuccess(path, content)}

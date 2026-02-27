@@ -44,7 +44,6 @@ export interface FramePickerSectionProps {
 export interface CatalogSectionProps {
   catalogs: CatalogMetadata[];
   catalogPath: string | null;
-  defaultCatalogFilename?: string | null;
   onOpen: () => void;
 }
 
@@ -195,7 +194,6 @@ export default function AppTopBar({
             <CatalogButton
               catalogs={catalog.catalogs}
               catalogPath={catalog.catalogPath}
-              defaultCatalogFilename={catalog.defaultCatalogFilename}
               onClick={catalog.onOpen}
             />
           </>

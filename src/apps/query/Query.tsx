@@ -10,6 +10,10 @@ import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useIOPickerHandlers } from "../../hooks/useIOPickerHandlers";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useQueryStore } from "./stores/queryStore";
+import { useSessionStore } from "../../stores/sessionStore";
+import { useSettingsStore } from "../settings/stores/settingsStore";
+import { buildCatalogPath } from "../../utils/catalogUtils";
+
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useQueryHandlers } from "./hooks/useQueryHandlers";
 import type { FrameMessage } from "../../types/frame";
@@ -17,7 +21,7 @@ import type { PlaybackPosition } from "../../api/io";
 import type { CatalogMetadata } from "../../api/catalog";
 import { listCatalogs } from "../../api/catalog";
 import { listBuffers, type BufferMetadata } from "../../api/buffer";
-import { resolveDefaultCatalogPath } from "../../utils/catalogUtils";
+
 import { getFavoritesForProfile, type TimeRangeFavorite } from "../../utils/favorites";
 import { loadCatalog } from "../../utils/catalogParser";
 import type { TimeBounds } from "../../components/TimeBoundsInput";
@@ -48,6 +52,7 @@ export default function Query() {
   const selectedQueryId = useQueryStore((s) => s.selectedQueryId);
   const catalogPath = useQueryStore((s) => s.catalogPath);
   const setCatalogPath = useQueryStore((s) => s.setCatalogPath);
+
   const setParsedCatalog = useQueryStore((s) => s.setParsedCatalog);
 
   // Catalog state
@@ -133,16 +138,6 @@ export default function Query() {
     loadParsedCatalog();
   }, [catalogPath, setParsedCatalog]);
 
-  // Auto-load default catalog when catalogs list and settings are available
-  useEffect(() => {
-    if (!settings?.default_catalog || catalogs.length === 0) return;
-    if (catalogPath) return; // Preserve user's manual selection
-
-    const defaultPath = resolveDefaultCatalogPath(settings.default_catalog, catalogs);
-    if (defaultPath) {
-      setCatalogPath(defaultPath);
-    }
-  }, [settings?.default_catalog, catalogs, catalogPath, setCatalogPath]);
 
   // Filter profiles to postgres only
   const postgresProfiles = useMemo(
@@ -193,6 +188,49 @@ export default function Query() {
     capabilities,
     session,
   } = manager;
+
+  // Subscribe to session's catalogPath. Returns undefined when session doesn't exist
+  // in the store yet, null when it exists with no decoder, or a string path.
+  const sessionCatalogPath = useSessionStore((s) => {
+    const sid = session.sessionId;
+    if (!sid) return undefined;
+    const sess = s.sessions[sid];
+    if (!sess) return undefined;
+    return sess.catalogPath;
+  });
+
+  // Cross-app decoder sync: when another app (or Session Manager) changes the
+  // session's catalogPath to a non-null value, update the local store.
+  useEffect(() => {
+    if (!sessionCatalogPath || sessionCatalogPath === catalogPath) return;
+    setCatalogPath(sessionCatalogPath);
+  }, [sessionCatalogPath, catalogPath, setCatalogPath]);
+
+  // Auto-set session decoder from source profile's preferred_catalog when a new session
+  // starts. Fires when sessionCatalogPath transitions from undefined to null.
+  useEffect(() => {
+    if (sessionCatalogPath !== null) return;
+    const sid = session.sessionId;
+    if (!sid) return;
+
+    if (sourceProfileId) {
+      const profiles = useSettingsStore.getState().ioProfiles.profiles;
+      const preferred = profiles.find(p => p.id === sourceProfileId)?.preferred_catalog;
+      if (preferred) {
+        const decoderDir = settings?.decoder_dir;
+        const path = buildCatalogPath(preferred, decoderDir);
+        setCatalogPath(path);
+        useSessionStore.getState().setSessionCatalogPath(sid, path);
+        return;
+      }
+    }
+
+    // No preferred decoder from profile — carry over any locally loaded decoder
+    if (catalogPath) {
+      useSessionStore.getState().setSessionCatalogPath(sid, catalogPath);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionCatalogPath, session.sessionId, sourceProfileId]);
 
   // Determine active source — postgres profile or buffer (mutually exclusive)
   const hasSource = !!sourceProfileId || !!selectedBufferId;
@@ -348,7 +386,6 @@ export default function Query() {
           defaultReadProfileId={settings?.default_read_profile}
           catalogs={catalogs}
           catalogPath={catalogPath}
-          defaultCatalogFilename={settings?.default_catalog}
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
           isStreaming={isStreaming || hasSource}
@@ -434,8 +471,11 @@ export default function Query() {
         onClose={() => dialogs.catalogPicker.close()}
         catalogs={catalogs}
         selectedPath={catalogPath}
-        defaultFilename={settings?.default_catalog}
-        onSelect={handlers.handleCatalogChange}
+        onSelect={(path: string) => {
+          handlers.handleCatalogChange(path);
+          const sid = session.sessionId;
+          if (sid) useSessionStore.getState().setSessionCatalogPath(sid, path);
+        }}
       />
 
       {/* Add Bookmark Dialog */}

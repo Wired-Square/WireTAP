@@ -17,7 +17,6 @@ interface Props {
   // Catalog selection
   catalogs: CatalogMetadata[];
   catalogPath: string | null;
-  defaultCatalogFilename?: string | null;
   onOpenCatalogPicker: () => void;
 
   // Dialog trigger
@@ -41,7 +40,6 @@ export default function QueryTopBar({
   defaultReadProfileId,
   catalogs,
   catalogPath,
-  defaultCatalogFilename,
   onOpenCatalogPicker,
   onOpenIoReaderPicker,
   isStreaming,
@@ -72,7 +70,6 @@ export default function QueryTopBar({
       catalog={{
         catalogs,
         catalogPath,
-        defaultCatalogFilename,
         onOpen: onOpenCatalogPicker,
       }}
     />

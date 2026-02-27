@@ -1,6 +1,6 @@
 // ui/src/apps/catalog/layout/CatalogToolbar.tsx
 
-import { Check, ChevronDown, Download, FileText, Glasses, RotateCcw, Save, Settings, Star, X } from "lucide-react";
+import { Check, ChevronDown, Download, FileText, Glasses, RotateCcw, Save, Settings, X } from "lucide-react";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { disabledState } from "../../../styles";
 import { buttonBase, iconButtonBase, toggleButtonClass } from "../../../styles/buttonStyles";
@@ -16,7 +16,6 @@ export type CatalogToolbarProps = {
 
   // Catalog picker
   catalogs: CatalogMetadata[];
-  defaultCatalogFilename?: string | null;
 
   onOpenPicker: () => void;
   onSave: () => void;
@@ -33,7 +32,6 @@ export default function CatalogToolbar({
   hasUnsavedChanges,
   validationState,
   catalogs,
-  defaultCatalogFilename,
   onOpenPicker,
   onSave,
   onReload,
@@ -48,7 +46,6 @@ export default function CatalogToolbar({
   const normalisedCatalogPath = catalogPath ? normalisePath(catalogPath) : null;
   const selectedCatalog = catalogs.find((c) => normalisePath(c.path) === normalisedCatalogPath);
   const catalogName = selectedCatalog?.name || catalogPath?.split("/").pop() || "No catalog";
-  const isDefaultCatalog = selectedCatalog?.filename === defaultCatalogFilename;
 
   // Validation button styling
   const validationButtonClass =
@@ -87,9 +84,6 @@ export default function CatalogToolbar({
         className={buttonBase}
         title="Select catalog"
       >
-        {isDefaultCatalog && (
-          <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
-        )}
         <span className="max-w-40 truncate">{catalogName}</span>
         <ChevronDown className={`${iconSm} flex-shrink-0 text-slate-400`} />
       </button>

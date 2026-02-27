@@ -2,10 +2,13 @@
 
 import { Play, Pause, Square, Trash2, UserMinus, Plus, X } from "lucide-react";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
+import { useSettingsStore } from "../../settings/stores/settingsStore";
+import { useSessionStore } from "../../../stores/sessionStore";
 import type { ActiveSessionInfo } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { iconSm } from "../../../styles/spacing";
 import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
+import { tlog } from "../../../api/settings";
 
 interface SessionDetailPanelProps {
   sessions: ActiveSessionInfo[];
@@ -163,6 +166,9 @@ function SessionDetails({
         </p>
       </div>
 
+      {/* Decoder — editable dropdown, syncs to all apps sharing the session */}
+      <SessionDecoderPicker session={session} />
+
       {/* Buffer Info */}
       {session.bufferId && (
         <div>
@@ -316,6 +322,16 @@ function SourceDetails({ profile, sessions, onRemoveSource }: {
         </p>
       </div>
 
+      {/* Preferred Decoder */}
+      <div>
+        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          Preferred Decoder
+        </label>
+        <p className={`text-sm ${profile.preferred_catalog ? "text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}>
+          {profile.preferred_catalog ?? "None"}
+        </p>
+      </div>
+
       {/* Actions — remove from session (only if session has more than 1 source) */}
       {usingSessions.some((s) => s.sourceProfileIds.length > 1) && (
         <div className="pt-2 border-t border-[color:var(--border-default)]">
@@ -336,6 +352,54 @@ function SourceDetails({ profile, sessions, onRemoveSource }: {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Decoder picker for a session — reads/writes the session-level catalogPath from sessionStore.
+// Apps sharing the session will see the change via their cross-app sync effects.
+function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
+  const catalogs = useSettingsStore((s) => s.catalogs.list);
+  const sessionCatalogPath = useSessionStore(
+    (s) => s.sessions[session.sessionId]?.catalogPath ?? null
+  );
+
+  // Convert full path to filename for dropdown value
+  const currentFilename = sessionCatalogPath
+    ? catalogs.find((c) => c.path === sessionCatalogPath)?.filename
+      ?? sessionCatalogPath.split("/").pop()
+      ?? ""
+    : "";
+
+  const handleChange = (filename: string) => {
+    if (!filename) {
+      tlog.debug(`[session-manager] Clearing session decoder for ${session.sessionId}`);
+      useSessionStore.getState().setSessionCatalogPath(session.sessionId, null);
+      return;
+    }
+    const catalog = catalogs.find((c) => c.filename === filename);
+    const path = catalog?.path ?? filename;
+    tlog.debug(`[session-manager] Setting session decoder → ${path}`);
+    useSessionStore.getState().setSessionCatalogPath(session.sessionId, path);
+  };
+
+  return (
+    <div>
+      <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        Decoder
+      </label>
+      <select
+        className="mt-1 w-full px-2 py-1 text-sm rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)]"
+        value={currentFilename}
+        onChange={(e) => handleChange(e.target.value)}
+      >
+        <option value="">None</option>
+        {catalogs.map((c) => (
+          <option key={c.filename} value={c.filename}>
+            {c.name}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

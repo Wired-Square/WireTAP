@@ -44,7 +44,7 @@ import type { SelectionSet } from '../utils/selectionSets';
 import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
 import { loadCatalog as loadCatalogFromPath, parseCanId } from '../utils/catalogParser';
-import { buildCatalogPath } from '../utils/catalogUtils';
+
 
 // Re-export for consumers that import from decoderStore
 export type { PlaybackSpeed } from '../components/TimeController';
@@ -289,7 +289,7 @@ interface DecoderState {
 
   // Actions - Catalog
   loadCatalog: (path: string) => Promise<void>;
-  initFromSettings: (defaultCatalog?: string, decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
+  initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
 
   // Actions - Frame management
   toggleFrameSelection: (id: number) => void;
@@ -515,18 +515,15 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       });
     } catch (e) {
       tlog.info(`[decoderStore] Failed to load catalog: ${e}`);
+      throw e;
     }
   },
 
-  initFromSettings: async (defaultCatalog, decoderDir, defaultReadProfile) => {
+  initFromSettings: async (_decoderDir, defaultReadProfile) => {
     if (defaultReadProfile) {
       set({ ioProfile: defaultReadProfile });
     }
-
-    if (defaultCatalog) {
-      const path = buildCatalogPath(defaultCatalog, decoderDir);
-      await get().loadCatalog(path);
-    }
+    // decoderDir is stored implicitly via the catalog path when a catalog is loaded
   },
 
   // Frame management actions

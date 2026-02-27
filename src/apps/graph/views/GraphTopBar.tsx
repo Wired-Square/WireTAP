@@ -38,7 +38,6 @@ interface Props {
   // Catalog
   catalogs: CatalogMetadata[];
   catalogPath: string | null;
-  defaultCatalogFilename?: string | null;
   onOpenCatalogPicker: () => void;
 
   // Watch state (for frame count display)
@@ -76,7 +75,6 @@ export default function GraphTopBar({
   onOpenIoReaderPicker,
   catalogs,
   catalogPath,
-  defaultCatalogFilename,
   onOpenCatalogPicker,
   isWatching,
   watchFrameCount,
@@ -158,7 +156,6 @@ export default function GraphTopBar({
       catalog={{
         catalogs,
         catalogPath,
-        defaultCatalogFilename,
         onOpen: onOpenCatalogPicker,
       }}
       actions={

@@ -6,7 +6,7 @@ import type { FrameDetail, SignalDef, MuxDef } from '../types/decoder';
 import type { Confidence } from '../types/catalog';
 import type { CanProtocolConfig } from '../utils/catalogParser';
 import { loadCatalog as loadCatalogFromPath } from '../utils/catalogParser';
-import { buildCatalogPath } from '../utils/catalogUtils';
+
 import type { SerialFrameConfig } from '../utils/frameExport';
 import {
   getAllGraphLayouts,
@@ -229,7 +229,7 @@ interface GraphState {
 
   // ── Actions ──
   loadCatalog: (path: string) => Promise<void>;
-  initFromSettings: (defaultCatalog?: string, decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
+  initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
   setIoProfile: (profile: string | null) => void;
   setPlaybackSpeed: (speed: number) => void;
   setBufferCapacity: (capacity: number) => void;
@@ -353,16 +353,13 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       });
     } catch (e) {
       tlog.info(`[graphStore] Failed to load catalog: ${e}`);
+      throw e;
     }
   },
 
-  initFromSettings: async (defaultCatalog, decoderDir, defaultReadProfile) => {
+  initFromSettings: async (_decoderDir, defaultReadProfile) => {
     if (defaultReadProfile) {
       set({ ioProfile: defaultReadProfile });
-    }
-    if (defaultCatalog) {
-      const path = buildCatalogPath(defaultCatalog, decoderDir);
-      await get().loadCatalog(path);
     }
     // Restore panels from last session
     await get().restoreLastSession();

@@ -14,7 +14,6 @@ type Props = {
   // Catalog selection
   catalogs: CatalogMetadata[];
   catalogPath: string | null;
-  defaultCatalogFilename?: string | null;
   onOpenCatalogPicker: () => void;
 
   // IO profile selection
@@ -89,7 +88,6 @@ type Props = {
 export default function DecoderTopBar({
   catalogs,
   catalogPath,
-  defaultCatalogFilename,
   onOpenCatalogPicker,
   ioProfiles,
   ioProfile,
@@ -164,7 +162,6 @@ export default function DecoderTopBar({
       catalog={{
         catalogs,
         catalogPath,
-        defaultCatalogFilename,
         onOpen: onOpenCatalogPicker,
       }}
     >

@@ -5,6 +5,7 @@ import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
 import { iconButtonHover } from "../../../styles/buttonStyles";
 import Dialog from "../../../components/Dialog";
 import type { IOProfile } from "../stores/settingsStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import SerialPortPicker from "../components/SerialPortPicker";
 import GsUsbDevicePicker from "../components/GsUsbDevicePicker";
 import LinuxCanSetupHelper from "../components/LinuxCanSetupHelper";
@@ -65,6 +66,9 @@ export default function IOProfileDialog({
   onUpdateConnectionField,
   onUpdateMqttFormat,
 }: Props) {
+  // Catalog list for preferred decoder picker
+  const catalogs = useSettingsStore((s) => s.catalogs.list);
+
   // Check password storage status
   const isPasswordSecurelyStored = !!profileForm.connection._password_stored;
   // Legacy password exists if there's a password in the original profile that isn't marked as securely stored
@@ -375,6 +379,22 @@ export default function IOProfileDialog({
               {availableKinds.includes("serial") && <option value="serial">Serial Port</option>}
               {availableKinds.includes("slcan") && <option value="slcan">slcan (CANable, USB-CAN)</option>}
               {availableKinds.includes("socketcan") && <option value="socketcan">SocketCAN (Linux)</option>}
+            </Select>
+          </FormField>
+
+          {/* Preferred Decoder */}
+          <FormField label="Preferred Decoder" variant="default">
+            <Select
+              variant="default"
+              value={profileForm.preferred_catalog || ""}
+              onChange={(e) => onUpdateProfileField("preferred_catalog", e.target.value || undefined)}
+            >
+              <option value="">None</option>
+              {catalogs.map((c) => (
+                <option key={c.filename} value={c.filename}>
+                  {c.name}
+                </option>
+              ))}
             </Select>
           </FormField>
 

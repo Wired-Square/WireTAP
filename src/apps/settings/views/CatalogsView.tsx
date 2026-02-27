@@ -1,16 +1,14 @@
 // ui/src/apps/settings/views/CatalogsView.tsx
-import { BookOpen, Star, Copy, Edit2, Trash2 } from "lucide-react";
+import { BookOpen, Copy, Edit2, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
-import { iconButtonHover, iconButtonHoverDanger, iconButtonHoverCompact } from "../../../styles/buttonStyles";
+import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
 import { badgeMetadata } from "../../../styles/badgeStyles";
 import type { CatalogFile } from "../stores/settingsStore";
 
 type CatalogsViewProps = {
   catalogs: CatalogFile[];
   decoderDir: string;
-  defaultCatalog: string | null;
-  onSetDefaultCatalog: (filename: string) => void;
   onDuplicateCatalog: (catalog: CatalogFile) => void;
   onEditCatalog: (catalog: CatalogFile) => void;
   onDeleteCatalog: (catalog: CatalogFile) => void;
@@ -19,8 +17,6 @@ type CatalogsViewProps = {
 export default function CatalogsView({
   catalogs,
   decoderDir,
-  defaultCatalog,
-  onSetDefaultCatalog,
   onDuplicateCatalog,
   onEditCatalog,
   onDeleteCatalog,
@@ -50,20 +46,6 @@ export default function CatalogsView({
                   <span className={badgeMetadata}>
                     {catalog.filename}
                   </span>
-
-                  <button
-                    onClick={() => onSetDefaultCatalog(catalog.filename)}
-                    className={iconButtonHoverCompact}
-                    title={defaultCatalog === catalog.filename ? "Unset as default" : "Set as default"}
-                  >
-                    <Star
-                      className={`${iconMd} ${
-                        defaultCatalog === catalog.filename
-                          ? "fill-yellow-500 text-yellow-500"
-                          : "text-[color:var(--text-muted)]"
-                      }`}
-                    />
-                  </button>
                 </div>
               </div>
               <div className={flexRowGap2}>

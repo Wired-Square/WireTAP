@@ -308,6 +308,8 @@ export interface Session {
   speed: number | null;
   /** Current playback position (centralised for all apps sharing this session) */
   playbackPosition: PlaybackPosition | null;
+  /** Decoder catalog path for this session (frontend-only, shared across apps) */
+  catalogPath: string | null;
 }
 
 /** Options for creating a session */
@@ -493,6 +495,8 @@ export interface SessionStore {
   showAppError: (title: string, message: string, details?: string) => void;
   /** Close the global app error dialog */
   closeAppError: () => void;
+  /** Set the decoder catalog path for a session (frontend-only, shared across apps) */
+  setSessionCatalogPath: (sessionId: string, catalogPath: string | null) => void;
 }
 
 // ============================================================================
@@ -929,6 +933,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             streamEndedReason: null,
             speed: null,
             playbackPosition: null,
+            catalogPath: null,
           };
           set((s) => ({
             sessions: { ...s.sessions, [sessionId]: errorSession },
@@ -1074,6 +1079,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         streamEndedReason: existingSession?.streamEndedReason ?? null,
         speed: existingSession?.speed ?? null,
         playbackPosition: existingSession?.playbackPosition ?? null,
+        catalogPath: existingSession?.catalogPath ?? null,
       };
 
       return {
@@ -1731,6 +1737,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         details: null,
       },
     }),
+
+  setSessionCatalogPath: (sessionId, catalogPath) => {
+    const session = get().sessions[sessionId];
+    if (!session) return;
+    set((s) => ({
+      sessions: {
+        ...s.sessions,
+        [sessionId]: { ...s.sessions[sessionId], catalogPath },
+      },
+    }));
+  },
 }));
 
 // Initialize the event listeners getter for frame throttling

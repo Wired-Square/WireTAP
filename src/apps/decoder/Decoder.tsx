@@ -9,8 +9,12 @@ import { useIOPickerHandlers } from '../../hooks/useIOPickerHandlers';
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
 import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
 import { useFocusStore } from '../../stores/focusStore';
+import { useSessionStore } from "../../stores/sessionStore";
+import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
 import { getFavoritesForProfile } from "../../utils/favorites";
 import { mergeSerialConfigForWatch } from "../../utils/sessionConfigMerge";
+import { buildCatalogPath } from "../../utils/catalogUtils";
+import { tlog } from "../../api/settings";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { clearBuffer } from "../../api/buffer";
 import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
@@ -26,6 +30,7 @@ import FlashNotification from "../../components/FlashNotification";
 import BookmarkEditorDialog from "../../dialogs/BookmarkEditorDialog";
 import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import FilterDialog from "./dialogs/FilterDialog";
+import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
 import { WINDOW_EVENTS, type CatalogSavedPayload, type BufferChangedPayload } from "../../events/registry";
 import { useDialogManager } from "../../hooks/useDialogManager";
@@ -52,8 +57,10 @@ export default function Decoder() {
     'speedPicker',
     'catalogPicker',
     'filter',
+    'decoderConflict',
   ] as const);
   const [bufferMetadata, setBufferMetadata] = useState<BufferMetadata | null>(null);
+  const [decoderConflictOptions, setDecoderConflictOptions] = useState<DecoderConflictOption[]>([]);
 
   // Selection sets for the dropdown in FramePicker (auto-refreshes cross-panel)
   const { selectionSets } = useSelectionSets();
@@ -549,6 +556,70 @@ export default function Decoder() {
     }
   }, [isBufferMode, isStreaming, bufferMetadata, sessionId]);
 
+  // Subscribe to the session's catalogPath in sessionStore.
+  // Returns undefined when the session doesn't exist yet, null when it exists with no
+  // decoder, or a string path. This distinction is critical: session.sessionId is set
+  // from manager options BEFORE openSession runs, so Zustand must re-render us when the
+  // session is actually created in the store.
+  const sessionCatalogPath = useSessionStore((s) => {
+    if (!sessionId) return undefined;
+    const sess = s.sessions[sessionId];
+    if (!sess) return undefined;
+    return sess.catalogPath;
+  });
+
+  // Cross-app decoder sync: when another app (or Session Manager) changes the
+  // session's catalogPath to a non-null value, load it locally.
+  useEffect(() => {
+    if (!sessionCatalogPath || sessionCatalogPath === catalogPath) return;
+    tlog.debug(`[Decoder] session decoder changed externally → ${sessionCatalogPath}`);
+    loadCatalog(sessionCatalogPath).catch(console.error);
+  }, [sessionCatalogPath, catalogPath, loadCatalog]);
+
+  // Auto-set session decoder from source profiles' preferred_catalog when a new session
+  // starts. Fires when sessionCatalogPath transitions from undefined (session not in
+  // store) to null (session created with no decoder).
+  useEffect(() => {
+    if (sessionCatalogPath !== null) return; // undefined (no session) or string (already set)
+    if (!sessionId) return;
+
+    const profiles = useSettingsStore.getState().ioProfiles.profiles;
+    const profileIds = ioProfiles.length > 0
+      ? ioProfiles : sourceProfileId ? [sourceProfileId] : [];
+    const preferredCatalogs = [...new Set(
+      profileIds.map(id => profiles.find(p => p.id === id)?.preferred_catalog).filter(Boolean)
+    )] as string[];
+
+    tlog.debug(`[Decoder] auto-load check: profileIds=${JSON.stringify(profileIds)}, preferred=${JSON.stringify(preferredCatalogs)}, localCatalog=${catalogPath}`);
+
+    if (preferredCatalogs.length === 1) {
+      const path = buildCatalogPath(preferredCatalogs[0], decoderDir);
+      tlog.debug(`[Decoder] auto-loading preferred decoder → ${path}`);
+      loadCatalog(path).catch((err) => {
+        console.warn("[Decoder] Failed to auto-load preferred decoder:", err);
+      });
+      useSessionStore.getState().setSessionCatalogPath(sessionId, path);
+    } else if (preferredCatalogs.length > 1) {
+      tlog.debug(`[Decoder] multiple preferred decoders: ${preferredCatalogs.join(", ")}`);
+      const options: DecoderConflictOption[] = preferredCatalogs.map(filename => ({
+        filename,
+        profileNames: profileIds
+          .filter(id => profiles.find(p => p.id === id)?.preferred_catalog === filename)
+          .map(id => profiles.find(p => p.id === id)?.name ?? id),
+      }));
+      setDecoderConflictOptions(options);
+      dialogs.decoderConflict.open();
+    } else if (catalogPath) {
+      // No preferred decoder from profiles, but the app already has a decoder loaded
+      // (e.g. user picked one before connecting). Carry it over to the session.
+      tlog.debug(`[Decoder] carrying over local decoder to session → ${catalogPath}`);
+      useSessionStore.getState().setSessionCatalogPath(sessionId, catalogPath);
+    }
+    // sessionCatalogPath drives the primary trigger: undefined→null when session is created.
+    // ioProfiles/sourceProfileId included in case they arrive in a later render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionCatalogPath, sessionId, ioProfiles, sourceProfileId]);
+
   // Use the orchestrator hook for all handlers
   const handlers = useDecoderHandlers({
     // Session actions (low-level, for playback)
@@ -621,7 +692,7 @@ export default function Decoder() {
     totalFrames: effectiveBufferMetadata?.count,
   });
 
-  // Centralised IO picker handlers - replaces manual dialog handler wiring
+  // Centralised IO picker handlers
   const ioPickerProps = useIOPickerHandlers({
     manager,
     closeDialog: () => dialogs.ioReaderPicker.close(),
@@ -721,7 +792,6 @@ export default function Decoder() {
 
     const init = async () => {
       await initFromSettings(
-        settings.default_catalog ?? undefined,
         settings.decoder_dir,
         settings.default_read_profile
       );
@@ -876,7 +946,6 @@ export default function Decoder() {
           <DecoderTopBar
             catalogs={catalogs}
             catalogPath={catalogPath}
-            defaultCatalogFilename={settings?.default_catalog}
             onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
             ioProfiles={settings?.io_profiles || []}
             ioProfile={ioProfile}
@@ -1031,8 +1100,11 @@ export default function Decoder() {
         onClose={() => dialogs.catalogPicker.close()}
         catalogs={catalogs}
         selectedPath={catalogPath}
-        defaultFilename={settings?.default_catalog}
-        onSelect={handlers.handleCatalogChange}
+        onSelect={(path: string) => {
+          handlers.handleCatalogChange(path);
+          const sid = session.sessionId;
+          if (sid) useSessionStore.getState().setSessionCatalogPath(sid, path);
+        }}
         title="Select Decoder Catalog"
       />
 
@@ -1058,6 +1130,20 @@ export default function Decoder() {
         onSave={(minLength, idFilter) => {
           setMinFrameLength(minLength);
           setFrameIdFilter(idFilter);
+        }}
+      />
+
+      <DecoderConflictDialog
+        isOpen={dialogs.decoderConflict.isOpen}
+        onClose={() => dialogs.decoderConflict.close()}
+        options={decoderConflictOptions}
+        onSelect={(filename) => {
+          const path = buildCatalogPath(filename, decoderDir);
+          loadCatalog(path).catch(console.error);
+          if (sessionId) useSessionStore.getState().setSessionCatalogPath(sessionId, path);
+        }}
+        onSkip={() => {
+          // User chose "None" — no decoder for this session
         }}
       />
     </AppLayout>

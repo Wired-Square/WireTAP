@@ -2,6 +2,22 @@
 
 All notable changes to CANdor will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Session-level decoder**: The active decoder catalog is now stored on the session, not the IO profile. When an app picks a decoder, all apps sharing the same session see the change immediately. The Session Manager's decoder dropdown reads and writes the session decoder.
+
+- **Auto-load from profile**: IO profiles have a `preferred_catalog` field (editable in Settings) that auto-loads when a session starts. Multi-source sessions with conflicting preferred decoders show a disambiguation dialog.
+
+- **Preferred decoder in Settings**: IO Profile edit dialog includes a "Preferred Decoder" dropdown to set or clear the decoder for any source profile.
+
+### Removed
+
+- **Global default catalog**: The `default_catalog` setting and its star badge in the Catalogs view have been removed. Decoders are now selected per-session, either manually or via the profile's preferred decoder.
+
+- **Auto-save to profile**: Apps no longer write the decoder back to the IO profile when the user picks one manually. The profile's `preferred_catalog` is config-only, editable from Settings.
+
 ## [0.4.6] - 2026-02-26
 
 ### Added

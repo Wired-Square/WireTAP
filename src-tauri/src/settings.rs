@@ -9,6 +9,8 @@ pub struct IOProfile {
     pub name: String,
     pub kind: String, // "mqtt", "postgres", "gvret_tcp"
     pub connection: HashMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub preferred_catalog: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -22,8 +24,6 @@ pub struct AppSettings {
     pub default_read_profile: Option<String>,
     #[serde(default)]
     pub default_write_profiles: Vec<String>,
-    #[serde(default)]
-    pub default_catalog: Option<String>,
     #[serde(default = "default_display_frame_id_format")]
     pub display_frame_id_format: String, // "hex" | "decimal"
     #[serde(default = "default_save_frame_id_format")]
@@ -269,7 +269,6 @@ impl Default for AppSettings {
             io_profiles: Vec::new(),
             default_read_profile: None,
             default_write_profiles: Vec::new(),
-            default_catalog: None,
             display_frame_id_format: default_display_frame_id_format(),
             save_frame_id_format: default_save_frame_id_format(),
             display_time_format: default_display_time_format(),
@@ -340,7 +339,6 @@ impl AppSettings {
             io_profiles: Vec::new(),
             default_read_profile: None,
             default_write_profiles: Vec::new(),
-            default_catalog: None,
             display_frame_id_format: default_display_frame_id_format(),
             save_frame_id_format: default_save_frame_id_format(),
             display_time_format: default_display_time_format(),

@@ -49,7 +49,6 @@ export type FrameDetail = {
 
 export type CatalogSettings = {
   decoder_dir?: string;
-  default_catalog?: string | null;
   default_read_profile?: string | null;
   io_profiles?: { id: string; name: string }[];
   display_frame_id_format?: "hex" | "decimal";

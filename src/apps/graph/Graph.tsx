@@ -6,8 +6,12 @@ import { useGraphStore, type SignalValueEntry } from "../../stores/graphStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useIOPickerHandlers } from "../../hooks/useIOPickerHandlers";
+import { useSessionStore } from "../../stores/sessionStore";
+import { useSettingsStore } from "../settings/stores/settingsStore";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { mergeSerialConfig } from "../../utils/sessionConfigMerge";
+import { buildCatalogPath } from "../../utils/catalogUtils";
+import { tlog } from "../../api/settings";
 import { catalogFilenameFromPath } from "../../utils/graphLayouts";
 import { onStoreChanged } from "../../api/store";
 import AppLayout from "../../components/AppLayout";
@@ -19,6 +23,7 @@ import IoReaderPickerDialog from "../../dialogs/IoReaderPickerDialog";
 import SignalPickerDialog from "./dialogs/SignalPickerDialog";
 import PanelConfigDialog from "./dialogs/PanelConfigDialog";
 import CandidateSignalsDialog from "./dialogs/CandidateSignalsDialog";
+import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { decodeSignal } from "../../utils/signalDecode";
 import { extractBits } from "../../utils/bits";
@@ -46,7 +51,9 @@ export default function Graph() {
     'signalPicker',
     'panelConfig',
     'candidateSignals',
+    'decoderConflict',
   ] as const);
+  const [decoderConflictOptions, setDecoderConflictOptions] = useState<DecoderConflictOption[]>([]);
 
   // Store selectors
   const catalogPath = useGraphStore((s) => s.catalogPath);
@@ -300,6 +307,7 @@ export default function Graph() {
     session,
     // Profile
     ioProfileName,
+    sourceProfileId,
     // Multi-bus state
     multiBusProfiles,
     // Derived state
@@ -319,6 +327,62 @@ export default function Graph() {
   } = manager;
 
   const { sessionId, state: readerState } = session;
+
+  // Subscribe to session's catalogPath. Returns undefined when session doesn't exist
+  // in the store yet, null when it exists with no decoder, or a string path.
+  const sessionCatalogPath = useSessionStore((s) => {
+    if (!sessionId) return undefined;
+    const sess = s.sessions[sessionId];
+    if (!sess) return undefined;
+    return sess.catalogPath;
+  });
+
+  // Cross-app decoder sync: when another app (or Session Manager) changes the
+  // session's catalogPath to a non-null value, load it locally.
+  useEffect(() => {
+    if (!sessionCatalogPath || sessionCatalogPath === catalogPath) return;
+    tlog.debug(`[Graph] session decoder changed externally → ${sessionCatalogPath}`);
+    loadCatalog(sessionCatalogPath).catch(console.error);
+  }, [sessionCatalogPath, catalogPath, loadCatalog]);
+
+  // Auto-set session decoder from source profiles' preferred_catalog when a new session
+  // starts. Fires when sessionCatalogPath transitions from undefined to null.
+  useEffect(() => {
+    if (sessionCatalogPath !== null) return;
+    if (!sessionId) return;
+
+    const profiles = useSettingsStore.getState().ioProfiles.profiles;
+    const profileIds = multiBusProfiles.length > 0
+      ? multiBusProfiles : sourceProfileId ? [sourceProfileId] : [];
+    const preferredCatalogs = [...new Set(
+      profileIds.map(id => profiles.find(p => p.id === id)?.preferred_catalog).filter(Boolean)
+    )] as string[];
+
+    tlog.debug(`[Graph] auto-load check: profileIds=${JSON.stringify(profileIds)}, preferred=${JSON.stringify(preferredCatalogs)}, localCatalog=${catalogPath}`);
+
+    if (preferredCatalogs.length === 1) {
+      const path = buildCatalogPath(preferredCatalogs[0], decoderDir);
+      tlog.debug(`[Graph] auto-loading preferred decoder → ${path}`);
+      loadCatalog(path).catch((err) => {
+        console.warn("[Graph] Failed to auto-load preferred decoder:", err);
+      });
+      useSessionStore.getState().setSessionCatalogPath(sessionId, path);
+    } else if (preferredCatalogs.length > 1) {
+      tlog.debug(`[Graph] multiple preferred decoders: ${preferredCatalogs.join(", ")}`);
+      const options: DecoderConflictOption[] = preferredCatalogs.map(filename => ({
+        filename,
+        profileNames: profileIds
+          .filter(id => profiles.find(p => p.id === id)?.preferred_catalog === filename)
+          .map(id => profiles.find(p => p.id === id)?.name ?? id),
+      }));
+      setDecoderConflictOptions(options);
+      dialogs.decoderConflict.open();
+    } else if (catalogPath) {
+      tlog.debug(`[Graph] carrying over local decoder to session → ${catalogPath}`);
+      useSessionStore.getState().setSessionCatalogPath(sessionId, catalogPath);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionCatalogPath, sessionId, multiBusProfiles, sourceProfileId]);
 
   // Centralised IO picker handlers
   const ioPickerProps = useIOPickerHandlers({
@@ -363,7 +427,6 @@ export default function Graph() {
   useEffect(() => {
     if (settings) {
       initFromSettings(
-        settings.default_catalog ?? undefined,
         settings.decoder_dir,
         settings.default_read_profile,
       );
@@ -390,7 +453,8 @@ export default function Graph() {
   // ── Dialog handlers ──
   const handleCatalogChange = useCallback(async (path: string) => {
     await loadCatalog(path);
-  }, [loadCatalog]);
+    if (sessionId) useSessionStore.getState().setSessionCatalogPath(sessionId, path);
+  }, [loadCatalog, sessionId]);
 
   const openPanelConfig = useCallback((panelId: string) => {
     setConfiguringPanelId(panelId);
@@ -430,7 +494,6 @@ export default function Graph() {
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
           catalogs={catalogs}
           catalogPath={catalogPath}
-          defaultCatalogFilename={settings?.default_catalog}
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
           isWatching={isWatching}
           watchFrameCount={watchFrameCount}
@@ -462,7 +525,6 @@ export default function Graph() {
         onClose={() => dialogs.catalogPicker.close()}
         catalogs={catalogs}
         selectedPath={catalogPath}
-        defaultFilename={settings?.default_catalog}
         onSelect={handleCatalogChange}
         title="Select Graph Catalog"
       />
@@ -500,6 +562,20 @@ export default function Graph() {
       <CandidateSignalsDialog
         isOpen={dialogs.candidateSignals.isOpen}
         onClose={() => dialogs.candidateSignals.close()}
+      />
+
+      <DecoderConflictDialog
+        isOpen={dialogs.decoderConflict.isOpen}
+        onClose={() => dialogs.decoderConflict.close()}
+        options={decoderConflictOptions}
+        onSelect={(filename) => {
+          const path = buildCatalogPath(filename, decoderDir);
+          loadCatalog(path).catch(console.error);
+          if (sessionId) useSessionStore.getState().setSessionCatalogPath(sessionId, path);
+        }}
+        onSkip={() => {
+          // User chose "None" — no decoder for this session
+        }}
       />
     </AppLayout>
   );

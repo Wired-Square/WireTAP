@@ -28,25 +28,13 @@ export function useSettingsCatalogHandlers({
   initEditCatalogForm,
 }: UseSettingsCatalogHandlersParams) {
   // Store selectors
-  const catalogs = useSettingsStore((s) => s.catalogs.list);
-  const defaultCatalog = useSettingsStore((s) => s.catalogs.defaultCatalog);
   const dialogPayload = useSettingsStore((s) => s.ui.dialogPayload);
 
   // Store actions
-  const setDefaultCatalog = useSettingsStore((s) => s.setDefaultCatalog);
   const loadCatalogs = useSettingsStore((s) => s.loadCatalogs);
   const openDialog = useSettingsStore((s) => s.openDialog);
   const closeDialog = useSettingsStore((s) => s.closeDialog);
   const setDialogPayload = useSettingsStore((s) => s.setDialogPayload);
-
-  // Toggle default catalog
-  const handleSetDefaultCatalog = (filename: string) => {
-    if (defaultCatalog === filename) {
-      setDefaultCatalog(null);
-    } else {
-      setDefaultCatalog(filename);
-    }
-  };
 
   // Open duplicate dialog
   const handleDuplicateCatalog = (catalog: CatalogFile) => {
@@ -94,11 +82,6 @@ export function useSettingsCatalogHandlers({
       await renameCatalogApi(catalog.path, catalogName, catalogFilename);
       await loadCatalogs();
 
-      // Update default catalog if it was renamed
-      if (defaultCatalog === catalog.filename) {
-        setDefaultCatalog(catalogFilename);
-      }
-
       closeDialog('editCatalog');
       setDialogPayload({ catalogToEdit: null });
       resetCatalogForm();
@@ -129,12 +112,6 @@ export function useSettingsCatalogHandlers({
       await deleteCatalogApi(catalog.path);
       await loadCatalogs();
 
-      // Clear default catalog if it was deleted
-      const deletedCatalog = catalogs.find((c) => c.path === catalog.path);
-      if (deletedCatalog && defaultCatalog === deletedCatalog.filename) {
-        setDefaultCatalog(null);
-      }
-
       closeDialog('deleteCatalog');
       setDialogPayload({ catalogToDelete: null });
     } catch (error) {
@@ -149,7 +126,6 @@ export function useSettingsCatalogHandlers({
   };
 
   return {
-    handleSetDefaultCatalog,
     handleDuplicateCatalog,
     handleConfirmDuplicate,
     handleCancelDuplicate,

@@ -14,7 +14,7 @@ import {
 import { validateMetaFields, validateCatalog, validateSerialConfig } from "../../validate";
 import type { AppSettings } from "../../../../hooks/useSettings";
 import type { ProtocolType } from "../../types";
-import { buildCatalogPath } from "../../../../utils/catalogUtils";
+
 
 export interface UseFileHandlersParams {
   settings: AppSettings | null | undefined;
@@ -54,18 +54,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
   // File operations
   const loadDefaultCatalog = async () => {
     if (!settings) return;
-
-    try {
-      setDecoderDir(settings.decoder_dir);
-
-      if (settings.default_catalog) {
-        const fullPath = buildCatalogPath(settings.default_catalog, settings.decoder_dir);
-        const content = await openCatalogAtPath(fullPath);
-        openSuccess(fullPath, content);
-      }
-    } catch (error) {
-      console.error("Failed to load default catalog:", error);
-    }
+    setDecoderDir(settings.decoder_dir);
   };
 
   const handleNewCatalog = () => {

@@ -1,7 +1,7 @@
 // ui/src/dialogs/CatalogPickerDialog.tsx
 
-import { Check, Star, X } from "lucide-react";
-import { iconMd, iconSm, iconLg, flexRowGap2 } from "../styles/spacing";
+import { Check, X } from "lucide-react";
+import { iconMd, iconLg } from "../styles/spacing";
 import { caption, textMedium, borderDivider, hoverLight, bgSurface } from "../styles";
 import Dialog from "../components/Dialog";
 import type { CatalogMetadata } from "../api/catalog";
@@ -11,7 +11,6 @@ type Props = {
   onClose: () => void;
   catalogs: CatalogMetadata[];
   selectedPath: string | null;
-  defaultFilename?: string | null;
   onSelect: (path: string) => void;
   title?: string;
 };
@@ -21,7 +20,6 @@ export default function CatalogPickerDialog({
   onClose,
   catalogs,
   selectedPath,
-  defaultFilename,
   onSelect,
   title = "Select Catalog",
 }: Props) {
@@ -53,7 +51,6 @@ export default function CatalogPickerDialog({
             <div className="py-1">
               {catalogs.map((catalog) => {
               const isSelected = catalog.path === selectedPath;
-              const isDefault = catalog.filename === defaultFilename;
               return (
                 <button
                   key={catalog.path}
@@ -63,14 +60,9 @@ export default function CatalogPickerDialog({
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className={flexRowGap2}>
-                      {isDefault && (
-                        <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
-                      )}
-                      <span className={`${textMedium} truncate`}>
-                        {catalog.name}
-                      </span>
-                    </div>
+                    <span className={`${textMedium} truncate`}>
+                      {catalog.name}
+                    </span>
                     <div className={`${caption} truncate`}>
                       {catalog.filename}
                     </div>
