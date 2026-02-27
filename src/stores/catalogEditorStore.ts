@@ -74,6 +74,7 @@ export interface CatalogEditorState {
       matchCount: number;
       currentIndex: number; // Current match index (-1 = none)
     };
+    treeScrollTop: number;
     dialogs: {
       newCatalog: boolean;
       addNode: boolean;
@@ -181,6 +182,9 @@ export interface CatalogEditorState {
   // Actions - UI
   setFilterByNode: (filter: string | null) => void;
   setAvailablePeers: (peers: string[]) => void;
+
+  // Actions - Scroll
+  setTreeScrollTop: (scrollTop: number) => void;
 
   // Actions - Find (UI mode)
   openFind: () => void;
@@ -299,6 +303,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
       matchCount: 0,
       currentIndex: -1,
     },
+    treeScrollTop: 0,
     dialogs: { ...initialDialogs },
     dialogPayload: { ...initialDialogPayload },
   },
@@ -474,6 +479,10 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
 
   setAvailablePeers: (peers) =>
     set((state) => ({ ui: { ...state.ui, availablePeers: peers } })),
+
+  // Scroll actions
+  setTreeScrollTop: (scrollTop) =>
+    set((state) => ({ ui: { ...state.ui, treeScrollTop: scrollTop } })),
 
   // Find actions
   openFind: () =>

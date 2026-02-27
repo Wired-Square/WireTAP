@@ -16,6 +16,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Last graph panel reappearing after individual removal**: Removing graph panels one-by-one left stale session data in the auto-save store because the save guard skipped empty states. On reopen, the phantom panel was restored. Now explicitly deletes the saved session when the last panel is removed.
 
+- **Catalog Editor tree panel scroll position lost on window switch**: Scrolling down the frame picker, switching to another window, and switching back reset the list to the top. Now preserves and restores scroll position using the same focus-tracking pattern as the Decoder.
+
 ### Added
 
 - **Sources in Session Details**: The Session Details panel now shows the source profile names feeding the session.

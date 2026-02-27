@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
+import { useFocusStore } from "../../stores/focusStore";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { Eye } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
@@ -74,9 +75,41 @@ export default function CatalogEditor() {
   const openSuccess = useCatalogEditorStore((s) => s.openSuccess);
   const openDialog = useCatalogEditorStore((s) => s.openDialog);
   const decoderDir = useCatalogEditorStore((s) => s.file.decoderDir);
+  const treeScrollTop = useCatalogEditorStore((s) => s.ui.treeScrollTop);
+  const setTreeScrollTop = useCatalogEditorStore((s) => s.setTreeScrollTop);
+
+  // Track if this panel is focused (for scroll position restoration)
+  const isFocused = useFocusStore((s) => s.focusedPanelId === "catalog-editor");
 
   // Ref for text mode textarea
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Scroll preservation for tree panel
+  const treeScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRestoringScrollRef = useRef(false);
+  const treeScrollTopRef = useRef(treeScrollTop);
+  useEffect(() => { treeScrollTopRef.current = treeScrollTop; }, [treeScrollTop]);
+
+  const handleTreeScroll = useCallback((scrollTop: number) => {
+    if (isRestoringScrollRef.current) return;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      setTreeScrollTop(scrollTop);
+    }, 100);
+  }, [setTreeScrollTop]);
+
+  // Restore scroll position when panel regains focus
+  useEffect(() => {
+    if (isFocused && treeScrollRef.current) {
+      const saved = treeScrollTopRef.current;
+      if (saved > 0) {
+        isRestoringScrollRef.current = true;
+        treeScrollRef.current.scrollTop = saved;
+        setTimeout(() => { isRestoringScrollRef.current = false; }, 50);
+      }
+    }
+  }, [isFocused]);
 
   // Catalog picker state
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
@@ -389,6 +422,8 @@ export default function CatalogEditor() {
             catalogPath={catalogPath}
             parsedTree={parsedTree}
             renderTreeNode={renderTreeNode}
+            scrollRef={treeScrollRef}
+            onScroll={handleTreeScroll}
             availablePeers={availablePeers}
             filterByNode={filterByNode}
             setFilterByNode={setFilterByNode}

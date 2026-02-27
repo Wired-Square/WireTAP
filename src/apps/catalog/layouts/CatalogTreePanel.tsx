@@ -14,6 +14,10 @@ export type CatalogTreePanelProps = {
   parsedTree: TomlNode[];
   renderTreeNode: (node: TomlNode, depth?: number) => React.ReactNode;
 
+  // Scroll preservation
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
+  onScroll?: (scrollTop: number) => void;
+
   availablePeers: string[];
 
   filterByNode: string | null;
@@ -42,6 +46,8 @@ export default function CatalogTreePanel({
   catalogPath,
   parsedTree,
   renderTreeNode,
+  scrollRef,
+  onScroll,
   availablePeers,
   filterByNode,
   setFilterByNode,
@@ -189,7 +195,11 @@ export default function CatalogTreePanel({
       </div>
 
       {/* Scrollable tree section */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 pb-4"
+        onScroll={onScroll ? (e) => onScroll((e.target as HTMLDivElement).scrollTop) : undefined}
+      >
         {!catalogPath ? (
           <p className="text-sm text-[color:var(--text-muted)]">Open a catalog file to view its structure</p>
         ) : parsedTree.length === 0 ? (
