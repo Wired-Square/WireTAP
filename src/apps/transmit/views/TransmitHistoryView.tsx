@@ -17,6 +17,7 @@ import { flexRowGap2 } from "../../../styles/spacing";
 import { buttonBase } from "../../../styles/buttonStyles";
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
+import { buildCsv } from "../../../utils/csvBuilder";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { formatBusLabel } from "../../../utils/busFormat";
 
@@ -123,31 +124,27 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
   const handleExport = useCallback(() => {
     if (history.length === 0) return;
 
-    const lines = [
-      "Timestamp,Interface,Type,ID,DLC,Data,Flags,Success,Error",
-    ];
+    const headers = ["Timestamp", "Interface", "Type", "ID", "DLC", "Data", "Flags", "Success", "Error"];
+    const rows: (string | number)[][] = [];
 
     for (const item of history) {
       const formatted = formatHistoryItem(item);
       if (!formatted) continue;
 
-      const timestamp = formatTimestampString(item.timestamp_us);
-      const id = formatted.id ?? "";
-      const dlc = item.frame?.data.length ?? item.bytes?.length ?? 0;
-      const data =
-        item.frame?.data.map(byteToHex).join("") ??
-        item.bytes?.map(byteToHex).join("") ??
-        "";
-      const flags = formatted.flags.join("|");
-      const success = item.success ? "true" : "false";
-      const error = item.error ?? "";
-
-      lines.push(
-        `"${timestamp}","${item.profileName}","${formatted.type}","${id}",${dlc},"${data}","${flags}",${success},"${error}"`
-      );
+      rows.push([
+        formatTimestampString(item.timestamp_us),
+        item.profileName,
+        formatted.type,
+        formatted.id ?? "",
+        item.frame?.data.length ?? item.bytes?.length ?? 0,
+        item.frame?.data.map(byteToHex).join("") ?? item.bytes?.map(byteToHex).join("") ?? "",
+        formatted.flags.join("|"),
+        item.success ? "true" : "false",
+        item.error ?? "",
+      ]);
     }
 
-    const csv = lines.join("\n");
+    const csv = buildCsv(headers, rows);
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

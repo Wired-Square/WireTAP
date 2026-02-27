@@ -4,6 +4,10 @@ All notable changes to CANdor will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **CSV exports use shared builder**: Transmit history, frame dump, serial bytes, and graph panel CSV exports now use the centralised `csvBuilder` utility for proper field escaping. Previously these paths built CSV manually, risking malformed output if fields contained commas or quotes.
+
 ### Added
 
 - **Query CSV export**: Export button in the Query app now saves results as CSV via the native file dialog. All 9 query types have dedicated CSV formatters using the new shared `csvBuilder` utility.

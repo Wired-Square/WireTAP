@@ -4,6 +4,7 @@
 import type { FrameMessage } from "../types/frame";
 import type { SerialBytesEntry } from "../stores/discoverySerialStore";
 import { CAN_FD_DLC_VALUES } from "../constants";
+import { buildCsv } from "./csvBuilder";
 
 export type ExportFormat = "csv" | "json" | "candump" | "hex" | "bin";
 
@@ -26,16 +27,15 @@ function findSmallestFittingDlc(byteCount: number): number {
  * Columns use the smallest valid CAN FD DLC that fits the largest frame
  */
 export function exportToCsv(frames: FrameMessage[]): string {
-  const lines: string[] = [];
-
   // Find max bytes across all frames, then round up to valid CAN FD DLC
   const maxBytes = frames.reduce((max, f) => Math.max(max, f.dlc, f.bytes.length), 0);
   const maxDataLen = findSmallestFittingDlc(maxBytes);
 
   // Build header with dynamic number of data columns
   const dataHeaders = Array.from({ length: maxDataLen }, (_, i) => `D${i + 1}`);
-  lines.push(["Time Stamp", "ID", "Extended", "Dir", "Bus", "LEN", ...dataHeaders].join(","));
+  const headers = ["Time Stamp", "ID", "Extended", "Dir", "Bus", "LEN", ...dataHeaders];
 
+  const rows: (string | number)[][] = [];
   for (const frame of frames) {
     // Format data bytes as hex (uppercase), pad to maxDataLen columns
     const bytes = Array.from({ length: maxDataLen }, (_, i) =>
@@ -50,7 +50,7 @@ export function exportToCsv(frames: FrameMessage[]): string {
     // Direction: Rx for received, Tx for transmitted
     const dir = frame.direction === "tx" ? "Tx" : "Rx";
 
-    lines.push([
+    rows.push([
       frame.timestamp_us,
       idHex,
       frame.is_extended ? "true" : "false",
@@ -58,10 +58,10 @@ export function exportToCsv(frames: FrameMessage[]): string {
       frame.bus,
       frame.dlc,
       ...bytes,
-    ].join(","));
+    ]);
   }
 
-  return lines.join("\n");
+  return buildCsv(headers, rows);
 }
 
 /**
@@ -180,14 +180,13 @@ export function exportBytesToBinary(bytes: SerialBytesEntry[]): Uint8Array {
  * Format: timestamp_us,byte_hex,byte_dec
  */
 export function exportBytesToCsv(bytes: SerialBytesEntry[]): string {
-  const lines: string[] = ['timestamp_us,byte_hex,byte_dec'];
-
-  for (const entry of bytes) {
-    const hexStr = entry.byte.toString(16).padStart(2, '0').toUpperCase();
-    lines.push(`${entry.timestampUs},${hexStr},${entry.byte}`);
-  }
-
-  return lines.join('\n');
+  const headers = ["timestamp_us", "byte_hex", "byte_dec"];
+  const rows: (string | number)[][] = bytes.map((entry) => [
+    entry.timestampUs,
+    entry.byte.toString(16).padStart(2, "0").toUpperCase(),
+    entry.byte,
+  ]);
+  return buildCsv(headers, rows);
 }
 
 /**

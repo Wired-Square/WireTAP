@@ -3,6 +3,7 @@
 // CSV export builder for graph panel data.
 
 import { readTimeSeries, getSignalLabel, type GraphPanel, type SignalTimeSeries, type SignalRef } from "../../../stores/graphStore";
+import { buildCsv } from "../../../utils/csvBuilder";
 import { formatTimestampIso } from "./graphFormat";
 
 /**
@@ -53,19 +54,18 @@ export function buildPanelCsv(
     }),
   ];
 
-  const lines: string[] = [headers.join(",")];
-
   // Data rows
+  const rows: (string | number)[][] = [];
   for (const ts of allTimestamps) {
-    const row = [formatTimestampIso(ts)];
+    const row: (string | number)[] = [formatTimestampIso(ts)];
     for (const lookup of lookups) {
       const v = lookup.get(ts);
-      row.push(v != null ? String(v) : "");
+      row.push(v != null ? v : "");
     }
-    lines.push(row.join(","));
+    rows.push(row);
   }
 
-  return lines.join("\n") + "\n";
+  return buildCsv(headers, rows);
 }
 
 /**
