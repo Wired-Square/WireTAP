@@ -202,7 +202,7 @@ export default function SignalEditDialog({
                   <option value="unix_time">Unix Time</option>
                 </Select>
               </FormField>
-              <div className="flex items-center gap-2 mt-6">
+              <div className="flex items-center gap-2 self-end pb-2">
                 <input
                   id="signal-signed"
                   type="checkbox"
@@ -286,7 +286,7 @@ export default function SignalEditDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 items-end">
               <FormField label="Confidence" variant="default">
                 <Select
                   variant="default"
@@ -299,13 +299,17 @@ export default function SignalEditDialog({
                   <option value="high">High</option>
                 </Select>
               </FormField>
-              <div>
-                <label className={`${labelSmall} mb-2 flex items-center gap-2`}>
-                  Byte Order
-                  {!fields.endianness && inheritedByteOrder && (
-                    <span className={badgeInfo}>Inherited</span>
-                  )}
-                </label>
+              <FormField
+                label={
+                  <span className="inline-flex items-center gap-2">
+                    Byte Order
+                    {!fields.endianness && inheritedByteOrder && (
+                      <span className={badgeInfo}>Inherited</span>
+                    )}
+                  </span>
+                }
+                variant="default"
+              >
                 <Select
                   variant="default"
                   className={!fields.endianness ? "text-[color:var(--text-muted)]" : ""}
@@ -320,7 +324,7 @@ export default function SignalEditDialog({
                   <option value="little">Little Endian</option>
                   <option value="big">Big Endian</option>
                 </Select>
-              </div>
+              </FormField>
             </div>
 
             <FormField label="Notes" variant="default">

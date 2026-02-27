@@ -6,6 +6,10 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
+- **Catalog editor signal view pencil icon not opening editor**: The edit button on the signal detail view silently failed because `locateSignal()` re-parsed the TOML and searched by property matching, which was fragile. Simplified to read `signalIndex` and `properties` directly from the tree node metadata, matching how the frame view's pencil already works.
+
+- **Signal edit dialog text alignment**: The Confidence/Byte Order row used a 3-column grid with only 2 items and inconsistent label styling. Changed to a 2-column grid, wrapped Byte Order in `FormField` for consistent labels, added `items-end` to align dropdowns, and replaced a brittle `mt-6` hack on the Signed checkbox with `self-end pb-2`.
+
 - **Preferred catalog not auto-loading**: IO profiles with a `preferred_catalog` failed to auto-load when starting a session because the settings store was only populated when the Settings panel was opened. The store is now loaded eagerly at app startup.
 
 - **Session Manager missing source nodes**: The visual session graph showed no source nodes because it read IO profiles from the unpopulated settings store. Fixed by the same eager-load change above.

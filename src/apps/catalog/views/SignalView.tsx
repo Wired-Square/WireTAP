@@ -22,10 +22,6 @@ export type SignalViewProps = {
   onSetValidation: (errors: ValidationError[]) => void;
 };
 
-function normalizeTomlKey(seg: string): string {
-  return seg.startsWith('"') && seg.endsWith('"') ? seg.slice(1, -1) : seg;
-}
-
 export default function SignalView({
   selectedNode,
   catalogContent,
@@ -34,41 +30,22 @@ export default function SignalView({
   onRequestDeleteSignal,
   onSetValidation,
 }: SignalViewProps) {
+  // Use tree metadata directly instead of re-parsing TOML and searching by properties.
   const locateSignal = React.useCallback(() => {
-    const signalsIdx = selectedNode.path.findIndex((seg) => seg === "signals" || seg === "signal");
+    const signalsIdx = selectedNode.path.findIndex(
+      (seg) => seg === "signals" || seg === "signal"
+    );
     if (signalsIdx < 0) return null;
 
-    const keyName = selectedNode.path[signalsIdx]; // "signals" or "signal"
     const signalsParentPath = selectedNode.path.slice(0, signalsIdx);
-
-    const parsed = tomlParse(catalogContent) as any;
-
-    // Navigate to the parent object that owns the signals array
-    let cur: any = parsed;
-    for (const seg of signalsParentPath) {
-      const key = normalizeTomlKey(seg);
-      cur = cur?.[key];
-    }
-
-    const arr: any[] = Array.isArray(cur?.[keyName]) ? cur[keyName] : [];
-
-    const sigProps = selectedNode.metadata?.properties || {};
-    const targetName = selectedNode.key;
-    const targetStart = sigProps.start_bit ?? undefined;
-    const targetLen = sigProps.bit_length ?? undefined;
-
-    const idx = arr.findIndex((s) =>
-      s &&
-      s.name === targetName &&
-      (targetStart === undefined || s.start_bit === targetStart) &&
-      (targetLen === undefined || s.bit_length === targetLen)
-    );
-
-    if (idx < 0) return null;
-
     const idKey = signalsParentPath[signalsParentPath.length - 1];
-    return { idKey, idx, signal: arr[idx], signalsParentPath };
-  }, [catalogContent, selectedNode.key, selectedNode.metadata?.properties, selectedNode.path]);
+    const idx = selectedNode.metadata?.signalIndex;
+    const signal = selectedNode.metadata?.properties;
+
+    if (idx === undefined || idx === null || !signal) return null;
+
+    return { idKey, idx, signal, signalsParentPath };
+  }, [selectedNode.metadata?.signalIndex, selectedNode.metadata?.properties, selectedNode.path]);
 
   return (
     <div className="space-y-4">
