@@ -15,7 +15,7 @@ import {
   catalogFilenameFromPath,
   type GraphLayout,
 } from '../utils/graphLayouts';
-import { storeGet, storeSet } from '../api/store';
+import { storeGet, storeSet, storeDelete } from '../api/store';
 
 // ─────────────────────────────────────────
 // Types
@@ -258,6 +258,7 @@ interface GraphState {
   addPanel: (type: PanelType) => string;
   clonePanel: (panelId: string) => void;
   removePanel: (panelId: string) => void;
+  removeAllPanels: () => void;
   updatePanel: (panelId: string, updates: Partial<Pick<GraphPanel, 'title' | 'minValue' | 'maxValue' | 'primarySignalIndex' | 'targetFrameId' | 'byteCount' | 'histogramBins'>>) => void;
   addSignalToPanel: (panelId: string, frameId: number, signalName: string, unit?: string) => void;
   removeSignalFromPanel: (panelId: string, frameId: number, signalName: string) => void;
@@ -486,6 +487,12 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       layout: layout.filter((l) => l.i !== panelId),
     });
     scheduleAutoSave();
+  },
+
+  removeAllPanels: () => {
+    set({ panels: [], layout: [] });
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    storeDelete(AUTO_SAVE_KEY);
   },
 
   updatePanel: (panelId, updates) => {

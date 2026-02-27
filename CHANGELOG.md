@@ -6,6 +6,8 @@ All notable changes to CANdor will be documented in this file.
 
 ### Added
 
+- **Remove all panels button**: Red bin icon in the Graph toolbar to delete all panels at once. Disabled when no panels exist.
+
 - **Hypothesis Explorer**: New signal hypothesis tool in the Graph app (Sparkles dropdown → Hypothesis Explorer) for fuzzy reverse engineering. Specify bit-level offsets, bit lengths (8/12/16/24/32), endianness, signed/unsigned, and scale/offset, then auto-generate candidate signal plots for one or all discovered frame IDs. Candidates are ranked by interest score using Discovery's payload analysis results (byte role, multi-byte patterns, variance, trend strength). Hypothesis signals persist across sessions and named layouts.
 
 - **Auto-join session on cross-app commands**: "Graph Signal", "Graph Frame", "Graph All Signals", and "Send to Transmit" context menu actions now automatically join the source app's session if the target panel has no session yet. Eliminates the need to manually pick the same IO source in the Graph or Transmit panel after using a context menu shortcut. The mechanism is centralised in `sessionStore` and `useIOSessionManager`, so any app using the session manager gets auto-join support automatically.

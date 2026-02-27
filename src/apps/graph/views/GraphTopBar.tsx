@@ -1,6 +1,6 @@
 // ui/src/apps/graph/views/GraphTopBar.tsx
 
-import { BarChart3, Plus, LineChart, Gauge, List, Save, Layout, X, AlertTriangle, Glasses, Waves, Grid3X3, BarChart2, Sparkles, FlaskConical } from "lucide-react";
+import { BarChart3, Plus, LineChart, Gauge, List, Save, Layout, X, AlertTriangle, Glasses, Waves, Grid3X3, BarChart2, Sparkles, FlaskConical, Trash2 } from "lucide-react";
 import AppTopBar from "../../../components/AppTopBar";
 import { iconButtonBase, iconButtonHoverDanger, toggleButtonClass } from "../../../styles/buttonStyles";
 import { inputBase } from "../../../styles/inputStyles";
@@ -90,6 +90,8 @@ export default function GraphTopBar({
   onOpenHypothesisExplorer,
 }: Props) {
   const addPanel = useGraphStore((s) => s.addPanel);
+  const removeAllPanels = useGraphStore((s) => s.removeAllPanels);
+  const hasPanels = useGraphStore((s) => s.panels.length > 0);
 
   // Add panel menu
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -360,6 +362,16 @@ export default function GraphTopBar({
         className={toggleButtonClass(rawViewMode, "purple")}
       >
         <Glasses className={iconMd} fill={rawViewMode ? "currentColor" : "none"} />
+      </button>
+
+      {/* Remove all panels */}
+      <button
+        onClick={removeAllPanels}
+        disabled={!hasPanels}
+        className={`${iconButtonHoverDanger} disabled:opacity-30 disabled:cursor-not-allowed`}
+        title="Remove all panels"
+      >
+        <Trash2 className={iconMd} />
       </button>
     </AppTopBar>
   );
