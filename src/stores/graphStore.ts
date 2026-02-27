@@ -482,11 +482,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   removePanel: (panelId) => {
     const { panels, layout } = get();
+    const remaining = panels.filter((p) => p.id !== panelId);
     set({
-      panels: panels.filter((p) => p.id !== panelId),
+      panels: remaining,
       layout: layout.filter((l) => l.i !== panelId),
     });
-    scheduleAutoSave();
+    if (remaining.length === 0) {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      storeDelete(AUTO_SAVE_KEY);
+    } else {
+      scheduleAutoSave();
+    }
   },
 
   removeAllPanels: () => {

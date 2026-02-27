@@ -14,6 +14,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Cross-app join skipped when Graph already had a session**: The auto-join guard rejected all pending joins if the target app had any active session, even a different one. Now only skips if already on the requested session, allowing session switching via cross-app commands.
 
+- **Last graph panel reappearing after individual removal**: Removing graph panels one-by-one left stale session data in the auto-save store because the save guard skipped empty states. On reopen, the phantom panel was restored. Now explicitly deletes the saved session when the last panel is removed.
+
 ### Added
 
 - **Sources in Session Details**: The Session Details panel now shows the source profile names feeding the session.
