@@ -3,12 +3,16 @@
 import React from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
-import { labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary, sectionHeaderText, hoverLight } from "../../../styles";
+import { caption, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary, sectionHeaderText, hoverLight } from "../../../styles";
+import BitPreview, { BitRange } from "../../../components/BitPreview";
 import ConfirmDeleteDialog from "../../../dialogs/ConfirmDeleteDialog";
 import type { TomlNode } from "../types";
+import { tomlParse } from "../toml";
+import { getFrameByteLengthFromPath } from "../utils";
 
 export type MuxViewProps = {
   selectedNode: TomlNode;
+  catalogContent: string;
   onAddCase: (muxPath: string[]) => void;
   onEditMux: (muxPath: string[], muxData: any) => void;
   onDeleteMux: (muxPath: string[]) => void;
@@ -17,12 +21,51 @@ export type MuxViewProps = {
 
 export default function MuxView({
   selectedNode,
+  catalogContent,
   onAddCase,
   onEditMux,
   onDeleteMux,
   onSelectNode,
 }: MuxViewProps) {
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+
+  const { ranges, numBytes } = React.useMemo(() => {
+    const r: BitRange[] = [];
+    let bytes = 8;
+    try {
+      const parsed = tomlParse(catalogContent) as any;
+      const protocol = selectedNode.path[1];
+      const frameKey = selectedNode.path[2];
+      const frame = parsed?.frame?.[protocol]?.[frameKey];
+      bytes = getFrameByteLengthFromPath(selectedNode.path, parsed);
+
+      // Frame-level signals
+      if (frame?.signals) {
+        frame.signals.forEach((signal: any) => {
+          r.push({
+            name: signal.name || "Signal",
+            start_bit: signal.start_bit || 0,
+            bit_length: signal.bit_length || 8,
+            type: "signal",
+          });
+        });
+      }
+
+      // Mux selector range
+      if (frame?.mux) {
+        r.push({
+          name: frame.mux.name || "Mux",
+          start_bit: frame.mux.start_bit || 0,
+          bit_length: frame.mux.bit_length || 8,
+          type: "mux",
+        });
+      }
+    } catch {
+      // fall back to defaults
+    }
+    return { ranges: r, numBytes: bytes };
+  }, [catalogContent, selectedNode.path]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -30,9 +73,9 @@ export default function MuxView({
         <div className={flexRowGap2}>
           <button
             onClick={() => onAddCase(selectedNode.path)}
-            className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
+            className="px-2 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
           >
-            + Add Case
+            + Case
           </button>
 
           <button
@@ -54,26 +97,28 @@ export default function MuxView({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
-          <div className={labelSmallMuted}>Name</div>
-          <div className={monoBody}>
-            {selectedNode.metadata?.muxName || "N/A"}
-          </div>
-        </div>
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
-          <div className={labelSmallMuted}>Start Bit</div>
-          <div className={monoBody}>
-            {selectedNode.metadata?.muxStartBit ?? "N/A"}
-          </div>
-        </div>
-        <div className={`p-3 ${bgSecondary} rounded-lg`}>
-          <div className={labelSmallMuted}>Bit Length</div>
-          <div className={monoBody}>
-            {selectedNode.metadata?.muxBitLength ?? "N/A"}
-          </div>
+      <div className={`p-3 ${bgSecondary} rounded-lg`}>
+        <div className={labelSmallMuted}>Name</div>
+        <div className={monoBody}>
+          {selectedNode.metadata?.muxName || "N/A"}
         </div>
       </div>
+
+      {ranges.length > 0 && (
+        <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
+          <div className="text-xs font-medium text-[color:var(--text-secondary)] mb-3">
+            Byte Layout (LSB first)
+          </div>
+          <BitPreview
+            numBytes={numBytes}
+            ranges={ranges}
+            currentStartBit={0}
+            currentBitLength={0}
+            interactive={false}
+            showLegend={false}
+          />
+        </div>
+      )}
 
       {selectedNode.metadata?.properties?.notes && (
         <div className={`p-3 ${bgSecondary} rounded-lg`}>
@@ -101,15 +146,36 @@ export default function MuxView({
             Cases ({selectedNode.children.length})
           </div>
           <div className="space-y-2">
-            {selectedNode.children.map((caseNode, idx) => (
-              <div
-                key={idx}
-                className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
-                onClick={() => onSelectNode(caseNode)}
-              >
-                <div className="font-medium text-[color:var(--text-primary)]">{caseNode.key}</div>
-              </div>
-            ))}
+            {selectedNode.children.map((caseNode, idx) => {
+              const caseSignals = caseNode.metadata?.properties?.signals || [];
+              return (
+                <div
+                  key={idx}
+                  className={`p-3 ${bgSecondary} rounded-lg ${hoverLight} cursor-pointer transition-colors`}
+                  onClick={() => onSelectNode(caseNode)}
+                >
+                  <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2 min-w-0">
+                    <span className="shrink-0">📍</span>
+                    <span className="truncate">{caseNode.key}</span>
+                    <span className={caption}>
+                      {caseSignals.length} signal{caseSignals.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  {caseSignals.length > 0 && (
+                    <div className={`${caption} mt-1 ml-6 space-y-0.5`}>
+                      {caseSignals.map((sig: any, sIdx: number) => (
+                        <div key={sIdx} className="truncate">
+                          ⚡ {sig.name || `Signal ${sIdx + 1}`}
+                          <span className="ml-1 text-[color:var(--text-muted)]">
+                            ({sig.start_bit ?? 0}:{sig.bit_length ?? 0})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

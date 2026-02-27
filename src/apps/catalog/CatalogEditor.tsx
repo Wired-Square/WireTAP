@@ -491,6 +491,10 @@ export default function CatalogEditor() {
                       onEditSignal: handlers.handleEditSignal,
                       onRequestDeleteSignal: handlers.requestDeleteSignal,
                       onAddMux: handlers.handleAddMux,
+                      onEditMux: handlers.handleEditMux,
+                      onDeleteMux: handlers.handleDeleteMux,
+                      onAddCase: handlers.handleAddCase,
+                      onSelectNode: (node: any) => setSelectedPath(node.path),
                     }}
                     canConfigProps={{
                       canConfig: currentCanConfig,
@@ -508,6 +512,7 @@ export default function CatalogEditor() {
                     }}
                     muxProps={{
                       selectedNode,
+                      catalogContent,
                       onAddCase: handlers.handleAddCase,
                       onEditMux: handlers.handleEditMux,
                       onDeleteMux: handlers.handleDeleteMux,

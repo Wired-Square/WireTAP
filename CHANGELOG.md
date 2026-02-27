@@ -22,6 +22,12 @@ All notable changes to CANdor will be documented in this file.
 
 ### Changed
 
+- **Inline mux display in frame view**: Selecting a CAN frame with a mux now shows the mux selector as an editable/deletable purple-bordered card, with all mux cases and their signals listed inline below. BitPreview renders for all frames with any signal content (including mux-only frames). "+ Case" and "+ Signal" buttons in the frame header.
+
+- **Mux selector view**: Redesigned with BitPreview byte layout, compact "+ Case" button, and cases showing signal counts and names inline with icons.
+
+- **Responsive signal property cards**: Signal detail view property cards now wrap long values instead of overflowing, with tighter grid spacing.
+
 - **Responsive BitPreview**: The byte layout grid in the Catalog Editor now scales proportionally to fit the available panel width. Byte row labels are compact number badges instead of "Byte N:" text, and vertical row spacing is tighter. The detail scroll area no longer overflows horizontally.
 
 - **Responsive signal cards**: Signal names in the Catalog Editor frame view truncate with ellipsis when the panel is narrow. Action buttons stay visible and the signals header wraps gracefully.

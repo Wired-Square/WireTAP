@@ -173,14 +173,14 @@ export default function SignalView({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         {selectedNode.metadata?.properties &&
           Object.entries(selectedNode.metadata.properties)
             .filter(([key]) => key !== "endianness" && key !== "byte_order")
             .map(([key, value]) => (
-            <div key={key} className={`p-3 ${bgSecondary} rounded-lg`}>
+            <div key={key} className={`p-3 ${bgSecondary} rounded-lg min-w-0`}>
               <div className={labelSmallMuted}>{key}</div>
-              <div className={monoBody}>
+              <div className={`${monoBody} break-all`}>
                 {typeof value === "boolean"
                   ? value
                     ? "true"
@@ -204,7 +204,7 @@ export default function SignalView({
           if (!effectiveByteOrder) return null;
 
           return (
-            <div className={`p-3 ${bgSecondary} rounded-lg`}>
+            <div className={`p-3 ${bgSecondary} rounded-lg min-w-0`}>
               <div className={`${flexRowGap2} mb-1`}>
                 <span className={labelSmall}>byte_order</span>
                 {isInherited && (
@@ -213,7 +213,7 @@ export default function SignalView({
                   </span>
                 )}
               </div>
-              <div className={monoBody}>
+              <div className={`${monoBody} break-all`}>
                 "{effectiveByteOrder}"
               </div>
             </div>
