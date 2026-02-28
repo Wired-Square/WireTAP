@@ -2,6 +2,13 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **GitHub release title**: Release name now shows "WireTAP" instead of "CANdor" (missed in rebrand)
+- **Build artifact names**: Upload artifact names updated from `candor-` to `wiretap-` prefix
+
 ## [0.4.7] - 2026-02-28
 
 ### Improved

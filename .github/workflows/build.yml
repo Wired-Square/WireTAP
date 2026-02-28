@@ -65,7 +65,7 @@ jobs:
           args: --target ${{ matrix.target }}
           # Only create release when pushing a version tag
           tagName: ${{ github.ref_name }}
-          releaseName: 'CANdor ${{ github.ref_name }}'
+          releaseName: 'WireTAP ${{ github.ref_name }}'
           releaseBody: |
             See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
           releaseDraft: true
@@ -87,7 +87,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: candor-${{ matrix.target }}
+          name: wiretap-${{ matrix.target }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/
           if-no-files-found: error
