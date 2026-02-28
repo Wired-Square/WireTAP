@@ -742,9 +742,20 @@ export function useIOSessionManager(
       sessionIdOverride,
     } = opts;
 
+    // Ensure every profile has bus mappings (fill defaults for any missing)
+    const effectiveBusMappings = new Map(busMappings ?? []);
+    for (const profileId of profileIds) {
+      if (!effectiveBusMappings.has(profileId)) {
+        const profile = ioProfiles.find((p) => p.id === profileId);
+        if (profile) {
+          effectiveBusMappings.set(profileId, buildDefaultBusMappings(profile));
+        }
+      }
+    }
+
     // Use provided session ID or generate one to avoid collisions between windows
-    const sessionId = sessionIdOverride ?? (busMappings
-      ? generateMultiSessionId(busMappings, profileNamesMap, emitRawBytes)
+    const sessionId = sessionIdOverride ?? (effectiveBusMappings.size > 0
+      ? generateMultiSessionId(effectiveBusMappings, profileNamesMap, emitRawBytes)
       : `s_${Math.random().toString(16).slice(2, 8)}`);
 
     const createOptions: CreateMultiSourceOptions = {
@@ -752,7 +763,7 @@ export function useIOSessionManager(
       listenerId: session.listenerId,
       appName,
       profileIds,
-      busMappings,
+      busMappings: effectiveBusMappings,
       profileNames: profileNamesMap,
       // Pass framing config for serial sources
       framingEncoding,

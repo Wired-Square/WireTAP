@@ -14,6 +14,7 @@ import {
   roundedDefault,
 } from "../styles";
 import { getReaderProtocols, type IOProfile } from "../hooks/useSettings";
+import { buildDefaultBusMappings } from "../utils/profileTraits";
 import { useSessionStore } from "../stores/sessionStore";
 import { pickCsvToOpen } from "../api/dialogs";
 import {
@@ -1034,6 +1035,17 @@ export default function IoReaderPickerDialog({
           can_transmit: true,
         },
       }]);
+    }
+
+    // Fallback: checked profiles not in either map get default bus mappings
+    // (e.g., modbus_tcp profiles that aren't GVRET or single-bus override devices)
+    for (const profileId of checkedReaderIds) {
+      if (!combinedBusMappings.has(profileId)) {
+        const profile = readProfiles.find(p => p.id === profileId);
+        if (profile) {
+          combinedBusMappings.set(profileId, buildDefaultBusMappings(profile));
+        }
+      }
     }
 
     options.busMappings = combinedBusMappings;

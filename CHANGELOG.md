@@ -20,9 +20,11 @@ All notable changes to CANdor will be documented in this file.
 
 ### Fixed
 
-- **Modbus poll errors no longer show blocking dialog**: Individual register read failures (e.g. "Illegal data address" for registers unsupported by a particular model) are now treated as non-fatal. The session stays running and errors are logged to the Session Log instead of showing a modal "Stream Error" dialog.
+- **Modbus poll errors no longer show blocking dialog**: Individual register read failures (e.g. "Illegal data address" for registers unsupported by a particular model) are now treated as non-fatal. The session stays running and errors are logged to the Session Log instead of showing a modal "Stream Error" dialog. Empty poll groups (e.g. before catalog loads) now gracefully end the source instead of triggering an error dialog.
 
-- **Modbus preferred catalog not providing poll groups**: When a Modbus TCP session was created with a preferred catalog, the catalog loaded after the session was already started, so no poll groups were passed to the backend. The Decoder now reinitialises the session with poll groups after the catalog finishes loading.
+- **Modbus preferred catalog not providing poll groups**: When a Modbus TCP session was created with a preferred catalog, the catalog loaded after the session was already started, so no poll groups were passed to the backend. The Decoder now reinitialises the session with poll groups after the catalog finishes loading — for both single-source and multi-source watch paths.
+
+- **Modbus TCP sessions using wrong `s_` prefix**: Modbus TCP profiles were missing from the combined bus mappings in the multi-source dialog because only GVRET-probed and single-bus-override devices were included. Added a generic fallback that builds default bus mappings (with proper protocol traits) for any profile not covered by existing maps. Also ensured `startMultiBusSession` fills in default bus mappings for profiles omitted by callers (e.g. during reinitialise).
 
 - **Catalog editor signal view pencil icon not opening editor**: The edit button on the signal detail view silently failed because `locateSignal()` re-parsed the TOML and searched by property matching, which was fragile. Simplified to read `signalIndex` and `properties` directly from the tree node metadata, matching how the frame view's pencil already works.
 
@@ -41,6 +43,8 @@ All notable changes to CANdor will be documented in this file.
 - **Catalog Editor tree panel scroll position lost on window switch**: Scrolling down the frame picker, switching to another window, and switching back reset the list to the top. Now preserves and restores scroll position using the same focus-tracking pattern as the Decoder.
 
 ### Added
+
+- **Protocol badges in Session Details**: The Session Details panel now shows protocol badges (CAN, CAN FD, Modbus, Serial) derived from session traits, with colour-coded styling. Uses generic terminology extensible for future protocols (SWCAN, LIN, etc.).
 
 - **Sources in Session Details**: The Session Details panel now shows the source profile names feeding the session.
 

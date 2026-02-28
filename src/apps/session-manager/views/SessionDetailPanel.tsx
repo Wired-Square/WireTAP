@@ -4,7 +4,7 @@ import { Play, Pause, Square, Trash2, UserMinus, Plus, X } from "lucide-react";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { useSessionStore } from "../../../stores/sessionStore";
-import type { ActiveSessionInfo } from "../../../api/io";
+import { getTraits, type ActiveSessionInfo } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { iconSm } from "../../../styles/spacing";
 import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
@@ -94,6 +94,32 @@ export default function SessionDetailPanel({
       </div>
     </div>
   );
+}
+
+/** Protocol display label (uppercase for acronyms, title-case for others) */
+function protocolLabel(protocol: string): string {
+  switch (protocol) {
+    case "can": return "CAN";
+    case "canfd": return "CAN FD";
+    case "modbus": return "Modbus";
+    case "serial": return "Serial";
+    default: return protocol.toUpperCase();
+  }
+}
+
+/** Protocol badge colour classes */
+function protocolBadgeStyle(protocol: string): string {
+  switch (protocol) {
+    case "can":
+    case "canfd":
+      return "bg-cyan-500/20 text-cyan-400";
+    case "modbus":
+      return "bg-teal-500/20 text-teal-400";
+    case "serial":
+      return "bg-orange-500/20 text-orange-400";
+    default:
+      return "bg-slate-500/20 text-slate-400";
+  }
 }
 
 // Session details sub-component
@@ -219,6 +245,16 @@ function SessionDetails({
           Capabilities
         </label>
         <div className="flex flex-wrap gap-1 mt-1">
+          {getTraits(session.capabilities).protocols.map((protocol) => (
+            <span key={protocol} className={`px-1.5 py-0.5 text-xs rounded ${protocolBadgeStyle(protocol)}`}>
+              {protocolLabel(protocol)}
+            </span>
+          ))}
+          {session.capabilities.is_realtime && (
+            <span className="px-1.5 py-0.5 text-xs rounded bg-amber-500/20 text-amber-400">
+              realtime
+            </span>
+          )}
           {session.capabilities.can_transmit && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400">
               transmit
@@ -232,11 +268,6 @@ function SessionDetails({
           {session.capabilities.supports_time_range && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-green-500/20 text-green-400">
               time-range
-            </span>
-          )}
-          {session.capabilities.is_realtime && (
-            <span className="px-1.5 py-0.5 text-xs rounded bg-amber-500/20 text-amber-400">
-              realtime
             </span>
           )}
         </div>

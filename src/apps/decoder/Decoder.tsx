@@ -508,6 +508,7 @@ export default function Decoder() {
     resumeWithNewBuffer,
     selectProfile,
     watchSingleSource,
+    watchMultiSource,
     // Bookmark methods
     jumpToBookmark,
   } = manager;
@@ -606,9 +607,13 @@ export default function Decoder() {
           // so the backend gets the poll configuration (polls aren't available
           // at initial session creation because the catalog loads after)
           const { modbusPollsJson } = useDecoderStore.getState();
-          if (modbusPollsJson && sourceProfileId) {
+          if (modbusPollsJson) {
             tlog.debug(`[Decoder] Modbus catalog loaded — reinitializing session with poll groups`);
-            watchSingleSource(sourceProfileId, { modbusPollsJson });
+            if (ioProfiles.length > 0) {
+              watchMultiSource(ioProfiles, { modbusPollsJson });
+            } else if (sourceProfileId) {
+              watchSingleSource(sourceProfileId, { modbusPollsJson });
+            }
           }
         }).catch((err) => {
           console.warn("[Decoder] Failed to auto-load preferred decoder:", err);
@@ -634,7 +639,7 @@ export default function Decoder() {
     // sessionCatalogPath drives the primary trigger: undefined→null when session is created.
     // ioProfiles/sourceProfileId included in case they arrive in a later render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionCatalogPath, sessionId, ioProfiles, sourceProfileId]);
+  }, [sessionCatalogPath, sessionId, ioProfiles, sourceProfileId, watchMultiSource]);
 
   // Use the orchestrator hook for all handlers
   const handlers = useDecoderHandlers({

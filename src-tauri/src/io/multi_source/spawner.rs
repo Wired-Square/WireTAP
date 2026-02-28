@@ -512,10 +512,14 @@ async fn run_modbus_tcp_client(
         .unwrap_or(0);
 
     if polls.is_empty() {
+        tlog!(
+            "[ModbusTCP] Source {} has no poll groups — waiting for catalog reinitialise",
+            source_idx
+        );
         let _ = tx
-            .send(SourceMessage::Error(
+            .send(SourceMessage::Ended(
                 source_idx,
-                "No Modbus poll groups configured. Load a catalog with [frame.modbus.*] entries.".to_string(),
+                "no_polls".to_string(),
             ))
             .await;
         return;
