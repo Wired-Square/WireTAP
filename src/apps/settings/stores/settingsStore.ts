@@ -40,6 +40,7 @@ export const DEFAULT_DECODER_MAX_FILTERED_FRAMES = 1000;
 export const DEFAULT_DECODER_MAX_DECODED_FRAMES = 500;
 export const DEFAULT_DECODER_MAX_DECODED_PER_SOURCE = 2000;
 export const DEFAULT_TRANSMIT_MAX_HISTORY = 1000;
+export const DEFAULT_MODBUS_MAX_REGISTER_ERRORS = 3;
 
 export interface DirectoryValidation {
   exists: boolean;
@@ -154,6 +155,8 @@ interface AppSettings {
   // Buffer persistence
   clear_buffers_on_start?: boolean;
   buffer_storage?: string;
+  // Modbus settings
+  modbus_max_register_errors?: number;
 }
 
 // Dialog types
@@ -327,6 +330,7 @@ interface SettingsState {
     logLevel: string;
     telemetryEnabled: boolean;
     telemetryConsentGiven: boolean;
+    modbusMaxRegisterErrors: number;
   };
 
   // UI state
@@ -414,6 +418,7 @@ interface SettingsState {
   setLogLevel: (value: string) => void;
   setTelemetryEnabled: (value: boolean) => void;
   setTelemetryConsentGiven: (value: boolean) => void;
+  setModbusMaxRegisterErrors: (value: number) => void;
 }
 
 // Auto-save debounce
@@ -490,6 +495,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     logLevel: "off",
     telemetryEnabled: false,
     telemetryConsentGiven: false,
+    modbusMaxRegisterErrors: DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
   },
 
   ui: {
@@ -595,6 +601,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Buffer persistence
         clear_buffers_on_start: settings.clear_buffers_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
         buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
+        // Modbus
+        modbus_max_register_errors: settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
       };
 
       set({
@@ -673,6 +681,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           logLevel: normalized.log_level ?? "off",
           telemetryEnabled: normalized.telemetry_enabled ?? false,
           telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
+          modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
         },
         originalSettings: normalized,
       });
@@ -783,6 +792,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Privacy / telemetry
         telemetry_enabled: general.telemetryEnabled,
         telemetry_consent_given: general.telemetryConsentGiven,
+        // Modbus
+        modbus_max_register_errors: general.modbusMaxRegisterErrors,
         // Theme settings
         theme_mode: display.themeMode,
         theme_bg_primary_light: display.themeColours.bgPrimaryLight,
@@ -861,6 +872,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // Privacy / telemetry
       telemetry_enabled: general.telemetryEnabled,
       telemetry_consent_given: general.telemetryConsentGiven,
+      // Modbus
+      modbus_max_register_errors: general.modbusMaxRegisterErrors,
       // Theme settings
       theme_mode: display.themeMode,
       theme_bg_primary_light: display.themeColours.bgPrimaryLight,
@@ -1282,6 +1295,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setTelemetryConsentGiven: (value) => {
     set((state) => ({
       general: { ...state.general, telemetryConsentGiven: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setModbusMaxRegisterErrors: (value) => {
+    set((state) => ({
+      general: { ...state.general, modbusMaxRegisterErrors: value },
     }));
     scheduleSave(get().saveSettings);
   },

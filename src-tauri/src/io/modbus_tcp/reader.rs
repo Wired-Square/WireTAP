@@ -72,6 +72,8 @@ pub struct ModbusTcpConfig {
     pub unit_id: u8,
     /// Poll groups derived from catalog
     pub polls: Vec<PollGroup>,
+    /// Stop polling a register group after this many consecutive errors (0 = never stop)
+    pub max_register_errors: u32,
 }
 
 // ============================================================================
@@ -190,6 +192,7 @@ impl IODevice for ModbusTcpReader {
                 poll.clone(),
                 ctx.clone(),
                 self.cancel_flag.clone(),
+                self.config.max_register_errors,
             );
             self.task_handles.push(handle);
         }
@@ -258,6 +261,7 @@ fn spawn_poll_task(
     poll: PollGroup,
     ctx: Arc<Mutex<client::Context>>,
     cancel_flag: Arc<AtomicBool>,
+    max_register_errors: u32,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let mut timer = interval(Duration::from_millis(poll.interval_ms));
@@ -268,6 +272,7 @@ fn spawn_poll_task(
             RegisterType::Discrete => "discrete",
         };
         let mut first_poll = true;
+        let mut consecutive_errors: u32 = 0;
 
         tlog!(
             "[ModbusTCP:{}] Poll task started: {} reg {} count {} every {}ms (frame_id={})",
@@ -333,6 +338,8 @@ fn spawn_poll_task(
 
             match result {
                 Ok(bytes) => {
+                    consecutive_errors = 0;
+
                     if first_poll {
                         tlog!(
                             "[ModbusTCP:{}] First poll OK: {} reg {} → {} bytes: {:02X?}",
@@ -359,9 +366,13 @@ fn spawn_poll_task(
                     emit_frames(&app, &session_id, vec![frame]);
                 }
                 Err(e) => {
+                    consecutive_errors += 1;
+
                     tlog!(
-                        "[ModbusTCP:{}] Error reading {} registers at {}: {}",
-                        session_id, type_name, poll.start_register, e
+                        "[ModbusTCP:{}] Error reading {} registers at {}: {} ({}/{})",
+                        session_id, type_name, poll.start_register, e,
+                        consecutive_errors,
+                        if max_register_errors > 0 { max_register_errors.to_string() } else { "∞".to_string() }
                     );
                     emit_to_session(
                         &app,
@@ -372,6 +383,23 @@ fn spawn_poll_task(
                             type_name, poll.start_register, e
                         ),
                     );
+
+                    if max_register_errors > 0 && consecutive_errors >= max_register_errors {
+                        tlog!(
+                            "[ModbusTCP:{}] Stopped polling {} reg {} after {} consecutive errors",
+                            session_id, type_name, poll.start_register, consecutive_errors
+                        );
+                        emit_to_session(
+                            &app,
+                            "session-error",
+                            &session_id,
+                            format!(
+                                "Stopped polling {} @ {} after {} consecutive errors",
+                                type_name, poll.start_register, consecutive_errors
+                            ),
+                        );
+                        break;
+                    }
                 }
             }
         }

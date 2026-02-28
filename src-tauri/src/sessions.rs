@@ -588,6 +588,7 @@ pub async fn create_reader_session(
                 port,
                 unit_id,
                 polls,
+                max_register_errors: settings.modbus_max_register_errors,
             };
 
             Box::new(ModbusTcpReader::new(app.clone(), session_id.clone(), config))

@@ -14,6 +14,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Modbus catalog editor: full protocol configuration**: The Catalog Configuration dialog now exposes all `[meta.modbus]` settings: default poll interval, default byte order, and default word order — in addition to the existing device address and register base fields. The read-only config view and meta summary also display the new fields. The Modbus protocol handler now correctly inherits `default_interval` from the Modbus config rather than the CAN config.
 
+- **Modbus consecutive error threshold**: Poll tasks now stop polling a register group after a configurable number of consecutive read errors (default: 3), preventing endless "Illegal data address" spam for registers that don't exist on the connected device. Configurable in Settings → General → Modbus; set to 0 to retry indefinitely.
+
 ### Fixed
 
 - **Modbus poll errors no longer show blocking dialog**: Individual register read failures (e.g. "Illegal data address" for registers unsupported by a particular model) are now treated as non-fatal. The session stays running and errors are logged to the Session Log instead of showing a modal "Stream Error" dialog.

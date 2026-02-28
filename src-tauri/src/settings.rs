@@ -133,6 +133,11 @@ pub struct AppSettings {
     // Transmit limits
     #[serde(default = "default_transmit_max_history")]
     pub transmit_max_history: u32,
+
+    // Modbus settings
+    /// Stop polling a register group after this many consecutive errors (0 = never stop)
+    #[serde(default = "default_modbus_max_register_errors")]
+    pub modbus_max_register_errors: u32,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -285,6 +290,11 @@ fn default_transmit_max_history() -> u32 {
     1000
 }
 
+// Modbus defaults
+fn default_modbus_max_register_errors() -> u32 {
+    3
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         // Get platform-specific documents directory
@@ -355,6 +365,8 @@ impl Default for AppSettings {
             decoder_max_decoded_per_source: default_decoder_max_decoded_per_source(),
             // Transmit limits
             transmit_max_history: default_transmit_max_history(),
+            // Modbus
+            modbus_max_register_errors: default_modbus_max_register_errors(),
         }
     }
 }
@@ -432,6 +444,8 @@ impl AppSettings {
             decoder_max_decoded_per_source: default_decoder_max_decoded_per_source(),
             // Transmit limits
             transmit_max_history: default_transmit_max_history(),
+            // Modbus
+            modbus_max_register_errors: default_modbus_max_register_errors(),
         })
     }
 }

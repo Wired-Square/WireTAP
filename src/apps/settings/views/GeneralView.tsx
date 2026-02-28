@@ -1,5 +1,6 @@
 // ui/src/apps/settings/views/GeneralView.tsx
 
+import Input from "../../../components/forms/Input";
 import Select from "../../../components/forms/Select";
 import { labelDefault, helpText } from "../../../styles";
 import { textPrimary } from "../../../styles/colourTokens";
@@ -9,6 +10,8 @@ type DefaultFrameType = "can" | "modbus" | "serial";
 type GeneralViewProps = {
   defaultFrameType: DefaultFrameType;
   onChangeDefaultFrameType: (value: DefaultFrameType) => void;
+  modbusMaxRegisterErrors: number;
+  onChangeModbusMaxRegisterErrors: (value: number) => void;
   preventIdleSleep: boolean;
   onChangePreventIdleSleep: (value: boolean) => void;
   keepDisplayAwake: boolean;
@@ -21,6 +24,8 @@ type GeneralViewProps = {
 export default function GeneralView({
   defaultFrameType,
   onChangeDefaultFrameType,
+  modbusMaxRegisterErrors,
+  onChangeModbusMaxRegisterErrors,
   preventIdleSleep,
   onChangePreventIdleSleep,
   keepDisplayAwake,
@@ -46,6 +51,24 @@ export default function GeneralView({
           <option value="modbus">Modbus</option>
           <option value="serial">Serial</option>
         </Select>
+      </div>
+
+      {/* Modbus Section */}
+      <div className="pt-4 border-t border-[color:var(--border-default)]">
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Modbus</h3>
+        <div className="space-y-2">
+          <label className={labelDefault}>Max Consecutive Register Errors</label>
+          <p className={helpText}>
+            Stop polling a register group after this many consecutive read errors. Set to 0 to retry indefinitely.
+          </p>
+          <Input
+            type="number"
+            min={0}
+            value={modbusMaxRegisterErrors}
+            onChange={(e) => onChangeModbusMaxRegisterErrors(Math.max(0, parseInt(e.target.value) || 0))}
+            className="w-32"
+          />
+        </div>
       </div>
 
       {/* Power Management Section */}

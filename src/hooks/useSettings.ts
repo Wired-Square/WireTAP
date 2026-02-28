@@ -16,6 +16,7 @@ import {
   DEFAULT_DECODER_MAX_DECODED_FRAMES,
   DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
   DEFAULT_TRANSMIT_MAX_HISTORY,
+  DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
 } from '../apps/settings/stores/settingsStore';
 
 export interface IOProfile {
@@ -140,6 +141,8 @@ export interface AppSettings {
   decoder_max_decoded_per_source?: number;
   // Transmit limits
   transmit_max_history?: number;
+  // Modbus settings
+  modbus_max_register_errors?: number;
 }
 
 /**
@@ -203,6 +206,8 @@ function normalizeSettings(
     decoder_max_decoded_per_source: settings.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
     // Transmit limits
     transmit_max_history: settings.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
+    // Modbus settings
+    modbus_max_register_errors: settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
   };
 }
 

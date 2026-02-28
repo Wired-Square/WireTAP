@@ -109,6 +109,8 @@ export default function Settings() {
   // General
   const defaultFrameType = useSettingsStore((s) => s.general.defaultFrameType);
   const setDefaultFrameType = useSettingsStore((s) => s.setDefaultFrameType);
+  const modbusMaxRegisterErrors = useSettingsStore((s) => s.general.modbusMaxRegisterErrors);
+  const setModbusMaxRegisterErrors = useSettingsStore((s) => s.setModbusMaxRegisterErrors);
   const preventIdleSleep = useSettingsStore((s) => s.general.preventIdleSleep);
   const setPreventIdleSleep = useSettingsStore((s) => s.setPreventIdleSleep);
   const keepDisplayAwake = useSettingsStore((s) => s.general.keepDisplayAwake);
@@ -268,6 +270,8 @@ export default function Settings() {
             <GeneralView
               defaultFrameType={defaultFrameType}
               onChangeDefaultFrameType={setDefaultFrameType}
+              modbusMaxRegisterErrors={modbusMaxRegisterErrors}
+              onChangeModbusMaxRegisterErrors={setModbusMaxRegisterErrors}
               preventIdleSleep={preventIdleSleep}
               onChangePreventIdleSleep={setPreventIdleSleep}
               keepDisplayAwake={keepDisplayAwake}
