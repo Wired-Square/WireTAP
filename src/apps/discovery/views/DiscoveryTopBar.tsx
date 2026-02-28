@@ -61,6 +61,9 @@ type Props = {
   /** Called when user wants to undo framing acceptance */
   onUndoFraming?: () => void;
 
+  /** Whether the active profile is Modbus TCP (enables scan tools without data) */
+  isModbusProfile?: boolean;
+
   // Dialogs
   onOpenIoReaderPicker: () => void;
 
@@ -94,6 +97,7 @@ export default function DiscoveryTopBar({
   framingAccepted = false,
   serialActiveTab = 'raw',
   onUndoFraming,
+  isModbusProfile = false,
   supportsTimeRange = false,
   onOpenBookmarkPicker,
   speed = 1,
@@ -197,9 +201,9 @@ export default function DiscoveryTopBar({
       {/* Toolbox button */}
       <button
         onClick={onOpenToolbox}
-        disabled={!hasFrames}
+        disabled={!hasFrames && !isModbusProfile}
         className={buttonBase}
-        title="Analysis tools"
+        title={isModbusProfile ? "Scanning & analysis tools" : "Analysis tools"}
       >
         <Wrench className={`${iconSm} flex-shrink-0`} />
         <span>Tools</span>

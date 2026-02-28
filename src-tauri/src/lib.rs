@@ -987,6 +987,9 @@ pub fn run() {
             settings::create_directory,
             settings::get_app_version,
             settings::check_for_updates,
+            settings::check_candor_migration,
+            settings::run_candor_migration,
+            settings::delete_candor_data,
             // Session-based reader API
             sessions::create_reader_session,
             sessions::get_reader_session_state,
@@ -1033,6 +1036,10 @@ pub fn run() {
             sessions::get_profiles_usage,
             // Power management API
             sessions::set_wake_settings,
+            // Modbus scanning API
+            sessions::modbus_scan_registers,
+            sessions::modbus_scan_unit_ids,
+            sessions::cancel_modbus_scan,
             io::get_active_listeners,
             io::webview_health_pong,
             io::check_recovery_occurred,

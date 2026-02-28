@@ -4,6 +4,12 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Modbus scanner (Discovery toolbox)**: Two new scanning tools in the Discovery toolbox for Modbus TCP profiles — **Register Scan** discovers which registers exist on a device using chunked reads with binary subdivision (minimises request count), and **Unit ID Scan** finds active devices on the network by probing unit IDs 1–247. Unit ID scanning uses **FC43 (Read Device Identification)** to retrieve vendor, product code, and revision info when supported, with automatic fallback to register reads. Results stream into Discovery as they're found, with per-tool results tabs, progress tracking, and cancel support. Discovered registers can be exported as a Modbus TOML catalog for use in Decoder.
+
+- **CANdor → WireTAP migration dialog**: On first launch, if old CANdor configuration data is detected, a dialog offers to migrate IO profiles, user preferences, and UI state to the new WireTAP directory — or delete the old data.
+
 ### Fixed
 
 - **GitHub release title**: Release name now shows "WireTAP" instead of "CANdor" (missed in rebrand)

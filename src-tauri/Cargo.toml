@@ -42,7 +42,7 @@ toml = "0.8"
 can-dbc = "8"
 reqwest = { version = "0.12", features = ["json"] }
 rumqttc = "0.24"
-tokio-modbus = { version = "0.14", default-features = false, features = ["tcp"] }
+tokio-modbus = { version = "0.17", default-features = false, features = ["tcp"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]

@@ -24,15 +24,17 @@ import { useDiscoveryUIStore } from './discoveryUIStore';
 import { ANALYSIS_YIELD_MS } from '../constants';
 
 // Toolbox types
-export type ToolboxView = 'frames' | 'message-order' | 'changes' | 'serial-framing' | 'serial-payload' | 'checksum-discovery';
+export type ToolboxView = 'frames' | 'message-order' | 'changes' | 'serial-framing' | 'serial-payload' | 'checksum-discovery' | 'modbus-register-scan' | 'modbus-unit-scan';
 
 /** Tab ID and label for each analysis tool's output tab */
 export const TOOL_TAB_CONFIG: Record<string, { tabId: string; label: string }> = {
-  'message-order':      { tabId: 'tool:message-order',      label: 'Frame Order' },
-  'changes':            { tabId: 'tool:changes',            label: 'Payload Changes' },
-  'checksum-discovery': { tabId: 'tool:checksum-discovery',  label: 'Checksums' },
-  'serial-framing':     { tabId: 'tool:serial-framing',      label: 'Serial Framing' },
-  'serial-payload':     { tabId: 'tool:serial-payload',      label: 'Serial Payload' },
+  'message-order':        { tabId: 'tool:message-order',        label: 'Frame Order' },
+  'changes':              { tabId: 'tool:changes',              label: 'Payload Changes' },
+  'checksum-discovery':   { tabId: 'tool:checksum-discovery',   label: 'Checksums' },
+  'serial-framing':       { tabId: 'tool:serial-framing',       label: 'Serial Framing' },
+  'serial-payload':       { tabId: 'tool:serial-payload',       label: 'Serial Payload' },
+  'modbus-register-scan': { tabId: 'tool:modbus-register-scan', label: 'Register Scan' },
+  'modbus-unit-scan':     { tabId: 'tool:modbus-unit-scan',     label: 'Unit ID Scan' },
 };
 
 export type MessageOrderOptions = {
@@ -61,6 +63,21 @@ export type SerialPayloadResult = {
   analysisResult: SerialFrameAnalysisResult;
 };
 
+export type DeviceInfo = {
+  vendor?: string;
+  product_code?: string;
+  revision?: string;
+};
+
+export type ModbusScanResults = {
+  frames: FrameMessage[];
+  scanType: 'register' | 'unit-id';
+  isScanning: boolean;
+  progress: { current: number; total: number; found_count: number } | null;
+  /** Device identification info keyed by unit ID (from FC43) */
+  deviceInfo: Map<number, DeviceInfo>;
+};
+
 export type ToolboxState = {
   isExpanded: boolean;
   activeView: ToolboxView;
@@ -72,6 +89,8 @@ export type ToolboxState = {
   serialFramingResults: SerialFramingResult | null;
   serialPayloadResults: SerialPayloadResult | null;
   checksumDiscoveryResults: ChecksumDiscoveryResult | null;
+  modbusRegisterScanResults: ModbusScanResults | null;
+  modbusUnitIdScanResults: ModbusScanResults | null;
   isRunning: boolean;
 };
 
@@ -95,6 +114,11 @@ interface DiscoveryToolboxState {
   setSerialFramingResults: (results: SerialFramingResult | null) => void;
   setSerialPayloadResults: (results: SerialPayloadResult | null) => void;
   setChecksumDiscoveryResults: (results: ChecksumDiscoveryResult | null) => void;
+  startModbusScan: (scanType: 'register' | 'unit-id') => void;
+  addModbusScanFrames: (frames: FrameMessage[]) => void;
+  addModbusScanDeviceInfo: (info: { unit_id: number; vendor?: string; product_code?: string; revision?: string }) => void;
+  updateModbusScanProgress: (progress: { current: number; total: number; found_count: number }) => void;
+  finishModbusScan: () => void;
   clearAnalysisResults: () => void;
   clearToolResult: (toolTabId: string) => void;
 
@@ -148,6 +172,8 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     serialFramingResults: null,
     serialPayloadResults: null,
     checksumDiscoveryResults: null,
+    modbusRegisterScanResults: null,
+    modbusUnitIdScanResults: null,
     isRunning: false,
   },
   knowledge: createEmptyKnowledge(),
@@ -220,6 +246,87 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     }));
   },
 
+  startModbusScan: (scanType) => {
+    const key = scanType === 'register' ? 'modbusRegisterScanResults' : 'modbusUnitIdScanResults';
+    const tabKey = scanType === 'register' ? 'modbus-register-scan' : 'modbus-unit-scan';
+    set((state) => ({
+      toolbox: {
+        ...state.toolbox,
+        [key]: { frames: [], scanType, isScanning: true, progress: null, deviceInfo: new Map() },
+      },
+    }));
+    useDiscoveryUIStore.getState().setFramesViewActiveTab(TOOL_TAB_CONFIG[tabKey].tabId);
+  },
+
+  addModbusScanFrames: (frames) => {
+    set((state) => {
+      // Find the actively scanning result
+      const reg = state.toolbox.modbusRegisterScanResults;
+      const uid = state.toolbox.modbusUnitIdScanResults;
+      const scan = reg?.isScanning ? reg : uid?.isScanning ? uid : null;
+      if (!scan) return state;
+      const key = scan.scanType === 'register' ? 'modbusRegisterScanResults' : 'modbusUnitIdScanResults';
+      return {
+        toolbox: {
+          ...state.toolbox,
+          [key]: { ...scan, frames: [...scan.frames, ...frames] },
+        },
+      };
+    });
+  },
+
+  addModbusScanDeviceInfo: (info) => {
+    set((state) => {
+      // Device info is only relevant for unit ID scans
+      const scan = state.toolbox.modbusUnitIdScanResults;
+      if (!scan) return state;
+      const newDeviceInfo = new Map(scan.deviceInfo);
+      newDeviceInfo.set(info.unit_id, {
+        vendor: info.vendor,
+        product_code: info.product_code,
+        revision: info.revision,
+      });
+      return {
+        toolbox: {
+          ...state.toolbox,
+          modbusUnitIdScanResults: { ...scan, deviceInfo: newDeviceInfo },
+        },
+      };
+    });
+  },
+
+  updateModbusScanProgress: (progress) => {
+    set((state) => {
+      const reg = state.toolbox.modbusRegisterScanResults;
+      const uid = state.toolbox.modbusUnitIdScanResults;
+      const scan = reg?.isScanning ? reg : uid?.isScanning ? uid : null;
+      if (!scan) return state;
+      const key = scan.scanType === 'register' ? 'modbusRegisterScanResults' : 'modbusUnitIdScanResults';
+      return {
+        toolbox: {
+          ...state.toolbox,
+          [key]: { ...scan, progress },
+        },
+      };
+    });
+  },
+
+  finishModbusScan: () => {
+    set((state) => {
+      const reg = state.toolbox.modbusRegisterScanResults;
+      const uid = state.toolbox.modbusUnitIdScanResults;
+      const scan = reg?.isScanning ? reg : uid?.isScanning ? uid : null;
+      if (!scan) return state;
+      const key = scan.scanType === 'register' ? 'modbusRegisterScanResults' : 'modbusUnitIdScanResults';
+      return {
+        toolbox: {
+          ...state.toolbox,
+          [key]: { ...scan, isScanning: false },
+        },
+      };
+    });
+  },
+
   clearAnalysisResults: () => {
     set((state) => ({
       toolbox: {
@@ -229,6 +336,8 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
         serialFramingResults: null,
         serialPayloadResults: null,
         checksumDiscoveryResults: null,
+        modbusRegisterScanResults: null,
+        modbusUnitIdScanResults: null,
       },
     }));
   },
@@ -251,6 +360,12 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
           break;
         case TOOL_TAB_CONFIG['serial-payload'].tabId:
           toolbox.serialPayloadResults = null;
+          break;
+        case TOOL_TAB_CONFIG['modbus-register-scan'].tabId:
+          toolbox.modbusRegisterScanResults = null;
+          break;
+        case TOOL_TAB_CONFIG['modbus-unit-scan'].tabId:
+          toolbox.modbusUnitIdScanResults = null;
           break;
       }
       return { toolbox };

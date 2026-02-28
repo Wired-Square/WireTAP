@@ -13,6 +13,7 @@ import type { PlaybackSpeed } from "../../../components/TimeController";
 import ChangesResultView from "./tools/ChangesResultView";
 import MessageOrderResultView from "./tools/MessageOrderResultView";
 import ChecksumDiscoveryResultView from "./tools/ChecksumDiscoveryResultView";
+import ModbusScanResultView from "./tools/ModbusScanResultView";
 import FilteredTabContent from "./FilteredTabContent";
 import { bgDataView, bgSurface, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
@@ -91,6 +92,9 @@ type Props = {
   isStreamPaused?: boolean;
   /** Called to resume a paused timeline stream */
   onResumeStream?: () => void;
+
+  /** Called to cancel a running modbus scan */
+  onCancelScan?: () => void;
 };
 
 function DiscoveryFramesView({
@@ -131,6 +135,7 @@ function DiscoveryFramesView({
   isLiveStreaming = false,
   isStreamPaused = false,
   onResumeStream,
+  onCancelScan,
 }: Props) {
 
   const renderBuffer = useDiscoveryStore((s) => s.renderBuffer);
@@ -652,8 +657,30 @@ function DiscoveryFramesView({
     if (toolboxResults.checksumDiscoveryResults) {
       result.push({ id: TOOL_TAB_CONFIG['checksum-discovery'].tabId, label: TOOL_TAB_CONFIG['checksum-discovery'].label, closeable: true });
     }
+    if (toolboxResults.modbusRegisterScanResults) {
+      const scan = toolboxResults.modbusRegisterScanResults;
+      const count = scan.isScanning ? undefined : scan.frames.length;
+      result.push({
+        id: TOOL_TAB_CONFIG['modbus-register-scan'].tabId,
+        label: TOOL_TAB_CONFIG['modbus-register-scan'].label,
+        count,
+        countColor: 'purple' as const,
+        closeable: !scan.isScanning,
+      });
+    }
+    if (toolboxResults.modbusUnitIdScanResults) {
+      const scan = toolboxResults.modbusUnitIdScanResults;
+      const count = scan.isScanning ? undefined : scan.frames.length;
+      result.push({
+        id: TOOL_TAB_CONFIG['modbus-unit-scan'].tabId,
+        label: TOOL_TAB_CONFIG['modbus-unit-scan'].label,
+        count,
+        countColor: 'purple' as const,
+        closeable: !scan.isScanning,
+      });
+    }
     return result;
-  }, [frameCount, filteredOutCount, toolboxResults.messageOrderResults, toolboxResults.changesResults, toolboxResults.checksumDiscoveryResults]);
+  }, [frameCount, filteredOutCount, toolboxResults.messageOrderResults, toolboxResults.changesResults, toolboxResults.checksumDiscoveryResults, toolboxResults.modbusRegisterScanResults, toolboxResults.modbusUnitIdScanResults]);
 
   // Handle closing a tool output tab
   const clearToolResult = useDiscoveryStore((s) => s.clearToolResult);
@@ -1080,6 +1107,22 @@ function DiscoveryFramesView({
         <div className={`flex-1 min-h-0 overflow-auto overscroll-none ${bgDataView} p-4`}>
           <ChecksumDiscoveryResultView onClose={() => handleTabClose(TOOL_TAB_CONFIG['checksum-discovery'].tabId)} />
         </div>
+      )}
+
+      {activeTab === TOOL_TAB_CONFIG['modbus-register-scan'].tabId && toolboxResults.modbusRegisterScanResults && (
+        <ModbusScanResultView
+          results={toolboxResults.modbusRegisterScanResults}
+          onClose={() => handleTabClose(TOOL_TAB_CONFIG['modbus-register-scan'].tabId)}
+          onCancel={onCancelScan}
+        />
+      )}
+
+      {activeTab === TOOL_TAB_CONFIG['modbus-unit-scan'].tabId && toolboxResults.modbusUnitIdScanResults && (
+        <ModbusScanResultView
+          results={toolboxResults.modbusUnitIdScanResults}
+          onClose={() => handleTabClose(TOOL_TAB_CONFIG['modbus-unit-scan'].tabId)}
+          onCancel={onCancelScan}
+        />
       )}
     </AppTabView>
 

@@ -16,7 +16,7 @@ mod timeline;
 // Real-time drivers
 pub mod gs_usb; // pub for Tauri command access
 pub mod gvret; // GVRET TCP/USB driver
-mod modbus_tcp;
+pub mod modbus_tcp; // pub for scanner command access
 mod mqtt;
 mod multi_source;
 #[cfg(not(target_os = "ios"))]
@@ -53,7 +53,10 @@ pub use codec::{SocketCanCodec, SocketCanEncodedFrame};
 #[allow(unused_imports)]
 pub use gs_usb::GsUsbConfig;
 pub use gvret::{BusMapping, GvretDeviceInfo, probe_gvret_tcp};
-pub use modbus_tcp::{ModbusTcpConfig, ModbusTcpReader, PollGroup};
+pub use modbus_tcp::{
+    ModbusTcpConfig, ModbusTcpReader, PollGroup,
+    ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
+};
 #[cfg(not(target_os = "ios"))]
 pub use gvret::probe_gvret_usb;
 pub use multi_source::{ModbusRole, MultiSourceReader, SourceConfig};

@@ -94,6 +94,30 @@ export async function setLogLevel(level: string): Promise<void> {
   await invoke("set_log_level", { level });
 }
 
+// ── CANdor → WireTAP migration ──
+
+export interface CandorMigrationInfo {
+  io_profile_count: number;
+  io_profile_names: string[];
+  has_ui_state: boolean;
+  has_window_state: boolean;
+}
+
+/** Check if old CANdor data exists and return a summary. */
+export async function checkCandorMigration(): Promise<CandorMigrationInfo | null> {
+  return await invoke<CandorMigrationInfo | null>("check_candor_migration");
+}
+
+/** Migrate user data from old CANdor directory, then delete it. */
+export async function runCandorMigration(): Promise<string> {
+  return await invoke<string>("run_candor_migration");
+}
+
+/** Delete the old CANdor directory without migrating. */
+export async function deleteCandorData(): Promise<void> {
+  await invoke("delete_candor_data");
+}
+
 /**
  * Levelled frontend logging — sends messages to the backend log file (and stderr).
  * Messages are filtered by the current log level threshold set in Settings.

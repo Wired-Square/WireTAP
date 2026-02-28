@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { saveCatalog } from '../api';
-import { buildFramesTomlWithKnowledge, type ExportFrameWithKnowledge, type SerialFrameConfig } from '../utils/frameExport';
+import { buildFramesTomlWithKnowledge, buildModbusDiscoveryToml, type ExportFrameWithKnowledge, type SerialFrameConfig, type ModbusExportConfig } from '../utils/frameExport';
 import { formatFrameId } from '../utils/frameIds';
 import { normalizeMeta } from '../utils/catalogMeta';
 import type { FrameInfo } from './discoveryFrameStore';
@@ -43,6 +43,8 @@ interface DiscoveryUIState {
   showSaveDialog: boolean;
   saveMetadata: FrameMetadata;
   serialConfig: SerialFrameConfig | null;
+  /** Modbus-specific export configuration, set when a scan completes */
+  modbusExportConfig: ModbusExportConfig | null;
 
   // Selection set state
   activeSelectionSetId: string | null;
@@ -77,6 +79,7 @@ interface DiscoveryUIState {
   closeSaveDialog: () => void;
   updateSaveMetadata: (metadata: FrameMetadata) => void;
   setSerialConfig: (config: SerialFrameConfig | null) => void;
+  setModbusExportConfig: (config: ModbusExportConfig | null) => void;
   saveFrames: (
     decoderDir: string,
     saveFrameIdFormat: 'hex' | 'decimal',
@@ -118,6 +121,7 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     filename: 'discovered-frames.toml',
   },
   serialConfig: null,
+  modbusExportConfig: null,
   activeSelectionSetId: null,
   selectionSetDirty: false,
   activeSelectionSetSelectedIds: null,
@@ -165,6 +169,10 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     }
   },
 
+  setModbusExportConfig: (config) => {
+    set({ modbusExportConfig: config });
+  },
+
   saveFrames: async (decoderDir, saveFrameIdFormat, selectedFrames, frameInfoMap) => {
     const { knowledge, toolbox } = useDiscoveryToolboxStore.getState();
 
@@ -205,6 +213,28 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
       default_interval: defaultInterval,
       default_frame: detectedProtocol,
     });
+
+    // Modbus protocol: use specialised TOML export
+    const { modbusExportConfig } = get();
+    if (detectedProtocol === 'modbus' && modbusExportConfig) {
+      const registers = selectedFramesList.map(f => ({
+        frameId: f.id,
+        dlc: f.len,
+      }));
+
+      const content = buildModbusDiscoveryToml(
+        registers,
+        normalizedMeta,
+        {
+          ...modbusExportConfig,
+          default_interval: defaultInterval,
+        },
+      );
+
+      await saveCatalog(path, content);
+      set({ showSaveDialog: false });
+      return;
+    }
 
     let enrichedSerialConfig = serialConfig;
     if (detectedProtocol === 'serial') {

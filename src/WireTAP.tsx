@@ -10,9 +10,11 @@ import { useTheme } from "./hooks/useTheme";
 import { useAppErrorDialog, useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./apps/settings/stores/settingsStore";
 import { checkRecoveryOccurred } from "./api/io";
-import { tlog } from "./api/settings";
+import { checkCandorMigration, tlog } from "./api/settings";
+import type { CandorMigrationInfo } from "./api/settings";
 import ErrorDialog from "./dialogs/ErrorDialog";
 import TelemetryConsentDialog from "./dialogs/TelemetryConsentDialog";
+import CandorMigrationDialog from "./dialogs/CandorMigrationDialog";
 
 // Lazy load AboutDialog since it's rarely used
 const AboutDialog = lazy(() => import("./dialogs/AboutDialog"));
@@ -40,6 +42,7 @@ function setSentryEnabled(enabled: boolean) {
 export default function WireTAP() {
   const [showAbout, setShowAbout] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
+  const [migrationInfo, setMigrationInfo] = useState<CandorMigrationInfo | null>(null);
   const currentWindow = getCurrentWebviewWindow();
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
 
@@ -77,6 +80,15 @@ export default function WireTAP() {
       unlistenAbout.then((fn) => fn());
     };
   }, [currentWindow]);
+
+  // Check for old CANdor data on startup
+  useEffect(() => {
+    if (settingsLoaded) {
+      checkCandorMigration().then((info) => {
+        if (info) setMigrationInfo(info);
+      });
+    }
+  }, [settingsLoaded]);
 
   // Show consent dialog on first boot (or upgrade without the setting)
   useEffect(() => {
@@ -143,6 +155,14 @@ export default function WireTAP() {
         onAccept={handleConsentAccept}
         onDecline={handleConsentDecline}
       />
+      {/* CANdor migration dialog - shown when old data is detected */}
+      {migrationInfo && (
+        <CandorMigrationDialog
+          open={!showConsentDialog}
+          info={migrationInfo}
+          onComplete={() => setMigrationInfo(null)}
+        />
+      )}
     </>
   );
 }

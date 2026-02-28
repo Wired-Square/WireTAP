@@ -19,6 +19,7 @@ use crate::{
         CsvReader, CsvReaderOptions,
         GvretDeviceInfo, probe_gvret_tcp,
         ModbusTcpConfig, ModbusTcpReader,
+        ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
         MqttConfig, MqttReader,
         ModbusRole, MultiSourceReader, SourceConfig,
         PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
@@ -33,7 +34,10 @@ use crate::{
 use crate::io::probe_gvret_usb;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 
 /// Map of session_id -> profile_ids for tracking which profiles each reader session uses.
 /// Multi-source sessions can use multiple profiles, so we store a Vec.
@@ -1926,4 +1930,52 @@ pub fn get_profiles_usage(profile_ids: Vec<String>) -> Vec<ProfileUsageInfo> {
 #[tauri::command(rename_all = "snake_case")]
 pub fn set_wake_settings(prevent_idle_sleep: bool, keep_display_awake: bool) {
     io_set_wake_settings(prevent_idle_sleep, keep_display_awake);
+}
+
+// ============================================================================
+// Modbus Scanning
+// ============================================================================
+
+/// Shared cancel flag for Modbus scan operations.
+/// Only one scan can run at a time.
+static MODBUS_SCAN_CANCEL: Lazy<Arc<AtomicBool>> =
+    Lazy::new(|| Arc::new(AtomicBool::new(false)));
+
+/// Scan a range of Modbus registers to discover which ones exist.
+/// Uses chunked reads with binary subdivision for efficiency.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn modbus_scan_registers(
+    app: tauri::AppHandle,
+    config: ModbusScanConfig,
+) -> Result<ScanCompletePayload, String> {
+    MODBUS_SCAN_CANCEL.store(false, Ordering::Relaxed);
+    crate::io::modbus_tcp::scanner::modbus_scan_registers(
+        app,
+        config,
+        MODBUS_SCAN_CANCEL.clone(),
+    )
+    .await
+}
+
+/// Scan for active Modbus unit IDs on the network.
+/// Probes a single register on each unit ID in the range.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn modbus_scan_unit_ids(
+    app: tauri::AppHandle,
+    config: UnitIdScanConfig,
+) -> Result<ScanCompletePayload, String> {
+    MODBUS_SCAN_CANCEL.store(false, Ordering::Relaxed);
+    crate::io::modbus_tcp::scanner::modbus_scan_unit_ids(
+        app,
+        config,
+        MODBUS_SCAN_CANCEL.clone(),
+    )
+    .await
+}
+
+/// Cancel a running Modbus scan operation.
+#[tauri::command(rename_all = "snake_case")]
+pub fn cancel_modbus_scan() {
+    MODBUS_SCAN_CANCEL.store(true, Ordering::Relaxed);
+    tlog!("[ModbusScan] Cancel requested");
 }

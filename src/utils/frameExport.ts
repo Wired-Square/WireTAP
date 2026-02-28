@@ -669,3 +669,62 @@ function sanitizeSignalName(name: string): string {
   // Replace spaces and special characters with underscores
   return name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^([0-9])/, '_$1');
 }
+
+// ============================================================================
+// Modbus Discovery Export
+// ============================================================================
+
+export type ModbusExportConfig = {
+  device_address: number;
+  register_base: 0 | 1;
+  register_type: 'holding' | 'input' | 'coil' | 'discrete';
+  default_interval: number;
+};
+
+/**
+ * Build a TOML catalog from discovered Modbus registers.
+ *
+ * Each discovered register (frame_id) becomes a [frame.modbus."N"] section.
+ * The register_type and register_number are set from the scan configuration.
+ */
+export function buildModbusDiscoveryToml(
+  registers: Array<{ frameId: number; dlc: number }>,
+  meta: ExportMeta,
+  modbusConfig: ModbusExportConfig,
+): string {
+  const lines: string[] = [];
+
+  // [meta] section
+  lines.push('[meta]');
+  lines.push(`name = "${meta.name}"`);
+  lines.push(`version = ${meta.version}`);
+  lines.push('default_frame = "modbus"');
+  lines.push(`default_interval = ${modbusConfig.default_interval}`);
+  lines.push('');
+
+  // [meta.modbus] section
+  lines.push('[meta.modbus]');
+  lines.push(`device_address = ${modbusConfig.device_address}`);
+  lines.push(`register_base = ${modbusConfig.register_base}`);
+  lines.push(`default_interval = ${modbusConfig.default_interval}`);
+  lines.push('');
+
+  // Sort registers by frameId
+  const sorted = [...registers].sort((a, b) => a.frameId - b.frameId);
+
+  for (const reg of sorted) {
+    const regType = modbusConfig.register_type;
+    const isCoilType = regType === 'coil' || regType === 'discrete';
+    // For holding/input registers: dlc is 2 bytes per register, so length = dlc / 2
+    // For coils/discrete: length is 1 (single bit)
+    const length = isCoilType ? 1 : Math.max(1, Math.floor(reg.dlc / 2));
+
+    lines.push(`[frame.modbus."${reg.frameId}"]`);
+    lines.push(`register_number = ${reg.frameId}`);
+    lines.push(`register_type = "${regType}"`);
+    lines.push(`length = ${length}`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}

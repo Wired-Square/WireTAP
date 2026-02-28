@@ -1,6 +1,6 @@
 // ui/src/dialogs/ToolboxDialog.tsx
 
-import { X, ListOrdered, GitCompare, Play, Loader2, Radio, Binary, ShieldCheck } from "lucide-react";
+import { X, ListOrdered, GitCompare, Play, Loader2, Radio, Binary, ShieldCheck, Radar, Network } from "lucide-react";
 import { iconMd, iconLg } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import { useDiscoveryStore, TOOL_TAB_CONFIG, type ToolboxView } from "../stores/discoveryStore";
@@ -19,6 +19,9 @@ import ChangesToolPanel from "../apps/discovery/views/tools/ChangesToolPanel";
 import SerialFramingToolPanel from "../apps/discovery/views/tools/SerialFramingToolPanel";
 import SerialPayloadToolPanel from "../apps/discovery/views/tools/SerialPayloadToolPanel";
 import ChecksumDiscoveryToolPanel from "../apps/discovery/views/tools/ChecksumDiscoveryToolPanel";
+import ModbusRegisterScanPanel from "../apps/discovery/views/tools/ModbusRegisterScanPanel";
+import ModbusUnitIdScanPanel from "../apps/discovery/views/tools/ModbusUnitIdScanPanel";
+import type { ModbusScanConfig, UnitIdScanConfig } from "../api/io";
 
 type ToolConfig = {
   id: ToolboxView;
@@ -27,13 +30,15 @@ type ToolConfig = {
   icon: React.ComponentType<{ className?: string }>;
   /** For serial tools: 'bytes' requires raw bytes, 'frames' requires framed data */
   serialRequires?: 'bytes' | 'frames';
+  /** For modbus tools: requires a modbus_tcp profile */
+  modbusRequires?: boolean;
 };
 
 const tools: ToolConfig[] = [
   {
     id: "message-order",
     label: "Frame Order Analysis",
-    description: "Analyze frame timing patterns and message order",
+    description: "Analyse frame timing patterns and message order",
     icon: ListOrdered,
   },
   {
@@ -62,7 +67,26 @@ const tools: ToolConfig[] = [
     icon: Radio,
     serialRequires: 'frames',
   },
+  {
+    id: "modbus-register-scan",
+    label: "Register Scan",
+    description: "Discover registers on a Modbus TCP device",
+    icon: Radar,
+    modbusRequires: true,
+  },
+  {
+    id: "modbus-unit-scan",
+    label: "Unit ID Scan",
+    description: "Find active Modbus devices on the network",
+    icon: Network,
+    modbusRequires: true,
+  },
 ];
+
+/** Check if a tool is a modbus scan tool (these produce data, not analyse it) */
+function isModbusScanTool(id: ToolboxView): boolean {
+  return id === 'modbus-register-scan' || id === 'modbus-unit-scan';
+}
 
 type Props = {
   isOpen: boolean;
@@ -77,6 +101,14 @@ type Props = {
   serialFrameCount?: number;
   /** Number of raw serial bytes available (before framing) */
   serialBytesCount?: number;
+  /** True when active profile is modbus_tcp */
+  isModbusProfile?: boolean;
+  /** Connection details from the active modbus profile */
+  modbusConnection?: { host: string; port: number; unit_id: number } | null;
+  /** Called when a modbus register scan should start */
+  onStartModbusScan?: (config: ModbusScanConfig) => void;
+  /** Called when a modbus unit ID scan should start */
+  onStartModbusUnitIdScan?: (config: UnitIdScanConfig) => void;
 };
 
 export default function ToolboxDialog({
@@ -88,6 +120,10 @@ export default function ToolboxDialog({
   isFilteredView = false,
   serialFrameCount = 0,
   serialBytesCount = 0,
+  isModbusProfile = false,
+  modbusConnection,
+  onStartModbusScan,
+  onStartModbusUnitIdScan,
 }: Props) {
   const activeView = useDiscoveryStore((s) => s.toolbox.activeView);
   const isRunning = useDiscoveryStore((s) => s.toolbox.isRunning);
@@ -97,14 +133,22 @@ export default function ToolboxDialog({
 
   const activeTool = activeView !== "frames" ? activeView : null;
 
-  // In serial mode, show both serial tools
-  // In CAN mode, exclude serial tools
+  // Filter tools based on mode:
+  // - Serial mode: show serial tools only
+  // - Modbus profile: show modbus tools + standard CAN tools
+  // - Default (CAN): show standard CAN tools only
   const availableTools = isSerialMode
     ? tools.filter((t) => t.serialRequires !== undefined)
-    : tools.filter((t) => t.serialRequires === undefined);
+    : isModbusProfile
+      ? tools.filter((t) => t.modbusRequires === true || (!t.serialRequires && !t.modbusRequires))
+      : tools.filter((t) => !t.serialRequires && !t.modbusRequires);
 
   // Check if a specific tool is available based on its requirements
   const isToolAvailable = (tool: ToolConfig): boolean => {
+    if (tool.modbusRequires) {
+      // Modbus scan tools are always available when profile matches
+      return isModbusProfile;
+    }
     if (!isSerialMode) {
       return frameCount > 0;
     }
@@ -124,6 +168,9 @@ export default function ToolboxDialog({
     const tool = tools.find(t => t.id === activeTool);
     if (!tool) return 0;
 
+    // Modbus scan tools don't need a count — they produce data
+    if (tool.modbusRequires) return 0;
+
     if (!isSerialMode) {
       return selectedCount;
     }
@@ -141,6 +188,9 @@ export default function ToolboxDialog({
 
   // Get the disabled reason for a tool
   const getDisabledReason = (tool: ToolConfig): string | null => {
+    if (tool.modbusRequires) {
+      return isModbusProfile ? null : "Requires a Modbus TCP profile";
+    }
     if (!isSerialMode) {
       return frameCount === 0 ? "No frames discovered" : null;
     }
@@ -178,12 +228,26 @@ export default function ToolboxDialog({
     }
   };
 
+  const handleStartModbusScan = (config: ModbusScanConfig) => {
+    onStartModbusScan?.(config);
+    onClose();
+  };
+
+  const handleStartModbusUnitIdScan = (config: UnitIdScanConfig) => {
+    onStartModbusUnitIdScan?.(config);
+    onClose();
+  };
+
+  const isActiveModbusScan = activeTool != null && isModbusScanTool(activeTool);
+
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-lg">
       <div className={`${cardElevated} shadow-xl overflow-hidden flex flex-col`}>
         {/* Header */}
         <div className={`${paddingCard} flex items-center justify-between border-b ${borderDefault}`}>
-          <h2 className={h3}>Analysis Tools</h2>
+          <h2 className={h3}>
+            {isModbusProfile ? "Analysis & Scanning Tools" : "Analysis Tools"}
+          </h2>
           <button
             onClick={onClose}
             className={`p-1 ${roundedDefault} ${hoverLight} transition-colors`}
@@ -237,11 +301,23 @@ export default function ToolboxDialog({
               {activeTool === "checksum-discovery" && <ChecksumDiscoveryToolPanel />}
               {activeTool === "serial-framing" && <SerialFramingToolPanel bytesCount={serialBytesCount} />}
               {activeTool === "serial-payload" && <SerialPayloadToolPanel framesCount={serialFrameCount} />}
+              {activeTool === "modbus-register-scan" && modbusConnection && (
+                <ModbusRegisterScanPanel
+                  connection={modbusConnection}
+                  onStartScan={handleStartModbusScan}
+                />
+              )}
+              {activeTool === "modbus-unit-scan" && modbusConnection && (
+                <ModbusUnitIdScanPanel
+                  connection={modbusConnection}
+                  onStartScan={handleStartModbusUnitIdScan}
+                />
+              )}
             </div>
           )}
 
-          {/* Selection count and run button */}
-          {activeTool && (
+          {/* Selection count and run button (for analysis tools, not modbus scan) */}
+          {activeTool && !isActiveModbusScan && (
             <div className={`border-t ${borderDefault} pt-3 ${spaceYSmall}`}>
               <div className={`text-sm ${textTertiary}`}>
                 {activeTool === "serial-framing"
@@ -271,7 +347,7 @@ export default function ToolboxDialog({
           {/* Help text when no tool selected */}
           {!activeTool && availableTools.some(t => isToolAvailable(t)) && (
             <div className={`text-xs ${textTertiary} text-center py-2`}>
-              Select a tool above to configure and run analysis
+              Select a tool above to configure and run
             </div>
           )}
 

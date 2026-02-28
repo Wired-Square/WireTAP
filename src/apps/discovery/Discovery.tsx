@@ -1,7 +1,7 @@
 // ui/src/apps/discovery/Discovery.tsx
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOPickerHandlers } from '../../hooks/useIOPickerHandlers';
@@ -10,7 +10,9 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
-import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
+import type { StreamEndedPayload, PlaybackPosition, ModbusScanConfig, UnitIdScanConfig } from '../../api/io';
+import { startModbusScan, startModbusUnitIdScan, cancelModbusScan } from '../../api/io';
+import { useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
 import { REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import AppLayout from "../../components/AppLayout";
 import DiscoveryTopBar from "./views/DiscoveryTopBar";
@@ -68,6 +70,7 @@ export default function Discovery() {
   const seenIds = useDiscoveryStore((state) => state.seenIds);
   const framesViewActiveTab = useDiscoveryUIStore((state) => state.framesViewActiveTab);
   const setShowBusColumn = useDiscoveryUIStore((state) => state.setShowBusColumn);
+  const setModbusExportConfig = useDiscoveryUIStore((state) => state.setModbusExportConfig);
 
   // Global error dialog
   const showAppError = useSessionStore((state) => state.showAppError);
@@ -158,6 +161,17 @@ export default function Discovery() {
 
   // Time range visibility
   const [showTimeRange] = useState(false);
+
+  // Modbus scan state (from toolbox store)
+  const startModbusScanStore = useDiscoveryToolboxStore((s) => s.startModbusScan);
+  const addModbusScanFrames = useDiscoveryToolboxStore((s) => s.addModbusScanFrames);
+  const addModbusScanDeviceInfo = useDiscoveryToolboxStore((s) => s.addModbusScanDeviceInfo);
+  const updateModbusScanProgress = useDiscoveryToolboxStore((s) => s.updateModbusScanProgress);
+  const finishModbusScan = useDiscoveryToolboxStore((s) => s.finishModbusScan);
+  const isScanning = useDiscoveryToolboxStore((s) =>
+    (s.toolbox.modbusRegisterScanResults?.isScanning ?? false) ||
+    (s.toolbox.modbusUnitIdScanResults?.isScanning ?? false)
+  );
 
   // Ref to track paused state (used by callbacks that can't access manager state directly)
   // When paused, frame emissions are from stepping - position updates, not new data
@@ -401,6 +415,27 @@ export default function Discovery() {
     reinitialize,
   } = session;
 
+  // Detect if active profile is modbus_tcp and extract connection details.
+  // Note: ioProfile holds the session ID (e.g. "m_abc123"), not the profile ID.
+  // Use ioProfiles (multiBusProfiles) which contains the actual profile IDs.
+  const modbusProfile = useMemo(() => {
+    if (!settings?.io_profiles || ioProfiles.length === 0) return null;
+    // Find first modbus_tcp profile among the active source profiles
+    for (const profileId of ioProfiles) {
+      const profile = settings.io_profiles.find((p: import("../../types/common").IOProfile) => p.id === profileId);
+      if (profile?.kind === 'modbus_tcp') {
+        return {
+          host: String(profile.connection?.host ?? '127.0.0.1'),
+          port: Number(profile.connection?.port) || 502,
+          unit_id: Number(profile.connection?.unit_id) || 1,
+        };
+      }
+    }
+    return null;
+  }, [ioProfiles, settings?.io_profiles]);
+
+  const isModbusProfile = modbusProfile !== null;
+
   // Note: isStreaming, isPaused, isStopped, isRealtime are now provided by useIOSessionManager
 
   // Fetch buffer metadata and frame info when:
@@ -609,6 +644,86 @@ export default function Discovery() {
     return `${formatFilenameDate()}-${protocol}`;
   }, [exportDataMode, protocolLabel]);
 
+  // Modbus scan: listen for scan events and route to toolbox store
+  useEffect(() => {
+    if (!isScanning) return;
+
+    let unlistenFrames: (() => void) | null = null;
+    let unlistenProgress: (() => void) | null = null;
+    let unlistenDeviceInfo: (() => void) | null = null;
+
+    const setup = async () => {
+      unlistenFrames = await listen<FrameMessage[]>("modbus-scan-frame", (event) => {
+        if (event.payload && event.payload.length > 0) {
+          addModbusScanFrames(event.payload);
+        }
+      });
+
+      unlistenProgress = await listen<{ current: number; total: number; found_count: number }>("modbus-scan-progress", (event) => {
+        updateModbusScanProgress(event.payload);
+      });
+
+      unlistenDeviceInfo = await listen<{ unit_id: number; vendor?: string; product_code?: string; revision?: string }>("modbus-scan-device-info", (event) => {
+        addModbusScanDeviceInfo(event.payload);
+      });
+    };
+
+    setup();
+
+    return () => {
+      unlistenFrames?.();
+      unlistenProgress?.();
+      unlistenDeviceInfo?.();
+    };
+  }, [isScanning, addModbusScanFrames, updateModbusScanProgress, addModbusScanDeviceInfo]);
+
+  // Modbus scan handlers
+  const handleStartModbusScan = useCallback(async (config: ModbusScanConfig) => {
+    startModbusScanStore('register');
+    // Set modbus export config so Save knows how to generate TOML
+    setModbusExportConfig({
+      device_address: config.unit_id,
+      register_base: 0,
+      register_type: config.register_type,
+      default_interval: 1000,
+    });
+    try {
+      const result = await startModbusScan(config);
+      console.log(`[Discovery] Modbus register scan complete: found ${result.found_count} of ${result.total_scanned} in ${result.duration_ms}ms`);
+    } catch (e) {
+      showAppError("Scan Error", "An error occurred during Modbus register scan.", String(e));
+    } finally {
+      finishModbusScan();
+    }
+  }, [startModbusScanStore, finishModbusScan, showAppError, setModbusExportConfig]);
+
+  const handleStartModbusUnitIdScan = useCallback(async (config: UnitIdScanConfig) => {
+    startModbusScanStore('unit-id');
+    // Set modbus export config for unit ID scan results
+    setModbusExportConfig({
+      device_address: config.start_unit_id,
+      register_base: 0,
+      register_type: config.register_type,
+      default_interval: 1000,
+    });
+    try {
+      const result = await startModbusUnitIdScan(config);
+      console.log(`[Discovery] Modbus unit ID scan complete: found ${result.found_count} of ${result.total_scanned} in ${result.duration_ms}ms`);
+    } catch (e) {
+      showAppError("Scan Error", "An error occurred during Modbus unit ID scan.", String(e));
+    } finally {
+      finishModbusScan();
+    }
+  }, [startModbusScanStore, finishModbusScan, showAppError, setModbusExportConfig]);
+
+  const handleCancelModbusScan = useCallback(async () => {
+    try {
+      await cancelModbusScan();
+    } catch (e) {
+      console.warn('[Discovery] Failed to cancel scan:', e);
+    }
+  }, []);
+
   // Use the handlers hook
   const handlers = useDiscoveryHandlers({
     // Session state
@@ -815,6 +930,7 @@ export default function Discovery() {
           framingAccepted={framingAccepted}
           serialActiveTab={serialActiveTab}
           onUndoFraming={undoAcceptFraming}
+          isModbusProfile={isModbusProfile}
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
           onSave={openSaveDialog}
           onExport={() => dialogs.export.open()}
@@ -836,6 +952,7 @@ export default function Discovery() {
             frames={frames}
             bufferId={bufferMetadata?.id ?? (bufferMode.enabled ? sessionBufferId : null)}
             protocol={protocolLabel}
+            onCancelScan={handleCancelModbusScan}
             displayFrameIdFormat={displayFrameIdFormat}
             displayTimeFormat={displayTimeFormat}
             onBookmark={isRecorded ? handlers.handleBookmark : undefined}
@@ -990,6 +1107,10 @@ export default function Discovery() {
         isFilteredView={framesViewActiveTab === 'filtered'}
         serialFrameCount={backendFrameCount > 0 ? backendFrameCount : (framedData.length + frames.length)}
         serialBytesCount={backendByteCount > 0 ? backendByteCount : serialBytesBuffer.length}
+        isModbusProfile={isModbusProfile}
+        modbusConnection={modbusProfile}
+        onStartModbusScan={handleStartModbusScan}
+        onStartModbusUnitIdScan={handleStartModbusUnitIdScan}
       />
 
       <DecoderInfoDialog

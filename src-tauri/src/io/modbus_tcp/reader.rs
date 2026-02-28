@@ -412,7 +412,7 @@ fn spawn_poll_task(
 
 /// Convert Modbus register values (u16) to bytes in big-endian order.
 /// Each register becomes 2 bytes (MSB first), matching standard Modbus byte order.
-fn registers_to_bytes(registers: &[u16]) -> Vec<u8> {
+pub fn registers_to_bytes(registers: &[u16]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(registers.len() * 2);
     for &reg in registers {
         bytes.push((reg >> 8) as u8); // MSB
@@ -423,7 +423,7 @@ fn registers_to_bytes(registers: &[u16]) -> Vec<u8> {
 
 /// Convert coil/discrete input values (bool) to packed bytes.
 /// 8 coils per byte, LSB first within each byte (Modbus convention).
-fn coils_to_bytes(coils: &[bool]) -> Vec<u8> {
+pub fn coils_to_bytes(coils: &[bool]) -> Vec<u8> {
     let byte_count = (coils.len() + 7) / 8;
     let mut bytes = vec![0u8; byte_count];
     for (i, &coil) in coils.iter().enumerate() {

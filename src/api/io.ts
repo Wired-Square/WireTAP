@@ -1349,3 +1349,62 @@ export async function getProfilesUsage(
 export async function checkRecoveryOccurred(): Promise<boolean> {
   return invoke("check_recovery_occurred");
 }
+
+// ============================================================================
+// Modbus Scanning
+// ============================================================================
+
+/** Register type for Modbus scanning. */
+export type ModbusRegisterType = 'holding' | 'input' | 'coil' | 'discrete';
+
+/** Configuration for register range scanning. */
+export interface ModbusScanConfig {
+  host: string;
+  port: number;
+  unit_id: number;
+  register_type: ModbusRegisterType;
+  start_register: number;
+  end_register: number;
+  chunk_size: number;
+  inter_request_delay_ms: number;
+}
+
+/** Configuration for unit ID scanning. */
+export interface UnitIdScanConfig {
+  host: string;
+  port: number;
+  start_unit_id: number;
+  end_unit_id: number;
+  test_register: number;
+  register_type: ModbusRegisterType;
+  inter_request_delay_ms: number;
+}
+
+/** Progress update emitted during scanning. */
+export interface ScanProgressPayload {
+  current: number;
+  total: number;
+  found_count: number;
+}
+
+/** Completion summary returned when scan finishes. */
+export interface ScanCompletePayload {
+  found_count: number;
+  total_scanned: number;
+  duration_ms: number;
+}
+
+/** Scan a range of Modbus registers to discover which ones exist. */
+export async function startModbusScan(config: ModbusScanConfig): Promise<ScanCompletePayload> {
+  return invoke("modbus_scan_registers", { config });
+}
+
+/** Scan for active Modbus unit IDs on the network. */
+export async function startModbusUnitIdScan(config: UnitIdScanConfig): Promise<ScanCompletePayload> {
+  return invoke("modbus_scan_unit_ids", { config });
+}
+
+/** Cancel a running Modbus scan operation. */
+export async function cancelModbusScan(): Promise<void> {
+  return invoke("cancel_modbus_scan");
+}

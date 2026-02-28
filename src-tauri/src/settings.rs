@@ -544,6 +544,194 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
     }
 }
 
+// ============================================================================
+// CANdor → WireTAP migration (prompted by user on first run)
+// ============================================================================
+
+/// Derive the old CANdor app config directory path from the current WireTAP path.
+fn get_candor_config_dir(app: &AppHandle) -> Option<PathBuf> {
+    let current_dir = app.path().app_config_dir().ok()?;
+    let current_str = current_dir.to_string_lossy();
+    let old_str = current_str.replace("com.wiredsquare.wiretap", "com.wiredsquare.candor");
+    if old_str == current_str.as_ref() {
+        return None;
+    }
+    let old_dir = PathBuf::from(old_str);
+    if old_dir.exists() { Some(old_dir) } else { None }
+}
+
+/// Summary of what was found in the old CANdor directory.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CandorMigrationInfo {
+    pub io_profile_count: usize,
+    pub io_profile_names: Vec<String>,
+    pub has_ui_state: bool,
+    pub has_window_state: bool,
+}
+
+/// Check whether old CANdor data exists and return a summary.
+#[tauri::command]
+pub fn check_candor_migration(app: AppHandle) -> Option<CandorMigrationInfo> {
+    let old_dir = get_candor_config_dir(&app)?;
+    let settings_path = old_dir.join("settings.json");
+    let ui_state_path = old_dir.join("ui-state.json");
+    let window_state_path = old_dir.join(".window-state.json");
+
+    // Need at least settings or ui-state to be worth prompting
+    if !settings_path.exists() && !ui_state_path.exists() {
+        return None;
+    }
+
+    let (io_profile_count, io_profile_names) = if settings_path.exists() {
+        std::fs::read_to_string(&settings_path)
+            .ok()
+            .and_then(|c| serde_json::from_str::<AppSettings>(&c).ok())
+            .map(|s| {
+                let names: Vec<String> = s.io_profiles.iter().map(|p| p.name.clone()).collect();
+                (names.len(), names)
+            })
+            .unwrap_or((0, Vec::new()))
+    } else {
+        (0, Vec::new())
+    };
+
+    Some(CandorMigrationInfo {
+        io_profile_count,
+        io_profile_names,
+        has_ui_state: ui_state_path.exists(),
+        has_window_state: window_state_path.exists(),
+    })
+}
+
+/// Surgically migrate user data from old CANdor directory, then delete it.
+/// Only copies IO profiles and user preferences into current settings;
+/// paths and defaults come from the current WireTAP installation.
+#[tauri::command]
+pub async fn run_candor_migration(app: AppHandle) -> Result<String, String> {
+    let old_dir = get_candor_config_dir(&app)
+        .ok_or_else(|| "Old CANdor directory not found".to_string())?;
+
+    let mut migrated = Vec::new();
+
+    // ── Settings: surgically copy user data fields ──
+    let settings_path = old_dir.join("settings.json");
+    if settings_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&settings_path) {
+            if let Ok(old) = serde_json::from_str::<AppSettings>(&content) {
+                // Load current settings (fresh defaults from first run)
+                let current_path = get_settings_path(&app)?;
+                let mut current: AppSettings = if current_path.exists() {
+                    let c = std::fs::read_to_string(&current_path)
+                        .map_err(|e| format!("Failed to read current settings: {}", e))?;
+                    serde_json::from_str(&c)
+                        .map_err(|e| format!("Failed to parse current settings: {}", e))?
+                } else {
+                    AppSettings::with_defaults(&app)?
+                };
+
+                // IO profiles and defaults
+                let profile_count = old.io_profiles.len();
+                current.io_profiles = old.io_profiles;
+                current.default_read_profile = old.default_read_profile;
+                current.default_write_profiles = old.default_write_profiles;
+
+                // User preferences (non-path settings)
+                current.display_frame_id_format = old.display_frame_id_format;
+                current.save_frame_id_format = old.save_frame_id_format;
+                current.display_time_format = old.display_time_format;
+                current.display_timezone = old.display_timezone;
+                current.signal_colour_none = old.signal_colour_none;
+                current.signal_colour_low = old.signal_colour_low;
+                current.signal_colour_medium = old.signal_colour_medium;
+                current.signal_colour_high = old.signal_colour_high;
+                current.binary_one_colour = old.binary_one_colour;
+                current.session_manager_stats_interval = old.session_manager_stats_interval;
+                current.graph_buffer_size = old.graph_buffer_size;
+                current.theme_mode = old.theme_mode;
+                // Light theme
+                current.theme_bg_primary_light = old.theme_bg_primary_light;
+                current.theme_bg_surface_light = old.theme_bg_surface_light;
+                current.theme_text_primary_light = old.theme_text_primary_light;
+                current.theme_text_secondary_light = old.theme_text_secondary_light;
+                current.theme_border_default_light = old.theme_border_default_light;
+                current.theme_data_bg_light = old.theme_data_bg_light;
+                current.theme_data_text_primary_light = old.theme_data_text_primary_light;
+                // Dark theme
+                current.theme_bg_primary_dark = old.theme_bg_primary_dark;
+                current.theme_bg_surface_dark = old.theme_bg_surface_dark;
+                current.theme_text_primary_dark = old.theme_text_primary_dark;
+                current.theme_text_secondary_dark = old.theme_text_secondary_dark;
+                current.theme_border_default_dark = old.theme_border_default_dark;
+                current.theme_data_bg_dark = old.theme_data_bg_dark;
+                current.theme_data_text_primary_dark = old.theme_data_text_primary_dark;
+                // Accent colours
+                current.theme_accent_primary = old.theme_accent_primary;
+                current.theme_accent_success = old.theme_accent_success;
+                current.theme_accent_danger = old.theme_accent_danger;
+                current.theme_accent_warning = old.theme_accent_warning;
+                // Power management
+                current.prevent_idle_sleep = old.prevent_idle_sleep;
+                current.keep_display_awake = old.keep_display_awake;
+                // Diagnostics
+                current.log_level = old.log_level;
+                // Buffer limits
+                current.decoder_max_unmatched_frames = old.decoder_max_unmatched_frames;
+                current.decoder_max_filtered_frames = old.decoder_max_filtered_frames;
+                current.decoder_max_decoded_frames = old.decoder_max_decoded_frames;
+                current.decoder_max_decoded_per_source = old.decoder_max_decoded_per_source;
+                current.transmit_max_history = old.transmit_max_history;
+                current.modbus_max_register_errors = old.modbus_max_register_errors;
+
+                // Apply path migration (CANdor → WireTAP) but keep fresh defaults for paths
+                // Don't copy old paths — they point to CANdor directories
+
+                save_settings(app.clone(), current).await?;
+                migrated.push(format!("{} IO profiles", profile_count));
+                tlog!("[migration] Migrated {} IO profiles and user preferences", profile_count);
+            }
+        }
+    }
+
+    // ── UI state: copy entire file (layouts, favourites, selection sets) ──
+    let ui_state_path = old_dir.join("ui-state.json");
+    if ui_state_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&ui_state_path) {
+            if let Ok(old_data) = serde_json::from_str::<HashMap<String, serde_json::Value>>(&content) {
+                let entry_count = old_data.len();
+                for (key, value) in &old_data {
+                    if let Err(e) = crate::store_manager::set(key, value.clone()) {
+                        tlog!("[migration] Failed to set UI state key '{}': {}", key, e);
+                    }
+                }
+                migrated.push(format!("{} UI state entries", entry_count));
+                tlog!("[migration] Migrated {} UI state entries", entry_count);
+            }
+        }
+    }
+
+    // ── Delete the entire old directory ──
+    if let Err(e) = std::fs::remove_dir_all(&old_dir) {
+        tlog!("[migration] Failed to remove old CANdor directory: {}", e);
+        return Err(format!("Migration complete but failed to remove old directory: {}", e));
+    }
+    tlog!("[migration] Removed old CANdor directory: {:?}", old_dir);
+
+    Ok(format!("Migrated: {}", migrated.join(", ")))
+}
+
+/// Delete the old CANdor directory without migrating anything.
+#[tauri::command]
+pub fn delete_candor_data(app: AppHandle) -> Result<(), String> {
+    let old_dir = get_candor_config_dir(&app)
+        .ok_or_else(|| "Old CANdor directory not found".to_string())?;
+
+    std::fs::remove_dir_all(&old_dir)
+        .map_err(|e| format!("Failed to remove old CANdor directory: {}", e))?;
+
+    tlog!("[migration] Deleted old CANdor directory: {:?}", old_dir);
+    Ok(())
+}
+
 /// Migrate persisted directory paths from CANdor to WireTAP after rebrand.
 /// Only replaces path components, not arbitrary substrings.
 fn migrate_persisted_paths(settings: &mut AppSettings) {
