@@ -799,9 +799,9 @@ async fn update_wake_lock() {
                 match KeepAwakeBuilder::default()
                     .idle(settings.prevent_idle_sleep)
                     .display(settings.keep_display_awake)
-                    .reason("CANdor session active")
-                    .app_name("CANdor")
-                    .app_reverse_domain("com.wiredsquare.candor")
+                    .reason("WireTAP session active")
+                    .app_name("WireTAP")
+                    .app_reverse_domain("com.wiredsquare.wiretap")
                     .create()
                 {
                     Ok(lock) => {

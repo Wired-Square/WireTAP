@@ -1,6 +1,8 @@
-# CANdor
+# WireTAP
 
-A desktop application for CAN bus analysis and signal decoding, built with Tauri, React, and TypeScript.
+A modern cross-platform tool for reverse engineering frame based protocols like CAN bus, MODBUS and serial.
+
+Formerly known as CANdor.
 
 ## Features
 
@@ -32,7 +34,7 @@ See the [Wiki](../../wiki) for detailed documentation:
 
 CANable and CANable Pro devices support two firmware options that determine which protocol they use:
 
-- **gs_usb** (candleLight firmware) — The device presents itself as a native USB CAN adapter using the gs_usb protocol. The host communicates directly over USB using raw packets, with no serial port involved. CANdor talks to the device via [nusb](https://github.com/kevinmehall/nusb), a cross-platform userspace USB library.
+- **gs_usb** (candleLight firmware) — The device presents itself as a native USB CAN adapter using the gs_usb protocol. The host communicates directly over USB using raw packets, with no serial port involved. WireTAP talks to the device via [nusb](https://github.com/kevinmehall/nusb), a cross-platform userspace USB library.
 
 - **slcan** (serial/LAWICEL firmware) — The device appears as a virtual serial port. CAN frames are exchanged as ASCII text commands over the serial link using the LAWICEL/slcan protocol.
 
@@ -42,7 +44,7 @@ CANable and CANable Pro devices support two firmware options that determine whic
 2. **Hardware timestamping** — gs_usb devices can provide hardware-level timestamps, giving more accurate frame timing than serial-based timestamps.
 3. **No serial port configuration** — There's no baud rate, flow control, or COM port selection to get wrong. The device is detected automatically over USB.
 4. **CAN FD support** — The CANable Pro with candleLight firmware supports CAN FD natively via gs_usb. slcan has no standard CAN FD extension.
-5. **Cross-platform without drivers** — CANdor's nusb integration means gs_usb works on macOS, Windows, and Linux without installing platform-specific drivers. On Linux, gs_usb devices also appear as native SocketCAN interfaces.
+5. **Cross-platform without drivers** — WireTAP's nusb integration means gs_usb works on macOS, Windows, and Linux without installing platform-specific drivers. On Linux, gs_usb devices also appear as native SocketCAN interfaces.
 
 To use gs_usb, flash your CANable with [candleLight firmware](https://github.com/candle-usb/candleLight_fw). See the [CANable Setup](../../wiki/CANable-Setup) wiki page for flashing instructions.
 
@@ -55,15 +57,15 @@ To use gs_usb, flash your CANable with [candleLight firmware](https://github.com
 
 ## Tools
 
-### [CANdor Server](tools/candor-server/)
+### [WireTAP Server](tools/wiretap-server/)
 
 A GVRET-compatible TCP server for Linux that bridges SocketCAN interfaces to TCP clients. Deploy on a Raspberry Pi or any Linux system with CAN hardware to:
 
-- Stream live CAN data to the CANdor desktop app over the network
+- Stream live CAN data to the WireTAP desktop app over the network
 - Optionally log all frames to PostgreSQL for historical analysis
 - Support multiple CAN interfaces and CAN FD
 
-See [tools/candor-server/README.md](tools/candor-server/README.md) for setup instructions.
+See [tools/wiretap-server/README.md](tools/wiretap-server/README.md) for setup instructions.
 
 ## Tech Stack
 

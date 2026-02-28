@@ -278,7 +278,7 @@ function applyConnectionDefaults(profile: IOProfile): IOProfile {
     case 'postgres':
       if (!processed.connection.host) processed.connection.host = 'localhost';
       if (!processed.connection.port) processed.connection.port = '5432';
-      if (!processed.connection.database) processed.connection.database = 'candor';
+      if (!processed.connection.database) processed.connection.database = 'wiretap';
       break;
     case 'gvret_tcp':
       if (!processed.connection.host) processed.connection.host = '192.168.1.100';

@@ -1,6 +1,6 @@
 [Unit]
-Description=CANdor GVRET Server
-Documentation=https://github.com/Wired-Square/CANdor
+Description=WireTAP GVRET Server
+Documentation=https://github.com/Wired-Square/WireTAP
 After=network.target can-interface.service postgresql.service
 Wants=can-interface.service
 StartLimitIntervalSec=60
@@ -10,10 +10,10 @@ StartLimitBurst=3
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/candor-server
+WorkingDirectory=/home/pi/wiretap-server
 
 # Main executable - adjust paths as needed
-ExecStart=/usr/bin/python3 /home/pi/candor-server/candor-server.py -C /home/pi/candor-server/candor-server.toml
+ExecStart=/usr/bin/python3 /home/pi/wiretap-server/wiretap-server.py -C /home/pi/wiretap-server/wiretap-server.toml
 
 # Restart on failure
 Restart=on-failure

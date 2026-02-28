@@ -27,7 +27,7 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
     <Dialog isOpen={isOpen} onBackdropClick={onClose}>
       <div className={paddingDialog}>
         <div className="flex items-start justify-between mb-6">
-          <h2 className={h1}>About CANdor</h2>
+          <h2 className={h1}>About WireTAP</h2>
           <button
             onClick={onClose}
             className={`p-1 ${hoverLight} ${roundedDefault} transition-colors`}
@@ -37,9 +37,12 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
         </div>
 
         <div className={`${spaceYDefault} ${bodyDefault}`}>
-          <div>
-            <p className="text-3xl font-bold text-[color:var(--text-primary)] mb-2">CANdor</p>
-            <p className={bodySmall}>Version {version}</p>
+          <div className="flex flex-col items-center text-center">
+            <img src="/logo.png" alt="WireTAP" className="w-16 h-16 rounded-xl mb-3" />
+            <p className="text-3xl font-bold text-[color:var(--text-primary)]">WireTAP</p>
+            <p className={`${bodySmall} mt-1`}>by Wired Square</p>
+            <p className={`${bodySmall} mt-2`}>Version {version}</p>
+            <p className="text-xs italic opacity-50 mt-1">the artist formerly known as CANdor</p>
           </div>
 
           <p>

@@ -288,7 +288,7 @@ GitHub Actions will now:
 2. Create a draft release with all installers
 
 Next steps:
-1. Go to https://github.com/YOUR_ORG/CANdor/releases
+1. Go to https://github.com/YOUR_ORG/WireTAP/releases
 2. Review the draft release
 3. Edit release notes if needed
 4. Publish the release

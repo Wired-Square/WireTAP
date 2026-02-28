@@ -150,7 +150,7 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
       >
         <img
           src={logo}
-          alt="CANdor"
+          alt="WireTAP"
           className="w-full h-full object-contain"
         />
       </button>

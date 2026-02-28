@@ -426,7 +426,7 @@ export interface DatabaseActivity {
   database: string | null;
   /** Username */
   username: string | null;
-  /** Application name (e.g., "CANdor Query") */
+  /** Application name (e.g., "WireTAP Query") */
   application_name: string | null;
   /** Client address */
   client_addr: string | null;

@@ -1,12 +1,12 @@
 # =============================================================================
-# CANdor Server Configuration
+# WireTAP Server Configuration
 # =============================================================================
-# This file configures candor-server.py, a GVRET TCP server that bridges
-# Linux SocketCAN interfaces to TCP clients (like CANdor desktop app) and
+# This file configures wiretap-server.py, a GVRET TCP server that bridges
+# Linux SocketCAN interfaces to TCP clients (like WireTAP desktop app) and
 # optionally ingests frames to PostgreSQL for historical analysis.
 #
 # Usage:
-#   ./candor-server.py -C candor-server.toml
+#   ./wiretap-server.py -C wiretap-server.toml
 #
 # CLI arguments override config file values. Environment variable PG_DSN
 # can be used instead of putting credentials in this file.
@@ -59,7 +59,7 @@ enable = false
 dsn = "postgresql://candor:SECRET_PASSWORD@HOST:5432/candor"
 
 # Qualified name of the ingest function. This function receives each frame's
-# fields as parameters. See candor-server.py for the expected signature.
+# fields as parameters. See wiretap-server.py for the expected signature.
 func = "public.ingest_can_frame"
 
 # Number of frames to batch before writing. Higher values improve throughput
@@ -90,10 +90,10 @@ dir = "rx"
 # On next startup, cached frames from the previous session are automatically
 # detected and drained.
 
-# Path to the SQLite cache file. Default: ~/.candor-server-cache.db
+# Path to the SQLite cache file. Default: ~/.wiretap-server-cache.db
 # TIP: Use a fast local disk (not NFS). The cache uses WAL mode for durability.
 # Environment variable PG_CACHE_PATH can also be used.
-# cache_path = "/home/pi/.candor-server-cache.db"
+# cache_path = "/home/pi/.wiretap-server-cache.db"
 
 # Maximum disk cache size in megabytes. When exceeded, new frames are dropped.
 # At ~3,700 frames/min, 1000 MB holds roughly 45 hours of data.

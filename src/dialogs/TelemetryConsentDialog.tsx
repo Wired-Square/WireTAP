@@ -34,13 +34,13 @@ export default function TelemetryConsentDialog({
           <div className={`w-12 h-12 ${bgInfo} ${roundedDefault} flex items-center justify-center`}>
             <Shield className={`${iconXl} ${textInfo}`} />
           </div>
-          <h2 className={h2}>Help improve CANdor</h2>
+          <h2 className={h2}>Help improve WireTAP</h2>
         </div>
 
         {/* Message */}
         <div className={`${textSecondary} space-y-3 mb-6`}>
           <p>
-            Hey! I'm building CANdor mostly on my own, and when something breaks
+            Hey! I'm building WireTAP mostly on my own, and when something breaks
             in the field I often have no idea what happened. If you're happy to
             share anonymous crash reports it'd be a huge help — it means I can
             find and fix problems faster, even the ones nobody thinks to report.
@@ -55,7 +55,7 @@ export default function TelemetryConsentDialog({
         {/* Actions */}
         <div className={`flex justify-end ${gapSmall}`}>
           <SecondaryButton onClick={onDecline}>No thanks</SecondaryButton>
-          <PrimaryButton onClick={onAccept}>Yes, help improve CANdor</PrimaryButton>
+          <PrimaryButton onClick={onAccept}>Yes, help improve WireTAP</PrimaryButton>
         </div>
       </div>
     </Dialog>

@@ -472,7 +472,7 @@ export default function IOProfileDialog({
                       variant="default"
                       value={profileForm.connection.formats?.json?.topic || ""}
                       onChange={(e) => onUpdateMqttFormat("json", "topic", e.target.value)}
-                      placeholder="candor/json/{bus}/{id_hex}/{signal}"
+                      placeholder="wiretap/json/{bus}/{id_hex}/{signal}"
                     />
                   </FormField>
                 </div>
@@ -503,7 +503,7 @@ export default function IOProfileDialog({
                       onChange={(e) =>
                         onUpdateMqttFormat("savvycan", "topic", e.target.value)
                       }
-                      placeholder="candor-savvycan/{id_dec}"
+                      placeholder="wiretap-savvycan/{id_dec}"
                     />
                   </FormField>
                 </div>
@@ -532,7 +532,7 @@ export default function IOProfileDialog({
                       variant="default"
                       value={profileForm.connection.formats?.decode?.topic || ""}
                       onChange={(e) => onUpdateMqttFormat("decode", "topic", e.target.value)}
-                      placeholder="candor/decode/{signal_name}/{id_hex}/{signal}"
+                      placeholder="wiretap/decode/{signal_name}/{id_hex}/{signal}"
                     />
                   </FormField>
                 </div>
@@ -607,7 +607,7 @@ export default function IOProfileDialog({
                   variant="default"
                   value={profileForm.connection.database || ""}
                   onChange={(e) => onUpdateConnectionField("database", e.target.value)}
-                  placeholder="candor"
+                  placeholder="wiretap"
                 />
               </FormField>
 
@@ -1225,7 +1225,7 @@ export default function IOProfileDialog({
                 </p>
                 <p className="text-sm text-[color:var(--text-info)] mt-2">
                   {profileForm.connection.bitrate
-                    ? "CANdor will configure the interface automatically (requires authentication)."
+                    ? "WireTAP will configure the interface automatically (requires authentication)."
                     : "Leave bitrate empty to use the interface as already configured by the system."}
                 </p>
               </div>

@@ -1,4 +1,4 @@
-// DBC export module - converts CANdor TOML catalog format to DBC format
+// DBC export module - converts WireTAP TOML catalog format to DBC format
 
 use std::collections::{HashMap, HashSet};
 
@@ -785,7 +785,7 @@ pub fn render_catalog_as_dbc_with_mode(
         let dlc = dlc_from_usage(frame);
         let default_name = format!("MSG_{:03X}", frame_id);
         let name = frame.name.as_deref().unwrap_or(&default_name);
-        let transmitter = frame.transmitter.as_deref().unwrap_or("CANdor");
+        let transmitter = frame.transmitter.as_deref().unwrap_or("WireTAP");
 
         out.push_str(&format!(
             "BO_ {} {}: {} {}\n",

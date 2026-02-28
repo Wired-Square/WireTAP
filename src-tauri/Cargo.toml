@@ -1,21 +1,21 @@
 [package]
-name = "candor"
+name = "wiretap"
 version = "0.4.6"
-description = "Desktop UI for CANdor. CAN bus analysis and decoding toolkit."
+description = "Desktop UI for WireTAP. CAN bus analysis and decoding toolkit."
 authors = ["Alex Ferrara"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = "CANdor"
+name = "WireTAP"
 path = "src/main.rs"
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "candor_lib"
+name = "wiretap_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

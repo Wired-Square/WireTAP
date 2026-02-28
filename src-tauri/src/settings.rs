@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, path::BaseDirectory};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -300,13 +300,13 @@ impl Default for AppSettings {
         // Get platform-specific documents directory
         let documents_dir = dirs::document_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("CANdor");
+            .join("WireTAP");
 
         let decoder_path = documents_dir.join("Decoders");
         let dump_path = documents_dir.join("Dumps");
 
         Self {
-            config_path: "config/candor.toml".to_string(),
+            config_path: "config/wiretap.toml".to_string(),
             decoder_dir: decoder_path.to_string_lossy().to_string(),
             dump_dir: dump_path.to_string_lossy().to_string(),
             io_profiles: Vec::new(),
@@ -379,13 +379,13 @@ impl AppSettings {
             .path()
             .document_dir()
             .map_err(|e| format!("Failed to get document directory: {}", e))?
-            .join("CANdor");
+            .join("WireTAP");
 
         let decoder_path = documents_dir.join("Decoders");
         let dump_path = documents_dir.join("Dumps");
 
         Ok(Self {
-            config_path: "config/candor.toml".to_string(),
+            config_path: "config/wiretap.toml".to_string(),
             decoder_dir: decoder_path.to_string_lossy().to_string(),
             dump_dir: dump_path.to_string_lossy().to_string(),
             io_profiles: Vec::new(),
@@ -519,6 +519,9 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
             settings.enable_file_logging = false;
         }
 
+        // Migrate persisted paths from CANdor → WireTAP (rebrand)
+        migrate_persisted_paths(&mut settings);
+
         // Check for stale paths (e.g., old iOS container UUIDs after reinstall)
         if paths_are_stale(&settings, &app) {
             tlog!("[settings] Regenerating stale directory paths");
@@ -538,6 +541,24 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
         initialize_directories(&settings)?;
         save_settings(app, settings.clone()).await?;
         Ok(settings)
+    }
+}
+
+/// Migrate persisted directory paths from CANdor to WireTAP after rebrand.
+/// Only replaces path components, not arbitrary substrings.
+fn migrate_persisted_paths(settings: &mut AppSettings) {
+    let sep = std::path::MAIN_SEPARATOR;
+    let old_component = format!("{}CANdor{}", sep, sep);
+    let new_component = format!("{}WireTAP{}", sep, sep);
+
+    if settings.decoder_dir.contains(&old_component) {
+        settings.decoder_dir = settings.decoder_dir.replace(&old_component, &new_component);
+    }
+    if settings.dump_dir.contains(&old_component) {
+        settings.dump_dir = settings.dump_dir.replace(&old_component, &new_component);
+    }
+    if settings.config_path.contains("candor.toml") {
+        settings.config_path = settings.config_path.replace("candor.toml", "wiretap.toml");
     }
 }
 
@@ -668,7 +689,7 @@ pub async fn validate_directory(path: String) -> Result<DirectoryValidation, Str
     // Check if writable
     let writable = if exists {
         // Try to create a temporary file to test writability
-        let test_file = dir_path.join(".candor_write_test");
+        let test_file = dir_path.join(".wiretap_write_test");
         match std::fs::write(&test_file, b"test") {
             Ok(_) => {
                 std::fs::remove_file(&test_file).ok();
@@ -754,12 +775,12 @@ pub async fn check_for_updates(app: AppHandle) -> Result<Option<UpdateInfo>, Str
         .unwrap_or_else(|| "0.0.0".to_string());
 
     let client = reqwest::Client::builder()
-        .user_agent("CANdor-App")
+        .user_agent("WireTAP-App")
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     let response = client
-        .get("https://api.github.com/repos/Wired-Square/CANdor/releases/latest")
+        .get("https://api.github.com/repos/Wired-Square/WireTAP/releases/latest")
         .send()
         .await
         .map_err(|e| format!("Failed to fetch release info: {}", e))?;
@@ -780,5 +801,20 @@ pub async fn check_for_updates(app: AppHandle) -> Result<Option<UpdateInfo>, Str
         }))
     } else {
         Ok(None)
+    }
+}
+
+/// Migrate user data directory from legacy CANdor name to WireTAP.
+/// Renames ~/Documents/CANdor → ~/Documents/WireTAP if the old directory
+/// exists and the new one does not. Called once on startup.
+pub fn migrate_data_directory(doc_dir: &Path) {
+    let old = doc_dir.join("CANdor");
+    let new = doc_dir.join("WireTAP");
+    if old.exists() && !new.exists() {
+        if let Err(e) = std::fs::rename(&old, &new) {
+            tlog!("[settings] Failed to migrate data directory: {}", e);
+        } else {
+            tlog!("[settings] Migrated data directory from CANdor to WireTAP");
+        }
     }
 }

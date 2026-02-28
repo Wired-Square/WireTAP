@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-SocketCAN to TCP GVRET bridge server for CANdor.
+SocketCAN to TCP GVRET bridge server for WireTAP.
 
 This server bridges SocketCAN interfaces to TCP clients using the GVRET protocol,
-enabling remote CAN bus access from CANdor or other GVRET-compatible tools.
+enabling remote CAN bus access from WireTAP or other GVRET-compatible tools.
 Optionally ingests frames to PostgreSQL for logging and analysis.
 """
 
@@ -26,7 +26,7 @@ from typing import Dict, List, Optional, Tuple
 
 from pyroute2 import IPRoute
 
-log = logging.getLogger("candor")
+log = logging.getLogger("wiretap")
 
 # SocketCAN ID flags/masks
 CAN_EFF_FLAG = 0x80000000
@@ -217,7 +217,7 @@ class DiskCache:
     SQLite-based disk cache for CAN frames when PostgreSQL is unavailable.
     Stores frames in a single table, supports batch operations.
     """
-    DEFAULT_PATH = Path.home() / ".candor-server-cache.db"
+    DEFAULT_PATH = Path.home() / ".wiretap-server-cache.db"
 
     def __init__(self, path: Optional[str] = None, max_mb: int = 1000):
         self.path = Path(path) if path else self.DEFAULT_PATH
@@ -472,7 +472,7 @@ class PostgresWriter:
         from psycopg2.extras import execute_values
         self._psycopg2 = psycopg2
         self._execute_values = execute_values
-        self._conn = psycopg2.connect(self.dsn, application_name="candor-server")
+        self._conn = psycopg2.connect(self.dsn, application_name="wiretap-server")
         self._conn.autocommit = False
         self._cur = self._conn.cursor()
         # Set statement timeout so blocked writes fail fast and trigger disk cache fallback
@@ -1383,7 +1383,7 @@ def build_parser():
         help="Override direction per row (default: uses --default-dir)")
     ap.add_argument(
         "--pg-cache-path", default=None,
-        help="Disk cache path for outages (default: ~/.candor-server-cache.db)")
+        help="Disk cache path for outages (default: ~/.wiretap-server-cache.db)")
     ap.add_argument(
         "--pg-cache-max-mb", type=int, default=1000,
         help="Max disk cache size in MB (default: 1000)")
@@ -1397,7 +1397,7 @@ def build_parser():
     return ap.parse_args()
 
 def main():
-    """Entry point for the candor-server."""
+    """Entry point for the wiretap-server."""
     args = build_parser()
 
     # Handle SIGTERM (from kill, systemd, etc.) same as Ctrl+C

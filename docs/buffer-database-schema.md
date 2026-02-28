@@ -2,7 +2,7 @@
 
 SQLite database used for ephemeral storage of captured CAN frames and raw serial bytes during a session. Data is stored on disk to avoid unbounded memory growth during long captures.
 
-**Location:** `{app_data_dir}/buffers.db` (e.g. `~/Library/Application Support/com.wired.candor/buffers.db` on macOS)
+**Location:** `{app_data_dir}/buffers.db` (e.g. `~/Library/Application Support/com.wired.wiretap/buffers.db` on macOS)
 
 **Lifecycle:** Cleared on each app launch. Buffer data is ephemeral and not intended to persist across sessions.
 
@@ -140,7 +140,7 @@ With SQLite, steady-state RAM at 480k frames drops from ~72 MB (+ clone overhead
 The database uses WAL mode, so you can open it read-only while the app is actively writing:
 
 ```bash
-sqlite3 ~/Library/Application\ Support/com.wired.candor/buffers.db
+sqlite3 ~/Library/Application\ Support/com.wired.wiretap/buffers.db
 ```
 
 ### Useful queries
@@ -173,7 +173,7 @@ PRAGMA journal_mode;
 
 | Platform | Path |
 |----------|------|
-| macOS | `~/Library/Application Support/com.wired.candor/buffers.db` |
-| Windows | `%APPDATA%\com.wired.candor\buffers.db` |
-| Linux | `~/.local/share/com.wired.candor/buffers.db` |
+| macOS | `~/Library/Application Support/com.wired.wiretap/buffers.db` |
+| Windows | `%APPDATA%\com.wired.wiretap\buffers.db` |
+| Linux | `~/.local/share/com.wired.wiretap/buffers.db` |
 | iOS | App sandbox (not user-accessible) |

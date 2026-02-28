@@ -1,9 +1,9 @@
-// ui/Candor.tsx
+// ui/WireTAP.tsx
 
 import * as Sentry from "@sentry/react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import "./Candor.css";
+import "./WireTAP.css";
 import MainLayout from "./components/MainLayout";
 import { useUpdateStore } from "./stores/updateStore";
 import { useTheme } from "./hooks/useTheme";
@@ -37,7 +37,7 @@ function setSentryEnabled(enabled: boolean) {
   }
 }
 
-export default function Candor() {
+export default function WireTAP() {
   const [showAbout, setShowAbout] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const currentWindow = getCurrentWebviewWindow();

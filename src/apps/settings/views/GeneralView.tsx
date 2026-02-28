@@ -121,7 +121,7 @@ export default function GeneralView({
         <div className="space-y-2">
           <label className={labelDefault}>Log Level</label>
           <p className={helpText}>
-            Diagnostic log verbosity. Logs are written to ~/Documents/CANdor/Reports/
+            Diagnostic log verbosity. Logs are written to ~/Documents/WireTAP/Reports/
           </p>
           <Select
             value={logLevel}

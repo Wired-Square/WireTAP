@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4E9A797294BCD484F4D6158B"
-               BuildableName = "CANdor.app"
-               BlueprintName = "candor_iOS"
-               ReferencedContainer = "container:candor.xcodeproj">
+               BuildableName = "WireTAP.app"
+               BlueprintName = "wiretap_iOS"
+               ReferencedContainer = "container:wiretap.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -31,9 +31,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4E9A797294BCD484F4D6158B"
-            BuildableName = "CANdor.app"
-            BlueprintName = "candor_iOS"
-            ReferencedContainer = "container:candor.xcodeproj">
+            BuildableName = "WireTAP.app"
+            BlueprintName = "wiretap_iOS"
+            ReferencedContainer = "container:wiretap.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <EnvironmentVariables>
@@ -66,9 +66,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4E9A797294BCD484F4D6158B"
-            BuildableName = "CANdor.app"
-            BlueprintName = "candor_iOS"
-            ReferencedContainer = "container:candor.xcodeproj">
+            BuildableName = "WireTAP.app"
+            BlueprintName = "wiretap_iOS"
+            ReferencedContainer = "container:wiretap.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <EnvironmentVariables>
@@ -95,9 +95,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "4E9A797294BCD484F4D6158B"
-            BuildableName = "CANdor.app"
-            BlueprintName = "candor_iOS"
-            ReferencedContainer = "container:candor.xcodeproj">
+            BuildableName = "WireTAP.app"
+            BlueprintName = "wiretap_iOS"
+            ReferencedContainer = "container:wiretap.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <EnvironmentVariables>

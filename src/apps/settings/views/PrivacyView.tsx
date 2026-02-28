@@ -27,7 +27,7 @@ export default function PrivacyView({
           <div>
             <span className={labelDefault}>Send anonymous crash reports</span>
             <p className={helpText}>
-              Help improve CANdor by sending anonymous crash and error reports
+              Help improve WireTAP by sending anonymous crash and error reports
               via Sentry. No personal data, CAN bus data, or usage analytics are
               collected — only error stack traces.
             </p>

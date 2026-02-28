@@ -213,7 +213,7 @@ fn get_window_config(label: &str) -> WindowConfig {
             min_height: 600.0,
         },
         _ => WindowConfig {
-            title: "CANdor",
+            title: "WireTAP",
             width: 900.0,
             height: 600.0,
             min_width: 700.0,
@@ -490,7 +490,7 @@ async fn set_log_level(app: AppHandle, level: String) -> Result<(), String> {
             .path()
             .document_dir()
             .map_err(|e| format!("Failed to get documents dir: {}", e))?
-            .join("CANdor")
+            .join("WireTAP")
             .join("Reports");
         logging::init_file_logging(&reports_dir)?;
     } else {
@@ -545,9 +545,9 @@ fn update_menu_focus_state(
 #[cfg(not(target_os = "ios"))]
 fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // Create About menu item (App submenu on macOS)
-    let about_item = MenuItemBuilder::with_id("about", "About CANdor").build(app)?;
+    let about_item = MenuItemBuilder::with_id("about", "About WireTAP").build(app)?;
 
-    let app_menu = SubmenuBuilder::new(app, "CANdor")
+    let app_menu = SubmenuBuilder::new(app, "WireTAP")
         .item(&about_item)
         .separator()
         .quit()
@@ -804,13 +804,13 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
             }
             // Help menu items - open URLs in default browser
             "help-issues" => {
-                let _ = app.opener().open_url("https://github.com/Wired-Square/CANdor/issues", None::<&str>);
+                let _ = app.opener().open_url("https://github.com/Wired-Square/WireTAP/issues", None::<&str>);
             }
             "help-wiki" => {
-                let _ = app.opener().open_url("https://github.com/Wired-Square/CANdor/wiki", None::<&str>);
+                let _ = app.opener().open_url("https://github.com/Wired-Square/WireTAP/wiki", None::<&str>);
             }
             "help-source" => {
-                let _ = app.opener().open_url("https://github.com/Wired-Square/CANdor", None::<&str>);
+                let _ = app.opener().open_url("https://github.com/Wired-Square/WireTAP", None::<&str>);
             }
             _ => {
                 // Unknown menu item - ignore
@@ -855,7 +855,7 @@ pub fn run() {
                             logging::set_log_level(&level);
                             if level != "off" {
                                 if let Ok(doc_dir) = app.path().document_dir() {
-                                    let reports_dir = doc_dir.join("CANdor").join("Reports");
+                                    let reports_dir = doc_dir.join("WireTAP").join("Reports");
                                     if let Err(e) = logging::init_file_logging(&reports_dir) {
                                         tlog!("[setup] Failed to init file logging: {}", e);
                                     }
@@ -864,6 +864,11 @@ pub fn run() {
                         }
                     }
                 }
+            }
+
+            // Migrate data directory from CANdor to WireTAP (one-time rebrand migration)
+            if let Ok(doc_dir) = app.path().document_dir() {
+                settings::migrate_data_directory(&doc_dir);
             }
 
             // Initialise the centralised store manager

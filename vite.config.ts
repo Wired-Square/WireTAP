@@ -21,7 +21,7 @@ export default defineConfig(async () => ({
       authToken: process.env.SENTRY_AUTH_TOKEN,
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
-      release: { name: `candor@${version}` },
+      release: { name: `wiretap@${version}` },
       disable: !process.env.SENTRY_AUTH_TOKEN,
     }),
   ],

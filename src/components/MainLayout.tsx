@@ -157,13 +157,13 @@ function Watermark(_props: IWatermarkPanelProps) {
       <div className="flex flex-col items-center gap-6">
         {/* Logo - twice as big */}
         <div className="w-32 h-32 rounded-3xl bg-white shadow-lg flex items-center justify-center">
-          <img src={logo} alt="CANdor" className="w-24 h-24 rounded-2xl object-cover" />
+          <img src={logo} alt="WireTAP" className="w-24 h-24 rounded-2xl object-cover" />
         </div>
 
         {/* Title with version */}
         <div className="relative flex items-baseline justify-center">
           <h1 className={`text-5xl font-semibold ${textPrimary} font-ubuntu`}>
-            CANdor
+            WireTAP
           </h1>
           {version && (
             <span className={`absolute left-full ml-3 text-sm ${textTertiary} font-ubuntu whitespace-nowrap`}>

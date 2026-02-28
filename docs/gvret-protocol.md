@@ -4,7 +4,7 @@
 
 GVRET (Generalized Electric Vehicle Reverse Engineering Tool) is a firmware for Arduino-based hardware (GEVCU, CANDue, EVTVDue, ESP32-RET, M2RET) that exposes one or more CAN buses over a USB serial or TCP connection using a compact binary protocol. SavvyCAN is the reference client.
 
-CANdor implements the binary frame streaming subset of GVRET over both USB serial (`gvret_usb`) and TCP (`gvret_tcp`).
+WireTAP implements the binary frame streaming subset of GVRET over both USB serial (`gvret_usb`) and TCP (`gvret_tcp`).
 
 ---
 
@@ -25,7 +25,7 @@ Binary mode must be activated before binary packets are accepted (see §2).
 
 Send the byte `0xE7` while the device is in its default IDLE/text state. The device switches off LAWICEL text mode and begins accepting and emitting binary packets.
 
-In practice, CANdor (and SavvyCAN) send the byte twice to ensure receipt:
+In practice, WireTAP (and SavvyCAN) send the byte twice to ensure receipt:
 
 ```
 Host → Device:  [0xE7] [0xE7]
@@ -351,11 +351,11 @@ The firmware operates a byte-level state machine. States relevant to the binary 
 
 ---
 
-## 7. CANdor Implementation
+## 7. WireTAP Implementation
 
-### 7.1 What CANdor Implements
+### 7.1 What WireTAP Implements
 
-CANdor implements the binary frame streaming subset sufficient for passive monitoring and frame transmission. The driver is in `src-tauri/src/io/gvret/`.
+WireTAP implements the binary frame streaming subset sufficient for passive monitoring and frame transmission. The driver is in `src-tauri/src/io/gvret/`.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -369,39 +369,39 @@ CANdor implements the binary frame streaming subset sufficient for passive monit
 | TCP transport | ✅ Implemented | `gvret_tcp` using Tokio |
 | Device probing — `PROTO_GET_NUMBUSES` (`0x0C`) | ✅ Implemented | Sent on connect; response determines bus count |
 | Device info probe — `PROTO_GET_DEV_INFO` (`0x07`) | ✅ Sent | Response consumed and discarded in streaming path |
-| CAN FD DLC codes (DLC 9–15) | ✅ Extended | Not in upstream protocol; CANdor extends DLC mapping using the standard FD DLC table |
+| CAN FD DLC codes (DLC 9–15) | ✅ Extended | Not in upstream protocol; WireTAP extends DLC mapping using the standard FD DLC table |
 | Keepalive response (`0x09`) | ✅ Silently consumed | Skipped in frame parser; not sent proactively |
 | Time sync response (`0x01`) | ✅ Silently consumed | Skipped in frame parser; host clock used for timestamps instead |
 | CAN params response (`0x06`) | ✅ Silently consumed | Skipped in frame parser |
-| Bus mapping | ✅ CANdor-specific | Device bus numbers remapped to output bus numbers via `BusMapping` config |
+| Bus mapping | ✅ WireTAP-specific | Device bus numbers remapped to output bus numbers via `BusMapping` config |
 
-### 7.2 What CANdor Does Not Implement
+### 7.2 What WireTAP Does Not Implement
 
 | Feature | Opcode | Reason |
 |---------|--------|--------|
 | Time sync request | `0x01` | Host clock used for all timestamps; device time discarded |
-| Digital input query | `0x02` | Hardware I/O not exposed through CANdor |
-| Analog input query | `0x03` | Hardware I/O not exposed through CANdor |
-| Set digital outputs | `0x04` | Hardware I/O not exposed through CANdor |
-| CAN bus speed/mode configuration | `0x05` | Device used in its pre-configured state; CANdor does not modify hardware settings |
+| Digital input query | `0x02` | Hardware I/O not exposed through WireTAP |
+| Analog input query | `0x03` | Hardware I/O not exposed through WireTAP |
+| Set digital outputs | `0x04` | Hardware I/O not exposed through WireTAP |
+| CAN bus speed/mode configuration | `0x05` | Device used in its pre-configured state; WireTAP does not modify hardware settings |
 | Get CAN bus params | `0x06` | Response consumed but not surfaced; bus config managed on the device directly |
-| Single-wire CAN mode | `0x08` | SWCAN not currently surfaced in CANdor |
+| Single-wire CAN mode | `0x08` | SWCAN not currently surfaced in WireTAP |
 | Set system type | `0x0A` | Not required for passive use |
 | Echo CAN frame | `0x0B` | Loopback testing not implemented |
 | Get/Set extended buses | `0x0D`, `0x0E` | SWCAN configuration not surfaced |
-| Checksums on transmit | — | CANdor omits the trailing XOR checksum byte when sending frames; in practice devices tolerate this |
+| Checksums on transmit | — | WireTAP omits the trailing XOR checksum byte when sending frames; in practice devices tolerate this |
 
 ### 7.3 Deviations from Upstream
 
-**Timestamps:** The upstream protocol delivers a device-side microsecond timestamp in every received frame (bytes 2–5). CANdor discards the device timestamp and substitutes the host wall-clock time via `now_us()`. This avoids clock drift issues when a device has not been synchronised, but means relative timing between frames is limited by host scheduling jitter rather than the hardware timer.
+**Timestamps:** The upstream protocol delivers a device-side microsecond timestamp in every received frame (bytes 2–5). WireTAP discards the device timestamp and substitutes the host wall-clock time via `now_us()`. This avoids clock drift issues when a device has not been synchronised, but means relative timing between frames is limited by host scheduling jitter rather than the hardware timer.
 
-**Checksums not sent:** CANdor does not append the XOR checksum byte when encoding transmit frames (`encode_gvret_frame`). GVRET-compatible devices have been observed to accept frames without checksum validation.
+**Checksums not sent:** WireTAP does not append the XOR checksum byte when encoding transmit frames (`encode_gvret_frame`). GVRET-compatible devices have been observed to accept frames without checksum validation.
 
-**CAN FD payload lengths:** The upstream GVRET protocol only defines DLC 0–8 for classic CAN. CANdor maps DLC nibble values 9–15 to the standard CAN FD payload sizes (12, 16, 20, 24, 32, 48, 64 bytes) using the `DLC_LEN` table, enabling CAN FD frame capture from devices that support it.
+**CAN FD payload lengths:** The upstream GVRET protocol only defines DLC 0–8 for classic CAN. WireTAP maps DLC nibble values 9–15 to the standard CAN FD payload sizes (12, 16, 20, 24, 32, 48, 64 bytes) using the `DLC_LEN` table, enabling CAN FD frame capture from devices that support it.
 
-**TCP transport:** The original GVRET protocol runs over USB CDC serial. CANdor also supports it over TCP (as does SavvyCAN). The binary protocol is identical; the transport is simply a TCP stream.
+**TCP transport:** The original GVRET protocol runs over USB CDC serial. WireTAP also supports it over TCP (as does SavvyCAN). The binary protocol is identical; the transport is simply a TCP stream.
 
-**Bus count default:** If a device does not respond to `PROTO_GET_NUMBUSES` within the probe timeout, CANdor defaults to 1 bus (USB) or 1 bus (TCP). The upstream firmware always returns 3 (CAN0, CAN1, SWCAN).
+**Bus count default:** If a device does not respond to `PROTO_GET_NUMBUSES` within the probe timeout, WireTAP defaults to 1 bus (USB) or 1 bus (TCP). The upstream firmware always returns 3 (CAN0, CAN1, SWCAN).
 
 ### 7.4 Relevant Source Files
 

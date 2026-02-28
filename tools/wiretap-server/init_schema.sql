@@ -1,4 +1,4 @@
--- candor-schema-postgres.sql
+-- wiretap-schema-postgres.sql
 -- Version: 20260113
 -- Schema for raw CAN frames + decoded signals
 

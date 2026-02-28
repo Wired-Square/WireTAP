@@ -36,7 +36,7 @@ interface FormatInfo {
 const FORMAT_INFO: Record<CatalogExportFormat, FormatInfo> = {
   toml: {
     name: "TOML Catalog",
-    description: "Native CANdor format. Preserves all features including nested multiplexing, confidence levels, and decode sets.",
+    description: "Native WireTAP format. Preserves all features including nested multiplexing, confidence levels, and decode sets.",
     icon: FileText,
     extension: ".toml",
     filters: CATALOG_FILTERS,

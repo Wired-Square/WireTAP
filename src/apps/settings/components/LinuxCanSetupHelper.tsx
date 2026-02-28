@@ -84,7 +84,7 @@ export default function LinuxCanSetupHelper({ interfaceName, bitrate }: Props) {
             </button>
           </div>
           <p className={`${helpText} mt-2 text-xs`}>
-            Note: You may need to adjust udev rules for non-root access, or run CANdor with elevated privileges.
+            Note: You may need to adjust udev rules for non-root access, or run WireTAP with elevated privileges.
           </p>
         </div>
       </div>

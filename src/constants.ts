@@ -1,5 +1,5 @@
 // ui/src/constants.ts
-// Global constants for the CANdor application
+// Global constants for the WireTAP application
 // Add new constants here for maintainability and single source of truth
 
 // =============================================================================

@@ -27,13 +27,13 @@ pub(crate) fn get_log_level() -> u8 {
 }
 
 /// Initialise file logging to the given reports directory.
-/// Creates a timestamped log file and a `CANdor.log` symlink (Unix only).
+/// Creates a timestamped log file and a `WireTAP.log` symlink (Unix only).
 pub(crate) fn init_file_logging(reports_dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(reports_dir)
         .map_err(|e| format!("Failed to create reports dir: {}", e))?;
 
     let filename = chrono::Local::now()
-        .format("%Y%m%d-%H%M%S-CANdor.log")
+        .format("%Y%m%d-%H%M%S-WireTAP.log")
         .to_string();
     let log_path = reports_dir.join(&filename);
 
@@ -43,15 +43,15 @@ pub(crate) fn init_file_logging(reports_dir: &Path) -> Result<(), String> {
         .open(&log_path)
         .map_err(|e| format!("Failed to create log file: {}", e))?;
 
-    // Update CANdor.log symlink (Unix only — Windows symlinks require elevated privileges)
+    // Update WireTAP.log symlink (Unix only — Windows symlinks require elevated privileges)
     #[cfg(unix)]
     {
-        let symlink_path = reports_dir.join("CANdor.log");
+        let symlink_path = reports_dir.join("WireTAP.log");
         // Remove existing symlink/file if present
         let _ = std::fs::remove_file(&symlink_path);
         if let Err(e) = std::os::unix::fs::symlink(&filename, &symlink_path) {
             eprintln!(
-                "{} [logging] Failed to create CANdor.log symlink: {}",
+                "{} [logging] Failed to create WireTAP.log symlink: {}",
                 chrono::Local::now().format("%H:%M:%S%.3f"),
                 e
             );

@@ -4,7 +4,7 @@
 import { documentDir, join } from '@tauri-apps/api/path';
 import { createDirectory } from '../api/settings';
 
-const CANDOR_DIR = 'CANdor';
+const WIRETAP_DIR = 'WireTAP';
 
 export type DefaultDirType = 'decoders' | 'dumps' | 'reports';
 
@@ -16,24 +16,24 @@ const DIR_NAMES: Record<DefaultDirType, string> = {
 
 /**
  * Get the default directory path for a given type.
- * Returns: ~/Documents/CANdor/{Decoders|Dumps|Reports}
+ * Returns: ~/Documents/WireTAP/{Decoders|Dumps|Reports}
  *
  * Cross-platform:
- * - macOS: /Users/<user>/Documents/CANdor/...
- * - Windows: C:\Users\<user>\Documents\CANdor\...
- * - Linux: /home/<user>/Documents/CANdor/...
+ * - macOS: /Users/<user>/Documents/WireTAP/...
+ * - Windows: C:\Users\<user>\Documents\WireTAP\...
+ * - Linux: /home/<user>/Documents/WireTAP/...
  */
 export async function getDefaultDir(type: DefaultDirType): Promise<string> {
   const docDir = await documentDir();
-  return join(docDir, CANDOR_DIR, DIR_NAMES[type]);
+  return join(docDir, WIRETAP_DIR, DIR_NAMES[type]);
 }
 
 /**
- * Get the CANdor base directory in Documents
+ * Get the WireTAP base directory in Documents
  */
-export async function getCandorBaseDir(): Promise<string> {
+export async function getWiretapBaseDir(): Promise<string> {
   const docDir = await documentDir();
-  return join(docDir, CANDOR_DIR);
+  return join(docDir, WIRETAP_DIR);
 }
 
 /**
@@ -41,7 +41,7 @@ export async function getCandorBaseDir(): Promise<string> {
  */
 export async function getAllDefaultDirs(): Promise<Record<DefaultDirType, string>> {
   const docDir = await documentDir();
-  const baseDir = await join(docDir, CANDOR_DIR);
+  const baseDir = await join(docDir, WIRETAP_DIR);
 
   return {
     decoders: await join(baseDir, DIR_NAMES.decoders),

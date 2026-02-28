@@ -1,4 +1,4 @@
-// DBC import module - converts DBC format to CANdor TOML catalog format
+// DBC import module - converts DBC format to WireTAP TOML catalog format
 
 use can_dbc::{ByteOrder, Comment, MultiplexIndicator, ValueDescription, ValueType};
 use std::collections::HashMap;
@@ -131,7 +131,7 @@ struct MuxCaseTree {
 // Main conversion function
 // ============================================================================
 
-/// Convert DBC file content to CANdor TOML catalog content.
+/// Convert DBC file content to WireTAP TOML catalog content.
 pub fn convert_dbc_to_toml(dbc_content: &str) -> Result<String, String> {
     let dbc = can_dbc::Dbc::try_from(dbc_content)
         .map_err(|e| format!("Failed to parse DBC file: {:?}", e))?;

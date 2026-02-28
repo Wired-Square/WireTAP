@@ -744,7 +744,7 @@ async fn run_modbus_poll_task(
 // ============================================================================
 
 /// Modbus TCP server source: listens for incoming Modbus TCP connections and logs requests.
-/// This enables MITM scenarios where CANdor sits between a Modbus master and slave.
+/// This enables MITM scenarios where WireTAP sits between a Modbus master and slave.
 async fn run_modbus_tcp_server(
     source_idx: usize,
     profile: &IOProfile,

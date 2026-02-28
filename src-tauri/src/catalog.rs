@@ -507,7 +507,7 @@ pub async fn test_decode_frame(
     std::fs::write(&temp_file, frame_line)
         .map_err(|e| format!("Failed to write temp frame file: {}", e))?;
 
-    let output = Command::new("candor")
+    let output = Command::new("wiretap")
         .args(&[
             "decode",
             "--catalog", &catalog_path,
@@ -516,7 +516,7 @@ pub async fn test_decode_frame(
             "--count", "1"
         ])
         .output()
-        .map_err(|e| format!("Failed to run candor CLI: {}", e))?;
+        .map_err(|e| format!("Failed to run wiretap CLI: {}", e))?;
 
     // Clean up temp file
     let _ = std::fs::remove_file(&temp_file);
@@ -738,7 +738,7 @@ pub async fn export_catalog(
                 Some("flattened") => crate::dbc_export::MuxExportMode::Flattened,
                 _ => crate::dbc_export::MuxExportMode::Extended,
             };
-            crate::dbc_export::render_catalog_as_dbc_with_mode(&content, "CANdor", mode)?
+            crate::dbc_export::render_catalog_as_dbc_with_mode(&content, "WireTAP", mode)?
         }
         _ => return Err(format!("Unknown export format: {}", format)),
     };

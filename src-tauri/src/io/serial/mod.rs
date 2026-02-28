@@ -1,7 +1,7 @@
 // ui/src-tauri/src/io/serial/mod.rs
 //
 // Serial port driver with optional framing support.
-// Provides cross-platform serial communication for CANdor.
+// Provides cross-platform serial communication for WireTAP.
 //
 // Features:
 // - Raw byte streaming (serial-raw-bytes events)

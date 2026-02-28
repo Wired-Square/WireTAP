@@ -1,10 +1,10 @@
-# CANdor Server
+# WireTAP Server
 
-A GVRET-compatible TCP server that bridges Linux SocketCAN interfaces to TCP clients (like the CANdor desktop app) and optionally ingests frames to PostgreSQL for historical analysis.
+A GVRET-compatible TCP server that bridges Linux SocketCAN interfaces to TCP clients (like the WireTAP desktop app) and optionally ingests frames to PostgreSQL for historical analysis.
 
 ## Features
 
-- **GVRET Protocol**: Compatible with SavvyCAN and CANdor desktop applications
+- **GVRET Protocol**: Compatible with SavvyCAN and WireTAP desktop applications
 - **Multi-bus Support**: Bridge multiple CAN interfaces simultaneously
 - **PostgreSQL Ingest**: Batch-insert frames for historical analysis
 - **CAN FD Support**: Handle payloads up to 64 bytes
@@ -84,12 +84,12 @@ can0  7DF   [8]  02 01 00 00 00 00 00 00
 can0  7E8   [8]  06 41 00 BE 3F A8 13 00
 ```
 
-### 3. Configure candor-server
+### 3. Configure wiretap-server
 
 Copy the example config and edit as needed:
 
 ```bash
-cp candor-server.toml my-config.toml
+cp wiretap-server.toml my-config.toml
 nano my-config.toml
 ```
 
@@ -113,17 +113,17 @@ dsn = "postgresql://candor:password@localhost:5432/candor"
 
 ```bash
 # Basic usage
-./candor-server.py -C my-config.toml
+./wiretap-server.py -C my-config.toml
 
 # With console echo for debugging
-./candor-server.py -C my-config.toml --echo
+./wiretap-server.py -C my-config.toml --echo
 
 # Override interface from command line
-./candor-server.py -C my-config.toml --iface can0,can1
+./wiretap-server.py -C my-config.toml --iface can0,can1
 
 # Use environment variable for PostgreSQL DSN (avoids storing password in config)
 export PG_DSN="postgresql://candor:secret@dbhost:5432/candor"
-./candor-server.py -C my-config.toml
+./wiretap-server.py -C my-config.toml
 ```
 
 Press `Ctrl+C` to stop the server gracefully.
@@ -134,25 +134,25 @@ Press `Ctrl+C` to stop the server gracefully.
 
 ```bash
 # Copy service file to systemd directory
-sudo cp candor-server.service /etc/systemd/system/
+sudo cp wiretap-server.service /etc/systemd/system/
 
 # Edit the service file to match your setup
-sudo nano /etc/systemd/system/candor-server.service
+sudo nano /etc/systemd/system/wiretap-server.service
 ```
 
 Update the paths and user in the service file:
 
 ```ini
 [Unit]
-Description=CANdor GVRET Server
+Description=WireTAP GVRET Server
 After=network.target
 
 [Service]
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/candor-server
-ExecStart=/usr/bin/python3 /home/pi/candor-server/candor-server.py -C /home/pi/candor-server/candor-server.toml
+WorkingDirectory=/home/pi/wiretap-server
+ExecStart=/usr/bin/python3 /home/pi/wiretap-server/wiretap-server.py -C /home/pi/wiretap-server/wiretap-server.toml
 Restart=on-failure
 RestartSec=5
 
@@ -247,37 +247,37 @@ sudo systemctl daemon-reload
 sudo systemctl enable can-interface.service
 sudo systemctl start can-interface.service
 
-# Enable and start candor-server
-sudo systemctl enable candor-server.service
-sudo systemctl start candor-server.service
+# Enable and start wiretap-server
+sudo systemctl enable wiretap-server.service
+sudo systemctl start wiretap-server.service
 
 # Check status
-sudo systemctl status candor-server.service
+sudo systemctl status wiretap-server.service
 ```
 
-After a reboot, both services will start automatically and candor-server will be ready to accept connections.
+After a reboot, both services will start automatically and wiretap-server will be ready to accept connections.
 
 ### 4. View Logs
 
 ```bash
 # Live logs
-sudo journalctl -u candor-server.service -f
+sudo journalctl -u wiretap-server.service -f
 
 # Recent logs
-sudo journalctl -u candor-server.service -n 100
+sudo journalctl -u wiretap-server.service -n 100
 ```
 
 ### 5. Manage the Service
 
 ```bash
 # Stop the server
-sudo systemctl stop candor-server.service
+sudo systemctl stop wiretap-server.service
 
 # Restart the server
-sudo systemctl restart candor-server.service
+sudo systemctl restart wiretap-server.service
 
 # Disable auto-start on boot
-sudo systemctl disable candor-server.service
+sudo systemctl disable wiretap-server.service
 ```
 
 ## PostgreSQL Setup (Optional)
@@ -329,9 +329,9 @@ Or use an environment variable:
 export PG_DSN="postgresql://candor:your-secure-password@localhost:5432/candor"
 ```
 
-## Connecting from CANdor Desktop
+## Connecting from WireTAP Desktop
 
-1. Open CANdor desktop application
+1. Open WireTAP desktop application
 2. Go to **Settings** → **Data I/O**
 3. Create a new IO Profile:
    - **Type**: GVRET TCP
@@ -361,14 +361,14 @@ sudo modprobe gs_usb  # For USB adapters
 
 Port 23 requires root privileges. Either:
 - Use a high port (e.g., `2323`) in your config
-- Run as root: `sudo ./candor-server.py -C config.toml`
+- Run as root: `sudo ./wiretap-server.py -C config.toml`
 - Grant capability: `sudo setcap cap_net_bind_service=+ep /usr/bin/python3`
 
-### "Connection refused" from CANdor
+### "Connection refused" from WireTAP
 
 ```bash
 # Check if server is running
-sudo systemctl status candor-server.service
+sudo systemctl status wiretap-server.service
 
 # Check if port is listening
 sudo ss -tlnp | grep 2323
@@ -398,13 +398,13 @@ flush_interval = 0.5
 psql -h localhost -U candor -d candor -c "SELECT COUNT(*) FROM can_frame;"
 
 # Check server logs for errors
-sudo journalctl -u candor-server.service -n 50
+sudo journalctl -u wiretap-server.service -n 50
 ```
 
 ## Command Line Reference
 
 ```
-usage: candor-server.py [-h] [-C CONFIG] [--iface IFACE] [--bus-offset N]
+usage: wiretap-server.py [-h] [-C CONFIG] [--iface IFACE] [--bus-offset N]
                         [--host HOST] [--port PORT] [--echo] [--colour]
                         [--default-dir DIR] [--can-fd] [--pg-enable]
                         [--pg-dsn DSN] [--pg-func FUNC] [--pg-batch-size N]
@@ -428,4 +428,4 @@ Options:
 
 ## License
 
-See the main CANdor repository for license information.
+See the main WireTAP repository for license information.

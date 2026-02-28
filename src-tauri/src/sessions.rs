@@ -646,7 +646,7 @@ pub async fn create_reader_session(
                 .and_then(|f| f.get("savvycan"))
                 .and_then(|s| s.get("topic"))
                 .and_then(|v| v.as_str())
-                .unwrap_or("candor/#")
+                .unwrap_or("wiretap/#")
                 .to_string();
 
             let config = MqttConfig {

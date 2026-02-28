@@ -54,7 +54,7 @@ impl Default for MqttConfig {
             port: 1883,
             username: None,
             password: None,
-            topic: "candor/#".to_string(),
+            topic: "wiretap/#".to_string(),
             client_id: None,
         }
     }
@@ -240,7 +240,7 @@ fn spawn_mqtt_stream(
 
         // Generate client ID if not provided
         let client_id = config.client_id.clone().unwrap_or_else(|| {
-            format!("candor-{}", uuid_simple())
+            format!("wiretap-{}", uuid_simple())
         });
 
         // Configure MQTT options

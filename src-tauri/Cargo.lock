@@ -516,40 +516,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "candor"
-version = "0.4.6"
-dependencies = [
- "async-trait",
- "can-dbc",
- "chrono",
- "dirs 5.0.1",
- "hex",
- "keepawake",
- "keyring",
- "nusb",
- "once_cell",
- "reqwest 0.12.28",
- "rumqttc",
- "rusqlite",
- "serde",
- "serde_json",
- "serialport",
- "socketcan",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-keep-screen-on",
- "tauri-plugin-opener",
- "tauri-plugin-os",
- "tauri-plugin-store",
- "tokio",
- "tokio-modbus",
- "tokio-postgres",
- "toml 0.8.2",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "cargo-platform"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6921,6 +6887,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb5a765337c50e9ec252c2069be9bf91c7df47afb103b642ba3a53bf8101be97"
 dependencies = [
  "cfg-if",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "wiretap"
+version = "0.4.6"
+dependencies = [
+ "async-trait",
+ "can-dbc",
+ "chrono",
+ "dirs 5.0.1",
+ "hex",
+ "keepawake",
+ "keyring",
+ "nusb",
+ "once_cell",
+ "reqwest 0.12.28",
+ "rumqttc",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serialport",
+ "socketcan",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-keep-screen-on",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-store",
+ "tokio",
+ "tokio-modbus",
+ "tokio-postgres",
+ "toml 0.8.2",
  "windows-sys 0.59.0",
 ]
 

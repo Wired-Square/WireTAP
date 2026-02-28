@@ -101,8 +101,8 @@ function extractThemeColours(settings: Record<string, unknown>): ThemeColours {
  *
  * @example
  * ```tsx
- * // In your root component (Candor.tsx)
- * export default function Candor() {
+ * // In your root component (WireTAP.tsx)
+ * export default function WireTAP() {
  *   useTheme(); // Apply global theme
  *   return <MainLayout />;
  * }

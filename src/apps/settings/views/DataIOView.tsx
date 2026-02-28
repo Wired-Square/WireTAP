@@ -126,7 +126,7 @@ const renderConnectionSummary = (profile: IOProfile) => {
   if (profile.kind === "postgres") {
     const host = c.host || "localhost";
     const port = c.port || "5432";
-    const db = c.database || "candor";
+    const db = c.database || "wiretap";
     const sourceType = (c.source_type || "can_frame") as string;
 
     // Friendly labels for source types

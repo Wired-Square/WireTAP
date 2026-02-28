@@ -2,7 +2,7 @@
 //
 // Serial port reader for multi-source sessions.
 // Can emit raw bytes and/or framed messages (SLIP, Modbus RTU, delimiter-based).
-// Provides cross-platform serial communication for CANdor.
+// Provides cross-platform serial communication for WireTAP.
 
 use serde::Serialize;
 use std::io::{Read, Write};

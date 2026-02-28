@@ -1,13 +1,13 @@
 # Uncomment the next line to define a global platform for your project
 
-target 'candor_iOS' do
+target 'wiretap_iOS' do
 platform :ios, '14.0'
-  # Pods for candor_iOS
+  # Pods for wiretap_iOS
 end
 
-target 'candor_macOS' do
+target 'wiretap_macOS' do
 platform :osx, '11.0'
-  # Pods for candor_macOS
+  # Pods for wiretap_macOS
 end
 
 # Delete the deployment target for iOS and macOS, causing it to be inherited from the Podfile

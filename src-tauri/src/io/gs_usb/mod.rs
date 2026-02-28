@@ -1,6 +1,6 @@
 // src-tauri/src/io/gs_usb/mod.rs
 //
-// gs_usb (candleLight firmware) support for CANdor.
+// gs_usb (candleLight firmware) support for WireTAP.
 //
 // This module provides support for CAN adapters running candleLight firmware,
 // which implements the gs_usb protocol. This is the same protocol used by the

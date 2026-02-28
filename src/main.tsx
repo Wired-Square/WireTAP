@@ -1,17 +1,17 @@
 import * as Sentry from "@sentry/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import Candor from "./Candor";
+import WireTAP from "./WireTAP";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
-  release: `candor@${__APP_VERSION__}`,
+  release: `wiretap@${__APP_VERSION__}`,
   environment: import.meta.env.MODE,
   enabled: false,
 });
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <Candor />
+    <WireTAP />
   </React.StrictMode>,
 );

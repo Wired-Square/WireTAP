@@ -433,7 +433,7 @@ pub struct DatabaseActivity {
     pub database: Option<String>,
     /// Username
     pub username: Option<String>,
-    /// Application name (e.g., "CANdor Query")
+    /// Application name (e.g., "WireTAP Query")
     pub application_name: Option<String>,
     /// Client address
     pub client_addr: Option<String>,
@@ -473,7 +473,7 @@ fn build_connection_string(profile: &IOProfile, password: Option<String>) -> Str
     let database = conn
         .get("database")
         .and_then(|v| v.as_str())
-        .unwrap_or("candor");
+        .unwrap_or("wiretap");
     let username = conn
         .get("username")
         .and_then(|v| v.as_str())
@@ -1152,7 +1152,7 @@ pub async fn db_query_activity(
     // Get the database name from the profile for filtering
     let database_name = profile.connection.get("database")
         .and_then(|v| v.as_str())
-        .unwrap_or("candor");
+        .unwrap_or("wiretap");
 
     // Query pg_stat_activity for this database
     // We filter to the specific database and show both active queries and idle sessions
@@ -1500,7 +1500,7 @@ pub async fn db_query_first_last(
 
     // Set application name
     client
-        .execute("SET application_name = 'CANdor Query'", &[])
+        .execute("SET application_name = 'WireTAP Query'", &[])
         .await
         .ok();
 
@@ -1653,7 +1653,7 @@ pub async fn db_query_frequency(
 
     // Set application name
     client
-        .execute("SET application_name = 'CANdor Query'", &[])
+        .execute("SET application_name = 'WireTAP Query'", &[])
         .await
         .ok();
 
@@ -1805,7 +1805,7 @@ pub async fn db_query_distribution(
 
     // Set application name
     client
-        .execute("SET application_name = 'CANdor Query'", &[])
+        .execute("SET application_name = 'WireTAP Query'", &[])
         .await
         .ok();
 
@@ -1948,7 +1948,7 @@ pub async fn db_query_gap_analysis(
 
     // Set application name
     client
-        .execute("SET application_name = 'CANdor Query'", &[])
+        .execute("SET application_name = 'WireTAP Query'", &[])
         .await
         .ok();
 
@@ -2100,7 +2100,7 @@ pub async fn db_query_pattern_search(
 
     // Set application name
     client
-        .execute("SET application_name = 'CANdor Query'", &[])
+        .execute("SET application_name = 'WireTAP Query'", &[])
         .await
         .ok();
 

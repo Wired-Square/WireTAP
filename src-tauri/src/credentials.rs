@@ -7,6 +7,7 @@
 
 use keyring::Entry;
 
+// Legacy name retained to preserve existing keyring entries
 const SERVICE_NAME: &str = "com.candor.io-profiles";
 
 /// Builds a unique account name for an IO profile credential.
