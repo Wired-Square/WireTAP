@@ -1,10 +1,14 @@
 # Sungrow SHx Hybrid Inverter — Modbus TCP Decoder Catalog
 #
-# Covers SH5K, SH6K, SH8K, SH10RT and similar SH-series hybrid inverters.
+# Covers SH5K, SH6K, SH8K, SH10RT, SH15T, SH20T, SH25T and similar
+# SH-series hybrid inverters.
+#
 # Register map based on community documentation:
 # https://github.com/mkaiser/Sungrow-SHx-Inverter-Modbus-Home-Assistant
+# https://github.com/theunknown86/unknown_sungrow
 #
-# Connection: Modbus TCP via WiNet-S dongle, default port 502, unit ID 1.
+# Connection: Modbus TCP via WiNet-S dongle or RS485-to-Ethernet adapter,
+# default port 502, unit ID 1.
 # All data registers are input registers (read-only, function code 04).
 # Holding registers (function code 03) included for configuration readback.
 # Addresses are 0-based protocol addresses (IEC).
@@ -20,6 +24,75 @@ register_base = 0
 default_interval = 5000
 default_byte_order = "big"
 default_word_order = "little"
+
+# ============================================================================
+# Version Strings (slow poll — 600s)
+# Registers 2581, 2596, 2612, 2628 — hardware/firmware version identifiers
+# ============================================================================
+
+[frame.modbus.version_1]
+register_number = 2581
+register_type = "input"
+length = 11
+tx.interval_ms = 600000
+
+[[frame.modbus.version_1.signals]]
+name = "Sungrow_Version_1"
+start_bit = 0
+bit_length = 176
+format = "ascii"
+
+[frame.modbus.version_2]
+register_number = 2596
+register_type = "input"
+length = 11
+tx.interval_ms = 600000
+
+[[frame.modbus.version_2.signals]]
+name = "Sungrow_Version_2"
+start_bit = 0
+bit_length = 176
+format = "ascii"
+
+[frame.modbus.version_3]
+register_number = 2612
+register_type = "input"
+length = 11
+tx.interval_ms = 600000
+
+[[frame.modbus.version_3.signals]]
+name = "Sungrow_Version_3"
+start_bit = 0
+bit_length = 176
+format = "ascii"
+
+[frame.modbus.version_4_battery]
+register_number = 2628
+register_type = "input"
+length = 11
+tx.interval_ms = 600000
+
+[[frame.modbus.version_4_battery.signals]]
+name = "Sungrow_Version_4_Battery"
+start_bit = 0
+bit_length = 176
+format = "ascii"
+
+# ============================================================================
+# Protocol Version (slow poll — 600s)
+# Register 4951 — U32
+# ============================================================================
+
+[frame.modbus.protocol_version]
+register_number = 4951
+register_type = "input"
+length = 2
+tx.interval_ms = 600000
+
+[[frame.modbus.protocol_version.signals]]
+name = "Protocol_Version"
+start_bit = 0
+bit_length = 32
 
 # ============================================================================
 # Firmware & Version Info (slow poll — 600s)
@@ -295,6 +368,103 @@ factor = 0.01
 unit = "Hz"
 
 # ============================================================================
+# Insulation Resistance
+# Register 5245
+# ============================================================================
+
+[frame.modbus.insulation_resistance]
+register_number = 5245
+register_type = "input"
+length = 1
+tx.interval_ms = 60000
+
+[[frame.modbus.insulation_resistance.signals]]
+name = "Insulation_Resistance"
+start_bit = 0
+bit_length = 16
+unit = "kΩ"
+
+# ============================================================================
+# PV String Data
+# Registers 5252–5261 — per-string voltage and current (up to 5 strings)
+# ============================================================================
+
+[frame.modbus.pv_strings]
+register_number = 5252
+register_type = "input"
+length = 10
+
+[[frame.modbus.pv_strings.signals]]
+name = "String1_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String1_Current"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "A"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String2_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String2_Current"
+start_bit = 48
+bit_length = 16
+factor = 0.1
+unit = "A"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String3_Voltage"
+start_bit = 64
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String3_Current"
+start_bit = 80
+bit_length = 16
+factor = 0.1
+unit = "A"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String4_Voltage"
+start_bit = 96
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String4_Current"
+start_bit = 112
+bit_length = 16
+factor = 0.1
+unit = "A"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String5_Voltage"
+start_bit = 128
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.pv_strings.signals]]
+name = "String5_Current"
+start_bit = 144
+bit_length = 16
+factor = 0.1
+unit = "A"
+
+# ============================================================================
 # Meter / Grid Power
 # Registers 5600–5607 — total + per-phase active power
 # ============================================================================
@@ -384,6 +554,40 @@ factor = 0.01
 unit = "kWh"
 
 # ============================================================================
+# Backup Phase Currents
+# Registers 5719–5721
+# ============================================================================
+
+[frame.modbus.backup_current]
+register_number = 5719
+register_type = "input"
+length = 3
+
+[[frame.modbus.backup_current.signals]]
+name = "Backup_Phase_A_Current"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = true
+
+[[frame.modbus.backup_current.signals]]
+name = "Backup_Phase_B_Current"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = true
+
+[[frame.modbus.backup_current.signals]]
+name = "Backup_Phase_C_Current"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = true
+
+# ============================================================================
 # Backup Power
 # Registers 5722–5727
 # ============================================================================
@@ -420,6 +624,116 @@ start_bit = 48
 bit_length = 32
 unit = "W"
 signed = true
+
+# ============================================================================
+# Backup Phase Voltages & Frequency
+# Registers 5730–5733
+# ============================================================================
+
+[frame.modbus.backup_voltage_freq]
+register_number = 5730
+register_type = "input"
+length = 4
+
+[[frame.modbus.backup_voltage_freq.signals]]
+name = "Backup_Phase_A_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.backup_voltage_freq.signals]]
+name = "Backup_Phase_B_Voltage"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.backup_voltage_freq.signals]]
+name = "Backup_Phase_C_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.backup_voltage_freq.signals]]
+name = "Backup_Frequency"
+start_bit = 48
+bit_length = 16
+factor = 0.01
+unit = "Hz"
+
+# ============================================================================
+# Meter Frequency
+# Register 5736
+# ============================================================================
+
+[frame.modbus.meter_frequency]
+register_number = 5736
+register_type = "input"
+length = 1
+
+[[frame.modbus.meter_frequency.signals]]
+name = "Meter_Frequency"
+start_bit = 0
+bit_length = 16
+factor = 0.01
+unit = "Hz"
+
+# ============================================================================
+# Meter Phase Voltages & Currents
+# Registers 5740–5745
+# ============================================================================
+
+[frame.modbus.meter_voltage_current]
+register_number = 5740
+register_type = "input"
+length = 6
+
+[[frame.modbus.meter_voltage_current.signals]]
+name = "Meter_Phase_A_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+signed = true
+
+[[frame.modbus.meter_voltage_current.signals]]
+name = "Meter_Phase_B_Voltage"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "V"
+signed = true
+
+[[frame.modbus.meter_voltage_current.signals]]
+name = "Meter_Phase_C_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "V"
+signed = true
+
+[[frame.modbus.meter_voltage_current.signals]]
+name = "Meter_Phase_A_Current"
+start_bit = 48
+bit_length = 16
+factor = 0.01
+unit = "A"
+
+[[frame.modbus.meter_voltage_current.signals]]
+name = "Meter_Phase_B_Current"
+start_bit = 64
+bit_length = 16
+factor = 0.01
+unit = "A"
+
+[[frame.modbus.meter_voltage_current.signals]]
+name = "Meter_Phase_C_Current"
+start_bit = 80
+bit_length = 16
+factor = 0.01
+unit = "A"
 
 # ============================================================================
 # Running State & Power Flow
@@ -711,6 +1025,104 @@ factor = 0.1
 unit = "kWh"
 
 # ============================================================================
+# Firmware Versions (slow poll — 600s)
+# Registers 13249, 13264, 13279 — inverter, comms module, battery firmware
+# ============================================================================
+
+[frame.modbus.inverter_firmware]
+register_number = 13249
+register_type = "input"
+length = 15
+tx.interval_ms = 600000
+
+[[frame.modbus.inverter_firmware.signals]]
+name = "Inverter_Firmware_Version"
+start_bit = 0
+bit_length = 240
+format = "ascii"
+
+[frame.modbus.comms_firmware]
+register_number = 13264
+register_type = "input"
+length = 15
+tx.interval_ms = 600000
+
+[[frame.modbus.comms_firmware.signals]]
+name = "Comms_Module_Firmware"
+start_bit = 0
+bit_length = 240
+format = "ascii"
+
+[frame.modbus.battery_firmware]
+register_number = 13279
+register_type = "input"
+length = 15
+tx.interval_ms = 600000
+
+[[frame.modbus.battery_firmware.signals]]
+name = "Battery_Firmware_Version"
+start_bit = 0
+bit_length = 240
+format = "ascii"
+
+# ============================================================================
+# Holding Registers — Load Adjustment Mode (readback, 30s)
+# ============================================================================
+
+[frame.modbus.load_adjustment_mode]
+register_number = 13001
+register_type = "holding"
+length = 1
+tx.interval_ms = 30000
+
+[[frame.modbus.load_adjustment_mode.signals]]
+name = "Load_Adjustment_Mode"
+start_bit = 0
+bit_length = 16
+
+# ============================================================================
+# Holding Registers — Load Adjustment Enable (readback, 30s)
+# ============================================================================
+
+[frame.modbus.load_adjustment_enable]
+register_number = 13010
+register_type = "holding"
+length = 1
+tx.interval_ms = 30000
+
+[[frame.modbus.load_adjustment_enable.signals]]
+name = "Load_Adjustment_Enable"
+start_bit = 0
+bit_length = 16
+
+# ============================================================================
+# Holding Registers — EMS Mode & Forced Charge/Discharge (readback, 30s)
+# Registers 13049–13051
+# ============================================================================
+
+[frame.modbus.ems_control]
+register_number = 13049
+register_type = "holding"
+length = 3
+tx.interval_ms = 30000
+
+[[frame.modbus.ems_control.signals]]
+name = "EMS_Mode"
+start_bit = 0
+bit_length = 16
+
+[[frame.modbus.ems_control.signals]]
+name = "Forced_Charge_Discharge_Cmd"
+start_bit = 16
+bit_length = 16
+
+[[frame.modbus.ems_control.signals]]
+name = "Forced_Charge_Discharge_Power"
+start_bit = 32
+bit_length = 16
+unit = "W"
+
+# ============================================================================
 # Holding Registers — Battery SoC Limits (readback, 10s)
 # ============================================================================
 
@@ -754,6 +1166,109 @@ unit = "W"
 name = "Backup_Mode"
 start_bit = 16
 bit_length = 16
+
+# ============================================================================
+# Holding Registers — Export Power Limit Mode & Active Power Limitation
+# Registers 13086–13089
+# ============================================================================
+
+[frame.modbus.power_limitation]
+register_number = 13086
+register_type = "holding"
+length = 4
+tx.interval_ms = 30000
+
+[[frame.modbus.power_limitation.signals]]
+name = "Export_Power_Limit_Mode"
+start_bit = 0
+bit_length = 16
+
+# 13087 gap
+
+[[frame.modbus.power_limitation.signals]]
+name = "Active_Power_Limitation"
+start_bit = 32
+bit_length = 16
+
+[[frame.modbus.power_limitation.signals]]
+name = "Active_Power_Limitation_Ratio"
+start_bit = 48
+bit_length = 16
+factor = 0.1
+unit = "%"
+
+# ============================================================================
+# Holding Registers — Power Gradients (readback, 30s)
+# Registers 31200–31201
+# ============================================================================
+
+[frame.modbus.power_gradients]
+register_number = 31200
+register_type = "holding"
+length = 2
+tx.interval_ms = 30000
+
+[[frame.modbus.power_gradients.signals]]
+name = "Power_Decline_Gradient"
+start_bit = 0
+bit_length = 16
+unit = "%"
+
+[[frame.modbus.power_gradients.signals]]
+name = "Power_Rising_Gradient"
+start_bit = 16
+bit_length = 16
+unit = "%"
+
+# ============================================================================
+# Holding Registers — APL Shutdown at Zero (readback, 30s)
+# Register 31212
+# ============================================================================
+
+[frame.modbus.apl_shutdown]
+register_number = 31212
+register_type = "holding"
+length = 1
+tx.interval_ms = 30000
+
+[[frame.modbus.apl_shutdown.signals]]
+name = "APL_Shutdown_At_Zero"
+start_bit = 0
+bit_length = 16
+
+# ============================================================================
+# Holding Registers — Export Power Limit Per Phase Mode (readback, 30s)
+# Register 31225
+# ============================================================================
+
+[frame.modbus.export_limit_per_phase]
+register_number = 31225
+register_type = "holding"
+length = 1
+tx.interval_ms = 30000
+
+[[frame.modbus.export_limit_per_phase.signals]]
+name = "Export_Power_Limit_Per_Phase_Mode"
+start_bit = 0
+bit_length = 16
+
+# ============================================================================
+# Holding Registers — Site Import Power Limit (readback, 30s)
+# Register 32997
+# ============================================================================
+
+[frame.modbus.site_import_limit]
+register_number = 32997
+register_type = "holding"
+length = 1
+tx.interval_ms = 30000
+
+[[frame.modbus.site_import_limit.signals]]
+name = "Site_Import_Power_Limit"
+start_bit = 0
+bit_length = 16
+factor = 0.01
+unit = "kW"
 
 # ============================================================================
 # Holding Registers — Battery Power Thresholds (slow poll — 600s)
