@@ -6892,7 +6892,7 @@ dependencies = [
 
 [[package]]
 name = "wiretap"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "async-trait",
  "can-dbc",
