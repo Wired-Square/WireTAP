@@ -352,16 +352,6 @@ export default function IOProfileDialog({
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Profile Name */}
-          <FormField label="Profile Name" required variant="default">
-            <Input
-              variant="default"
-              value={profileForm.name}
-              onChange={(e) => onUpdateProfileField("name", e.target.value)}
-              placeholder="My IO Profile"
-            />
-          </FormField>
-
           {/* Profile Type - filtered based on platform availability */}
           <FormField label="Type" variant="default">
             <Select
@@ -382,6 +372,16 @@ export default function IOProfileDialog({
               {availableKinds.includes("slcan") && <option value="slcan">slcan (CANable, USB-CAN)</option>}
               {availableKinds.includes("socketcan") && <option value="socketcan">SocketCAN (Linux)</option>}
             </Select>
+          </FormField>
+
+          {/* Profile Name */}
+          <FormField label="Profile Name" required variant="default">
+            <Input
+              variant="default"
+              value={profileForm.name}
+              onChange={(e) => onUpdateProfileField("name", e.target.value)}
+              placeholder="My IO Profile"
+            />
           </FormField>
 
           {/* Preferred Decoder */}

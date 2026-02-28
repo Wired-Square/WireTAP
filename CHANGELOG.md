@@ -18,6 +18,10 @@ All notable changes to CANdor will be documented in this file.
 
 - **Modbus consecutive error threshold**: Poll tasks now stop polling a register group after a configurable number of consecutive read errors (default: 3), preventing endless "Illegal data address" spam for registers that don't exist on the connected device. Configurable in Settings → General → Modbus; set to 0 to retry indefinitely.
 
+### Improved
+
+- **Data IO settings polish**: Modbus TCP profile cards now show proper `host`, `port`, and `unit` badges instead of raw JSON. The profile dialog puts Type before Profile Name for a more natural flow. The "Add Profile" button uses a compact `+ Profile` label.
+
 ### Fixed
 
 - **Modbus poll errors no longer show blocking dialog**: Individual register read failures (e.g. "Illegal data address" for registers unsupported by a particular model) are now treated as non-fatal. The session stays running and errors are logged to the Session Log instead of showing a modal "Stream Error" dialog. Empty poll groups (e.g. before catalog loads) now gracefully end the source instead of triggering an error dialog.

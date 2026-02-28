@@ -253,6 +253,20 @@ const renderConnectionSummary = (profile: IOProfile) => {
     );
   }
 
+  if (profile.kind === "modbus_tcp") {
+    const host = c.host || "localhost";
+    const port = c.port || "502";
+    const unitId = c.unit_id || "1";
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        <SummaryBadge label="host" value={host} />
+        <SummaryBadge label="port" value={port} />
+        <SummaryBadge label="unit" value={unitId} />
+      </div>
+    );
+  }
+
   // Fallback (should be rare)
   const raw = JSON.stringify(profile.connection ?? {}, null, 0);
   return (
@@ -275,9 +289,9 @@ export default function DataIOView({
     <div className={spaceYLarge}>
       <div className="flex items-center justify-between">
         <h2 className={h2}>Data IO Profiles</h2>
-        <PrimaryButton onClick={onAddProfile}>
+        <PrimaryButton onClick={onAddProfile} className="flex items-center gap-1">
           <Plus className={iconMd} />
-          Add Profile
+          Profile
         </PrimaryButton>
       </div>
 
