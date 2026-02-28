@@ -3,19 +3,24 @@
 import { Network, Pencil } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { labelSmallMuted, monoBody, iconButtonHover, bgSecondary } from "../../../styles";
-import type { TomlNode } from "../types";
+import type { TomlNode, ModbusProtocolConfig } from "../types";
 
 export type ModbusConfigViewProps = {
   selectedNode: TomlNode;
+  modbusConfig?: ModbusProtocolConfig;
   onEditConfig?: () => void;
 };
 
 export default function ModbusConfigView({
   selectedNode,
+  modbusConfig,
   onEditConfig,
 }: ModbusConfigViewProps) {
-  const deviceAddress = selectedNode.metadata?.deviceAddress;
-  const registerBase = selectedNode.metadata?.registerBase;
+  const deviceAddress = modbusConfig?.device_address ?? selectedNode.metadata?.deviceAddress;
+  const registerBase = modbusConfig?.register_base ?? selectedNode.metadata?.registerBase;
+  const defaultInterval = modbusConfig?.default_interval;
+  const defaultByteOrder = modbusConfig?.default_byte_order;
+  const defaultWordOrder = modbusConfig?.default_word_order;
 
   return (
     <div className="space-y-6">
@@ -69,6 +74,45 @@ export default function ModbusConfigView({
               registerBase === 0 ? "0-based" : "1-based"
             ) : (
               <span className="text-orange-500">Not set</span>
+            )}
+          </div>
+        </div>
+
+        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={labelSmallMuted}>
+            Default Interval
+          </div>
+          <div className={monoBody}>
+            {defaultInterval !== undefined ? (
+              `${defaultInterval} ms`
+            ) : (
+              <span className="text-[color:var(--text-muted)]">Not set</span>
+            )}
+          </div>
+        </div>
+
+        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={labelSmallMuted}>
+            Byte Order
+          </div>
+          <div className={monoBody}>
+            {defaultByteOrder !== undefined ? (
+              defaultByteOrder === "big" ? "Big-endian" : "Little-endian"
+            ) : (
+              <span className="text-[color:var(--text-muted)]">Not set</span>
+            )}
+          </div>
+        </div>
+
+        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={labelSmallMuted}>
+            Word Order
+          </div>
+          <div className={monoBody}>
+            {defaultWordOrder !== undefined ? (
+              defaultWordOrder === "big" ? "Big-endian" : "Little-endian"
+            ) : (
+              <span className="text-[color:var(--text-muted)]">Not set</span>
             )}
           </div>
         </div>

@@ -419,10 +419,24 @@ export function upsertModbusConfigToml(toml: string, config: ModbusProtocolConfi
   const meta = ensureObject(parsed, "meta");
 
   // Ensure config section exists and set values
-  meta.modbus = {
+  const modbusObj: Record<string, any> = {
     device_address: config.device_address,
     register_base: config.register_base,
   };
+
+  if (config.default_interval !== undefined) {
+    modbusObj.default_interval = config.default_interval;
+  }
+
+  if (config.default_byte_order !== undefined) {
+    modbusObj.default_byte_order = config.default_byte_order;
+  }
+
+  if (config.default_word_order !== undefined) {
+    modbusObj.default_word_order = config.default_word_order;
+  }
+
+  meta.modbus = modbusObj;
 
   return tomlStringify(parsed);
 }

@@ -205,7 +205,26 @@ function parseModbusConfig(parsed: any): ModbusProtocolConfig | undefined {
   // Both fields must be present for a valid config
   if (deviceAddress === undefined || registerBase === undefined) return undefined;
 
-  return { device_address: deviceAddress, register_base: registerBase };
+  const config: ModbusProtocolConfig = { device_address: deviceAddress, register_base: registerBase };
+
+  // default_interval is optional
+  if (typeof configSection.default_interval === "number") {
+    config.default_interval = configSection.default_interval;
+  }
+
+  // default_byte_order is optional
+  const byteOrder = configSection.default_byte_order ?? configSection.byte_order;
+  if (byteOrder === "big" || byteOrder === "little") {
+    config.default_byte_order = byteOrder;
+  }
+
+  // default_word_order is optional
+  const wordOrder = configSection.default_word_order;
+  if (wordOrder === "big" || wordOrder === "little") {
+    config.default_word_order = wordOrder;
+  }
+
+  return config;
 }
 
 /**
@@ -440,10 +459,13 @@ function objectToTree(obj: any, parentPath: string[], meta: MetaFields | null, c
         default_endianness: canConfig?.default_endianness,
         default_extended: canConfig?.default_extended,
         default_fd: canConfig?.default_fd,
-        // Modbus config from [frame.modbus.config]
+        // Modbus config from [meta.modbus]
         modbusDeviceAddress: modbusConfig?.device_address,
         modbusRegisterBase: modbusConfig?.register_base,
-        // Serial config from [frame.serial.config]
+        modbusDefaultInterval: modbusConfig?.default_interval,
+        modbusDefaultByteOrder: modbusConfig?.default_byte_order,
+        modbusDefaultWordOrder: modbusConfig?.default_word_order,
+        // Serial config from [meta.serial]
         serialEncoding: serialConfig?.encoding,
       };
 

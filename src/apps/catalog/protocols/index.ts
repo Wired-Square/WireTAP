@@ -17,10 +17,13 @@ export interface ProtocolDefaults {
   // CAN config from [meta.can]
   default_extended?: boolean;
   default_fd?: boolean;
-  // Modbus config from [frame.modbus.config]
+  // Modbus config from [meta.modbus]
   modbusDeviceAddress?: number;
   modbusRegisterBase?: 0 | 1;
-  // Serial encoding from [frame.serial.config]
+  modbusDefaultInterval?: number;
+  modbusDefaultByteOrder?: "big" | "little";
+  modbusDefaultWordOrder?: "big" | "little";
+  // Serial encoding from [meta.serial]
   serialEncoding?: "slip" | "cobs" | "raw" | "length_prefixed";
 }
 

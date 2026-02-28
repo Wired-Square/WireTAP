@@ -39,6 +39,9 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
   const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
   const modbusDeviceAddress = useCatalogEditorStore((s) => s.forms.modbusDeviceAddress);
   const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
+  const modbusDefaultInterval = useCatalogEditorStore((s) => s.forms.modbusDefaultInterval);
+  const modbusDefaultByteOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultByteOrder);
+  const modbusDefaultWordOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultWordOrder);
   const canDefaultEndianness = useCatalogEditorStore((s) => s.forms.canDefaultEndianness);
   const canDefaultInterval = useCatalogEditorStore((s) => s.forms.canDefaultInterval);
   const canDefaultExtended = useCatalogEditorStore((s) => s.forms.canDefaultExtended);
@@ -91,6 +94,9 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
         content = upsertModbusConfigToml(content, {
           device_address: modbusDeviceAddress,
           register_base: modbusRegisterBase,
+          default_interval: modbusDefaultInterval,
+          default_byte_order: modbusDefaultByteOrder,
+          default_word_order: modbusDefaultWordOrder,
         });
       } else if (selectedProtocol === "serial") {
         content = upsertSerialConfigToml(content, { encoding: serialEncoding });

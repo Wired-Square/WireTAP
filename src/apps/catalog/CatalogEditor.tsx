@@ -168,6 +168,9 @@ export default function CatalogEditor() {
   const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
   const setModbusDeviceAddress = useCatalogEditorStore((s) => s.setModbusDeviceAddress);
   const setModbusRegisterBase = useCatalogEditorStore((s) => s.setModbusRegisterBase);
+  const setModbusDefaultInterval = useCatalogEditorStore((s) => s.setModbusDefaultInterval);
+  const setModbusDefaultByteOrder = useCatalogEditorStore((s) => s.setModbusDefaultByteOrder);
+  const setModbusDefaultWordOrder = useCatalogEditorStore((s) => s.setModbusDefaultWordOrder);
   const catalogDefaults = useMemo(() => ({
     interval: canDefaultInterval,           // From [frame.can.config], stored in forms.canDefaultInterval
     endianness: canDefaultEndianness,       // From [frame.can.config], stored in forms.canDefaultEndianness
@@ -331,10 +334,13 @@ export default function CatalogEditor() {
         setSerialMaxFrameLength(undefined);
         setSerialChecksum(null);
       }
-      // Store modbus config from [frame.modbus.config] if present
+      // Store modbus config from [meta.modbus] if present
       if (modbusConfig) {
         setModbusDeviceAddress(modbusConfig.device_address);
         setModbusRegisterBase(modbusConfig.register_base);
+        setModbusDefaultInterval(modbusConfig.default_interval);
+        setModbusDefaultByteOrder(modbusConfig.default_byte_order ?? "big");
+        setModbusDefaultWordOrder(modbusConfig.default_word_order ?? "big");
       }
 
       // Keep selection stable by path; clear it if the node no longer exists.
@@ -619,6 +625,7 @@ export default function CatalogEditor() {
                       onDeleteFrame: (key) => handlers.handleDeleteFrame("modbus", key),
                     }}
                     modbusConfigProps={{
+                      modbusConfig: currentModbusConfig,
                       onEditConfig: () => openDialog("config"),
                     }}
                     serialFrameProps={{

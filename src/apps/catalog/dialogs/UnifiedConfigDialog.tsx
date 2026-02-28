@@ -67,6 +67,12 @@ export default function UnifiedConfigDialog({
   const setModbusDeviceAddress = useCatalogEditorStore((s) => s.setModbusDeviceAddress);
   const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
   const setModbusRegisterBase = useCatalogEditorStore((s) => s.setModbusRegisterBase);
+  const modbusDefaultInterval = useCatalogEditorStore((s) => s.forms.modbusDefaultInterval);
+  const setModbusDefaultInterval = useCatalogEditorStore((s) => s.setModbusDefaultInterval);
+  const modbusDefaultByteOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultByteOrder);
+  const setModbusDefaultByteOrder = useCatalogEditorStore((s) => s.setModbusDefaultByteOrder);
+  const modbusDefaultWordOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultWordOrder);
+  const setModbusDefaultWordOrder = useCatalogEditorStore((s) => s.setModbusDefaultWordOrder);
 
   // Track whether each protocol is "enabled" (we'll add config when enabling)
   const [canEnabled, setCanEnabled] = useState(!!canConfig);
@@ -123,6 +129,9 @@ export default function UnifiedConfigDialog({
     // Set defaults
     setModbusDeviceAddress(1);
     setModbusRegisterBase(1);
+    setModbusDefaultInterval(undefined);
+    setModbusDefaultByteOrder("big");
+    setModbusDefaultWordOrder("big");
   };
 
   // Handle removing a protocol config (just update local state - actual removal on Save)
@@ -249,6 +258,12 @@ export default function UnifiedConfigDialog({
               setDeviceAddress={setModbusDeviceAddress}
               registerBase={modbusRegisterBase}
               setRegisterBase={setModbusRegisterBase}
+              defaultInterval={modbusDefaultInterval}
+              setDefaultInterval={setModbusDefaultInterval}
+              defaultByteOrder={modbusDefaultByteOrder}
+              setDefaultByteOrder={setModbusDefaultByteOrder}
+              defaultWordOrder={modbusDefaultWordOrder}
+              setDefaultWordOrder={setModbusDefaultWordOrder}
             />
           </div>
 

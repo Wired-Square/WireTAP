@@ -131,8 +131,11 @@ export interface CatalogEditorState {
     serialHeaderLength: number | undefined;  // For Serial config - global header length in bytes
     serialMaxFrameLength: number | undefined;  // For Serial config - max frame length (default: 64)
     serialChecksum: SerialChecksumConfig | null;  // For Serial config - protocol-level checksum defaults
-    modbusDeviceAddress: number;     // For new catalog dialog - stored in [frame.modbus.config]
-    modbusRegisterBase: 0 | 1;       // For new catalog dialog - stored in [frame.modbus.config]
+    modbusDeviceAddress: number;     // For new catalog dialog - stored in [meta.modbus]
+    modbusRegisterBase: 0 | 1;       // For new catalog dialog - stored in [meta.modbus]
+    modbusDefaultInterval: number | undefined;  // Default poll interval in ms - stored in [meta.modbus]
+    modbusDefaultByteOrder: "big" | "little";   // Default byte order - stored in [meta.modbus]
+    modbusDefaultWordOrder: "big" | "little";   // Default word order - stored in [meta.modbus]
   };
 
   // Validation state
@@ -231,6 +234,9 @@ export interface CatalogEditorState {
   setSerialChecksum: (checksum: SerialChecksumConfig | null) => void;
   setModbusDeviceAddress: (address: number) => void;
   setModbusRegisterBase: (base: 0 | 1) => void;
+  setModbusDefaultInterval: (interval: number | undefined) => void;
+  setModbusDefaultByteOrder: (order: "big" | "little") => void;
+  setModbusDefaultWordOrder: (order: "big" | "little") => void;
 
   // Computed
   hasUnsavedChanges: () => boolean;
@@ -351,6 +357,9 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     serialChecksum: null,    // No protocol-level checksum config
     modbusDeviceAddress: 1,  // Default for new catalogs
     modbusRegisterBase: 0,   // Default for new catalogs (0-based)
+    modbusDefaultInterval: undefined,  // No default interval
+    modbusDefaultByteOrder: 'big',     // Default for new catalogs
+    modbusDefaultWordOrder: 'big',     // Default for new catalogs
   },
 
   validation: { errors: [], isValid: null },
@@ -681,6 +690,15 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
 
   setModbusRegisterBase: (modbusRegisterBase) =>
     set((state) => ({ forms: { ...state.forms, modbusRegisterBase } })),
+
+  setModbusDefaultInterval: (modbusDefaultInterval) =>
+    set((state) => ({ forms: { ...state.forms, modbusDefaultInterval } })),
+
+  setModbusDefaultByteOrder: (modbusDefaultByteOrder) =>
+    set((state) => ({ forms: { ...state.forms, modbusDefaultByteOrder } })),
+
+  setModbusDefaultWordOrder: (modbusDefaultWordOrder) =>
+    set((state) => ({ forms: { ...state.forms, modbusDefaultWordOrder } })),
 
   // Computed
   hasUnsavedChanges: () => {

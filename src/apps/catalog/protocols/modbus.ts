@@ -27,8 +27,8 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
     let interval = value.tx?.interval ?? value.tx?.interval_ms;
     let intervalInherited = false;
 
-    if (interval === undefined && defaults.default_interval !== undefined) {
-      interval = defaults.default_interval;
+    if (interval === undefined && defaults.modbusDefaultInterval !== undefined) {
+      interval = defaults.modbusDefaultInterval;
       intervalInherited = true;
     }
 

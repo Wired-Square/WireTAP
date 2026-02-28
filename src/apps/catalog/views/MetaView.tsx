@@ -142,6 +142,15 @@ export default function MetaView({
             <div className="text-xs text-[color:var(--text-muted)]">
               <span>Address: {modbusConfig.device_address}</span>
               <span> • Base: {modbusConfig.register_base}-based</span>
+              {modbusConfig.default_interval !== undefined && (
+                <span> • Interval: {modbusConfig.default_interval}ms</span>
+              )}
+              {modbusConfig.default_byte_order && (
+                <span> • Byte: {modbusConfig.default_byte_order === "big" ? "BE" : "LE"}</span>
+              )}
+              {modbusConfig.default_word_order && (
+                <span> • Word: {modbusConfig.default_word_order === "big" ? "BE" : "LE"}</span>
+              )}
             </div>
           )}
         </ProtocolConfigCard>

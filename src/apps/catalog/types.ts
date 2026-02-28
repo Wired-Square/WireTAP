@@ -137,10 +137,13 @@ export interface CanProtocolConfig {
   fields?: Record<string, CanHeaderField>;
 }
 
-/** Modbus protocol config - stored in [frame.modbus.config] */
+/** Modbus protocol config - stored in [meta.modbus] */
 export interface ModbusProtocolConfig {
   device_address: number;      // Default slave address (1-247)
   register_base: 0 | 1;        // 0-based or 1-based register addressing
+  default_interval?: number;   // Default poll interval in milliseconds
+  default_byte_order?: "big" | "little";  // Default byte order for multi-register values
+  default_word_order?: "big" | "little";  // Default word order for multi-register values (word swap)
 }
 
 /** Serial encoding types */

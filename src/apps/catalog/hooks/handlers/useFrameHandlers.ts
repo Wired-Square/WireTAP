@@ -64,6 +64,9 @@ export function useFrameHandlers({
   const serialByteOrder = useCatalogEditorStore((s) => s.forms.serialByteOrder);
   const modbusDeviceAddress = useCatalogEditorStore((s) => s.forms.modbusDeviceAddress);
   const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
+  const modbusDefaultInterval = useCatalogEditorStore((s) => s.forms.modbusDefaultInterval);
+  const modbusDefaultByteOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultByteOrder);
+  const modbusDefaultWordOrder = useCatalogEditorStore((s) => s.forms.modbusDefaultWordOrder);
   const canDefaultEndianness = useCatalogEditorStore((s) => s.forms.canDefaultEndianness);
   const canDefaultInterval = useCatalogEditorStore((s) => s.forms.canDefaultInterval);
   const canDefaultExtended = useCatalogEditorStore((s) => s.forms.canDefaultExtended);
@@ -633,6 +636,9 @@ export function useFrameHandlers({
         newContent = upsertModbusConfigToml(newContent, {
           device_address: modbusDeviceAddress,
           register_base: modbusRegisterBase,
+          default_interval: modbusDefaultInterval,
+          default_byte_order: modbusDefaultByteOrder,
+          default_word_order: modbusDefaultWordOrder,
         });
       } else {
         // Delete Modbus config if disabled
@@ -730,6 +736,9 @@ export function useFrameHandlers({
       const newContent = upsertModbusConfigToml(catalogContent, {
         device_address: modbusDeviceAddress,
         register_base: modbusRegisterBase,
+        default_interval: modbusDefaultInterval,
+        default_byte_order: modbusDefaultByteOrder,
+        default_word_order: modbusDefaultWordOrder,
       });
       setToml(newContent);
       closeDialog("config");

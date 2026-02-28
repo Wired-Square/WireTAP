@@ -12,6 +12,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Modbus word-swap support (`word_order`)**: New `word_order` signal property (and `default_word_order` in `[meta.modbus]`) for devices that transmit multi-register values with swapped 16-bit words (CDAB byte order). Set `word_order = "little"` per-signal or `default_word_order = "little"` catalog-wide. Required for Sungrow and many other Modbus devices that use low-word-first ordering for 32-bit values.
 
+- **Modbus catalog editor: full protocol configuration**: The Catalog Configuration dialog now exposes all `[meta.modbus]` settings: default poll interval, default byte order, and default word order — in addition to the existing device address and register base fields. The read-only config view and meta summary also display the new fields. The Modbus protocol handler now correctly inherits `default_interval` from the Modbus config rather than the CAN config.
+
 ### Fixed
 
 - **Modbus poll errors no longer show blocking dialog**: Individual register read failures (e.g. "Illegal data address" for registers unsupported by a particular model) are now treated as non-fatal. The session stays running and errors are logged to the Session Log instead of showing a modal "Stream Error" dialog.
