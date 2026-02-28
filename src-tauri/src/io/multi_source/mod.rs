@@ -34,7 +34,7 @@ use crate::buffer_store::{self, BufferType};
 use super::gs_usb::encode_frame as encode_gs_usb_frame;
 
 use merge::run_merge_task;
-pub use types::SourceConfig;
+pub use types::{ModbusRole, SourceConfig};
 use types::{TransmitChannels, TransmitRoute};
 
 // ============================================================================

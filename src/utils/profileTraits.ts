@@ -119,7 +119,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     protocols: ["modbus"],
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
-    isMultiSourceCapable: false,
+    isMultiSourceCapable: true,
   },
 };
 

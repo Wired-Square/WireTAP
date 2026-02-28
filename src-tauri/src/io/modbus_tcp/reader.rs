@@ -37,7 +37,7 @@ use crate::io::{
 // ============================================================================
 
 /// Register type for Modbus polling
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum RegisterType {
     Holding,
@@ -47,7 +47,7 @@ pub enum RegisterType {
 }
 
 /// A single poll group - one register read operation on a timer
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, Deserialize)]
 pub struct PollGroup {
     /// Register type (determines Modbus function code)
     pub register_type: RegisterType,

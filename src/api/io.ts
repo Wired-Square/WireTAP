@@ -1126,6 +1126,8 @@ export interface MultiSourceInput {
   sourceAddressBytes?: number;
   /** Source address extraction: byte order (true = big endian) */
   sourceAddressBigEndian?: boolean;
+  /** Modbus interface role (client or server) */
+  modbusRole?: "client" | "server";
 }
 
 /**
@@ -1140,6 +1142,8 @@ export interface CreateMultiSourceSessionOptions {
   listenerId?: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName?: string;
+  /** Shared Modbus poll groups JSON (injected into all modbus_tcp sources) */
+  modbusPollsJson?: string;
 }
 
 /**
@@ -1182,6 +1186,7 @@ export async function createMultiSourceSession(
     source_address_start_byte: source.sourceAddressStartByte,
     source_address_bytes: source.sourceAddressBytes,
     source_address_big_endian: source.sourceAddressBigEndian,
+    modbus_role: source.modbusRole,
   }));
 
   return invoke("create_multi_source_session", {
@@ -1189,6 +1194,7 @@ export async function createMultiSourceSession(
     sources: rustSources,
     listener_id: options.listenerId,
     app_name: options.appName,
+    modbus_polls: options.modbusPollsJson,
   });
 }
 

@@ -56,7 +56,7 @@ pub use gvret::{BusMapping, GvretDeviceInfo, probe_gvret_tcp};
 pub use modbus_tcp::{ModbusTcpConfig, ModbusTcpReader, PollGroup};
 #[cfg(not(target_os = "ios"))]
 pub use gvret::probe_gvret_usb;
-pub use multi_source::{MultiSourceReader, SourceConfig};
+pub use multi_source::{ModbusRole, MultiSourceReader, SourceConfig};
 pub use mqtt::{MqttConfig, MqttReader};
 #[cfg(not(target_os = "ios"))]
 #[allow(unused_imports)]

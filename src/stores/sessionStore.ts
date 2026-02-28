@@ -1908,6 +1908,8 @@ export interface CreateMultiSourceOptions {
   sourceAddressBytes?: number;
   /** Source address extraction: byte order (true = big endian) */
   sourceAddressBigEndian?: boolean;
+  /** Shared Modbus poll groups JSON (from catalog, injected into all modbus_tcp sources) */
+  modbusPollsJson?: string;
 }
 
 /**
@@ -2005,6 +2007,7 @@ export async function createAndStartMultiSourceSession(
     sources,
     listenerId,
     appName,
+    modbusPollsJson: options.modbusPollsJson,
   });
 
   // Register this listener with the session

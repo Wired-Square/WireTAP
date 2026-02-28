@@ -20,7 +20,7 @@ use crate::{
         GvretDeviceInfo, probe_gvret_tcp,
         ModbusTcpConfig, ModbusTcpReader,
         MqttConfig, MqttReader,
-        MultiSourceReader, SourceConfig,
+        ModbusRole, MultiSourceReader, SourceConfig,
         PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
         CanTransmitFrame, TransmitResult,
         emit_device_probe, DeviceProbePayload,
@@ -237,7 +237,7 @@ fn choose_profile_by_id(settings: &AppSettings, profile_id: Option<&str>) -> Opt
 fn is_realtime_device(kind: &str) -> bool {
     matches!(
         kind,
-        "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" | "slcan" | "gs_usb" | "socketcan" | "serial"
+        "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" | "slcan" | "gs_usb" | "socketcan" | "serial" | "modbus_tcp"
     )
 }
 
@@ -283,6 +283,10 @@ fn create_source_config_from_profile(
         source_address_start_byte: None,
         source_address_bytes: None,
         source_address_big_endian: None,
+        // Modbus fields - populated later by create_multi_source_session
+        modbus_polls: None,
+        modbus_role: None,
+        max_register_errors: None,
     })
 }
 
@@ -365,6 +369,7 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
         "slcan" => ("can0".to_string(), vec![Protocol::Can], true),
         "gs_usb" => ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true),
         "socketcan" => ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true),
+        "modbus_tcp" => ("modbus0".to_string(), vec![Protocol::Modbus], false),
         _ => ("can0".to_string(), vec![Protocol::Can], true),
     };
 
@@ -1657,6 +1662,9 @@ pub struct MultiSourceInput {
     /// Source address extraction: byte order (true = big endian)
     #[serde(default)]
     pub source_address_big_endian: Option<bool>,
+    /// Modbus interface role (client or server)
+    #[serde(default)]
+    pub modbus_role: Option<ModbusRole>,
 }
 
 /// Convert a MultiSourceInput to a SourceConfig, resolving profile name and kind from settings.
@@ -1683,6 +1691,7 @@ fn resolve_source_config(
         "slcan" => ("can0".to_string(), vec![Protocol::Can], true),
         "gs_usb" => ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true),
         "socketcan" => ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true),
+        "modbus_tcp" => ("modbus0".to_string(), vec![Protocol::Modbus], false),
         _ => ("can0".to_string(), vec![Protocol::Can], true),
     };
 
@@ -1724,6 +1733,9 @@ fn resolve_source_config(
         source_address_start_byte: input.source_address_start_byte,
         source_address_bytes: input.source_address_bytes,
         source_address_big_endian: input.source_address_big_endian,
+        modbus_polls: None,    // Injected by create_multi_source_session
+        modbus_role: input.modbus_role,
+        max_register_errors: None, // Injected by create_multi_source_session
     })
 }
 
@@ -1742,6 +1754,7 @@ pub async fn create_multi_source_session(
     sources: Vec<MultiSourceInput>,
     listener_id: Option<String>,
     app_name: Option<String>,
+    modbus_polls: Option<String>,
 ) -> Result<IOCapabilities, String> {
     if sources.is_empty() {
         return Err("At least one source is required".to_string());
@@ -1751,10 +1764,29 @@ pub async fn create_multi_source_session(
         .await
         .map_err(|e| format!("Failed to load settings: {}", e))?;
 
+    // Parse shared Modbus poll groups (if any)
+    let parsed_polls: Option<Vec<crate::io::PollGroup>> = match &modbus_polls {
+        Some(json) => {
+            let polls: Vec<crate::io::PollGroup> = serde_json::from_str(json)
+                .map_err(|e| format!("Failed to parse Modbus poll groups: {}", e))?;
+            tlog!("[create_multi_source_session] Parsed {} shared Modbus poll groups", polls.len());
+            Some(polls)
+        }
+        None => None,
+    };
+
     // Convert MultiSourceInput to SourceConfig
     let mut source_configs: Vec<SourceConfig> = Vec::with_capacity(sources.len());
     for (source_idx, input) in sources.into_iter().enumerate() {
         source_configs.push(resolve_source_config(input, source_idx, &settings)?);
+    }
+
+    // Inject shared Modbus polls and settings into Modbus TCP source configs
+    for config in &mut source_configs {
+        if config.profile_kind == "modbus_tcp" {
+            config.modbus_polls = parsed_polls.clone();
+            config.max_register_errors = Some(settings.modbus_max_register_errors);
+        }
     }
 
     // Validate all profiles are real-time devices supported by MultiSourceReader
@@ -1762,7 +1794,7 @@ pub async fn create_multi_source_session(
         if !is_realtime_device(&config.profile_kind) {
             return Err(format!(
                 "Profile '{}' has unsupported type '{}' for multi-source mode. \
-                Currently supported: gvret_tcp, gvret_usb, slcan, gs_usb, socketcan, serial",
+                Currently supported: gvret_tcp, gvret_usb, slcan, gs_usb, socketcan, serial, modbus_tcp",
                 config.profile_id, config.profile_kind
             ));
         }

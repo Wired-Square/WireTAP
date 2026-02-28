@@ -130,6 +130,11 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
             protocols: vec![Protocol::Can],
             can_transmit: false,
         },
+        "modbus_tcp" => InterfaceTraits {
+            temporal_mode: TemporalMode::Realtime,
+            protocols: vec![Protocol::Modbus],
+            can_transmit: false,
+        },
         "postgres" => InterfaceTraits {
             temporal_mode: TemporalMode::Timeline,
             protocols: vec![Protocol::Can, Protocol::Modbus, Protocol::Serial],

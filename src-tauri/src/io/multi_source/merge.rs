@@ -78,6 +78,10 @@ pub(super) async fn run_merge_task(
         let source_address_start_byte = source_config.source_address_start_byte;
         let source_address_bytes = source_config.source_address_bytes;
         let source_address_big_endian = source_config.source_address_big_endian;
+        // Modbus-specific config
+        let modbus_polls = source_config.modbus_polls.clone();
+        let modbus_role = source_config.modbus_role.clone();
+        let max_register_errors = source_config.max_register_errors;
 
         let handle = tokio::spawn(async move {
             run_source_reader(
@@ -98,6 +102,9 @@ pub(super) async fn run_merge_task(
                 source_address_start_byte,
                 source_address_bytes,
                 source_address_big_endian,
+                modbus_polls,
+                modbus_role,
+                max_register_errors,
                 stop_flag_clone,
                 tx_clone,
             )

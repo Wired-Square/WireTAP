@@ -6,14 +6,25 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::io::gvret::BusMapping;
+use crate::io::modbus_tcp::PollGroup;
 use crate::io::types::TransmitSender;
+
+/// Modbus interface role in a multi-source session
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ModbusRole {
+    /// Client role: connect to a Modbus TCP server and poll registers
+    Client,
+    /// Server role: accept incoming Modbus TCP connections (for MITM)
+    Server,
+}
 
 /// Configuration for a single source in a multi-source session
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SourceConfig {
     /// Profile ID for this source
     pub profile_id: String,
-    /// Profile kind (gvret_tcp, gvret_usb, gs_usb, socketcan, slcan, serial)
+    /// Profile kind (gvret_tcp, gvret_usb, gs_usb, socketcan, slcan, serial, modbus_tcp)
     pub profile_kind: String,
     /// Display name for this source
     pub display_name: String,
@@ -52,6 +63,15 @@ pub struct SourceConfig {
     /// Source address extraction: byte order (true = big endian)
     #[serde(default)]
     pub source_address_big_endian: Option<bool>,
+    /// Modbus poll groups (shared across all Modbus interfaces in a session)
+    #[serde(default)]
+    pub modbus_polls: Option<Vec<PollGroup>>,
+    /// Modbus interface role (client or server)
+    #[serde(default)]
+    pub modbus_role: Option<ModbusRole>,
+    /// Modbus max consecutive register errors before stopping (0 = never stop)
+    #[serde(default)]
+    pub max_register_errors: Option<u32>,
 }
 
 /// Transmit routing info: maps output bus to source and device bus

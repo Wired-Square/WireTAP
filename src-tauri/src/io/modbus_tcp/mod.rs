@@ -6,4 +6,4 @@
 
 mod reader;
 
-pub use reader::{ModbusTcpConfig, ModbusTcpReader, PollGroup};
+pub use reader::{ModbusTcpConfig, ModbusTcpReader, PollGroup, RegisterType};

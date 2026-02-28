@@ -336,6 +336,8 @@ function generateMultiSessionId(
   let prefix: string;
   if (protocol === "serial" && emitRawBytes) {
     prefix = "b";  // bytes (raw serial)
+  } else if (protocol === "modbus") {
+    prefix = "m";  // modbus
   } else if (protocol === "can" || protocol === "serial") {
     prefix = "f";  // frames (CAN or framed serial)
   } else {
@@ -767,6 +769,8 @@ export function useIOSessionManager(
       sourceAddressStartByte,
       sourceAddressBytes,
       sourceAddressBigEndian: sourceAddressEndianness === "big",
+      // Modbus poll groups (shared across all Modbus TCP interfaces)
+      modbusPollsJson: opts.modbusPollsJson,
     };
 
     // Create the session and set up heartbeats
