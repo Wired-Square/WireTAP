@@ -1,0 +1,338 @@
+# Sungrow SHx Hybrid Inverter — Modbus TCP Decoder Catalog
+#
+# Covers SH5K, SH6K, SH8K, SH10RT and similar SH-series hybrid inverters.
+# Register map based on community documentation:
+# https://github.com/mkaiser/Sungrow-SHx-Inverter-Modbus-Home-Assistant
+#
+# Connection: Modbus TCP via WiNet-S dongle, default port 502, unit ID 1.
+# All registers are input registers (read-only, function code 04).
+# Addresses are 0-based protocol addresses (IEC).
+
+[meta]
+name = "Sungrow SHx"
+version = 1
+default_frame = "modbus"
+
+[meta.modbus]
+device_address = 1
+register_base = 0
+default_interval = 5000
+default_byte_order = "big"
+
+# ============================================================================
+# Inverter Temperature
+# Register 5007 — polled every 30s
+# ============================================================================
+
+[frame.modbus.inverter_temp]
+register_number = 5007
+register_type = "input"
+length = 1
+tx.interval_ms = 30000
+
+[[frame.modbus.inverter_temp.signals]]
+name = "Inverter_Temperature"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "°C"
+signed = true
+endianness = "big"
+
+# ============================================================================
+# Solar / PV Production
+# Registers 5010–5017 — MPPT1/2 voltage+current, total DC power
+# ============================================================================
+
+[frame.modbus.solar_pv]
+register_number = 5010
+register_type = "input"
+length = 8
+
+[[frame.modbus.solar_pv.signals]]
+name = "MPPT1_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+endianness = "big"
+
+[[frame.modbus.solar_pv.signals]]
+name = "MPPT1_Current"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "A"
+endianness = "big"
+
+[[frame.modbus.solar_pv.signals]]
+name = "MPPT2_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "V"
+endianness = "big"
+
+[[frame.modbus.solar_pv.signals]]
+name = "MPPT2_Current"
+start_bit = 48
+bit_length = 16
+factor = 0.1
+unit = "A"
+endianness = "big"
+
+[[frame.modbus.solar_pv.signals]]
+name = "Total_DC_Power"
+start_bit = 96
+bit_length = 32
+unit = "W"
+endianness = "big"
+
+# ============================================================================
+# Grid Voltages
+# Registers 5018–5020 — Phase A/B/C voltage
+# ============================================================================
+
+[frame.modbus.grid_voltage]
+register_number = 5018
+register_type = "input"
+length = 3
+
+[[frame.modbus.grid_voltage.signals]]
+name = "Grid_Phase_A_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+endianness = "big"
+
+[[frame.modbus.grid_voltage.signals]]
+name = "Grid_Phase_B_Voltage"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "V"
+endianness = "big"
+
+[[frame.modbus.grid_voltage.signals]]
+name = "Grid_Phase_C_Voltage"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "V"
+endianness = "big"
+
+# ============================================================================
+# Battery Power
+# Registers 5213–5214 — S32, negative = charging, positive = discharging
+# ============================================================================
+
+[frame.modbus.battery_power]
+register_number = 5213
+register_type = "input"
+length = 2
+
+[[frame.modbus.battery_power.signals]]
+name = "Battery_Power"
+start_bit = 0
+bit_length = 32
+unit = "W"
+signed = true
+endianness = "big"
+
+# ============================================================================
+# Grid Frequency
+# Register 5241 — polled every 10s
+# ============================================================================
+
+[frame.modbus.grid_frequency]
+register_number = 5241
+register_type = "input"
+length = 1
+tx.interval_ms = 10000
+
+[[frame.modbus.grid_frequency.signals]]
+name = "Grid_Frequency"
+start_bit = 0
+bit_length = 16
+factor = 0.01
+unit = "Hz"
+endianness = "big"
+
+# ============================================================================
+# Meter / Grid Power
+# Registers 5600–5601 — S32, positive = importing, negative = exporting
+# ============================================================================
+
+[frame.modbus.meter_power]
+register_number = 5600
+register_type = "input"
+length = 2
+
+[[frame.modbus.meter_power.signals]]
+name = "Meter_Active_Power"
+start_bit = 0
+bit_length = 32
+unit = "W"
+signed = true
+endianness = "big"
+
+# ============================================================================
+# System State + PV Energy
+# Registers 13000–13003 — system state, daily + total PV generation
+# Polled every 30s (energy counters change slowly)
+# ============================================================================
+
+[frame.modbus.system_pv_energy]
+register_number = 13000
+register_type = "input"
+length = 4
+tx.interval_ms = 30000
+
+[[frame.modbus.system_pv_energy.signals]]
+name = "System_State"
+start_bit = 0
+bit_length = 16
+endianness = "big"
+
+[[frame.modbus.system_pv_energy.signals]]
+name = "Daily_PV_Generation"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+endianness = "big"
+
+[[frame.modbus.system_pv_energy.signals]]
+name = "Total_PV_Generation"
+start_bit = 32
+bit_length = 32
+factor = 0.1
+unit = "kWh"
+endianness = "big"
+
+# ============================================================================
+# Load Power
+# Registers 13007–13008 — S32, household consumption
+# ============================================================================
+
+[frame.modbus.load_power]
+register_number = 13007
+register_type = "input"
+length = 2
+
+[[frame.modbus.load_power.signals]]
+name = "Load_Power"
+start_bit = 0
+bit_length = 32
+unit = "W"
+signed = true
+endianness = "big"
+
+# ============================================================================
+# Battery Status
+# Registers 13019–13024 — voltage, (gap 13020–13021), SoC, SoH, temperature
+# Polled every 10s
+# ============================================================================
+
+[frame.modbus.battery_status]
+register_number = 13019
+register_type = "input"
+length = 6
+tx.interval_ms = 10000
+
+[[frame.modbus.battery_status.signals]]
+name = "Battery_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+endianness = "big"
+
+[[frame.modbus.battery_status.signals]]
+name = "Battery_SoC"
+start_bit = 48
+bit_length = 16
+factor = 0.1
+unit = "%"
+endianness = "big"
+
+[[frame.modbus.battery_status.signals]]
+name = "Battery_SoH"
+start_bit = 64
+bit_length = 16
+factor = 0.1
+unit = "%"
+endianness = "big"
+
+[[frame.modbus.battery_status.signals]]
+name = "Battery_Temperature"
+start_bit = 80
+bit_length = 16
+factor = 0.1
+unit = "°C"
+signed = true
+endianness = "big"
+
+# ============================================================================
+# Total Active Power
+# Registers 13033–13034 — S32, total inverter output
+# ============================================================================
+
+[frame.modbus.total_active_power]
+register_number = 13033
+register_type = "input"
+length = 2
+
+[[frame.modbus.total_active_power.signals]]
+name = "Total_Active_Power"
+start_bit = 0
+bit_length = 32
+unit = "W"
+signed = true
+endianness = "big"
+
+# ============================================================================
+# Energy Import / Export
+# Registers 13035–13046 — daily + total import and export energy
+# Gap at 13038–13043 (registers read but no signals defined)
+# Polled every 30s
+# ============================================================================
+
+[frame.modbus.energy_import_export]
+register_number = 13035
+register_type = "input"
+length = 12
+tx.interval_ms = 30000
+
+[[frame.modbus.energy_import_export.signals]]
+name = "Daily_Imported_Energy"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+endianness = "big"
+
+[[frame.modbus.energy_import_export.signals]]
+name = "Total_Imported_Energy"
+start_bit = 16
+bit_length = 32
+factor = 0.1
+unit = "kWh"
+endianness = "big"
+
+[[frame.modbus.energy_import_export.signals]]
+name = "Daily_Exported_Energy"
+start_bit = 144
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+endianness = "big"
+
+[[frame.modbus.energy_import_export.signals]]
+name = "Total_Exported_Energy"
+start_bit = 160
+bit_length = 32
+factor = 0.1
+unit = "kWh"
+endianness = "big"

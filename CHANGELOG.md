@@ -8,6 +8,8 @@ All notable changes to CANdor will be documented in this file.
 
 - **Modbus TCP support**: New IO driver for polling registers from Modbus TCP servers (PLCs, sensors, motor controllers). Catalog-driven: define registers in `[frame.modbus.*]` sections and the driver automatically builds poll groups. Supports holding registers, input registers, coils, and discrete inputs (FC01–FC04, read-only). Includes profile creation with host/port/unit ID, traditional and IEC register addressing, and signal decoding with big-endian default byte order.
 
+- **Sungrow SHx decoder catalog**: Bundled example catalog for Sungrow SH-series hybrid solar inverters (SH5K, SH6K, SH8K, SH10RT, etc.) via Modbus TCP. Decodes 25 signals across solar PV (MPPT voltage/current, total DC power), battery (power, SoC, SoH, voltage, temperature), grid (phase voltages, frequency, meter power), load consumption, and energy import/export totals.
+
 ### Fixed
 
 - **Catalog editor signal view pencil icon not opening editor**: The edit button on the signal detail view silently failed because `locateSignal()` re-parsed the TOML and searched by property matching, which was fragile. Simplified to read `signalIndex` and `properties` directly from the tree node metadata, matching how the frame view's pencil already works.
