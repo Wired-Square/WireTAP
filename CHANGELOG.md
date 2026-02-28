@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Improved
+
+- **About dialog**: Scales nicely within the viewport (max 80vh with scrollable content), uses Ubuntu font for branding, white background behind logo, and expanded features list covering CAN, Modbus, serial, MQTT, PostgreSQL, graphing, and more
+
 ### Changed
 
 - **Rebrand: CANdor → WireTAP**: The project has been renamed from CANdor to WireTAP across the entire codebase. The splash screen and About dialog reference "the artist formerly known as CANdor". Specific changes:

@@ -25,8 +25,8 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onClose}>
-      <div className={paddingDialog}>
-        <div className="flex items-start justify-between mb-6">
+      <div className={`${paddingDialog} max-h-[80vh] flex flex-col`}>
+        <div className="flex items-start justify-between mb-4 shrink-0">
           <h2 className={h1}>About WireTAP</h2>
           <button
             onClick={onClose}
@@ -36,12 +36,12 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           </button>
         </div>
 
-        <div className={`${spaceYDefault} ${bodyDefault}`}>
+        <div className={`${spaceYDefault} ${bodyDefault} overflow-y-auto min-h-0`}>
           <div className="flex flex-col items-center text-center">
-            <img src="/logo.png" alt="WireTAP" className="w-16 h-16 rounded-xl mb-3" />
-            <p className="text-3xl font-bold text-[color:var(--text-primary)]">WireTAP</p>
-            <p className={`${bodySmall} mt-1`}>by Wired Square</p>
-            <p className={`${bodySmall} mt-2`}>Version {version}</p>
+            <img src="/logo.png" alt="WireTAP" className="w-14 h-14 rounded-2xl mb-2 bg-white p-1.5" />
+            <p className="text-2xl font-bold font-ubuntu text-[color:var(--text-primary)]">WireTAP</p>
+            <p className={`${bodySmall} font-ubuntu mt-1`}>by Wired Square</p>
+            <p className={`${bodySmall} mt-1`}>Version {version}</p>
             <p className="text-xs italic opacity-50 mt-1">the artist formerly known as CANdor</p>
           </div>
 
@@ -50,18 +50,21 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             bus messages, with a focus on reverse-engineering energy storage and vehicle communication protocols.
           </p>
 
-          <div className={`pt-4 border-t ${borderDefault}`}>
+          <div className={`pt-3 border-t ${borderDefault}`}>
             <p className={`${h3} mb-2`}>Features</p>
             <ul className={`${bodySmall} space-y-1 list-disc list-inside`}>
-              <li>CAN Message Decoding</li>
-              <li>Protocol Discovery</li>
-              <li>Catalog Management</li>
-              <li>Multi-source I/O</li>
-              <li>Real-time Streaming</li>
+              <li>CAN bus analysis, decoding, and discovery</li>
+              <li>Modbus TCP client/server polling</li>
+              <li>Serial device communication</li>
+              <li>MQTT and PostgreSQL integration</li>
+              <li>Multi-source I/O with real-time streaming</li>
+              <li>Signal catalogue editor</li>
+              <li>Frame transmission and playback</li>
+              <li>Graphing and data visualisation</li>
             </ul>
           </div>
 
-          <div className={`pt-4 border-t ${borderDefault}`}>
+          <div className={`pt-3 border-t ${borderDefault}`}>
             <p className={bodySmall}>
               <strong>License:</strong> MIT License
             </p>
@@ -69,12 +72,12 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <strong>Copyright:</strong> © 2026 Wired Square
             </p>
           </div>
+        </div>
 
-          <div className="pt-4">
-            <PrimaryButton onClick={onClose} className="w-full">
-              Close
-            </PrimaryButton>
-          </div>
+        <div className="pt-4 shrink-0">
+          <PrimaryButton onClick={onClose} className="w-full">
+            Close
+          </PrimaryButton>
         </div>
       </div>
     </Dialog>
