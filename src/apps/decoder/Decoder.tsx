@@ -595,10 +595,25 @@ export default function Decoder() {
 
     if (preferredCatalogs.length === 1) {
       const path = buildCatalogPath(preferredCatalogs[0], decoderDir);
-      tlog.debug(`[Decoder] auto-loading preferred decoder → ${path}`);
-      loadCatalog(path).catch((err) => {
-        console.warn("[Decoder] Failed to auto-load preferred decoder:", err);
-      });
+      if (catalogPath === path) {
+        // Catalog already loaded locally (e.g. session was reinitialised with polls).
+        // Just carry the path to the new session without reloading or reinitialising.
+        tlog.debug(`[Decoder] preferred decoder already loaded → ${path}`);
+      } else {
+        tlog.debug(`[Decoder] auto-loading preferred decoder → ${path}`);
+        loadCatalog(path).then(() => {
+          // If the catalog produced Modbus poll groups, reinitialize the session
+          // so the backend gets the poll configuration (polls aren't available
+          // at initial session creation because the catalog loads after)
+          const { modbusPollsJson } = useDecoderStore.getState();
+          if (modbusPollsJson && sourceProfileId) {
+            tlog.debug(`[Decoder] Modbus catalog loaded — reinitializing session with poll groups`);
+            watchSingleSource(sourceProfileId, { modbusPollsJson });
+          }
+        }).catch((err) => {
+          console.warn("[Decoder] Failed to auto-load preferred decoder:", err);
+        });
+      }
       useSessionStore.getState().setSessionCatalogPath(sessionId, path);
     } else if (preferredCatalogs.length > 1) {
       tlog.debug(`[Decoder] multiple preferred decoders: ${preferredCatalogs.join(", ")}`);

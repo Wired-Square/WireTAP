@@ -8,9 +8,15 @@ All notable changes to CANdor will be documented in this file.
 
 - **Modbus TCP support**: New IO driver for polling registers from Modbus TCP servers (PLCs, sensors, motor controllers). Catalog-driven: define registers in `[frame.modbus.*]` sections and the driver automatically builds poll groups. Supports holding registers, input registers, coils, and discrete inputs (FC01–FC04, read-only). Includes profile creation with host/port/unit ID, traditional and IEC register addressing, and signal decoding with big-endian default byte order.
 
-- **Sungrow SHx decoder catalog**: Bundled example catalog for Sungrow SH-series hybrid solar inverters (SH5K, SH6K, SH8K, SH10RT, etc.) via Modbus TCP. Decodes 25 signals across solar PV (MPPT voltage/current, total DC power), battery (power, SoC, SoH, voltage, temperature), grid (phase voltages, frequency, meter power), load consumption, and energy import/export totals.
+- **Sungrow SHx decoder catalog**: Bundled example catalog for Sungrow SH-series hybrid solar inverters (SH5K, SH6K, SH8K, SH10RT, etc.) via Modbus TCP. Expanded to ~70 signals across 27 poll groups covering all four MPPTs, per-phase meter power, backup power, battery configuration, reactive power, power factor, firmware versions, and holding register readback (SoC limits, export limits, power thresholds).
+
+- **Modbus word-swap support (`word_order`)**: New `word_order` signal property (and `default_word_order` in `[meta.modbus]`) for devices that transmit multi-register values with swapped 16-bit words (CDAB byte order). Set `word_order = "little"` per-signal or `default_word_order = "little"` catalog-wide. Required for Sungrow and many other Modbus devices that use low-word-first ordering for 32-bit values.
 
 ### Fixed
+
+- **Modbus poll errors no longer show blocking dialog**: Individual register read failures (e.g. "Illegal data address" for registers unsupported by a particular model) are now treated as non-fatal. The session stays running and errors are logged to the Session Log instead of showing a modal "Stream Error" dialog.
+
+- **Modbus preferred catalog not providing poll groups**: When a Modbus TCP session was created with a preferred catalog, the catalog loaded after the session was already started, so no poll groups were passed to the backend. The Decoder now reinitialises the session with poll groups after the catalog finishes loading.
 
 - **Catalog editor signal view pencil icon not opening editor**: The edit button on the signal detail view silently failed because `locateSignal()` re-parsed the TOML and searched by property matching, which was fragile. Simplified to read `signalIndex` and `properties` directly from the tree node metadata, matching how the frame view's pencil already works.
 

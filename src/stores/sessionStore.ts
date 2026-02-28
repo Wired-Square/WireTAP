@@ -562,8 +562,11 @@ async function setupSessionEventListeners(
     (event) => {
       const error = event.payload;
       // Don't show error dialog for expected/transient errors
+      // Modbus poll errors are non-fatal (individual register groups may not exist on all models)
       const isExpectedError =
-        error === "No IO profile configured" || error.includes("not found");
+        error === "No IO profile configured" ||
+        error.includes("not found") ||
+        error.includes("Modbus read error");
       if (!isExpectedError) {
         invokeCallbacks(eventListeners, "onError", error);
         // Show global error dialog
@@ -574,11 +577,11 @@ async function setupSessionEventListeners(
             showAppError("Stream Error", "An error occurred while streaming.", error);
           }
         }
+        updateSession(sessionId, {
+          ioState: "error",
+          errorMessage: error,
+        });
       }
-      updateSession(sessionId, {
-        ioState: "error",
-        errorMessage: error,
-      });
     }
   );
   unlistenFunctions.push(unlistenError);

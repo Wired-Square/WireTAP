@@ -574,12 +574,14 @@ pub async fn create_reader_session(
                 .unwrap_or(1);
 
             // Parse poll groups from frontend (catalog-derived JSON)
+            tlog!("[create_reader_session] modbus_polls JSON: {:?}", modbus_polls.as_deref().unwrap_or("None"));
             let polls: Vec<crate::io::PollGroup> = match &modbus_polls {
                 Some(json) => serde_json::from_str(json).map_err(|e| {
                     format!("Failed to parse Modbus poll groups: {}", e)
                 })?,
                 None => Vec::new(),
             };
+            tlog!("[create_reader_session] Parsed {} Modbus poll groups for {}:{} unit {}", polls.len(), host, port, unit_id);
 
             let config = ModbusTcpConfig {
                 host,
@@ -674,10 +676,10 @@ pub async fn create_reader_session(
     let is_playback_source = matches!(profile.kind.as_str(), "postgres" | "csv_file" | "csv-file");
 
     if result.is_new && !is_playback_source {
-        tlog!("[create_reader_session] Auto-starting new session '{}' (real-time device)", session_id);
-        if let Err(e) = start_session(&session_id).await {
-            tlog!("[create_reader_session] Failed to auto-start session '{}': {}", session_id, e);
-            // Don't fail the whole creation - session is created but not started
+        tlog!("[create_reader_session] Auto-starting new session '{}' (device type: {})", session_id, profile.kind);
+        match start_session(&session_id).await {
+            Ok(_) => tlog!("[create_reader_session] Auto-start succeeded for '{}' (device type: {})", session_id, profile.kind),
+            Err(e) => tlog!("[create_reader_session] Auto-start FAILED for '{}': {}", session_id, e),
         }
     } else if result.is_new && is_playback_source {
         tlog!("[create_reader_session] Created playback session '{}' (not auto-starting - frontend will start after listener registration)", session_id);

@@ -76,6 +76,7 @@ export interface ResolvedSignal {
   bit_length?: number;
   signed?: boolean;
   endianness?: Endianness;
+  word_order?: Endianness;
   factor?: number;
   offset?: number;
   unit?: string;
@@ -113,6 +114,8 @@ export interface ModbusProtocolConfig {
   default_interval?: number;
   /** Default byte order for multi-register values */
   default_byte_order?: 'big' | 'little';
+  /** Default word order for multi-register values: 'big' = standard (high word first), 'little' = word-swapped (low word first) */
+  default_word_order?: 'big' | 'little';
 }
 
 export interface ParsedCatalog {
@@ -197,6 +200,7 @@ export function normaliseSignal(raw: any): ResolvedSignal {
     bit_length: raw.bit_length,
     signed: raw.signed,
     endianness: raw.byte_order ?? raw.endianness,
+    word_order: raw.word_order,
     factor: raw.factor,
     offset: raw.offset,
     unit: raw.unit,
@@ -504,6 +508,11 @@ export function parseModbusConfig(parsed: any): ModbusProtocolConfig | null {
   const byteOrder = configSection.default_byte_order ?? configSection.byte_order;
   if (byteOrder === 'big' || byteOrder === 'little') {
     config.default_byte_order = byteOrder;
+  }
+
+  const wordOrder = configSection.default_word_order;
+  if (wordOrder === 'big' || wordOrder === 'little') {
+    config.default_word_order = wordOrder;
   }
 
   return Object.keys(config).length > 0 ? config : null;

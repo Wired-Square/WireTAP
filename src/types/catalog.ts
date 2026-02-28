@@ -27,6 +27,7 @@ export interface SignalDoc {
   unit?: string;
   signed?: boolean;
   endianness?: Endianness;
+  word_order?: Endianness;
   min?: number;
   max?: number;
   enum?: Record<number, string>;

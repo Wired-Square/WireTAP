@@ -267,6 +267,12 @@ fn spawn_poll_task(
             RegisterType::Coil => "coil",
             RegisterType::Discrete => "discrete",
         };
+        let mut first_poll = true;
+
+        tlog!(
+            "[ModbusTCP:{}] Poll task started: {} reg {} count {} every {}ms (frame_id={})",
+            session_id, type_name, poll.start_register, poll.count, poll.interval_ms, poll.frame_id
+        );
 
         loop {
             timer.tick().await;
@@ -327,6 +333,14 @@ fn spawn_poll_task(
 
             match result {
                 Ok(bytes) => {
+                    if first_poll {
+                        tlog!(
+                            "[ModbusTCP:{}] First poll OK: {} reg {} → {} bytes: {:02X?}",
+                            session_id, type_name, poll.start_register, bytes.len(), &bytes[..bytes.len().min(16)]
+                        );
+                        first_poll = false;
+                    }
+
                     let frame = FrameMessage {
                         protocol: "modbus".to_string(),
                         timestamp_us: now_us(),

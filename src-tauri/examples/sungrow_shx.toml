@@ -5,7 +5,8 @@
 # https://github.com/mkaiser/Sungrow-SHx-Inverter-Modbus-Home-Assistant
 #
 # Connection: Modbus TCP via WiNet-S dongle, default port 502, unit ID 1.
-# All registers are input registers (read-only, function code 04).
+# All data registers are input registers (read-only, function code 04).
+# Holding registers (function code 03) included for configuration readback.
 # Addresses are 0-based protocol addresses (IEC).
 
 [meta]
@@ -18,10 +19,93 @@ device_address = 1
 register_base = 0
 default_interval = 5000
 default_byte_order = "big"
+default_word_order = "little"
+
+# ============================================================================
+# Firmware & Version Info (slow poll — 600s)
+# ============================================================================
+
+[frame.modbus.firmware_arm]
+register_number = 4953
+register_type = "input"
+length = 15
+tx.interval_ms = 600000
+
+[[frame.modbus.firmware_arm.signals]]
+name = "ARM_Software_Version"
+start_bit = 0
+bit_length = 240
+format = "ascii"
+
+[frame.modbus.firmware_dsp]
+register_number = 4968
+register_type = "input"
+length = 15
+tx.interval_ms = 600000
+
+[[frame.modbus.firmware_dsp.signals]]
+name = "DSP_Software_Version"
+start_bit = 0
+bit_length = 240
+format = "ascii"
+
+# ============================================================================
+# Device Info (slow poll — 600s)
+# Registers 4989–5000
+# ============================================================================
+
+[frame.modbus.device_info]
+register_number = 4989
+register_type = "input"
+length = 12
+tx.interval_ms = 600000
+
+[[frame.modbus.device_info.signals]]
+name = "Inverter_Serial"
+start_bit = 0
+bit_length = 160
+format = "ascii"
+
+[[frame.modbus.device_info.signals]]
+name = "Device_Type_Code"
+start_bit = 160
+bit_length = 16
+
+[[frame.modbus.device_info.signals]]
+name = "Inverter_Rated_Output"
+start_bit = 176
+bit_length = 16
+factor = 100
+unit = "W"
+
+# ============================================================================
+# PV+Battery Generation Totals (slow poll — 600s)
+# Registers 5002–5004
+# ============================================================================
+
+[frame.modbus.pv_battery_generation]
+register_number = 5002
+register_type = "input"
+length = 3
+tx.interval_ms = 600000
+
+[[frame.modbus.pv_battery_generation.signals]]
+name = "Daily_PV_Battery_Generation"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+
+[[frame.modbus.pv_battery_generation.signals]]
+name = "Total_PV_Battery_Generation"
+start_bit = 16
+bit_length = 32
+factor = 0.1
+unit = "kWh"
 
 # ============================================================================
 # Inverter Temperature
-# Register 5007 — polled every 30s
+# Register 5007
 # ============================================================================
 
 [frame.modbus.inverter_temp]
@@ -37,11 +121,10 @@ bit_length = 16
 factor = 0.1
 unit = "°C"
 signed = true
-endianness = "big"
 
 # ============================================================================
 # Solar / PV Production
-# Registers 5010–5017 — MPPT1/2 voltage+current, total DC power
+# Registers 5010–5017 — MPPT1/2/3 voltage+current, total DC power
 # ============================================================================
 
 [frame.modbus.solar_pv]
@@ -55,7 +138,6 @@ start_bit = 0
 bit_length = 16
 factor = 0.1
 unit = "V"
-endianness = "big"
 
 [[frame.modbus.solar_pv.signals]]
 name = "MPPT1_Current"
@@ -63,7 +145,6 @@ start_bit = 16
 bit_length = 16
 factor = 0.1
 unit = "A"
-endianness = "big"
 
 [[frame.modbus.solar_pv.signals]]
 name = "MPPT2_Voltage"
@@ -71,7 +152,6 @@ start_bit = 32
 bit_length = 16
 factor = 0.1
 unit = "V"
-endianness = "big"
 
 [[frame.modbus.solar_pv.signals]]
 name = "MPPT2_Current"
@@ -79,17 +159,29 @@ start_bit = 48
 bit_length = 16
 factor = 0.1
 unit = "A"
-endianness = "big"
+
+[[frame.modbus.solar_pv.signals]]
+name = "MPPT3_Voltage"
+start_bit = 64
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.solar_pv.signals]]
+name = "MPPT3_Current"
+start_bit = 80
+bit_length = 16
+factor = 0.1
+unit = "A"
 
 [[frame.modbus.solar_pv.signals]]
 name = "Total_DC_Power"
 start_bit = 96
 bit_length = 32
 unit = "W"
-endianness = "big"
 
 # ============================================================================
-# Grid Voltages
+# Grid Voltages & Frequency
 # Registers 5018–5020 — Phase A/B/C voltage
 # ============================================================================
 
@@ -104,7 +196,6 @@ start_bit = 0
 bit_length = 16
 factor = 0.1
 unit = "V"
-endianness = "big"
 
 [[frame.modbus.grid_voltage.signals]]
 name = "Grid_Phase_B_Voltage"
@@ -112,7 +203,6 @@ start_bit = 16
 bit_length = 16
 factor = 0.1
 unit = "V"
-endianness = "big"
 
 [[frame.modbus.grid_voltage.signals]]
 name = "Grid_Phase_C_Voltage"
@@ -120,7 +210,54 @@ start_bit = 32
 bit_length = 16
 factor = 0.1
 unit = "V"
-endianness = "big"
+
+# ============================================================================
+# Reactive Power & Power Factor
+# Registers 5032–5034
+# ============================================================================
+
+[frame.modbus.power_quality]
+register_number = 5032
+register_type = "input"
+length = 3
+
+[[frame.modbus.power_quality.signals]]
+name = "Reactive_Power"
+start_bit = 0
+bit_length = 32
+unit = "var"
+signed = true
+
+[[frame.modbus.power_quality.signals]]
+name = "Power_Factor"
+start_bit = 32
+bit_length = 16
+factor = 0.001
+signed = true
+
+# ============================================================================
+# MPPT4 (only for SH8/10RS with 4 MPPTs)
+# Registers 5114–5115
+# ============================================================================
+
+[frame.modbus.mppt4]
+register_number = 5114
+register_type = "input"
+length = 2
+
+[[frame.modbus.mppt4.signals]]
+name = "MPPT4_Voltage"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "V"
+
+[[frame.modbus.mppt4.signals]]
+name = "MPPT4_Current"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "A"
 
 # ============================================================================
 # Battery Power
@@ -138,11 +275,10 @@ start_bit = 0
 bit_length = 32
 unit = "W"
 signed = true
-endianness = "big"
 
 # ============================================================================
 # Grid Frequency
-# Register 5241 — polled every 10s
+# Register 5241
 # ============================================================================
 
 [frame.modbus.grid_frequency]
@@ -157,17 +293,16 @@ start_bit = 0
 bit_length = 16
 factor = 0.01
 unit = "Hz"
-endianness = "big"
 
 # ============================================================================
 # Meter / Grid Power
-# Registers 5600–5601 — S32, positive = importing, negative = exporting
+# Registers 5600–5607 — total + per-phase active power
 # ============================================================================
 
 [frame.modbus.meter_power]
 register_number = 5600
 register_type = "input"
-length = 2
+length = 8
 
 [[frame.modbus.meter_power.signals]]
 name = "Meter_Active_Power"
@@ -175,70 +310,261 @@ start_bit = 0
 bit_length = 32
 unit = "W"
 signed = true
-endianness = "big"
 
-# ============================================================================
-# System State + PV Energy
-# Registers 13000–13003 — system state, daily + total PV generation
-# Polled every 30s (energy counters change slowly)
-# ============================================================================
-
-[frame.modbus.system_pv_energy]
-register_number = 13000
-register_type = "input"
-length = 4
-tx.interval_ms = 30000
-
-[[frame.modbus.system_pv_energy.signals]]
-name = "System_State"
-start_bit = 0
-bit_length = 16
-endianness = "big"
-
-[[frame.modbus.system_pv_energy.signals]]
-name = "Daily_PV_Generation"
-start_bit = 16
-bit_length = 16
-factor = 0.1
-unit = "kWh"
-endianness = "big"
-
-[[frame.modbus.system_pv_energy.signals]]
-name = "Total_PV_Generation"
+[[frame.modbus.meter_power.signals]]
+name = "Meter_Phase_A_Power"
 start_bit = 32
 bit_length = 32
+unit = "W"
+signed = true
+
+[[frame.modbus.meter_power.signals]]
+name = "Meter_Phase_B_Power"
+start_bit = 64
+bit_length = 32
+unit = "W"
+signed = true
+
+[[frame.modbus.meter_power.signals]]
+name = "Meter_Phase_C_Power"
+start_bit = 96
+bit_length = 32
+unit = "W"
+signed = true
+
+# ============================================================================
+# Battery Configuration (slow poll — 600s)
+# Registers 5627–5638
+# ============================================================================
+
+[frame.modbus.battery_config]
+register_number = 5627
+register_type = "input"
+length = 12
+tx.interval_ms = 600000
+
+[[frame.modbus.battery_config.signals]]
+name = "BDC_Rated_Power"
+start_bit = 0
+bit_length = 16
+factor = 100
+unit = "W"
+
+# 5628-5629 gap
+
+[[frame.modbus.battery_config.signals]]
+name = "Battery_Current"
+start_bit = 48
+bit_length = 16
 factor = 0.1
+unit = "A"
+signed = true
+
+# 5631-5633 gap
+
+[[frame.modbus.battery_config.signals]]
+name = "BMS_Max_Charge_Current"
+start_bit = 112
+bit_length = 16
+unit = "A"
+
+[[frame.modbus.battery_config.signals]]
+name = "BMS_Max_Discharge_Current"
+start_bit = 128
+bit_length = 16
+unit = "A"
+
+# 5636-5637 gap
+
+[[frame.modbus.battery_config.signals]]
+name = "Battery_Capacity"
+start_bit = 176
+bit_length = 16
+factor = 0.01
 unit = "kWh"
-endianness = "big"
 
 # ============================================================================
-# Load Power
-# Registers 13007–13008 — S32, household consumption
+# Backup Power
+# Registers 5722–5727
 # ============================================================================
 
-[frame.modbus.load_power]
-register_number = 13007
+[frame.modbus.backup_power]
+register_number = 5722
+register_type = "input"
+length = 6
+
+[[frame.modbus.backup_power.signals]]
+name = "Backup_Phase_A_Power"
+start_bit = 0
+bit_length = 16
+unit = "W"
+signed = true
+
+[[frame.modbus.backup_power.signals]]
+name = "Backup_Phase_B_Power"
+start_bit = 16
+bit_length = 16
+unit = "W"
+signed = true
+
+[[frame.modbus.backup_power.signals]]
+name = "Backup_Phase_C_Power"
+start_bit = 32
+bit_length = 16
+unit = "W"
+signed = true
+
+[[frame.modbus.backup_power.signals]]
+name = "Total_Backup_Power"
+start_bit = 48
+bit_length = 32
+unit = "W"
+signed = true
+
+# ============================================================================
+# Running State & Power Flow
+# Registers 12999–13000
+# ============================================================================
+
+[frame.modbus.system_state]
+register_number = 12999
 register_type = "input"
 length = 2
 
-[[frame.modbus.load_power.signals]]
+[[frame.modbus.system_state.signals]]
+name = "Running_State"
+start_bit = 0
+bit_length = 16
+format = "hex"
+
+[[frame.modbus.system_state.signals]]
+name = "Power_Flow_Status"
+start_bit = 16
+bit_length = 16
+format = "hex"
+
+# ============================================================================
+# PV Generation & Export
+# Registers 13001–13006 — daily/total PV gen + daily/total PV export
+# ============================================================================
+
+[frame.modbus.pv_energy]
+register_number = 13001
+register_type = "input"
+length = 6
+tx.interval_ms = 30000
+
+[[frame.modbus.pv_energy.signals]]
+name = "Daily_PV_Generation"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+
+[[frame.modbus.pv_energy.signals]]
+name = "Total_PV_Generation"
+start_bit = 16
+bit_length = 32
+factor = 0.1
+unit = "kWh"
+
+[[frame.modbus.pv_energy.signals]]
+name = "Daily_Exported_Energy_PV"
+start_bit = 48
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+
+[[frame.modbus.pv_energy.signals]]
+name = "Total_Exported_Energy_PV"
+start_bit = 64
+bit_length = 32
+factor = 0.1
+unit = "kWh"
+
+# ============================================================================
+# Load Power & Grid Exchange
+# Registers 13007–13010 — load power, export power raw
+# ============================================================================
+
+[frame.modbus.load_grid]
+register_number = 13007
+register_type = "input"
+length = 4
+
+[[frame.modbus.load_grid.signals]]
 name = "Load_Power"
 start_bit = 0
 bit_length = 32
 unit = "W"
 signed = true
-endianness = "big"
+
+[[frame.modbus.load_grid.signals]]
+name = "Export_Power"
+start_bit = 32
+bit_length = 32
+unit = "W"
+signed = true
+
+# ============================================================================
+# Battery Charge from PV
+# Registers 13011–13013
+# ============================================================================
+
+[frame.modbus.battery_charge_pv]
+register_number = 13011
+register_type = "input"
+length = 3
+tx.interval_ms = 30000
+
+[[frame.modbus.battery_charge_pv.signals]]
+name = "Daily_Battery_Charge_PV"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+
+[[frame.modbus.battery_charge_pv.signals]]
+name = "Total_Battery_Charge_PV"
+start_bit = 16
+bit_length = 32
+factor = 0.1
+unit = "kWh"
+
+# ============================================================================
+# Direct Energy Consumption
+# Registers 13016–13018
+# ============================================================================
+
+[frame.modbus.direct_consumption]
+register_number = 13016
+register_type = "input"
+length = 3
+tx.interval_ms = 30000
+
+[[frame.modbus.direct_consumption.signals]]
+name = "Daily_Direct_Consumption"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+
+[[frame.modbus.direct_consumption.signals]]
+name = "Total_Direct_Consumption"
+start_bit = 16
+bit_length = 32
+factor = 0.1
+unit = "kWh"
 
 # ============================================================================
 # Battery Status
-# Registers 13019–13024 — voltage, (gap 13020–13021), SoC, SoH, temperature
-# Polled every 10s
+# Registers 13019–13027 — voltage, SoC, SoH, temperature, discharge energy
 # ============================================================================
 
 [frame.modbus.battery_status]
 register_number = 13019
 register_type = "input"
-length = 6
+length = 9
 tx.interval_ms = 10000
 
 [[frame.modbus.battery_status.signals]]
@@ -247,7 +573,8 @@ start_bit = 0
 bit_length = 16
 factor = 0.1
 unit = "V"
-endianness = "big"
+
+# 13020-13021 gap (2 registers)
 
 [[frame.modbus.battery_status.signals]]
 name = "Battery_SoC"
@@ -255,7 +582,6 @@ start_bit = 48
 bit_length = 16
 factor = 0.1
 unit = "%"
-endianness = "big"
 
 [[frame.modbus.battery_status.signals]]
 name = "Battery_SoH"
@@ -263,7 +589,6 @@ start_bit = 64
 bit_length = 16
 factor = 0.1
 unit = "%"
-endianness = "big"
 
 [[frame.modbus.battery_status.signals]]
 name = "Battery_Temperature"
@@ -272,31 +597,65 @@ bit_length = 16
 factor = 0.1
 unit = "°C"
 signed = true
-endianness = "big"
+
+[[frame.modbus.battery_status.signals]]
+name = "Daily_Battery_Discharge"
+start_bit = 96
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+
+[[frame.modbus.battery_status.signals]]
+name = "Total_Battery_Discharge"
+start_bit = 112
+bit_length = 32
+factor = 0.1
+unit = "kWh"
 
 # ============================================================================
-# Total Active Power
-# Registers 13033–13034 — S32, total inverter output
+# AC Current & Total Active Power
+# Registers 13030–13034
 # ============================================================================
 
-[frame.modbus.total_active_power]
-register_number = 13033
+[frame.modbus.ac_power]
+register_number = 13030
 register_type = "input"
-length = 2
+length = 5
 
-[[frame.modbus.total_active_power.signals]]
-name = "Total_Active_Power"
+[[frame.modbus.ac_power.signals]]
+name = "Phase_A_Current"
 start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = true
+
+[[frame.modbus.ac_power.signals]]
+name = "Phase_B_Current"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = true
+
+[[frame.modbus.ac_power.signals]]
+name = "Phase_C_Current"
+start_bit = 32
+bit_length = 16
+factor = 0.1
+unit = "A"
+signed = true
+
+[[frame.modbus.ac_power.signals]]
+name = "Total_Active_Power"
+start_bit = 48
 bit_length = 32
 unit = "W"
 signed = true
-endianness = "big"
 
 # ============================================================================
 # Energy Import / Export
 # Registers 13035–13046 — daily + total import and export energy
-# Gap at 13038–13043 (registers read but no signals defined)
-# Polled every 30s
 # ============================================================================
 
 [frame.modbus.energy_import_export]
@@ -311,7 +670,6 @@ start_bit = 0
 bit_length = 16
 factor = 0.1
 unit = "kWh"
-endianness = "big"
 
 [[frame.modbus.energy_import_export.signals]]
 name = "Total_Imported_Energy"
@@ -319,7 +677,24 @@ start_bit = 16
 bit_length = 32
 factor = 0.1
 unit = "kWh"
-endianness = "big"
+
+# 13038 gap
+
+[[frame.modbus.energy_import_export.signals]]
+name = "Daily_Battery_Charge"
+start_bit = 64
+bit_length = 16
+factor = 0.1
+unit = "kWh"
+
+[[frame.modbus.energy_import_export.signals]]
+name = "Total_Battery_Charge"
+start_bit = 80
+bit_length = 32
+factor = 0.1
+unit = "kWh"
+
+# 13042-13043 gap
 
 [[frame.modbus.energy_import_export.signals]]
 name = "Daily_Exported_Energy"
@@ -327,7 +702,6 @@ start_bit = 144
 bit_length = 16
 factor = 0.1
 unit = "kWh"
-endianness = "big"
 
 [[frame.modbus.energy_import_export.signals]]
 name = "Total_Exported_Energy"
@@ -335,4 +709,108 @@ start_bit = 160
 bit_length = 32
 factor = 0.1
 unit = "kWh"
-endianness = "big"
+
+# ============================================================================
+# Holding Registers — Battery SoC Limits (readback, 10s)
+# ============================================================================
+
+[frame.modbus.battery_soc_limits]
+register_number = 13057
+register_type = "holding"
+length = 2
+tx.interval_ms = 30000
+
+[[frame.modbus.battery_soc_limits.signals]]
+name = "Battery_Max_SoC"
+start_bit = 0
+bit_length = 16
+factor = 0.1
+unit = "%"
+
+[[frame.modbus.battery_soc_limits.signals]]
+name = "Battery_Min_SoC"
+start_bit = 16
+bit_length = 16
+factor = 0.1
+unit = "%"
+
+# ============================================================================
+# Holding Registers — Export Power Limit (readback, 30s)
+# ============================================================================
+
+[frame.modbus.export_limit]
+register_number = 13073
+register_type = "holding"
+length = 2
+tx.interval_ms = 30000
+
+[[frame.modbus.export_limit.signals]]
+name = "Export_Power_Limit"
+start_bit = 0
+bit_length = 16
+unit = "W"
+
+[[frame.modbus.export_limit.signals]]
+name = "Backup_Mode"
+start_bit = 16
+bit_length = 16
+
+# ============================================================================
+# Holding Registers — Battery Power Thresholds (slow poll — 600s)
+# ============================================================================
+
+[frame.modbus.battery_power_limits]
+register_number = 33046
+register_type = "holding"
+length = 2
+tx.interval_ms = 600000
+
+[[frame.modbus.battery_power_limits.signals]]
+name = "Battery_Max_Charge_Power"
+start_bit = 0
+bit_length = 16
+factor = 10
+unit = "W"
+
+[[frame.modbus.battery_power_limits.signals]]
+name = "Battery_Max_Discharge_Power"
+start_bit = 16
+bit_length = 16
+factor = 10
+unit = "W"
+
+[frame.modbus.battery_power_start]
+register_number = 33148
+register_type = "holding"
+length = 2
+tx.interval_ms = 600000
+
+[[frame.modbus.battery_power_start.signals]]
+name = "Battery_Charging_Start_Power"
+start_bit = 0
+bit_length = 16
+factor = 10
+unit = "W"
+
+[[frame.modbus.battery_power_start.signals]]
+name = "Battery_Discharging_Start_Power"
+start_bit = 16
+bit_length = 16
+factor = 10
+unit = "W"
+
+# ============================================================================
+# Holding Registers — Backup SoC Reserve (readback, 30s)
+# ============================================================================
+
+[frame.modbus.backup_soc]
+register_number = 13099
+register_type = "holding"
+length = 1
+tx.interval_ms = 30000
+
+[[frame.modbus.backup_soc.signals]]
+name = "Battery_Reserved_SoC_Backup"
+start_bit = 0
+bit_length = 16
+unit = "%"

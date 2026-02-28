@@ -11,6 +11,8 @@ export type SignalDefinition = {
   bit_length?: number;
   signed?: boolean;
   endianness?: Endianness;
+  /** Word order for multi-register (>16-bit) values: 'little' = word-swapped (low word first, e.g. Sungrow CDAB) */
+  word_order?: Endianness;
   factor?: number;
   offset?: number;
   unit?: string;
@@ -121,7 +123,29 @@ export function decodeSignal(
   const len = def.bit_length ?? 0;
   // Use signal's endianness if specified, otherwise fall back to catalog default
   const endianness: Endianness = def.endianness ?? defaultEndianness;
-  const raw = extractBits(bytes, start, len, endianness, def.signed);
+
+  // Apply word-swap for multi-register signals (e.g. Sungrow CDAB byte order)
+  // word_order='little' means registers arrive low-word-first; reverse 16-bit words
+  let effectiveBytes = bytes;
+  if (def.word_order === 'little' && len > 16) {
+    const startByte = Math.floor(start / 8);
+    const numBytes = Math.ceil(len / 8);
+    const numWords = Math.ceil(numBytes / 2);
+    effectiveBytes = [...bytes];
+    const words: [number, number][] = [];
+    for (let i = 0; i < numWords; i++) {
+      const idx = startByte + i * 2;
+      words.push([effectiveBytes[idx] ?? 0, effectiveBytes[idx + 1] ?? 0]);
+    }
+    words.reverse();
+    for (let i = 0; i < words.length; i++) {
+      const idx = startByte + i * 2;
+      effectiveBytes[idx] = words[i][0];
+      if (idx + 1 < effectiveBytes.length) effectiveBytes[idx + 1] = words[i][1];
+    }
+  }
+
+  const raw = extractBits(effectiveBytes, start, len, endianness, def.signed);
   const factor = def.factor ?? 1;
   const offset = def.offset ?? 0;
   const scaled = new Decimal(raw).mul(factor).add(offset);

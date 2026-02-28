@@ -8,6 +8,7 @@ export type SignalDef = {
   bit_length?: number;
   signed?: boolean;
   endianness?: Endianness;
+  word_order?: Endianness;
   factor?: number;
   offset?: number;
   unit?: string;

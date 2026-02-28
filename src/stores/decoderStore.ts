@@ -515,6 +515,23 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         }
       }
 
+      // Apply Modbus default_word_order to signals that don't have an explicit word_order
+      if (catalog.modbusConfig?.default_word_order) {
+        const defaultWo = catalog.modbusConfig.default_word_order;
+        for (const [, frame] of frameMap) {
+          for (const signal of frame.signals) {
+            if (!signal.word_order) signal.word_order = defaultWo;
+          }
+          if (frame.mux) {
+            for (const caseDef of Object.values(frame.mux.cases)) {
+              for (const signal of caseDef.signals) {
+                if (!signal.word_order) signal.word_order = defaultWo;
+              }
+            }
+          }
+        }
+      }
+
       // Pre-build Modbus poll groups from catalog (before converting to FrameDetail)
       const modbusPolls = buildPollsFromCatalog(catalog.frames, catalog.modbusConfig ?? null);
       const modbusPollsJson = modbusPolls.length > 0 ? JSON.stringify(modbusPolls) : null;
