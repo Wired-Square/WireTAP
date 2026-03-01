@@ -13,6 +13,9 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "node scripts/bump-version.js && tauri build",
+    "ios:init": "tauri ios init",
+    "ios:dev": "tauri ios dev",
+    "ios:build": "tauri ios build",
     "version:patch": "node scripts/bump-version.js patch",
     "version:minor": "node scripts/bump-version.js minor",
     "version:major": "node scripts/bump-version.js major",
@@ -44,7 +47,7 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
-    "@sentry/vite-plugin": "^4.9.1",
+    "@sentry/vite-plugin": "^5.1.1",
     "@tailwindcss/postcss": "^4.1.18",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",

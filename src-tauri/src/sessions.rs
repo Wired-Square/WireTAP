@@ -1416,6 +1416,7 @@ pub async fn probe_device(
                 bus_count: 0,
                 primary_info: None,
                 secondary_info: None,
+                supports_fd: None,
                 error: Some("GVRET USB is not available on iOS".to_string()),
             })
         }
@@ -1591,6 +1592,7 @@ pub async fn probe_device(
                 bus_count: 0,
                 primary_info: None,
                 secondary_info: None,
+                supports_fd: None,
                 error: Some("Serial ports are not available on iOS".to_string()),
             })
         }

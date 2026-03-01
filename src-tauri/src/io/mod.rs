@@ -1719,7 +1719,7 @@ pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
 const STATUS_LOG_INTERVAL_SECS: u64 = 60;
 
 /// Get process RSS (Resident Set Size) in MB using platform-specific APIs.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 fn get_rss_mb() -> Option<f64> {
     use std::mem;
 

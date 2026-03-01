@@ -15,9 +15,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.3.2</string>
+	<string>0.5.0</string>
 	<key>CFBundleVersion</key>
-	<string>0.3.2</string>
+	<string>0.5.0</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -40,11 +40,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>CANdor uses Bluetooth to provision WiFi credentials on embedded devices.</string>
+	<string>WireTAP uses Bluetooth to provision WiFi credentials and upgrade firmware on embedded devices.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>WireTAP uses the local network to discover and upgrade firmware on embedded devices via mDNS.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_mcumgr._udp</string>
+		<string>_framelink._tcp</string>
+	</array>
 </dict>
 </plist>

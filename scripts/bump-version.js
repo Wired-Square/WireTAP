@@ -66,4 +66,36 @@ tauriConf.version = newVersion;
 writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
 console.log(`  ✓ src-tauri/tauri.conf.json`);
 
+// Update iOS Info.plist (CFBundleShortVersionString + CFBundleVersion)
+const iosPlistPath = join(tauriDir, 'gen', 'apple', 'wiretap_iOS', 'Info.plist');
+try {
+  let iosPlist = readFileSync(iosPlistPath, 'utf8');
+  iosPlist = iosPlist.replace(
+    /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]*/,
+    `$1${newVersion}`
+  );
+  iosPlist = iosPlist.replace(
+    /(<key>CFBundleVersion<\/key>\s*<string>)[^<]*/,
+    `$1${newVersion}`
+  );
+  writeFileSync(iosPlistPath, iosPlist);
+  console.log(`  ✓ src-tauri/gen/apple/wiretap_iOS/Info.plist`);
+} catch { /* iOS not initialised yet */ }
+
+// Update iOS project.yml (CFBundleShortVersionString + CFBundleVersion)
+const projectYmlPath = join(tauriDir, 'gen', 'apple', 'project.yml');
+try {
+  let projectYml = readFileSync(projectYmlPath, 'utf8');
+  projectYml = projectYml.replace(
+    /CFBundleShortVersionString: .+/,
+    `CFBundleShortVersionString: ${newVersion}`
+  );
+  projectYml = projectYml.replace(
+    /CFBundleVersion: .+/,
+    `CFBundleVersion: "${newVersion}"`
+  );
+  writeFileSync(projectYmlPath, projectYml);
+  console.log(`  ✓ src-tauri/gen/apple/project.yml`);
+} catch { /* iOS not initialised yet */ }
+
 console.log(`\nVersion bumped to ${newVersion}`);

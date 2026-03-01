@@ -464,11 +464,16 @@ async fn create_main_window(app: AppHandle, label: String) -> Result<(), String>
 
 /// Show the calling window and give it focus.
 /// Called from the frontend inline script once the splash HTML is painted.
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 fn show_current_window(window: tauri::WebviewWindow) {
     let _ = window.show();
     let _ = window.set_focus();
 }
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+fn show_current_window() {}
 
 /// Write a frontend log message to the backend log file.
 /// The message is filtered by the current log level threshold.
@@ -895,10 +900,11 @@ pub fn run() {
                 }
             }
 
-            // Restore dashboard window geometry from persisted state.
+            // Restore dashboard window geometry from persisted state (desktop only).
             // The window starts hidden (visible: false in tauri.conf.json) and is
             // shown by a frontend inline script once the splash HTML has rendered,
             // so it appears at the saved position with content already painted.
+            #[cfg(not(target_os = "ios"))]
             if let Some(window) = app.get_webview_window("dashboard") {
                 let mut restored = false;
 

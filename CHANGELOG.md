@@ -2,6 +2,19 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **iOS build support**: Fixed compilation for `aarch64-apple-ios` target — gated desktop-only APIs (`show`, `set_focus`, `set_size`, `set_position`, `center`) behind `#[cfg(not(target_os = "ios"))]`, extended `get_rss_mb` Mach implementation to cover iOS, and added missing `supports_fd` field to iOS device probe stubs
+- **iOS project configuration**: Added `CoreBluetooth.framework` to Xcode project dependencies, configured code signing (`DEVELOPMENT_TEAM`, `CODE_SIGN_STYLE`) in `project.yml`, synced iOS bundle version to 0.5.0, and removed leftover `Sources/candor/` directory from the CANdor rename
+- **iOS npm scripts**: Added `ios:init`, `ios:dev`, and `ios:build` scripts to `package.json`
+- **iOS version bumping**: `bump-version.js` now updates `CFBundleShortVersionString` and `CFBundleVersion` in `Info.plist` and `project.yml`
+
+### Fixed
+
+- **CANdor references in iOS plists**: Updated `NSBluetoothAlwaysUsageDescription` and `NSLocalNetworkUsageDescription` from "CANdor" to "WireTAP" in both `src-tauri/Info.plist` and `gen/apple/wiretap_iOS/Info.plist`
+
 ## [0.5.0] - 2026-02-28
 
 ### Added
