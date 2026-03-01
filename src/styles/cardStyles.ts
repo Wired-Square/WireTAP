@@ -28,7 +28,7 @@ export const cardElevated = `${cardBase} bg-[var(--bg-surface)] border-[color:va
  * Use for: List items, selectable cards
  * Uses CSS variables for cross-platform dark mode support
  */
-export const cardInteractive = `${cardBase} bg-[var(--bg-surface)] border-[color:var(--border-default)] hover:brightness-95 cursor-pointer transition-all`;
+export const cardInteractive = `${cardBase} bg-[var(--bg-surface)] border-[color:var(--border-default)] hover:brightness-95 transition-all`;
 
 /**
  * Alert base - common alert box styles
@@ -96,7 +96,7 @@ export const panelFooter = "p-3 bg-[var(--bg-primary)] border-t border-[color:va
  * Uses CSS variables for cross-platform dark mode support
  */
 export const expandableRowContainer =
-  "w-full flex items-center justify-between px-4 py-3 bg-[var(--bg-surface)] hover:brightness-95 transition-all cursor-pointer";
+  "w-full flex items-center justify-between px-4 py-3 bg-[var(--bg-surface)] hover:brightness-95 transition-all";
 
 /**
  * Selectable option box - for radio/checkbox option containers
@@ -104,4 +104,4 @@ export const expandableRowContainer =
  * Uses CSS variables for cross-platform dark mode support
  */
 export const selectableOptionBox =
-  "flex items-start gap-3 p-3 rounded-lg border border-[color:var(--border-default)] cursor-pointer hover:brightness-95 transition-all";
+  "flex items-start gap-3 p-3 rounded-lg border border-[color:var(--border-default)] hover:brightness-95 transition-all";

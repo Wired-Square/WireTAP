@@ -2,6 +2,7 @@
 
 import { SelectHTMLAttributes, forwardRef } from 'react';
 import { focusRing } from '../../styles';
+import { formElementHeight } from '../../styles/inputStyles';
 
 export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   variant?: 'default' | 'simple';
@@ -15,7 +16,7 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ variant = 'default', className = '', children, ...props }, ref) => {
     // Uses CSS variables for cross-platform dark mode support (Windows WebView)
-    const baseClasses = 'w-full border transition-colors text-[color:var(--text-primary)]';
+    const baseClasses = `w-full border transition-colors text-[color:var(--text-primary)] ${formElementHeight}`;
 
     const variantClasses = {
       default: `px-4 py-2 bg-[var(--bg-surface)] border-[color:var(--border-default)] rounded-lg ${focusRing}`,

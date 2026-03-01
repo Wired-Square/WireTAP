@@ -33,6 +33,7 @@ import {
   hoverBg,
 } from "../../../styles";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
+import { toolbarElementHeight } from "../../../styles/inputStyles";
 
 /** Format timestamp as HH:MM:SS.mmm */
 function formatTime(timestamp: number): string {
@@ -197,7 +198,7 @@ export default function SessionLogView() {
         {/* Event Type Filter Dropdown */}
         <div className="relative group">
           <button
-            className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded border ${borderDefault} ${bgSurface} ${textSecondary} ${hoverBg}`}
+            className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textSecondary} ${hoverBg}`}
           >
             <Filter className="w-3 h-3" />
             <span>Events</span>
@@ -247,7 +248,7 @@ export default function SessionLogView() {
           onChange={(e) =>
             setFilter({ sessionId: e.target.value || null })
           }
-          className={`text-xs px-2 py-1 rounded border ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
+          className={`text-xs px-2 py-1 rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
         >
           <option value="">All sessions</option>
           {uniqueSessionIds.map((sessionId) => (
@@ -265,7 +266,7 @@ export default function SessionLogView() {
             placeholder="Search..."
             value={filter.searchText}
             onChange={(e) => setFilter({ searchText: e.target.value })}
-            className={`w-full text-xs pl-7 pr-2 py-1 rounded border ${borderDefault} ${bgSurface} ${textPrimary} placeholder:${textMuted} focus:outline-none focus:ring-1 focus:ring-blue-500`}
+            className={`w-full text-xs pl-7 pr-2 py-1 rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textPrimary} placeholder:${textMuted} focus:outline-none focus:ring-1 focus:ring-blue-500`}
           />
         </div>
 

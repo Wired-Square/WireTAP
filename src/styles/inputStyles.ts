@@ -51,3 +51,9 @@ export const selectDefault = `${inputBase} px-4 py-2 bg-[var(--bg-primary)] bord
  * Select simple style - matches input simple
  */
 export const selectSimple = `${inputBase} px-3 py-2 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:outline-none focus:ring-2 focus:ring-blue-500`;
+
+/** Standard form element height for settings, dialogs, and main views */
+export const formElementHeight = "h-[42px]";
+
+/** Compact form element height for toolbars and data view controls */
+export const toolbarElementHeight = "h-[26px]";

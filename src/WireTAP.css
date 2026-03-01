@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+
+/* Use default cursor everywhere; inputs and textareas still show text cursor via browser UA styles */
+* {
+  cursor: default;
+}
+
 /* Prevent the entire webview from scrolling/bouncing on macOS */
 html, body {
   overflow: hidden;
@@ -33,10 +39,16 @@ html, body {
   letter-spacing: 0.05em;
 }
 
+/* Override Dockview's cursor: pointer on tabs and pane headers */
+.dockview-theme-abyss .dv-tab,
+.dockview-theme-abyss .dv-tab *,
+.dv-pane-container .dv-view .dv-default-header {
+  cursor: default;
+}
+
 /* Dockview header action buttons - reset global button styles */
 .dockview-theme-abyss .dv-tabs-and-actions-container button {
   all: unset;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -181,11 +193,6 @@ form button {
   background-color: #ffffff;
   transition: border-color 0.25s;
   box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-.container button,
-form button {
-  cursor: pointer;
 }
 
 .container button:hover,

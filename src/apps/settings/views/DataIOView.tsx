@@ -20,6 +20,7 @@ import {
   badgePurple,
   badgeWarning,
   badgeNeutral,
+  badgeDanger,
   badgeInfo,
   iconButtonHoverDanger,
 } from "../../../styles";
@@ -327,30 +328,10 @@ export default function DataIOView({
 
                   {/* Realtime indicator */}
                   {!isReaderRealtime(profile.kind) && (
-                    <span className={badgeNeutral}>
+                    <span className={badgeDanger}>
                       Recorded
                     </span>
                   )}
-
-                  {/* Star icon for default */}
-                  <button
-                    onClick={() => onToggleDefaultRead(profile.id)}
-                    className={`p-1 ${hoverSubtle} rounded transition-colors`}
-                    title={
-                      defaultReadProfile === profile.id
-                        ? "Unset as default"
-                        : "Set as default"
-                    }
-                  >
-                    <Star
-                      className={`${iconMd} ${
-                        defaultReadProfile === profile.id
-                          ? "fill-yellow-500 text-yellow-500"
-                          : ""
-                      }`}
-                      style={defaultReadProfile !== profile.id ? { color: 'var(--text-secondary)', opacity: 0.6 } : undefined}
-                    />
-                  </button>
                 </div>
 
                 {/* Connection summary */}
@@ -360,6 +341,24 @@ export default function DataIOView({
               </div>
 
               <div className={`flex items-center ${gapSmall}`}>
+                <button
+                  onClick={() => onToggleDefaultRead(profile.id)}
+                  className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
+                  title={
+                    defaultReadProfile === profile.id
+                      ? "Unset as default"
+                      : "Set as default"
+                  }
+                >
+                  <Star
+                    className={`${iconMd} ${
+                      defaultReadProfile === profile.id
+                        ? "fill-yellow-500 text-yellow-500"
+                        : ""
+                    }`}
+                    style={defaultReadProfile !== profile.id ? { color: 'var(--text-secondary)', opacity: 0.6 } : undefined}
+                  />
+                </button>
                 <button
                   onClick={() => onDuplicateProfile(profile)}
                   className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}

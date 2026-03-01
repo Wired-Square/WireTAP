@@ -4,6 +4,7 @@
 
 import { SelectHTMLAttributes, forwardRef } from 'react';
 import { disabledState } from "../../styles";
+import { toolbarElementHeight } from '../../styles/inputStyles';
 
 export interface ToolbarSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   /** Optional size variant */
@@ -21,7 +22,7 @@ const ToolbarSelect = forwardRef<HTMLSelectElement, ToolbarSelectProps>(
       small: 'px-1.5 py-0.5 text-xs',
     };
 
-    const baseClasses = `rounded border border-gray-600 bg-gray-700 text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 ${disabledState}`;
+    const baseClasses = `rounded border border-gray-600 bg-gray-700 text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 ${toolbarElementHeight} ${disabledState}`;
 
     return (
       <select
