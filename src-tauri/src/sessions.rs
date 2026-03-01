@@ -1597,6 +1597,56 @@ pub async fn probe_device(
             })
         }
 
+        // Modbus TCP - probe by attempting a TCP connection
+        "modbus_tcp" => {
+            let host = profile.connection.get("host")
+                .and_then(|v| v.as_str())
+                .unwrap_or("127.0.0.1");
+            let port = profile.connection.get("port")
+                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                .unwrap_or(502) as u16;
+            let timeout_sec = profile.connection.get("timeout")
+                .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                .unwrap_or(5.0);
+
+            let addr = format!("{}:{}", host, port);
+            match tokio::time::timeout(
+                std::time::Duration::from_secs_f64(timeout_sec),
+                tokio::net::TcpStream::connect(&addr),
+            ).await {
+                Ok(Ok(_stream)) => Ok(DeviceProbeResult {
+                    success: true,
+                    device_type: "modbus_tcp".to_string(),
+                    is_multi_bus: false,
+                    bus_count: 1,
+                    primary_info: Some("Modbus TCP".to_string()),
+                    secondary_info: Some(addr),
+                    supports_fd: None,
+                    error: None,
+                }),
+                Ok(Err(e)) => Ok(DeviceProbeResult {
+                    success: false,
+                    device_type: "modbus_tcp".to_string(),
+                    is_multi_bus: false,
+                    bus_count: 0,
+                    primary_info: None,
+                    secondary_info: Some(addr),
+                    supports_fd: None,
+                    error: Some(format!("Connection failed: {}", e)),
+                }),
+                Err(_) => Ok(DeviceProbeResult {
+                    success: false,
+                    device_type: "modbus_tcp".to_string(),
+                    is_multi_bus: false,
+                    bus_count: 0,
+                    primary_info: None,
+                    secondary_info: Some(addr),
+                    supports_fd: None,
+                    error: Some(format!("Connection timed out after {}s", timeout_sec)),
+                }),
+            }
+        }
+
         // Recorded sources or unsupported types
         _ => Err(format!(
             "Profile '{}' is not a real-time device (kind: {})",

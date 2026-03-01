@@ -13,6 +13,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **Modbus TCP probe**: Added missing `modbus_tcp` handler in `probe_device()` — selecting a Modbus TCP profile in the Data Source dialog no longer fails with "not a real-time device". The probe now checks TCP reachability (with timeout) and reports success or a meaningful connection error.
 - **CANdor references in iOS plists**: Updated `NSBluetoothAlwaysUsageDescription` and `NSLocalNetworkUsageDescription` from "CANdor" to "WireTAP" in both `src-tauri/Info.plist` and `gen/apple/wiretap_iOS/Info.plist`
 
 ## [0.5.0] - 2026-02-28
