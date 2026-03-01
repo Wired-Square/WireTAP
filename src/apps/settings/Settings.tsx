@@ -1,36 +1,49 @@
 // ui/src/apps/settings/Settings.tsx
 
-import { useEffect, useState } from 'react';
-import { pickDirectory } from '../../api/dialogs';
+import { useEffect, useState } from "react";
+import { pickDirectory } from "../../api/dialogs";
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
 import AppSideBar, { type SideBarItem } from "../../components/AppSideBar";
-import { Cog, MapPin, Cable, Database, BookOpen, Monitor, Bookmark, Star, LayoutGrid, Shield } from "lucide-react";
+import {
+  Cog,
+  MapPin,
+  Cable,
+  Database,
+  BookOpen,
+  Monitor,
+  Bookmark,
+  Star,
+  LayoutGrid,
+  Shield,
+  Cpu,
+} from "lucide-react";
 import { bgDataView, borderDataView } from "../../styles/colourTokens";
-import LocationsView from './views/LocationsView';
-import DisplayView from './views/DisplayView';
-import CatalogsView from './views/CatalogsView';
-import DataIOView from './views/DataIOView';
-import GeneralView from './views/GeneralView';
-import BuffersView from './views/BuffersView';
-import BookmarksView from './views/BookmarksView';
-import SelectionSetsView from './views/SelectionSetsView';
-import GraphLayoutsView from './views/GraphLayoutsView';
-import PrivacyView from './views/PrivacyView';
-import IOProfileDialog from './dialogs/IOProfileDialog';
-import EditCatalogDialog from './dialogs/EditCatalogDialog';
-import ConfirmDeleteDialog from '../../dialogs/ConfirmDeleteDialog';
-import DuplicateCatalogDialog from './dialogs/DuplicateCatalogDialog';
-import EditBookmarkDialog from './dialogs/EditBookmarkDialog';
-import EditSelectionSetDialog from './dialogs/EditSelectionSetDialog';
-import EditGraphLayoutDialog from './dialogs/EditGraphLayoutDialog';
-import CreateBookmarkDialog from './dialogs/CreateBookmarkDialog';
-import { useSettingsStore, type SettingsSection } from './stores/settingsStore';
-import { useSettingsForms } from './hooks/useSettingsForms';
-import { useSettingsHandlers } from './hooks/useSettingsHandlers';
-import { getTimeRangeCapableProfiles } from '../../utils/profileFilters';
-import { isIOS } from '../../utils/platform';
-import { onStoreChanged } from '../../api/store';
+import LocationsView from "./views/LocationsView";
+import DisplayView from "./views/DisplayView";
+import CatalogsView from "./views/CatalogsView";
+import DataIOView from "./views/DataIOView";
+import GeneralView from "./views/GeneralView";
+import BuffersView from "./views/BuffersView";
+import BookmarksView from "./views/BookmarksView";
+import SelectionSetsView from "./views/SelectionSetsView";
+import GraphLayoutsView from "./views/GraphLayoutsView";
+import PrivacyView from "./views/PrivacyView";
+import Devices from "../devices/Devices";
+import IOProfileDialog from "./dialogs/IOProfileDialog";
+import EditCatalogDialog from "./dialogs/EditCatalogDialog";
+import ConfirmDeleteDialog from "../../dialogs/ConfirmDeleteDialog";
+import DuplicateCatalogDialog from "./dialogs/DuplicateCatalogDialog";
+import EditBookmarkDialog from "./dialogs/EditBookmarkDialog";
+import EditSelectionSetDialog from "./dialogs/EditSelectionSetDialog";
+import EditGraphLayoutDialog from "./dialogs/EditGraphLayoutDialog";
+import CreateBookmarkDialog from "./dialogs/CreateBookmarkDialog";
+import { useSettingsStore, type SettingsSection } from "./stores/settingsStore";
+import { useSettingsForms } from "./hooks/useSettingsForms";
+import { useSettingsHandlers } from "./hooks/useSettingsHandlers";
+import { getTimeRangeCapableProfiles } from "../../utils/profileFilters";
+import { isIOS } from "../../utils/platform";
+import { onStoreChanged } from "../../api/store";
 
 export default function Settings() {
   // Form state for dialogs
@@ -48,18 +61,26 @@ export default function Settings() {
   const decoderDir = useSettingsStore((s) => s.locations.decoderDir);
   const dumpDir = useSettingsStore((s) => s.locations.dumpDir);
   const reportDir = useSettingsStore((s) => s.locations.reportDir);
-  const decoderValidation = useSettingsStore((s) => s.locations.decoderValidation);
+  const decoderValidation = useSettingsStore(
+    (s) => s.locations.decoderValidation,
+  );
   const dumpValidation = useSettingsStore((s) => s.locations.dumpValidation);
-  const reportValidation = useSettingsStore((s) => s.locations.reportValidation);
+  const reportValidation = useSettingsStore(
+    (s) => s.locations.reportValidation,
+  );
   const setDecoderDir = useSettingsStore((s) => s.setDecoderDir);
   const setDumpDir = useSettingsStore((s) => s.setDumpDir);
   const setReportDir = useSettingsStore((s) => s.setReportDir);
 
   // Display
-  const saveFrameIdFormat = useSettingsStore((s) => s.display.saveFrameIdFormat);
+  const saveFrameIdFormat = useSettingsStore(
+    (s) => s.display.saveFrameIdFormat,
+  );
   const setSaveFrameIdFormat = useSettingsStore((s) => s.setSaveFrameIdFormat);
   const displayFrameIdFormat = useSettingsStore((s) => s.display.frameIdFormat);
-  const setDisplayFrameIdFormat = useSettingsStore((s) => s.setDisplayFrameIdFormat);
+  const setDisplayFrameIdFormat = useSettingsStore(
+    (s) => s.setDisplayFrameIdFormat,
+  );
   const displayTimeFormat = useSettingsStore((s) => s.display.timeFormat);
   const setDisplayTimeFormat = useSettingsStore((s) => s.setDisplayTimeFormat);
   const timezone = useSettingsStore((s) => s.display.timezone);
@@ -72,10 +93,18 @@ export default function Settings() {
   const resetBinaryOneColour = useSettingsStore((s) => s.resetBinaryOneColour);
   const binaryZeroColour = useSettingsStore((s) => s.display.binaryZeroColour);
   const setBinaryZeroColour = useSettingsStore((s) => s.setBinaryZeroColour);
-  const resetBinaryZeroColour = useSettingsStore((s) => s.resetBinaryZeroColour);
-  const binaryUnusedColour = useSettingsStore((s) => s.display.binaryUnusedColour);
-  const setBinaryUnusedColour = useSettingsStore((s) => s.setBinaryUnusedColour);
-  const resetBinaryUnusedColour = useSettingsStore((s) => s.resetBinaryUnusedColour);
+  const resetBinaryZeroColour = useSettingsStore(
+    (s) => s.resetBinaryZeroColour,
+  );
+  const binaryUnusedColour = useSettingsStore(
+    (s) => s.display.binaryUnusedColour,
+  );
+  const setBinaryUnusedColour = useSettingsStore(
+    (s) => s.setBinaryUnusedColour,
+  );
+  const resetBinaryUnusedColour = useSettingsStore(
+    (s) => s.resetBinaryUnusedColour,
+  );
 
   // Theme
   const themeMode = useSettingsStore((s) => s.display.themeMode);
@@ -85,12 +114,20 @@ export default function Settings() {
   const resetThemeColours = useSettingsStore((s) => s.resetThemeColours);
 
   // Buffers
-  const clearBuffersOnStart = useSettingsStore((s) => s.buffers.clearBuffersOnStart);
-  const setClearBuffersOnStart = useSettingsStore((s) => s.setClearBuffersOnStart);
+  const clearBuffersOnStart = useSettingsStore(
+    (s) => s.buffers.clearBuffersOnStart,
+  );
+  const setClearBuffersOnStart = useSettingsStore(
+    (s) => s.setClearBuffersOnStart,
+  );
   const bufferStorage = useSettingsStore((s) => s.buffers.bufferStorage);
   const setBufferStorage = useSettingsStore((s) => s.setBufferStorage);
-  const discoveryHistoryBuffer = useSettingsStore((s) => s.buffers.discoveryHistoryBuffer);
-  const setDiscoveryHistoryBuffer = useSettingsStore((s) => s.setDiscoveryHistoryBuffer);
+  const discoveryHistoryBuffer = useSettingsStore(
+    (s) => s.buffers.discoveryHistoryBuffer,
+  );
+  const setDiscoveryHistoryBuffer = useSettingsStore(
+    (s) => s.setDiscoveryHistoryBuffer,
+  );
   const queryResultLimit = useSettingsStore((s) => s.buffers.queryResultLimit);
   const setQueryResultLimit = useSettingsStore((s) => s.setQueryResultLimit);
   const graphBufferSize = useSettingsStore((s) => s.buffers.graphBufferSize);
@@ -117,6 +154,8 @@ export default function Settings() {
   const setKeepDisplayAwake = useSettingsStore((s) => s.setKeepDisplayAwake);
   const logLevel = useSettingsStore((s) => s.general.logLevel);
   const setLogLevel = useSettingsStore((s) => s.setLogLevel);
+  const smpPort = useSettingsStore((s) => s.general.smpPort);
+  const setSmpPort = useSettingsStore((s) => s.setSmpPort);
 
   // Privacy
   const telemetryEnabled = useSettingsStore((s) => s.general.telemetryEnabled);
@@ -124,7 +163,9 @@ export default function Settings() {
 
   // IO Profiles
   const ioProfiles = useSettingsStore((s) => s.ioProfiles.profiles);
-  const defaultReadProfile = useSettingsStore((s) => s.ioProfiles.defaultReadProfile);
+  const defaultReadProfile = useSettingsStore(
+    (s) => s.ioProfiles.defaultReadProfile,
+  );
   const timeRangeCapableProfiles = getTimeRangeCapableProfiles(ioProfiles);
 
   // Catalogs
@@ -188,32 +229,37 @@ export default function Settings() {
   // Reload collections when they change from other panels
   useEffect(() => {
     const promise = onStoreChanged((event) => {
-      if (event.key === 'graph.layouts') loadGraphLayouts();
-      if (event.key === 'favorites.timeRanges') loadBookmarks();
-      if (event.key === 'selectionSets.all') loadSelectionSets();
+      if (event.key === "graph.layouts") loadGraphLayouts();
+      if (event.key === "favorites.timeRanges") loadBookmarks();
+      if (event.key === "selectionSets.all") loadSelectionSets();
     });
-    return () => { promise.then((unlisten) => unlisten()); };
+    return () => {
+      promise.then((unlisten) => unlisten());
+    };
   }, [loadGraphLayouts, loadBookmarks, loadSelectionSets]);
 
   // Sidebar items (Storage hidden on iOS due to sandboxing restrictions)
   const sidebarItems: SideBarItem[] = [
-    { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
-    { id: 'buffers', label: 'Buffers', icon: Database },
-    { id: 'catalogs', label: 'Catalogs', icon: BookOpen },
-    { id: 'data-io', label: 'Data IO', icon: Cable },
-    { id: 'display', label: 'Display', icon: Monitor },
-    { id: 'general', label: 'General', icon: Cog },
-    { id: 'graph-layouts', label: 'Graph Layouts', icon: LayoutGrid },
-    { id: 'privacy', label: 'Privacy', icon: Shield },
-    { id: 'selection-sets', label: 'Selection Sets', icon: Star },
+    { id: "bookmarks", label: "Bookmarks", icon: Bookmark },
+    { id: "buffers", label: "Buffers", icon: Database },
+    { id: "catalogs", label: "Catalogs", icon: BookOpen },
+    { id: "data-io", label: "Data IO", icon: Cable },
+    { id: "display", label: "Display", icon: Monitor },
+    { id: "devices", label: "Devices", icon: Cpu },
+    { id: "general", label: "General", icon: Cog },
+    { id: "graph-layouts", label: "Graph Layouts", icon: LayoutGrid },
+    { id: "privacy", label: "Privacy", icon: Shield },
+    { id: "selection-sets", label: "Selection Sets", icon: Star },
     // Hide Storage on iOS - custom directory paths aren't supported
-    ...(!isIOSPlatform ? [{ id: 'locations' as const, label: 'Storage', icon: MapPin }] : []),
+    ...(!isIOSPlatform
+      ? [{ id: "locations" as const, label: "Storage", icon: MapPin }]
+      : []),
   ];
 
   // Directory picker helper
   const handlePickDirectory = async (
     currentPath: string,
-    setter: (path: string) => void
+    setter: (path: string) => void,
   ) => {
     try {
       const selected = await pickDirectory(currentPath);
@@ -221,21 +267,20 @@ export default function Settings() {
         setter(selected);
       }
     } catch (error) {
-      console.error('Failed to pick directory:', error);
+      console.error("Failed to pick directory:", error);
     }
   };
 
   return (
     <AppLayout
       topBar={
-        <AppTopBar
-          icon={Cog}
-          iconColour="text-[color:var(--accent-warning)]"
-        />
+        <AppTopBar icon={Cog} iconColour="text-[color:var(--accent-warning)]" />
       }
     >
       {/* Sidebar + Content in bubble */}
-      <div className={`flex-1 flex min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
+      <div
+        className={`flex-1 flex min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}
+      >
         <AppSideBar
           items={sidebarItems}
           activeItem={currentSection}
@@ -247,7 +292,7 @@ export default function Settings() {
         {/* Content Area */}
         <main className={`flex-1 min-h-0 overflow-y-auto p-6 ${bgDataView}`}>
           {/* Locations Section (hidden on iOS) */}
-          {currentSection === 'locations' && !isIOSPlatform && (
+          {currentSection === "locations" && !isIOSPlatform && (
             <LocationsView
               decoderDir={decoderDir}
               dumpDir={dumpDir}
@@ -260,13 +305,20 @@ export default function Settings() {
               onChangeDumpDir={setDumpDir}
               onChangeReportDir={setReportDir}
               onChangeSaveFrameIdFormat={setSaveFrameIdFormat}
-              onPickDecoderDir={() => handlePickDirectory(decoderDir, setDecoderDir)}
+              onPickDecoderDir={() =>
+                handlePickDirectory(decoderDir, setDecoderDir)
+              }
               onPickDumpDir={() => handlePickDirectory(dumpDir, setDumpDir)}
-              onPickReportDir={() => handlePickDirectory(reportDir, setReportDir)}
+              onPickReportDir={() =>
+                handlePickDirectory(reportDir, setReportDir)
+              }
             />
           )}
 
-          {currentSection === 'general' && (
+          {/* Devices Section (WiFi Provisioning + Firmware Upgrade) */}
+          {currentSection === "devices" && <Devices />}
+
+          {currentSection === "general" && (
             <GeneralView
               defaultFrameType={defaultFrameType}
               onChangeDefaultFrameType={setDefaultFrameType}
@@ -278,11 +330,13 @@ export default function Settings() {
               onChangeKeepDisplayAwake={setKeepDisplayAwake}
               logLevel={logLevel}
               onChangeLogLevel={setLogLevel}
+              smpPort={smpPort}
+              onChangeSmpPort={setSmpPort}
               isIOS={isIOSPlatform}
             />
           )}
 
-          {currentSection === 'buffers' && (
+          {currentSection === "buffers" && (
             <BuffersView
               clearBuffersOnStart={clearBuffersOnStart}
               onChangeClearBuffersOnStart={setClearBuffersOnStart}
@@ -307,7 +361,7 @@ export default function Settings() {
             />
           )}
 
-          {currentSection === 'privacy' && (
+          {currentSection === "privacy" && (
             <PrivacyView
               telemetryEnabled={telemetryEnabled}
               onChangeTelemetryEnabled={setTelemetryEnabled}
@@ -315,20 +369,22 @@ export default function Settings() {
           )}
 
           {/* Data IO Section */}
-          {currentSection === 'data-io' && (
+          {currentSection === "data-io" && (
             <DataIOView
               ioProfiles={ioProfiles}
               defaultReadProfile={defaultReadProfile}
               onToggleDefaultRead={handlers.toggleDefaultRead}
               onAddProfile={handlers.handleAddIOProfile}
-              onEditProfile={(profile) => handlers.handleEditIOProfile(profile.id)}
+              onEditProfile={(profile) =>
+                handlers.handleEditIOProfile(profile.id)
+              }
               onDeleteProfile={handlers.handleDeleteIOProfile}
               onDuplicateProfile={handlers.handleDuplicateIOProfile}
             />
           )}
 
           {/* Catalogs Section */}
-          {currentSection === 'catalogs' && (
+          {currentSection === "catalogs" && (
             <CatalogsView
               catalogs={catalogs}
               decoderDir={decoderDir}
@@ -339,7 +395,7 @@ export default function Settings() {
           )}
 
           {/* Bookmarks Section */}
-          {currentSection === 'bookmarks' && (
+          {currentSection === "bookmarks" && (
             <BookmarksView
               bookmarks={bookmarks}
               ioProfiles={ioProfiles}
@@ -351,7 +407,7 @@ export default function Settings() {
           )}
 
           {/* Selection Sets Section */}
-          {currentSection === 'selection-sets' && (
+          {currentSection === "selection-sets" && (
             <SelectionSetsView
               selectionSets={selectionSets}
               onEditSelectionSet={handlers.handleEditSelectionSet}
@@ -360,7 +416,7 @@ export default function Settings() {
           )}
 
           {/* Graph Layouts Section */}
-          {currentSection === 'graph-layouts' && (
+          {currentSection === "graph-layouts" && (
             <GraphLayoutsView
               graphLayouts={graphLayouts}
               onEditGraphLayout={handlers.handleEditGraphLayout}
@@ -369,7 +425,7 @@ export default function Settings() {
           )}
 
           {/* Display Section */}
-          {currentSection === 'display' && (
+          {currentSection === "display" && (
             <DisplayView
               displayFrameIdFormat={displayFrameIdFormat}
               displayTimeFormat={displayTimeFormat}
@@ -406,7 +462,9 @@ export default function Settings() {
         profileForm={dialogPayload.profileForm}
         originalProfile={
           dialogPayload.editingProfileId
-            ? ioProfiles.find((p) => p.id === dialogPayload.editingProfileId) ?? null
+            ? (ioProfiles.find(
+                (p) => p.id === dialogPayload.editingProfileId,
+              ) ?? null)
             : null
         }
         onCancel={handlers.handleCancelProfile}
@@ -432,7 +490,10 @@ export default function Settings() {
         open={dialogs.deleteCatalog}
         title="Delete Catalog"
         message="Are you sure you want to delete"
-        highlightText={dialogPayload.catalogToDelete?.name || dialogPayload.catalogToDelete?.filename}
+        highlightText={
+          dialogPayload.catalogToDelete?.name ||
+          dialogPayload.catalogToDelete?.filename
+        }
         onCancel={handlers.handleCancelDelete}
         onConfirm={handlers.handleConfirmDelete}
       />

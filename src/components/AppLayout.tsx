@@ -5,6 +5,7 @@
 
 import { type ReactNode } from "react";
 import { bgPrimary } from "../styles/colourTokens";
+import { marginAppContent } from "../styles/spacing";
 
 interface AppLayoutProps {
   /** Top bar content (rendered via AppTopBar or custom) */
@@ -41,7 +42,7 @@ export default function AppLayout({
     <div className={`h-full flex flex-col ${bgPrimary} overflow-hidden`}>
       {topBar}
       <div
-        className={`flex-1 flex flex-col min-h-0 overflow-hidden ${contentMargin ? "m-2" : ""}`}
+        className={`flex-1 flex flex-col min-h-0 overflow-hidden ${contentMargin ? marginAppContent : ""}`}
       >
         {children}
       </div>

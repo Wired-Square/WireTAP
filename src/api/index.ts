@@ -60,3 +60,44 @@ export {
   type ChecksumAlgorithm,
   type ChecksumValidationResult,
 } from "./checksums";
+
+// BLE Provisioning API
+export {
+  bleScanStart,
+  bleScanStop,
+  bleConnect,
+  bleDisconnect,
+  bleDeleteAllCredentials,
+  bleWifiDisconnect,
+  bleReadDeviceState,
+  bleProvisionWifi,
+  bleSubscribeStatus,
+  bleGetHostWifiSsid,
+  SECURITY_OPEN,
+  SECURITY_WPA2_PSK,
+  STATUS_DISCONNECTED,
+  STATUS_CONNECTING,
+  STATUS_CONNECTED,
+  STATUS_ERROR,
+  type BleDevice,
+  type DeviceWifiState,
+  type WifiCredentials,
+  type ProvisioningStatus,
+} from "./bleProvision";
+
+// SMP Firmware Upgrade API
+export {
+  smpScanStart,
+  smpScanStop,
+  smpConnectBle,
+  smpConnectUdp,
+  smpDisconnect,
+  smpListImages,
+  smpUploadFirmware,
+  smpTestImage,
+  smpConfirmImage,
+  smpResetDevice,
+  smpCancelUpload,
+  type ImageSlotInfo,
+  type UploadProgress,
+} from "./smpUpgrade";

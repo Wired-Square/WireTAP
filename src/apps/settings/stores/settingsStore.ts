@@ -26,7 +26,7 @@ import {
 } from '../../../utils/graphLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "buffers" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
+export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "buffers" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
 // Buffer setting defaults — single source of truth, referenced by settingsStore and useSettings
@@ -124,6 +124,7 @@ interface AppSettings {
   decoder_max_decoded_frames?: number;
   decoder_max_decoded_per_source?: number;
   transmit_max_history?: number;
+  smp_port?: number;
   // Theme settings
   theme_mode?: ThemeMode;
   theme_bg_primary_light?: string;
@@ -331,6 +332,7 @@ interface SettingsState {
     telemetryEnabled: boolean;
     telemetryConsentGiven: boolean;
     modbusMaxRegisterErrors: number;
+    smpPort: number;
   };
 
   // UI state
@@ -419,6 +421,7 @@ interface SettingsState {
   setTelemetryEnabled: (value: boolean) => void;
   setTelemetryConsentGiven: (value: boolean) => void;
   setModbusMaxRegisterErrors: (value: number) => void;
+  setSmpPort: (port: number) => void;
 }
 
 // Auto-save debounce
@@ -496,6 +499,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     telemetryEnabled: false,
     telemetryConsentGiven: false,
     modbusMaxRegisterErrors: DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
+    smpPort: 1337,
   },
 
   ui: {
@@ -603,6 +607,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
         // Modbus
         modbus_max_register_errors: settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
+        // Networking
+        smp_port: settings.smp_port ?? 1337,
       };
 
       set({
@@ -682,6 +688,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           telemetryEnabled: normalized.telemetry_enabled ?? false,
           telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
           modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
+          smpPort: normalized.smp_port ?? 1337,
         },
         originalSettings: normalized,
       });
@@ -814,6 +821,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         theme_accent_success: display.themeColours.accentSuccess,
         theme_accent_danger: display.themeColours.accentDanger,
         theme_accent_warning: display.themeColours.accentWarning,
+        // Networking
+        smp_port: general.smpPort,
       };
 
       await saveSettingsApi(settings);
@@ -894,6 +903,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       theme_accent_success: display.themeColours.accentSuccess,
       theme_accent_danger: display.themeColours.accentDanger,
       theme_accent_warning: display.themeColours.accentWarning,
+      // Networking
+      smp_port: general.smpPort,
     };
 
     return stableStringify(currentSettings) !== stableStringify(originalSettings);
@@ -1299,9 +1310,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     scheduleSave(get().saveSettings);
   },
 
-  setModbusMaxRegisterErrors: (value) => {
+    setModbusMaxRegisterErrors: (value) => {
+        set((state) => ({
+            general: { ...state.general, modbusMaxRegisterErrors: value },
+        }));
+        scheduleSave(get().saveSettings);
+    },
+
+  setSmpPort: (port) => {
     set((state) => ({
-      general: { ...state.general, modbusMaxRegisterErrors: value },
+      general: { ...state.general, smpPort: port },
     }));
     scheduleSave(get().saveSettings);
   },

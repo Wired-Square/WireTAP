@@ -1,5 +1,7 @@
 #[macro_use]
 pub(crate) mod logging;
+mod ble_common;
+mod ble_provision;
 mod buffer_db;
 mod bufferquery;
 mod buffer_store;
@@ -10,11 +12,13 @@ mod credentials;
 mod dbc_export;
 mod dbc_import;
 mod dbquery;
+mod device_scan;
 mod framing;
 mod io;
 mod profile_tracker;
 mod sessions;
 mod settings;
+mod smp_upgrade;
 mod store_manager;
 mod transmit;
 
@@ -546,9 +550,14 @@ fn update_menu_focus_state(
 fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // Create About menu item (App submenu on macOS)
     let about_item = MenuItemBuilder::with_id("about", "About WireTAP").build(app)?;
+    let settings_item = MenuItemBuilder::with_id("settings", "Settings\u{2026}")
+        .accelerator("cmdOrCtrl+,")
+        .build(app)?;
 
     let app_menu = SubmenuBuilder::new(app, "WireTAP")
         .item(&about_item)
+        .separator()
+        .item(&settings_item)
         .separator()
         .quit()
         .build()?;
@@ -578,9 +587,6 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
     let sessions_item = MenuItemBuilder::with_id("app-session-manager", "Sessions")
         .accelerator("cmdOrCtrl+8")
         .build(app)?;
-    let settings_item = MenuItemBuilder::with_id("settings", "Settings…")
-        .accelerator("cmdOrCtrl+,")
-        .build(app)?;
 
     let apps_menu = SubmenuBuilder::new(app, "Apps")
         .item(&discovery_item)
@@ -592,8 +598,6 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
         .item(&catalog_item)
         .item(&calculator_item)
         .item(&sessions_item)
-        .separator()
-        .item(&settings_item)
         .build()?;
 
     // Create View menu items
@@ -1139,6 +1143,33 @@ pub fn run() {
             bufferquery::buffer_query_distribution,
             bufferquery::buffer_query_gap_analysis,
             bufferquery::buffer_query_pattern_search,
+                        // Unified Device Scan API
+                        device_scan::device_scan_start,
+                        device_scan::device_scan_stop,
+                        // BLE WiFi Provisioning API
+                        ble_provision::ble_scan_start,
+                        ble_provision::ble_scan_stop,
+                        ble_provision::ble_connect,
+                        ble_provision::ble_disconnect,
+                        ble_provision::ble_delete_all_credentials,
+                        ble_provision::ble_wifi_disconnect,
+                        ble_provision::ble_read_device_state,
+                        ble_provision::ble_provision_wifi,
+                        ble_provision::ble_subscribe_status,
+                        ble_provision::ble_get_host_wifi_ssid,
+                        // SMP Firmware Upgrade API
+                        smp_upgrade::smp_scan_start,
+                        smp_upgrade::smp_scan_stop,
+                        smp_upgrade::smp_attach_ble,
+                        smp_upgrade::smp_connect_ble,
+                        smp_upgrade::smp_connect_udp,
+                        smp_upgrade::smp_disconnect,
+                        smp_upgrade::smp_list_images,
+                        smp_upgrade::smp_upload_firmware,
+                        smp_upgrade::smp_test_image,
+                        smp_upgrade::smp_confirm_image,
+                        smp_upgrade::smp_reset_device,
+                        smp_upgrade::smp_cancel_upload,
         ]);
 
     // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)

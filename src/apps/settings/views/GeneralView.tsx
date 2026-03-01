@@ -18,6 +18,8 @@ type GeneralViewProps = {
   onChangeKeepDisplayAwake: (value: boolean) => void;
   logLevel: string;
   onChangeLogLevel: (value: string) => void;
+  smpPort: number;
+  onChangeSmpPort: (value: number) => void;
   isIOS?: boolean;
 };
 
@@ -32,20 +34,27 @@ export default function GeneralView({
   onChangeKeepDisplayAwake,
   logLevel,
   onChangeLogLevel,
+  smpPort,
+  onChangeSmpPort,
   isIOS = false,
 }: GeneralViewProps) {
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">General</h2>
+      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+        General
+      </h2>
 
       <div className="space-y-2">
         <label className={labelDefault}>Default Frame Type</label>
         <p className={helpText}>
-          Protocol type used when adding new frames (can be overridden per catalog)
+          Protocol type used when adding new frames (can be overridden per
+          catalog)
         </p>
         <Select
           value={defaultFrameType}
-          onChange={(e) => onChangeDefaultFrameType(e.target.value as DefaultFrameType)}
+          onChange={(e) =>
+            onChangeDefaultFrameType(e.target.value as DefaultFrameType)
+          }
         >
           <option value="can">CAN</option>
           <option value="modbus">Modbus</option>
@@ -57,15 +66,22 @@ export default function GeneralView({
       <div className="pt-4 border-t border-[color:var(--border-default)]">
         <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Modbus</h3>
         <div className="space-y-2">
-          <label className={labelDefault}>Max Consecutive Register Errors</label>
+          <label className={labelDefault}>
+            Max Consecutive Register Errors
+          </label>
           <p className={helpText}>
-            Stop polling a register group after this many consecutive read errors. Set to 0 to retry indefinitely.
+            Stop polling a register group after this many consecutive read
+            errors. Set to 0 to retry indefinitely.
           </p>
           <Input
             type="number"
             min={0}
             value={modbusMaxRegisterErrors}
-            onChange={(e) => onChangeModbusMaxRegisterErrors(Math.max(0, parseInt(e.target.value) || 0))}
+            onChange={(e) =>
+              onChangeModbusMaxRegisterErrors(
+                Math.max(0, parseInt(e.target.value) || 0),
+              )
+            }
             className="w-32"
           />
         </div>
@@ -73,7 +89,9 @@ export default function GeneralView({
 
       {/* Power Management Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Power Management</h3>
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>
+          Power Management
+        </h3>
         <div className="space-y-4">
           {/* Prevent idle sleep: desktop only (uses keepawake crate) */}
           {!isIOS && (
@@ -89,7 +107,8 @@ export default function GeneralView({
                   Prevent idle sleep during active sessions
                 </span>
                 <p className={helpText}>
-                  Keep the system awake while a session is actively streaming data
+                  Keep the system awake while a session is actively streaming
+                  data
                 </p>
               </div>
             </label>
@@ -117,11 +136,14 @@ export default function GeneralView({
 
       {/* Diagnostics Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Diagnostics</h3>
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>
+          Diagnostics
+        </h3>
         <div className="space-y-2">
           <label className={labelDefault}>Log Level</label>
           <p className={helpText}>
-            Diagnostic log verbosity. Logs are written to ~/Documents/WireTAP/Reports/
+            Diagnostic log verbosity. Logs are written to
+            ~/Documents/WireTAP/Reports/
           </p>
           <Select
             value={logLevel}
@@ -132,6 +154,30 @@ export default function GeneralView({
             <option value="debug">Debug</option>
             <option value="verbose">Verbose</option>
           </Select>
+        </div>
+      </div>
+
+      {/* Networking Section */}
+      <div className="pt-4 border-t border-[color:var(--border-default)]">
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>
+          Networking
+        </h3>
+        <div className="space-y-2">
+          <label className={labelDefault}>SMP UDP Port</label>
+          <p className={helpText}>
+            Default port for SMP firmware upgrade over UDP
+          </p>
+          <Input
+            type="number"
+            value={smpPort}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              if (!isNaN(v) && v >= 1 && v <= 65535) onChangeSmpPort(v);
+            }}
+            min={1}
+            max={65535}
+            className="w-32"
+          />
         </div>
       </div>
     </div>

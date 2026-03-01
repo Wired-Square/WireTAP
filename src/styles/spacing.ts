@@ -19,6 +19,16 @@ export const paddingCardSm = "p-3";
 export const paddingSection = "p-8";
 
 // =============================================================================
+// Padding - App Bars
+// =============================================================================
+
+/** Horizontal padding for app-level bars (top bar, logo menu) */
+export const paddingAppBarX = "px-4";
+
+/** App content margin — bubble effect around panels and menu items */
+export const marginAppContent = "m-2";
+
+// =============================================================================
 // Padding - Inline Elements
 // =============================================================================
 

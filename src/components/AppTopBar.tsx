@@ -9,7 +9,7 @@ import { IOSessionControls, type IOSessionControlsProps } from "./SessionControl
 import CatalogButton from "./CatalogButton";
 import FlexSeparator from "./FlexSeparator";
 import { buttonBase } from "../styles/buttonStyles";
-import { iconLg, iconSm } from "../styles/spacing";
+import { iconLg, iconSm, paddingAppBarX } from "../styles/spacing";
 import { bgSurface, borderDivider } from "../styles/colourTokens";
 import type { CatalogMetadata } from "../api/catalog";
 
@@ -125,7 +125,7 @@ export default function AppTopBar({
   const hasActions = !!actions;
 
   return (
-    <div className={`flex-shrink-0 ${bgSurface} ${borderDivider} px-4 py-2`}>
+    <div className={`flex-shrink-0 ${bgSurface} ${borderDivider} ${paddingAppBarX} py-2`}>
       <div className="flex flex-wrap items-center gap-2">
         {/* Icon */}
         <Icon className={`${iconLg} ${iconColour} shrink-0`} />

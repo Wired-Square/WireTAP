@@ -138,6 +138,10 @@ pub struct AppSettings {
     /// Stop polling a register group after this many consecutive errors (0 = never stop)
     #[serde(default = "default_modbus_max_register_errors")]
     pub modbus_max_register_errors: u32,
+
+    /// SMP UDP port for firmware upgrades over the network
+    #[serde(default = "default_smp_port")]
+    pub smp_port: u16,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -270,6 +274,9 @@ fn default_clear_buffers_on_start() -> bool {
 fn default_buffer_storage() -> String {
     "sqlite".to_string()
 }
+fn default_smp_port() -> u16 {
+    1337
+}
 
 // Decoder buffer limit defaults
 fn default_decoder_max_unmatched_frames() -> u32 {
@@ -367,6 +374,7 @@ impl Default for AppSettings {
             transmit_max_history: default_transmit_max_history(),
             // Modbus
             modbus_max_register_errors: default_modbus_max_register_errors(),
+            smp_port: default_smp_port(),
         }
     }
 }
@@ -446,6 +454,7 @@ impl AppSettings {
             transmit_max_history: default_transmit_max_history(),
             // Modbus
             modbus_max_register_errors: default_modbus_max_register_errors(),
+            smp_port: default_smp_port(),
         })
     }
 }

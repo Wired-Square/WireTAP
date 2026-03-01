@@ -308,7 +308,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
-- **Settings tab order**: Sidebar tabs are now sorted alphabetically (Bookmarks, Buffers, Catalogs, Data IO, Display, General, Graph Layouts, Privacy, Selection Sets, Storage).
+- **Settings tab order**: Sidebar tabs are now sorted alphabetically (Bookmarks, Buffers, Catalogs, Data IO, Devices, Display, General, Graph Layouts, Privacy, Selection Sets, Storage).
 
 - **Settings → General**: Discovery History Buffer, Query Result Limit, and Graph Buffer Size moved to the new Buffers tab.
 

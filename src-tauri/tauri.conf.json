@@ -39,6 +39,9 @@
     ],
     "resources": {
       "examples/*": "examples/"
+    },
+    "macOS": {
+      "infoPlist": "Info.plist"
     }
   }
 }

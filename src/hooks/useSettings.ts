@@ -143,6 +143,8 @@ export interface AppSettings {
   transmit_max_history?: number;
   // Modbus settings
   modbus_max_register_errors?: number;
+  /** SMP UDP port for firmware upgrades (default 1337) */
+  smp_port?: number;
 }
 
 /**

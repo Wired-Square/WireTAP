@@ -7,6 +7,7 @@ export interface FormFieldProps {
   label: ReactNode;
   required?: boolean;
   variant?: 'default' | 'simple';
+  className?: string;
   children: ReactNode;
 }
 
@@ -15,7 +16,7 @@ export interface FormFieldProps {
  * - variant='default': Block label with medium font (for Settings, IOProfile dialogs)
  * - variant='simple': Inline label with smaller text (for SaveFrames dialogs)
  */
-export default function FormField({ label, required, variant = 'default', children }: FormFieldProps) {
+export default function FormField({ label, required, variant = 'default', className, children }: FormFieldProps) {
   if (variant === 'simple') {
     return (
       <label className="text-sm text-[color:var(--text-secondary)] space-y-1">
@@ -30,7 +31,7 @@ export default function FormField({ label, required, variant = 'default', childr
 
   // default variant
   return (
-    <div>
+    <div className={className}>
       <label className={`block ${textMedium} mb-2`}>
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}

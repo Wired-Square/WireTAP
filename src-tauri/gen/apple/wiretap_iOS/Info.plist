@@ -44,5 +44,7 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>CANdor uses Bluetooth to provision WiFi credentials on embedded devices.</string>
 </dict>
 </plist>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>CANdor uses Bluetooth to provision WiFi credentials and upgrade firmware on embedded devices.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>CANdor uses the local network to discover and upgrade firmware on embedded devices via mDNS.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_mcumgr._udp</string>
+		<string>_framelink._tcp</string>
+	</array>
+</dict>
+</plist>
