@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Improved
+
+- **Session hover preview**: Hovering the IO reader button in the top bar now shows a tooltip with session State, Type, and Source(s) instead of the generic "Select IO Reader" text
+
 ### Added
 
 - **iOS build support**: Fixed compilation for `aarch64-apple-ios` target — gated desktop-only APIs (`show`, `set_focus`, `set_size`, `set_position`, `center`) behind `#[cfg(not(target_os = "ios"))]`, extended `get_rss_mb` Mach implementation to cover iOS, and added missing `supports_fd` field to iOS device probe stubs

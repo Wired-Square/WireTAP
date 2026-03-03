@@ -14,6 +14,7 @@ import {
   warningButtonBase,
   successIconButton,
 } from "../styles/buttonStyles";
+import { getIOKindLabel } from "../utils/ioKindLabel";
 
 // ============================================================================
 // Reader Button - displays current reader with appropriate icon
@@ -96,31 +97,119 @@ export function ReaderButton({
   };
   const statusColour = getStatusColour();
 
+  // --- Tooltip data (only when a session is configured) ---
+  const showTooltip = ioProfile !== null;
+
+  const getStatusLabel = (): { label: string; colour: string } | null => {
+    if (!ioState || !ioProfile) return null;
+    if (ioState === "running")  return { label: "Running",  colour: "text-[color:var(--status-success-text)]" };
+    if (ioState === "paused")   return { label: "Paused",   colour: "text-[color:var(--status-warning-text)]" };
+    if (ioState === "stopped")  return { label: "Stopped",  colour: "text-[color:var(--text-muted)]" };
+    if (ioState === "starting") return { label: "Starting", colour: "text-[color:var(--status-info-text)]" };
+    if (ioState.startsWith("Error")) return { label: ioState, colour: "text-[color:var(--status-danger-text)]" };
+    return { label: ioState, colour: "text-[color:var(--text-secondary)]" };
+  };
+  const statusLabel = getStatusLabel();
+
+  let typeLabel: string;
+  if (isBufferProfile) {
+    typeLabel = "Buffer";
+  } else if (showAsMultiBus) {
+    typeLabel = "Multi-Source";
+  } else if (selectedProfile?.kind) {
+    typeLabel = getIOKindLabel(selectedProfile.kind);
+  } else {
+    typeLabel = "Unknown";
+  }
+
+  let sourceNames: string[];
+  if (showAsMultiBus) {
+    sourceNames = multiBusProfiles.map(
+      (pid) => ioProfiles.find((p) => p.id === pid)?.name ?? pid
+    );
+  } else if (selectedProfile) {
+    sourceNames = [selectedProfile.name];
+  } else if (isBufferProfile) {
+    sourceNames = [ioProfile ?? "Buffer"];
+  } else {
+    sourceNames = [];
+  }
+
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={buttonBase}
-      title="Select IO Reader"
-    >
-      {showAsMultiBus ? (
-        <GitMerge className={`${iconSm} text-purple-500 flex-shrink-0`} />
-      ) : isBufferProfile ? (
-        <FileText className={`${iconSm} text-blue-500 flex-shrink-0`} />
-      ) : isDefaultReader ? (
-        <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
-      ) : null}
-      {statusColour && (
-        <span
-          className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColour}`}
-          title={ioState ?? undefined}
-        />
+    <div className="relative group shrink-0">
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className={buttonBase}
+        title={showTooltip ? undefined : "Select IO Reader"}
+      >
+        {showAsMultiBus ? (
+          <GitMerge className={`${iconSm} text-purple-500 flex-shrink-0`} />
+        ) : isBufferProfile ? (
+          <FileText className={`${iconSm} text-blue-500 flex-shrink-0`} />
+        ) : isDefaultReader ? (
+          <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
+        ) : null}
+        {statusColour && (
+          <span
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColour}`}
+          />
+        )}
+        <span className="max-w-40 truncate">{displayName}</span>
+        {sessionId && !sessionIdInDisplayName && (
+          <span className="text-[color:var(--text-muted)] text-xs font-mono">{sessionId}</span>
+        )}
+      </button>
+
+      {/* Session preview tooltip */}
+      {showTooltip && (
+        <div
+          className={[
+            "absolute left-1/2 -translate-x-1/2 top-full mt-2",
+            "min-w-[180px] max-w-[260px]",
+            "px-3 py-2 rounded-lg border shadow-xl z-50",
+            "bg-[var(--bg-surface)] border-[color:var(--border-default)]",
+            "text-xs",
+            "opacity-0 invisible group-hover:opacity-100 group-hover:visible",
+            "transition-all duration-200 delay-300",
+            "pointer-events-none",
+          ].join(" ")}
+        >
+          {/* Arrow */}
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-[var(--bg-surface)] border-l border-t border-[color:var(--border-default)]" />
+
+          {/* State */}
+          {statusLabel && (
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <span className="text-[color:var(--text-muted)]">State</span>
+              <span className={`font-medium ${statusLabel.colour}`}>{statusLabel.label}</span>
+            </div>
+          )}
+
+          {/* Type */}
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <span className="text-[color:var(--text-muted)]">Type</span>
+            <span className="font-medium text-[color:var(--text-primary)]">{typeLabel}</span>
+          </div>
+
+          {/* Sources */}
+          {sourceNames.length > 0 && (
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-[color:var(--text-muted)] shrink-0">
+                {sourceNames.length > 1 ? "Sources" : "Source"}
+              </span>
+              <div className="flex flex-col items-end">
+                {sourceNames.map((name, i) => (
+                  <span key={i} className="text-[color:var(--text-primary)] truncate max-w-[160px]">
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
-      <span className="max-w-40 truncate">{displayName}</span>
-      {sessionId && !sessionIdInDisplayName && (
-        <span className="text-[color:var(--text-muted)] text-xs font-mono">{sessionId}</span>
-      )}
-    </button>
+    </div>
   );
 }
 

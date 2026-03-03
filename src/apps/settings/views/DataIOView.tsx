@@ -5,6 +5,7 @@ import { Cable, Plus, Copy, Edit2, Trash2, Star } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
 import type { IOProfile } from "../stores/settingsStore";
 import { getReaderProtocols, isReaderRealtime } from "../../../hooks/useSettings";
+import { getIOKindLabel } from "../../../utils/ioKindLabel";
 import { PrimaryButton } from "../../../components/forms/DialogButtons";
 import {
   h2,
@@ -36,32 +37,6 @@ type DataIOViewProps = {
 };
 
 
-const getIOKindLabel = (kind: IOProfile["kind"]) => {
-  switch (kind) {
-    case "mqtt":
-      return "MQTT";
-    case "postgres":
-      return "PostgreSQL";
-    case "gvret_tcp":
-      return "GVRET TCP";
-    case "gvret_usb":
-      return "GVRET USB";
-    case "csv_file":
-      return "CSV File";
-    case "serial":
-      return "Serial";
-    case "slcan":
-      return "slcan";
-    case "socketcan":
-      return "SocketCAN";
-    case "gs_usb":
-      return "gs_usb";
-    case "modbus_tcp":
-      return "Modbus TCP";
-    default:
-      return kind;
-  }
-};
 
 const getProtocolBadgeStyle = (protocol: string) => {
   switch (protocol) {
