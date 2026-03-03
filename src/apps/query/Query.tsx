@@ -189,6 +189,8 @@ export default function Query() {
     handleLeave,
     capabilities,
     session,
+    watchFrameCount,
+    watchUniqueFrameCount,
   } = manager;
 
   // Subscribe to session's catalogPath. Returns undefined when session doesn't exist
@@ -391,6 +393,8 @@ export default function Query() {
           catalogPath={catalogPath}
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
+          uniqueFrameCount={watchUniqueFrameCount}
+          totalFrameCount={watchFrameCount}
           isStreaming={isStreaming || hasSource}
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}

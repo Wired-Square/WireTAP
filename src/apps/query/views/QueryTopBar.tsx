@@ -19,6 +19,10 @@ interface Props {
   catalogPath: string | null;
   onOpenCatalogPicker: () => void;
 
+  // Frame counts (for tooltip)
+  uniqueFrameCount?: number;
+  totalFrameCount?: number;
+
   // Dialog trigger
   onOpenIoReaderPicker: () => void;
 
@@ -41,6 +45,8 @@ export default function QueryTopBar({
   catalogs,
   catalogPath,
   onOpenCatalogPicker,
+  uniqueFrameCount,
+  totalFrameCount,
   onOpenIoReaderPicker,
   isStreaming,
   isStopped,
@@ -58,6 +64,8 @@ export default function QueryTopBar({
         ioProfile,
         ioProfiles,
         defaultReadProfileId,
+        frameCount: uniqueFrameCount,
+        totalFrameCount,
         onOpenIoReaderPicker,
         isStreaming,
         isStopped,

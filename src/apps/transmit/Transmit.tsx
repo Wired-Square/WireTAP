@@ -151,6 +151,8 @@ export default function Transmit() {
     handleLeave: managerLeave,
     stopWatch,
     resumeWithNewBuffer,
+    watchFrameCount,
+    watchUniqueFrameCount,
   } = manager;
 
   // Session controls (for menu commands)
@@ -273,6 +275,8 @@ export default function Transmit() {
           onStop={handlers.handleStop}
           onResume={handlers.handleResume}
           onLeave={managerLeave}
+          uniqueFrameCount={watchUniqueFrameCount}
+          totalFrameCount={watchFrameCount}
           isLoading={isLoading}
           error={transmitError}
         />

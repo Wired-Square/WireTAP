@@ -386,6 +386,8 @@ export default function Discovery() {
     currentFrameIndex: sessionCurrentFrameIndex,
     handleLeave,
     // Watch state (used by ioPickerProps hook)
+    watchFrameCount,
+    watchUniqueFrameCount,
     resetWatchFrameCount,
     // Session switching methods
     stopWatch,
@@ -923,6 +925,8 @@ export default function Discovery() {
           supportsSpeed={capabilities?.supports_speed_control ?? false}
           onOpenSpeedPicker={() => dialogs.speedPicker.open()}
           frameCount={frameList.length}
+          uniqueFrameCount={watchUniqueFrameCount}
+          totalFrameCount={watchFrameCount}
           selectedFrameCount={selectedFrames.size}
           onOpenFramePicker={() => dialogs.framePicker.open()}
           isSerialMode={isSerialMode}

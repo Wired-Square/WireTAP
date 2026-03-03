@@ -511,6 +511,9 @@ export default function Decoder() {
     watchMultiSource,
     // Bookmark methods
     jumpToBookmark,
+    // Watch state
+    watchFrameCount,
+    watchUniqueFrameCount,
   } = manager;
 
   // Session controls from the underlying session
@@ -993,6 +996,8 @@ export default function Decoder() {
             supportsTimeRange={capabilities?.supports_time_range ?? false}
             onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
             frameCount={frameList.length}
+            uniqueFrameCount={watchUniqueFrameCount}
+            totalFrameCount={watchFrameCount}
             selectedFrameCount={selectedFrames.size}
             onOpenFramePicker={() => dialogs.framePicker.open()}
             onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}

@@ -43,6 +43,10 @@ interface Props {
   supportsTimeRange?: boolean;
   onOpenBookmarkPicker?: () => void;
 
+  // Frame counts (for tooltip)
+  uniqueFrameCount?: number;
+  totalFrameCount?: number;
+
   // Handlers
   onOpenIoPicker: () => void;
   onStop?: () => void;
@@ -69,6 +73,8 @@ export default function TransmitTopBar({
   supportsTimeRange = false,
   onOpenBookmarkPicker,
   capabilities,
+  uniqueFrameCount,
+  totalFrameCount,
   onOpenIoPicker,
   onStop,
   onResume,
@@ -90,6 +96,8 @@ export default function TransmitTopBar({
         defaultReadProfileId,
         sessionId,
         ioState,
+        frameCount: uniqueFrameCount,
+        totalFrameCount,
         onOpenIoReaderPicker: onOpenIoPicker,
         speed,
         supportsSpeed,

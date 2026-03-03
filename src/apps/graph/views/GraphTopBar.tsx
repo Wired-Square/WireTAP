@@ -43,6 +43,7 @@ interface Props {
   // Watch state (for frame count display)
   isWatching: boolean;
   watchFrameCount: number;
+  watchUniqueFrameCount?: number;
 
   // Layout persistence
   savedLayouts: GraphLayout[];
@@ -79,6 +80,7 @@ export default function GraphTopBar({
   onOpenCatalogPicker,
   isWatching,
   watchFrameCount,
+  watchUniqueFrameCount,
   savedLayouts,
   onSaveLayout,
   onLoadLayout,
@@ -156,6 +158,8 @@ export default function GraphTopBar({
         defaultReadProfileId,
         sessionId,
         ioState,
+        frameCount: watchUniqueFrameCount,
+        totalFrameCount: watchFrameCount,
         onOpenIoReaderPicker,
         isStreaming,
         isStopped,

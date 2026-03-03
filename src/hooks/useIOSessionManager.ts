@@ -210,8 +210,10 @@ export interface UseIOSessionManagerResult {
   handleDestroy: () => Promise<void>;
 
   // ---- Watch State (for top bar display) ----
-  /** Frame count during watch mode */
+  /** Total frame count during watch mode */
   watchFrameCount: number;
+  /** Unique frame IDs seen during watch mode */
+  watchUniqueFrameCount: number;
   /** Reset watch frame count */
   resetWatchFrameCount: () => void;
   /** Whether currently watching (streaming with real-time display) */
@@ -395,6 +397,8 @@ export function useIOSessionManager(
   // ---- Detach/Watch State ----
   const [isDetached, setIsDetached] = useState(false);
   const [watchFrameCount, setWatchFrameCount] = useState(0);
+  const watchUniqueIdsRef = useRef(new Set<number>());
+  const [watchUniqueFrameCount, setWatchUniqueFrameCount] = useState(0);
   const [isWatching, setIsWatching] = useState(false);
 
   // ---- Ingest State (unified with session) ----
@@ -480,6 +484,15 @@ export function useIOSessionManager(
     }
     if (isWatchingRef.current) {
       setWatchFrameCount((prev) => prev + frames.length);
+      const ids = watchUniqueIdsRef.current;
+      let changed = false;
+      for (const f of frames) {
+        if (!ids.has(f.frame_id)) {
+          ids.add(f.frame_id);
+          changed = true;
+        }
+      }
+      if (changed) setWatchUniqueFrameCount(ids.size);
     }
     onFramesProp?.(frames);
   }, [onFramesProp]);
@@ -511,6 +524,8 @@ export function useIOSessionManager(
     onBeforeWatch?.();
     // Reset frame count
     setWatchFrameCount(0);
+    watchUniqueIdsRef.current = new Set();
+    setWatchUniqueFrameCount(0);
     // Reset stream completed flag
     if (streamCompletedRef) {
       streamCompletedRef.current = false;
@@ -525,6 +540,8 @@ export function useIOSessionManager(
     onBeforeWatch?.();
     // Reset frame count
     setWatchFrameCount(0);
+    watchUniqueIdsRef.current = new Set();
+    setWatchUniqueFrameCount(0);
     // Reset stream completed flag
     if (streamCompletedRef) {
       streamCompletedRef.current = false;
@@ -587,6 +604,8 @@ export function useIOSessionManager(
     setIsIngesting(false);
     setIsDetached(false);
     setWatchFrameCount(0);
+    watchUniqueIdsRef.current = new Set();
+    setWatchUniqueFrameCount(0);
     streamCompletedRef.current = false;
 
     // Switch to orphaned buffer if available, otherwise clear profile
@@ -719,6 +738,8 @@ export function useIOSessionManager(
 
   const resetWatchFrameCount = useCallback(() => {
     setWatchFrameCount(0);
+    watchUniqueIdsRef.current = new Set();
+    setWatchUniqueFrameCount(0);
   }, []);
 
   // Start multi-bus session
@@ -1424,6 +1445,7 @@ export function useIOSessionManager(
 
     // Watch State
     watchFrameCount,
+    watchUniqueFrameCount,
     resetWatchFrameCount,
     isWatching,
     setIsWatching,

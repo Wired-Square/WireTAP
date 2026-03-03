@@ -150,6 +150,8 @@ export default function AppTopBar({
             defaultReadProfileId={ioSession.defaultReadProfileId}
             sessionId={ioSession.sessionId}
             ioState={ioSession.ioState}
+            frameCount={ioSession.frameCount}
+            totalFrameCount={ioSession.totalFrameCount}
             onOpenIoReaderPicker={ioSession.onOpenIoReaderPicker}
             speed={ioSession.speed}
             supportsSpeed={ioSession.supportsSpeed}

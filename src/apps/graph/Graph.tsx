@@ -350,6 +350,7 @@ export default function Graph() {
     // Watch state
     isWatching,
     watchFrameCount,
+    watchUniqueFrameCount,
     stopWatch,
   } = manager;
 
@@ -524,6 +525,7 @@ export default function Graph() {
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
           isWatching={isWatching}
           watchFrameCount={watchFrameCount}
+          watchUniqueFrameCount={watchUniqueFrameCount}
           savedLayouts={savedLayouts}
           onSaveLayout={saveCurrentLayout}
           onLoadLayout={loadLayout}

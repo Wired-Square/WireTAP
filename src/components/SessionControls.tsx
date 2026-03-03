@@ -35,6 +35,10 @@ export interface ReaderButtonProps {
   sessionId?: string | null;
   /** Current IO state (running, stopped, paused, error) */
   ioState?: string | null;
+  /** Number of unique frame IDs (shown in tooltip) */
+  frameCount?: number;
+  /** Total number of frames seen (shown in tooltip when available) */
+  totalFrameCount?: number;
   /** Click handler to open reader picker */
   onClick: () => void;
   /** Whether button should be disabled (e.g., while streaming) */
@@ -49,6 +53,8 @@ export function ReaderButton({
   defaultReadProfileId,
   sessionId,
   ioState,
+  frameCount,
+  totalFrameCount,
   onClick,
   disabled = false,
 }: ReaderButtonProps) {
@@ -192,6 +198,20 @@ export function ReaderButton({
             <span className="font-medium text-[color:var(--text-primary)]">{typeLabel}</span>
           </div>
 
+          {/* Frame counts */}
+          {totalFrameCount != null && (
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <span className="text-[color:var(--text-muted)]">Frames</span>
+              <span className="font-medium text-[color:var(--text-primary)]">{totalFrameCount.toLocaleString()}</span>
+            </div>
+          )}
+          {frameCount != null && (
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <span className="text-[color:var(--text-muted)]">{totalFrameCount != null ? "Unique" : "Frames"}</span>
+              <span className="font-medium text-[color:var(--text-primary)]">{frameCount.toLocaleString()}</span>
+            </div>
+          )}
+
           {/* Sources */}
           {sourceNames.length > 0 && (
             <div className="flex items-start justify-between gap-3">
@@ -318,6 +338,10 @@ export interface IOSessionControlsProps {
   sessionId?: string | null;
   /** Current IO state (running, stopped, paused, error) */
   ioState?: string | null;
+  /** Number of unique frame IDs (shown in tooltip) */
+  frameCount?: number;
+  /** Total number of frames seen (shown in tooltip when available) */
+  totalFrameCount?: number;
   /** Click handler to open reader picker */
   onOpenIoReaderPicker: () => void;
 
@@ -362,6 +386,8 @@ export function IOSessionControls({
   defaultReadProfileId,
   sessionId,
   ioState,
+  frameCount,
+  totalFrameCount,
   onOpenIoReaderPicker,
   // Speed props
   speed = 1,
@@ -394,6 +420,8 @@ export function IOSessionControls({
         defaultReadProfileId={defaultReadProfileId}
         sessionId={sessionId}
         ioState={ioState}
+        frameCount={frameCount}
+        totalFrameCount={totalFrameCount}
         onClick={onOpenIoReaderPicker}
         disabled={isStreaming && !isBufferMode}
       />

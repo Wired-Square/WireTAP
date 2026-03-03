@@ -51,6 +51,10 @@ type Props = {
 
   // Frame picker
   frameCount: number;
+  /** Unique frame IDs seen at the session level (for tooltip) */
+  uniqueFrameCount?: number;
+  /** Total frames seen at the session level (for tooltip) */
+  totalFrameCount?: number;
   selectedFrameCount: number;
   onOpenFramePicker: () => void;
 
@@ -107,6 +111,8 @@ export default function DecoderTopBar({
   supportsTimeRange = false,
   onOpenBookmarkPicker,
   frameCount,
+  uniqueFrameCount,
+  totalFrameCount,
   selectedFrameCount,
   onOpenFramePicker,
   onOpenIoReaderPicker,
@@ -142,6 +148,8 @@ export default function DecoderTopBar({
         defaultReadProfileId,
         sessionId,
         ioState,
+        frameCount: uniqueFrameCount,
+        totalFrameCount,
         onOpenIoReaderPicker,
         speed,
         supportsSpeed,

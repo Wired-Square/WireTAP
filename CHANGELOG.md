@@ -6,7 +6,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Improved
 
-- **Session hover preview**: Hovering the IO reader button in the top bar now shows a tooltip with session State, Type, and Source(s) instead of the generic "Select IO Reader" text
+- **Session hover preview**: Hovering the IO reader button in the top bar now shows a tooltip with session State, Type, Source(s), and live frame counts (total frames seen + unique frame IDs) across all five apps (Discovery, Decoder, Graph, Transmit, Query)
 
 ### Added
 
