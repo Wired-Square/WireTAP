@@ -1066,6 +1066,7 @@ pub fn run() {
             buffers::get_buffer_frames_tail,
             buffers::get_buffer_frame_info,
             buffers::find_buffer_offset_for_timestamp,
+            buffers::search_buffer_frames,
             // Multi-buffer registry API
             buffers::list_buffers,
             buffers::delete_buffer,

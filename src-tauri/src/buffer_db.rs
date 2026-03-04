@@ -489,6 +489,97 @@ pub fn find_offset_for_timestamp(
     Ok(count as usize)
 }
 
+/// Search frames in a buffer for a text query, returning 0-based offsets in the
+/// selected-ID-filtered result set.
+///
+/// `query` must have whitespace stripped by the caller.
+/// `search_id` matches against the hex representation of frame_id.
+/// `search_data` matches against the hex representation of the payload BLOB.
+/// `frame_ids` filters which frames are included (empty = all frames).
+pub fn search_frames(
+    buffer_id: &str,
+    query: &str,
+    search_id: bool,
+    search_data: bool,
+    frame_ids: &[u32],
+) -> Result<Vec<usize>, String> {
+    if query.is_empty() || (!search_id && !search_data) {
+        return Ok(Vec::new());
+    }
+
+    // Strip any 0x/0X prefix for hex ID matching
+    let q = if query.starts_with("0x") || query.starts_with("0X") {
+        &query[2..]
+    } else {
+        query
+    };
+    let q_lower = q.to_lowercase();
+    let q_upper = q.to_uppercase();
+
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    // Build optional frame_id IN (...) filter
+    let id_filter = if frame_ids.is_empty() {
+        String::new()
+    } else {
+        let placeholders = frame_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(" AND frame_id IN ({})", placeholders)
+    };
+
+    // ROW_NUMBER gives us the 0-based offset in the filtered result set.
+    // ID search: printf('%x', frame_id) for lowercase hex (matches the stripped query).
+    // Data search: hex(payload) returns uppercase hex (match against upper query).
+    let search_clauses: Vec<String> = {
+        let mut clauses = Vec::new();
+        if search_id {
+            clauses.push(format!(
+                "printf('%x', frame_id) LIKE '%{}%'",
+                q_lower.replace('\'', "''")
+            ));
+        }
+        if search_data {
+            clauses.push(format!(
+                "upper(hex(payload)) LIKE '%{}%'",
+                q_upper.replace('\'', "''")
+            ));
+        }
+        clauses
+    };
+
+    let where_clause = search_clauses.join(" OR ");
+
+    let sql = format!(
+        "WITH numbered AS (
+            SELECT frame_id, payload,
+                   CAST(ROW_NUMBER() OVER (ORDER BY rowid) AS INTEGER) - 1 AS offset
+            FROM frames
+            WHERE buffer_id = ?1{}
+        )
+        SELECT offset FROM numbered WHERE {}",
+        id_filter, where_clause
+    );
+
+    let mut stmt = conn
+        .prepare(&sql)
+        .map_err(|e| format!("Failed to prepare search: {}", e))?;
+
+    let rows = stmt
+        .query_map(params![buffer_id], |row| row.get::<_, i64>(0))
+        .map_err(|e| format!("Failed to execute search: {}", e))?;
+
+    let mut offsets = Vec::new();
+    for row in rows {
+        offsets.push(row.map_err(|e| format!("Failed to read row: {}", e))? as usize);
+    }
+
+    Ok(offsets)
+}
+
 /// Copy all frame and byte data from one buffer to another using INSERT SELECT.
 pub fn copy_buffer_data(source_id: &str, dest_id: &str) -> Result<usize, String> {
     let mut guard = DB.lock().unwrap();

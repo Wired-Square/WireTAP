@@ -11,3 +11,4 @@ export { default as DiscoveryViewController } from '../../../components/DataView
 
 // Discovery-specific components
 export { default as FrameDataTable, type FrameRow, type FrameDataTableProps } from './FrameDataTable';
+export { default as DiscoveryFindBar } from './DiscoveryFindBar';

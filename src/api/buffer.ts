@@ -591,3 +591,29 @@ export async function findBufferBytesOffsetForTimestamp(
 ): Promise<number> {
   return invoke("find_buffer_bytes_offset_for_timestamp", { target_time_us: targetTimeUs });
 }
+
+/**
+ * Search a frame buffer for frames matching a query string.
+ * Returns 0-based offsets in the selected-ID-filtered result set.
+ *
+ * @param bufferId - The buffer ID to search
+ * @param query - Search string (whitespace already stripped by caller)
+ * @param searchId - Whether to search the frame ID column
+ * @param searchData - Whether to search the payload (data) column
+ * @param selectedIds - Frame IDs to include (empty = all)
+ */
+export async function searchBufferFrames(
+  bufferId: string,
+  query: string,
+  searchId: boolean,
+  searchData: boolean,
+  selectedIds: number[]
+): Promise<number[]> {
+  return invoke("search_buffer_frames", {
+    buffer_id: bufferId,
+    query,
+    search_id: searchId,
+    search_data: searchData,
+    selected_ids: selectedIds,
+  });
+}

@@ -1,12 +1,14 @@
 // ui/src/apps/discovery/views/DiscoveryFramesView.tsx
 import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "react";
-import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw, Copy, ClipboardCopy, Target, Send, BarChart3, Bookmark } from "lucide-react";
+import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw, Copy, ClipboardCopy, Target, Send, BarChart3, Bookmark, Search } from "lucide-react";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { useDiscoveryStore, TOOL_TAB_CONFIG } from "../../../stores/discoveryStore";
+import { getDiscoveryFrameBuffer } from "../../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
-import { type BufferMetadata } from "../../../api/buffer";
+import { type BufferMetadata, searchBufferFrames } from "../../../api/buffer";
 import { FrameDataTable, type TabDefinition, FRAME_PAGE_SIZE_OPTIONS } from "../components";
+import DiscoveryFindBar, { type FindSearchMode } from "../components/DiscoveryFindBar";
 import AppTabView from "../../../components/AppTabView";
 import { PlaybackControls, type PlaybackState } from "../../../components/PlaybackControls";
 import type { PlaybackSpeed } from "../../../components/TimeController";
@@ -151,6 +153,14 @@ function DiscoveryFramesView({
   const renderFrozen = useDiscoveryStore((s) => s.renderFrozen);
   const setRenderFrozen = useDiscoveryStore((s) => s.setRenderFrozen);
   const refreshFrozenView = useDiscoveryStore((s) => s.refreshFrozenView);
+
+  // Find bar state
+  const [findOpen, setFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [findMode, setFindMode] = useState<FindSearchMode>('both');
+  const [findResults, setFindResults] = useState<number[]>([]);   // filteredOffsets in the entire buffer
+  const [findCurrentIndex, setFindCurrentIndex] = useState(-1);
+  const [isFindSearching, setIsFindSearching] = useState(false);
 
   // Context menu state (frame rows)
   const [contextMenu, setContextMenu] = useState<{
@@ -784,6 +794,110 @@ function DiscoveryFramesView({
     return matchIndex >= 0 ? matchIndex : null;
   }, [currentFrameIndex, currentTimeUs, visibleFrames, renderBuffer, effectiveCurrentPage, framesWereReversed]);
 
+  // Find bar: search the entire buffer (in-memory or via Tauri for buffer-first)
+  // Debounce ref for buffer-first async search
+  const findDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!findOpen) {
+      setFindResults([]);
+      setFindCurrentIndex(-1);
+      setIsFindSearching(false);
+      return;
+    }
+
+    const q = findQuery.replace(/\s/g, '').toLowerCase();
+    if (!q) {
+      setFindResults([]);
+      setFindCurrentIndex(-1);
+      setIsFindSearching(false);
+      return;
+    }
+
+    if (useBufferFirstMode && effectiveBufferId) {
+      // Buffer-first: async Tauri search with 300ms debounce
+      if (findDebounceRef.current) clearTimeout(findDebounceRef.current);
+      setIsFindSearching(true);
+      findDebounceRef.current = setTimeout(async () => {
+        try {
+          const results = await searchBufferFrames(
+            effectiveBufferId,
+            q,
+            findMode !== 'data',
+            findMode !== 'id',
+            Array.from(selectedFrames),
+          );
+          setFindResults(results);
+          setFindCurrentIndex(results.length > 0 ? 0 : -1);
+        } finally {
+          setIsFindSearching(false);
+        }
+      }, 300);
+      return () => {
+        if (findDebounceRef.current) clearTimeout(findDebounceRef.current);
+      };
+    } else {
+      // In-memory: scan full _frameBuffer synchronously
+      const buffer = getDiscoveryFrameBuffer();
+      let filteredOffset = 0;
+      const matches: number[] = [];
+      for (const frame of buffer) {
+        if (selectedFrames.has(frame.frame_id)) {
+          const idStr = formatFrameId(frame.frame_id, displayFrameIdFormat, frame.is_extended)
+            .replace(/\s/g, '').toLowerCase();
+          const hexStr = frame.bytes.map(b => b.toString(16).padStart(2, '0')).join('').toLowerCase();
+          if ((findMode !== 'data' && idStr.includes(q)) ||
+              (findMode !== 'id' && hexStr.includes(q))) {
+            matches.push(filteredOffset);
+          }
+          filteredOffset++;
+        }
+      }
+      setFindResults(matches);
+      setFindCurrentIndex(matches.length > 0 ? 0 : -1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findOpen, findQuery, findMode, frameVersion, selectedFrames, useBufferFirstMode, effectiveBufferId, displayFrameIdFormat]);
+
+  // Navigate to match when findCurrentIndex changes (e.g. after results load)
+  const navigateToMatch = useCallback((idx: number) => {
+    if (findResults.length === 0 || idx < 0) return;
+    const filteredOffset = findResults[idx];
+    const ps = renderBuffer === -1 ? 1000 : renderBuffer;
+    setCurrentPageStable(Math.floor(filteredOffset / ps));
+    setFindCurrentIndex(idx);
+  }, [findResults, renderBuffer, setCurrentPageStable]);
+
+  // Auto-navigate when results first arrive
+  useEffect(() => {
+    if (findCurrentIndex === 0 && findResults.length > 0) {
+      navigateToMatch(0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findResults]);
+
+  // Cmd/Ctrl+F to open find bar
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setFindOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // Resolve highlighted row: find bar takes priority over playback highlight
+  const findPageSize = renderBuffer === -1 ? 1000 : renderBuffer;
+  const currentMatchOffset = (findOpen && findCurrentIndex >= 0 && findResults.length > 0)
+    ? findResults[findCurrentIndex]
+    : null;
+  const currentMatchPage = currentMatchOffset != null ? Math.floor(currentMatchOffset / findPageSize) : null;
+  const effectiveHighlightedRow = (currentMatchPage === effectiveCurrentPage && currentMatchOffset != null)
+    ? currentMatchOffset % findPageSize
+    : highlightedRowIndex;
+
   // Handle row click - convert row index to global frame index and get timestamp
   const handleRowClick = useCallback((rowIndex: number) => {
     if (!onFrameSelect || rowIndex >= visibleFrames.length) return;
@@ -868,6 +982,26 @@ function DiscoveryFramesView({
         title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
       >
         <FileText className={iconSm} />
+      </button>
+      <button
+        onClick={() => {
+          if (findOpen) {
+            setFindOpen(false);
+            setFindQuery('');
+            setFindResults([]);
+            setFindCurrentIndex(-1);
+          } else {
+            setFindOpen(true);
+          }
+        }}
+        className={`p-1.5 rounded transition-colors ${
+          findOpen
+            ? 'bg-gray-600 text-white hover:bg-gray-500'
+            : `${bgSurface} ${textSecondary} hover:brightness-95`
+        }`}
+        title={findOpen ? 'Close find (Escape)' : 'Find in frames (⌘F)'}
+      >
+        <Search className={iconSm} />
       </button>
       {isStreaming && (
         <>
@@ -1055,30 +1189,46 @@ function DiscoveryFramesView({
       contentArea={{ wrap: false }}
     >
       {activeTab === 'frames' && (
-        <FrameDataTable
-          ref={scrollRef}
-          frames={visibleFrames}
-          displayFrameIdFormat={displayFrameIdFormat}
-          formatTime={formatTime}
-          onBookmark={onBookmark}
-          emptyMessage={
-            isStreamPaused
-              ? (isBufferFirstLoading ? 'Loading frames...' : 'No frames in buffer')
-              : (isStreaming ? 'Waiting for frames...' : 'No frames to display')
-          }
-          showCalculator={false}
-          showRef={showRefColumn}
-          showAscii={showAsciiColumn}
-          showBus={showBusColumn}
-          highlightedRowIndex={highlightedRowIndex}
-          onRowClick={onFrameSelect ? handleRowClick : undefined}
-          pageStartIndex={effectivePageStartIndex}
-          framesReversed={framesWereReversed}
-          pageFrameCount={visibleFrames.length}
-          bufferIndices={useBufferFirstMode ? bufferFrameView.bufferIndices : streamingIndices}
-          onContextMenu={handleContextMenu}
-          onHeaderContextMenu={handleHeaderContextMenu}
-        />
+        <>
+          {findOpen && (
+            <DiscoveryFindBar
+              query={findQuery}
+              onQueryChange={setFindQuery}
+              matchCount={findResults.length}
+              currentIndex={findCurrentIndex}
+              onNext={() => navigateToMatch((findCurrentIndex + 1) % Math.max(1, findResults.length))}
+              onPrev={() => navigateToMatch((findCurrentIndex - 1 + Math.max(1, findResults.length)) % Math.max(1, findResults.length))}
+              onClose={() => { setFindOpen(false); setFindQuery(''); setFindResults([]); setFindCurrentIndex(-1); }}
+              searchMode={findMode}
+              onSearchModeChange={setFindMode}
+              isSearching={isFindSearching}
+            />
+          )}
+          <FrameDataTable
+            ref={scrollRef}
+            frames={visibleFrames}
+            displayFrameIdFormat={displayFrameIdFormat}
+            formatTime={formatTime}
+            onBookmark={onBookmark}
+            emptyMessage={
+              isStreamPaused
+                ? (isBufferFirstLoading ? 'Loading frames...' : 'No frames in buffer')
+                : (isStreaming ? 'Waiting for frames...' : 'No frames to display')
+            }
+            showCalculator={false}
+            showRef={showRefColumn}
+            showAscii={showAsciiColumn}
+            showBus={showBusColumn}
+            highlightedRowIndex={effectiveHighlightedRow}
+            onRowClick={onFrameSelect ? handleRowClick : undefined}
+            pageStartIndex={effectivePageStartIndex}
+            framesReversed={framesWereReversed}
+            pageFrameCount={visibleFrames.length}
+            bufferIndices={useBufferFirstMode ? bufferFrameView.bufferIndices : streamingIndices}
+            onContextMenu={handleContextMenu}
+            onHeaderContextMenu={handleHeaderContextMenu}
+          />
+        </>
       )}
 
       {activeTab === 'filtered' && (

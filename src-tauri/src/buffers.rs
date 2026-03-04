@@ -321,6 +321,20 @@ pub async fn find_buffer_bytes_offset_for_timestamp(
     Ok(buffer_store::find_buffer_bytes_offset_for_timestamp(target_time_us))
 }
 
+/// Search a specific buffer for frames matching a query string.
+/// Returns 0-based offsets in the selected-ID-filtered result set.
+/// `query` should have whitespace stripped before calling.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn search_buffer_frames(
+    buffer_id: String,
+    query: String,
+    search_id: bool,
+    search_data: bool,
+    selected_ids: Vec<u32>,
+) -> Result<Vec<usize>, String> {
+    crate::buffer_db::search_frames(&buffer_id, &query, search_id, search_data, &selected_ids)
+}
+
 // ============================================================================
 // Session-Aware Buffer Commands
 // ============================================================================
