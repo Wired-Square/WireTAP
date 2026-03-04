@@ -1,6 +1,6 @@
-// ui/src/dialogs/io-source-picker/GvretBusConfig.tsx
+// ui/src/dialogs/io-source-picker/DeviceBusConfig.tsx
 //
-// Bus configuration UI for GVRET devices.
+// Bus configuration UI for multi-bus devices.
 // Shows available buses with toggles to enable/disable and optional bus remapping.
 // Also supports protocol selection when used in profile settings.
 
@@ -24,7 +24,7 @@ export interface BusMappingWithProtocol extends BusMapping {
   protocol?: 'can' | 'canfd';
 }
 
-interface GvretBusConfigProps {
+interface DeviceBusConfigProps {
   /** Device info from probing (null while loading or on error) */
   deviceInfo: GvretDeviceInfo | null;
   /** Whether probe is in progress */
@@ -49,7 +49,7 @@ interface GvretBusConfigProps {
   configLocked?: boolean;
 }
 
-export default function GvretBusConfig({
+export default function DeviceBusConfig({
   deviceInfo,
   isLoading,
   error,
@@ -61,7 +61,7 @@ export default function GvretBusConfig({
   showOutputBus = true,
   showProtocol = false,
   configLocked = false,
-}: GvretBusConfigProps) {
+}: DeviceBusConfigProps) {
   // Toggle a bus enabled/disabled
   const toggleBus = (deviceBus: number) => {
     const newConfig = busConfig.map((mapping) =>

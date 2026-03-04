@@ -7,11 +7,11 @@ export { default as FramingOptions } from "./FramingOptions";
 export { default as FilterOptions } from "./FilterOptions";
 export { default as ActionButtons } from "./ActionButtons";
 export { default as LoadStatus } from "./LoadStatus";
-export { default as GvretBusConfig } from "./GvretBusConfig";
+export { default as DeviceBusConfig } from "./DeviceBusConfig";
 export { default as SingleBusConfig } from "./SingleBusConfig";
 
 export type { FramingConfig } from "./FramingOptions";
-export type { BusMappingWithProtocol } from "./GvretBusConfig";
+export type { BusMappingWithProtocol } from "./DeviceBusConfig";
 export type { InterfaceFramingConfig } from "./SingleBusConfig";
 
 export {

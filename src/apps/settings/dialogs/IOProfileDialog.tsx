@@ -12,7 +12,7 @@ import GsUsbDevicePicker from "../components/GsUsbDevicePicker";
 import LinuxCanSetupHelper from "../components/LinuxCanSetupHelper";
 import SecurePasswordField from "../components/SecurePasswordField";
 import IODeviceStatus, { type DeviceProbeState, type DeviceProbeResult } from "../components/IODeviceStatus";
-import { GvretBusConfig, type BusMappingWithProtocol } from "../../../dialogs/io-source-picker";
+import { DeviceBusConfig, type BusMappingWithProtocol } from "../../../dialogs/io-source-picker";
 import { Input, Select, FormField, PrimaryButton, SecondaryButton } from "../../../components/forms";
 import {
   h2,
@@ -161,7 +161,7 @@ export default function IOProfileDialog({
   }, [editingProfileId, profileForm.connection.interfaces, onUpdateConnectionField]);
 
   // Convert GvretInterfaceConfig[] to BusMappingWithProtocol[] for the component
-  const getGvretBusConfig = useCallback((): BusMappingWithProtocol[] => {
+  const getDeviceBusConfig = useCallback((): BusMappingWithProtocol[] => {
     const interfaces = profileForm.connection.interfaces as GvretInterfaceConfig[] | undefined;
     if (!interfaces || interfaces.length === 0) {
       // No interfaces configured - show empty state
@@ -175,8 +175,8 @@ export default function IOProfileDialog({
     }));
   }, [profileForm.connection.interfaces]);
 
-  // Handle bus config changes from GvretBusConfig component
-  const handleGvretBusConfigChange = useCallback(
+  // Handle bus config changes from DeviceBusConfig component
+  const handleDeviceBusConfigChange = useCallback(
     (config: BusMappingWithProtocol[]) => {
       const interfaces: GvretInterfaceConfig[] = config.map((mapping) => ({
         device_bus: mapping.deviceBus,
@@ -766,19 +766,19 @@ export default function IOProfileDialog({
                   </div>
                 )}
 
-                {getGvretBusConfig().length > 0 && (
-                  <GvretBusConfig
+                {getDeviceBusConfig().length > 0 && (
+                  <DeviceBusConfig
                     deviceInfo={gvretDeviceInfo}
                     isLoading={gvretProbeState === "probing"}
                     error={gvretProbeState === "error" ? gvretProbeError : null}
-                    busConfig={getGvretBusConfig()}
-                    onBusConfigChange={handleGvretBusConfigChange}
+                    busConfig={getDeviceBusConfig()}
+                    onBusConfigChange={handleDeviceBusConfigChange}
                     showOutputBus={false}
                     showProtocol={true}
                   />
                 )}
 
-                {editingProfileId && getGvretBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
+                {editingProfileId && getDeviceBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
                   <p className="text-sm text-[color:var(--text-muted)]">
                     Click "Probe Device" to detect available interfaces.
                   </p>
@@ -859,19 +859,19 @@ export default function IOProfileDialog({
                   </div>
                 )}
 
-                {getGvretBusConfig().length > 0 && (
-                  <GvretBusConfig
+                {getDeviceBusConfig().length > 0 && (
+                  <DeviceBusConfig
                     deviceInfo={gvretDeviceInfo}
                     isLoading={gvretProbeState === "probing"}
                     error={gvretProbeState === "error" ? gvretProbeError : null}
-                    busConfig={getGvretBusConfig()}
-                    onBusConfigChange={handleGvretBusConfigChange}
+                    busConfig={getDeviceBusConfig()}
+                    onBusConfigChange={handleDeviceBusConfigChange}
                     showOutputBus={false}
                     showProtocol={true}
                   />
                 )}
 
-                {editingProfileId && getGvretBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
+                {editingProfileId && getDeviceBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
                   <p className="text-sm text-[color:var(--text-muted)]">
                     Click "Probe Device" to detect available interfaces.
                   </p>

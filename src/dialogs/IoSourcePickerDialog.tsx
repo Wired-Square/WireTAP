@@ -55,7 +55,7 @@ import { LoadOptions } from "./io-source-picker";
 import { FramingOptions, FilterOptions } from "./io-source-picker";
 import { ActionButtons } from "./io-source-picker";
 import { LoadStatus } from "./io-source-picker";
-import GvretBusConfig from "./io-source-picker/GvretBusConfig";
+import DeviceBusConfig from "./io-source-picker/DeviceBusConfig";
 import SingleBusConfig from "./io-source-picker/SingleBusConfig";
 import {
   localToIsoWithOffset,
@@ -255,7 +255,7 @@ export default function IoSourcePickerDialog({
   // Multi-bus mode - per-profile maps for device probing and configuration
   const [deviceProbeResultMap, setDeviceProbeResultMap] = useState<Map<string, DeviceProbeResult>>(new Map());
   const [deviceProbeLoadingMap, setDeviceProbeLoadingMap] = useState<Map<string, boolean>>(new Map());
-  const [gvretBusConfigMap, setGvretBusConfigMap] = useState<Map<string, BusMapping[]>>(new Map());
+  const [deviceBusConfigMap, setDeviceBusConfigMap] = useState<Map<string, BusMapping[]>>(new Map());
   const [singleBusOverrideMap, setSingleBusOverrideMap] = useState<Map<string, number>>(new Map());
   // Per-profile framing config (for serial profiles in multi-bus mode)
   const [framingConfigMap, setFramingConfigMap] = useState<Map<string, InterfaceFramingConfig>>(new Map());
@@ -367,7 +367,7 @@ export default function IoSourcePickerDialog({
       // Reset multi-select maps and probed profiles ref
       setDeviceProbeResultMap(new Map());
       setDeviceProbeLoadingMap(new Map());
-      setGvretBusConfigMap(new Map());
+      setDeviceBusConfigMap(new Map());
       setSingleBusOverrideMap(new Map());
       probedProfilesRef.current.clear();
     }
@@ -465,7 +465,7 @@ export default function IoSourcePickerDialog({
       // No real-time profiles selected, clear the maps and ref
       setDeviceProbeResultMap(new Map());
       setDeviceProbeLoadingMap(new Map());
-      setGvretBusConfigMap(new Map());
+      setDeviceBusConfigMap(new Map());
       setSingleBusOverrideMap(new Map());
       probedProfilesRef.current.clear();
       return;
@@ -492,7 +492,7 @@ export default function IoSourcePickerDialog({
       }
       return changed ? newMap : prev;
     });
-    setGvretBusConfigMap((prev) => {
+    setDeviceBusConfigMap((prev) => {
       let changed = false;
       const newMap = new Map(prev);
       for (const key of newMap.keys()) {
@@ -559,7 +559,7 @@ export default function IoSourcePickerDialog({
           error: null,
         }));
         if (isMultiBus) {
-          setGvretBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(5, outputBusOffset)));
+          setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(5, outputBusOffset)));
         } else {
           setSingleBusOverrideMap((prev) => new Map(prev).set(profileId, outputBusOffset));
         }
@@ -574,7 +574,7 @@ export default function IoSourcePickerDialog({
         .then((result) => {
           setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, result));
           if (result.isMultiBus) {
-            setGvretBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(result.busCount, outputBusOffset)));
+            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(result.busCount, outputBusOffset)));
           } else {
             setSingleBusOverrideMap((prev) => new Map(prev).set(profileId, outputBusOffset));
           }
@@ -593,7 +593,7 @@ export default function IoSourcePickerDialog({
           }));
           // For multi-bus devices, fall back to default 5 buses
           if (isMultiBus) {
-            setGvretBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(5, outputBusOffset)));
+            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(5, outputBusOffset)));
           }
         })
         .finally(() => {
@@ -995,7 +995,7 @@ export default function IoSourcePickerDialog({
     // Reset multi-bus device probe maps
     setDeviceProbeResultMap(new Map());
     setDeviceProbeLoadingMap(new Map());
-    setGvretBusConfigMap(new Map());
+    setDeviceBusConfigMap(new Map());
     setSingleBusOverrideMap(new Map());
     probedProfilesRef.current.clear();
 
@@ -1012,7 +1012,7 @@ export default function IoSourcePickerDialog({
     const combinedBusMappings = new Map<string, BusMapping[]>();
 
     // Add GVRET multi-bus device mappings
-    for (const [profileId, mappings] of gvretBusConfigMap.entries()) {
+    for (const [profileId, mappings] of deviceBusConfigMap.entries()) {
       combinedBusMappings.set(profileId, mappings);
     }
 
@@ -1266,7 +1266,7 @@ export default function IoSourcePickerDialog({
 
               // Collect output buses used by OTHER profiles for duplicate detection
               const usedOutputBuses = new Set<number>();
-              for (const [otherId, otherConfig] of gvretBusConfigMap.entries()) {
+              for (const [otherId, otherConfig] of deviceBusConfigMap.entries()) {
                 if (otherId !== profileId) {
                   for (const mapping of otherConfig) {
                     if (mapping.enabled) {
@@ -1281,9 +1281,9 @@ export default function IoSourcePickerDialog({
                 }
               }
 
-              // Multi-bus devices (GVRET) - show GvretBusConfig
+              // Multi-bus devices - show DeviceBusConfig
               if (isGvret || probeResult?.isMultiBus) {
-                let busConfig = gvretBusConfigMap.get(profileId);
+                let busConfig = deviceBusConfigMap.get(profileId);
                 if (!busConfig && probeResult) {
                   const profileIndex = checkedSourceIds.indexOf(profileId);
                   const offset = profileIndex >= 0 ? profileIndex : 0;
@@ -1297,13 +1297,13 @@ export default function IoSourcePickerDialog({
                   : null;
 
                 return (
-                  <GvretBusConfig
+                  <DeviceBusConfig
                     deviceInfo={deviceInfo}
                     isLoading={isLoading}
                     error={probeResult?.error || null}
                     busConfig={busConfig}
                     onBusConfigChange={(config) => {
-                      setGvretBusConfigMap((prev) => new Map(prev).set(profileId, config));
+                      setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, config));
                     }}
                     compact
                     usedOutputBuses={usedOutputBuses}

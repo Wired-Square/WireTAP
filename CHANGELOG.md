@@ -15,6 +15,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **Rename `GvretBusConfig` → `DeviceBusConfig`**: The multi-bus device configuration component and its related internal identifiers (`GvretBusConfigProps`, `getGvretBusConfig`, `handleGvretBusConfigChange`, `gvretBusConfigMap`) have been renamed to `DeviceBusConfig` and equivalents to reflect that the component is generic and works with any multi-bus device, not just GVRET.
+
 - **Clearer session UI terminology**: Renamed user-facing labels throughout the IO source picker and session controls to be more intuitive. "IO Reader" and "Reader" are now "Source" (sources can both receive and transmit frames). The "Watch" action button is now "Connect" (creating a new session from a realtime device) and "Ingest" is now "Load" (loading recorded data). "Watch Speed" is now "Playback Speed". The top-bar button label "No reader" is now "No source".
 
 - **Internal identifier alignment**: Renamed TypeScript identifiers, filenames, and directories to match the updated UI terminology — `IoReaderPickerDialog` → `IoSourcePickerDialog`, `useIOPickerHandlers` → `useIOSourcePickerHandlers`, `io-reader-picker/` → `io-source-picker/`, `IngestOptions` → `LoadOptions`, `isIngesting` → `isLoading`, `ingestSingleSource` → `loadSingleSource`, and related props/callbacks throughout.
