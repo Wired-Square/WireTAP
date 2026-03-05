@@ -186,7 +186,7 @@ impl MultiSourceReader {
         let has_can_transmit_routes = self.transmit_routes.values().any(|route| {
             matches!(
                 route.profile_kind.as_str(),
-                "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan"
+                "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan" | "virtual"
             )
         });
 
@@ -285,6 +285,17 @@ impl MultiSourceReader {
                     EncodedFrame::Classic(buf) => buf.to_vec(),
                     EncodedFrame::Fd(buf) => buf.to_vec(),
                 }
+            }
+            "virtual" => {
+                // Simple binary loopback encoding: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
+                let mut buf = Vec::with_capacity(8 + routed_frame.data.len());
+                buf.extend_from_slice(&routed_frame.frame_id.to_le_bytes());
+                buf.push(routed_frame.bus);
+                buf.push(routed_frame.is_extended as u8);
+                buf.push(routed_frame.is_fd as u8);
+                buf.push(routed_frame.data.len() as u8);
+                buf.extend_from_slice(&routed_frame.data);
+                buf
             }
             _ => {
                 return Err(format!(

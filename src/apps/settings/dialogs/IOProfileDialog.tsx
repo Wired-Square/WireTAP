@@ -371,6 +371,7 @@ export default function IOProfileDialog({
               {availableKinds.includes("serial") && <option value="serial">Serial Port</option>}
               {availableKinds.includes("slcan") && <option value="slcan">slcan (CANable, USB-CAN)</option>}
               {availableKinds.includes("socketcan") && <option value="socketcan">SocketCAN (Linux)</option>}
+              {availableKinds.includes("virtual") && <option value="virtual">Virtual CAN (Testing)</option>}
             </Select>
           </FormField>
 
@@ -673,6 +674,44 @@ export default function IOProfileDialog({
                   <option value="0">No Limit</option>
                 </Select>
               </FormField>
+            </div>
+          )}
+
+          {/* Virtual CAN */}
+          {profileForm.kind === "virtual" && (
+            <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
+              <h3 className={h3}>Virtual CAN Settings</h3>
+              <p className={caption}>
+                Generates synthetic CAN frames for testing without real hardware.
+                Transmitted frames are echoed back as received (loopback).
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Frame Rate (Hz)" variant="default">
+                  <Input
+                    variant="default"
+                    type="number"
+                    min="0.1"
+                    max="1000"
+                    step="0.5"
+                    value={profileForm.connection.frame_rate_hz || "10"}
+                    onChange={(e) => onUpdateConnectionField("frame_rate_hz", e.target.value)}
+                    placeholder="10"
+                  />
+                </FormField>
+                <FormField label="Bus Count" variant="default">
+                  <Select
+                    variant="default"
+                    value={profileForm.connection.bus_count || "1"}
+                    onChange={(e) => onUpdateConnectionField("bus_count", e.target.value)}
+                  >
+                    <option value="1">1 bus</option>
+                    <option value="2">2 buses</option>
+                    <option value="4">4 buses</option>
+                    <option value="8">8 buses</option>
+                  </Select>
+                </FormField>
+              </div>
             </div>
           )}
 

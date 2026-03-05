@@ -51,7 +51,7 @@ export interface DirectoryValidation {
 export interface IOProfile {
   id: string;
   name: string;
-  kind: 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'csv_file' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp';
+  kind: 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'csv_file' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp' | 'virtual';
   connection: Record<string, any>;
   preferred_catalog?: string;
 }

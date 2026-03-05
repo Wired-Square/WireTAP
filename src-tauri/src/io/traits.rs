@@ -155,6 +155,11 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
             protocols: vec![Protocol::Serial],
             can_transmit: true,
         },
+        "virtual" => InterfaceTraits {
+            temporal_mode: TemporalMode::Realtime,
+            protocols: vec![Protocol::Can],
+            can_transmit: true,
+        },
         _ => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![],

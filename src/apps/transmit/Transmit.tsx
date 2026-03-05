@@ -61,6 +61,10 @@ function getTransmitStatus(p: IOProfile): { canTransmit: boolean; reason?: strin
   if (p.kind === "serial") {
     return { canTransmit: true };
   }
+  // virtual device supports loopback transmit
+  if (p.kind === "virtual") {
+    return { canTransmit: true };
+  }
   return { canTransmit: false, reason: "Not a transmit interface" };
 }
 
@@ -82,6 +86,7 @@ export default function Transmit() {
         if (p.kind === "gs_usb") return true;
         if (p.kind === "socketcan") return true;
         if (p.kind === "serial") return true;
+        if (p.kind === "virtual") return true;
         return false;
       }),
     [ioProfiles]

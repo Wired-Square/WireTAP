@@ -121,6 +121,13 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     platforms: ["windows", "macos", "linux", "ios"],
     isMultiSourceCapable: true,
   },
+  virtual: {
+    temporalMode: "realtime",
+    protocols: ["can"],
+    canTransmit: true,
+    platforms: ["windows", "macos", "linux", "ios"],
+    isMultiSourceCapable: true,
+  },
 };
 
 // ============================================================================

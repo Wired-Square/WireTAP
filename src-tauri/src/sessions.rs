@@ -21,6 +21,7 @@ use crate::{
         ModbusTcpConfig, ModbusTcpReader,
         ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
         MqttConfig, MqttReader,
+        VirtualDeviceConfig, VirtualDeviceReader,
         ModbusRole, MultiSourceReader, SourceConfig,
         PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
         CanTransmitFrame, TransmitResult,
@@ -241,7 +242,7 @@ fn choose_profile_by_id(settings: &AppSettings, profile_id: Option<&str>) -> Opt
 fn is_realtime_device(kind: &str) -> bool {
     matches!(
         kind,
-        "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" | "slcan" | "gs_usb" | "socketcan" | "serial" | "modbus_tcp"
+        "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" | "slcan" | "gs_usb" | "socketcan" | "serial" | "modbus_tcp" | "virtual"
     )
 }
 
@@ -664,9 +665,44 @@ pub async fn create_reader_session(
 
             Box::new(MqttReader::new(app.clone(), session_id.clone(), config))
         }
+        "virtual" => {
+            let frame_rate_hz = profile
+                .connection
+                .get("frame_rate_hz")
+                .and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .or_else(|| v.as_f64())
+                })
+                .unwrap_or(10.0)
+                .clamp(0.1, 1000.0);
+
+            let bus_count = profile
+                .connection
+                .get("bus_count")
+                .and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse::<u8>().ok())
+                        .or_else(|| v.as_i64().map(|n| n as u8))
+                })
+                .unwrap_or(1)
+                .clamp(1, 8);
+
+            let config = VirtualDeviceConfig {
+                frame_rate_hz,
+                bus_count,
+            };
+
+            tlog!(
+                "[create_reader_session] Virtual device — {:.1} Hz, {} bus(es)",
+                frame_rate_hz, bus_count
+            );
+
+            Box::new(VirtualDeviceReader::new(app.clone(), session_id.clone(), config))
+        }
         kind => {
             return Err(format!(
-                "Unsupported reader type '{}'. Supported: modbus_tcp, mqtt, gvret_tcp, gvret_usb, postgres, csv_file, serial, slcan, socketcan, gs_usb",
+                "Unsupported reader type '{}'. Supported: modbus_tcp, mqtt, virtual, gvret_tcp, gvret_usb, postgres, csv_file, serial, slcan, socketcan, gs_usb",
                 kind
             ));
         }
@@ -1647,6 +1683,39 @@ pub async fn probe_device(
             }
         }
 
+        // Virtual CAN — always succeeds, reports configured bus count
+        "virtual" => {
+            let bus_count = profile
+                .connection
+                .get("bus_count")
+                .and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .or_else(|| v.as_i64().map(|n| n as u32))
+                })
+                .unwrap_or(1)
+                .clamp(1, 8) as u8;
+            let frame_rate_hz = profile
+                .connection
+                .get("frame_rate_hz")
+                .and_then(|v| {
+                    v.as_str()
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .or_else(|| v.as_f64())
+                })
+                .unwrap_or(10.0);
+            Ok(DeviceProbeResult {
+                success: true,
+                device_type: "virtual".to_string(),
+                is_multi_bus: bus_count > 1,
+                bus_count,
+                primary_info: Some(format!("{:.1} Hz", frame_rate_hz)),
+                secondary_info: Some(format!("{} bus(es)", bus_count)),
+                supports_fd: Some(false),
+                error: None,
+            })
+        }
+
         // Recorded sources or unsupported types
         _ => Err(format!(
             "Profile '{}' is not a real-time device (kind: {})",
@@ -1850,7 +1919,7 @@ pub async fn create_multi_source_session(
         if !is_realtime_device(&config.profile_kind) {
             return Err(format!(
                 "Profile '{}' has unsupported type '{}' for multi-source mode. \
-                Currently supported: gvret_tcp, gvret_usb, slcan, gs_usb, socketcan, serial, modbus_tcp",
+                Currently supported: gvret_tcp, gvret_usb, slcan, gs_usb, socketcan, serial, modbus_tcp, virtual",
                 config.profile_id, config.profile_kind
             ));
         }

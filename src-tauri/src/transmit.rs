@@ -78,9 +78,9 @@ pub struct RepeatStoppedEvent {
 
 /// Kinds that support CAN transmit (platform-dependent)
 #[cfg(not(target_os = "ios"))]
-const CAN_TRANSMIT_KINDS: [&str; 5] = ["slcan", "gvret_tcp", "gvret_usb", "socketcan", "gs_usb"];
+const CAN_TRANSMIT_KINDS: [&str; 6] = ["slcan", "gvret_tcp", "gvret_usb", "socketcan", "gs_usb", "virtual"];
 #[cfg(target_os = "ios")]
-const CAN_TRANSMIT_KINDS: [&str; 1] = ["gvret_tcp"];
+const CAN_TRANSMIT_KINDS: [&str; 2] = ["gvret_tcp", "virtual"];
 
 /// Kinds that support serial transmit (not available on iOS)
 #[cfg(not(target_os = "ios"))]
@@ -157,6 +157,14 @@ fn get_capabilities_for_kind(kind: &str, profile: &IOProfile) -> WriterCapabilit
             supports_extended_id: false,
             supports_rtr: false,
             available_buses: vec![],
+        },
+        "virtual" => WriterCapabilities {
+            can_transmit_can: true,
+            can_transmit_serial: false,
+            supports_canfd: false,
+            supports_extended_id: true,
+            supports_rtr: false,
+            available_buses: vec![0, 1, 2, 3, 4, 5, 6, 7],
         },
         _ => WriterCapabilities {
             can_transmit_can: false,
@@ -251,6 +259,11 @@ static IO_REPEAT_TASK_COUNTER: AtomicU64 = AtomicU64::new(0);
 // ============================================================================
 // Simple Transmit Helpers
 // ============================================================================
+
+/// Public re-export of is_permanent_error for use by other modules (e.g. replay).
+pub fn is_permanent_error_pub(error: &str) -> bool {
+    is_permanent_error(error)
+}
 
 /// Check if an error is permanent (should stop repeat) vs transient (can continue)
 fn is_permanent_error(error: &str) -> bool {

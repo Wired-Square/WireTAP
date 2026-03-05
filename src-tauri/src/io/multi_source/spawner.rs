@@ -4,6 +4,7 @@
 
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc as std_mpsc;
 use std::sync::Arc;
 use tauri::AppHandle;
 use tokio::sync::mpsc;
@@ -22,7 +23,7 @@ use crate::io::{now_us, FrameMessage};
 use crate::io::serial::{parse_profile_for_source, run_source as run_serial_source};
 #[cfg(not(target_os = "ios"))]
 use crate::io::slcan::run_slcan_source;
-use crate::io::types::SourceMessage;
+use crate::io::types::{SourceMessage, TransmitRequest};
 use crate::settings::IOProfile;
 
 #[cfg(target_os = "linux")]
@@ -102,6 +103,9 @@ pub(super) async fn run_source_reader(
                 tx,
             )
             .await;
+        }
+        "virtual" => {
+            run_virtual_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await;
         }
         "modbus_tcp" => {
             let role = _modbus_role.unwrap_or(ModbusRole::Client);
@@ -464,6 +468,154 @@ async fn run_serial_reader(
         tx,
     )
     .await;
+}
+
+// ============================================================================
+// Virtual CAN Source
+// ============================================================================
+
+/// Virtual CAN source for multi-source sessions: generates synthetic frames and sends
+/// them via the merge channel (no direct emit_frames call — merge task handles that).
+async fn run_virtual_reader(
+    source_idx: usize,
+    profile: &IOProfile,
+    bus_mappings: Vec<BusMapping>,
+    stop_flag: Arc<AtomicBool>,
+    tx: mpsc::Sender<SourceMessage>,
+) {
+    const SYNTHETIC_FRAME_IDS: &[u32] = &[
+        0x100, 0x200, 0x300, 0x123, 0x456, 0x700, 0x1FF, 0x7FF,
+    ];
+
+    let frame_rate_hz = profile
+        .connection
+        .get("frame_rate_hz")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(10.0)
+        .clamp(0.1, 1000.0);
+    let bus_count = profile
+        .connection
+        .get("bus_count")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1)
+        .clamp(1, 8) as u8;
+
+    let _ = tx
+        .send(SourceMessage::Connected(
+            source_idx,
+            "virtual".to_string(),
+            "virtual://internal".to_string(),
+            None,
+        ))
+        .await;
+
+    // Create transmit channel for loopback: transmitted frames are echoed back as received
+    let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
+    let _ = tx
+        .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
+        .await;
+
+    // Spawn loopback task: receives encoded frames and echoes them back via the merge channel
+    let tx_loopback = tx.clone();
+    let stop_flag_for_transmit = stop_flag.clone();
+    tokio::spawn(async move {
+        while !stop_flag_for_transmit.load(Ordering::Relaxed) {
+            match transmit_rx.recv_timeout(std::time::Duration::from_millis(10)) {
+                Ok(req) => {
+                    let data = &req.data;
+                    // Decode virtual frame format: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
+                    if data.len() >= 8 {
+                        let frame_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+                        let bus = data[4];
+                        let is_extended = data[5] != 0;
+                        let is_fd = data[6] != 0;
+                        let dlc = data[7];
+                        let frame_data = data.get(8..).unwrap_or(&[]).to_vec();
+                        let ts = now_us();
+                        let frame = FrameMessage {
+                            protocol: "can".to_string(),
+                            timestamp_us: ts,
+                            frame_id,
+                            bus,
+                            dlc,
+                            bytes: frame_data,
+                            is_extended,
+                            is_fd,
+                            source_address: None,
+                            incomplete: None,
+                            direction: Some("rx".to_string()),
+                        };
+                        let _ = tx_loopback
+                            .send(SourceMessage::Frames(source_idx, vec![frame]))
+                            .await;
+                    }
+                    let _ = req.result_tx.send(Ok(()));
+                }
+                Err(std_mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std_mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+    });
+
+    let interval_us = (1_000_000.0 / frame_rate_hz) as u64;
+    let mut ticker = interval(Duration::from_micros(interval_us));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    let mut counter: u64 = 0;
+
+    loop {
+        ticker.tick().await;
+
+        if stop_flag.load(Ordering::Relaxed) {
+            break;
+        }
+
+        let frame_id = SYNTHETIC_FRAME_IDS[(counter as usize) % SYNTHETIC_FRAME_IDS.len()];
+        let device_bus = (counter as u8) % bus_count;
+
+        // Map device bus to output bus via bus_mappings
+        let output_bus = bus_mappings
+            .iter()
+            .find(|m| m.device_bus == device_bus)
+            .map(|m| m.output_bus)
+            .unwrap_or(device_bus);
+
+        let ts = now_us();
+        let data = vec![
+            ((counter >> 24) & 0xFF) as u8,
+            ((counter >> 16) & 0xFF) as u8,
+            ((counter >> 8) & 0xFF) as u8,
+            (counter & 0xFF) as u8,
+            ((ts >> 24) & 0xFF) as u8,
+            ((ts >> 16) & 0xFF) as u8,
+            ((ts >> 8) & 0xFF) as u8,
+            (ts & 0xFF) as u8,
+        ];
+
+        let frame = FrameMessage {
+            protocol: "can".to_string(),
+            timestamp_us: ts,
+            frame_id,
+            bus: output_bus,
+            dlc: data.len() as u8,
+            bytes: data,
+            is_extended: false,
+            is_fd: false,
+            source_address: None,
+            incomplete: None,
+            direction: Some("rx".to_string()),
+        };
+
+        if tx.send(SourceMessage::Frames(source_idx, vec![frame])).await.is_err() {
+            break;
+        }
+
+        counter = counter.wrapping_add(1);
+    }
+
+    let _ = tx
+        .send(SourceMessage::Ended(source_idx, "stopped".to_string()))
+        .await;
 }
 
 // ============================================================================

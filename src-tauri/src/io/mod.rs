@@ -19,6 +19,7 @@ pub mod gvret; // GVRET TCP/USB driver
 pub mod modbus_tcp; // pub for scanner command access
 mod mqtt;
 mod multi_source;
+mod virtual_device;
 #[cfg(not(target_os = "ios"))]
 pub mod serial; // pub for Tauri command access (list_serial_ports)
 #[cfg(not(target_os = "ios"))]
@@ -61,6 +62,7 @@ pub use modbus_tcp::{
 pub use gvret::probe_gvret_usb;
 pub use multi_source::{ModbusRole, MultiSourceReader, SourceConfig};
 pub use mqtt::{MqttConfig, MqttReader};
+pub use virtual_device::{VirtualDeviceConfig, VirtualDeviceReader};
 #[cfg(not(target_os = "ios"))]
 #[allow(unused_imports)]
 pub use serial::Parity;
@@ -1187,6 +1189,9 @@ pub fn emit_frames(
     session_id: &str,
     frames: Vec<FrameMessage>,
 ) {
+    // Tap into MITM router (non-blocking: uses try_lock + try_send, never blocks emit path)
+    crate::router::route_frames_to_routers(session_id, &frames);
+
     let active_listeners = get_active_listeners_sync(session_id);
     let payload = FrameBatchPayload {
         frames,
