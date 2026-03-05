@@ -58,17 +58,18 @@ pub async fn import_csv_to_buffer(file_path: String) -> Result<BufferMetadata, S
         .ok_or_else(|| "Failed to store frames in buffer".to_string())
 }
 
-/// Preview a CSV file: read first N rows, detect headers, suggest column mappings
+/// Preview a data file: read first N rows, detect delimiter/headers, suggest column mappings
 #[tauri::command(rename_all = "snake_case")]
 pub async fn preview_csv(
     file_path: String,
     max_rows: Option<usize>,
+    delimiter: Option<io::Delimiter>,
 ) -> Result<io::CsvPreview, String> {
     let max = max_rows.unwrap_or(20);
-    io::preview_csv_file(&file_path, max)
+    io::preview_csv_file(&file_path, max, delimiter)
 }
 
-/// Import a CSV file with user-provided column mappings
+/// Import a data file with user-provided column mappings
 #[tauri::command(rename_all = "snake_case")]
 pub async fn import_csv_with_mapping(
     file_path: String,
@@ -76,17 +77,18 @@ pub async fn import_csv_with_mapping(
     skip_first_row: bool,
     timestamp_unit: io::TimestampUnit,
     negate_timestamps: bool,
+    delimiter: io::Delimiter,
 ) -> Result<BufferMetadata, String> {
     let filename = std::path::Path::new(&file_path)
         .file_name()
         .and_then(|n| n.to_str())
-        .unwrap_or("unknown.csv")
+        .unwrap_or("unknown")
         .to_string();
 
-    let frames = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps)?;
+    let frames = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps, delimiter)?;
 
     if frames.is_empty() {
-        return Err("CSV file contains no valid frames with the given column mapping".to_string());
+        return Err("File contains no valid frames with the given column mapping".to_string());
     }
 
     buffer_store::set_buffer(frames, filename);

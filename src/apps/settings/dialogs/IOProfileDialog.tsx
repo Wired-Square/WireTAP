@@ -362,7 +362,7 @@ export default function IOProfileDialog({
                 onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
               }
             >
-              {availableKinds.includes("csv_file") && <option value="csv_file">CSV File</option>}
+              {availableKinds.includes("csv_file") && <option value="csv_file">Data File</option>}
               {availableKinds.includes("gs_usb") && <option value="gs_usb">gs_usb (candleLight)</option>}
               {availableKinds.includes("gvret_tcp") && <option value="gvret_tcp">GVRET TCP</option>}
               {availableKinds.includes("gvret_usb") && <option value="gvret_usb">GVRET USB (Serial)</option>}
@@ -914,10 +914,10 @@ export default function IOProfileDialog({
             </div>
           )}
 
-          {/* CSV File */}
+          {/* Data File */}
           {profileForm.kind === "csv_file" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>CSV File</h3>
+              <h3 className={h3}>Data File</h3>
 
               <FormField label="File Path (optional)" variant="default">
                 <Input
@@ -933,7 +933,7 @@ export default function IOProfileDialog({
                   {profileForm.connection.file_path
                     ? "This profile will always use the specified file."
                     : "Leave empty to select a file when starting the stream."}
-                  {" "}Supports GVRET/SavvyCAN CSV format.
+                  {" "}Supports CSV, CAN dump, and other delimited formats.
                 </p>
               </div>
 

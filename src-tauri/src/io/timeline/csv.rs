@@ -105,6 +105,76 @@ impl IODevice for CsvReader {
 }
 
 // ============================================================================
+// Delimiter type for flexible column splitting
+// ============================================================================
+
+/// Column delimiter for splitting lines into fields
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Delimiter {
+    Comma,
+    Tab,
+    Space,
+    Semicolon,
+}
+
+impl Delimiter {
+    /// Return the character used for splitting
+    pub fn as_char(self) -> char {
+        match self {
+            Delimiter::Comma => ',',
+            Delimiter::Tab => '\t',
+            Delimiter::Space => ' ',
+            Delimiter::Semicolon => ';',
+        }
+    }
+}
+
+/// Split a line by the given delimiter.
+/// For `Space` delimiter, consecutive spaces are collapsed (like split_whitespace).
+fn split_line<'a>(line: &'a str, delimiter: Delimiter) -> Vec<&'a str> {
+    if delimiter == Delimiter::Space {
+        line.split_whitespace().collect()
+    } else {
+        line.split(delimiter.as_char()).collect()
+    }
+}
+
+/// Detect the most likely delimiter from the first few lines of a file.
+/// Tries comma, tab, semicolon, space in priority order.
+/// Picks the delimiter that produces a consistent column count > 1.
+pub fn detect_delimiter(lines: &[&str]) -> Delimiter {
+    let candidates = [
+        Delimiter::Comma,
+        Delimiter::Tab,
+        Delimiter::Semicolon,
+        Delimiter::Space,
+    ];
+
+    for &delim in &candidates {
+        let counts: Vec<usize> = lines
+            .iter()
+            .filter(|l| !l.trim().is_empty())
+            .take(10)
+            .map(|l| split_line(l, delim).len())
+            .collect();
+
+        if counts.is_empty() {
+            continue;
+        }
+
+        let first = counts[0];
+        // All lines must have the same column count, and more than 1 column
+        if first > 1 && counts.iter().all(|&c| c == first) {
+            return delim;
+        }
+    }
+
+    // Default to comma
+    Delimiter::Comma
+}
+
+// ============================================================================
 // Flexible CSV column mapping types (for user-driven import)
 // ============================================================================
 
@@ -123,6 +193,9 @@ pub enum CsvColumnRole {
     Extended,
     Bus,
     Direction,
+    /// Combined frame ID and data in one column, separated by # (candump format)
+    /// e.g., "689#DEADBEEF0102"
+    FrameIdData,
 }
 
 /// A single column mapping: column index to its assigned role
@@ -173,6 +246,8 @@ pub struct CsvPreview {
     pub suggested_timestamp_unit: TimestampUnit,
     /// Whether the sample timestamps are all negative (suggests negate fix)
     pub has_negative_timestamps: bool,
+    /// Detected or user-specified delimiter
+    pub delimiter: Delimiter,
 }
 
 // ============================================================================
@@ -345,12 +420,13 @@ pub fn parse_csv_file(file_path: &str) -> Result<Vec<FrameMessage>, String> {
 // ============================================================================
 
 /// Preview a CSV file: read first N rows, detect headers, suggest column mappings.
-pub fn preview_csv_file(file_path: &str, max_rows: usize) -> Result<CsvPreview, String> {
+pub fn preview_csv_file(file_path: &str, max_rows: usize, delimiter: Option<Delimiter>) -> Result<CsvPreview, String> {
     let file = File::open(file_path)
-        .map_err(|e| format!("Failed to open CSV file '{}': {}", file_path, e))?;
+        .map_err(|e| format!("Failed to open file '{}': {}", file_path, e))?;
     let reader = BufReader::new(file);
 
-    let mut all_rows: Vec<Vec<String>> = Vec::new();
+    // Read all lines first (we need a few to auto-detect delimiter)
+    let mut raw_lines: Vec<String> = Vec::new();
     let mut total_lines = 0usize;
 
     for line_result in reader.lines() {
@@ -359,16 +435,26 @@ pub fn preview_csv_file(file_path: &str, max_rows: usize) -> Result<CsvPreview, 
             continue;
         }
         total_lines += 1;
-        // Collect preview rows (up to max_rows + 1 for potential header)
-        if all_rows.len() <= max_rows {
-            let cells: Vec<String> = line.split(',').map(|s| s.trim().to_string()).collect();
-            all_rows.push(cells);
+        if raw_lines.len() <= max_rows {
+            raw_lines.push(line);
         }
     }
 
-    if all_rows.is_empty() {
-        return Err("CSV file is empty".to_string());
+    if raw_lines.is_empty() {
+        return Err("File is empty".to_string());
     }
+
+    // Auto-detect delimiter if not specified
+    let delim = delimiter.unwrap_or_else(|| {
+        let line_refs: Vec<&str> = raw_lines.iter().map(|s| s.as_str()).collect();
+        detect_delimiter(&line_refs)
+    });
+
+    // Split lines into cells using the detected delimiter
+    let all_rows: Vec<Vec<String>> = raw_lines
+        .iter()
+        .map(|line| split_line(line, delim).iter().map(|s| s.trim().to_string()).collect())
+        .collect();
 
     let has_header = detect_has_header(&all_rows[0]);
 
@@ -404,7 +490,7 @@ pub fn preview_csv_file(file_path: &str, max_rows: usize) -> Result<CsvPreview, 
             let parsed: Vec<i64> = preview_rows
                 .iter()
                 .filter_map(|row| row.get(col))
-                .filter_map(|s| s.parse::<i64>().ok())
+                .filter_map(|s| parse_timestamp_string(s).map(|f| f as i64))
                 .collect();
             !parsed.is_empty() && parsed.iter().all(|&v| v < 0)
         })
@@ -418,6 +504,7 @@ pub fn preview_csv_file(file_path: &str, max_rows: usize) -> Result<CsvPreview, 
         has_header,
         suggested_timestamp_unit: suggested_unit,
         has_negative_timestamps,
+        delimiter: delim,
     })
 }
 
@@ -428,15 +515,20 @@ pub fn parse_csv_with_mapping(
     skip_first_row: bool,
     timestamp_unit: TimestampUnit,
     negate_timestamps: bool,
+    delimiter: Delimiter,
 ) -> Result<Vec<FrameMessage>, String> {
     let file = File::open(file_path)
-        .map_err(|e| format!("Failed to open CSV file '{}': {}", file_path, e))?;
+        .map_err(|e| format!("Failed to open file '{}': {}", file_path, e))?;
     let reader = BufReader::new(file);
 
     // Build role -> column index lookups
     let frame_id_col = mappings
         .iter()
         .find(|m| matches!(m.role, CsvColumnRole::FrameId))
+        .map(|m| m.column_index);
+    let frame_id_data_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::FrameIdData))
         .map(|m| m.column_index);
     let timestamp_col = mappings
         .iter()
@@ -471,15 +563,18 @@ pub fn parse_csv_with_mapping(
         .collect();
     data_byte_cols.sort();
 
-    if frame_id_col.is_none() {
-        return Err("Column mapping must include at least a Frame ID column".to_string());
+    if frame_id_col.is_none() && frame_id_data_col.is_none() {
+        return Err("Column mapping must include a Frame ID or Frame ID + Data column".to_string());
     }
 
     let mut frames: Vec<FrameMessage> = Vec::new();
     let mut line_number = 0usize;
     let mut synthetic_timestamp: u64 = 0;
-    // Collect raw i64 timestamps so we can normalise after the loop
-    let mut raw_i64_timestamps: Vec<i64> = Vec::new();
+    // Collect raw f64 timestamps so we can normalise after the loop (supports float seconds)
+    let mut raw_f64_timestamps: Vec<f64> = Vec::new();
+    // Whether timestamps are float seconds (auto-detected from first parsed timestamp)
+    let mut ts_is_float = false;
+    let mut ts_float_detected = false;
 
     for line_result in reader.lines() {
         line_number += 1;
@@ -492,38 +587,64 @@ pub fn parse_csv_with_mapping(
             continue;
         }
 
-        let parts: Vec<&str> = line.split(',').collect();
+        let parts: Vec<&str> = split_line(&line, delimiter);
 
-        // Parse frame ID (required)
-        let id_str = match parts.get(frame_id_col.unwrap()) {
-            Some(s) => s.trim(),
-            None => continue,
-        };
-        let frame_id = match parse_hex_or_decimal_u32(id_str) {
-            Some(id) => id,
-            None => continue,
+        // Parse frame ID and data — either from separate columns or combined FrameIdData
+        let (frame_id, frame_id_data_bytes) = if let Some(fid_col) = frame_id_data_col {
+            // Combined id#data column (candump format)
+            let combined = match parts.get(fid_col) {
+                Some(s) => s.trim(),
+                None => continue,
+            };
+            match parse_frame_id_data(combined) {
+                Some(result) => result,
+                None => continue,
+            }
+        } else {
+            // Separate frame ID column
+            let id_str = match parts.get(frame_id_col.unwrap()) {
+                Some(s) => s.trim(),
+                None => continue,
+            };
+            match parse_hex_or_decimal_u32(id_str) {
+                Some(id) => (id, None),
+                None => continue,
+            }
         };
 
-        // Parse timestamp — store as i64 to preserve ordering for negative values.
-        // We'll normalise to u64 after collecting all frames.
+        // Parse timestamp — supports both integer and float (e.g., candump seconds with decimals).
+        // Strip surrounding parentheses for candump format: (0000000000.005000)
         let raw_timestamp = if let Some(ts_col) = timestamp_col {
-            parts
-                .get(ts_col)
-                .and_then(|s| s.trim().parse::<i64>().ok())
-                .unwrap_or_else(|| {
-                    synthetic_timestamp += 1000;
-                    synthetic_timestamp as i64
-                })
+            let raw_str = parts.get(ts_col).map(|s| s.trim()).unwrap_or("");
+            // Strip parentheses: "(1234.567)" -> "1234.567"
+            let cleaned = raw_str
+                .strip_prefix('(')
+                .and_then(|s| s.strip_suffix(')'))
+                .unwrap_or(raw_str);
+
+            if let Some(ts) = parse_timestamp_string(cleaned) {
+                // Detect if this is a float timestamp on first successful parse
+                if !ts_float_detected {
+                    ts_is_float = cleaned.contains('.');
+                    ts_float_detected = true;
+                }
+                ts
+            } else {
+                synthetic_timestamp += 1000;
+                synthetic_timestamp as f64
+            }
         } else {
             synthetic_timestamp += 1000;
-            synthetic_timestamp as i64
+            synthetic_timestamp as f64
         };
-        raw_i64_timestamps.push(raw_timestamp);
+        raw_f64_timestamps.push(raw_timestamp);
         // Placeholder — will be corrected after the loop
         let timestamp_us = 0u64;
 
-        // Parse data bytes
-        let bytes = if let Some(db_col) = data_bytes_col {
+        // Parse data bytes — FrameIdData provides bytes directly, otherwise use other columns
+        let bytes = if let Some(ref fid_bytes) = frame_id_data_bytes {
+            fid_bytes.clone()
+        } else if let Some(db_col) = data_bytes_col {
             parts
                 .get(db_col)
                 .map(|s| parse_space_separated_hex(s.trim()))
@@ -559,14 +680,34 @@ pub fn parse_csv_with_mapping(
             bytes.len() as u8
         };
 
-        let is_extended = extended_col
-            .and_then(|c| parts.get(c))
-            .map(|s| s.trim().eq_ignore_ascii_case("true"))
-            .unwrap_or(false);
+        let is_extended = if let Some(ext_c) = extended_col {
+            parts
+                .get(ext_c)
+                .map(|s| s.trim().eq_ignore_ascii_case("true"))
+                .unwrap_or(false)
+        } else {
+            // For candump: extended if frame_id > 0x7FF
+            frame_id > 0x7FF
+        };
 
         let bus = bus_col
             .and_then(|c| parts.get(c))
-            .and_then(|s| s.trim().parse::<u8>().ok())
+            .and_then(|s| {
+                let trimmed = s.trim();
+                // Try parsing as number first, then extract trailing digits from interface name (e.g., "vcan0" -> 0)
+                trimmed.parse::<u8>().ok().or_else(|| {
+                    trimmed
+                        .chars()
+                        .rev()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect::<String>()
+                        .chars()
+                        .rev()
+                        .collect::<String>()
+                        .parse::<u8>()
+                        .ok()
+                })
+            })
             .unwrap_or(0);
 
         let direction = direction_col.and_then(|c| parts.get(c)).map(|s| {
@@ -593,21 +734,31 @@ pub fn parse_csv_with_mapping(
     }
 
     // Normalise timestamps, then convert to microseconds.
-    if !raw_i64_timestamps.is_empty() && frames.len() == raw_i64_timestamps.len() {
-        if negate_timestamps {
-            // Negative timestamps: take the absolute value to recover the real epoch time.
-            // Logs that store negative epoch values (e.g., -1767062175875212 for 2025-12-30)
-            // simply need their sign stripped — the magnitude IS the epoch timestamp.
+    if !raw_f64_timestamps.is_empty() && frames.len() == raw_f64_timestamps.len() {
+        if ts_is_float {
+            // Float seconds (e.g., candump format: 0000000000.005000)
+            // Offset so minimum becomes 0, then convert to microseconds.
+            let min_ts = raw_f64_timestamps.iter().cloned().fold(f64::INFINITY, f64::min);
+            for (frame, &raw_ts) in frames.iter_mut().zip(raw_f64_timestamps.iter()) {
+                let offset_secs = if negate_timestamps {
+                    raw_ts.abs() - min_ts.abs()
+                } else {
+                    raw_ts - min_ts
+                };
+                frame.timestamp_us = (offset_secs * 1_000_000.0).round() as u64;
+            }
+        } else if negate_timestamps {
+            // Negative integer timestamps: take the absolute value to recover the real epoch time.
             for (i, frame) in frames.iter_mut().enumerate() {
-                let raw_us = raw_i64_timestamps[i].unsigned_abs();
+                let raw_us = (raw_f64_timestamps[i].abs()) as u64;
                 frame.timestamp_us = timestamp_unit
                     .to_microseconds(raw_us)
                     .unwrap_or(u64::MAX);
             }
         } else {
-            // Positive/mixed timestamps: offset so the minimum becomes 0.
-            let min_ts = raw_i64_timestamps.iter().copied().min().unwrap_or(0);
-            for (frame, &raw_ts) in frames.iter_mut().zip(raw_i64_timestamps.iter()) {
+            // Positive/mixed integer timestamps: offset so the minimum becomes 0.
+            let min_ts = raw_f64_timestamps.iter().cloned().fold(f64::INFINITY, f64::min);
+            for (frame, &raw_ts) in frames.iter_mut().zip(raw_f64_timestamps.iter()) {
                 let normalised = (raw_ts - min_ts) as u64;
                 frame.timestamp_us = timestamp_unit
                     .to_microseconds(normalised)
@@ -616,8 +767,6 @@ pub fn parse_csv_with_mapping(
         }
 
         // Sort frames by timestamp to ensure chronological order in the buffer.
-        // CSV files may have rows in arbitrary order (e.g., reverse chronological),
-        // but the buffer expects ascending timestamp order for correct playback.
         frames.sort_by_key(|f| f.timestamp_us);
     }
 
@@ -804,6 +953,45 @@ fn guess_column_role(header: Option<&str>, samples: &[&str]) -> CsvColumnRole {
         return CsvColumnRole::Ignore;
     }
 
+    // Combined frame ID + data (candump format: "689#DEADBEEF", "123#0102030405")
+    let frame_id_data_count = non_empty
+        .iter()
+        .filter(|s| {
+            if let Some(hash_pos) = s.find('#') {
+                let id_part = &s[..hash_pos];
+                let data_part = &s[hash_pos + 1..];
+                // ID: 1-8 hex chars, Data: even number of hex chars (byte pairs)
+                !id_part.is_empty()
+                    && id_part.len() <= 8
+                    && id_part.chars().all(|c| c.is_ascii_hexdigit())
+                    && !data_part.is_empty()
+                    && data_part.len() % 2 == 0
+                    && data_part.chars().all(|c| c.is_ascii_hexdigit())
+            } else {
+                false
+            }
+        })
+        .count();
+    if frame_id_data_count > non_empty.len() / 2 {
+        return CsvColumnRole::FrameIdData;
+    }
+
+    // Parenthesised decimal timestamps (candump format: "(0000000000.005000)")
+    let paren_ts_count = non_empty
+        .iter()
+        .filter(|s| {
+            let s = s.trim();
+            if let Some(inner) = s.strip_prefix('(').and_then(|s| s.strip_suffix(')')) {
+                inner.parse::<f64>().is_ok()
+            } else {
+                false
+            }
+        })
+        .count();
+    if paren_ts_count > non_empty.len() / 2 {
+        return CsvColumnRole::Timestamp;
+    }
+
     // Space-separated hex bytes (e.g., "62 6E 60 77 A9 01 22 35")
     let space_hex_count = non_empty
         .iter()
@@ -851,6 +1039,19 @@ fn guess_column_role(header: Option<&str>, samples: &[&str]) -> CsvColumnRole {
         .count();
     if dir_count > non_empty.len() / 2 {
         return CsvColumnRole::Direction;
+    }
+
+    // CAN interface names (can0, vcan0, slcan0, etc.) → Bus
+    let interface_count = non_empty
+        .iter()
+        .filter(|s| {
+            let s = s.to_lowercase();
+            (s.starts_with("can") || s.starts_with("vcan") || s.starts_with("slcan"))
+                && s.chars().last().map(|c| c.is_ascii_digit()).unwrap_or(false)
+        })
+        .count();
+    if interface_count > non_empty.len() / 2 {
+        return CsvColumnRole::Bus;
     }
 
     // Single hex byte (1-2 hex chars, e.g., "A6", "00", "FF")
@@ -913,6 +1114,42 @@ fn parse_space_separated_hex(s: &str) -> Vec<u8> {
         .collect()
 }
 
+/// Parse a timestamp string that may be an integer or a float (with optional parentheses stripped).
+/// Returns the value as f64.
+fn parse_timestamp_string(s: &str) -> Option<f64> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    s.parse::<f64>().ok()
+}
+
+/// Parse concatenated hex bytes: "DEADBEEF" -> [0xDE, 0xAD, 0xBE, 0xEF]
+/// The input must have an even number of hex characters.
+fn parse_concatenated_hex(s: &str) -> Vec<u8> {
+    let s = s.trim();
+    if s.len() % 2 != 0 {
+        return Vec::new();
+    }
+    (0..s.len())
+        .step_by(2)
+        .filter_map(|i| u8::from_str_radix(&s[i..i + 2], 16).ok())
+        .collect()
+}
+
+/// Parse a combined frame ID + data column (candump format): "689#DEADBEEF"
+/// Returns (frame_id, Some(data_bytes)) on success.
+fn parse_frame_id_data(s: &str) -> Option<(u32, Option<Vec<u8>>)> {
+    let s = s.trim();
+    let hash_pos = s.find('#')?;
+    let id_part = &s[..hash_pos];
+    let data_part = &s[hash_pos + 1..];
+
+    let frame_id = u32::from_str_radix(id_part, 16).ok()?;
+    let bytes = parse_concatenated_hex(data_part);
+    Some((frame_id, Some(bytes)))
+}
+
 /// Analyse sample timestamp values and suggest the most likely unit.
 ///
 /// Two-pass heuristic:
@@ -937,6 +1174,24 @@ fn suggest_timestamp_unit(
         Some(c) => c,
         None => return TimestampUnit::Microseconds,
     };
+
+    // If timestamps look like float seconds (contain '.' or are parenthesised),
+    // return Seconds immediately — the import path handles float→µs conversion.
+    let has_float = sample_rows.iter().any(|row| {
+        if let Some(s) = row.get(col) {
+            let trimmed = s.trim();
+            let inner = trimmed
+                .strip_prefix('(')
+                .and_then(|s| s.strip_suffix(')'))
+                .unwrap_or(trimmed);
+            inner.contains('.') && inner.parse::<f64>().is_ok()
+        } else {
+            false
+        }
+    });
+    if has_float {
+        return TimestampUnit::Seconds;
+    }
 
     let timestamps: Vec<i64> = sample_rows
         .iter()

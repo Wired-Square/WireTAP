@@ -152,12 +152,12 @@ export const JSON_FILTERS: DialogFilter[] = [
 ];
 
 /**
- * Dialog filter for CSV files (GVRET/SavvyCAN format)
+ * Dialog filter for data files (CSV, CAN dump, log)
  */
 export const CSV_FILTERS: DialogFilter[] = [
   {
-    name: "CSV Files",
-    extensions: ["csv"],
+    name: "Data Files (CSV, CAN Dump)",
+    extensions: ["csv", "log", "dump"],
   },
 ];
 

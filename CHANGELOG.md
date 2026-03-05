@@ -29,6 +29,12 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Expanded serial baud rates**: All serial baud rate selectors (GVRET USB, Serial, SLCAN) now offer 15 standard rates from 9600 to 3,000,000 (including 500,000 and other previously missing values) plus a "Custom" option for non-standard rates
 
+- **Configurable column delimiters**: The column mapper dialog now auto-detects and allows selecting the field delimiter (comma, tab, space, semicolon). Enables importing tab-separated, space-separated, and other delimited file formats alongside CSV.
+
+- **CAN dump import**: Import `candump`-format log files (`.log`, `.dump`) with space-delimited columns, parenthesised float timestamps like `(0000000000.005000)`, and combined `ID#DATA` columns. A new "ID#Data (candump)" column role handles the `689#DEADBEEF` format, splitting on `#` to extract both frame ID and payload. CAN interface names (can0, vcan0) are auto-detected as the Bus column.
+
+- **Data file label rename**: Source picker and IO profile settings now show "CSV, CAN Dump" and "Data File" labels instead of "CSV" to reflect broader format support
+
 ### Changed
 
 - **Rename `GvretBusConfig` → `DeviceBusConfig`**: The multi-bus device configuration component and its related internal identifiers (`GvretBusConfigProps`, `getGvretBusConfig`, `handleGvretBusConfigChange`, `gvretBusConfigMap`) have been renamed to `DeviceBusConfig` and equivalents to reflect that the component is generic and works with any multi-bus device, not just GVRET.

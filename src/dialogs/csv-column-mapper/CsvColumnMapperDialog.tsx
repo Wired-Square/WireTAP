@@ -15,6 +15,7 @@ import {
   type CsvColumnMapping,
   type CsvColumnRole,
   type TimestampUnit,
+  type Delimiter,
   type BufferMetadata,
 } from "../../api/buffer";
 import {
@@ -48,6 +49,7 @@ export default function CsvColumnMapperDialog({
   const [preview, setPreview] = useState<CsvPreview | null>(null);
   const [mappings, setMappings] = useState<CsvColumnMapping[]>([]);
   const [hasHeader, setHasHeader] = useState(true);
+  const [delimiter, setDelimiter] = useState<Delimiter>("comma");
   const [isLoading, setIsLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +74,7 @@ export default function CsvColumnMapperDialog({
         setPreview(data);
         setMappings(data.suggested_mappings);
         setHasHeader(data.has_header);
+        setDelimiter(data.delimiter);
         setTimestampUnit(data.suggested_timestamp_unit);
         setNegateTimestamps(data.has_negative_timestamps);
       })
@@ -88,21 +91,23 @@ export default function CsvColumnMapperDialog({
     };
   }, [isOpen, filePath]);
 
-  // Handle header toggle — shift rows and re-run suggestions
-  const handleHeaderToggle = useCallback(
-    (checked: boolean) => {
-      if (!preview) return;
-      setHasHeader(checked);
+  // Re-preview helper — used by delimiter change and header toggle
+  const rePreview = useCallback(
+    (overrideDelimiter?: Delimiter, overrideHasHeader?: boolean) => {
       setIsLoading(true);
       setError(null);
 
-      // Re-preview to recalculate suggestions with/without header
-      // The backend always does its own detection, but we override has_header
-      previewCsv(filePath, 20)
+      const delimToUse = overrideDelimiter ?? delimiter;
+      const headerCheck = overrideHasHeader ?? hasHeader;
+
+      previewCsv(filePath, 20, delimToUse)
         .then((data) => {
-          // Use the user's choice for has_header, but adjust data accordingly
-          if (checked && !data.has_header) {
-            // User says it's a header but backend disagrees — treat first data row as header
+          if (overrideDelimiter !== undefined) {
+            setDelimiter(overrideDelimiter);
+          }
+
+          // Adjust header vs no-header based on user's choice
+          if (headerCheck && !data.has_header) {
             const newHeaders = data.rows[0] ?? null;
             const newRows = data.rows.slice(1);
             setPreview({
@@ -112,11 +117,8 @@ export default function CsvColumnMapperDialog({
               has_header: true,
               total_rows: data.total_rows - 1,
             });
-            // Re-suggest with the user-chosen headers
-            // Use the backend suggestions as a baseline since we can't run heuristics client-side
             setMappings(data.suggested_mappings);
-          } else if (!checked && data.has_header) {
-            // User says no header but backend detected one — include header as data row
+          } else if (!headerCheck && data.has_header) {
             const newRows = data.headers
               ? [data.headers, ...data.rows]
               : data.rows;
@@ -129,9 +131,9 @@ export default function CsvColumnMapperDialog({
             });
             setMappings(data.suggested_mappings);
           } else {
-            // Agreement between user and backend
             setPreview(data);
             setMappings(data.suggested_mappings);
+            setHasHeader(data.has_header);
           }
           setTimestampUnit(data.suggested_timestamp_unit);
           setNegateTimestamps(data.has_negative_timestamps);
@@ -143,7 +145,25 @@ export default function CsvColumnMapperDialog({
           setIsLoading(false);
         });
     },
-    [filePath, preview]
+    [filePath, delimiter, hasHeader]
+  );
+
+  // Handle delimiter change — re-preview with new delimiter
+  const handleDelimiterChange = useCallback(
+    (newDelimiter: Delimiter) => {
+      rePreview(newDelimiter);
+    },
+    [rePreview]
+  );
+
+  // Handle header toggle — shift rows and re-run suggestions
+  const handleHeaderToggle = useCallback(
+    (checked: boolean) => {
+      if (!preview) return;
+      setHasHeader(checked);
+      rePreview(undefined, checked);
+    },
+    [preview, rePreview]
   );
 
   // Handle column role change
@@ -164,20 +184,21 @@ export default function CsvColumnMapperDialog({
     setError(null);
 
     try {
-      const metadata = await importCsvWithMapping(filePath, mappings, hasHeader, timestampUnit, negateTimestamps);
+      const metadata = await importCsvWithMapping(filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter);
       onImportComplete(metadata);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setIsImporting(false);
     }
-  }, [filePath, mappings, hasHeader, timestampUnit, negateTimestamps, onImportComplete]);
+  }, [filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter, onImportComplete]);
 
   // Validation
-  const hasFrameId = mappings.some((m) => m.role === "frame_id");
+  const hasFrameId = mappings.some((m) => m.role === "frame_id" || m.role === "frame_id_data");
   const hasData =
     mappings.some((m) => m.role === "data_bytes") ||
-    mappings.some((m) => m.role === "data_byte");
+    mappings.some((m) => m.role === "data_byte") ||
+    mappings.some((m) => m.role === "frame_id_data");
   const hasTimestamp = mappings.some((m) => m.role === "timestamp");
   const canImport = hasFrameId && !isLoading && !isImporting;
 
@@ -229,7 +250,7 @@ export default function CsvColumnMapperDialog({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className={h3}>Map CSV Columns</h3>
+            <h3 className={h3}>Map Columns</h3>
             <div className={caption}>
               {filename}
               {preview && (
@@ -241,17 +262,33 @@ export default function CsvColumnMapperDialog({
           </div>
         </div>
 
-        {/* Header toggle */}
-        <label className={`flex items-center gap-2 ${caption} cursor-pointer select-none`}>
-          <input
-            type="checkbox"
-            checked={hasHeader}
-            onChange={(e) => handleHeaderToggle(e.target.checked)}
-            disabled={isLoading}
-            className="accent-blue-500"
-          />
-          <span>First row is a header</span>
-        </label>
+        {/* Delimiter + header toggle */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <label className={`text-xs ${textSecondary} whitespace-nowrap`}>Delimiter</label>
+            <select
+              value={delimiter}
+              onChange={(e) => handleDelimiterChange(e.target.value as Delimiter)}
+              disabled={isLoading}
+              className={`text-xs px-2 py-1 rounded border ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
+            >
+              <option value="comma">Comma</option>
+              <option value="tab">Tab</option>
+              <option value="space">Space</option>
+              <option value="semicolon">Semicolon</option>
+            </select>
+          </div>
+          <label className={`flex items-center gap-2 ${caption} cursor-pointer select-none`}>
+            <input
+              type="checkbox"
+              checked={hasHeader}
+              onChange={(e) => handleHeaderToggle(e.target.checked)}
+              disabled={isLoading}
+              className="accent-blue-500"
+            />
+            <span>First row is a header</span>
+          </label>
+        </div>
 
         {/* Preview table */}
         {isLoading ? (

@@ -26,6 +26,7 @@ import {
 const ROLE_OPTIONS: { value: CsvColumnRole; label: string }[] = [
   { value: "ignore", label: "Ignore" },
   { value: "frame_id", label: "Frame ID" },
+  { value: "frame_id_data", label: "ID#Data (candump)" },
   { value: "timestamp", label: "Timestamp" },
   { value: "data_bytes", label: "Data (hex string)" },
   { value: "data_byte", label: "Data Byte" },
@@ -39,6 +40,8 @@ const ROLE_OPTIONS: { value: CsvColumnRole; label: string }[] = [
 function roleColour(role: CsvColumnRole): string {
   switch (role) {
     case "frame_id":
+      return textDataCyan;
+    case "frame_id_data":
       return textDataCyan;
     case "data_bytes":
     case "data_byte":

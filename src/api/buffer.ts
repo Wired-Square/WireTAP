@@ -55,6 +55,11 @@ export async function importCsvToBuffer(filePath: string): Promise<BufferMetadat
 // ============================================================================
 
 /**
+ * Column delimiter for splitting lines into fields
+ */
+export type Delimiter = "comma" | "tab" | "space" | "semicolon";
+
+/**
  * Column role for CSV mapping
  */
 export type CsvColumnRole =
@@ -66,7 +71,8 @@ export type CsvColumnRole =
   | "dlc"
   | "extended"
   | "bus"
-  | "direction";
+  | "direction"
+  | "frame_id_data";
 
 /**
  * A single column mapping: column index to role
@@ -103,31 +109,37 @@ export interface CsvPreview {
   suggested_timestamp_unit: TimestampUnit;
   /** Whether sample timestamps are all negative (suggests negate fix) */
   has_negative_timestamps: boolean;
+  /** Detected or user-specified delimiter */
+  delimiter: Delimiter;
 }
 
 /**
- * Preview a CSV file: reads first N rows, detects headers, suggests column mappings.
+ * Preview a data file: reads first N rows, detects delimiter/headers, suggests column mappings.
  *
- * @param filePath - Full path to the CSV file
+ * @param filePath - Full path to the data file
  * @param maxRows - Maximum preview rows (default: 20)
+ * @param delimiter - Column delimiter (auto-detected if not specified)
  * @returns Preview data with suggested mappings
  */
 export async function previewCsv(
   filePath: string,
-  maxRows?: number
+  maxRows?: number,
+  delimiter?: Delimiter | null
 ): Promise<CsvPreview> {
   return invoke("preview_csv", {
     file_path: filePath,
     max_rows: maxRows ?? null,
+    delimiter: delimiter ?? null,
   });
 }
 
 /**
- * Import a CSV file with user-provided column mappings.
+ * Import a data file with user-provided column mappings.
  *
- * @param filePath - Full path to the CSV file
+ * @param filePath - Full path to the data file
  * @param mappings - Column role assignments
  * @param skipFirstRow - Whether to skip the first row (header)
+ * @param delimiter - Column delimiter
  * @returns Buffer metadata for the imported data
  */
 export async function importCsvWithMapping(
@@ -135,7 +147,8 @@ export async function importCsvWithMapping(
   mappings: CsvColumnMapping[],
   skipFirstRow: boolean,
   timestampUnit: TimestampUnit,
-  negateTimestamps: boolean
+  negateTimestamps: boolean,
+  delimiter: Delimiter
 ): Promise<BufferMetadata> {
   return invoke("import_csv_with_mapping", {
     file_path: filePath,
@@ -143,6 +156,7 @@ export async function importCsvWithMapping(
     skip_first_row: skipFirstRow,
     timestamp_unit: timestampUnit,
     negate_timestamps: negateTimestamps,
+    delimiter,
   });
 }
 

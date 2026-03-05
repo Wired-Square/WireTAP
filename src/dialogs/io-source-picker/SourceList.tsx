@@ -134,7 +134,7 @@ export default function SourceList({
     const isMultiSource = checkedMultiSourceSession?.deviceType === "multi_source";
 
     if (isCsvSelected) {
-      displayName = "CSV";
+      displayName = "CSV, CAN Dump";
       subtitle = "Import from file";
     } else if (isBufferSession && checkedMultiSourceSession) {
       // Buffer session — show buffer ID + source name from buffer metadata
@@ -425,7 +425,7 @@ export default function SourceList({
                 {isCsvSelected && <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />}
               </div>
               <div className="flex-1 min-w-0">
-                <span className={textMedium}>CSV</span>
+                <span className={textMedium}>CSV, CAN Dump</span>
                 <div className={caption}>Import from file</div>
               </div>
             </button>

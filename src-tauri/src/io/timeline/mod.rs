@@ -13,6 +13,6 @@ mod postgres;
 pub use buffer::{step_frame, BufferReader, StepResult};
 pub use csv::{
     parse_csv_file, parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
-    CsvReader, CsvReaderOptions, TimestampUnit,
+    CsvReader, CsvReaderOptions, Delimiter, TimestampUnit,
 };
 pub use postgres::{PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType};
