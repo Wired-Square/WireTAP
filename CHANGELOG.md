@@ -27,6 +27,8 @@ All notable changes to WireTAP will be documented in this file.
 - **iOS npm scripts**: Added `ios:init`, `ios:dev`, and `ios:build` scripts to `package.json`
 - **iOS version bumping**: `bump-version.js` now updates `CFBundleShortVersionString` and `CFBundleVersion` in `Info.plist` and `project.yml`
 
+- **Expanded serial baud rates**: All serial baud rate selectors (GVRET USB, Serial, SLCAN) now offer 15 standard rates from 9600 to 3,000,000 (including 500,000 and other previously missing values) plus a "Custom" option for non-standard rates
+
 ### Changed
 
 - **Rename `GvretBusConfig` → `DeviceBusConfig`**: The multi-bus device configuration component and its related internal identifiers (`GvretBusConfigProps`, `getGvretBusConfig`, `handleGvretBusConfigChange`, `gvretBusConfigMap`) have been renamed to `DeviceBusConfig` and equivalents to reflect that the component is generic and works with any multi-bus device, not just GVRET.

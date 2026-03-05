@@ -14,6 +14,7 @@ import SecurePasswordField from "../components/SecurePasswordField";
 import IODeviceStatus, { type DeviceProbeState, type DeviceProbeResult } from "../components/IODeviceStatus";
 import { DeviceBusConfig, type BusMappingWithProtocol } from "../../../dialogs/io-source-picker";
 import { Input, Select, FormField, PrimaryButton, SecondaryButton } from "../../../components/forms";
+import BaudRateSelect from "../../../components/forms/BaudRateSelect";
 import {
   h2,
   h3,
@@ -841,17 +842,11 @@ export default function IOProfileDialog({
 
               {/* Serial Baud Rate */}
               <FormField label="Serial Baud Rate" variant="default">
-                <Select
-                  variant="default"
+                <BaudRateSelect
                   value={profileForm.connection.baud_rate || "115200"}
-                  onChange={(e) => onUpdateConnectionField("baud_rate", e.target.value)}
-                >
-                  <option value="115200">115200 (default)</option>
-                  <option value="460800">460800</option>
-                  <option value="921600">921600</option>
-                  <option value="1000000">1000000</option>
-                  <option value="2000000">2000000</option>
-                </Select>
+                  onChange={(v) => onUpdateConnectionField("baud_rate", v)}
+                  defaultLabel="default"
+                />
               </FormField>
 
               <div className={alertInfo}>
@@ -976,20 +971,10 @@ export default function IOProfileDialog({
 
               {/* Baud Rate */}
               <FormField label="Baud Rate" variant="default">
-                <Select
-                  variant="default"
+                <BaudRateSelect
                   value={profileForm.connection.baud_rate || "115200"}
-                  onChange={(e) => onUpdateConnectionField("baud_rate", e.target.value)}
-                >
-                  <option value="9600">9600</option>
-                  <option value="19200">19200</option>
-                  <option value="38400">38400</option>
-                  <option value="57600">57600</option>
-                  <option value="115200">115200</option>
-                  <option value="230400">230400</option>
-                  <option value="460800">460800</option>
-                  <option value="921600">921600</option>
-                </Select>
+                  onChange={(v) => onUpdateConnectionField("baud_rate", v)}
+                />
               </FormField>
 
               {/* Data Bits, Stop Bits, Parity */}
@@ -1048,18 +1033,11 @@ export default function IOProfileDialog({
 
               {/* Serial Baud Rate */}
               <FormField label="Serial Baud Rate" variant="default">
-                <Select
-                  variant="default"
+                <BaudRateSelect
                   value={profileForm.connection.baud_rate || "115200"}
-                  onChange={(e) => onUpdateConnectionField("baud_rate", e.target.value)}
-                >
-                  <option value="115200">115200 (default for CANable)</option>
-                  <option value="460800">460800</option>
-                  <option value="921600">921600</option>
-                  <option value="1000000">1000000</option>
-                  <option value="2000000">2000000</option>
-                  <option value="3000000">3000000</option>
-                </Select>
+                  onChange={(v) => onUpdateConnectionField("baud_rate", v)}
+                  defaultLabel="default for CANable"
+                />
               </FormField>
 
               {/* Device Status */}
