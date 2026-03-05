@@ -21,6 +21,7 @@ mod settings;
 mod smp_upgrade;
 mod store_manager;
 mod transmit;
+mod transmit_history;
 mod replay;
 
 use std::sync::Mutex;
@@ -895,6 +896,10 @@ pub fn run() {
                     tlog!("[setup] Failed to initialise buffer database: {}", e);
                 }
 
+                if let Err(e) = transmit_history::initialise(&data_dir) {
+                    tlog!("[setup] Failed to initialise transmit history database: {}", e);
+                }
+
                 // Hydrate the buffer registry from SQLite when not clearing on start
                 if !clear_on_start {
                     buffer_store::hydrate_from_db();
@@ -1126,6 +1131,10 @@ pub fn run() {
             replay::io_start_replay,
             replay::io_stop_replay,
             replay::io_stop_all_replays,
+            // Transmit history (SQLite-backed)
+            transmit_history::transmit_history_query,
+            transmit_history::transmit_history_count,
+            transmit_history::transmit_history_clear,
             // Centralised store API (replaces tauri-plugin-store for multi-window support)
             store_manager::store_get,
             store_manager::store_set,

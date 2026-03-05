@@ -8,7 +8,11 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Bulk add to Transmit queue**: Select any range of frame IDs in Discovery (using the hex Min/Max filter), choose a repeat interval and optional group name, and click "Add to Queue" to enqueue all matching frame IDs in the Transmit panel. Uses the last-seen byte values from the live capture. Accessible via the Send toolbar button or the right-click context menu in Discovery.
 
-- **Frame replay with timing**: Replay a range of frames from the Discovery buffer directly to a transmit-capable session, preserving original inter-frame timing. Configurable speed multiplier (0.25× – 10×), optional loop, per-frame or overridden target bus. Progress is shown in the Transmit History tab. Accessible via the Play toolbar button or context menu in Discovery.
+- **Frame replay with timing**: Replay a range of frames from the Discovery buffer directly to a transmit-capable session, preserving original inter-frame timing. Configurable speed multiplier (0.25× – 10×), optional loop, per-frame or overridden target bus. Accessible via the Play toolbar button or context menu in Discovery.
+
+- **Replay tab in Transmit panel**: Active replays show a progress banner with Restart and Stop buttons. A lifecycle log records every Started, Loop restart, Completed, Stopped, and Error event with timestamps, frame counts, and speed. Navigates automatically to the Replay tab when a replay is started.
+
+- **SQLite-backed transmit history**: Transmitted frames (single-shot CAN/serial, queue repeats, and replay frames) are written to a persistent SQLite database (`transmit_history.db`) instead of accumulating in memory. The History tab now paginates results (200 rows per page) and stays responsive at any frame rate. History persists across app launches and can be cleared via the toolbar.
 
 - **Tab navigation**: "Send to Transmit" now opens the Frame tab; "Add to Transmit Queue" opens the Queue tab.
 

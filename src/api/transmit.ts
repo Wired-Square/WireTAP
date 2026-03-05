@@ -126,6 +126,15 @@ export interface ReplayProgressEvent {
   total_frames: number;
 }
 
+/** Emitted when a looping replay finishes a pass and is about to restart */
+export interface ReplayLoopRestartedEvent {
+  replay_id: string;
+  /** Pass number that just completed (1-based) */
+  pass: number;
+  /** Cumulative frames sent across all passes so far */
+  frames_sent: number;
+}
+
 // ============================================================================
 // Profile Query API
 // ============================================================================

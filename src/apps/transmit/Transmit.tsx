@@ -28,6 +28,7 @@ import CanTransmitView from "./views/CanTransmitView";
 import SerialTransmitView from "./views/SerialTransmitView";
 import TransmitQueueView from "./views/TransmitQueueView";
 import TransmitHistoryView from "./views/TransmitHistoryView";
+import TransmitReplayView from "./views/TransmitReplayView";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 
 // ============================================================================
@@ -102,7 +103,8 @@ export default function Transmit() {
   const profiles = useTransmitStore((s) => s.profiles);
   const activeTab = useTransmitStore((s) => s.activeTab);
   const queue = useTransmitStore((s) => s.queue);
-  const history = useTransmitStore((s) => s.history);
+  const historyDbCount = useTransmitStore((s) => s.historyDbCount);
+  const activeReplays = useTransmitStore((s) => s.activeReplays);
   const transmitError = useTransmitStore((s) => s.error);
   const isLoading = useTransmitStore((s) => s.isLoading);
 
@@ -217,7 +219,7 @@ export default function Transmit() {
   });
 
   // Subscribe to transmit history events from repeat transmissions
-  useTransmitHistorySubscription({ profileName: ioProfileName ?? null });
+  useTransmitHistorySubscription();
 
   // Set active session for child components (CanTransmitView, etc.)
   useEffect(() => {
@@ -258,6 +260,8 @@ export default function Transmit() {
         return <TransmitQueueView outputBusToSource={outputBusToSource} />;
       case "history":
         return <TransmitHistoryView outputBusToSource={outputBusToSource} />;
+      case "replay":
+        return <TransmitReplayView />;
       default:
         return null;
     }
@@ -373,9 +377,20 @@ export default function Transmit() {
               className={dataViewTabClass(activeTab === "history")}
             >
               History
-              {history.length > 0 && (
+              {historyDbCount > 0 && (
                 <span className={`ml-1.5 text-xs ${tabCountColorClass("gray")}`}>
-                  ({history.length})
+                  ({historyDbCount.toLocaleString()})
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => handlers.handleTabClick("replay")}
+              className={dataViewTabClass(activeTab === "replay", activeReplays.size > 0)}
+            >
+              Replay
+              {activeReplays.size > 0 && (
+                <span className={`ml-1.5 text-xs ${tabCountColorClass("green")}`}>
+                  ({activeReplays.size})
                 </span>
               )}
             </button>

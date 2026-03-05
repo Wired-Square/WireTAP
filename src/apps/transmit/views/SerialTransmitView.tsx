@@ -30,7 +30,6 @@ export default function SerialTransmitView() {
   const addSerialToQueue = useTransmitStore((s) => s.addSerialToQueue);
   const resetSerialEditor = useTransmitStore((s) => s.resetSerialEditor);
   const setActiveTab = useTransmitStore((s) => s.setActiveTab);
-  const addHistoryItem = useTransmitStore((s) => s.addHistoryItem);
 
   // Local state for transmit
   const [isSending, setIsSending] = useState(false);
@@ -117,32 +116,13 @@ export default function SerialTransmitView() {
 
     setIsSending(true);
     try {
-      const result = await ioTransmitSerial(activeSession.id, bytesToSend);
-      // Add to history
-      addHistoryItem({
-        timestamp_us: result.timestamp_us,
-        profileId: activeSession.id,
-        profileName: activeSession.profileId ?? "Serial",
-        type: "serial",
-        bytes: bytesToSend,
-        success: result.success,
-        error: result.error,
-      });
+      await ioTransmitSerial(activeSession.id, bytesToSend);
     } catch (e) {
       console.error("Serial transmit failed:", e);
-      addHistoryItem({
-        timestamp_us: Date.now() * 1000,
-        profileId: activeSession.id,
-        profileName: activeSession.profileId ?? "Serial",
-        type: "serial",
-        bytes: bytesToSend,
-        success: false,
-        error: String(e),
-      });
     } finally {
       setIsSending(false);
     }
-  }, [activeSession, parsedBytes, serialEditor.framingMode, serialEditor.delimiter, addHistoryItem]);
+  }, [activeSession, parsedBytes, serialEditor.framingMode, serialEditor.delimiter]);
 
   // If not connected
   if (!isConnected) {

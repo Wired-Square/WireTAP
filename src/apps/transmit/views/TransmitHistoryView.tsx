@@ -1,9 +1,11 @@
 // ui/src/apps/transmit/views/TransmitHistoryView.tsx
 //
-// Transmitted packet history view.
+// Paginated, SQLite-backed transmit history view.
+// Fetches rows from the Rust backend on mount and whenever historyDbCount
+// changes (signalled by the transmit-history-updated event).
 
-import React, { useCallback, useMemo } from "react";
-import { Trash2, Check, X, Download, StopCircle, Play } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Trash2, Check, X, Download, ChevronDown } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import type { BusSourceInfo } from "../../../stores/sessionStore";
 import { useSettings } from "../../../hooks/useSettings";
@@ -15,12 +17,24 @@ import {
 } from "../../../styles/colourTokens";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { buttonBase } from "../../../styles/buttonStyles";
-import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
+import {
+  emptyStateContainer,
+  emptyStateText,
+  emptyStateHeading,
+  emptyStateDescription,
+} from "../../../styles/typography";
 import { byteToHex } from "../../../utils/byteUtils";
 import { buildCsv } from "../../../utils/csvBuilder";
 import { formatFrameId } from "../../../utils/frameIds";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { formatBusLabel } from "../../../utils/busFormat";
+import {
+  transmitHistoryQuery,
+  transmitHistoryClear,
+  type TransmitHistoryRow,
+} from "../../../api/transmitHistory";
+
+const PAGE_SIZE = 200;
 
 interface TransmitHistoryViewProps {
   outputBusToSource: Map<number, BusSourceInfo>;
@@ -28,31 +42,59 @@ interface TransmitHistoryViewProps {
 
 export default function TransmitHistoryView({ outputBusToSource }: TransmitHistoryViewProps) {
   const { settings } = useSettings();
+  const historyDbCount = useTransmitStore((s) => s.historyDbCount);
 
-  // Store selectors
-  const history = useTransmitStore((s) => s.history);
-  const activeReplays = useTransmitStore((s) => s.activeReplays);
-  const replayProgress = useTransmitStore((s) => s.replayProgress);
+  const [rows, setRows] = useState<TransmitHistoryRow[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  // Store actions
-  const clearHistory = useTransmitStore((s) => s.clearHistory);
-  const stopReplay = useTransmitStore((s) => s.stopReplay);
-
-  // Get timestamp format from settings
   const timestampFormat = settings?.display_time_format ?? "human";
 
-  // Handle clear history
-  const handleClearHistory = useCallback(() => {
-    clearHistory();
-  }, [clearHistory]);
+  // Fetch the first page (newest PAGE_SIZE rows). Called on mount and when historyDbCount changes.
+  const fetchFirstPage = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const newRows = await transmitHistoryQuery(0, PAGE_SIZE);
+      setRows(newRows);
+      setOffset(newRows.length);
+      setHasMore(newRows.length === PAGE_SIZE);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  // Get the oldest timestamp for delta-start (history is newest-first, so last item is oldest)
+  useEffect(() => {
+    fetchFirstPage();
+  }, [historyDbCount, fetchFirstPage]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (isLoading || !hasMore) return;
+    setIsLoading(true);
+    try {
+      const newRows = await transmitHistoryQuery(offset, PAGE_SIZE);
+      setRows((prev) => [...prev, ...newRows]);
+      setOffset((prev) => prev + newRows.length);
+      setHasMore(newRows.length === PAGE_SIZE);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, hasMore, offset]);
+
+  const handleClear = useCallback(async () => {
+    await transmitHistoryClear();
+    setRows([]);
+    setOffset(0);
+    setHasMore(false);
+    useTransmitStore.setState({ historyDbCount: 0 });
+  }, []);
+
+  // Oldest timestamp for delta-start (rows are newest-first, so last row is oldest)
   const oldestTimestampUs = useMemo(() => {
-    if (history.length === 0) return null;
-    return history[history.length - 1].timestamp_us;
-  }, [history]);
+    if (rows.length === 0) return null;
+    return rows[rows.length - 1].timestamp_us;
+  }, [rows]);
 
-  // Format timestamp based on settings - returns React node for delta modes
   const formatTimestamp = useCallback(
     (timestampUs: number, prevTimestampUs: number | null): React.ReactNode => {
       switch (timestampFormat) {
@@ -72,7 +114,6 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
     [timestampFormat, oldestTimestampUs]
   );
 
-  // Format timestamp as string for CSV export
   const formatTimestampString = useCallback(
     (timestampUs: number): string => {
       switch (timestampFormat) {
@@ -80,7 +121,6 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
           return formatIsoUs(timestampUs);
         case "delta-start":
         case "delta-last":
-          // For CSV, just use seconds
           return `${(timestampUs / 1_000_000).toFixed(6)}`;
         case "human":
         default:
@@ -90,131 +130,54 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
     [timestampFormat]
   );
 
-  // Format frame for display
-  const formatHistoryItem = (item: (typeof history)[0]) => {
-    if (item.type === "can" && item.frame) {
-      const frame = item.frame;
-      const idStr = formatFrameId(frame.frame_id, "hex", frame.is_extended);
-      const dataStr = frame.data.map(byteToHex).join(" ");
-      return {
-        type: "CAN",
-        id: idStr,
-        details: `[${frame.data.length}] ${dataStr}`,
-        flags: [
-          frame.is_extended && "EXT",
-          frame.is_fd && "FD",
-          frame.is_brs && "BRS",
-          frame.is_rtr && "RTR",
-        ].filter((f): f is string => Boolean(f)),
-        bus: frame.bus,
-      };
-    } else if (item.type === "serial" && item.bytes) {
-      const dataStr = item.bytes.slice(0, 8).map(byteToHex).join(" ");
-      const truncated = item.bytes.length > 8 ? "..." : "";
-      return {
-        type: "Serial",
-        id: null,
-        details: `[${item.bytes.length}] ${dataStr}${truncated}`,
-        flags: [],
-        bus: null,
-      };
+  const handleExport = useCallback(async () => {
+    if (rows.length === 0 && historyDbCount === 0) return;
+    setIsLoading(true);
+    try {
+      // Fetch all rows for export (no pagination limit)
+      const allRows = await transmitHistoryQuery(0, Math.max(historyDbCount, rows.length) + 1);
+      const headers = ["Timestamp", "Session", "Kind", "Frame ID", "DLC", "Data", "Bus", "Flags", "Success", "Error"];
+      const csvRows: (string | number)[][] = allRows.map((row) => {
+        const frameIdStr = row.kind === "can" && row.frame_id != null
+          ? formatFrameId(row.frame_id, "hex", row.is_extended)
+          : "";
+        const dataStr = row.bytes.map(byteToHex).join("");
+        const flags = [
+          row.is_extended && "EXT",
+          row.is_fd && "FD",
+        ].filter((f): f is string => Boolean(f)).join("|");
+        return [
+          formatTimestampString(row.timestamp_us),
+          row.session_id,
+          row.kind.toUpperCase(),
+          frameIdStr,
+          row.dlc ?? "",
+          dataStr,
+          row.bus,
+          flags,
+          row.success ? "true" : "false",
+          row.error_msg ?? "",
+        ];
+      });
+      const csv = buildCsv(headers, csvRows);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `transmit-history-${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsLoading(false);
     }
-    return null;
-  };
+  }, [rows.length, historyDbCount, formatTimestampString]);
 
-  // Export history as CSV
-  const handleExport = useCallback(() => {
-    if (history.length === 0) return;
-
-    const headers = ["Timestamp", "Interface", "Type", "ID", "DLC", "Data", "Flags", "Success", "Error"];
-    const rows: (string | number)[][] = [];
-
-    for (const item of history) {
-      const formatted = formatHistoryItem(item);
-      if (!formatted) continue;
-
-      rows.push([
-        formatTimestampString(item.timestamp_us),
-        item.profileName,
-        formatted.type,
-        formatted.id ?? "",
-        item.frame?.data.length ?? item.bytes?.length ?? 0,
-        item.frame?.data.map(byteToHex).join("") ?? item.bytes?.map(byteToHex).join("") ?? "",
-        formatted.flags.join("|"),
-        item.success ? "true" : "false",
-        item.error ?? "",
-      ]);
-    }
-
-    const csv = buildCsv(headers, rows);
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `transmit-history-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [history, formatTimestampString]);
-
-  // Stats
-  const stats = useMemo(() => {
-    const total = history.length;
-    const success = history.filter((h) => h.success).length;
-    const failed = total - success;
-    return { total, success, failed };
-  }, [history]);
+  const failedCount = useMemo(() => rows.filter((r) => !r.success).length, [rows]);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Active replay banners */}
-      {replayProgress.size > 0 && (
-        <div className={`border-b ${borderDataView}`}>
-          {[...replayProgress.entries()].map(([replayId, info]) => {
-            const pct = info.totalFrames > 0
-              ? Math.round((info.framesSent / info.totalFrames) * 100)
-              : 0;
-            return (
-              <div
-                key={replayId}
-                className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar}`}
-              >
-                <Play size={12} className="text-blue-400 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs ${textDataSecondary}`}>
-                      Replaying{info.loopReplay ? " (loop)" : ""}
-                      <span className="ml-1.5 font-mono">
-                        {info.framesSent} / {info.totalFrames}
-                      </span>
-                      <span className="ml-1.5 text-[color:var(--text-secondary)]">
-                        {info.speed}×
-                      </span>
-                    </span>
-                    <span className={`text-xs font-mono ${textDataSecondary}`}>{pct}%</span>
-                  </div>
-                  <div className={`h-1 rounded-full bg-[var(--bg-surface)] overflow-hidden`}>
-                    <div
-                      className="h-full bg-blue-500 transition-all duration-200"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-                <button
-                  onClick={() => stopReplay(replayId)}
-                  className="shrink-0 flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-red-500/40 bg-red-600/15 text-red-400 hover:bg-red-600/25 transition-colors"
-                  title="Stop this replay"
-                >
-                  <StopCircle size={11} />
-                  Stop
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Empty state (no history yet) */}
-      {history.length === 0 && (
+      {/* Empty state */}
+      {rows.length === 0 && !isLoading && (
         <div className={emptyStateContainer}>
           <div className={emptyStateText}>
             <p className={emptyStateHeading}>No History</p>
@@ -225,214 +188,174 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
         </div>
       )}
 
-      {history.length === 0 ? null : (<>
-      {/* Toolbar */}
-      <div
-        className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar} border-b ${borderDataView}`}
-      >
-        <span className={`${textDataSecondary} text-sm`}>
-          {stats.total} packet{stats.total !== 1 ? "s" : ""}
-          {stats.failed > 0 && (
-            <span className="text-red-400 ml-2">
-              ({stats.failed} failed)
+      {rows.length > 0 && (
+        <>
+          {/* Toolbar */}
+          <div
+            className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar} border-b ${borderDataView}`}
+          >
+            <span className={`${textDataSecondary} text-sm`}>
+              {historyDbCount > 0 ? historyDbCount.toLocaleString() : rows.length} packet{historyDbCount !== 1 ? "s" : ""}
+              {failedCount > 0 && (
+                <span className="text-red-400 ml-2">
+                  ({failedCount} failed)
+                </span>
+              )}
             </span>
-          )}
-        </span>
 
-        <div className="flex-1" />
+            <div className="flex-1" />
 
-        {/* Stop active replays */}
-        {activeReplays.size > 0 && (
-          <button
-            onClick={() => activeReplays.forEach((id) => stopReplay(id))}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded border border-red-500/50 bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
-            title="Stop all active replays"
-          >
-            <StopCircle size={13} />
-            Stop Replay{activeReplays.size > 1 ? `s (${activeReplays.size})` : ""}
-          </button>
-        )}
+            <button
+              onClick={handleExport}
+              disabled={isLoading}
+              className={buttonBase}
+              title="Export as CSV"
+            >
+              <Download size={14} />
+              <span className="text-sm ml-1">Export</span>
+            </button>
 
-        <button
-          onClick={handleExport}
-          className={buttonBase}
-          title="Export as CSV"
-        >
-          <Download size={14} />
-          <span className="text-sm ml-1">Export</span>
-        </button>
+            <button
+              onClick={handleClear}
+              className={buttonBase}
+              title="Clear history"
+            >
+              <Trash2 size={14} />
+              <span className="text-sm ml-1">Clear</span>
+            </button>
+          </div>
 
-        <button
-          onClick={handleClearHistory}
-          className={buttonBase}
-          title="Clear history"
-        >
-          <Trash2 size={14} />
-          <span className="text-sm ml-1">Clear</span>
-        </button>
-      </div>
-
-      {/* History Table */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead
-            className={`${bgDataToolbar} sticky top-0 ${textDataSecondary} text-xs`}
-          >
-            <tr>
-              <th className="text-left px-4 py-2 w-12"></th>
-              <th className="text-left px-4 py-2">Timestamp</th>
-              <th className="text-left px-4 py-2">Bus</th>
-              <th className="text-left px-4 py-2 w-16">Type</th>
-              <th className="text-left px-4 py-2">Frame / Data</th>
-              <th className="text-left px-4 py-2">Error</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((item, index) => {
-              // Get previous timestamp for delta-last (history is newest-first)
-              // So the "previous" in chronological order is the next item in the array
-              const prevTimestampUs = index < history.length - 1
-                ? history[index + 1].timestamp_us
-                : null;
-
-              // Replay row (started or summary)
-              if (item.type === "replay") {
-                const framesSent = item.replayFramesSent ?? 0;
-                const totalFrames = item.replayTotalFrames ?? 0;
-                const speed = item.replaySpeed ?? 1;
-                const isLoop = item.replayLoopReplay ?? false;
-
-                let frameInfo: string;
-                if (item.replayStarted) {
-                  frameInfo = isLoop
-                    ? `${totalFrames} frames/pass · ${speed}× · Loop`
-                    : `${totalFrames} frames · ${speed}×`;
-                } else if (isLoop) {
-                  frameInfo = `${framesSent} frames · ${speed}× · Loop`;
-                } else if (item.success) {
-                  frameInfo = `${totalFrames} frames · ${speed}×`;
-                } else {
-                  frameInfo = `${framesSent} / ${totalFrames} frames · ${speed}×`;
-                }
-
-                return (
-                  <tr key={item.id} className={`border-b ${borderDataView} ${hoverDataRow}`}>
-                    <td className="px-4 py-2">
-                      {item.replayStarted ? (
-                        <Play size={14} className="text-teal-400" />
-                      ) : item.success ? (
-                        <Check size={14} className="text-green-400" />
-                      ) : (
-                        <X size={14} className="text-red-400" />
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className="font-mono text-gray-400 text-xs">
-                        {formatTimestamp(item.timestamp_us, prevTimestampUs)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className={`${textDataSecondary} text-xs truncate max-w-[120px] block`}>
-                        {item.profileName}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-teal-600/30 text-teal-400">
-                        Replay
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className="font-mono text-gray-400 text-xs">{frameInfo}</span>
-                    </td>
-                    <td className="px-4 py-2">
-                      {item.error && <span className="text-red-400 text-xs">{item.error}</span>}
-                    </td>
-                  </tr>
-                );
-              }
-
-              const formatted = formatHistoryItem(item);
-              if (!formatted) return null;
-
-              return (
-                <tr
-                  key={item.id}
-                  className={`border-b ${borderDataView} ${hoverDataRow}`}
-                >
-                  {/* Status */}
-                  <td className="px-4 py-2">
-                    {item.success ? (
-                      <Check size={14} className="text-green-400" />
-                    ) : (
-                      <X size={14} className="text-red-400" />
-                    )}
-                  </td>
-
-                  {/* Timestamp */}
-                  <td className="px-4 py-2">
-                    <span className="font-mono text-gray-400 text-xs">
-                      {formatTimestamp(item.timestamp_us, prevTimestampUs)}
-                    </span>
-                  </td>
-
-                  {/* Source */}
-                  <td className="px-4 py-2">
-                    <span
-                      className={`${textDataSecondary} text-xs truncate max-w-[120px] block`}
-                      title={formatBusLabel(item.profileName, formatted.bus, outputBusToSource)}
-                    >
-                      {formatBusLabel(item.profileName, formatted.bus, outputBusToSource)}
-                    </span>
-                  </td>
-
-                  {/* Type */}
-                  <td className="px-4 py-2">
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded ${
-                        formatted.type === "CAN"
-                          ? "bg-blue-600/30 text-blue-400"
-                          : "bg-purple-600/30 text-purple-400"
-                      }`}
-                    >
-                      {formatted.type}
-                    </span>
-                  </td>
-
-                  {/* Frame / Data */}
-                  <td className="px-4 py-2">
-                    <div className={flexRowGap2}>
-                      {formatted.id && (
-                        <code className="font-mono text-green-400">
-                          {formatted.id}
-                        </code>
-                      )}
-                      <code className="font-mono text-gray-400 text-xs">
-                        {formatted.details}
-                      </code>
-                      {formatted.flags.map((flag) => (
-                        <span
-                          key={flag}
-                          className="text-[10px] text-amber-400 uppercase"
-                        >
-                          {flag}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-
-                  {/* Error */}
-                  <td className="px-4 py-2">
-                    {item.error && (
-                      <span className="text-red-400 text-xs">{item.error}</span>
-                    )}
-                  </td>
+          {/* History table */}
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-sm">
+              <thead
+                className={`${bgDataToolbar} sticky top-0 ${textDataSecondary} text-xs`}
+              >
+                <tr>
+                  <th className="text-left px-4 py-2 w-10"></th>
+                  <th className="text-left px-4 py-2">Timestamp</th>
+                  <th className="text-left px-4 py-2">Bus</th>
+                  <th className="text-left px-4 py-2 w-16">Kind</th>
+                  <th className="text-left px-4 py-2">Frame / Data</th>
+                  <th className="text-left px-4 py-2">Error</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>)}
+              </thead>
+              <tbody>
+                {rows.map((row, index) => {
+                  const prevTimestampUs =
+                    index < rows.length - 1 ? rows[index + 1].timestamp_us : null;
+
+                  const isCanRow = row.kind === "can";
+                  const frameIdStr = isCanRow && row.frame_id != null
+                    ? formatFrameId(row.frame_id, "hex", row.is_extended)
+                    : null;
+                  const dlcStr = row.dlc != null ? `[${row.dlc}]` : "";
+                  const dataStr = row.bytes.slice(0, 8).map(byteToHex).join(" ");
+                  const truncated = row.bytes.length > 8 ? " …" : "";
+                  const flags = [
+                    row.is_extended && "EXT",
+                    row.is_fd && "FD",
+                  ].filter((f): f is string => Boolean(f));
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`border-b ${borderDataView} ${hoverDataRow}`}
+                    >
+                      {/* Status */}
+                      <td className="px-4 py-2">
+                        {row.success ? (
+                          <Check size={14} className="text-green-400" />
+                        ) : (
+                          <X size={14} className="text-red-400" />
+                        )}
+                      </td>
+
+                      {/* Timestamp */}
+                      <td className="px-4 py-2">
+                        <span className="font-mono text-gray-400 text-xs">
+                          {formatTimestamp(row.timestamp_us, prevTimestampUs)}
+                        </span>
+                      </td>
+
+                      {/* Bus */}
+                      <td className="px-4 py-2">
+                        <span
+                          className={`${textDataSecondary} text-xs truncate max-w-[120px] block`}
+                          title={formatBusLabel(row.session_id, isCanRow ? row.bus : null, outputBusToSource)}
+                        >
+                          {formatBusLabel(row.session_id, isCanRow ? row.bus : null, outputBusToSource)}
+                        </span>
+                      </td>
+
+                      {/* Kind badge */}
+                      <td className="px-4 py-2">
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded ${
+                            isCanRow
+                              ? "bg-blue-600/30 text-blue-400"
+                              : "bg-purple-600/30 text-purple-400"
+                          }`}
+                        >
+                          {isCanRow ? "CAN" : "Serial"}
+                        </span>
+                      </td>
+
+                      {/* Frame / Data */}
+                      <td className="px-4 py-2">
+                        <div className={flexRowGap2}>
+                          {frameIdStr && (
+                            <code className="font-mono text-green-400">
+                              {frameIdStr}
+                            </code>
+                          )}
+                          <code className="font-mono text-gray-400 text-xs">
+                            {dlcStr} {dataStr}{truncated}
+                          </code>
+                          {flags.map((flag) => (
+                            <span
+                              key={flag}
+                              className="text-[10px] text-amber-400 uppercase"
+                            >
+                              {flag}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* Error */}
+                      <td className="px-4 py-2">
+                        {row.error_msg && (
+                          <span className="text-red-400 text-xs">{row.error_msg}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Load more / loading indicator */}
+            {hasMore && (
+              <div className="flex justify-center py-3">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isLoading}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border ${borderDataView} ${textDataSecondary} hover:brightness-95 transition-colors disabled:opacity-50`}
+                >
+                  <ChevronDown size={13} />
+                  {isLoading ? "Loading…" : `Load more (${Math.max(0, historyDbCount - offset)} remaining)`}
+                </button>
+              </div>
+            )}
+            {isLoading && rows.length === 0 && (
+              <div className="flex justify-center py-8">
+                <span className={`text-sm ${textDataSecondary}`}>Loading…</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

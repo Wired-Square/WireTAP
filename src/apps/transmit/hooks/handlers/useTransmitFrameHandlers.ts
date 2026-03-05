@@ -46,7 +46,6 @@ export function useTransmitFrameHandlers({
   const addSerialToQueue = useTransmitStore((s) => s.addSerialToQueue);
   const resetSerialEditor = useTransmitStore((s) => s.resetSerialEditor);
   const setActiveTab = useTransmitStore((s) => s.setActiveTab);
-  const addHistoryItem = useTransmitStore((s) => s.addHistoryItem);
 
   // Local state for serial transmission
   const [isSerialSending, setIsSerialSending] = useState(false);
@@ -79,27 +78,9 @@ export function useTransmitFrameHandlers({
 
     setIsSerialSending(true);
     try {
-      const result = await ioTransmitSerial(activeSession.id, bytesToSend);
-      addHistoryItem({
-        timestamp_us: result.timestamp_us,
-        profileId: activeSession.id,
-        profileName: activeSession.profileId ?? "Serial",
-        type: "serial",
-        bytes: bytesToSend,
-        success: result.success,
-        error: result.error,
-      });
+      await ioTransmitSerial(activeSession.id, bytesToSend);
     } catch (e) {
       console.error("Serial transmit failed:", e);
-      addHistoryItem({
-        timestamp_us: Date.now() * 1000,
-        profileId: activeSession.id,
-        profileName: activeSession.profileId ?? "Serial",
-        type: "serial",
-        bytes: bytesToSend,
-        success: false,
-        error: String(e),
-      });
     } finally {
       setIsSerialSending(false);
     }
@@ -108,7 +89,6 @@ export function useTransmitFrameHandlers({
     serialBytes,
     serialEditor.framingMode,
     serialEditor.delimiter,
-    addHistoryItem,
   ]);
 
   // Add serial bytes to queue

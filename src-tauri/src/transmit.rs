@@ -47,28 +47,6 @@ pub struct TransmitResult {
     pub error: Option<String>,
 }
 
-/// Event payload for CAN transmit history (emitted during repeat transmits)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TransmitHistoryEvent {
-    pub session_id: String,
-    pub queue_id: String,
-    pub frame: CanTransmitFrame,
-    pub success: bool,
-    pub timestamp_us: u64,
-    pub error: Option<String>,
-}
-
-/// Event payload for serial transmit history (emitted during repeat transmits)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SerialTransmitHistoryEvent {
-    pub session_id: String,
-    pub queue_id: String,
-    pub bytes: Vec<u8>,
-    pub success: bool,
-    pub timestamp_us: u64,
-    pub error: Option<String>,
-}
-
 /// Event payload for repeat stopped (emitted when repeat stops due to permanent error)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RepeatStoppedEvent {
@@ -228,19 +206,44 @@ pub async fn get_profile_usage(
 /// Transmit a CAN frame through an existing IO session
 #[tauri::command]
 pub async fn io_transmit_can_frame(
+    app: AppHandle,
     session_id: String,
     frame: CanTransmitFrame,
 ) -> Result<crate::io::TransmitResult, String> {
-    io::transmit_frame(&session_id, &frame).await
+    let result = io::transmit_frame(&session_id, &frame).await?;
+    crate::transmit_history::write_entry(
+        &session_id, "can",
+        Some(frame.frame_id as i64),
+        Some(frame.data.len() as i64),
+        &frame.data,
+        frame.bus as i64,
+        frame.is_extended,
+        frame.is_fd,
+        result.success,
+        result.error.as_deref(),
+    );
+    let _ = app.emit("transmit-history-updated", ());
+    Ok(result)
 }
 
 /// Transmit raw serial bytes through an IO session
 #[tauri::command]
 pub async fn io_transmit_serial(
+    app: AppHandle,
     session_id: String,
     bytes: Vec<u8>,
 ) -> Result<crate::io::TransmitResult, String> {
-    io::transmit_serial(&session_id, &bytes).await
+    let result = io::transmit_serial(&session_id, &bytes).await?;
+    crate::transmit_history::write_entry(
+        &session_id, "serial",
+        None, None,
+        &bytes,
+        0, false, false,
+        result.success,
+        result.error.as_deref(),
+    );
+    let _ = app.emit("transmit-history-updated", ());
+    Ok(result)
 }
 
 /// Get IO session capabilities (includes transmit capabilities)
@@ -355,28 +358,31 @@ pub async fn io_start_repeat_transmit(
     let queue_id_for_task = queue_id.clone();
 
     let handle = tauri::async_runtime::spawn(async move {
-        // Helper to emit history and check for stop
-        let emit_and_check = |app: &AppHandle, result: &Result<crate::io::TransmitResult, String>, queue_id: &str| -> (bool, Option<String>) {
-            let now_us = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_micros() as u64;
+        const NOTIFY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+        let mut last_notify: Option<std::time::Instant> = None;
 
-            let (success, timestamp_us, error) = match result {
-                Ok(r) => (r.success, r.timestamp_us, r.error.clone()),
-                Err(e) => (false, now_us, Some(e.clone())),
+        // Write this frame's transmit result to SQLite and rate-limit the UI notification.
+        let write_and_notify = |app: &AppHandle, result: &Result<crate::io::TransmitResult, String>, last_notify: &mut Option<std::time::Instant>| -> (bool, Option<String>) {
+            let (success, error) = match result {
+                Ok(r) => (r.success, r.error.clone()),
+                Err(e) => (false, Some(e.clone())),
             };
-
-            let event = TransmitHistoryEvent {
-                session_id: session_id_clone.clone(),
-                queue_id: queue_id.to_string(),
-                frame: frame.clone(),
+            crate::transmit_history::write_entry(
+                &session_id_clone, "can",
+                Some(frame.frame_id as i64),
+                Some(frame.data.len() as i64),
+                &frame.data,
+                frame.bus as i64,
+                frame.is_extended,
+                frame.is_fd,
                 success,
-                timestamp_us,
-                error: error.clone(),
-            };
-            let _ = app.emit("transmit-history", &event);
-
+                error.as_deref(),
+            );
+            let should_emit = last_notify.as_ref().map_or(true, |t| t.elapsed() >= NOTIFY_INTERVAL);
+            if should_emit {
+                let _ = app.emit("transmit-history-updated", ());
+                *last_notify = Some(std::time::Instant::now());
+            }
             (success, error)
         };
 
@@ -387,7 +393,7 @@ pub async fn io_start_repeat_transmit(
         }
 
         let (result, should_stop) = do_transmit(&session_id_clone, &frame).await;
-        let (_, error) = emit_and_check(&app, &result, &queue_id_for_task);
+        let (_, error) = write_and_notify(&app, &result, &mut last_notify);
 
         if should_stop {
             let reason = error.unwrap_or_else(|| "Permanent error".to_string());
@@ -399,6 +405,7 @@ pub async fn io_start_repeat_transmit(
                 queue_id: queue_id_for_task.clone(),
                 reason,
             });
+            let _ = app.emit("transmit-history-updated", ());
             return;
         }
 
@@ -418,7 +425,7 @@ pub async fn io_start_repeat_transmit(
 
             // Transmit with retry for transient errors
             let (result, should_stop) = do_transmit(&session_id_clone, &frame).await;
-            let (_, error) = emit_and_check(&app, &result, &queue_id_for_task);
+            let (_, error) = write_and_notify(&app, &result, &mut last_notify);
 
             // Stop on permanent errors (device gone, session invalid)
             if should_stop {
@@ -432,6 +439,7 @@ pub async fn io_start_repeat_transmit(
                     queue_id: queue_id_for_task.clone(),
                     reason,
                 });
+                let _ = app.emit("transmit-history-updated", ());
                 break;
             }
         }
@@ -511,28 +519,27 @@ pub async fn io_start_serial_repeat_transmit(
     let queue_id_for_task = queue_id.clone();
 
     let handle = tauri::async_runtime::spawn(async move {
-        // Helper to emit history and check for stop
-        let emit_and_check = |app: &AppHandle, result: &Result<crate::io::TransmitResult, String>, queue_id: &str| -> Option<String> {
-            let now_us = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_micros() as u64;
+        const NOTIFY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+        let mut last_notify: Option<std::time::Instant> = None;
 
-            let (success, timestamp_us, error) = match result {
-                Ok(r) => (r.success, r.timestamp_us, r.error.clone()),
-                Err(e) => (false, now_us, Some(e.clone())),
+        let write_and_notify = |result: &Result<crate::io::TransmitResult, String>, last_notify: &mut Option<std::time::Instant>| -> Option<String> {
+            let (success, error) = match result {
+                Ok(r) => (r.success, r.error.clone()),
+                Err(e) => (false, Some(e.clone())),
             };
-
-            let event = SerialTransmitHistoryEvent {
-                session_id: session_id_clone.clone(),
-                queue_id: queue_id.to_string(),
-                bytes: bytes.clone(),
+            crate::transmit_history::write_entry(
+                &session_id_clone, "serial",
+                None, None,
+                &bytes,
+                0, false, false,
                 success,
-                timestamp_us,
-                error: error.clone(),
-            };
-            let _ = app.emit("serial-transmit-history", &event);
-
+                error.as_deref(),
+            );
+            let should_emit = last_notify.as_ref().map_or(true, |t| t.elapsed() >= NOTIFY_INTERVAL);
+            if should_emit {
+                let _ = app.emit("transmit-history-updated", ());
+                *last_notify = Some(std::time::Instant::now());
+            }
             error
         };
 
@@ -543,7 +550,7 @@ pub async fn io_start_serial_repeat_transmit(
         }
 
         let (result, should_stop) = do_serial_transmit(&session_id_clone, &bytes).await;
-        let error = emit_and_check(&app, &result, &queue_id_for_task);
+        let error = write_and_notify(&result, &mut last_notify);
 
         if should_stop {
             let reason = error.unwrap_or_else(|| "Permanent error".to_string());
@@ -555,6 +562,7 @@ pub async fn io_start_serial_repeat_transmit(
                 queue_id: queue_id_for_task.clone(),
                 reason,
             });
+            let _ = app.emit("transmit-history-updated", ());
             return;
         }
 
@@ -574,7 +582,7 @@ pub async fn io_start_serial_repeat_transmit(
 
             // Transmit with retry for transient errors
             let (result, should_stop) = do_serial_transmit(&session_id_clone, &bytes).await;
-            let error = emit_and_check(&app, &result, &queue_id_for_task);
+            let error = write_and_notify(&result, &mut last_notify);
 
             // Stop on permanent errors (device gone, session invalid)
             if should_stop {
@@ -588,6 +596,7 @@ pub async fn io_start_serial_repeat_transmit(
                     queue_id: queue_id_for_task.clone(),
                     reason,
                 });
+                let _ = app.emit("transmit-history-updated", ());
                 break;
             }
         }
@@ -652,28 +661,31 @@ pub async fn io_start_repeat_group(
     );
 
     let handle = tauri::async_runtime::spawn(async move {
-        // Helper to emit history event and return error if any
-        let emit_history = |app: &AppHandle, frame: &CanTransmitFrame, result: &Result<crate::io::TransmitResult, String>, group_id: &str| -> Option<String> {
-            let now_us = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_micros() as u64;
+        const NOTIFY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+        let mut last_notify: Option<std::time::Instant> = None;
 
-            let (success, timestamp_us, error) = match result {
-                Ok(r) => (r.success, r.timestamp_us, r.error.clone()),
-                Err(e) => (false, now_us, Some(e.clone())),
+        // Write a CAN frame result to SQLite and rate-limit the UI notification.
+        let write_frame = |frame: &CanTransmitFrame, result: &Result<crate::io::TransmitResult, String>, last_notify: &mut Option<std::time::Instant>| -> Option<String> {
+            let (success, error) = match result {
+                Ok(r) => (r.success, r.error.clone()),
+                Err(e) => (false, Some(e.clone())),
             };
-
-            let event = TransmitHistoryEvent {
-                session_id: session_id_clone.clone(),
-                queue_id: group_id.to_string(),
-                frame: frame.clone(),
+            crate::transmit_history::write_entry(
+                &session_id_clone, "can",
+                Some(frame.frame_id as i64),
+                Some(frame.data.len() as i64),
+                &frame.data,
+                frame.bus as i64,
+                frame.is_extended,
+                frame.is_fd,
                 success,
-                timestamp_us,
-                error: error.clone(),
-            };
-            let _ = app.emit("transmit-history", &event);
-
+                error.as_deref(),
+            );
+            let should_emit = last_notify.as_ref().map_or(true, |t| t.elapsed() >= NOTIFY_INTERVAL);
+            if should_emit {
+                let _ = app.emit("transmit-history-updated", ());
+                *last_notify = Some(std::time::Instant::now());
+            }
             error
         };
 
@@ -685,7 +697,7 @@ pub async fn io_start_repeat_group(
 
         for frame in &frames {
             let (result, should_stop) = do_transmit(&session_id_clone, frame).await;
-            let error = emit_history(&app, frame, &result, &group_id_for_task);
+            let error = write_frame(frame, &result, &mut last_notify);
 
             if should_stop {
                 let reason = error.unwrap_or_else(|| "Permanent error".to_string());
@@ -697,6 +709,7 @@ pub async fn io_start_repeat_group(
                     queue_id: group_id_for_task.clone(),
                     reason,
                 });
+                let _ = app.emit("transmit-history-updated", ());
                 return;
             }
         }
@@ -719,7 +732,7 @@ pub async fn io_start_repeat_group(
             for frame in &frames {
                 // Transmit with retry for transient errors
                 let (result, should_stop) = do_transmit(&session_id_clone, frame).await;
-                let error = emit_history(&app, frame, &result, &group_id_for_task);
+                let error = write_frame(frame, &result, &mut last_notify);
 
                 // Stop on permanent errors (device gone, session invalid)
                 if should_stop {
@@ -733,6 +746,7 @@ pub async fn io_start_repeat_group(
                         queue_id: group_id_for_task.clone(),
                         reason,
                     });
+                    let _ = app.emit("transmit-history-updated", ());
                     break 'outer;
                 }
             }

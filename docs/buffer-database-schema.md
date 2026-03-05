@@ -177,3 +177,94 @@ PRAGMA journal_mode;
 | Windows | `%APPDATA%\com.wired.wiretap\buffers.db` |
 | Linux | `~/.local/share/com.wired.wiretap/buffers.db` |
 | iOS | App sandbox (not user-accessible) |
+
+---
+
+# Transmit History Database Schema
+
+SQLite database used to record every frame transmitted via the Transmit panel — single-shot CAN, single-shot serial, queue repeats, and replay. Replaces the previous unbounded Zustand `history[]` array that caused frontend performance issues at high transmit rates.
+
+**Location:** `{app_data_dir}/transmit_history.db` (e.g. `~/Library/Application Support/com.wired.wiretap/transmit_history.db` on macOS)
+
+**Lifecycle:** Persists across app launches. Can be cleared manually via the History tab toolbar in the Transmit panel.
+
+**PRAGMAs:**
+
+| PRAGMA | Value | Reason |
+|--------|-------|--------|
+| `journal_mode` | WAL | Concurrent read from frontend while Rust writes per-frame |
+| `synchronous` | NORMAL | Safe with WAL, faster than FULL |
+
+## Tables
+
+### `transmit_history`
+
+One row per transmitted frame or serial payload.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `id` | INTEGER | NO | AUTOINCREMENT | Primary key. Insertion (chronological) order. |
+| `session_id` | TEXT | NO | | Session that transmitted this frame. |
+| `timestamp_us` | INTEGER | NO | | Wall-clock timestamp in microseconds at time of transmission. |
+| `kind` | TEXT | NO | | `"can"` or `"serial"`. |
+| `frame_id` | INTEGER | YES | NULL | CAN arbitration ID. NULL for serial payloads. |
+| `dlc` | INTEGER | YES | NULL | Data length code. NULL for serial payloads. |
+| `bytes` | BLOB | NO | | Transmitted payload bytes. |
+| `bus` | INTEGER | NO | 0 | CAN bus number. `0` for serial. |
+| `is_extended` | INTEGER | NO | 0 | Boolean (0/1). `1` if 29-bit extended CAN ID. |
+| `is_fd` | INTEGER | NO | 0 | Boolean (0/1). `1` if CAN FD frame. |
+| `success` | INTEGER | NO | 1 | Boolean (0/1). `1` if the device accepted the frame. |
+| `error_msg` | TEXT | YES | NULL | Error string from the device if `success = 0`. |
+
+## Indexes
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| `idx_ts` | `id DESC` | Fast reverse-chronological pagination (most-recent-first). |
+
+## Query Patterns
+
+- **Paginated read (most recent first):** `SELECT * FROM transmit_history ORDER BY id DESC LIMIT ? OFFSET ?`
+- **Count:** `SELECT COUNT(*) FROM transmit_history`
+- **Clear:** `DELETE FROM transmit_history`
+
+## Architecture
+
+### Module layout
+
+| Module | File | Role |
+|--------|------|------|
+| `transmit_history` | `src-tauri/src/transmit_history.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
+
+### Data flow
+
+```
+io_transmit_can_frame / io_transmit_serial
+  └─ transmit_history::write_entry() → SQLite
+     └─ app.emit("transmit-history-updated") → frontend refetches count
+
+io_start_repeat_transmit / io_start_serial_repeat_transmit / io_start_repeat_group
+  └─ transmit_history::write_entry() per frame (rate-limited emit every 250 ms)
+
+io_start_replay (replay.rs)
+  └─ transmit_history::write_entry() per frame (piggybacked on replay-progress emit)
+```
+
+### Frontend integration
+
+The frontend never receives individual history rows via events. Instead:
+
+1. Rust emits `"transmit-history-updated"` (rate-limited, max once per 250 ms) after writing rows.
+2. `useTransmitHistorySubscription` listens for this event and calls `transmitHistoryCount()`.
+3. The count is stored as `historyDbCount` in `transmitStore`.
+4. `TransmitHistoryView` subscribes to `historyDbCount` and re-fetches a paginated page when it changes.
+
+This keeps the Zustand store lightweight — no `history[]` array, just a single integer counter.
+
+### Platform paths
+
+| Platform | Path |
+|----------|------|
+| macOS | `~/Library/Application Support/com.wired.wiretap/transmit_history.db` |
+| Windows | `%APPDATA%\com.wired.wiretap\transmit_history.db` |
+| Linux | `~/.local/share/com.wired.wiretap/transmit_history.db` |

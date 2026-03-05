@@ -35,7 +35,7 @@ import { CAN_FD_DLC_VALUES } from "../constants";
 // ============================================================================
 
 /** Active tab in the transmit UI */
-export type TransmitTab = "frame" | "queue" | "history";
+export type TransmitTab = "frame" | "queue" | "history" | "replay";
 
 /** Re-export CAN_FD_DLC_VALUES for backwards compatibility */
 export { CAN_FD_DLC_VALUES };
@@ -85,36 +85,33 @@ export interface ReplayProgressInfo {
   profileName: string;
 }
 
-/** History entry for transmitted packets */
-export interface TransmitHistoryItem {
-  /** Unique ID */
+/** Kind of replay log entry */
+export type ReplayLogKind = "started" | "completed" | "stoppedByUser" | "deviceError" | "loopRestarted";
+
+/** Log entry for a replay lifecycle event (start / complete / stop / error) */
+export interface ReplayLogEntry {
+  /** Unique entry ID */
   id: string;
-  /** Timestamp in microseconds since UNIX epoch */
-  timestamp_us: number;
-  /** Profile ID used for transmission */
-  profileId: string;
-  /** Display name for the profile */
+  /** Replay ID this entry relates to */
+  replayId: string;
+  /** Profile/session name */
   profileName: string;
-  /** Type of transmission */
-  type: "can" | "serial" | "replay";
-  /** CAN frame (if type is 'can') */
-  frame?: CanTransmitFrame;
-  /** Serial bytes (if type is 'serial') */
-  bytes?: number[];
-  /** Whether transmission was successful */
-  success: boolean;
-  /** Error message if failed */
-  error?: string;
-  /** Frames sent during replay (if type is 'replay') */
-  replayFramesSent?: number;
-  /** Total frames in replay (if type is 'replay') */
-  replayTotalFrames?: number;
-  /** Playback speed (if type is 'replay') */
-  replaySpeed?: number;
-  /** Whether this is the start entry (true) vs the end entry (false/undefined) */
-  replayStarted?: boolean;
+  /** Total frames in the replay */
+  totalFrames: number;
+  /** Playback speed multiplier */
+  speed: number;
   /** Whether the replay was set to loop */
-  replayLoopReplay?: boolean;
+  loopReplay: boolean;
+  /** When this entry was created (ms since epoch) */
+  timestamp: number;
+  /** Lifecycle kind */
+  kind: ReplayLogKind;
+  /** Frames sent (for completed/stoppedByUser/deviceError/loopRestarted) */
+  framesSent?: number;
+  /** Error message (for deviceError) */
+  errorMessage?: string;
+  /** Loop pass number that just completed (for loopRestarted) */
+  pass?: number;
 }
 
 // IOSessionConnection type removed - now using sessionStore for session management
@@ -149,7 +146,6 @@ export interface SerialEditorState {
   delimiter: number[];
 }
 
-import { useSettingsStore } from '../apps/settings/stores/settingsStore';
 
 // ============================================================================
 // Store
@@ -162,8 +158,8 @@ export interface TransmitState {
   // NOTE: IO session is now managed by sessionStore, accessed via useSessionStore
   /** Transmit queue */
   queue: TransmitQueueItem[];
-  /** Transmission history */
-  history: TransmitHistoryItem[];
+  /** Count of rows in the SQLite transmit history (updated by transmit-history-updated event) */
+  historyDbCount: number;
   /** Active group repeats (group names currently repeating) */
   activeGroups: Set<string>;
 
@@ -262,22 +258,28 @@ export interface TransmitState {
   activeReplays: Set<string>;
   /** Progress info per active replay */
   replayProgress: Map<string, ReplayProgressInfo>;
+  /** Replay lifecycle log (started/completed/stopped/error entries) */
+  replayLog: ReplayLogEntry[];
+  /** Cached replay params keyed by replayId — used to support restart */
+  replayCache: Map<string, { sessionId: string; frames: ReplayFrame[]; speed: number; loop: boolean }>;
   /** Start a time-accurate frame replay */
   startReplay: (sessionId: string, replayId: string, frames: ReplayFrame[], speed: number, loop: boolean) => Promise<void>;
   /** Stop a specific replay */
   stopReplay: (replayId: string) => Promise<void>;
+  /** Restart a replay from the beginning using its cached params */
+  restartReplay: (replayId: string) => Promise<void>;
   /** Called by `replay-started` event — records metadata for the progress banner */
   markReplayStarted: (replayId: string, totalFrames: number, speed: number, loopReplay: boolean) => void;
   /** Called by `replay-progress` event — updates frame count in the banner */
   updateReplayProgress: (replayId: string, framesSent: number) => void;
-  /** Mark a replay as stopped (called by backend `repeat-stopped` event); adds a summary history entry */
+  /** Mark a replay as stopped (called by backend `repeat-stopped` event); adds a log entry */
   markReplayStopped: (replayId: string, reason?: string) => void;
-
-  // History Actions
-  /** Clear history */
-  clearHistory: () => void;
-  /** Add item to history (internal) */
-  addHistoryItem: (item: Omit<TransmitHistoryItem, "id">) => void;
+  /** Called by `replay-loop-restarted` event — adds a loopRestarted log entry */
+  markReplayLoopRestarted: (replayId: string, pass: number, framesSent: number) => void;
+  /** Add a replay lifecycle log entry */
+  addReplayLogEntry: (entry: Omit<ReplayLogEntry, "id">) => void;
+  /** Clear the replay log */
+  clearReplayLog: () => void;
 
   // Error handling
   /** Clear error */
@@ -311,10 +313,12 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
   // ---- Initial State ----
   profiles: [],
   queue: [],
-  history: [],
+  historyDbCount: 0,
   activeGroups: new Set(),
   activeReplays: new Set(),
   replayProgress: new Map(),
+  replayLog: [],
+  replayCache: new Map(),
   activeTab: "frame",
   isLoading: false,
   error: null,
@@ -439,18 +443,6 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
 
     try {
       const result = await ioTransmitCanFrame(session.id, frame);
-
-      // Add to history
-      get().addHistoryItem({
-        timestamp_us: result.timestamp_us,
-        profileId: session.profileId,
-        profileName: session.profileName ?? "IO Session",
-        type: "can",
-        frame,
-        success: result.success,
-        error: result.error,
-      });
-
       return result;
     } catch (e) {
       set({ error: String(e) });
@@ -986,28 +978,25 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     try {
       await ioStartReplay(sessionId, replayId, frames, speed, loop);
       set((state) => {
+        const nextCache = new Map(state.replayCache);
+        nextCache.set(replayId, { sessionId, frames, speed, loop });
         const nextProgress = new Map(state.replayProgress);
         nextProgress.set(replayId, { totalFrames: frames.length, framesSent: 0, speed, loopReplay: loop, profileName });
-        // Add a "started" history entry
-        const startedItem: TransmitHistoryItem = {
+        const startedEntry: ReplayLogEntry = {
           id: `replay-start-${replayId}`,
-          timestamp_us: Date.now() * 1000,
-          profileId: replayId,
+          replayId,
           profileName,
-          type: "replay",
-          success: true,
-          replayFramesSent: 0,
-          replayTotalFrames: frames.length,
-          replaySpeed: speed,
-          replayStarted: true,
-          replayLoopReplay: loop,
+          totalFrames: frames.length,
+          speed,
+          loopReplay: loop,
+          timestamp: Date.now(),
+          kind: "started",
         };
-        const maxHistory = useSettingsStore.getState().buffers.transmitMaxHistory;
-        const history = [startedItem, ...state.history].slice(0, maxHistory);
         return {
           activeReplays: new Set([...state.activeReplays, replayId]),
           replayProgress: nextProgress,
-          history,
+          replayCache: nextCache,
+          replayLog: [startedEntry, ...state.replayLog],
         };
       });
     } catch (e) {
@@ -1063,43 +1052,98 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
 
       const completed = reason?.startsWith("Replay complete") ?? false;
       const stoppedByUser = reason?.startsWith("Replay stopped") ?? false;
-      const success = completed || stoppedByUser;
-      // For completed non-loop: use totalFrames (progress may be stale). For all other cases: use last known framesSent.
       const framesSent = completed && !info.loopReplay ? info.totalFrames : info.framesSent;
-      const summaryItem: TransmitHistoryItem = {
+
+      let kind: ReplayLogKind;
+      if (completed) kind = "completed";
+      else if (stoppedByUser) kind = "stoppedByUser";
+      else kind = "deviceError";
+
+      const summaryEntry: ReplayLogEntry = {
         id: `replay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        timestamp_us: Date.now() * 1000,
-        profileId: replayId,
+        replayId,
         profileName: info.profileName,
-        type: "replay",
-        success,
-        replayFramesSent: framesSent,
-        replayTotalFrames: info.totalFrames,
-        replaySpeed: info.speed,
-        replayLoopReplay: info.loopReplay,
-        error: success ? undefined : reason,
+        totalFrames: info.totalFrames,
+        speed: info.speed,
+        loopReplay: info.loopReplay,
+        timestamp: Date.now(),
+        kind,
+        framesSent,
+        errorMessage: kind === "deviceError" ? reason : undefined,
       };
 
-      const maxHistory = useSettingsStore.getState().buffers.transmitMaxHistory;
-      const history = [summaryItem, ...state.history].slice(0, maxHistory);
-
-      return { activeReplays: nextReplays, replayProgress: nextProgress, history };
+      return {
+        activeReplays: nextReplays,
+        replayProgress: nextProgress,
+        replayLog: [summaryEntry, ...state.replayLog],
+      };
     });
   },
 
-  // History Actions
-  clearHistory: () => set({ history: [] }),
-
-  addHistoryItem: (item) => {
-    const state = get();
-    const id = `history-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const newItem: TransmitHistoryItem = { ...item, id };
-
-    // Prepend to history, cap at max
-    const maxHistory = useSettingsStore.getState().buffers.transmitMaxHistory;
-    const history = [newItem, ...state.history].slice(0, maxHistory);
-    set({ history });
+  restartReplay: async (replayId) => {
+    const cached = get().replayCache.get(replayId);
+    if (!cached) return;
+    const { sessionId, frames, speed, loop } = cached;
+    try {
+      await ioStopReplay(replayId);
+      await ioStartReplay(sessionId, replayId, frames, speed, loop);
+      const { sessions } = useSessionStore.getState();
+      const profileName = sessions[sessionId]?.profileName ?? "Unknown";
+      set((state) => {
+        const nextProgress = new Map(state.replayProgress);
+        nextProgress.set(replayId, { totalFrames: frames.length, framesSent: 0, speed, loopReplay: loop, profileName });
+        const restartedEntry: ReplayLogEntry = {
+          id: `replay-restart-${replayId}-${Date.now()}`,
+          replayId,
+          profileName,
+          totalFrames: frames.length,
+          speed,
+          loopReplay: loop,
+          timestamp: Date.now(),
+          kind: "started",
+        };
+        return {
+          activeReplays: new Set([...state.activeReplays, replayId]),
+          replayProgress: nextProgress,
+          replayLog: [restartedEntry, ...state.replayLog],
+        };
+      });
+    } catch (e) {
+      set({ error: String(e) });
+    }
   },
+
+  markReplayLoopRestarted: (replayId, pass, framesSent) => {
+    set((state) => {
+      const info = state.replayProgress.get(replayId);
+      if (!info) return {};
+      // Deduplicate: the async listener cleanup pattern can produce two events for
+      // the same pass. Skip if the most recent loopRestarted entry for this replay
+      // already records the same pass and framesSent.
+      const last = state.replayLog.find(e => e.replayId === replayId && e.kind === "loopRestarted");
+      if (last?.pass === pass && last?.framesSent === framesSent) return {};
+      const entry: ReplayLogEntry = {
+        id: `replay-loop-${replayId}-${pass}-${Date.now()}`,
+        replayId,
+        profileName: info.profileName,
+        totalFrames: info.totalFrames,
+        speed: info.speed,
+        loopReplay: true,
+        timestamp: Date.now(),
+        kind: "loopRestarted",
+        framesSent,
+        pass,
+      };
+      return { replayLog: [entry, ...state.replayLog] };
+    });
+  },
+
+  addReplayLogEntry: (entry) => {
+    const id = `replay-log-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    set((state) => ({ replayLog: [{ ...entry, id }, ...state.replayLog] }));
+  },
+
+  clearReplayLog: () => set({ replayLog: [] }),
 
   // Error handling
   clearError: () => set({ error: null }),

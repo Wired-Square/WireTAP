@@ -37,6 +37,17 @@ pub struct ReplayProgressEvent {
     pub total_frames: u64,
 }
 
+/// Emitted when a looping replay completes a pass and is about to restart.
+#[derive(Clone, Serialize)]
+pub struct ReplayLoopRestartedEvent {
+    /// The replay that looped.
+    pub replay_id: String,
+    /// The pass number that just completed (1-based).
+    pub pass: u64,
+    /// Cumulative frames sent across all passes so far.
+    pub frames_sent: u64,
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -114,6 +125,7 @@ pub async fn io_start_replay(
 
         let mut last_progress = std::time::Instant::now();
         const PROGRESS_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+        let mut pass: u64 = 1;
 
         'outer: loop {
             for i in 0..frames.len() {
@@ -124,9 +136,8 @@ pub async fn io_start_replay(
 
                 let frame = &frames[i].frame;
 
-                // Transmit the frame (no per-frame history event — replay is a bulk
-                // operation and emitting one event per frame at high replay rates floods
-                // the JS event queue and causes the frontend to freeze).
+                // Transmit the frame. Writing to SQLite per frame is safe here because
+                // the write_entry mutex lock is held only for the INSERT (~microseconds).
                 let result = io::transmit_frame(&session_id_clone, frame).await;
 
                 // Stop on permanent device errors
@@ -139,6 +150,19 @@ pub async fn io_start_replay(
                         Ok(r) => r.error.clone().unwrap_or_else(|| "Device error".to_string()),
                         Err(e) => e.clone(),
                     };
+                    // Write the failed frame to history before stopping
+                    crate::transmit_history::write_entry(
+                        &session_id_clone, "can",
+                        Some(frame.frame_id as i64),
+                        Some(frame.data.len() as i64),
+                        &frame.data,
+                        frame.bus as i64,
+                        frame.is_extended,
+                        frame.is_fd,
+                        false,
+                        Some(&err_msg),
+                    );
+                    let _ = app.emit("transmit-history-updated", ());
                     tlog!("[replay] Stopping replay '{}' due to permanent error: {}", replay_id_for_task, err_msg);
                     let _ = app.emit("repeat-stopped", RepeatStoppedEvent {
                         queue_id: replay_id_for_task.clone(),
@@ -147,18 +171,35 @@ pub async fn io_start_replay(
                     return;
                 }
 
+                let (r_success, r_error) = match &result {
+                    Ok(r) => (r.success, r.error.clone()),
+                    Err(e) => (false, Some(e.clone())),
+                };
+                crate::transmit_history::write_entry(
+                    &session_id_clone, "can",
+                    Some(frame.frame_id as i64),
+                    Some(frame.data.len() as i64),
+                    &frame.data,
+                    frame.bus as i64,
+                    frame.is_extended,
+                    frame.is_fd,
+                    r_success,
+                    r_error.as_deref(),
+                );
+
                 match result {
                     Ok(r) if r.success => frames_sent += 1,
                     _ => frames_failed += 1,
                 }
 
-                // Throttled progress update (~250 ms)
+                // Throttled progress + history update (~250 ms)
                 if last_progress.elapsed() >= PROGRESS_INTERVAL {
                     let _ = app.emit("replay-progress", ReplayProgressEvent {
                         replay_id: replay_id_for_task.clone(),
                         frames_sent,
                         total_frames,
                     });
+                    let _ = app.emit("transmit-history-updated", ());
                     last_progress = std::time::Instant::now();
                 }
 
@@ -178,9 +219,20 @@ pub async fn io_start_replay(
             if !loop_replay {
                 break;
             }
+
+            // Emit loop-restart event before beginning the next pass
+            let _ = app.emit("replay-loop-restarted", ReplayLoopRestartedEvent {
+                replay_id: replay_id_for_task.clone(),
+                pass,
+                frames_sent,
+            });
+            pass += 1;
         }
 
         tlog!("[replay] '{}' complete: {} sent, {} failed", replay_id_for_task, frames_sent, frames_failed);
+
+        // Final history update notification
+        let _ = app.emit("transmit-history-updated", ());
 
         // Notify frontend that replay has finished or was cancelled
         let reason = if cancelled {

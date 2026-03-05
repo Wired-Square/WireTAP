@@ -1,42 +1,48 @@
 // src/apps/transmit/hooks/useTransmitHistorySubscription.ts
 //
-// Subscribes to transmit history events from the backend.
-// Handles CAN transmit, serial transmit, and repeat-stopped events.
+// Subscribes to transmit-related events from the backend.
+// Handles replay lifecycle events and the transmit-history-updated notification
+// that signals new rows have been written to the SQLite history database.
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTransmitStore } from "../../../stores/transmitStore";
+import { transmitHistoryCount } from "../../../api/transmitHistory";
 import type {
-  TransmitHistoryEvent,
-  SerialTransmitHistoryEvent,
   RepeatStoppedEvent,
   ReplayStartedEvent,
   ReplayProgressEvent,
+  ReplayLoopRestartedEvent,
 } from "../../../api/transmit";
-
-interface UseTransmitHistorySubscriptionParams {
-  /** Profile name to use in history entries (falls back to session ID) */
-  profileName: string | null;
-}
 
 /**
  * Subscribes to transmit history events and updates the store.
  *
  * Listens for:
- * - `transmit-history`: CAN frame transmission results
- * - `serial-transmit-history`: Serial byte transmission results
- * - `repeat-stopped`: Notification when a repeating transmission is stopped
+ * - `transmit-history-updated`: SQLite rows written — refetch count
+ * - `replay-started`: Replay began
+ * - `replay-progress`: Replay frame count update
+ * - `replay-loop-restarted`: Looping replay completed a pass and is restarting
+ * - `repeat-stopped`: Repeating transmission or replay stopped
  */
-export function useTransmitHistorySubscription({
-  profileName,
-}: UseTransmitHistorySubscriptionParams): void {
-  const addHistoryItem = useTransmitStore((s) => s.addHistoryItem);
+export function useTransmitHistorySubscription(): void {
   const markRepeatStopped = useTransmitStore((s) => s.markRepeatStopped);
   const markReplayStopped = useTransmitStore((s) => s.markReplayStopped);
   const markReplayStarted = useTransmitStore((s) => s.markReplayStarted);
   const updateReplayProgress = useTransmitStore((s) => s.updateReplayProgress);
+  const markReplayLoopRestarted = useTransmitStore((s) => s.markReplayLoopRestarted);
 
   useEffect(() => {
+    // SQLite history updated — fetch the new count so TransmitHistoryView can refresh
+    const unlistenHistoryUpdated = listen("transmit-history-updated", async () => {
+      try {
+        const count = await transmitHistoryCount();
+        useTransmitStore.setState({ historyDbCount: count });
+      } catch {
+        // Non-critical — the view will still show whatever it last fetched
+      }
+    });
+
     // Replay lifecycle events
     const unlistenReplayStarted = listen<ReplayStartedEvent>(
       "replay-started",
@@ -54,37 +60,11 @@ export function useTransmitHistorySubscription({
       }
     );
 
-    // CAN transmit history events
-    const unlistenCan = listen<TransmitHistoryEvent>(
-      "transmit-history",
+    const unlistenLoopRestarted = listen<ReplayLoopRestartedEvent>(
+      "replay-loop-restarted",
       (event) => {
-        const data = event.payload;
-        addHistoryItem({
-          timestamp_us: data.timestamp_us,
-          profileId: data.session_id,
-          profileName: profileName ?? data.session_id,
-          type: "can",
-          frame: data.frame,
-          success: data.success,
-          error: data.error,
-        });
-      }
-    );
-
-    // Serial transmit history events
-    const unlistenSerial = listen<SerialTransmitHistoryEvent>(
-      "serial-transmit-history",
-      (event) => {
-        const data = event.payload;
-        addHistoryItem({
-          timestamp_us: data.timestamp_us,
-          profileId: data.session_id,
-          profileName: profileName ?? data.session_id,
-          type: "serial",
-          bytes: data.bytes,
-          success: data.success,
-          error: data.error,
-        });
+        const { replay_id, pass, frames_sent } = event.payload;
+        markReplayLoopRestarted(replay_id, pass, frames_sent);
       }
     );
 
@@ -103,11 +83,11 @@ export function useTransmitHistorySubscription({
     );
 
     return () => {
+      unlistenHistoryUpdated.then((fn) => fn());
       unlistenReplayStarted.then((fn) => fn());
       unlistenReplayProgress.then((fn) => fn());
-      unlistenCan.then((fn) => fn());
-      unlistenSerial.then((fn) => fn());
+      unlistenLoopRestarted.then((fn) => fn());
       unlistenStopped.then((fn) => fn());
     };
-  }, [addHistoryItem, markRepeatStopped, markReplayStopped, markReplayStarted, updateReplayProgress, profileName]);
+  }, [markRepeatStopped, markReplayStopped, markReplayStarted, updateReplayProgress, markReplayLoopRestarted]);
 }

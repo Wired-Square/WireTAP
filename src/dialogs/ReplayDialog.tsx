@@ -191,6 +191,7 @@ export default function ReplayDialog({ isOpen, onClose, bufferId }: Props) {
       }
       if (frames.length === 0) return;
       await startReplay(selectedSessionId, replayId, applyBusOverride(frames), speed, loop);
+      useTransmitStore.setState({ activeTab: "replay" });
       openPanel("transmit");
       onClose();
     } finally {
