@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **gs_usb CAN FD initialisation**: Fixed DATA_BITTIMING failure ("Cancelled") when enabling CAN FD on candleLight/CANable devices. The bittiming calculation now uses device-reported constraints from BT_CONST/BT_CONST_EXT instead of hardcoded limits, and tries additional time quantum values needed for high-speed data phase bitrates. Also checks the FD feature flag before attempting FD setup, and logs timing parameters for easier debugging.
+
 ## [0.5.1] - 2026-03-05
 
 ### Added

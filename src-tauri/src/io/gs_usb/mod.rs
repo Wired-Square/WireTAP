@@ -312,6 +312,52 @@ pub struct GsDeviceBtConst {
 
 impl GsDeviceBtConst {
     pub const SIZE: usize = 40;
+
+    /// Parse from a byte slice (must be at least 40 bytes).
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        if data.len() < Self::SIZE {
+            return None;
+        }
+        Some(GsDeviceBtConst {
+            feature: u32::from_le_bytes([data[0], data[1], data[2], data[3]]),
+            fclk_can: u32::from_le_bytes([data[4], data[5], data[6], data[7]]),
+            tseg1_min: u32::from_le_bytes([data[8], data[9], data[10], data[11]]),
+            tseg1_max: u32::from_le_bytes([data[12], data[13], data[14], data[15]]),
+            tseg2_min: u32::from_le_bytes([data[16], data[17], data[18], data[19]]),
+            tseg2_max: u32::from_le_bytes([data[20], data[21], data[22], data[23]]),
+            sjw_max: u32::from_le_bytes([data[24], data[25], data[26], data[27]]),
+            brp_min: u32::from_le_bytes([data[28], data[29], data[30], data[31]]),
+            brp_max: u32::from_le_bytes([data[32], data[33], data[34], data[35]]),
+            brp_inc: u32::from_le_bytes([data[36], data[37], data[38], data[39]]),
+        })
+    }
+
+    /// Extract bittiming constraints from this BT_CONST response.
+    pub fn constraints(&self) -> BittimingConstraints {
+        BittimingConstraints {
+            tseg1_min: self.tseg1_min,
+            tseg1_max: self.tseg1_max,
+            tseg2_min: self.tseg2_min,
+            tseg2_max: self.tseg2_max,
+            sjw_max: self.sjw_max,
+            brp_min: self.brp_min,
+            brp_max: self.brp_max,
+            brp_inc: if self.brp_inc == 0 { 1 } else { self.brp_inc },
+        }
+    }
+}
+
+/// Device-reported bittiming constraints (from BT_CONST or BT_CONST_EXT).
+#[derive(Debug, Clone, Copy)]
+pub struct BittimingConstraints {
+    pub tseg1_min: u32,
+    pub tseg1_max: u32,
+    pub tseg2_min: u32,
+    pub tseg2_max: u32,
+    pub sjw_max: u32,
+    pub brp_min: u32,
+    pub brp_max: u32,
+    pub brp_inc: u32,
 }
 
 /// Bit timing configuration
@@ -630,6 +676,68 @@ pub fn calculate_bittiming_default(fclk_can: u32, bitrate: u32) -> Option<GsDevi
     calculate_bittiming(fclk_can, bitrate, 87.5)
 }
 
+/// Calculate bit timing using device-reported constraints.
+///
+/// This uses the actual min/max values from BT_CONST or BT_CONST_EXT
+/// instead of hardcoded limits. Essential for CAN FD data phase where
+/// constraints are often much tighter than nominal phase.
+pub fn calculate_bittiming_constrained(
+    fclk_can: u32,
+    bitrate: u32,
+    sample_point: f32,
+    c: &BittimingConstraints,
+) -> Option<GsDeviceBittiming> {
+    // Wider TQ range — includes small values needed for high-speed FD data phase
+    for tq_per_bit in &[25u32, 20, 16, 12, 10, 8, 6, 5, 4] {
+        let brp = fclk_can / (bitrate * tq_per_bit);
+
+        // Check brp against device constraints
+        if brp < c.brp_min || brp > c.brp_max {
+            continue;
+        }
+
+        // Respect brp increment
+        if c.brp_inc > 1 && (brp - c.brp_min) % c.brp_inc != 0 {
+            continue;
+        }
+
+        // Verify the timing gives acceptable bitrate (within 1% tolerance)
+        let actual_bitrate = fclk_can / (brp * tq_per_bit);
+        let error_percent = ((actual_bitrate as i64 - bitrate as i64).abs() * 100) / bitrate as i64;
+        if error_percent > 1 {
+            continue;
+        }
+
+        // Calculate segment lengths for the desired sample point
+        let sync_plus_seg1 = ((sample_point / 100.0) * (*tq_per_bit as f32)).round() as u32;
+        let seg1 = sync_plus_seg1.saturating_sub(1);
+        let seg2 = tq_per_bit.saturating_sub(1).saturating_sub(seg1);
+
+        // Validate against device constraints
+        if seg1 < c.tseg1_min || seg1 > c.tseg1_max {
+            continue;
+        }
+        if seg2 < c.tseg2_min || seg2 > c.tseg2_max {
+            continue;
+        }
+
+        let sjw = seg1.min(seg2).min(c.sjw_max);
+        if sjw < 1 {
+            continue;
+        }
+
+        return Some(GsDeviceBittiming {
+            prop_seg: 0,
+            phase_seg1: seg1,
+            phase_seg2: seg2,
+            sjw,
+            brp,
+        });
+    }
+
+    None
+}
+
 // ============================================================================
 // Tauri Commands
 // ============================================================================
@@ -792,5 +900,103 @@ mod tests {
 
         // Empty slice - should return None
         assert!(GsDeviceConfig::from_bytes(&[]).is_none());
+    }
+
+    #[test]
+    fn test_bt_const_from_bytes() {
+        // 40-byte BT_CONST response (typical candleLight values)
+        let mut data = [0u8; 40];
+        // feature = FD | BT_CONST_EXT (0x500)
+        data[0..4].copy_from_slice(&0x00000500u32.to_le_bytes());
+        // fclk_can = 48 MHz
+        data[4..8].copy_from_slice(&48_000_000u32.to_le_bytes());
+        // tseg1_min = 1
+        data[8..12].copy_from_slice(&1u32.to_le_bytes());
+        // tseg1_max = 256
+        data[12..16].copy_from_slice(&256u32.to_le_bytes());
+        // tseg2_min = 1
+        data[16..20].copy_from_slice(&1u32.to_le_bytes());
+        // tseg2_max = 128
+        data[20..24].copy_from_slice(&128u32.to_le_bytes());
+        // sjw_max = 128
+        data[24..28].copy_from_slice(&128u32.to_le_bytes());
+        // brp_min = 1
+        data[28..32].copy_from_slice(&1u32.to_le_bytes());
+        // brp_max = 1024
+        data[32..36].copy_from_slice(&1024u32.to_le_bytes());
+        // brp_inc = 1
+        data[36..40].copy_from_slice(&1u32.to_le_bytes());
+
+        let bt = GsDeviceBtConst::from_bytes(&data).expect("should parse");
+        let feature = { bt.feature };
+        let fclk = { bt.fclk_can };
+        assert_eq!(feature, 0x500);
+        assert_eq!(fclk, 48_000_000);
+        assert!(feature & can_feature::FD != 0);
+
+        let c = bt.constraints();
+        assert_eq!(c.tseg1_max, 256);
+        assert_eq!(c.brp_max, 1024);
+    }
+
+    #[test]
+    fn test_constrained_bittiming_nominal() {
+        // Typical candleLight nominal constraints
+        let c = BittimingConstraints {
+            tseg1_min: 1,
+            tseg1_max: 256,
+            tseg2_min: 1,
+            tseg2_max: 128,
+            sjw_max: 128,
+            brp_min: 1,
+            brp_max: 1024,
+            brp_inc: 1,
+        };
+        // 500 kbps at 48 MHz, 87.5% sample point
+        let timing = calculate_bittiming_constrained(48_000_000, 500_000, 87.5, &c);
+        assert!(timing.is_some(), "should find timing for 500kbps nominal");
+    }
+
+    #[test]
+    fn test_constrained_bittiming_fd_data_phase() {
+        // Typical FD data phase constraints (tighter than nominal)
+        let c = BittimingConstraints {
+            tseg1_min: 1,
+            tseg1_max: 32,
+            tseg2_min: 1,
+            tseg2_max: 16,
+            sjw_max: 16,
+            brp_min: 1,
+            brp_max: 32,
+            brp_inc: 1,
+        };
+        // 2 Mbps at 48 MHz, 75% sample point
+        let timing = calculate_bittiming_constrained(48_000_000, 2_000_000, 75.0, &c);
+        assert!(timing.is_some(), "should find timing for 2Mbps FD data");
+        let t = timing.unwrap();
+        let brp = { t.brp };
+        let seg1 = { t.phase_seg1 };
+        let seg2 = { t.phase_seg2 };
+        assert!(brp <= 32, "brp {} should be within device limit 32", brp);
+        assert!(seg1 <= 32, "seg1 {} should be within device limit 32", seg1);
+        assert!(seg2 <= 16, "seg2 {} should be within device limit 16", seg2);
+    }
+
+    #[test]
+    fn test_constrained_bittiming_rejects_out_of_range() {
+        // Very tight constraints that can't achieve 2 Mbps at 48 MHz
+        let c = BittimingConstraints {
+            tseg1_min: 1,
+            tseg1_max: 2,
+            tseg2_min: 1,
+            tseg2_max: 1,
+            sjw_max: 1,
+            brp_min: 1,
+            brp_max: 1,
+            brp_inc: 1,
+        };
+        // This should fail — constraints are too tight
+        let timing = calculate_bittiming_constrained(48_000_000, 2_000_000, 75.0, &c);
+        assert!(timing.is_none(), "should not find timing with impossibly tight constraints");
     }
 }

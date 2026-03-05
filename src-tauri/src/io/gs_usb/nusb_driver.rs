@@ -20,8 +20,9 @@ use tauri::AppHandle;
 
 use super::{
     can_fd_flags, can_feature, can_id_flags, can_mode, get_bittiming_for_bitrate,
-    GsDeviceBittiming, GsDeviceConfig, GsDeviceMode, GsHostFrame, GsHostFrameFd, GsUsbBreq,
-    GsUsbConfig, GsUsbDeviceInfo, GsUsbProbeResult, GS_USB_HOST_FORMAT, GS_USB_PIDS, GS_USB_VID,
+    GsDeviceBittiming, GsDeviceBtConst, GsDeviceConfig, GsDeviceMode, GsHostFrame, GsHostFrameFd,
+    GsUsbBreq, GsUsbConfig, GsUsbDeviceInfo, GsUsbProbeResult, GS_USB_HOST_FORMAT, GS_USB_PIDS,
+    GS_USB_VID,
 };
 use tokio::sync::mpsc;
 
@@ -756,7 +757,7 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
 
     // 2. Query BT_CONST (required by some firmware before setting bit timing)
     // This matches the Linux gs_usb driver initialization sequence
-    let bt_const = interface
+    let bt_const_data = interface
         .control_in(ControlIn {
             control_type: ControlType::Vendor,
             recipient: Recipient::Interface,
@@ -768,25 +769,44 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
         .await
         .map_err(|e| format!("BT_CONST query failed: {:?}", e))?;
 
-    // Extract device clock frequency from BT_CONST (bytes 4-7)
-    let fclk_can = if bt_const.len() >= 8 {
-        u32::from_le_bytes([bt_const[4], bt_const[5], bt_const[6], bt_const[7]])
-    } else {
-        48_000_000 // Default to 48 MHz (standard CANable)
-    };
+    // Parse full BT_CONST to get clock, features, and constraints
+    let bt_const = GsDeviceBtConst::from_bytes(&bt_const_data);
+    let fclk_can = bt_const.map(|c| c.fclk_can).unwrap_or(48_000_000);
+    let nominal_constraints = bt_const.map(|c| c.constraints());
 
-    // 3. Set bit timing - calculate based on device's actual clock frequency and sample point
-    let timing = super::calculate_bittiming(fclk_can, config.bitrate, config.sample_point)
-        .or_else(|| {
-            // Fall back to pre-calculated 48 MHz timing if calculation fails
-            get_bittiming_for_bitrate(config.bitrate)
-        })
-        .ok_or_else(|| {
-            format!(
-                "Unsupported bitrate {} with {}% sample point for {} Hz clock.",
-                config.bitrate, config.sample_point, fclk_can
-            )
-        })?;
+    // Check FD feature flag before attempting FD setup
+    if config.enable_fd {
+        let has_fd = bt_const.map(|c| c.feature & can_feature::FD != 0).unwrap_or(false);
+        if !has_fd {
+            return Err("CAN FD enabled but device does not report FD support in BT_CONST features".to_string());
+        }
+    }
+
+    // 3. Set bit timing - use device constraints when available
+    let timing = if let Some(ref constraints) = nominal_constraints {
+        super::calculate_bittiming_constrained(fclk_can, config.bitrate, config.sample_point, constraints)
+            .or_else(|| super::calculate_bittiming(fclk_can, config.bitrate, config.sample_point))
+    } else {
+        super::calculate_bittiming(fclk_can, config.bitrate, config.sample_point)
+    }
+    .or_else(|| get_bittiming_for_bitrate(config.bitrate))
+    .ok_or_else(|| {
+        format!(
+            "Unsupported bitrate {} with {}% sample point for {} Hz clock.",
+            config.bitrate, config.sample_point, fclk_can
+        )
+    })?;
+
+    {
+        let brp = { timing.brp };
+        let seg1 = { timing.phase_seg1 };
+        let seg2 = { timing.phase_seg2 };
+        let sjw = { timing.sjw };
+        tlog!(
+            "[gs_usb] Nominal timing: brp={}, seg1={}, seg2={}, sjw={} (clock: {} Hz, bitrate: {} bps, sp: {}%)",
+            brp, seg1, seg2, sjw, fclk_can, config.bitrate, config.sample_point
+        );
+    }
 
     let timing_bytes = unsafe {
         std::slice::from_raw_parts(
@@ -807,10 +827,10 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
         .await
         .map_err(|e| format!("BITTIMING failed: {:?}", e))?;
 
-    // 3. If FD is enabled, set data phase bit timing
+    // 4. If FD is enabled, set data phase bit timing
     if config.enable_fd {
-        // Query BT_CONST_EXT for data phase timing constraints (optional, use same clock if unavailable)
-        let fclk_data = interface
+        // Query BT_CONST_EXT for data phase timing constraints
+        let bt_const_ext_result = interface
             .control_in(ControlIn {
                 control_type: ControlType::Vendor,
                 recipient: Recipient::Interface,
@@ -821,23 +841,53 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
             }, CONTROL_TIMEOUT)
             .await
             .ok()
-            .and_then(|data| {
-                if data.len() >= 8 {
-                    Some(u32::from_le_bytes([data[4], data[5], data[6], data[7]]))
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(fclk_can); // Use nominal clock if extended not available
+            .and_then(|data| GsDeviceBtConst::from_bytes(&data));
 
-        // Calculate data phase timing
-        let data_timing = super::calculate_bittiming(fclk_data, config.data_bitrate, config.data_sample_point)
-            .ok_or_else(|| {
+        let fclk_data = bt_const_ext_result.map(|c| c.fclk_can).unwrap_or(fclk_can);
+        let data_constraints = bt_const_ext_result.map(|c| c.constraints());
+
+        if let Some(ref dc) = data_constraints {
+            tlog!(
+                "[gs_usb] FD data constraints: tseg1={}-{}, tseg2={}-{}, sjw_max={}, brp={}-{} (inc {}), clock: {} Hz",
+                dc.tseg1_min, dc.tseg1_max, dc.tseg2_min, dc.tseg2_max,
+                dc.sjw_max, dc.brp_min, dc.brp_max, dc.brp_inc, fclk_data
+            );
+        } else {
+            tlog!("[gs_usb] FD: BT_CONST_EXT not available, using nominal clock {} Hz", fclk_can);
+        }
+
+        // Calculate data phase timing using device constraints
+        let data_timing = if let Some(ref constraints) = data_constraints {
+            super::calculate_bittiming_constrained(fclk_data, config.data_bitrate, config.data_sample_point, constraints)
+                .or_else(|| super::calculate_bittiming(fclk_data, config.data_bitrate, config.data_sample_point))
+        } else {
+            super::calculate_bittiming(fclk_data, config.data_bitrate, config.data_sample_point)
+        }
+        .ok_or_else(|| {
+            if let Some(ref dc) = data_constraints {
+                format!(
+                    "Cannot calculate FD data timing for {} bps at {}% sample point (clock: {} Hz, device limits: tseg1={}-{}, tseg2={}-{}, brp={}-{})",
+                    config.data_bitrate, config.data_sample_point, fclk_data,
+                    dc.tseg1_min, dc.tseg1_max, dc.tseg2_min, dc.tseg2_max, dc.brp_min, dc.brp_max
+                )
+            } else {
                 format!(
                     "Cannot calculate FD data timing for {} bps at {}% sample point (clock: {} Hz)",
                     config.data_bitrate, config.data_sample_point, fclk_data
                 )
-            })?;
+            }
+        })?;
+
+        {
+            let brp = { data_timing.brp };
+            let seg1 = { data_timing.phase_seg1 };
+            let seg2 = { data_timing.phase_seg2 };
+            let sjw = { data_timing.sjw };
+            tlog!(
+                "[gs_usb] FD data timing: brp={}, seg1={}, seg2={}, sjw={} (clock: {} Hz, bitrate: {} bps, sp: {}%)",
+                brp, seg1, seg2, sjw, fclk_data, config.data_bitrate, config.data_sample_point
+            );
+        }
 
         let data_timing_bytes = unsafe {
             std::slice::from_raw_parts(
@@ -857,11 +907,6 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
             }, CONTROL_TIMEOUT)
             .await
             .map_err(|e| format!("DATA_BITTIMING failed: {:?} (device may not support CAN FD)", e))?;
-
-        tlog!(
-            "[gs_usb] FD mode: data bitrate {} bps, sample point {}%",
-            config.data_bitrate, config.data_sample_point
-        );
     }
 
     // 4. Set mode and start
