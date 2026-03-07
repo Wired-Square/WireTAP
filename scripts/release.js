@@ -268,7 +268,7 @@ async function main() {
     run('cargo check --manifest-path src-tauri/Cargo.toml');
 
     console.log('\nCommitting version bump...');
-    run('git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json CHANGELOG.md');
+    run('git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json CHANGELOG.md src-tauri/gen/apple/project.yml src-tauri/gen/apple/wiretap_iOS/Info.plist');
     run(`git commit -m "Bump version to ${newVersion}"`);
 
     // Create tag

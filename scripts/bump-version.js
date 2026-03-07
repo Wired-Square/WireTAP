@@ -78,6 +78,7 @@ try {
     /(<key>CFBundleVersion<\/key>\s*<string>)[^<]*/,
     `$1${newVersion}`
   );
+  if (!iosPlist.endsWith('\n')) iosPlist += '\n';
   writeFileSync(iosPlistPath, iosPlist);
   console.log(`  ✓ src-tauri/gen/apple/wiretap_iOS/Info.plist`);
 } catch { /* iOS not initialised yet */ }
