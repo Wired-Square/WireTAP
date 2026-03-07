@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **CAN FD test script** (`scripts/canfd_test.py`): Linux utility for testing CAN FD setups — configures vcan or physical interfaces, sends distinctive 64-byte test patterns, and monitors traffic with bus health reporting
+
 ### Fixed
 
 - **gs_usb CAN FD initialisation**: Fixed three issues preventing CAN FD from working on candleLight devices (e.g. ELMUE Candlelight 2.5):
