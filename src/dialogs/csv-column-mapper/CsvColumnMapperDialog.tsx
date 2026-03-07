@@ -20,7 +20,6 @@ import {
   type Delimiter,
   type BufferMetadata,
   type CsvImportResult,
-  type SequenceGap,
 } from "../../api/buffer";
 import {
   h3,
@@ -36,30 +35,34 @@ import {
 } from "../../styles";
 import { iconMd, iconSm } from "../../styles/spacing";
 
-/** Format sequence gap summary as plain text for display and copying */
-function formatSequenceSummary(result: CsvImportResult): string {
+/** Format import summary as plain text for copying */
+function formatImportSummary(result: CsvImportResult, fileCount: number, hasSequence: boolean): string {
   const lines: string[] = [];
   lines.push(`Import Summary`);
-  lines.push(`Frames imported: ${result.metadata.count.toLocaleString()}`);
-  lines.push(`Sequence gaps: ${result.sequence_gaps.length}`);
-  lines.push(`Estimated dropped frames: ${result.total_dropped.toLocaleString()}`);
+  const filePart = fileCount > 1 ? ` from ${fileCount} files` : "";
+  lines.push(`Frames imported: ${result.metadata.count.toLocaleString()}${filePart}`);
 
-  if (result.wrap_points.length > 0) {
-    lines.push(
-      `Sequence wraparound at: ${result.wrap_points.map((v) => v.toLocaleString()).join(", ")}`
-    );
-  }
-
-  if (result.sequence_gaps.length > 0) {
-    lines.push("");
-    lines.push("Gaps:");
-    for (const gap of result.sequence_gaps) {
-      const loc = gap.filename
-        ? `${gap.filename} line ${gap.line}`
-        : `line ${gap.line}`;
+  if (hasSequence) {
+    lines.push(`Sequence gaps: ${result.sequence_gaps.length}`);
+    if (result.sequence_gaps.length > 0) {
+      lines.push(`Estimated dropped frames: ${result.total_dropped.toLocaleString()}`);
+    }
+    if (result.wrap_points.length > 0) {
       lines.push(
-        `  ${loc}: seq ${gap.from_seq} → ${gap.to_seq} (${gap.dropped} dropped)`
+        `Sequence wraparound at: ${result.wrap_points.map((v) => v.toLocaleString()).join(", ")}`
       );
+    }
+    if (result.sequence_gaps.length > 0) {
+      lines.push("");
+      lines.push("Gaps:");
+      for (const gap of result.sequence_gaps) {
+        const loc = gap.filename
+          ? `${gap.filename} line ${gap.line}`
+          : `line ${gap.line}`;
+        lines.push(
+          `  ${loc}: seq ${gap.from_seq} → ${gap.to_seq} (${gap.dropped} dropped)`
+        );
+      }
     }
   }
 
@@ -103,6 +106,7 @@ export default function CsvColumnMapperDialog({
 
   const isMultiFile = allFilePaths && allFilePaths.length > 1;
   const fileCount = allFilePaths?.length ?? 1;
+  const hasSequence = mappings.some((m) => m.role === "sequence");
 
   // Extract filename from path
   const filename = filePath.split(/[/\\]/).pop() ?? filePath;
@@ -263,12 +267,7 @@ export default function CsvColumnMapperDialog({
         result = await importCsvWithMapping(filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter);
       }
 
-      // Show summary if there are sequence gaps; otherwise complete immediately
-      if (result.sequence_gaps.length > 0) {
-        setImportSummary(result);
-      } else {
-        onImportComplete(result.metadata);
-      }
+      setImportSummary(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -482,19 +481,21 @@ export default function CsvColumnMapperDialog({
           />
         )}
 
-        {/* Sequence gap summary — shown after import when gaps are detected */}
+        {/* Post-import summary */}
         {importSummary && (
           <div className="space-y-3">
             <div className={`border ${borderDefault} rounded p-3 ${bgSurface}`}>
               <div className="flex items-center justify-between mb-2">
                 <h4 className={`text-sm font-medium ${textSecondary}`}>
-                  Import Complete — Sequence Gaps Detected
+                  {importSummary.sequence_gaps.length > 0
+                    ? "Import Complete — Sequence Gaps Detected"
+                    : "Import Complete"}
                 </h4>
                 <button
                   type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      formatSequenceSummary(importSummary)
+                      formatImportSummary(importSummary, fileCount, hasSequence)
                     );
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
@@ -513,10 +514,17 @@ export default function CsvColumnMapperDialog({
               <div className={`text-xs ${textSecondary} space-y-1`}>
                 <p>
                   {importSummary.metadata.count.toLocaleString()} frames imported
-                  · {importSummary.sequence_gaps.length} gap{importSummary.sequence_gaps.length !== 1 ? "s" : ""} detected
-                  · ~{importSummary.total_dropped.toLocaleString()} dropped
+                  {fileCount > 1 && ` from ${fileCount} files`}
+                  {hasSequence && (
+                    <>
+                      {" · "}{importSummary.sequence_gaps.length} gap{importSummary.sequence_gaps.length !== 1 ? "s" : ""} detected
+                      {importSummary.total_dropped > 0 && (
+                        <>{" · ~"}{importSummary.total_dropped.toLocaleString()} dropped</>
+                      )}
+                    </>
+                  )}
                 </p>
-                {importSummary.wrap_points.length > 0 && (
+                {hasSequence && importSummary.wrap_points.length > 0 && (
                   <p className={textMuted}>
                     Sequence wraps at:{" "}
                     {importSummary.wrap_points.map((v) => v.toLocaleString()).join(", ")}

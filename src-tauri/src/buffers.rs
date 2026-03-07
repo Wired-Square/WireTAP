@@ -150,6 +150,8 @@ pub async fn import_csv_batch_with_mapping(
     let total_files = file_paths.len();
     let mut total_frames: usize = 0;
     let mut all_sequence_gaps: Vec<io::SequenceGap> = Vec::new();
+    let mut prev_file_last_seq: Option<u64> = None;
+    let mut prev_file_name: Option<String> = None;
 
     for (i, file_path) in file_paths.iter().enumerate() {
         let fname = extract_filename(file_path);
@@ -173,10 +175,40 @@ pub async fn import_csv_batch_with_mapping(
 
         total_frames += result.frames.len();
 
-        // Tag gaps with the filename for multi-file reporting
+        // Detect inter-file sequence gap (between previous file's last seq and this file's first)
+        if let (Some(prev_last), Some(cur_first)) = (prev_file_last_seq, result.first_seq) {
+            let gap = if cur_first > prev_last {
+                cur_first - prev_last - 1
+            } else if prev_last > 0 && cur_first < prev_last / 2 {
+                // Wraparound
+                cur_first
+            } else {
+                0
+            };
+            if gap > 0 {
+                all_sequence_gaps.push(io::SequenceGap {
+                    line: 1,
+                    from_seq: prev_last,
+                    to_seq: cur_first,
+                    dropped: gap,
+                    filename: Some(format!(
+                        "{} → {}",
+                        prev_file_name.as_deref().unwrap_or("?"),
+                        fname
+                    )),
+                });
+            }
+        }
+
+        // Tag intra-file gaps with the filename
         for mut gap in result.sequence_gaps {
             gap.filename = Some(fname.clone());
             all_sequence_gaps.push(gap);
+        }
+
+        if result.last_seq.is_some() {
+            prev_file_last_seq = result.last_seq;
+            prev_file_name = Some(fname);
         }
 
         buffer_store::append_frames(result.frames);

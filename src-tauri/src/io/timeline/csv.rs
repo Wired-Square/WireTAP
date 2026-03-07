@@ -220,6 +220,10 @@ pub struct SequenceGap {
 pub struct CsvParseResult {
     pub frames: Vec<FrameMessage>,
     pub sequence_gaps: Vec<SequenceGap>,
+    /// First raw sequence value in sorted order (for inter-file gap detection)
+    pub first_seq: Option<u64>,
+    /// Last raw sequence value in sorted order (for inter-file gap detection)
+    pub last_seq: Option<u64>,
 }
 
 /// A single column mapping: column index to its assigned role
@@ -879,9 +883,14 @@ pub fn parse_csv_with_mapping(
         }
     }
 
+    let first_seq = raw_sequences.iter().find_map(|s| *s);
+    let last_seq = raw_sequences.iter().rev().find_map(|s| *s);
+
     Ok(CsvParseResult {
         frames,
         sequence_gaps,
+        first_seq,
+        last_seq,
     })
 }
 

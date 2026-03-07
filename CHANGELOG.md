@@ -10,6 +10,11 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Sequence column role for CSV import**: New "Sequence" column type for frame sequence numbers (e.g. "Seq"). Auto-detected from headers (`seq`, `sequence`, `seqno`) and from monotonically increasing decimal integers in sample data. When mapped, sequence is used as the primary sort key during import (with timestamp as secondary), handling counter wraparound (e.g. 16-bit wrap at 65535 → 0). After import, a summary reports any sequence gaps (dropped frames) with file/line locations and wrap points, with a copy-to-clipboard button.
 
+### Fixed
+
+- **CSV import summary not displayed**: The post-import summary was only shown when sequence gaps were detected, so imports with no gaps closed the dialog silently. Now always shows a summary with frame count, file count (for multi-file), sequence gap count, and wrap points (when a sequence column is mapped).
+- **Inter-file sequence gaps not detected**: Multi-file CSV import only detected gaps within each file. Gaps between files (e.g. missing files in a numbered series) were silently ignored. Now tracks the last sequence value across files and reports inter-file gaps with both filenames.
+
 ### Improved
 
 - **CSV column auto-detection**: Unique roles (Frame ID, Timestamp, Sequence) are now deduplicated — if a column is already detected via header match, subsequent columns with similar content patterns are set to Ignore instead of producing duplicates.
