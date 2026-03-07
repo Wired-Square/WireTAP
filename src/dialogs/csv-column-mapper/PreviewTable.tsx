@@ -34,6 +34,7 @@ const ROLE_OPTIONS: { value: CsvColumnRole; label: string }[] = [
   { value: "extended", label: "Extended Flag" },
   { value: "bus", label: "Bus" },
   { value: "direction", label: "Direction" },
+  { value: "sequence", label: "Sequence" },
 ];
 
 /** Map column role to a text colour class */
@@ -53,6 +54,7 @@ function roleColour(role: CsvColumnRole): string {
     case "bus":
     case "extended":
     case "direction":
+    case "sequence":
       return textDataAmber;
     case "ignore":
     default:

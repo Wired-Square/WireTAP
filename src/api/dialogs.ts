@@ -214,3 +214,20 @@ export async function pickCsvToOpen(defaultDir?: string): Promise<string | null>
     filters: CSV_FILTERS,
   });
 }
+
+/**
+ * Pick one or more CSV/data files to open.
+ * Returns an array of file paths, or null if cancelled.
+ */
+export async function pickCsvFilesToOpen(defaultDir?: string): Promise<string[] | null> {
+  const selected = await open({
+    directory: false,
+    multiple: true,
+    defaultPath: defaultDir,
+    filters: CSV_FILTERS,
+  });
+
+  if (!selected) return null;
+  if (typeof selected === "string") return [selected];
+  return selected.length > 0 ? selected : null;
+}

@@ -3,20 +3,24 @@
 // Dialog for mapping CSV columns to CAN frame fields before import.
 // Shows a preview of the CSV data with dropdown selectors per column.
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Loader2, Copy, Check } from "lucide-react";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import Dialog from "../../components/Dialog";
 import { DialogFooter } from "../../components/forms/DialogFooter";
 import PreviewTable from "./PreviewTable";
 import {
   previewCsv,
   importCsvWithMapping,
+  importCsvBatchWithMapping,
   type CsvPreview,
   type CsvColumnMapping,
   type CsvColumnRole,
   type TimestampUnit,
   type Delimiter,
   type BufferMetadata,
+  type CsvImportResult,
+  type SequenceGap,
 } from "../../api/buffer";
 import {
   h3,
@@ -30,11 +34,45 @@ import {
   textSecondary,
   textDataPurple,
 } from "../../styles";
-import { iconMd } from "../../styles/spacing";
+import { iconMd, iconSm } from "../../styles/spacing";
+
+/** Format sequence gap summary as plain text for display and copying */
+function formatSequenceSummary(result: CsvImportResult): string {
+  const lines: string[] = [];
+  lines.push(`Import Summary`);
+  lines.push(`Frames imported: ${result.metadata.count.toLocaleString()}`);
+  lines.push(`Sequence gaps: ${result.sequence_gaps.length}`);
+  lines.push(`Estimated dropped frames: ${result.total_dropped.toLocaleString()}`);
+
+  if (result.wrap_points.length > 0) {
+    lines.push(
+      `Sequence wraparound at: ${result.wrap_points.map((v) => v.toLocaleString()).join(", ")}`
+    );
+  }
+
+  if (result.sequence_gaps.length > 0) {
+    lines.push("");
+    lines.push("Gaps:");
+    for (const gap of result.sequence_gaps) {
+      const loc = gap.filename
+        ? `${gap.filename} line ${gap.line}`
+        : `line ${gap.line}`;
+      lines.push(
+        `  ${loc}: seq ${gap.from_seq} → ${gap.to_seq} (${gap.dropped} dropped)`
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
 
 export type CsvColumnMapperDialogProps = {
   isOpen: boolean;
   filePath: string;
+  /** When set, multiple files will be imported using the same column mapping */
+  allFilePaths?: string[];
+  /** Per-file header detection (parallel to allFilePaths). Auto-detected if not provided. */
+  hasHeaderPerFile?: boolean[];
   onCancel: () => void;
   /** Called when import succeeds — returns the buffer metadata */
   onImportComplete: (metadata: BufferMetadata) => void;
@@ -43,6 +81,8 @@ export type CsvColumnMapperDialogProps = {
 export default function CsvColumnMapperDialog({
   isOpen,
   filePath,
+  allFilePaths,
+  hasHeaderPerFile,
   onCancel,
   onImportComplete,
 }: CsvColumnMapperDialogProps) {
@@ -56,9 +96,24 @@ export default function CsvColumnMapperDialog({
   const [timestampUnit, setTimestampUnit] = useState<TimestampUnit>("microseconds");
   const [negateTimestamps, setNegateTimestamps] = useState(false);
   const [showImportedTs, setShowImportedTs] = useState(false);
+  const [importProgress, setImportProgress] = useState<string | null>(null);
+  const [importSummary, setImportSummary] = useState<CsvImportResult | null>(null);
+  const [copied, setCopied] = useState(false);
+  const unlistenRef = useRef<UnlistenFn | null>(null);
+
+  const isMultiFile = allFilePaths && allFilePaths.length > 1;
+  const fileCount = allFilePaths?.length ?? 1;
 
   // Extract filename from path
   const filename = filePath.split(/[/\\]/).pop() ?? filePath;
+
+  // Clean up progress listener on unmount
+  useEffect(() => {
+    return () => {
+      unlistenRef.current?.();
+      unlistenRef.current = null;
+    };
+  }, []);
 
   // Load preview when dialog opens
   useEffect(() => {
@@ -182,16 +237,47 @@ export default function CsvColumnMapperDialog({
   const handleImport = useCallback(async () => {
     setIsImporting(true);
     setError(null);
+    setImportProgress(null);
 
     try {
-      const metadata = await importCsvWithMapping(filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter);
-      onImportComplete(metadata);
+      let result: CsvImportResult;
+
+      if (isMultiFile && allFilePaths) {
+        // Listen for per-file progress events
+        unlistenRef.current = await listen<{ file_index: number; total_files: number; filename: string }>(
+          "csv-import-progress",
+          (event) => {
+            setImportProgress(
+              `Importing file ${event.payload.file_index + 1} of ${event.payload.total_files}: ${event.payload.filename}`
+            );
+          }
+        );
+
+        // Build per-file header flags: use provided detection or fall back to current hasHeader for all
+        const perFileHeaders = hasHeaderPerFile ?? allFilePaths.map(() => hasHeader);
+        result = await importCsvBatchWithMapping(allFilePaths, mappings, perFileHeaders, timestampUnit, negateTimestamps, delimiter);
+
+        unlistenRef.current?.();
+        unlistenRef.current = null;
+      } else {
+        result = await importCsvWithMapping(filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter);
+      }
+
+      // Show summary if there are sequence gaps; otherwise complete immediately
+      if (result.sequence_gaps.length > 0) {
+        setImportSummary(result);
+      } else {
+        onImportComplete(result.metadata);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
+      unlistenRef.current?.();
+      unlistenRef.current = null;
     }
-  }, [filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter, onImportComplete]);
+  }, [filePath, allFilePaths, isMultiFile, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter, onImportComplete]);
 
   // Validation
   const hasFrameId = mappings.some((m) => m.role === "frame_id" || m.role === "frame_id_data");
@@ -252,7 +338,13 @@ export default function CsvColumnMapperDialog({
           <div>
             <h3 className={h3}>Map Columns</h3>
             <div className={caption}>
-              {filename}
+              {isMultiFile ? (
+                <>
+                  Previewing first file · {fileCount} files selected
+                </>
+              ) : (
+                filename
+              )}
               {preview && (
                 <span className={`ml-2 ${textMuted}`}>
                   · {preview.total_rows.toLocaleString()} rows
@@ -366,13 +458,94 @@ export default function CsvColumnMapperDialog({
         {/* Error display */}
         {error && <div className={errorBoxCompact}>{error}</div>}
 
+        {/* Import progress */}
+        {importProgress && (
+          <div className={`flex items-center gap-2 text-xs ${textMuted}`}>
+            <Loader2 className={`${iconMd} animate-spin`} />
+            <span>{importProgress}</span>
+          </div>
+        )}
+
         {/* Footer */}
-        <DialogFooter
-          onCancel={onCancel}
-          onConfirm={handleImport}
-          confirmLabel={isImporting ? "Importing..." : "Import"}
-          confirmDisabled={!canImport}
-        />
+        {!importSummary && (
+          <DialogFooter
+            onCancel={onCancel}
+            onConfirm={handleImport}
+            confirmLabel={
+              isImporting
+                ? "Importing..."
+                : isMultiFile
+                  ? `Import ${fileCount} Files`
+                  : "Import"
+            }
+            confirmDisabled={!canImport}
+          />
+        )}
+
+        {/* Sequence gap summary — shown after import when gaps are detected */}
+        {importSummary && (
+          <div className="space-y-3">
+            <div className={`border ${borderDefault} rounded p-3 ${bgSurface}`}>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className={`text-sm font-medium ${textSecondary}`}>
+                  Import Complete — Sequence Gaps Detected
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      formatSequenceSummary(importSummary)
+                    );
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded border ${borderDefault} ${bgSurface} ${textMuted} hover:brightness-90 transition-colors`}
+                  title="Copy summary to clipboard"
+                >
+                  {copied ? (
+                    <Check className={iconSm} />
+                  ) : (
+                    <Copy className={iconSm} />
+                  )}
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <div className={`text-xs ${textSecondary} space-y-1`}>
+                <p>
+                  {importSummary.metadata.count.toLocaleString()} frames imported
+                  · {importSummary.sequence_gaps.length} gap{importSummary.sequence_gaps.length !== 1 ? "s" : ""} detected
+                  · ~{importSummary.total_dropped.toLocaleString()} dropped
+                </p>
+                {importSummary.wrap_points.length > 0 && (
+                  <p className={textMuted}>
+                    Sequence wraps at:{" "}
+                    {importSummary.wrap_points.map((v) => v.toLocaleString()).join(", ")}
+                  </p>
+                )}
+              </div>
+              {importSummary.sequence_gaps.length > 0 && (
+                <div
+                  className={`mt-2 text-xs font-mono ${textMuted} overflow-y-auto border-t ${borderDefault} pt-2`}
+                  style={{ maxHeight: "12rem" }}
+                >
+                  {importSummary.sequence_gaps.map((gap, i) => (
+                    <div key={i} className="py-0.5">
+                      {gap.filename ? `${gap.filename} ` : ""}line {gap.line}:{" "}
+                      seq {gap.from_seq} → {gap.to_seq}{" "}
+                      <span className="text-amber-500">
+                        ({gap.dropped} dropped)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter
+              onConfirm={() => onImportComplete(importSummary.metadata)}
+              confirmLabel="Done"
+            />
+          </div>
+        )}
       </div>
     </Dialog>
   );

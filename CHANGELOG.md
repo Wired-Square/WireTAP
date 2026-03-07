@@ -2,6 +2,18 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Multi-file CSV import**: Import multiple CSV/data files sequentially into a single buffer. A file order dialog lets you confirm the import sequence with natural sort, drag-and-drop reordering, and per-file header detection. Cross-file validation warns about column count mismatches and differing headers. Files can be removed from the list via right-click context menu. The column mapper then previews the first file and applies the same mapping to all files, with per-file progress reporting during import.
+
+- **Sequence column role for CSV import**: New "Sequence" column type for frame sequence numbers (e.g. "Seq"). Auto-detected from headers (`seq`, `sequence`, `seqno`) and from monotonically increasing decimal integers in sample data. When mapped, sequence is used as the primary sort key during import (with timestamp as secondary), handling counter wraparound (e.g. 16-bit wrap at 65535 → 0). After import, a summary reports any sequence gaps (dropped frames) with file/line locations and wrap points, with a copy-to-clipboard button.
+
+### Improved
+
+- **CSV column auto-detection**: Unique roles (Frame ID, Timestamp, Sequence) are now deduplicated — if a column is already detected via header match, subsequent columns with similar content patterns are set to Ignore instead of producing duplicates.
+
 ## [0.5.3] - 2026-03-07
 
 ### Added

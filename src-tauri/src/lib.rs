@@ -1063,6 +1063,7 @@ pub fn run() {
             buffers::import_csv_to_buffer,
             buffers::preview_csv,
             buffers::import_csv_with_mapping,
+            buffers::import_csv_batch_with_mapping,
             buffers::get_buffer_metadata,
             buffers::clear_buffer,
             buffers::get_buffer_frames,

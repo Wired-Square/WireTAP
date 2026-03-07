@@ -196,6 +196,30 @@ pub enum CsvColumnRole {
     /// Combined frame ID and data in one column, separated by # (candump format)
     /// e.g., "689#DEADBEEF0102"
     FrameIdData,
+    /// Frame sequence number — used for import ordering only (not stored on the frame)
+    Sequence,
+}
+
+/// A gap detected in the sequence column during CSV import.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SequenceGap {
+    /// Line number in the CSV file where the gap starts (1-based, after header)
+    pub line: usize,
+    /// Sequence value before the gap
+    pub from_seq: u64,
+    /// Sequence value after the gap
+    pub to_seq: u64,
+    /// Estimated number of dropped frames
+    pub dropped: u64,
+    /// Filename (set by the caller for multi-file imports)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+}
+
+/// Result of parsing a CSV file with column mappings.
+pub struct CsvParseResult {
+    pub frames: Vec<FrameMessage>,
+    pub sequence_gaps: Vec<SequenceGap>,
 }
 
 /// A single column mapping: column index to its assigned role
@@ -516,7 +540,7 @@ pub fn parse_csv_with_mapping(
     timestamp_unit: TimestampUnit,
     negate_timestamps: bool,
     delimiter: Delimiter,
-) -> Result<Vec<FrameMessage>, String> {
+) -> Result<CsvParseResult, String> {
     let file = File::open(file_path)
         .map_err(|e| format!("Failed to open file '{}': {}", file_path, e))?;
     let reader = BufReader::new(file);
@@ -554,6 +578,10 @@ pub fn parse_csv_with_mapping(
         .iter()
         .find(|m| matches!(m.role, CsvColumnRole::Direction))
         .map(|m| m.column_index);
+    let sequence_col = mappings
+        .iter()
+        .find(|m| matches!(m.role, CsvColumnRole::Sequence))
+        .map(|m| m.column_index);
 
     // Collect individual data byte columns sorted by column index
     let mut data_byte_cols: Vec<usize> = mappings
@@ -572,6 +600,10 @@ pub fn parse_csv_with_mapping(
     let mut synthetic_timestamp: u64 = 0;
     // Collect raw f64 timestamps so we can normalise after the loop (supports float seconds)
     let mut raw_f64_timestamps: Vec<f64> = Vec::new();
+    // Collect raw sequence numbers for sort ordering (handles wraparound)
+    let mut raw_sequences: Vec<Option<u64>> = Vec::new();
+    // Track CSV line numbers per frame (for gap reporting)
+    let mut frame_line_numbers: Vec<usize> = Vec::new();
     // Whether timestamps are float seconds (auto-detected from first parsed timestamp)
     let mut ts_is_float = false;
     let mut ts_float_detected = false;
@@ -638,6 +670,11 @@ pub fn parse_csv_with_mapping(
             synthetic_timestamp as f64
         };
         raw_f64_timestamps.push(raw_timestamp);
+        // Parse sequence number (used for sort ordering only)
+        let seq_value = sequence_col
+            .and_then(|col| parts.get(col))
+            .and_then(|s| s.trim().parse::<u64>().ok());
+        raw_sequences.push(seq_value);
         // Placeholder — will be corrected after the loop
         let timestamp_us = 0u64;
 
@@ -718,6 +755,7 @@ pub fn parse_csv_with_mapping(
             }
         });
 
+        frame_line_numbers.push(line_number);
         frames.push(FrameMessage {
             protocol: "can".to_string(),
             timestamp_us,
@@ -766,11 +804,85 @@ pub fn parse_csv_with_mapping(
             }
         }
 
-        // Sort frames by timestamp to ensure chronological order in the buffer.
-        frames.sort_by_key(|f| f.timestamp_us);
+        // Sort frames to ensure correct order in the buffer.
+        // When a sequence column is mapped, use unwrapped sequence as the primary sort key
+        // (handles counter wraparound, e.g. 16-bit: 65534, 65535, 0, 1, 2) with timestamp
+        // as a tiebreaker. Otherwise, sort by timestamp alone.
+        if raw_sequences.iter().any(|s| s.is_some()) {
+            // Unwrap sequence numbers: detect wraparound and add epoch offsets.
+            let mut unwrapped: Vec<u64> = Vec::with_capacity(raw_sequences.len());
+            let mut epoch: u64 = 0;
+            let mut prev: Option<u64> = None;
+            for seq in &raw_sequences {
+                match (*seq, prev) {
+                    (Some(cur), Some(p)) if cur < p / 2 => {
+                        // Wraparound detected — advance epoch
+                        epoch += p + 1;
+                        unwrapped.push(epoch + cur);
+                        prev = Some(cur);
+                    }
+                    (Some(cur), _) => {
+                        unwrapped.push(epoch + cur);
+                        prev = Some(cur);
+                    }
+                    (None, _) => {
+                        unwrapped.push(u64::MAX); // no sequence → sort last
+                    }
+                }
+            }
+
+            let mut indices: Vec<usize> = (0..frames.len()).collect();
+            indices.sort_by(|&a, &b| {
+                unwrapped[a]
+                    .cmp(&unwrapped[b])
+                    .then(frames[a].timestamp_us.cmp(&frames[b].timestamp_us))
+            });
+            frames = indices.iter().map(|&i| frames[i].clone()).collect();
+            raw_sequences = indices.iter().map(|&i| raw_sequences[i]).collect();
+            frame_line_numbers = indices.iter().map(|&i| frame_line_numbers[i]).collect();
+        } else {
+            frames.sort_by_key(|f| f.timestamp_us);
+        }
     }
 
-    Ok(frames)
+    // Detect sequence gaps (dropped frames) by walking consecutive raw sequence values.
+    // After sorting, sequences are in order (possibly with wraparound boundaries).
+    let mut sequence_gaps = Vec::new();
+    {
+        let mut prev_seq: Option<u64> = None;
+        for (i, seq) in raw_sequences.iter().enumerate() {
+            if let Some(cur) = *seq {
+                if let Some(p) = prev_seq {
+                    let gap = if cur > p {
+                        // Normal increase — gap if more than 1 step
+                        cur - p - 1
+                    } else if p > 0 && cur < p / 2 {
+                        // Wraparound (e.g. 65535 → 0): expect next after wrap is 0
+                        // Dropped = cur (since 0 would be no gap, 2 means 0 and 1 were dropped)
+                        cur
+                    } else {
+                        0 // duplicate or minor reorder
+                    };
+
+                    if gap > 0 {
+                        sequence_gaps.push(SequenceGap {
+                            line: frame_line_numbers[i],
+                            from_seq: p,
+                            to_seq: cur,
+                            dropped: gap,
+                            filename: None,
+                        });
+                    }
+                }
+                prev_seq = Some(cur);
+            }
+        }
+    }
+
+    Ok(CsvParseResult {
+        frames,
+        sequence_gaps,
+    })
 }
 
 // ============================================================================
@@ -782,6 +894,7 @@ fn detect_has_header(first_row: &[String]) -> bool {
     let header_keywords = [
         "id", "time", "timestamp", "stamp", "dlc", "len", "length", "bus", "dir", "direction",
         "ext", "extended", "data", "byte", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8",
+        "seq",
     ];
     let lower: Vec<String> = first_row.iter().map(|s| s.to_lowercase()).collect();
     let matches = lower
@@ -900,6 +1013,22 @@ fn suggest_column_mappings(
         }
     }
 
+    // Third pass: deduplicate unique roles.
+    // If multiple columns are detected as FrameId (or Timestamp, Sequence),
+    // keep only the first occurrence and set the rest to Ignore.
+    for role in [CsvColumnRole::FrameId, CsvColumnRole::Timestamp, CsvColumnRole::Sequence] {
+        let mut found = false;
+        for mapping in mappings.iter_mut() {
+            if mapping.role == role {
+                if found {
+                    mapping.role = CsvColumnRole::Ignore;
+                } else {
+                    found = true;
+                }
+            }
+        }
+    }
+
     mappings
 }
 
@@ -925,6 +1054,9 @@ fn guess_column_role(header: Option<&str>, samples: &[&str]) -> CsvColumnRole {
         }
         if h == "dir" || h == "direction" {
             return CsvColumnRole::Direction;
+        }
+        if h == "seq" || h == "sequence" || h == "seqno" || h == "seq_no" || h == "seq_num" {
+            return CsvColumnRole::Sequence;
         }
         // "data bytes", "data", "payload"
         if h.contains("data") && (h.contains("byte") || h.contains("payload")) {
@@ -1005,6 +1137,44 @@ fn guess_column_role(header: Option<&str>, samples: &[&str]) -> CsvColumnRole {
         .count();
     if space_hex_count > non_empty.len() / 2 {
         return CsvColumnRole::DataBytes;
+    }
+
+    // Sequence: monotonically increasing decimal integers (with wraparound), not timestamps.
+    // Checked before Frame ID so that pure-decimal sequences like "10872" aren't mis-detected as hex IDs.
+    let decimal_ints: Vec<u64> = non_empty
+        .iter()
+        .filter_map(|s| {
+            let trimmed = s.trim();
+            // Must be pure decimal (no hex letters) to distinguish from Frame ID
+            if !trimmed.is_empty() && trimmed.chars().all(|c| c.is_ascii_digit()) {
+                trimmed.parse::<u64>().ok()
+            } else {
+                None
+            }
+        })
+        .collect();
+    if decimal_ints.len() > non_empty.len() / 2 && decimal_ints.len() >= 3 {
+        let max_val = decimal_ints.iter().copied().max().unwrap_or(0);
+        let transitions = decimal_ints.len() - 1;
+        // Count strictly increasing steps and rare wraparound steps separately.
+        // A true sequence has mostly increasing steps with only occasional wraps.
+        let mut increasing = 0usize;
+        let mut wraps = 0usize;
+        for w in decimal_ints.windows(2) {
+            if w[1] > w[0] {
+                increasing += 1;
+            } else if w[0] > 0 && w[1] < w[0] / 2 {
+                wraps += 1;
+            }
+        }
+        // >80% strictly increasing, wraps must be rare (<5% of transitions),
+        // and max value under 1M (timestamps are typically >1M)
+        if increasing > transitions * 8 / 10
+            && wraps <= transitions / 20
+            && max_val <= 1_000_000
+        {
+            return CsvColumnRole::Sequence;
+        }
     }
 
     // Frame ID: 3-8 char hex strings (e.g., "00000286", "142", "1A3")

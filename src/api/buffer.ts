@@ -54,6 +54,30 @@ export async function importCsvToBuffer(filePath: string): Promise<BufferMetadat
 // Flexible CSV Import API (column mapping)
 // ============================================================================
 
+/** A gap detected in the sequence column during CSV import */
+export interface SequenceGap {
+  /** Line number in the CSV file where the gap starts (1-based) */
+  line: number;
+  /** Sequence value before the gap */
+  from_seq: number;
+  /** Sequence value after the gap */
+  to_seq: number;
+  /** Estimated number of dropped frames */
+  dropped: number;
+  /** Filename (set for multi-file imports) */
+  filename?: string;
+}
+
+/** Result of a CSV import, including buffer metadata and sequence diagnostics */
+export interface CsvImportResult {
+  metadata: BufferMetadata;
+  sequence_gaps: SequenceGap[];
+  /** Total number of dropped frames estimated from sequence gaps */
+  total_dropped: number;
+  /** Detected sequence wraparound points (raw sequence value at each wrap) */
+  wrap_points: number[];
+}
+
 /**
  * Column delimiter for splitting lines into fields
  */
@@ -72,7 +96,8 @@ export type CsvColumnRole =
   | "extended"
   | "bus"
   | "direction"
-  | "frame_id_data";
+  | "frame_id_data"
+  | "sequence";
 
 /**
  * A single column mapping: column index to role
@@ -149,11 +174,41 @@ export async function importCsvWithMapping(
   timestampUnit: TimestampUnit,
   negateTimestamps: boolean,
   delimiter: Delimiter
-): Promise<BufferMetadata> {
+): Promise<CsvImportResult> {
   return invoke("import_csv_with_mapping", {
     file_path: filePath,
     mappings,
     skip_first_row: skipFirstRow,
+    timestamp_unit: timestampUnit,
+    negate_timestamps: negateTimestamps,
+    delimiter,
+  });
+}
+
+/**
+ * Import multiple data files with shared column mappings into a single buffer.
+ * Files are parsed sequentially and concatenated in order.
+ *
+ * @param filePaths - Ordered list of file paths to import
+ * @param mappings - Column role assignments (applied to all files)
+ * @param skipFirstRowPerFile - Per-file flag: whether to skip the first row (header)
+ * @param timestampUnit - Timestamp unit for all files
+ * @param negateTimestamps - Whether to negate timestamps
+ * @param delimiter - Column delimiter
+ * @returns Buffer metadata for the merged data
+ */
+export async function importCsvBatchWithMapping(
+  filePaths: string[],
+  mappings: CsvColumnMapping[],
+  skipFirstRowPerFile: boolean[],
+  timestampUnit: TimestampUnit,
+  negateTimestamps: boolean,
+  delimiter: Delimiter
+): Promise<CsvImportResult> {
+  return invoke("import_csv_batch_with_mapping", {
+    file_paths: filePaths,
+    mappings,
+    skip_first_row_per_file: skipFirstRowPerFile,
     timestamp_unit: timestampUnit,
     negate_timestamps: negateTimestamps,
     delimiter,

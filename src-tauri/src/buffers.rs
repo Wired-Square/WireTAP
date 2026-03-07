@@ -3,10 +3,23 @@
 // Tauri commands for buffer management.
 // Handles CSV import, buffer CRUD, pagination, and multi-buffer registry.
 
+use tauri::{AppHandle, Emitter};
+
 use crate::{
     buffer_store::{self, BufferMetadata, BufferFrameInfo, TimestampedByte, TailResponse},
     io::{self, FrameMessage},
 };
+
+/// Result of a CSV import, including buffer metadata and any sequence gap diagnostics.
+#[derive(Clone, serde::Serialize)]
+pub struct CsvImportResult {
+    pub metadata: BufferMetadata,
+    pub sequence_gaps: Vec<io::SequenceGap>,
+    /// Total number of dropped frames estimated from sequence gaps
+    pub total_dropped: u64,
+    /// Detected sequence wraparound points (raw sequence value at each wrap)
+    pub wrap_points: Vec<u64>,
+}
 
 /// Response for paginated buffer frames
 #[derive(Clone, serde::Serialize)]
@@ -78,23 +91,168 @@ pub async fn import_csv_with_mapping(
     timestamp_unit: io::TimestampUnit,
     negate_timestamps: bool,
     delimiter: io::Delimiter,
-) -> Result<BufferMetadata, String> {
+) -> Result<CsvImportResult, String> {
     let filename = std::path::Path::new(&file_path)
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
         .to_string();
 
-    let frames = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps, delimiter)?;
+    let result = io::parse_csv_with_mapping(&file_path, &mappings, skip_first_row, timestamp_unit, negate_timestamps, delimiter)?;
 
-    if frames.is_empty() {
+    if result.frames.is_empty() {
         return Err("File contains no valid frames with the given column mapping".to_string());
     }
 
-    buffer_store::set_buffer(frames, filename);
+    let sequence_gaps = result.sequence_gaps;
+    let total_dropped = sequence_gaps.iter().map(|g| g.dropped).sum();
+    let wrap_points = detect_wrap_points(&sequence_gaps);
 
-    buffer_store::get_metadata()
-        .ok_or_else(|| "Failed to store frames in buffer".to_string())
+    buffer_store::set_buffer(result.frames, filename);
+
+    let metadata = buffer_store::get_metadata()
+        .ok_or_else(|| "Failed to store frames in buffer".to_string())?;
+
+    Ok(CsvImportResult {
+        metadata,
+        sequence_gaps,
+        total_dropped,
+        wrap_points,
+    })
+}
+
+/// Import multiple data files with shared column mappings into a single buffer.
+/// Files are parsed sequentially and concatenated in order.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn import_csv_batch_with_mapping(
+    app_handle: AppHandle,
+    file_paths: Vec<String>,
+    mappings: Vec<io::CsvColumnMapping>,
+    skip_first_row_per_file: Vec<bool>,
+    timestamp_unit: io::TimestampUnit,
+    negate_timestamps: bool,
+    delimiter: io::Delimiter,
+) -> Result<CsvImportResult, String> {
+    if file_paths.is_empty() {
+        return Err("No files provided".to_string());
+    }
+
+    // Build display name from filenames
+    let name = if file_paths.len() == 1 {
+        extract_filename(&file_paths[0])
+    } else {
+        build_batch_name(&file_paths)
+    };
+
+    // Create a single buffer for all files
+    let buffer_id = buffer_store::create_buffer(buffer_store::BufferType::Frames, name);
+
+    let total_files = file_paths.len();
+    let mut total_frames: usize = 0;
+    let mut all_sequence_gaps: Vec<io::SequenceGap> = Vec::new();
+
+    for (i, file_path) in file_paths.iter().enumerate() {
+        let fname = extract_filename(file_path);
+
+        // Emit progress event for frontend
+        let _ = app_handle.emit(
+            "csv-import-progress",
+            serde_json::json!({
+                "file_index": i,
+                "total_files": total_files,
+                "filename": fname,
+            }),
+        );
+
+        // Per-file header flag; falls back to false if array is shorter
+        let skip_row = skip_first_row_per_file.get(i).copied().unwrap_or(false);
+
+        let result = io::parse_csv_with_mapping(
+            file_path, &mappings, skip_row, timestamp_unit, negate_timestamps, delimiter,
+        )?;
+
+        total_frames += result.frames.len();
+
+        // Tag gaps with the filename for multi-file reporting
+        for mut gap in result.sequence_gaps {
+            gap.filename = Some(fname.clone());
+            all_sequence_gaps.push(gap);
+        }
+
+        buffer_store::append_frames(result.frames);
+    }
+
+    if total_frames == 0 {
+        let _ = buffer_store::delete_buffer(&buffer_id);
+        return Err("No valid frames found in any of the selected files".to_string());
+    }
+
+    tlog!(
+        "[Buffers] Batch imported {} files ({} frames) into buffer '{}'",
+        total_files, total_frames, buffer_id
+    );
+
+    let total_dropped = all_sequence_gaps.iter().map(|g| g.dropped).sum();
+    let wrap_points = detect_wrap_points(&all_sequence_gaps);
+
+    let metadata = buffer_store::finalize_buffer()
+        .ok_or_else(|| "Failed to finalise buffer".to_string())?;
+
+    Ok(CsvImportResult {
+        metadata,
+        sequence_gaps: all_sequence_gaps,
+        total_dropped,
+        wrap_points,
+    })
+}
+
+/// Detect sequence wraparound points from gaps.
+/// A wrap is when `to_seq` is much smaller than `from_seq` (large backward jump).
+fn detect_wrap_points(gaps: &[io::SequenceGap]) -> Vec<u64> {
+    let mut wraps = Vec::new();
+    for gap in gaps {
+        if gap.from_seq > 0 && gap.to_seq < gap.from_seq / 2 {
+            // This gap is a wraparound — the sequence wrapped at from_seq
+            if !wraps.contains(&gap.from_seq) {
+                wraps.push(gap.from_seq);
+            }
+        }
+    }
+    wraps
+}
+
+/// Extract filename from a full path
+fn extract_filename(path: &str) -> String {
+    std::path::Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string()
+}
+
+/// Build a display name for a batch of files.
+/// Tries to find a common prefix; falls back to "N files merged".
+fn build_batch_name(paths: &[String]) -> String {
+    let filenames: Vec<String> = paths.iter().map(|p| extract_filename(p)).collect();
+
+    // Find longest common prefix among filenames
+    if let Some(first) = filenames.first() {
+        let prefix_len = first
+            .char_indices()
+            .take_while(|&(i, c)| filenames.iter().all(|f| f.get(i..i + c.len_utf8()) == Some(&first[i..i + c.len_utf8()])))
+            .map(|(i, c)| i + c.len_utf8())
+            .last()
+            .unwrap_or(0);
+
+        if prefix_len > 3 {
+            let prefix = &first[..prefix_len];
+            // Trim trailing separators/underscores
+            let trimmed = prefix.trim_end_matches(|c: char| c == '_' || c == '-' || c == '.');
+            return format!("{} ({} files)", trimmed, paths.len());
+        }
+    }
+
+    format!("{} files merged", paths.len())
 }
 
 // ============================================================================
