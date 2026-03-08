@@ -21,7 +21,7 @@ use crate::{
         ModbusTcpConfig, ModbusTcpReader,
         ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
         MqttConfig, MqttReader,
-        VirtualDeviceConfig, VirtualDeviceReader,
+        VirtualDeviceConfig, VirtualDeviceReader, VirtualInterfaceConfig, VirtualTrafficType,
         ModbusRole, MultiSourceReader, SourceConfig,
         PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
         CanTransmitFrame, TransmitResult,
@@ -666,36 +666,114 @@ pub async fn create_reader_session(
             Box::new(MqttReader::new(app.clone(), session_id.clone(), config))
         }
         "virtual" => {
-            let frame_rate_hz = profile
+            let traffic_type = match profile
                 .connection
-                .get("frame_rate_hz")
-                .and_then(|v| {
-                    v.as_str()
-                        .and_then(|s| s.parse::<f64>().ok())
-                        .or_else(|| v.as_f64())
-                })
-                .unwrap_or(10.0)
-                .clamp(0.1, 1000.0);
+                .get("traffic_type")
+                .and_then(|v| v.as_str())
+            {
+                Some("canfd") => VirtualTrafficType::CanFd,
+                Some("modbus") => VirtualTrafficType::Modbus,
+                Some("serial") => VirtualTrafficType::Serial,
+                _ => VirtualTrafficType::Can,
+            };
 
-            let bus_count = profile
+            let loopback = profile
                 .connection
-                .get("bus_count")
+                .get("loopback")
                 .and_then(|v| {
-                    v.as_str()
-                        .and_then(|s| s.parse::<u8>().ok())
-                        .or_else(|| v.as_i64().map(|n| n as u8))
+                    v.as_bool()
+                        .or_else(|| v.as_str().map(|s| s != "false"))
                 })
-                .unwrap_or(1)
-                .clamp(1, 8);
+                .unwrap_or(true);
+
+            // Parse per-bus interface configs from connection.interfaces array.
+            // Falls back to a single bus with legacy frame_rate_hz / signal_generator fields.
+            let interfaces: Vec<VirtualInterfaceConfig> = profile
+                .connection
+                .get("interfaces")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|item| {
+                            let bus = item
+                                .get("bus")
+                                .and_then(|v| {
+                                    v.as_i64()
+                                        .map(|n| n as u8)
+                                        .or_else(|| v.as_str().and_then(|s| s.parse::<u8>().ok()))
+                                })
+                                .unwrap_or(0);
+                            let signal_generator = item
+                                .get("signal_generator")
+                                .and_then(|v| {
+                                    v.as_bool()
+                                        .or_else(|| v.as_str().map(|s| s != "false"))
+                                })
+                                .unwrap_or(true);
+                            let frame_rate_hz = item
+                                .get("frame_rate_hz")
+                                .and_then(|v| {
+                                    v.as_f64()
+                                        .or_else(|| v.as_str().and_then(|s| s.parse::<f64>().ok()))
+                                })
+                                .unwrap_or(10.0)
+                                .clamp(0.1, 1000.0);
+                            Some(VirtualInterfaceConfig {
+                                bus,
+                                signal_generator,
+                                frame_rate_hz,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_else(|| {
+                    // Legacy fallback: single bus from top-level fields
+                    let frame_rate_hz = profile
+                        .connection
+                        .get("frame_rate_hz")
+                        .and_then(|v| {
+                            v.as_str()
+                                .and_then(|s| s.parse::<f64>().ok())
+                                .or_else(|| v.as_f64())
+                        })
+                        .unwrap_or(10.0)
+                        .clamp(0.1, 1000.0);
+                    let signal_generator = profile
+                        .connection
+                        .get("signal_generator")
+                        .and_then(|v| {
+                            v.as_bool()
+                                .or_else(|| v.as_str().map(|s| s != "false"))
+                        })
+                        .unwrap_or(true);
+                    let bus_count = profile
+                        .connection
+                        .get("bus_count")
+                        .and_then(|v| {
+                            v.as_str()
+                                .and_then(|s| s.parse::<u8>().ok())
+                                .or_else(|| v.as_i64().map(|n| n as u8))
+                        })
+                        .unwrap_or(1)
+                        .clamp(1, 8);
+                    (0..bus_count)
+                        .map(|bus| VirtualInterfaceConfig {
+                            bus,
+                            signal_generator,
+                            frame_rate_hz,
+                        })
+                        .collect()
+                });
 
             let config = VirtualDeviceConfig {
-                frame_rate_hz,
-                bus_count,
+                traffic_type,
+                loopback,
+                interfaces,
             };
 
             tlog!(
-                "[create_reader_session] Virtual device — {:.1} Hz, {} bus(es)",
-                frame_rate_hz, bus_count
+                "[create_reader_session] Virtual device — {:?} loopback={} {} interface(s)",
+                config.traffic_type, loopback, config.interfaces.len()
             );
 
             Box::new(VirtualDeviceReader::new(app.clone(), session_id.clone(), config))
@@ -834,6 +912,16 @@ pub fn copy_buffer_for_detach(buffer_id: String, new_name: String) -> Result<Str
 #[tauri::command(rename_all = "snake_case")]
 pub async fn update_reader_speed(session_id: String, speed: f64) -> Result<(), String> {
     update_session_speed(&session_id, speed).await
+}
+
+/// Enable or disable traffic generation for a virtual device session
+#[tauri::command(rename_all = "snake_case")]
+pub async fn set_virtual_traffic_enabled(
+    session_id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    use crate::io::set_session_traffic_enabled;
+    set_session_traffic_enabled(&session_id, enabled).await
 }
 
 /// Update time range for a reader session (only works when stopped)
@@ -1683,35 +1771,45 @@ pub async fn probe_device(
             }
         }
 
-        // Virtual CAN — always succeeds, reports configured bus count
+        // Virtual adapter — always succeeds, reports configured interface count and traffic type
         "virtual" => {
             let bus_count = profile
                 .connection
-                .get("bus_count")
-                .and_then(|v| {
-                    v.as_str()
-                        .and_then(|s| s.parse::<u32>().ok())
-                        .or_else(|| v.as_i64().map(|n| n as u32))
-                })
-                .unwrap_or(1)
-                .clamp(1, 8) as u8;
-            let frame_rate_hz = profile
+                .get("interfaces")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len() as u8)
+                .unwrap_or_else(|| {
+                    profile
+                        .connection
+                        .get("bus_count")
+                        .and_then(|v| {
+                            v.as_str()
+                                .and_then(|s| s.parse::<u8>().ok())
+                                .or_else(|| v.as_i64().map(|n| n as u8))
+                        })
+                        .unwrap_or(1)
+                        .clamp(1, 8)
+                });
+            let traffic_type = profile
                 .connection
-                .get("frame_rate_hz")
-                .and_then(|v| {
-                    v.as_str()
-                        .and_then(|s| s.parse::<f64>().ok())
-                        .or_else(|| v.as_f64())
-                })
-                .unwrap_or(10.0);
+                .get("traffic_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("can");
+            let traffic_label = match traffic_type {
+                "canfd" => "CAN-FD",
+                "modbus" => "Modbus",
+                "serial" => "Serial",
+                _ => "CAN",
+            };
+            let supports_fd = traffic_type == "canfd";
             Ok(DeviceProbeResult {
                 success: true,
                 device_type: "virtual".to_string(),
                 is_multi_bus: bus_count > 1,
                 bus_count,
-                primary_info: Some(format!("{:.1} Hz", frame_rate_hz)),
-                secondary_info: Some(format!("{} bus(es)", bus_count)),
-                supports_fd: Some(false),
+                primary_info: Some(format!("{}", traffic_label)),
+                secondary_info: Some(format!("{} interface(s)", bus_count)),
+                supports_fd: Some(supports_fd),
                 error: None,
             })
         }

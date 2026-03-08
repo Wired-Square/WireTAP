@@ -23,6 +23,7 @@ import {
   badgeNeutral,
   badgeDanger,
   badgeInfo,
+  badgeCyan,
   iconButtonHoverDanger,
 } from "../../../styles";
 
@@ -42,6 +43,8 @@ const getProtocolBadgeStyle = (protocol: string) => {
   switch (protocol) {
     case "can":
       return badgeSuccess;
+    case "canfd":
+      return badgeCyan;
     case "serial":
       return badgePurple;
     case "modbus":
@@ -55,6 +58,8 @@ const getProtocolLabel = (protocol: string) => {
   switch (protocol) {
     case "can":
       return "CAN";
+    case "canfd":
+      return "CAN-FD";
     case "serial":
       return "Serial";
     case "modbus":
@@ -239,6 +244,35 @@ const renderConnectionSummary = (profile: IOProfile) => {
         <SummaryBadge label="host" value={host} />
         <SummaryBadge label="port" value={port} />
         <SummaryBadge label="unit" value={unitId} />
+      </div>
+    );
+  }
+
+  if (profile.kind === "virtual") {
+    const interfaces: { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[] =
+      c.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: c.frame_rate_hz || 10 }];
+    const busCount = interfaces.length;
+    const sigGenCount = interfaces.filter((i) => i.signal_generator !== false).length;
+    const loopback = c.loopback !== false;
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        <SummaryBadge label="buses" value={busCount} />
+        <SummaryBadge label="loopback" value={loopback ? "on" : "off"} />
+        <SummaryBadge
+          label="signal gen"
+          value={sigGenCount === busCount ? "all" : sigGenCount === 0 ? "off" : `${sigGenCount}/${busCount}`}
+        />
+        {sigGenCount > 0 && (
+          <SummaryBadge
+            label="rate"
+            value={
+              new Set(interfaces.filter((i) => i.signal_generator !== false).map((i) => String(i.frame_rate_hz || 10))).size === 1
+                ? `${interfaces.find((i) => i.signal_generator !== false)?.frame_rate_hz || 10} Hz`
+                : "mixed"
+            }
+          />
+        )}
       </div>
     );
   }

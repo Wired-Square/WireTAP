@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { loadSettings as loadSettingsApi, tlog } from '../api/settings';
 import { getOrCreateDefaultDirs } from '../utils/defaultPaths';
 import { WINDOW_EVENTS } from '../events/registry';
-import { getTraitsForKind } from '../utils/profileTraits';
+import { getTraitsForKind, getProfileTraits } from '../utils/profileTraits';
 import {
   DEFAULT_BUFFER_STORAGE,
   DEFAULT_CLEAR_BUFFERS_ON_START,
@@ -28,7 +28,7 @@ export interface IOProfile {
 }
 
 /** Protocol types that a reader can provide */
-export type ReaderProtocol = 'can' | 'serial' | 'modbus';
+export type ReaderProtocol = 'can' | 'canfd' | 'serial' | 'modbus';
 
 /** Interface configuration for GVRET devices (stored in profile connection.interfaces) */
 export interface GvretInterfaceConfig {
@@ -37,34 +37,26 @@ export interface GvretInterfaceConfig {
   protocol: 'can' | 'canfd';  // Protocol type
 }
 
-/** Get the protocol(s) supported by a reader kind */
+/**
+ * Get display-friendly protocol(s) for a reader kind.
+ * Delegates to getProfileTraits() for config-aware protocol detection,
+ * then filters for display (e.g., shows only "CAN-FD" when FD is enabled,
+ * since CAN is implied by CAN-FD).
+ */
 export function getReaderProtocols(kind: IOProfile['kind'], connection?: Record<string, any>): ReaderProtocol[] {
-  // PostgreSQL protocol depends on source_type configuration
-  if (kind === 'postgres') {
-    const sourceType = connection?.source_type || 'can_frame';
-    switch (sourceType) {
-      case 'can_frame':
-        return ['can'];
-      case 'modbus_frame':
-        return ['modbus'];
-      case 'serial_frame':
-      case 'serial_raw':
-        return ['serial'];
-      default:
-        return ['can'];
-    }
+  const traits = getProfileTraits({ id: '', name: '', kind, connection: connection ?? {} });
+  if (!traits) return ['can'];
+
+  const protocols = traits.protocols.filter(
+    (p): p is ReaderProtocol => ['can', 'canfd', 'serial', 'modbus'].includes(p)
+  );
+
+  // For display: if CAN-FD is present, omit base "can" (CAN-FD implies CAN)
+  if (protocols.includes('canfd') && protocols.includes('can')) {
+    return protocols.filter((p) => p !== 'can');
   }
 
-  // For other kinds, delegate to centralised trait system
-  const traits = getTraitsForKind(kind);
-  if (traits) {
-    // Convert Protocol[] to ReaderProtocol[] (filter to supported subset)
-    return traits.protocols.filter(
-      (p): p is ReaderProtocol => ['can', 'serial', 'modbus'].includes(p)
-    );
-  }
-
-  return ['can'];
+  return protocols.length > 0 ? protocols : ['can'];
 }
 
 /** Check if a reader kind is realtime (hardware) vs historical (replay) */

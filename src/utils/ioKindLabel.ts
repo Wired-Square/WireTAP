@@ -28,6 +28,8 @@ export function getIOKindLabel(kind: string | undefined): string {
       return "gs_usb";
     case "modbus_tcp":
       return "Modbus TCP";
+    case "virtual":
+      return "Virtual";
     default:
       return kind ?? "Unknown";
   }

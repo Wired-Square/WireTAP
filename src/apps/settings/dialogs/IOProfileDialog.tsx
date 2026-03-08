@@ -372,7 +372,7 @@ export default function IOProfileDialog({
               {availableKinds.includes("serial") && <option value="serial">Serial Port</option>}
               {availableKinds.includes("slcan") && <option value="slcan">slcan (CANable, USB-CAN)</option>}
               {availableKinds.includes("socketcan") && <option value="socketcan">SocketCAN (Linux)</option>}
-              {availableKinds.includes("virtual") && <option value="virtual">Virtual CAN (Testing)</option>}
+              {availableKinds.includes("virtual") && <option value="virtual">Virtual Adapter (Testing)</option>}
             </Select>
           </FormField>
 
@@ -678,41 +678,97 @@ export default function IOProfileDialog({
             </div>
           )}
 
-          {/* Virtual CAN */}
+          {/* Virtual Adapter */}
           {profileForm.kind === "virtual" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>Virtual CAN Settings</h3>
+              <h3 className={h3}>Virtual Device Settings</h3>
               <p className={caption}>
-                Generates synthetic CAN frames for testing without real hardware.
-                Transmitted frames are echoed back as received (loopback).
+                Generates synthetic traffic for testing without real hardware.
               </p>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Frame Rate (Hz)" variant="default">
+                <FormField label="Traffic Type" variant="default">
+                  <Select
+                    variant="default"
+                    value={profileForm.connection.traffic_type || "can"}
+                    onChange={(e) => onUpdateConnectionField("traffic_type", e.target.value)}
+                  >
+                    <option value="can">CAN (8-byte frames)</option>
+                    <option value="canfd">CAN-FD (up to 64-byte frames)</option>
+                    <option value="modbus">Modbus (register polling)</option>
+                    <option value="serial">Serial (raw byte stream)</option>
+                  </Select>
+                </FormField>
+                <FormField label="" variant="default">
+                  <label className="flex items-center gap-2 pt-6">
+                    <input
+                      type="checkbox"
+                      checked={profileForm.connection.loopback !== false && profileForm.connection.loopback !== "false"}
+                      onChange={(e) => onUpdateConnectionField("loopback", e.target.checked)}
+                    />
+                    <span className={textMedium}>Loopback</span>
+                  </label>
+                </FormField>
+              </div>
+
+              {/* Interface count selector */}
+              <FormField label="Interfaces" variant="default">
+                <Select
+                  variant="default"
+                  value={String((profileForm.connection.interfaces as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[] | undefined)?.length || 1)}
+                  onChange={(e) => {
+                    const count = parseInt(e.target.value, 10);
+                    const existing = (profileForm.connection.interfaces || []) as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[];
+                    const updated = Array.from({ length: count }, (_, i) => existing[i] || {
+                      bus: i,
+                      signal_generator: true,
+                      frame_rate_hz: 10,
+                    });
+                    onUpdateConnectionField("interfaces", updated as any);
+                  }}
+                >
+                  <option value="1">1 interface</option>
+                  <option value="2">2 interfaces</option>
+                  <option value="3">3 interfaces</option>
+                  <option value="4">4 interfaces</option>
+                  <option value="8">8 interfaces</option>
+                </Select>
+              </FormField>
+
+              {/* Per-interface configuration table */}
+              {((profileForm.connection.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: 10 }]) as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[]).map((iface, idx) => (
+                <div key={idx} className={`flex items-center gap-3 py-1.5 ${idx > 0 ? `border-t ${borderDefault}` : ""}`}>
+                  <span className={`${textMedium} w-14 shrink-0`}>Bus {iface.bus}</span>
                   <Input
                     variant="default"
                     type="number"
                     min="0.1"
                     max="1000"
                     step="0.5"
-                    value={profileForm.connection.frame_rate_hz || "10"}
-                    onChange={(e) => onUpdateConnectionField("frame_rate_hz", e.target.value)}
+                    value={iface.frame_rate_hz || "10"}
+                    onChange={(e) => {
+                      const interfaces = [...((profileForm.connection.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: 10 }]) as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[])];
+                      interfaces[idx] = { ...interfaces[idx], frame_rate_hz: e.target.value };
+                      onUpdateConnectionField("interfaces", interfaces as any);
+                    }}
                     placeholder="10"
+                    className="w-20"
                   />
-                </FormField>
-                <FormField label="Bus Count" variant="default">
-                  <Select
-                    variant="default"
-                    value={profileForm.connection.bus_count || "1"}
-                    onChange={(e) => onUpdateConnectionField("bus_count", e.target.value)}
-                  >
-                    <option value="1">1 bus</option>
-                    <option value="2">2 buses</option>
-                    <option value="4">4 buses</option>
-                    <option value="8">8 buses</option>
-                  </Select>
-                </FormField>
-              </div>
+                  <span className={`${caption} shrink-0`}>Hz</span>
+                  <label className="flex items-center gap-1.5 ml-auto shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={iface.signal_generator !== false}
+                      onChange={(e) => {
+                        const interfaces = [...((profileForm.connection.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: 10 }]) as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[])];
+                        interfaces[idx] = { ...interfaces[idx], signal_generator: e.target.checked };
+                        onUpdateConnectionField("interfaces", interfaces as any);
+                      }}
+                    />
+                    <span className={textMedium}>Signal Generator</span>
+                  </label>
+                </div>
+              ))}
             </div>
           )}
 

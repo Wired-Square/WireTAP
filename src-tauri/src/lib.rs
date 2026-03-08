@@ -1021,6 +1021,7 @@ pub fn run() {
             sessions::resume_reader_session_fresh,
             sessions::copy_buffer_for_detach,
             sessions::update_reader_speed,
+            sessions::set_virtual_traffic_enabled,
             sessions::update_reader_time_range,
             sessions::reconfigure_reader_session,
             sessions::seek_reader_session,

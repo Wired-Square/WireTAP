@@ -37,6 +37,11 @@ export const badgeNeutral = `${badgeBase} bg-[var(--bg-surface)] text-[color:var
  */
 export const badgePurple = `${badgeBase} bg-purple-600/20 text-purple-600`;
 
+/**
+ * Cyan badge - cyan, for CAN-FD and enhanced protocol indicators
+ */
+export const badgeCyan = `${badgeBase} bg-cyan-600/20 text-cyan-600`;
+
 // ============================================================================
 // Small Badges - compact versions for tight UI spaces (e.g., reader lists)
 // ============================================================================

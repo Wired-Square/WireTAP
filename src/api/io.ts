@@ -412,6 +412,17 @@ export async function copyBufferForDetach(
 }
 
 /**
+ * Enable or disable traffic generation for a virtual device session.
+ * When disabled, the session stays connected but no synthetic traffic is generated.
+ */
+export async function setVirtualTrafficEnabled(
+  sessionId: string,
+  enabled: boolean
+): Promise<void> {
+  return invoke("set_virtual_traffic_enabled", { session_id: sessionId, enabled });
+}
+
+/**
  * Update playback speed for a reader session.
  * Only works for readers that support speed control (e.g., PostgreSQL).
  */

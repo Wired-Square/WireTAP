@@ -5,7 +5,7 @@
 //
 // This is the single source of truth for all profile capabilities.
 
-import type { IOProfile } from "../hooks/useSettings";
+import type { IOProfile, GvretInterfaceConfig } from "../hooks/useSettings";
 import type { BusMapping } from "../api/io";
 
 // ============================================================================
@@ -143,12 +143,76 @@ export function getTraitsForKind(kind: ProfileKind): ProfileTraits | undefined {
 }
 
 /**
- * Get traits for a profile.
+ * Get traits for a profile, with config-aware protocol detection.
  * Returns undefined if the profile has no kind or kind is not in registry.
+ *
+ * The static registry provides base defaults. This function overrides
+ * protocols based on connection config for devices that support CAN-FD
+ * or multiple protocol modes.
  */
 export function getProfileTraits(profile: IOProfile): ProfileTraits | undefined {
   if (!profile.kind) return undefined;
-  return getTraitsForKind(profile.kind);
+  const base = PROFILE_TRAIT_REGISTRY[profile.kind];
+  if (!base) return undefined;
+  const traits = { ...base };
+  const c = profile.connection;
+
+  switch (profile.kind) {
+    case "virtual":
+      return getVirtualProfileTraits(profile);
+
+    case "slcan":
+    case "gs_usb":
+    case "socketcan":
+      if (c?.enable_fd) traits.protocols = ["can", "canfd"];
+      break;
+
+    case "gvret_tcp":
+    case "gvret_usb": {
+      const ifaces = c?.interfaces as GvretInterfaceConfig[] | undefined;
+      if (ifaces?.some((i) => i.protocol === "canfd")) {
+        traits.protocols = ["can", "canfd"];
+      }
+      break;
+    }
+
+    case "postgres":
+      switch (c?.source_type) {
+        case "modbus_frame":
+          traits.protocols = ["modbus"];
+          break;
+        case "serial_frame":
+        case "serial_raw":
+          traits.protocols = ["serial"];
+          break;
+      }
+      break;
+  }
+
+  return traits;
+}
+
+/**
+ * Derive virtual adapter traits from profile connection config.
+ * The traffic_type determines which protocols the virtual device uses.
+ */
+function getVirtualProfileTraits(profile: IOProfile): ProfileTraits {
+  const base = { ...PROFILE_TRAIT_REGISTRY.virtual };
+  switch (profile.connection?.traffic_type as string | undefined) {
+    case "canfd":
+      base.protocols = ["can", "canfd"];
+      break;
+    case "modbus":
+      base.protocols = ["modbus"];
+      base.canTransmit = false;
+      break;
+    case "serial":
+      base.protocols = ["serial"];
+      break;
+    default: // "can" or unset
+      break;
+  }
+  return base;
 }
 
 // ============================================================================

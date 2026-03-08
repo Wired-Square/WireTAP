@@ -4,9 +4,24 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Virtual adapter traffic types**: Virtual adapters now support CAN, CAN-FD, Modbus, and Serial traffic modes via a traffic type selector in the profile dialog. CAN/CAN-FD patterns match the `canfd_test.py` reference script (C0FFEE42, walking bit, sequential, etc.). Modbus generates cycling register frames; Serial emits raw byte streams.
+
+- **Per-bus signal generator**: Each virtual adapter bus interface has its own signal generator toggle and rate (Hz). Signal generators can be toggled at runtime via a new `set_virtual_traffic_enabled` Tauri command. The profile dialog shows per-interface configuration rows with bus number, rate, and signal generator checkbox.
+
+- **Optional loopback for virtual adapters**: Virtual adapter transmit loopback is now configurable (previously always-on). When disabled, the adapter rejects transmit requests.
+
+- **CAN-FD protocol badge**: New cyan "CAN-FD" badge distinguishes CAN-FD profiles from standard CAN across the Data IO settings page. Applies to all device kinds that support FD: gs_usb, slcan, SocketCAN, GVRET, and virtual adapters.
+
 ### Changed
 
+- **Unified config-aware protocol detection**: `getProfileTraits()` is now the single source of truth for profile protocol detection, reading `enable_fd` (slcan/gs_usb/SocketCAN), `interfaces[].protocol` (GVRET), `source_type` (PostgreSQL), and `traffic_type` (virtual) from connection config. `getReaderProtocols()` delegates to it instead of duplicating per-kind logic. Rust fallback traits aligned with TypeScript base defaults.
+
+- **Virtual adapter connection summary**: Virtual profiles in Data IO settings now show formatted summary badges (buses, loopback, signal generator status, rate) instead of raw JSON.
+
 - **macOS code signing and notarisation**: Switched from Apple Development certificate to Developer ID Application certificate for GitHub releases. Added Apple notarisation so downloaded builds are trusted by Gatekeeper without manual overrides. Signing identity and team ID are now sourced from CI environment variables instead of being hardcoded in the Tauri config.
+
 - **Local notarisation scripts**: Added `notarise:build`, `notarise:history`, and `notarise:log` npm scripts for local signed builds and notarisation status checks. Added Apple signing placeholders to `.env.example`.
 
 ## [0.5.4] - 2026-03-07

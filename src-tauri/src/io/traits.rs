@@ -107,7 +107,7 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
     match kind {
         "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
-            protocols: vec![Protocol::Can, Protocol::CanFd],
+            protocols: vec![Protocol::Can],
             can_transmit: true,
         },
         "slcan" => InterfaceTraits {
@@ -117,12 +117,12 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
         },
         "gs_usb" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
-            protocols: vec![Protocol::Can, Protocol::CanFd],
+            protocols: vec![Protocol::Can],
             can_transmit: true, // Note: listen_only overrides this at runtime
         },
         "socketcan" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
-            protocols: vec![Protocol::Can, Protocol::CanFd],
+            protocols: vec![Protocol::Can],
             can_transmit: true,
         },
         "mqtt" => InterfaceTraits {
@@ -137,7 +137,7 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
         },
         "postgres" => InterfaceTraits {
             temporal_mode: TemporalMode::Timeline,
-            protocols: vec![Protocol::Can, Protocol::Modbus, Protocol::Serial],
+            protocols: vec![Protocol::Can],
             can_transmit: false,
         },
         "csv_file" | "csv-file" => InterfaceTraits {
@@ -153,7 +153,7 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
         "serial" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Serial],
-            can_transmit: true,
+            can_transmit: false,
         },
         "virtual" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,

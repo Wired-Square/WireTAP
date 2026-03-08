@@ -62,7 +62,7 @@ pub use modbus_tcp::{
 pub use gvret::probe_gvret_usb;
 pub use multi_source::{ModbusRole, MultiSourceReader, SourceConfig};
 pub use mqtt::{MqttConfig, MqttReader};
-pub use virtual_device::{VirtualDeviceConfig, VirtualDeviceReader};
+pub use virtual_device::{VirtualDeviceConfig, VirtualDeviceReader, VirtualInterfaceConfig, VirtualTrafficType};
 #[cfg(not(target_os = "ios"))]
 #[allow(unused_imports)]
 pub use serial::Parity;
@@ -601,6 +601,12 @@ pub trait IODevice: Send + Sync {
     /// Default implementation returns "unknown"
     fn device_type(&self) -> &'static str {
         "unknown"
+    }
+
+    /// Enable or disable traffic generation (virtual device only).
+    /// Default implementation returns an error.
+    fn set_traffic_enabled(&mut self, _enabled: bool) -> Result<(), String> {
+        Err("This device does not support traffic toggle".to_string())
     }
 
     /// For multi-source sessions, return the source configurations.
@@ -2089,6 +2095,16 @@ pub async fn resume_session(session_id: &str) -> Result<IOState, String> {
     }
 
     Ok(current)
+}
+
+/// Enable or disable traffic generation for a virtual device session
+pub async fn set_session_traffic_enabled(session_id: &str, enabled: bool) -> Result<(), String> {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    session.device.set_traffic_enabled(enabled)
 }
 
 /// Update speed for a reader session
