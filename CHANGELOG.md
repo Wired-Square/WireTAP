@@ -10,6 +10,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Per-bus signal generator**: Each virtual adapter bus interface has its own signal generator toggle and rate (Hz). Signal generators can be toggled at runtime via a new `set_virtual_traffic_enabled` Tauri command. The profile dialog shows per-interface configuration rows with bus number, rate, and signal generator checkbox.
 
+- **Runtime signal generator controls**: Per-bus signal generator toggle and cadence (Hz) controls in the Source Details panel when a virtual adapter source is selected in the Visual tab. Changes take effect immediately without restarting the session. Includes add/remove bus and save-to-profile support.
+
 - **Optional loopback for virtual adapters**: Virtual adapter transmit loopback is now configurable (previously always-on). When disabled, the adapter rejects transmit requests.
 
 - **CAN-FD protocol badge**: New cyan "CAN-FD" badge distinguishes CAN-FD profiles from standard CAN across the Data IO settings page. Applies to all device kinds that support FD: gs_usb, slcan, SocketCAN, GVRET, and virtual adapters.
@@ -25,6 +27,8 @@ All notable changes to WireTAP will be documented in this file.
 - **Local notarisation scripts**: Added `notarise:build`, `notarise:history`, and `notarise:log` npm scripts for local signed builds and notarisation status checks. Added Apple signing placeholders to `.env.example`.
 
 ### Fixed
+
+- **Virtual adapter Hz stepping**: Fixed Hz number inputs stepping in fractional increments (1 → 1.1 → 2.1) in both the profile dialog and runtime controls. Changed step to 1 and min to 1 for whole-number increments.
 
 - **Virtual adapter multi-bus in multi-source sessions**: The multi-source spawner's virtual reader now correctly parses the `interfaces` array from profile config, matching the standalone `VirtualDeviceReader`. Previously it only read legacy top-level `bus_count`/`frame_rate_hz` fields, causing all frames to appear on Bus 0 at the default 10 Hz rate. Each bus now gets its own generator task with independent frame rate, correct CAN/CAN-FD/Modbus patterns, and proper `is_fd` flag for CAN-FD traffic.
 

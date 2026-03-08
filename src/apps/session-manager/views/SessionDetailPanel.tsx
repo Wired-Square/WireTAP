@@ -1,10 +1,11 @@
 // src/apps/session-manager/views/SessionDetailPanel.tsx
 
-import { Play, Pause, Square, Trash2, UserMinus, Plus, X } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Play, Pause, Square, Trash2, UserMinus, Plus, X, Save } from "lucide-react";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { useSessionStore } from "../../../stores/sessionStore";
-import { getTraits, type ActiveSessionInfo } from "../../../api/io";
+import { getTraits, getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence, type ActiveSessionInfo, type VirtualBusState, type IOStateType } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { iconSm } from "../../../styles/spacing";
 import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
@@ -386,6 +387,15 @@ function SourceDetails({ profile, sessions, onRemoveSource }: {
         </p>
       </div>
 
+      {/* Signal Generator controls (virtual devices only) */}
+      {profile.kind === "virtual" && usingSessions.length > 0 && (
+        <VirtualSignalGenControls
+          profile={profile}
+          sessionId={usingSessions[0].sessionId}
+          sessionState={usingSessions[0].state}
+        />
+      )}
+
       {/* Actions — remove from session (only if session has more than 1 source) */}
       {usingSessions.some((s) => s.sourceProfileIds.length > 1) && (
         <div className="pt-2 border-t border-[color:var(--border-default)]">
@@ -405,6 +415,165 @@ function SourceDetails({ profile, sessions, onRemoveSource }: {
             ) : null
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Signal generator runtime controls for virtual device sources
+function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profile: IOProfile; sessionId: string; sessionState: IOStateType }) {
+  const [busStates, setBusStates] = useState<VirtualBusState[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dirty, setDirty] = useState(false);
+  // Track which buses exist in the running backend (for live toggle/cadence)
+  const runtimeBuses = useRef<Set<number>>(new Set());
+  const cadenceTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  const updateProfile = useSettingsStore((s) => s.updateProfile);
+
+  // Load bus states when session is running
+  useEffect(() => {
+    if (sessionState !== "running") {
+      setBusStates([]);
+      setLoading(false);
+      setDirty(false);
+      runtimeBuses.current.clear();
+      return;
+    }
+    setLoading(true);
+    getVirtualBusStates(sessionId)
+      .then((states) => {
+        setBusStates(states);
+        runtimeBuses.current = new Set(states.map((s) => s.bus));
+        setDirty(false);
+      })
+      .catch(() => setBusStates([]))
+      .finally(() => setLoading(false));
+  }, [sessionId, sessionState]);
+
+  const handleToggle = useCallback(async (bus: number, enabled: boolean) => {
+    setBusStates((prev) => prev.map((s) => s.bus === bus ? { ...s, enabled } : s));
+    setDirty(true);
+    // Only send to backend if bus exists at runtime
+    if (!runtimeBuses.current.has(bus)) return;
+    try {
+      await setVirtualBusTrafficEnabled(sessionId, bus, enabled);
+    } catch (e) {
+      tlog.debug(`[session-manager] Failed to toggle bus ${bus}: ${e}`);
+      setBusStates((prev) => prev.map((s) => s.bus === bus ? { ...s, enabled: !enabled } : s));
+    }
+  }, [sessionId]);
+
+  const handleCadenceChange = useCallback((bus: number, value: string) => {
+    const hz = parseFloat(value);
+    if (isNaN(hz)) return;
+    setBusStates((prev) => prev.map((s) => s.bus === bus ? { ...s, frame_rate_hz: hz } : s));
+    setDirty(true);
+    // Only send to backend if bus exists at runtime
+    if (!runtimeBuses.current.has(bus)) return;
+    if (cadenceTimers.current[bus]) clearTimeout(cadenceTimers.current[bus]);
+    cadenceTimers.current[bus] = setTimeout(async () => {
+      try {
+        await setVirtualBusCadence(sessionId, bus, hz);
+      } catch (e) {
+        tlog.debug(`[session-manager] Failed to set cadence for bus ${bus}: ${e}`);
+      }
+    }, 300);
+  }, [sessionId]);
+
+  const handleAddBus = useCallback(() => {
+    setBusStates((prev) => {
+      const usedBuses = new Set(prev.map((s) => s.bus));
+      let nextBus = 0;
+      while (usedBuses.has(nextBus) && nextBus < 8) nextBus++;
+      if (nextBus >= 8) return prev;
+      return [...prev, { bus: nextBus, enabled: true, frame_rate_hz: 10 }];
+    });
+    setDirty(true);
+  }, []);
+
+  const handleRemoveBus = useCallback((bus: number) => {
+    setBusStates((prev) => prev.filter((s) => s.bus !== bus));
+    setDirty(true);
+  }, []);
+
+  const handleSaveToProfile = useCallback(() => {
+    const interfaces = busStates.map((bs) => ({
+      bus: bs.bus,
+      signal_generator: bs.enabled,
+      frame_rate_hz: bs.frame_rate_hz,
+    }));
+    const updated: IOProfile = {
+      ...profile,
+      connection: { ...profile.connection, interfaces },
+    };
+    updateProfile(profile.id, updated);
+    setDirty(false);
+    tlog.debug(`[session-manager] Saved signal generator settings to profile ${profile.id}`);
+  }, [busStates, profile, updateProfile]);
+
+  if (sessionState !== "running") return null;
+  if (loading) return null;
+  if (busStates.length === 0) return null;
+
+  return (
+    <div className="pt-2 border-t border-[color:var(--border-default)]">
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+          Signal Generator
+        </label>
+        {busStates.length < 8 && (
+          <button
+            onClick={handleAddBus}
+            className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-xs ${iconButtonHover}`}
+            title="Add bus"
+          >
+            <Plus className={iconSm} />
+          </button>
+        )}
+      </div>
+      <div className="space-y-2">
+        {busStates.map((bs) => (
+          <div key={bs.bus} className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 shrink-0">
+              <input
+                type="checkbox"
+                checked={bs.enabled}
+                onChange={(e) => handleToggle(bs.bus, e.target.checked)}
+                className="w-3.5 h-3.5 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+              />
+              <span className="text-xs text-[color:var(--text-primary)] w-10">Bus {bs.bus}</span>
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="1000"
+              step="1"
+              value={bs.frame_rate_hz}
+              onChange={(e) => handleCadenceChange(bs.bus, e.target.value)}
+              disabled={!bs.enabled}
+              className="w-16 px-1.5 py-0.5 text-xs rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] disabled:opacity-40"
+            />
+            <span className="text-xs text-[color:var(--text-muted)]">Hz</span>
+            {busStates.length > 1 && (
+              <button
+                onClick={() => handleRemoveBus(bs.bus)}
+                className={`p-0.5 rounded ${iconButtonHoverDanger}`}
+                title={`Remove bus ${bs.bus}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {dirty && (
+        <button
+          onClick={handleSaveToProfile}
+          className={`mt-2 flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover}`}
+        >
+          <Save className={iconSm} />
+          Save to Profile
+        </button>
       )}
     </div>
   );

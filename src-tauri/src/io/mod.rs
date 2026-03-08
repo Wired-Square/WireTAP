@@ -139,6 +139,14 @@ pub struct PlaybackPosition {
     pub frame_count: Option<usize>,
 }
 
+/// Per-bus signal generator state (returned to frontend for virtual devices)
+#[derive(Clone, Serialize)]
+pub struct VirtualBusState {
+    pub bus: u8,
+    pub enabled: bool,
+    pub frame_rate_hz: f64,
+}
+
 /// Get current time in microseconds since UNIX epoch
 pub fn now_us() -> u64 {
     SystemTime::now()
@@ -607,6 +615,21 @@ pub trait IODevice: Send + Sync {
     /// Default implementation returns an error.
     fn set_traffic_enabled(&mut self, _enabled: bool) -> Result<(), String> {
         Err("This device does not support traffic toggle".to_string())
+    }
+
+    /// Enable or disable signal generator for a specific bus (virtual device only).
+    fn set_bus_traffic_enabled(&mut self, _bus: u8, _enabled: bool) -> Result<(), String> {
+        Err("This device does not support per-bus traffic toggle".to_string())
+    }
+
+    /// Update signal generator cadence for a specific bus (virtual device only).
+    fn set_bus_cadence(&mut self, _bus: u8, _frame_rate_hz: f64) -> Result<(), String> {
+        Err("This device does not support per-bus cadence control".to_string())
+    }
+
+    /// Query current per-bus signal generator states (virtual device only).
+    fn virtual_bus_states(&self) -> Result<Vec<VirtualBusState>, String> {
+        Err("This device does not support virtual bus states".to_string())
     }
 
     /// For multi-source sessions, return the source configurations.
@@ -2105,6 +2128,36 @@ pub async fn set_session_traffic_enabled(session_id: &str, enabled: bool) -> Res
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
     session.device.set_traffic_enabled(enabled)
+}
+
+/// Enable or disable signal generator for a specific bus
+pub async fn set_session_bus_traffic_enabled(session_id: &str, bus: u8, enabled: bool) -> Result<(), String> {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    session.device.set_bus_traffic_enabled(bus, enabled)
+}
+
+/// Update signal generator cadence for a specific bus
+pub async fn set_session_bus_cadence(session_id: &str, bus: u8, frame_rate_hz: f64) -> Result<(), String> {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    session.device.set_bus_cadence(bus, frame_rate_hz)
+}
+
+/// Query per-bus signal generator states
+pub async fn get_session_virtual_bus_states(session_id: &str) -> Result<Vec<VirtualBusState>, String> {
+    let sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    session.device.virtual_bus_states()
 }
 
 /// Update speed for a reader session

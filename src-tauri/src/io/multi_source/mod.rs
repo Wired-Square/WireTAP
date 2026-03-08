@@ -9,7 +9,7 @@ mod types;
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc as std_mpsc, Arc, Mutex};
 use tauri::AppHandle;
 use tokio::sync::mpsc;
@@ -26,7 +26,7 @@ use super::traits::{get_traits_for_profile_kind, validate_session_traits};
 use super::types::{SourceMessage, TransmitRequest};
 use super::{
     CanTransmitFrame, IOCapabilities, IODevice, IOState, InterfaceTraits, Protocol, TemporalMode,
-    TransmitPayload, TransmitResult, emit_buffer_orphaned, emit_buffer_created,
+    TransmitPayload, TransmitResult, VirtualBusState, emit_buffer_orphaned, emit_buffer_created,
 };
 use crate::buffer_store::{self, BufferType};
 
@@ -36,6 +36,21 @@ use super::gs_usb::encode_frame as encode_gs_usb_frame;
 use merge::run_merge_task;
 pub use types::{ModbusRole, SourceConfig};
 use types::{TransmitChannels, TransmitRoute};
+
+// ============================================================================
+// Virtual Bus Control (shared with generator tasks)
+// ============================================================================
+
+/// Shared runtime controls for a single virtual bus generator task
+pub struct VirtualBusControl {
+    /// Whether the signal generator is enabled for this bus
+    pub traffic_enabled: Arc<AtomicBool>,
+    /// Generator interval in microseconds (1_000_000 / frame_rate_hz)
+    pub interval_us: Arc<AtomicU64>,
+}
+
+/// Shared map of bus -> control, populated by the virtual source spawner
+pub type VirtualBusControls = Arc<Mutex<HashMap<u8, VirtualBusControl>>>;
 
 // ============================================================================
 // Multi-Source Reader
@@ -62,6 +77,8 @@ pub struct MultiSourceReader {
     session_traits: InterfaceTraits,
     /// Whether this session emits raw bytes (for serial sources without framing)
     emits_raw_bytes: bool,
+    /// Per-bus signal generator controls for virtual sources (populated on start)
+    virtual_bus_controls: VirtualBusControls,
 }
 
 impl MultiSourceReader {
@@ -164,6 +181,7 @@ impl MultiSourceReader {
             transmit_channels: Arc::new(Mutex::new(HashMap::new())),
             session_traits,
             emits_raw_bytes,
+            virtual_bus_controls: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -447,6 +465,12 @@ impl IODevice for MultiSourceReader {
         // This should always succeed now since we checked/recreated above
         let rx = self.rx.take().ok_or("Receiver already taken")?;
 
+        // Clear any previous virtual bus controls from last run
+        if let Ok(mut controls) = self.virtual_bus_controls.lock() {
+            controls.clear();
+        }
+        let virtual_bus_controls = self.virtual_bus_controls.clone();
+
         // Spawn the merge task that collects frames from all sources
         let merge_handle = tokio::spawn(async move {
             run_merge_task(
@@ -459,6 +483,7 @@ impl IODevice for MultiSourceReader {
                 rx,
                 tx,
                 transmit_channels,
+                virtual_bus_controls,
             )
             .await;
         });
@@ -526,6 +551,62 @@ impl IODevice for MultiSourceReader {
 
     fn device_type(&self) -> &'static str {
         "multi_source"
+    }
+
+    fn set_traffic_enabled(&mut self, enabled: bool) -> Result<(), String> {
+        let controls = self.virtual_bus_controls.lock()
+            .map_err(|e| format!("Failed to lock virtual bus controls: {}", e))?;
+        if controls.is_empty() {
+            return Err("No virtual bus controls available (no virtual sources)".to_string());
+        }
+        for ctrl in controls.values() {
+            ctrl.traffic_enabled.store(enabled, Ordering::Relaxed);
+        }
+        let state = if enabled { "ON" } else { "OFF" };
+        tlog!("[MultiSource:{}] Signal generator {} (all buses)", self.session_id, state);
+        Ok(())
+    }
+
+    fn set_bus_traffic_enabled(&mut self, bus: u8, enabled: bool) -> Result<(), String> {
+        let controls = self.virtual_bus_controls.lock()
+            .map_err(|e| format!("Failed to lock virtual bus controls: {}", e))?;
+        let ctrl = controls.get(&bus)
+            .ok_or_else(|| format!("No virtual bus control for bus {}", bus))?;
+        ctrl.traffic_enabled.store(enabled, Ordering::Relaxed);
+        let state = if enabled { "ON" } else { "OFF" };
+        tlog!("[MultiSource:{}] Signal generator {} (bus {})", self.session_id, state, bus);
+        Ok(())
+    }
+
+    fn set_bus_cadence(&mut self, bus: u8, frame_rate_hz: f64) -> Result<(), String> {
+        let hz = frame_rate_hz.clamp(0.1, 1000.0);
+        let interval_us = (1_000_000.0 / hz) as u64;
+        let controls = self.virtual_bus_controls.lock()
+            .map_err(|e| format!("Failed to lock virtual bus controls: {}", e))?;
+        let ctrl = controls.get(&bus)
+            .ok_or_else(|| format!("No virtual bus control for bus {}", bus))?;
+        ctrl.interval_us.store(interval_us, Ordering::Relaxed);
+        tlog!("[MultiSource:{}] Cadence set to {:.1} Hz (bus {})", self.session_id, hz, bus);
+        Ok(())
+    }
+
+    fn virtual_bus_states(&self) -> Result<Vec<VirtualBusState>, String> {
+        let controls = self.virtual_bus_controls.lock()
+            .map_err(|e| format!("Failed to lock virtual bus controls: {}", e))?;
+        if controls.is_empty() {
+            return Err("No virtual bus controls available (no virtual sources)".to_string());
+        }
+        let mut states: Vec<VirtualBusState> = controls.iter().map(|(&bus, ctrl)| {
+            let interval_us = ctrl.interval_us.load(Ordering::Relaxed) as f64;
+            let frame_rate_hz = if interval_us > 0.0 { 1_000_000.0 / interval_us } else { 0.0 };
+            VirtualBusState {
+                bus,
+                enabled: ctrl.traffic_enabled.load(Ordering::Relaxed),
+                frame_rate_hz,
+            }
+        }).collect();
+        states.sort_by_key(|s| s.bus);
+        Ok(states)
     }
 
     fn multi_source_configs(&self) -> Option<Vec<SourceConfig>> {

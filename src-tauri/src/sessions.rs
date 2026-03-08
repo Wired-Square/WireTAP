@@ -924,6 +924,37 @@ pub async fn set_virtual_traffic_enabled(
     set_session_traffic_enabled(&session_id, enabled).await
 }
 
+/// Enable or disable signal generator for a specific bus
+#[tauri::command(rename_all = "snake_case")]
+pub async fn set_virtual_bus_traffic_enabled(
+    session_id: String,
+    bus: u8,
+    enabled: bool,
+) -> Result<(), String> {
+    use crate::io::set_session_bus_traffic_enabled;
+    set_session_bus_traffic_enabled(&session_id, bus, enabled).await
+}
+
+/// Update signal generator cadence for a specific bus
+#[tauri::command(rename_all = "snake_case")]
+pub async fn set_virtual_bus_cadence(
+    session_id: String,
+    bus: u8,
+    frame_rate_hz: f64,
+) -> Result<(), String> {
+    use crate::io::set_session_bus_cadence;
+    set_session_bus_cadence(&session_id, bus, frame_rate_hz).await
+}
+
+/// Query per-bus signal generator states
+#[tauri::command(rename_all = "snake_case")]
+pub async fn get_virtual_bus_states(
+    session_id: String,
+) -> Result<Vec<crate::io::VirtualBusState>, String> {
+    use crate::io::get_session_virtual_bus_states;
+    get_session_virtual_bus_states(&session_id).await
+}
+
 /// Update time range for a reader session (only works when stopped)
 #[tauri::command(rename_all = "snake_case")]
 pub async fn update_reader_time_range(

@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 
 use super::spawner::run_source_reader;
 use super::types::{SourceConfig, TransmitChannels};
+use super::VirtualBusControls;
 use crate::buffer_store::{self, TimestampedByte};
 use crate::io::types::{RawBytesPayload, SourceMessage};
 use crate::io::{emit_device_connected, emit_frames, emit_session_error, emit_stream_ended, emit_to_session, FrameMessage};
@@ -33,6 +34,7 @@ pub(super) async fn run_merge_task(
     mut rx: mpsc::Receiver<SourceMessage>,
     tx: mpsc::Sender<SourceMessage>,
     transmit_channels: TransmitChannels,
+    virtual_bus_controls: VirtualBusControls,
 ) {
     use crate::settings;
 
@@ -83,6 +85,7 @@ pub(super) async fn run_merge_task(
         let modbus_role = source_config.modbus_role.clone();
         let max_register_errors = source_config.max_register_errors;
 
+        let virtual_bus_controls_clone = virtual_bus_controls.clone();
         let handle = tokio::spawn(async move {
             run_source_reader(
                 app_clone,
@@ -107,6 +110,7 @@ pub(super) async fn run_merge_task(
                 max_register_errors,
                 stop_flag_clone,
                 tx_clone,
+                virtual_bus_controls_clone,
             )
             .await;
         });

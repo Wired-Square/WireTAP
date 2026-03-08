@@ -422,6 +422,44 @@ export async function setVirtualTrafficEnabled(
   return invoke("set_virtual_traffic_enabled", { session_id: sessionId, enabled });
 }
 
+/** Per-bus signal generator state returned from the backend */
+export interface VirtualBusState {
+  bus: number;
+  enabled: boolean;
+  frame_rate_hz: number;
+}
+
+/**
+ * Enable or disable signal generator for a specific bus on a virtual device session.
+ */
+export async function setVirtualBusTrafficEnabled(
+  sessionId: string,
+  bus: number,
+  enabled: boolean
+): Promise<void> {
+  return invoke("set_virtual_bus_traffic_enabled", { session_id: sessionId, bus, enabled });
+}
+
+/**
+ * Update signal generator cadence (frame rate) for a specific bus.
+ */
+export async function setVirtualBusCadence(
+  sessionId: string,
+  bus: number,
+  frameRateHz: number
+): Promise<void> {
+  return invoke("set_virtual_bus_cadence", { session_id: sessionId, bus, frame_rate_hz: frameRateHz });
+}
+
+/**
+ * Query current per-bus signal generator states for a virtual device session.
+ */
+export async function getVirtualBusStates(
+  sessionId: string
+): Promise<VirtualBusState[]> {
+  return invoke("get_virtual_bus_states", { session_id: sessionId });
+}
+
 /**
  * Update playback speed for a reader session.
  * Only works for readers that support speed control (e.g., PostgreSQL).

@@ -14,7 +14,7 @@
 use async_trait::async_trait;
 use serde::Serialize;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 use tauri::AppHandle;
@@ -25,7 +25,7 @@ use crate::buffer_store::{self, BufferType, TimestampedByte};
 use crate::io::{
     emit_device_connected, emit_frames, emit_stream_ended, emit_to_session, now_us,
     CanTransmitFrame, FrameMessage, IOCapabilities, IODevice, IOState, InterfaceTraits, Protocol,
-    SessionDataStreams, TemporalMode, TransmitPayload, TransmitResult,
+    SessionDataStreams, TemporalMode, TransmitPayload, TransmitResult, VirtualBusState,
 };
 
 // ============================================================================
@@ -122,6 +122,8 @@ pub struct VirtualDeviceReader {
     cancel_flag: Arc<AtomicBool>,
     /// Per-bus signal generator enable flags (shared with background tasks)
     bus_traffic_flags: Vec<Arc<AtomicBool>>,
+    /// Per-bus cadence intervals in microseconds (shared with background tasks)
+    bus_cadence_intervals: Vec<Arc<AtomicU64>>,
     task_handles: Vec<tauri::async_runtime::JoinHandle<()>>,
     /// Sender into the loopback task (None if loopback is disabled)
     loopback_tx: std::sync::Mutex<Option<UnboundedSender<LoopbackMessage>>>,
@@ -134,6 +136,14 @@ impl VirtualDeviceReader {
             .iter()
             .map(|iface| Arc::new(AtomicBool::new(iface.signal_generator)))
             .collect();
+        let bus_cadence_intervals: Vec<Arc<AtomicU64>> = config
+            .interfaces
+            .iter()
+            .map(|iface| {
+                let hz = iface.frame_rate_hz.clamp(0.1, 1000.0);
+                Arc::new(AtomicU64::new((1_000_000.0 / hz) as u64))
+            })
+            .collect();
         Self {
             app,
             session_id,
@@ -141,6 +151,7 @@ impl VirtualDeviceReader {
             state: IOState::Stopped,
             cancel_flag: Arc::new(AtomicBool::new(false)),
             bus_traffic_flags,
+            bus_cadence_intervals,
             task_handles: Vec::new(),
             loopback_tx: std::sync::Mutex::new(None),
         }
@@ -285,6 +296,7 @@ impl IODevice for VirtualDeviceReader {
         // Spawn one generator task per bus interface
         for (idx, iface) in self.config.interfaces.iter().enumerate() {
             let traffic_flag = self.bus_traffic_flags[idx].clone();
+            let cadence_interval = self.bus_cadence_intervals[idx].clone();
             let handle = spawn_bus_generator(
                 self.app.clone(),
                 self.session_id.clone(),
@@ -292,6 +304,7 @@ impl IODevice for VirtualDeviceReader {
                 iface.clone(),
                 self.cancel_flag.clone(),
                 traffic_flag,
+                cadence_interval,
             );
             self.task_handles.push(handle);
         }
@@ -397,6 +410,38 @@ impl IODevice for VirtualDeviceReader {
         Ok(())
     }
 
+    fn set_bus_traffic_enabled(&mut self, bus: u8, enabled: bool) -> Result<(), String> {
+        let idx = self.config.interfaces.iter().position(|i| i.bus == bus)
+            .ok_or_else(|| format!("No virtual interface for bus {}", bus))?;
+        self.bus_traffic_flags[idx].store(enabled, Ordering::Relaxed);
+        let state = if enabled { "ON" } else { "OFF" };
+        tlog!("[Virtual:{}] Signal generator {} (bus {})", self.session_id, state, bus);
+        Ok(())
+    }
+
+    fn set_bus_cadence(&mut self, bus: u8, frame_rate_hz: f64) -> Result<(), String> {
+        let idx = self.config.interfaces.iter().position(|i| i.bus == bus)
+            .ok_or_else(|| format!("No virtual interface for bus {}", bus))?;
+        let hz = frame_rate_hz.clamp(0.1, 1000.0);
+        let interval_us = (1_000_000.0 / hz) as u64;
+        self.bus_cadence_intervals[idx].store(interval_us, Ordering::Relaxed);
+        tlog!("[Virtual:{}] Cadence set to {:.1} Hz (bus {})", self.session_id, hz, bus);
+        Ok(())
+    }
+
+    fn virtual_bus_states(&self) -> Result<Vec<VirtualBusState>, String> {
+        let states: Vec<VirtualBusState> = self.config.interfaces.iter().enumerate().map(|(i, iface)| {
+            let interval_us = self.bus_cadence_intervals[i].load(Ordering::Relaxed) as f64;
+            let frame_rate_hz = if interval_us > 0.0 { 1_000_000.0 / interval_us } else { 0.0 };
+            VirtualBusState {
+                bus: iface.bus,
+                enabled: self.bus_traffic_flags[i].load(Ordering::Relaxed),
+                frame_rate_hz,
+            }
+        }).collect();
+        Ok(states)
+    }
+
     fn state(&self) -> IOState {
         self.state.clone()
     }
@@ -441,11 +486,12 @@ fn spawn_bus_generator(
     iface: VirtualInterfaceConfig,
     cancel_flag: Arc<AtomicBool>,
     traffic_enabled: Arc<AtomicBool>,
+    cadence_interval_us: Arc<AtomicU64>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let hz = iface.frame_rate_hz.clamp(0.1, 1000.0);
-        let interval_us = (1_000_000.0 / hz) as u64;
-        let mut ticker = interval(Duration::from_micros(interval_us));
+        let mut current_interval_us = (1_000_000.0 / hz) as u64;
+        let mut ticker = interval(Duration::from_micros(current_interval_us));
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
         // Pre-compute CAN-FD patterns (heap-allocated, done once)
@@ -467,6 +513,16 @@ fn spawn_bus_generator(
 
             if cancel_flag.load(Ordering::Relaxed) {
                 break;
+            }
+
+            // Check if cadence changed at runtime
+            let new_interval_us = cadence_interval_us.load(Ordering::Relaxed);
+            if new_interval_us != current_interval_us {
+                current_interval_us = new_interval_us;
+                ticker = interval(Duration::from_micros(current_interval_us));
+                ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                // Consume the immediate first tick
+                ticker.tick().await;
             }
 
             // Only generate traffic if signal generator is enabled for this bus

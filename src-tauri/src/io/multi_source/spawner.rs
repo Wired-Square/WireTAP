@@ -3,7 +3,7 @@
 // Per-protocol source spawning for multi-source sessions.
 
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc as std_mpsc;
 use std::sync::Arc;
 use tauri::AppHandle;
@@ -25,6 +25,7 @@ use crate::io::serial::{parse_profile_for_source, run_source as run_serial_sourc
 use crate::io::slcan::run_slcan_source;
 use crate::io::types::{SourceMessage, TransmitRequest};
 use crate::settings::IOProfile;
+use super::{VirtualBusControl, VirtualBusControls};
 
 #[cfg(target_os = "linux")]
 use crate::io::socketcan::run_source as run_socketcan_source;
@@ -61,6 +62,7 @@ pub(super) async fn run_source_reader(
     _max_register_errors: Option<u32>,
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
+    virtual_bus_controls: VirtualBusControls,
 ) {
     match profile.kind.as_str() {
         "gvret_tcp" | "gvret-tcp" => {
@@ -105,7 +107,7 @@ pub(super) async fn run_source_reader(
             .await;
         }
         "virtual" => {
-            run_virtual_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await;
+            run_virtual_reader(source_idx, &profile, bus_mappings, stop_flag, tx, virtual_bus_controls).await;
         }
         "modbus_tcp" => {
             let role = _modbus_role.unwrap_or(ModbusRole::Client);
@@ -497,6 +499,7 @@ async fn run_virtual_reader(
     bus_mappings: Vec<BusMapping>,
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
+    virtual_bus_controls: VirtualBusControls,
 ) {
     use crate::io::virtual_device::{canfd_patterns, CAN_PATTERNS, MODBUS_REGISTERS};
 
@@ -627,11 +630,21 @@ async fn run_virtual_reader(
         Arc::new(Vec::new())
     };
 
-    // Spawn one generator task per bus interface
+    // Register per-bus controls in the shared map and spawn generator tasks for ALL buses
+    // (even disabled ones — they check the traffic_enabled flag on each tick)
     let mut gen_handles = Vec::new();
     for iface in &interfaces {
-        if !iface.signal_generator {
-            continue;
+        let hz = iface.frame_rate_hz;
+        let initial_interval_us = (1_000_000.0 / hz) as u64;
+        let traffic_enabled = Arc::new(AtomicBool::new(iface.signal_generator));
+        let interval_us_atomic = Arc::new(AtomicU64::new(initial_interval_us));
+
+        // Register in shared controls map so the session can modify at runtime
+        if let Ok(mut controls) = virtual_bus_controls.lock() {
+            controls.insert(iface.bus, VirtualBusControl {
+                traffic_enabled: traffic_enabled.clone(),
+                interval_us: interval_us_atomic.clone(),
+            });
         }
 
         let tx_clone = tx.clone();
@@ -639,12 +652,11 @@ async fn run_virtual_reader(
         let bus_mappings_clone = bus_mappings.clone();
         let canfd_pats_clone = canfd_pats.clone();
         let bus = iface.bus;
-        let hz = iface.frame_rate_hz;
         let traffic = traffic_type.to_string();
 
         let handle = tokio::spawn(async move {
-            let interval_us = (1_000_000.0 / hz) as u64;
-            let mut ticker = interval(Duration::from_micros(interval_us));
+            let mut current_interval_us = initial_interval_us;
+            let mut ticker = interval(Duration::from_micros(current_interval_us));
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
             // Map device bus to output bus
@@ -661,6 +673,21 @@ async fn run_virtual_reader(
 
                 if stop_clone.load(Ordering::Relaxed) {
                     break;
+                }
+
+                // Check if cadence changed at runtime
+                let new_interval_us = interval_us_atomic.load(Ordering::Relaxed);
+                if new_interval_us != current_interval_us {
+                    current_interval_us = new_interval_us;
+                    ticker = interval(Duration::from_micros(current_interval_us));
+                    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    // Consume the immediate first tick
+                    ticker.tick().await;
+                }
+
+                // Skip frame generation if signal generator is disabled for this bus
+                if !traffic_enabled.load(Ordering::Relaxed) {
+                    continue;
                 }
 
                 let ts = now_us();

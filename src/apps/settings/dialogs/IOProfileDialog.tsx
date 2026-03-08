@@ -742,13 +742,13 @@ export default function IOProfileDialog({
                   <Input
                     variant="default"
                     type="number"
-                    min="0.1"
+                    min="1"
                     max="1000"
-                    step="0.5"
+                    step="1"
                     value={iface.frame_rate_hz || "10"}
                     onChange={(e) => {
                       const interfaces = [...((profileForm.connection.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: 10 }]) as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[])];
-                      interfaces[idx] = { ...interfaces[idx], frame_rate_hz: e.target.value };
+                      interfaces[idx] = { ...interfaces[idx], frame_rate_hz: parseFloat(e.target.value) || 0 };
                       onUpdateConnectionField("interfaces", interfaces as any);
                     }}
                     placeholder="10"
