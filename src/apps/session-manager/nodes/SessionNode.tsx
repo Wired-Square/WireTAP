@@ -87,11 +87,29 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     ? "Error"
     : session.state;
 
+  const totalOutputHandles = outputCount + 1; // connected + one empty slot
+
   return (
     <div
       className={`px-4 py-3 rounded-lg border-2 ${borderColour} ${bgColour} min-w-[180px] shadow-lg`}
     >
-      {/* Main content with input/output handle columns */}
+      {/* Output handles on the right edge (same style as app input handle) */}
+      {Array.from({ length: totalOutputHandles }, (_, i) => (
+        <Handle
+          key={`out-${i}`}
+          id={`out-${i}`}
+          type="source"
+          position={Position.Right}
+          className={
+            i < outputCount
+              ? "!w-3 !h-3 !bg-green-500 !border-2 !border-green-300"
+              : "!w-3 !h-3 !bg-green-800 !border-2 !border-dashed !border-green-600 !opacity-40"
+          }
+          style={{ top: `${((i + 1) / (totalOutputHandles + 1)) * 100}%` }}
+        />
+      ))}
+
+      {/* Main content with input handle column */}
       <div className="flex gap-3">
         {/* Input bus handles (left column) */}
         <div className="flex flex-col gap-1 justify-center">
@@ -153,7 +171,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
             <div className="flex items-center gap-1">
               <Users className={iconXs} />
               <span>
-                {session.listenerCount} listener{session.listenerCount !== 1 ? "s" : ""}
+                {session.listenerCount} app{session.listenerCount !== 1 ? "s" : ""}
               </span>
             </div>
             {session.bufferFrameCount !== null && session.bufferFrameCount > 0 && (
@@ -162,29 +180,6 @@ function SessionNode({ data, selected }: SessionNodeProps) {
               </div>
             )}
             <div className="text-[10px] opacity-70">{session.deviceType === "buffer" ? "sqlite" : session.deviceType}</div>
-          </div>
-        </div>
-
-        {/* Output handles (right column) */}
-        <div className="flex flex-col gap-1 justify-center">
-          {listenerIds.map((_id, i) => (
-            <div key={i} className="flex items-center relative">
-              <Handle
-                id={`out-${i}`}
-                type="source"
-                position={Position.Right}
-                className="!w-3 !h-3 !bg-cyan-500 !border-2 !border-cyan-300 !relative !transform-none !top-0 !right-0"
-              />
-            </div>
-          ))}
-          {/* Extra empty output handle for new connections */}
-          <div className="flex items-center relative">
-            <Handle
-              id={`out-${outputCount}`}
-              type="source"
-              position={Position.Right}
-              className="!w-3 !h-3 !bg-cyan-800 !border-2 !border-dashed !border-cyan-600 !opacity-40 !relative !transform-none !top-0 !right-0"
-            />
           </div>
         </div>
       </div>

@@ -26,6 +26,14 @@ All notable changes to WireTAP will be documented in this file.
 
 - **CAN-FD protocol badge**: New cyan "CAN-FD" badge distinguishes CAN-FD profiles from standard CAN across the Data IO settings page. Applies to all device kinds that support FD: gs_usb, slcan, SocketCAN, GVRET, and virtual adapters.
 
+- **Visual tab app IDs**: Open session-aware panels now display their generated app ID (e.g., "graph_k3f7") in the Visual tab even before connecting to a session, matching the format of connected apps like "discovery_u6n2".
+
+- **Visual tab session connect**: Connecting a session to an app from the Visual tab (via drag-to-connect or the detail panel's Connect button) now actually joins the session instead of only focusing the app panel. The Sessions tab stays focused during the operation.
+
+- **Visual tab terminology**: Renamed "listener" to "app" throughout the Visual tab UI — node types, detail panel labels, and internal identifiers — since apps both receive and transmit on sessions.
+
+- **Session output handles**: Session node output handles now sit on the right edge of the node (matching the app node input handle style) instead of being inline in a flex column.
+
 ### Changed
 
 - **Unified config-aware protocol detection**: `getProfileTraits()` is now the single source of truth for profile protocol detection, reading `enable_fd` (slcan/gs_usb/SocketCAN), `interfaces[].protocol` (GVRET), `source_type` (PostgreSQL), and `traffic_type` (virtual) from connection config. `getReaderProtocols()` delegates to it instead of duplicating per-kind logic. Rust fallback traits aligned with TypeScript base defaults.

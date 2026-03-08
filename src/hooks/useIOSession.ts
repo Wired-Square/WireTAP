@@ -16,6 +16,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useSessionStore } from "../stores/sessionStore";
+import { useFocusStore } from "../stores/focusStore";
 import { tlog } from "../api/settings";
 
 // Generate unique listener instance IDs using random suffix.
@@ -369,6 +370,13 @@ export function useIOSession(
       onDestroyed,
     };
   }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onResuming, onDestroyed]);
+
+  // ---- Register listener ID with focusStore so Visual tab can display it ----
+  useEffect(() => {
+    const lid = listenerIdRef.current;
+    useFocusStore.getState().setListenerId(appName, lid);
+    return () => useFocusStore.getState().removeListenerId(appName);
+  }, [appName]);
 
   // ---- Query Backend + Set Up Event Listeners ----
   // This effect queries the backend for current state on mount/sessionId change,

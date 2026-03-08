@@ -21,8 +21,8 @@ import {
 import Dialog from "../../components/Dialog";
 import { useSettingsStore } from "../settings/stores/settingsStore";
 import { useFocusStore } from "../../stores/focusStore";
+import { useSessionStore } from "../../stores/sessionStore";
 import { useSessionManagerStore } from "./stores/sessionManagerStore";
-import { openPanel } from "../../utils/windowCommunication";
 import { useSessionLogStore } from "./stores/sessionLogStore";
 import { useSessionLogSubscription } from "./hooks/useSessionLogSubscription";
 import AppLayout from "../../components/AppLayout";
@@ -49,6 +49,7 @@ export default function SessionManager() {
 
   // Track which panels are currently open (for unconnected app nodes)
   const openPanelIds = useFocusStore((s) => s.openPanelIds);
+  const listenerIds = useFocusStore((s) => s.listenerIds);
 
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(
@@ -239,11 +240,10 @@ export default function SessionManager() {
     }
   }, [sessions, fetchSessions]);
 
-  // Connect an open app panel to a session
-  const handleConnectAppToSession = useCallback((_sessionId: string, appName: string) => {
-    // Ensure the panel is open and focused — the app's useIOSessionManager
-    // will handle session joining via the IO picker flow
-    openPanel(appName);
+  // Connect an open app panel to a session (without stealing focus)
+  const handleConnectAppToSession = useCallback((sessionId: string, appName: string) => {
+    // Request the app to auto-join the session (consumed by useIOSessionManager's pendingJoin effect)
+    useSessionStore.getState().requestSessionJoin(appName, sessionId);
   }, []);
 
   // Available profiles for add source dialog (realtime profiles not already in the session)
@@ -284,6 +284,7 @@ export default function SessionManager() {
                   sessions={sessions}
                   profiles={profiles}
                   openPanelIds={openPanelIds}
+                  listenerIds={listenerIds}
                   onEnableBusMapping={handleEnableBusMapping}
                   onCreateBusMapping={handleCreateBusMapping}
                   onConnectAppToSession={handleConnectAppToSession}

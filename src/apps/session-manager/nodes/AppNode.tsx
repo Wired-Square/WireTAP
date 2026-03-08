@@ -1,12 +1,12 @@
-// src/apps/session-manager/nodes/ListenerNode.tsx
+// src/apps/session-manager/nodes/AppNode.tsx
 
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { Search, Activity, Send, FileText, Calculator, DatabaseZap, Settings, BarChart3 } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
 
-export interface ListenerNodeData {
-  listenerId: string;
+export interface AppNodeData {
+  appId: string;
   appName: string;
   sessionId?: string;
   isActive: boolean;
@@ -26,13 +26,13 @@ const appConfig: Record<string, { icon: typeof Search; colour: string }> = {
   settings: { icon: Settings, colour: "text-orange-400" },
 };
 
-interface ListenerNodeProps {
-  data: ListenerNodeData;
+interface AppNodeProps {
+  data: AppNodeData;
   selected: boolean;
 }
 
-function ListenerNode({ data, selected }: ListenerNodeProps) {
-  const { listenerId, appName, isActive } = data;
+function AppNode({ data, selected }: AppNodeProps) {
+  const { appId, appName, isActive } = data;
 
   const config = appConfig[appName.toLowerCase()] || {
     icon: Search,
@@ -48,10 +48,10 @@ function ListenerNode({ data, selected }: ListenerNodeProps) {
 
   const bgColour = "bg-[var(--bg-surface)]";
 
-  // Format display name from listener ID
-  const displayName = listenerId.includes("-")
-    ? listenerId.split("-").slice(0, 2).join("-")
-    : listenerId;
+  // Format display name from app ID
+  const displayName = appId.includes("-")
+    ? appId.split("-").slice(0, 2).join("-")
+    : appId;
 
   return (
     <div
@@ -77,4 +77,4 @@ function ListenerNode({ data, selected }: ListenerNodeProps) {
   );
 }
 
-export default memo(ListenerNode);
+export default memo(AppNode);

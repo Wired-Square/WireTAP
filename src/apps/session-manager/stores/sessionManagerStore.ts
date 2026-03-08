@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 
-export type SelectedNodeType = "source" | "session" | "listener" | "edge" | null;
+export type SelectedNodeType = "source" | "session" | "app" | "edge" | null;
 
 export interface SelectedNode {
   id: string;

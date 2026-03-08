@@ -64,7 +64,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
         )}
       </div>
 
-      {/* Bus handles with labels inside the bubble */}
+      {/* Bus handles with labels */}
       {allBuses.length > 0 ? (
         <div className="mt-2 flex flex-col gap-1">
           {allBuses.map(({ bus, enabled }) => (

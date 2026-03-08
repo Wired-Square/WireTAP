@@ -74,13 +74,14 @@ export default function SessionDetailPanel({
       return <SourceDetails profile={profile} sessions={sessions} onRemoveSource={onRemoveSource} onDisableBusMapping={onDisableBusMapping} />;
     }
 
-    if (selectedNode.type === "listener") {
-      // Check if this is an unconnected app node (app::panelId)
-      if (selectedNode.id.startsWith("app::")) {
-        const appName = selectedNode.id.replace("app::", "");
+    if (selectedNode.type === "app") {
+      // Check if this is an unconnected app node (app::panelId — no session ID in the middle)
+      const parts = selectedNode.id.split("::");
+      if (parts.length === 2) {
+        const appName = parts[1];
         return <UnconnectedAppDetails appName={appName} sessions={sessions} onConnectApp={onConnectAppToSession} />;
       }
-      return <ListenerDetails nodeId={selectedNode.id} sessions={sessions} onEvict={onEvictListener} />;
+      return <AppDetails nodeId={selectedNode.id} sessions={sessions} onEvict={onEvictListener} />;
     }
 
     if (selectedNode.type === "edge") {
@@ -256,10 +257,10 @@ function SessionDetails({
         </div>
       )}
 
-      {/* Listeners */}
+      {/* Apps */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Listeners
+          Apps
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
           {session.listenerCount}
@@ -873,7 +874,7 @@ function EdgeDetails({
 
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-            Listener
+            App
           </label>
           <p className="text-sm text-[color:var(--text-primary)] font-mono">
             {listenerId}
@@ -994,9 +995,9 @@ function EdgeDetails({
   );
 }
 
-// Listener details sub-component
-function ListenerDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: ActiveSessionInfo[]; onEvict: (sessionId: string, listenerId: string) => void }) {
-  // Parse "listener::${sessionId}::${listenerId}"
+// Connected app details sub-component
+function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: ActiveSessionInfo[]; onEvict: (sessionId: string, listenerId: string) => void }) {
+  // Parse "app::${sessionId}::${listenerId}"
   const parts = nodeId.split("::");
   const sessionId = parts[1];
   const listenerId = parts[2];
@@ -1005,7 +1006,7 @@ function ListenerDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessio
   const listener = session?.listeners.find((l) => l.listener_id === listenerId);
 
   if (!listener) {
-    return <p className="text-sm text-[color:var(--text-muted)]">Listener not found</p>;
+    return <p className="text-sm text-[color:var(--text-muted)]">App not found</p>;
   }
 
   const formatUptime = (seconds: number): string => {
@@ -1016,10 +1017,10 @@ function ListenerDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessio
 
   return (
     <div className="space-y-4">
-      {/* Listener ID */}
+      {/* App ID */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Listener ID
+          App ID
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono">
           {listener.listener_id}

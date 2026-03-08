@@ -20,7 +20,7 @@ import "@xyflow/react/dist/style.css";
 
 import SourceNode from "../nodes/SourceNode";
 import SessionNode from "../nodes/SessionNode";
-import ListenerNode from "../nodes/ListenerNode";
+import AppNode from "../nodes/AppNode";
 import InterfaceEdge from "../edges/InterfaceEdge";
 import { buildSessionGraph, calculateFitViewPadding } from "../utils/layoutUtils";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
@@ -32,7 +32,7 @@ import type { IOProfile } from "../../../hooks/useSettings";
 const nodeTypes: NodeTypes = {
   source: SourceNode as any,
   session: SessionNode as any,
-  listener: ListenerNode as any,
+  app: AppNode as any,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,6 +44,7 @@ interface SessionCanvasProps {
   sessions: ActiveSessionInfo[];
   profiles: IOProfile[];
   openPanelIds?: string[];
+  listenerIds?: Record<string, string>;
   onEnableBusMapping?: (sessionId: string, profileId: string, deviceBus: number, outputBus: number) => void;
   onCreateBusMapping?: (sessionId: string, profileId: string, deviceBus: number, newOutputBus: number) => void;
   onConnectAppToSession?: (sessionId: string, appName: string) => void;
@@ -53,6 +54,7 @@ export default function SessionCanvas({
   sessions,
   profiles,
   openPanelIds,
+  listenerIds,
   onEnableBusMapping,
   onCreateBusMapping,
   onConnectAppToSession,
@@ -61,8 +63,8 @@ export default function SessionCanvas({
   const setSelectedNode = useSessionManagerStore((s) => s.setSelectedNode);
 
   const graphData = useMemo(
-    () => buildSessionGraph(sessions, profiles, undefined, openPanelIds),
-    [sessions, profiles, openPanelIds]
+    () => buildSessionGraph(sessions, profiles, undefined, openPanelIds, listenerIds),
+    [sessions, profiles, openPanelIds, listenerIds]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(graphData.nodes as Node[]);
@@ -113,7 +115,7 @@ export default function SessionCanvas({
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
-      setSelectedNode({ id: node.id, type: node.type as "source" | "session" | "listener" });
+      setSelectedNode({ id: node.id, type: node.type as "source" | "session" | "app" });
     },
     [setSelectedNode]
   );
@@ -257,7 +259,7 @@ export default function SessionCanvas({
             switch (node.type) {
               case "source": return "#a855f7";
               case "session": return "#06b6d4";
-              case "listener": return "#22c55e";
+              case "app": return "#22c55e";
               default: return "#6b7280";
             }
           }}
