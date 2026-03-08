@@ -2,6 +2,13 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **macOS code signing and notarisation**: Switched from Apple Development certificate to Developer ID Application certificate for GitHub releases. Added Apple notarisation so downloaded builds are trusted by Gatekeeper without manual overrides. Signing identity and team ID are now sourced from CI environment variables instead of being hardcoded in the Tauri config.
+- **Local notarisation scripts**: Added `notarise:build`, `notarise:history`, and `notarise:log` npm scripts for local signed builds and notarisation status checks. Added Apple signing placeholders to `.env.example`.
+
 ## [0.5.4] - 2026-03-07
 
 ### Added
@@ -18,10 +25,6 @@ All notable changes to WireTAP will be documented in this file.
 ### Improved
 
 - **CSV column auto-detection**: Unique roles (Frame ID, Timestamp, Sequence) are now deduplicated — if a column is already detected via header match, subsequent columns with similar content patterns are set to Ignore instead of producing duplicates.
-
-### Changed
-
-- **macOS code signing and notarisation**: Switched from Apple Development certificate to Developer ID Application certificate for GitHub releases. Added Apple notarisation so downloaded builds are trusted by Gatekeeper without manual overrides. Signing identity and team ID are now sourced from CI environment variables instead of being hardcoded in the Tauri config.
 
 ## [0.5.3] - 2026-03-07
 
