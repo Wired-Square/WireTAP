@@ -970,6 +970,33 @@ export async function removeSourceFromSession(
 }
 
 /**
+ * Update bus mappings for a source in a multi-source session.
+ * Hot-swaps the source by removing and re-adding it with updated mappings.
+ * If no mappings remain enabled, the source is removed entirely.
+ * @param sessionId The session ID
+ * @param profileId The profile ID of the source to update
+ * @param busMappings The updated bus mappings
+ * @returns Updated IOCapabilities for the session
+ */
+export async function updateSourceBusMappings(
+  sessionId: string,
+  profileId: string,
+  busMappings: BusMapping[],
+): Promise<IOCapabilities> {
+  return invoke("update_source_bus_mappings_cmd", {
+    session_id: sessionId,
+    profile_id: profileId,
+    bus_mappings: busMappings.map((m) => ({
+      device_bus: m.deviceBus,
+      enabled: m.enabled,
+      output_bus: m.outputBus,
+      interface_id: m.interfaceId,
+      traits: m.traits,
+    })),
+  });
+}
+
+/**
  * Get all listeners for a session.
  * Useful for debugging and for the frontend to understand session state.
  * @param sessionId The session ID

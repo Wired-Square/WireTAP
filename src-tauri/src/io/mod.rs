@@ -642,6 +642,12 @@ pub trait IODevice: Send + Sync {
         Err("This device does not support hot source remove".to_string())
     }
 
+    /// Update bus mappings for a source in a running multi-source session.
+    /// Hot-swaps the source by removing and re-adding it with updated mappings.
+    fn update_source_bus_mappings(&mut self, _profile_id: &str, _bus_mappings: Vec<gvret::BusMapping>) -> Result<(), String> {
+        Err("This device does not support bus mapping updates".to_string())
+    }
+
     /// Add a virtual bus generator to a running session.
     fn add_virtual_bus(&mut self, _bus: u8, _traffic_type: String, _frame_rate_hz: f64) -> Result<(), String> {
         Err("This device does not support virtual bus add".to_string())
@@ -2989,6 +2995,40 @@ pub async fn remove_source_from_session(
 
     tlog!(
         "[reader] Removed source '{}' from session '{}' (remaining sources: {:?})",
+        profile_id, session_id, session.source_names
+    );
+
+    Ok(capabilities)
+}
+
+/// Update bus mappings for a source in a multi-source session.
+/// Hot-swaps the source by removing and re-adding it with updated mappings.
+/// If no mappings are enabled, the source is removed entirely (unless it's the last source).
+pub async fn update_source_bus_mappings(
+    session_id: &str,
+    profile_id: &str,
+    bus_mappings: Vec<BusMapping>,
+) -> Result<IOCapabilities, String> {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    // Only multi-source sessions support this
+    session.device.multi_source_configs()
+        .ok_or_else(|| "Session does not support multi-source — cannot update bus mappings".to_string())?;
+
+    // Delegate to the device implementation (handles hot-swap internally)
+    session.device.update_source_bus_mappings(profile_id, bus_mappings)?;
+
+    // Rebuild source_names from current configs
+    if let Some(configs) = session.device.multi_source_configs() {
+        session.source_names = configs.iter().map(|c| c.display_name.clone()).collect();
+    }
+
+    let capabilities = session.device.capabilities();
+    tlog!(
+        "[reader] Updated bus mappings for source '{}' in session '{}' (sources: {:?})",
         profile_id, session_id, session.source_names
     );
 

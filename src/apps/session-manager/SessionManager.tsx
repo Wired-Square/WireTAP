@@ -15,6 +15,7 @@ import {
   evictSessionListener,
   addSourceToSession,
   removeSourceFromSession,
+  updateSourceBusMappings,
   type ActiveSessionInfo,
 } from "../../api/io";
 import Dialog from "../../components/Dialog";
@@ -166,6 +167,23 @@ export default function SessionManager() {
     }
   }, [fetchSessions]);
 
+  const handleDisableBusMapping = useCallback(async (sessionId: string, profileId: string, deviceBus: number) => {
+    const session = sessions.find((s) => s.sessionId === sessionId);
+    const config = session?.multiSourceConfigs?.find((c) => c.profileId === profileId);
+    if (!config) return;
+
+    const updatedMappings = config.busMappings.map((m) =>
+      m.deviceBus === deviceBus ? { ...m, enabled: false } : m
+    );
+
+    try {
+      await updateSourceBusMappings(sessionId, profileId, updatedMappings);
+      await fetchSessions();
+    } catch (error) {
+      console.error("[SessionManager] Failed to disable bus mapping:", error);
+    }
+  }, [sessions, fetchSessions]);
+
   // Available profiles for add source dialog (realtime profiles not already in the session)
   const addSourceSession = addSourceSessionId
     ? sessions.find((s) => s.sessionId === addSourceSessionId)
@@ -216,6 +234,7 @@ export default function SessionManager() {
               onEvictListener={handleEvictListener}
               onAddSource={handleAddSource}
               onRemoveSource={handleRemoveSource}
+              onDisableBusMapping={handleDisableBusMapping}
             />
           </div>
         )}

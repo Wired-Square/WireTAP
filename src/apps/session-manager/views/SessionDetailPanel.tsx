@@ -23,6 +23,7 @@ interface SessionDetailPanelProps {
   onEvictListener: (sessionId: string, listenerId: string) => void;
   onAddSource: (sessionId: string) => void;
   onRemoveSource: (sessionId: string, profileId: string) => void;
+  onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
 }
 
 export default function SessionDetailPanel({
@@ -36,6 +37,7 @@ export default function SessionDetailPanel({
   onEvictListener,
   onAddSource,
   onRemoveSource,
+  onDisableBusMapping,
 }: SessionDetailPanelProps) {
   const selectedNode = useSessionManagerStore((s) => s.selectedNode);
   const setSelectedNode = useSessionManagerStore((s) => s.setSelectedNode);
@@ -57,7 +59,7 @@ export default function SessionDetailPanel({
       const session = sessions.find((s) => s.sessionId === sessionId);
       if (!session) return <p className="text-sm text-[color:var(--text-muted)]">Session not found</p>;
 
-      return <SessionDetails session={session} profiles={profiles} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} />;
+      return <SessionDetails session={session} profiles={profiles} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} onDisableBusMapping={onDisableBusMapping} />;
     }
 
     if (selectedNode.type === "source") {
@@ -65,7 +67,7 @@ export default function SessionDetailPanel({
       const profile = profiles.find((p) => p.id === profileId);
       if (!profile) return <p className="text-sm text-[color:var(--text-muted)]">Profile not found</p>;
 
-      return <SourceDetails profile={profile} sessions={sessions} onRemoveSource={onRemoveSource} />;
+      return <SourceDetails profile={profile} sessions={sessions} onRemoveSource={onRemoveSource} onDisableBusMapping={onDisableBusMapping} />;
     }
 
     if (selectedNode.type === "listener") {
@@ -134,6 +136,7 @@ function SessionDetails({
   onResume,
   onDestroy,
   onAddSource,
+  onDisableBusMapping,
 }: {
   session: ActiveSessionInfo;
   profiles: IOProfile[];
@@ -143,6 +146,7 @@ function SessionDetails({
   onResume: (id: string) => void;
   onDestroy: (id: string) => void;
   onAddSource: (id: string) => void;
+  onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
 }) {
   const isRunning = session.state === "running";
   const isStopped = session.state === "stopped";
@@ -205,11 +209,27 @@ function SessionDetails({
                   </p>
                   {enabledMappings.length > 0 && (
                     <div className="ml-2 mt-0.5 space-y-0.5">
-                      {enabledMappings.map((m) => (
-                        <div key={`${m.deviceBus}-${m.outputBus}`} className="text-xs text-[color:var(--text-muted)] font-mono">
-                          bus{m.deviceBus} → bus{m.outputBus}
-                        </div>
-                      ))}
+                      {enabledMappings.map((m) => {
+                        // Don't show trash if this is the last enabled mapping on the last source
+                        const totalEnabledAcrossSources = session.multiSourceConfigs?.reduce(
+                          (sum, c) => sum + (c.busMappings.filter((b) => b.enabled).length), 0
+                        ) ?? 0;
+                        const canDisable = totalEnabledAcrossSources > 1;
+                        return (
+                          <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-[color:var(--text-muted)] font-mono">
+                            <span>bus{m.deviceBus} → bus{m.outputBus}</span>
+                            {canDisable && (
+                              <button
+                                onClick={() => onDisableBusMapping(session.sessionId, id, m.deviceBus)}
+                                className={`p-0.5 rounded ${iconButtonHoverDanger}`}
+                                title={`Remove bus${m.deviceBus} mapping`}
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -353,10 +373,11 @@ function SessionDetails({
 }
 
 // Source (profile) details sub-component
-function SourceDetails({ profile, sessions, onRemoveSource }: {
+function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping }: {
   profile: IOProfile;
   sessions: ActiveSessionInfo[];
   onRemoveSource: (sessionId: string, profileId: string) => void;
+  onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
 }) {
   // Find sessions that use this profile as a source
   const usingSessions = sessions.filter((s) => s.sourceProfileIds.includes(profile.id));
@@ -419,11 +440,26 @@ function SourceDetails({ profile, sessions, onRemoveSource }: {
                   <p className="text-xs text-[color:var(--text-muted)] font-mono">{s.sessionId}</p>
                 )}
                 <div className="ml-2 space-y-0.5">
-                  {enabledMappings.map((m) => (
-                    <div key={`${m.deviceBus}-${m.outputBus}`} className="text-xs text-[color:var(--text-primary)] font-mono">
-                      bus{m.deviceBus} → bus{m.outputBus}
-                    </div>
-                  ))}
+                  {enabledMappings.map((m) => {
+                    const totalEnabled = s.multiSourceConfigs?.reduce(
+                      (sum, c) => sum + (c.busMappings.filter((b) => b.enabled).length), 0
+                    ) ?? 0;
+                    const canDisable = totalEnabled > 1;
+                    return (
+                      <div key={`${m.deviceBus}-${m.outputBus}`} className="flex items-center gap-1 text-xs text-[color:var(--text-primary)] font-mono">
+                        <span>bus{m.deviceBus} → bus{m.outputBus}</span>
+                        {canDisable && (
+                          <button
+                            onClick={() => onDisableBusMapping(s.sessionId, profile.id, m.deviceBus)}
+                            className={`p-0.5 rounded ${iconButtonHoverDanger}`}
+                            title={`Remove bus${m.deviceBus} mapping`}
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

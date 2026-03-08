@@ -1045,6 +1045,7 @@ pub fn run() {
             sessions::evict_session_listener_cmd,
             sessions::add_source_to_session_cmd,
             sessions::remove_source_from_session_cmd,
+            sessions::update_source_bus_mappings_cmd,
             sessions::get_session_listener_list,
             sessions::reinitialize_session_if_safe_cmd,
             sessions::set_session_listener_active,

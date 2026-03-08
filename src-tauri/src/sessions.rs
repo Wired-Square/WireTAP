@@ -12,7 +12,7 @@ use crate::{
         reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_listener_active, start_session, stop_session,
         suspend_session, switch_to_buffer_replay, resume_to_live_session, transmit_frame, unregister_listener,
-        evict_session_listener, add_source_to_session, remove_source_from_session, get_session_source_count,
+        evict_session_listener, add_source_to_session, remove_source_from_session, update_source_bus_mappings, get_session_source_count,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IODevice, IOState,
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, BufferReader, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
@@ -1328,6 +1328,18 @@ pub async fn remove_source_from_session_cmd(
     }
 
     Ok(capabilities)
+}
+
+/// Update bus mappings for a source in a multi-source session.
+/// Hot-swaps the source by removing and re-adding it with updated mappings.
+/// If no mappings remain enabled, the source is removed entirely.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn update_source_bus_mappings_cmd(
+    session_id: String,
+    profile_id: String,
+    bus_mappings: Vec<BusMapping>,
+) -> Result<IOCapabilities, String> {
+    update_source_bus_mappings(&session_id, &profile_id, bus_mappings).await
 }
 
 /// Check if it's safe to reinitialize a session and do so if safe.

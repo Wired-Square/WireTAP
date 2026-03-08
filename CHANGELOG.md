@@ -12,7 +12,9 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Runtime signal generator controls**: Per-bus signal generator toggle and cadence (Hz) controls in the Source Details panel when a virtual adapter source is selected in the Visual tab. Changes take effect immediately without restarting the session. Includes add/remove bus and save-to-profile support.
 
-- **Per-bus visual graph edges**: The Visual tab now renders one edge per bus mapping instead of a single combined edge per source. Each bus has its own dot on the source and session nodes, making bus routing clearly traceable. Source and session detail panels also show per-source bus mappings.
+- **Per-bus visual graph edges**: The Visual tab now renders one edge per bus mapping instead of a single combined edge per source. Each bus has its own dot on the source and session nodes, making bus routing clearly traceable. Source and session detail panels also show per-source bus mappings with inline remove buttons.
+
+- **Bus mapping hot-update**: New `update_source_bus_mappings` Tauri command enables disabling individual bus mappings on a running session via hot-swap (remove + re-add source). The Session and Source detail panels expose per-mapping trash buttons; disabling the last mapping on a multi-source profile removes the source entirely.
 
 - **Hot source and bus add/remove**: Adding or removing sources from a running multi-source session no longer stops and restarts the entire session. New sources are spawned into the running merge task; removed sources are signalled to stop individually. Virtual bus generators can also be added and removed at runtime via the Source Details panel.
 

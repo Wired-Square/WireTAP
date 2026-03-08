@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 /// Capacity for the async frame/bytes channel between source readers and the merge task.
 const SOURCE_CHANNEL_CAPACITY: usize = 1024;
 
-use super::gvret::{encode_gvret_frame, validate_gvret_frame};
+use super::gvret::{encode_gvret_frame, validate_gvret_frame, BusMapping};
 #[cfg(not(target_os = "ios"))]
 use super::slcan::encode_transmit_frame as encode_slcan_frame;
 #[cfg(target_os = "linux")]
@@ -683,6 +683,35 @@ impl IODevice for MultiSourceReader {
             .map_err(|e| format!("Failed to send remove-source command: {}", e))?;
         // Update local configs
         self.sources.retain(|c| c.profile_id != profile_id);
+        Ok(())
+    }
+
+    fn update_source_bus_mappings(&mut self, profile_id: &str, bus_mappings: Vec<BusMapping>) -> Result<(), String> {
+        // Find the existing source config for this profile
+        let existing = self.sources.iter()
+            .find(|c| c.profile_id == profile_id)
+            .ok_or_else(|| format!("Profile '{}' is not a source in this session", profile_id))?
+            .clone();
+
+        let has_enabled = bus_mappings.iter().any(|m| m.enabled);
+
+        if !has_enabled {
+            // No enabled mappings — remove the source entirely
+            if self.sources.len() <= 1 {
+                return Err("Cannot disable all buses on the last source — destroy the session instead".to_string());
+            }
+            self.remove_source_hot(profile_id)?;
+            return Ok(());
+        }
+
+        // Build updated config with new bus mappings
+        let mut updated = existing;
+        updated.bus_mappings = bus_mappings;
+
+        // Hot-swap: remove then re-add with updated mappings
+        self.remove_source_hot(profile_id)?;
+        self.add_source_hot(updated)?;
+
         Ok(())
     }
 
