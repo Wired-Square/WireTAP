@@ -31,7 +31,7 @@ import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
 import { isBufferProfileId } from "../../hooks/useIOSessionManager";
 import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
-import { clearBuffer as clearBackendBuffer, getBufferMetadata, getBufferFramesPaginated, getBufferFramesPaginatedFiltered, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
+import { getBufferMetadata, getBufferFramesPaginated, getBufferFramesPaginatedFiltered, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
 import { WINDOW_EVENTS } from "../../events/registry";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import ToolboxDialog from "../../dialogs/ToolboxDialog";
@@ -346,7 +346,6 @@ export default function Discovery() {
     ioProfiles: settings?.io_profiles ?? [],
     store: { ioProfile, setIoProfile },
     enableIngest: true,
-    onBeforeIngestStart: clearBackendBuffer,
     onIngestComplete: handleIngestComplete,
     onFrames: handleFrames,
     onBytes: handleBytes,

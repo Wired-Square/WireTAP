@@ -16,7 +16,6 @@ import { mergeSerialConfigForWatch } from "../../utils/sessionConfigMerge";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { tlog } from "../../api/settings";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
-import { clearBuffer } from "../../api/buffer";
 import { UI_UPDATE_INTERVAL_MS, COPY_FEEDBACK_TIMEOUT_MS, REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
 import AppLayout from "../../components/AppLayout";
@@ -458,7 +457,6 @@ export default function Decoder() {
     ioProfiles: settings?.io_profiles ?? [],
     store: { ioProfile, setIoProfile },
     enableIngest: true,
-    onBeforeIngestStart: clearBuffer,
     onIngestComplete: handleIngestComplete,
     requireFrames: true,
     onFrames: handleFrames,

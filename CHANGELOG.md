@@ -46,6 +46,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **Removed legacy clear-all-buffers on ingest**: The Decoder, Discovery, and IO Source Picker no longer delete all non-persistent buffers before starting an ingest. The backend already handles buffer lifecycle by orphaning old buffers and creating fresh ones when a session starts. Old buffers now remain as orphaned buffers instead of being destroyed. Removed the `clear_buffer` Tauri command and related Rust/TypeScript functions.
+
 - **Unified config-aware protocol detection**: `getProfileTraits()` is now the single source of truth for profile protocol detection, reading `enable_fd` (slcan/gs_usb/SocketCAN), `interfaces[].protocol` (GVRET), `source_type` (PostgreSQL), and `traffic_type` (virtual) from connection config. `getReaderProtocols()` delegates to it instead of duplicating per-kind logic. Rust fallback traits aligned with TypeScript base defaults.
 
 - **Virtual adapter connection summary**: Virtual profiles in Data IO settings now show formatted summary badges (buses, loopback, signal generator status, rate) instead of raw JSON.

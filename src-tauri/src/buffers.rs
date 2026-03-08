@@ -297,12 +297,6 @@ pub async fn get_buffer_metadata() -> Result<Option<BufferMetadata>, String> {
     Ok(buffer_store::get_metadata())
 }
 
-/// Clear the shared buffer
-#[tauri::command(rename_all = "snake_case")]
-pub async fn clear_buffer() -> Result<(), String> {
-    buffer_store::clear_buffer()
-}
-
 /// Get all frames from the shared buffer
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_buffer_frames() -> Result<Vec<FrameMessage>, String> {

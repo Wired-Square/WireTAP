@@ -1071,7 +1071,6 @@ pub fn run() {
             buffers::import_csv_with_mapping,
             buffers::import_csv_batch_with_mapping,
             buffers::get_buffer_metadata,
-            buffers::clear_buffer,
             buffers::get_buffer_frames,
             buffers::get_buffer_frames_paginated,
             buffers::get_buffer_frames_paginated_filtered,

@@ -228,13 +228,6 @@ export async function getBufferMetadata(): Promise<BufferMetadata | null> {
 }
 
 /**
- * Clear the shared buffer.
- */
-export async function clearBuffer(): Promise<void> {
-  return invoke("clear_buffer");
-}
-
-/**
  * A single CAN frame from the buffer.
  */
 export interface BufferFrame {

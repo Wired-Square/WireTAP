@@ -21,7 +21,6 @@ import {
   listOrphanedBuffers,
   deleteBuffer,
   setActiveBuffer,
-  clearBuffer,
   type BufferMetadata,
 } from "../api/buffer";
 import { CsvColumnMapperDialog } from "./csv-column-mapper";
@@ -748,9 +747,6 @@ export default function IoSourcePickerDialog({
     internalLoadSessionIdRef.current = sessionId;
 
     try {
-      // Clear existing buffer first
-      await clearBuffer();
-
       // Set up event listeners for this session
       const unlistenStreamEnded = await listen<StreamEndedPayload>(
         `stream-ended:${sessionId}`,

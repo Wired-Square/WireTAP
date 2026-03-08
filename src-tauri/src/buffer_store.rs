@@ -293,30 +293,6 @@ pub fn delete_buffer(id: &str) -> Result<(), String> {
     }
 }
 
-/// Clear all non-persistent buffers. Persistent (pinned) buffers are preserved.
-pub fn clear_all_buffers() {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
-    registry.buffers.retain(|_, buf| buf.metadata.persistent);
-
-    // Clear active/streaming IDs if they pointed to a now-removed buffer
-    if let Some(ref id) = registry.active_id {
-        if !registry.buffers.contains_key(id) {
-            registry.active_id = None;
-        }
-    }
-    if let Some(ref id) = registry.streaming_id {
-        if !registry.buffers.contains_key(id) {
-            registry.streaming_id = None;
-        }
-    }
-    drop(registry);
-
-    if let Err(e) = buffer_db::delete_non_persistent_data() {
-        tlog!("[BufferStore] Failed to clear non-persistent buffer data from SQLite: {}", e);
-    }
-    tlog!("[BufferStore] Cleared all non-persistent buffers");
-}
-
 /// Get the active buffer ID.
 pub fn get_active_buffer_id() -> Option<String> {
     let registry = BUFFER_REGISTRY.read().unwrap();
@@ -1202,12 +1178,6 @@ pub fn get_frames() -> Vec<FrameMessage> {
 /// Check if any buffer has frame data (backward compat).
 pub fn has_data() -> bool {
     has_any_data()
-}
-
-/// Legacy clear_buffer (clears all buffers).
-pub fn clear_buffer() -> Result<(), String> {
-    clear_all_buffers();
-    Ok(())
 }
 
 /// Get paginated frames from the active buffer (or first frame buffer as fallback).

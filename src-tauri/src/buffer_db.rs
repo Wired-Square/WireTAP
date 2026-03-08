@@ -657,41 +657,6 @@ pub fn delete_buffer_data(buffer_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Delete all non-persistent data from all tables (frames, bytes, and metadata).
-/// Persistent (pinned) buffers and their data are preserved.
-pub fn delete_non_persistent_data() -> Result<(), String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-
-    // Delete frames/bytes belonging to non-persistent buffers
-    conn.execute(
-        "DELETE FROM frames WHERE buffer_id IN (SELECT buffer_id FROM buffer_metadata WHERE persistent = 0)",
-        [],
-    )
-    .map_err(|e| format!("Failed to delete non-persistent frames: {}", e))?;
-    conn.execute(
-        "DELETE FROM bytes WHERE buffer_id IN (SELECT buffer_id FROM buffer_metadata WHERE persistent = 0)",
-        [],
-    )
-    .map_err(|e| format!("Failed to delete non-persistent bytes: {}", e))?;
-    conn.execute("DELETE FROM buffer_metadata WHERE persistent = 0", [])
-        .map_err(|e| format!("Failed to delete non-persistent buffer metadata: {}", e))?;
-
-    // Also delete orphaned data (frames/bytes with no metadata row at all)
-    conn.execute(
-        "DELETE FROM frames WHERE buffer_id NOT IN (SELECT buffer_id FROM buffer_metadata)",
-        [],
-    )
-    .map_err(|e| format!("Failed to delete orphaned frames: {}", e))?;
-    conn.execute(
-        "DELETE FROM bytes WHERE buffer_id NOT IN (SELECT buffer_id FROM buffer_metadata)",
-        [],
-    )
-    .map_err(|e| format!("Failed to delete orphaned bytes: {}", e))?;
-
-    Ok(())
-}
-
 /// Clear and refill a buffer with new frames (used by framing to reuse buffer IDs).
 pub fn clear_and_refill(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
     let mut guard = DB.lock().unwrap();
