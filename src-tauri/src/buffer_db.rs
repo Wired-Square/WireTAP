@@ -657,17 +657,37 @@ pub fn delete_buffer_data(buffer_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Delete all data from all tables (frames, bytes, and metadata).
-pub fn delete_all_data() -> Result<(), String> {
+/// Delete all non-persistent data from all tables (frames, bytes, and metadata).
+/// Persistent (pinned) buffers and their data are preserved.
+pub fn delete_non_persistent_data() -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
-    conn.execute("DELETE FROM frames", [])
-        .map_err(|e| format!("Failed to delete frames: {}", e))?;
-    conn.execute("DELETE FROM bytes", [])
-        .map_err(|e| format!("Failed to delete bytes: {}", e))?;
-    conn.execute("DELETE FROM buffer_metadata", [])
-        .map_err(|e| format!("Failed to delete buffer metadata: {}", e))?;
+    // Delete frames/bytes belonging to non-persistent buffers
+    conn.execute(
+        "DELETE FROM frames WHERE buffer_id IN (SELECT buffer_id FROM buffer_metadata WHERE persistent = 0)",
+        [],
+    )
+    .map_err(|e| format!("Failed to delete non-persistent frames: {}", e))?;
+    conn.execute(
+        "DELETE FROM bytes WHERE buffer_id IN (SELECT buffer_id FROM buffer_metadata WHERE persistent = 0)",
+        [],
+    )
+    .map_err(|e| format!("Failed to delete non-persistent bytes: {}", e))?;
+    conn.execute("DELETE FROM buffer_metadata WHERE persistent = 0", [])
+        .map_err(|e| format!("Failed to delete non-persistent buffer metadata: {}", e))?;
+
+    // Also delete orphaned data (frames/bytes with no metadata row at all)
+    conn.execute(
+        "DELETE FROM frames WHERE buffer_id NOT IN (SELECT buffer_id FROM buffer_metadata)",
+        [],
+    )
+    .map_err(|e| format!("Failed to delete orphaned frames: {}", e))?;
+    conn.execute(
+        "DELETE FROM bytes WHERE buffer_id NOT IN (SELECT buffer_id FROM buffer_metadata)",
+        [],
+    )
+    .map_err(|e| format!("Failed to delete orphaned bytes: {}", e))?;
 
     Ok(())
 }

@@ -293,18 +293,28 @@ pub fn delete_buffer(id: &str) -> Result<(), String> {
     }
 }
 
-/// Clear all buffers.
+/// Clear all non-persistent buffers. Persistent (pinned) buffers are preserved.
 pub fn clear_all_buffers() {
     let mut registry = BUFFER_REGISTRY.write().unwrap();
-    registry.buffers.clear();
-    registry.active_id = None;
-    registry.streaming_id = None;
+    registry.buffers.retain(|_, buf| buf.metadata.persistent);
+
+    // Clear active/streaming IDs if they pointed to a now-removed buffer
+    if let Some(ref id) = registry.active_id {
+        if !registry.buffers.contains_key(id) {
+            registry.active_id = None;
+        }
+    }
+    if let Some(ref id) = registry.streaming_id {
+        if !registry.buffers.contains_key(id) {
+            registry.streaming_id = None;
+        }
+    }
     drop(registry);
 
-    if let Err(e) = buffer_db::delete_all_data() {
-        tlog!("[BufferStore] Failed to clear all buffer data from SQLite: {}", e);
+    if let Err(e) = buffer_db::delete_non_persistent_data() {
+        tlog!("[BufferStore] Failed to clear non-persistent buffer data from SQLite: {}", e);
     }
-    tlog!("[BufferStore] Cleared all buffers");
+    tlog!("[BufferStore] Cleared all non-persistent buffers");
 }
 
 /// Get the active buffer ID.
