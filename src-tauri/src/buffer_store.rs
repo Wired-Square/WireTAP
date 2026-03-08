@@ -63,6 +63,9 @@ pub struct BufferMetadata {
     /// When a session is destroyed, the buffer is orphaned (owning_session_id = None).
     #[serde(default)]
     pub owning_session_id: Option<String>,
+    /// Whether this buffer survives app restart when 'clear buffers on start' is enabled.
+    #[serde(default)]
+    pub persistent: bool,
 }
 
 // ============================================================================
@@ -148,6 +151,7 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
         created_at,
         is_streaming: false,
         owning_session_id: None,
+        persistent: false,
     };
 
     let buffer = NamedBuffer { metadata: metadata.clone() };
@@ -333,6 +337,27 @@ pub fn rename_buffer(id: &str, new_name: &str) -> Result<BufferMetadata, String>
     }
 
     tlog!("[BufferStore] Renamed buffer '{}' to '{}'", id, new_name);
+    Ok(meta)
+}
+
+/// Set a buffer's persistent flag.
+/// Persistent buffers survive app restart when 'clear buffers on start' is enabled.
+pub fn set_buffer_persistent(id: &str, persistent: bool) -> Result<BufferMetadata, String> {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    let buffer = registry.buffers.get_mut(id)
+        .ok_or_else(|| format!("Buffer '{}' not found", id))?;
+
+    buffer.metadata.persistent = persistent;
+    let meta = buffer.metadata.clone();
+
+    // Drop registry lock before touching SQLite
+    drop(registry);
+
+    if let Err(e) = buffer_db::update_buffer_persistent(id, persistent) {
+        tlog!("[BufferStore] Failed to persist buffer persistent flag: {}", e);
+    }
+
+    tlog!("[BufferStore] Set buffer '{}' persistent={}", id, persistent);
     Ok(meta)
 }
 
@@ -558,6 +583,7 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
             created_at,
             is_streaming: false,
             owning_session_id: None,
+            persistent: false,
         };
 
         let buffer = NamedBuffer { metadata: metadata.clone() };

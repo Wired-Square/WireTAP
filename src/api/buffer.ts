@@ -37,6 +37,8 @@ export interface BufferMetadata {
    * When a session is destroyed, the buffer is orphaned.
    */
   owning_session_id: string | null;
+  /** Whether this buffer survives app restart when 'clear buffers on start' is enabled */
+  persistent: boolean;
 }
 
 /**
@@ -443,6 +445,18 @@ export async function deleteBuffer(bufferId: string): Promise<void> {
  */
 export async function renameBuffer(bufferId: string, newName: string): Promise<BufferMetadata> {
   return invoke("rename_buffer", { buffer_id: bufferId, new_name: newName });
+}
+
+/**
+ * Set a buffer's persistent (pinned) flag.
+ * Persistent buffers survive app restart when 'clear buffers on start' is enabled.
+ *
+ * @param bufferId - The buffer ID
+ * @param persistent - Whether the buffer should be persistent
+ * @returns Updated buffer metadata
+ */
+export async function setBufferPersistent(bufferId: string, persistent: boolean): Promise<BufferMetadata> {
+  return invoke("set_buffer_persistent", { buffer_id: bufferId, persistent });
 }
 
 /**

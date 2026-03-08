@@ -78,21 +78,46 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
     conn.execute_batch(SCHEMA_SQL)
         .map_err(|e| format!("Failed to create schema: {}", e))?;
 
+    // Schema migration: add persistent column (idempotent — ignores duplicate column error)
+    let _ = conn.execute(
+        "ALTER TABLE buffer_metadata ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
+
     // Conditionally clear leftover data and reclaim disk space
+    // Persistent (pinned) buffers survive the clear.
     if clear_on_start {
         // The database file persists WAL mode from the previous session.
         // VACUUM cannot shrink a WAL-mode database, so switch to DELETE mode first.
         conn.execute_batch("PRAGMA journal_mode=DELETE;")
             .map_err(|e| format!("Failed to switch to DELETE journal mode: {}", e))?;
-        conn.execute("DELETE FROM frames", [])
-            .map_err(|e| format!("Failed to clear frames: {}", e))?;
-        conn.execute("DELETE FROM bytes", [])
-            .map_err(|e| format!("Failed to clear bytes: {}", e))?;
-        conn.execute("DELETE FROM buffer_metadata", [])
-            .map_err(|e| format!("Failed to clear buffer metadata: {}", e))?;
+        // Delete frames/bytes belonging to non-persistent buffers
+        conn.execute(
+            "DELETE FROM frames WHERE buffer_id IN (SELECT buffer_id FROM buffer_metadata WHERE persistent = 0)",
+            [],
+        )
+        .map_err(|e| format!("Failed to clear non-persistent frames: {}", e))?;
+        conn.execute(
+            "DELETE FROM bytes WHERE buffer_id IN (SELECT buffer_id FROM buffer_metadata WHERE persistent = 0)",
+            [],
+        )
+        .map_err(|e| format!("Failed to clear non-persistent bytes: {}", e))?;
+        conn.execute("DELETE FROM buffer_metadata WHERE persistent = 0", [])
+            .map_err(|e| format!("Failed to clear non-persistent buffer metadata: {}", e))?;
+        // Also delete orphaned data (frames/bytes with no metadata row at all)
+        conn.execute(
+            "DELETE FROM frames WHERE buffer_id NOT IN (SELECT buffer_id FROM buffer_metadata)",
+            [],
+        )
+        .map_err(|e| format!("Failed to clear orphaned frames: {}", e))?;
+        conn.execute(
+            "DELETE FROM bytes WHERE buffer_id NOT IN (SELECT buffer_id FROM buffer_metadata)",
+            [],
+        )
+        .map_err(|e| format!("Failed to clear orphaned bytes: {}", e))?;
         conn.execute_batch("VACUUM;")
             .map_err(|e| format!("Failed to vacuum database: {}", e))?;
-        tlog!("[buffer_db] Initialised at {:?} (cleared and vacuumed)", db_path);
+        tlog!("[buffer_db] Initialised at {:?} (cleared non-persistent and vacuumed)", db_path);
     } else {
         tlog!("[buffer_db] Initialised at {:?} (preserving previous data)", db_path);
     }
@@ -1178,8 +1203,8 @@ pub fn save_buffer_metadata(meta: &BufferMetadata) -> Result<(), String> {
     };
 
     conn.execute(
-        "INSERT OR REPLACE INTO buffer_metadata (buffer_id, buffer_type, name, count, start_time_us, end_time_us, created_at, owning_session_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT OR REPLACE INTO buffer_metadata (buffer_id, buffer_type, name, count, start_time_us, end_time_us, created_at, owning_session_id, persistent)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             &meta.id,
             type_str,
@@ -1189,6 +1214,7 @@ pub fn save_buffer_metadata(meta: &BufferMetadata) -> Result<(), String> {
             meta.end_time_us.map(|v| v as i64),
             meta.created_at as i64,
             &meta.owning_session_id,
+            meta.persistent as i64,
         ],
     )
     .map_err(|e| format!("Failed to save buffer metadata: {}", e))?;
@@ -1202,7 +1228,7 @@ pub fn load_all_buffer_metadata() -> Result<Vec<BufferMetadata>, String> {
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     let mut stmt = conn
-        .prepare("SELECT buffer_id, buffer_type, name, count, start_time_us, end_time_us, created_at, owning_session_id FROM buffer_metadata")
+        .prepare("SELECT buffer_id, buffer_type, name, count, start_time_us, end_time_us, created_at, owning_session_id, persistent FROM buffer_metadata")
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
@@ -1224,6 +1250,7 @@ pub fn load_all_buffer_metadata() -> Result<Vec<BufferMetadata>, String> {
                 created_at: row.get::<_, i64>("created_at")? as u64,
                 is_streaming: false,
                 owning_session_id: row.get("owning_session_id")?,
+                persistent: row.get::<_, i64>("persistent").unwrap_or(0) != 0,
             })
         })
         .map_err(|e| format!("Failed to query: {}", e))?;
@@ -1245,6 +1272,20 @@ pub fn update_buffer_name(buffer_id: &str, new_name: &str) -> Result<(), String>
         params![buffer_id, new_name],
     )
     .map_err(|e| format!("Failed to update buffer name: {}", e))?;
+
+    Ok(())
+}
+
+/// Update the persistent flag of a buffer in SQLite.
+pub fn update_buffer_persistent(buffer_id: &str, persistent: bool) -> Result<(), String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    conn.execute(
+        "UPDATE buffer_metadata SET persistent = ?2 WHERE buffer_id = ?1",
+        params![buffer_id, persistent as i64],
+    )
+    .map_err(|e| format!("Failed to update buffer persistent flag: {}", e))?;
 
     Ok(())
 }

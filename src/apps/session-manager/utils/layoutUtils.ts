@@ -30,15 +30,23 @@ export interface SessionGraphData {
   edges: Edge[];
 }
 
+/** Buffer metadata for source node display */
+export interface BufferInfo {
+  name: string;
+  persistent: boolean;
+  count: number;
+  bufferType: string;
+}
+
 /**
  * Transform session data into React Flow nodes and edges.
- * @param bufferNames Optional map of buffer_id → display name for buffer source nodes.
+ * @param bufferInfoMap Optional map of buffer_id → metadata for buffer source nodes.
  * @param openPanelIds IDs of currently open Dockview panels (used for unconnected app nodes).
  */
 export function buildSessionGraph(
   sessions: ActiveSessionInfo[],
   profiles: IOProfile[],
-  bufferNames?: Map<string, string>,
+  bufferInfoMap?: Map<string, BufferInfo>,
   openPanelIds?: string[],
   listenerIds?: Record<string, string>,
 ): SessionGraphData {
@@ -124,12 +132,17 @@ export function buildSessionGraph(
   );
   bufferSourceIds.forEach((bufferId, i) => {
     const index = activeProfiles.length + i;
+    const info = bufferInfoMap?.get(bufferId);
     const nodeData: SourceNodeData = {
       profileId: bufferId,
-      profileName: bufferNames?.get(bufferId) ?? bufferId,
+      profileName: info?.name ?? bufferId,
       deviceType: "sqlite",
       isRealtime: false,
       isActive: true,
+      bufferName: info?.name,
+      isPersistent: info?.persistent,
+      bufferCount: info?.count,
+      bufferType: info?.bufferType,
     };
     nodes.push({
       id: `source-${bufferId}`,

@@ -1393,6 +1393,7 @@ export default function IoSourcePickerDialog({
                 onDeleteBuffer={handleDeleteBuffer}
                 onClearAllBuffers={handleClearAllBuffers}
                 onBufferRenamed={() => listOrphanedBuffers().then(setBuffers).catch(console.error)}
+                onBufferPersistenceChanged={() => listOrphanedBuffers().then(setBuffers).catch(console.error)}
                 activeSessionBufferMap={new Map(
                   activeMultiSourceSessions
                     .filter((s) => s.deviceType === "buffer")

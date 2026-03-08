@@ -3,13 +3,13 @@
 // Shows buffers available for replay (from completed sessions or CSV imports).
 
 import { useState, useRef, useEffect } from "react";
-import { Check, FileText, Trash2, Archive, Pencil, Database } from "lucide-react";
+import { Check, FileText, Trash2, Archive, Pencil, Database, Pin, PinOff } from "lucide-react";
 import { iconMd, iconSm, iconXs } from "../../styles/spacing";
 import { badgeSmallInfo } from "../../styles/badgeStyles";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
 import type { BufferMetadata } from "../../api/buffer";
-import { renameBuffer } from "../../api/buffer";
+import { renameBuffer, setBufferPersistent } from "../../api/buffer";
 
 type Props = {
   buffers: BufferMetadata[];
@@ -22,6 +22,8 @@ type Props = {
   onClearAllBuffers: () => void;
   /** Called after a buffer is renamed so the parent can refresh */
   onBufferRenamed?: () => void;
+  /** Called after a buffer's persistent flag is toggled so the parent can refresh */
+  onBufferPersistenceChanged?: () => void;
   /** Map of buffer ID to session ID for buffers owned by active sessions */
   activeSessionBufferMap?: Map<string, string>;
 };
@@ -35,6 +37,7 @@ export default function BufferList({
   onDeleteBuffer,
   onClearAllBuffers,
   onBufferRenamed,
+  onBufferPersistenceChanged,
   activeSessionBufferMap = new Map(),
 }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -70,6 +73,16 @@ export default function BufferList({
 
   const cancelRename = () => {
     setRenamingId(null);
+  };
+
+  const togglePersistent = async (buffer: BufferMetadata, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await setBufferPersistent(buffer.id, !buffer.persistent);
+      onBufferPersistenceChanged?.();
+    } catch (err) {
+      console.error("[BufferList] Failed to toggle persistence:", err);
+    }
   };
 
   if (buffers.length === 0) {
@@ -143,7 +156,7 @@ export default function BufferList({
                   />
                 ) : (
                   <div className={`${textMedium} truncate`}>
-                    {buffer.buffer_type === "bytes" ? "Bytes" : "Frames"}: {buffer.name}
+                    {buffer.name}
                   </div>
                 )}
                 <div className={`${caption} flex items-center gap-2`}>
@@ -155,6 +168,11 @@ export default function BufferList({
                   </span>
                   {isInSession && (
                     <span className={badgeSmallInfo}>{sessionId}</span>
+                  )}
+                  {buffer.persistent && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)]">
+                      pinned
+                    </span>
                   )}
                 </div>
               </div>
@@ -170,6 +188,17 @@ export default function BufferList({
                 title="Rename buffer"
               >
                 <Pencil className={iconSm} />
+              </button>
+              <button
+                onClick={(e) => togglePersistent(buffer, e)}
+                className={`p-1 rounded transition-colors hover:bg-[var(--hover-bg)] ${
+                  buffer.persistent
+                    ? "text-[color:var(--status-warning-text)]"
+                    : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                }`}
+                title={buffer.persistent ? "Unpin buffer (will be cleared on restart)" : "Pin buffer (survives restart)"}
+              >
+                {buffer.persistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
               </button>
               <button
                 onClick={(e) => {

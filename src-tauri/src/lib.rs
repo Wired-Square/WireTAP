@@ -900,10 +900,9 @@ pub fn run() {
                     tlog!("[setup] Failed to initialise transmit history database: {}", e);
                 }
 
-                // Hydrate the buffer registry from SQLite when not clearing on start
-                if !clear_on_start {
-                    buffer_store::hydrate_from_db();
-                }
+                // Hydrate the buffer registry from SQLite.
+                // Always called — persistent (pinned) buffers may survive clear_on_start.
+                buffer_store::hydrate_from_db();
             }
 
             // Restore dashboard window geometry from persisted state (desktop only).
@@ -1095,6 +1094,7 @@ pub fn run() {
             buffers::get_buffer_bytes_paginated_by_id,
             buffers::find_buffer_bytes_offset_for_timestamp,
             buffers::rename_buffer,
+            buffers::set_buffer_persistent,
             // Session-aware buffer API
             buffers::list_orphaned_buffers,
             // Backend framing

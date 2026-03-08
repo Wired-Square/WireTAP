@@ -537,6 +537,13 @@ pub async fn rename_buffer(buffer_id: String, new_name: String) -> Result<Buffer
     buffer_store::rename_buffer(&buffer_id, &new_name)
 }
 
+/// Set a buffer's persistent flag.
+/// Persistent buffers survive app restart when 'clear buffers on start' is enabled.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn set_buffer_persistent(buffer_id: String, persistent: bool) -> Result<BufferMetadata, String> {
+    buffer_store::set_buffer_persistent(&buffer_id, persistent)
+}
+
 /// List only orphaned buffers (no owning session).
 /// These are buffers available for standalone selection in the IO picker.
 /// Includes CSV imports and buffers from destroyed sessions.

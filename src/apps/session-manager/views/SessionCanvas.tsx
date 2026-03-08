@@ -1,6 +1,6 @@
 // src/apps/session-manager/views/SessionCanvas.tsx
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -22,10 +22,11 @@ import SourceNode from "../nodes/SourceNode";
 import SessionNode from "../nodes/SessionNode";
 import AppNode from "../nodes/AppNode";
 import InterfaceEdge from "../edges/InterfaceEdge";
-import { buildSessionGraph, calculateFitViewPadding } from "../utils/layoutUtils";
+import { buildSessionGraph, calculateFitViewPadding, type BufferInfo } from "../utils/layoutUtils";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import type { ActiveSessionInfo } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
+import { listBuffers } from "../../../api/buffer";
 
 // Register custom node and edge types
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,9 +63,28 @@ export default function SessionCanvas({
   const { fitView } = useReactFlow();
   const setSelectedNode = useSessionManagerStore((s) => s.setSelectedNode);
 
+  // Fetch buffer metadata for source node display
+  const [bufferInfoMap, setBufferInfoMap] = useState<Map<string, BufferInfo>>(new Map());
+  useEffect(() => {
+    listBuffers()
+      .then((buffers) => {
+        const map = new Map<string, BufferInfo>();
+        for (const b of buffers) {
+          map.set(b.id, {
+            name: b.name,
+            persistent: b.persistent,
+            count: b.count,
+            bufferType: b.buffer_type,
+          });
+        }
+        setBufferInfoMap(map);
+      })
+      .catch(console.error);
+  }, [sessions]);
+
   const graphData = useMemo(
-    () => buildSessionGraph(sessions, profiles, undefined, openPanelIds, listenerIds),
-    [sessions, profiles, openPanelIds, listenerIds]
+    () => buildSessionGraph(sessions, profiles, bufferInfoMap, openPanelIds, listenerIds),
+    [sessions, profiles, bufferInfoMap, openPanelIds, listenerIds]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(graphData.nodes as Node[]);

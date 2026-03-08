@@ -2,8 +2,8 @@
 
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
-import { Wifi, Database, Radio } from "lucide-react";
-import { iconSm } from "../../../styles/spacing";
+import { Wifi, Database, Radio, Pin } from "lucide-react";
+import { iconSm, iconXs } from "../../../styles/spacing";
 
 export interface SourceNodeData {
   profileId: string;
@@ -15,6 +15,14 @@ export interface SourceNodeData {
   outputBuses?: number[];
   /** Device bus numbers with disabled mappings (shown as muted handles) */
   disabledBuses?: number[];
+  /** Buffer display name (when source is a buffer) */
+  bufferName?: string;
+  /** Whether this buffer is pinned (persistent across restarts) */
+  isPersistent?: boolean;
+  /** Number of items in the buffer */
+  bufferCount?: number;
+  /** Buffer data type ("frames" or "bytes") */
+  bufferType?: string;
 }
 
 interface SourceNodeProps {
@@ -23,7 +31,7 @@ interface SourceNodeProps {
 }
 
 function SourceNode({ data, selected }: SourceNodeProps) {
-  const { profileName, deviceType, isRealtime, isActive, outputBuses, disabledBuses } = data;
+  const { profileName, deviceType, isRealtime, isActive, outputBuses, disabledBuses, bufferName, isPersistent, bufferCount, bufferType } = data;
   // Merge enabled + disabled buses for handle layout (disabled shown as muted)
   const allBuses = [
     ...(outputBuses ?? []).map((b) => ({ bus: b, enabled: true })),
@@ -52,17 +60,25 @@ function SourceNode({ data, selected }: SourceNodeProps) {
       <div className="flex items-center gap-2 mb-1">
         <Icon className={`${iconSm} ${iconColour}`} />
         <span className="font-medium text-sm text-[color:var(--text-primary)] truncate">
-          {profileName}
+          {bufferName || profileName}
         </span>
+        {isPersistent && (
+          <Pin className={`${iconXs} text-amber-400 flex-shrink-0`} />
+        )}
       </div>
 
-      {/* Device type */}
+      {/* Device type + buffer info */}
       <div className="text-xs text-[color:var(--text-muted)] flex items-center gap-1">
         <span>{deviceType}</span>
         {isActive && (
           <Radio className="w-3 h-3 text-purple-500 animate-pulse" />
         )}
       </div>
+      {bufferCount != null && (
+        <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
+          {bufferCount.toLocaleString()} {bufferType ?? "frames"}
+        </div>
+      )}
 
       {/* Bus handles with labels */}
       {allBuses.length > 0 ? (
