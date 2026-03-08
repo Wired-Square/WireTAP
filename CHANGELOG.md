@@ -28,6 +28,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Visual tab app IDs**: Open session-aware panels now display their generated app ID (e.g., "graph_k3f7") in the Visual tab even before connecting to a session, matching the format of connected apps like "discovery_u6n2".
 
+- **Notarisation info script**: Added `notarise:info` npm script to query the status of a specific notarisation submission by ID.
+
 - **Visual tab session connect**: Connecting a session to an app from the Visual tab (via drag-to-connect or the detail panel's Connect button) now actually joins the session instead of only focusing the app panel. The Sessions tab stays focused during the operation.
 
 - **Visual tab terminology**: Renamed "listener" to "app" throughout the Visual tab UI — node types, detail panel labels, and internal identifiers — since apps both receive and transmit on sessions.
