@@ -823,7 +823,7 @@ export default function Discovery() {
     getBufferBytesPaginated,
     getBufferFramesPaginated,
     getBufferFramesPaginatedById,
-    clearBackendBuffer,
+    bufferMetadata,
     pickFileToSave,
     saveCatalog,
 

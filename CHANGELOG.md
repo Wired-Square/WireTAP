@@ -42,6 +42,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Per-buffer persistence (pinning)**: Individual buffers can now be pinned so they survive app restart when "clear buffers on start" is enabled. A pin/unpin toggle button appears on each buffer in the IO Source Picker, with an amber pin icon and "pinned" badge for persistent buffers. The Session Manager Visual tab source nodes now display buffer name, item count, data type, and a pin icon for persistent buffers.
 
+- **Discovery clear respects pinned buffers**: The "Clear all frames" button is now disabled when viewing a pinned (persistent) buffer. Clearing now deletes only the current buffer instead of all non-persistent buffers.
+
 ### Changed
 
 - **Unified config-aware protocol detection**: `getProfileTraits()` is now the single source of truth for profile protocol detection, reading `enable_fd` (slcan/gs_usb/SocketCAN), `interfaces[].protocol` (GVRET), `source_type` (PostgreSQL), and `traffic_type` (virtual) from connection config. `getReaderProtocols()` delegates to it instead of duplicating per-kind logic. Rust fallback traits aligned with TypeScript base defaults.

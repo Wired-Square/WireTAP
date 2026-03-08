@@ -26,6 +26,7 @@ import {
 import { useTimeHandlers, type TimeHandlers } from "../../../hooks/useTimeHandlers";
 import type { PlaybackSpeed, FrameMessage } from "../../../stores/discoveryStore";
 import type { BufferMetadata, TimestampedByte } from "../../../api/buffer";
+import { deleteBuffer } from "../../../api/buffer";
 import type { ExportDataMode } from "../../../dialogs/ExportFramesDialog";
 import type { SelectionSet } from "../../../utils/selectionSets";
 import { isBufferProfileId, type LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
@@ -129,7 +130,7 @@ export interface UseDiscoveryHandlersParams {
   getBufferBytesPaginated: (offset: number, limit: number) => Promise<{ bytes: TimestampedByte[] }>;
   getBufferFramesPaginated: (offset: number, limit: number) => Promise<{ frames: any[] }>;
   getBufferFramesPaginatedById: (id: string, offset: number, limit: number) => Promise<{ frames: any[] }>;
-  clearBackendBuffer: () => Promise<void>;
+  bufferMetadata: BufferMetadata | null;
   pickFileToSave: (options: any) => Promise<string | null>;
   saveCatalog: (path: string, content: string) => Promise<void>;
 
@@ -267,21 +268,15 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     if (params.isSerialMode) {
       params.clearSerialBytes();
       params.resetFraming();
-      params.clearBuffer();
-      params.clearFramePicker();
-      await params.clearBackendBuffer();
-      if (isBufferProfileId(params.ioProfile) && params.sourceProfileId) {
-        params.setIoProfile(params.sourceProfileId);
-        await params.reinitialize(params.sourceProfileId);
-      }
-    } else {
-      params.clearBuffer();
-      params.clearFramePicker();
-      await params.clearBackendBuffer();
-      if (isBufferProfileId(params.ioProfile) && params.sourceProfileId) {
-        params.setIoProfile(params.sourceProfileId);
-        await params.reinitialize(params.sourceProfileId);
-      }
+    }
+    params.clearBuffer();
+    params.clearFramePicker();
+    if (params.bufferMetadata?.id) {
+      await deleteBuffer(params.bufferMetadata.id);
+    }
+    if (isBufferProfileId(params.ioProfile) && params.sourceProfileId) {
+      params.setIoProfile(params.sourceProfileId);
+      await params.reinitialize(params.sourceProfileId);
     }
   }, [
     params.isSerialMode,
@@ -289,7 +284,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     params.resetFraming,
     params.clearBuffer,
     params.clearFramePicker,
-    params.clearBackendBuffer,
+    params.bufferMetadata?.id,
     params.ioProfile,
     params.sourceProfileId,
     params.setIoProfile,

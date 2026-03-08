@@ -118,6 +118,8 @@ export default function DiscoveryTopBar({
 }: Props) {
   // In serial mode, tools are available with raw bytes even without framed data
   const hasFrames = isSerialMode ? (frameCount > 0 || serialBytesCount > 0) : frameCount > 0;
+  const isPersistentBuffer = bufferMetadata?.persistent === true;
+  const canClear = hasFrames && !isPersistentBuffer;
 
   return (
     <AppTopBar
@@ -174,9 +176,9 @@ export default function DiscoveryTopBar({
 
           <button
             onClick={onClear}
-            disabled={!hasFrames}
-            className={`${iconButtonBase} hover:!bg-red-600 hover:!text-white`}
-            title={isSerialMode ? "Clear all bytes" : "Clear all frames"}
+            disabled={!canClear}
+            className={`${iconButtonBase} enabled:hover:!bg-red-600 enabled:hover:!text-white`}
+            title={isPersistentBuffer ? "Cannot clear a pinned buffer" : isSerialMode ? "Clear all bytes" : "Clear all frames"}
           >
             <Trash2 className={iconMd} />
           </button>
