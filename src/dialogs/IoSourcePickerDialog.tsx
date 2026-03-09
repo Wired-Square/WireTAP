@@ -267,6 +267,8 @@ export default function IoSourcePickerDialog({
   const [framingConfigMap, setFramingConfigMap] = useState<Map<string, InterfaceFramingConfig>>(new Map());
   // Track which profiles have been probed to avoid duplicate probes (refs don't trigger re-renders)
   const probedProfilesRef = useRef<Set<string>>(new Set());
+  // Tracks whether the user has clicked "Change" to expand the collapsed view (prevents re-collapsing)
+  const hasUserExpandedRef = useRef(false);
 
   // Active multi-source sessions (for sharing between apps)
   const [activeMultiSourceSessions, setActiveMultiSourceSessions] = useState<ActiveSessionInfo[]>([]);
@@ -436,6 +438,7 @@ export default function IoSourcePickerDialog({
         setCheckedReaderIds([]);
       }
       setValidationError(null);
+      hasUserExpandedRef.current = false;
 
       // Reset multi-select maps and probed profiles ref
       // (buffer probe results will be populated after listOrphanedBuffers completes)
@@ -513,6 +516,22 @@ export default function IoSourcePickerDialog({
 
     return () => clearInterval(intervalId);
   }, [isOpen, ioProfiles]);
+
+  // After activeMultiSourceSessions loads, if current source is a buffer with an
+  // active session, set checkedReaderId so the collapsed view shows it
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!selectedId || !isBufferProfileId(selectedId)) return;
+    if (checkedSourceId !== null) return;
+    if (hasUserExpandedRef.current) return;
+
+    const bufferSession = activeMultiSourceSessions.find(
+      (s) => s.sessionId === selectedId
+    );
+    if (bufferSession) {
+      setCheckedReaderId(selectedId);
+    }
+  }, [isOpen, selectedId, checkedSourceId, activeMultiSourceSessions]);
 
   // Filter bookmarks for the checked profile
   const profileBookmarks = useMemo(() => {
@@ -1360,6 +1379,9 @@ export default function IoSourcePickerDialog({
             isLoading={isLoading}
             bufferNames={new Map(buffers.map((b) => [b.id, b.name]))}
             onSelectSource={(id) => {
+              if (id === null) {
+                hasUserExpandedRef.current = true;
+              }
               setCheckedReaderId(id);
               // Clear multi-bus selection when selecting a single profile
               // (ensures mutual exclusivity between single-select and multi-select)

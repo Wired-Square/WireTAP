@@ -11,6 +11,7 @@ All notable changes to WireTAP will be documented in this file.
 ### Fixed
 
 - **Clear All preserves pinned buffers**: The "Clear All" button in the IO source picker no longer deletes persistent (pinned) buffers.
+- **Buffer sources show collapsed view in Data Source dialog**: When opening the Data Source dialog while on a buffer with an active session, the dialog now shows the collapsed source view (matching the behaviour of other source types) instead of the full source list.
 
 ## [0.5.5] - 2026-03-09
 
