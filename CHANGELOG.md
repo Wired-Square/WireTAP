@@ -8,7 +8,15 @@ All notable changes to WireTAP will be documented in this file.
 
 - **iOS safe area (bottom)**: Content no longer clips behind the home indicator on iOS. Uses `tauri-plugin-safe-area-insets-css` to read native safe area values and apply bottom padding. Also switched from `h-screen` (100vh) to percentage-based heights to avoid the iOS viewport height bug.
 
+- **SLCAN probe args**: Fixed `platform_probe_slcan_device` invoke sending camelCase argument names instead of snake_case, which prevented the probe from ever working.
+
+- **SLCAN line buffer overflow**: Increased the SLCAN read loop line buffer from 64 to 512 bytes. The 64-byte limit was too small for CAN FD frames (up to ~139 chars) and Elmue extended version responses (~200 chars), causing data to be silently discarded.
+
+- **iOS plugin errors on desktop**: Guarded `safe-area-insets-css` and `keep-screen-on` plugin imports to iOS only. Previously caused "Plugin not found" errors and build failures on desktop.
+
 ### Added
+
+- **SLCAN device probe and capability detection**: The SLCAN profile editor now auto-probes the device when a port is selected, showing firmware version, hardware info, and a CAN FD / CAN 2.0 capability badge. Elmue CANable 2.5 firmware is detected via its extended version response and shows board type and MCU info (e.g. "Multiboard STM32G431").
 
 - **Keep screen on (iOS)**: Added `keep-screen-on` Tauri plugin capability to prevent the screen from dimming during active sessions on iOS.
 

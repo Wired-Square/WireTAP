@@ -7,6 +7,7 @@
 import { CircleCheck, CircleX, Loader2, RefreshCw } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, iconButtonHoverSmall } from "../../../styles";
+import { badgeSmallSuccess, badgeSmallNeutral } from "../../../styles/badgeStyles";
 
 export type DeviceProbeState = "idle" | "probing" | "success" | "error";
 
@@ -17,7 +18,7 @@ export interface DeviceProbeResult {
   primaryInfo?: string | null;
   /** Secondary info to display (e.g., hardware version) */
   secondaryInfo?: string | null;
-  /** Whether device supports CAN FD (gs_usb only) */
+  /** Whether device supports CAN FD */
   supports_fd?: boolean | null;
   /** Error message (if probe failed) */
   error?: string | null;
@@ -95,6 +96,12 @@ export default function IODeviceStatus({
                 {secondaryLabel}: {result.secondaryInfo}
               </span>
             )}
+            {result.supports_fd === true && (
+              <span className={`ml-2 ${badgeSmallSuccess}`}>CAN FD</span>
+            )}
+            {result.supports_fd === false && (
+              <span className={`ml-2 ${badgeSmallNeutral}`}>CAN 2.0</span>
+            )}
           </div>
         )}
         {state === "error" && result && (
@@ -122,7 +129,7 @@ export default function IODeviceStatus({
           type="button"
           onClick={onRefresh}
           className={iconButtonHoverSmall}
-          title="Probe device again"
+          title="Test connection"
         >
           <RefreshCw className={`${iconMd} text-[color:var(--text-muted)]`} />
         </button>

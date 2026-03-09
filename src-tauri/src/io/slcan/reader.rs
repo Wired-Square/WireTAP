@@ -272,6 +272,8 @@ pub struct SlcanProbeResult {
     pub hardware_version: Option<String>,
     /// Serial number (if available)
     pub serial_number: Option<String>,
+    /// Whether the device supports CAN FD (None if couldn't determine)
+    pub supports_fd: Option<bool>,
     /// Error message (if probe failed)
     pub error: Option<String>,
 }
@@ -320,6 +322,7 @@ pub fn probe_slcan_device(
                 version: None,
                 hardware_version: None,
                 serial_number: None,
+                supports_fd: None,
                 error: Some(IoError::connection(&device, e.to_string()).to_string()),
             };
         }
@@ -342,34 +345,77 @@ pub fn probe_slcan_device(
     let mut version: Option<String> = None;
     let mut hardware_version: Option<String> = None;
     let mut serial_number: Option<String> = None;
+    let mut is_elmue_firmware = false;
     let mut got_any_response = false;
 
     // Query firmware version (V command)
-    if let Some(response) = send_and_read(&mut serial_port, b"V\r") {
+    // The Elmue CANable 2.5 firmware returns an extended multi-line response:
+    //   V+Board: MultiboardMCU: STM32G431DevID: 1128Firmware: 2490643Slcan: 100Clock: 160Limits: ...
+    // Standard slcan firmware returns a short response: "V1013"
+    if let Some(response) = send_and_read_all(&mut serial_port, b"V\r") {
         got_any_response = true;
-        // Response format varies, but typically starts with 'V' followed by version digits
-        // e.g., "V1013" or "V1234\r"
         let trimmed = response.trim();
         if !trimmed.is_empty() && trimmed != "\x07" {
-            // Remove leading 'V' if present
-            version = Some(if trimmed.starts_with('V') || trimmed.starts_with('v') {
-                format_version(&trimmed[1..])
+            // Try to parse Elmue extended format (contains "Firmware:" field)
+            // Elmue CANable 2.5 firmware supports CAN FD on STM32G431
+            if let Some(fw_pos) = trimmed.find("Firmware:") {
+                is_elmue_firmware = true;
+                let after_fw = &trimmed[fw_pos + 9..];
+                // Extract digits until next non-digit character
+                let fw_digits: String = after_fw.chars().take_while(|c| c.is_ascii_digit()).collect();
+                if !fw_digits.is_empty() {
+                    version = Some(format_version(&fw_digits));
+                }
+                // Extract board info for hardware_version
+                if let Some(board_pos) = trimmed.find("Board:") {
+                    let after_board = &trimmed[board_pos + 6..];
+                    // Take until "MCU:" or end
+                    let board = if let Some(mcu_pos) = after_board.find("MCU:") {
+                        after_board[..mcu_pos].trim()
+                    } else {
+                        after_board.split_whitespace().next().unwrap_or("")
+                    };
+                    if !board.is_empty() {
+                        // Also grab MCU if present
+                        if let Some(mcu_pos) = trimmed.find("MCU:") {
+                            let after_mcu = &trimmed[mcu_pos + 4..];
+                            let mcu: String = after_mcu.chars().take_while(|c| *c != 'D' && *c != '\r' && *c != '\n').collect();
+                            let mcu = mcu.trim();
+                            if !mcu.is_empty() {
+                                hardware_version = Some(format!("{} {}", board.trim_start_matches('+').trim(), mcu));
+                            } else {
+                                hardware_version = Some(board.trim_start_matches('+').trim().to_string());
+                            }
+                        } else {
+                            hardware_version = Some(board.trim_start_matches('+').trim().to_string());
+                        }
+                    }
+                }
             } else {
-                format_version(trimmed)
-            });
+                // Standard slcan format: "V1013" or "v1013"
+                let raw = if trimmed.starts_with('V') || trimmed.starts_with('v') {
+                    &trimmed[1..]
+                } else {
+                    trimmed
+                };
+                version = Some(format_version(raw));
+            }
         }
     }
 
     // Query hardware version (v command) - some devices support this
-    if let Some(response) = send_and_read(&mut serial_port, b"v\r") {
-        got_any_response = true;
-        let trimmed = response.trim();
-        if !trimmed.is_empty() && trimmed != "\x07" {
-            hardware_version = Some(if trimmed.starts_with('v') {
-                trimmed[1..].to_string()
-            } else {
-                trimmed.to_string()
-            });
+    // Skip if we already got hardware info from the extended V response
+    if hardware_version.is_none() {
+        if let Some(response) = send_and_read(&mut serial_port, b"v\r") {
+            got_any_response = true;
+            let trimmed = response.trim();
+            if !trimmed.is_empty() && trimmed != "\x07" {
+                hardware_version = Some(if trimmed.starts_with('v') {
+                    trimmed[1..].to_string()
+                } else {
+                    trimmed.to_string()
+                });
+            }
         }
     }
 
@@ -386,6 +432,15 @@ pub fn probe_slcan_device(
         }
     }
 
+    // Detect CAN FD support from firmware identification.
+    // The Elmue CANable 2.5 firmware (identified by extended V response with "Firmware:" field)
+    // supports CAN FD on STM32G4xx MCUs. Standard slcan firmware does not support FD.
+    let supports_fd = if got_any_response {
+        Some(is_elmue_firmware)
+    } else {
+        None
+    };
+
     // Close the port
     drop(serial_port);
 
@@ -395,6 +450,7 @@ pub fn probe_slcan_device(
             version,
             hardware_version,
             serial_number,
+            supports_fd,
             error: None,
         }
     } else {
@@ -403,6 +459,7 @@ pub fn probe_slcan_device(
             version: None,
             hardware_version: None,
             serial_number: None,
+            supports_fd: None,
             error: Some("No response from device".to_string()),
         }
     }
@@ -418,6 +475,40 @@ fn format_version(s: &str) -> String {
     } else {
         s.to_string()
     }
+}
+
+/// Send a command and read the full response (larger buffer, longer wait).
+/// Used for V command which may return extended multi-line responses from Elmue firmware.
+fn send_and_read_all(port: &mut Box<dyn serialport::SerialPort>, cmd: &[u8]) -> Option<String> {
+    if port.write_all(cmd).is_err() {
+        return None;
+    }
+    let _ = port.flush();
+
+    // Longer wait for extended responses
+    std::thread::sleep(Duration::from_millis(200));
+
+    let mut buf = [0u8; 512];
+    let mut response = String::new();
+
+    // Read until timeout — collect everything the device sends
+    for _ in 0..10 {
+        match port.read(&mut buf) {
+            Ok(n) if n > 0 => {
+                for &b in &buf[..n] {
+                    if b == 0x07 {
+                        return Some("\x07".to_string());
+                    }
+                    if b.is_ascii() && (b >= 0x20 || b == b'\r' || b == b'\n') {
+                        response.push(b as char);
+                    }
+                }
+            }
+            _ => break,
+        }
+    }
+
+    if response.is_empty() { None } else { Some(response) }
 }
 
 /// Send a command and read the response
@@ -605,7 +696,7 @@ pub async fn run_source(
     let serial_port_clone = serial_port.clone();
 
     let blocking_handle = tokio::task::spawn_blocking(move || {
-        let mut line_buf = String::with_capacity(64);
+        let mut line_buf = String::with_capacity(256);
         let mut read_buf = [0u8; 256];
 
         while !stop_flag_clone.load(Ordering::SeqCst) {
@@ -659,8 +750,10 @@ pub async fn run_source(
                             line_buf.clear();
                         } else if byte.is_ascii() && !byte.is_ascii_control() {
                             line_buf.push(byte as char);
-                            if line_buf.len() > 64 {
-                                tlog!("[slcan] Line buffer exceeded 64 bytes, discarding");
+                            // CAN FD frames can be up to ~139 chars; Elmue extended
+                            // V responses ~200 chars. 512 is generous headroom.
+                            if line_buf.len() > 512 {
+                                tlog!("[slcan] Line buffer exceeded 512 bytes, discarding");
                                 line_buf.clear();
                             }
                         }

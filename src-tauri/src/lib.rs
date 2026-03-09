@@ -59,6 +59,7 @@ pub struct SlcanProbeResultCompat {
     pub version: Option<String>,
     pub hardware_version: Option<String>,
     pub serial_number: Option<String>,
+    pub supports_fd: Option<bool>,
     pub error: Option<String>,
 }
 
@@ -104,6 +105,7 @@ fn platform_probe_slcan_device(
             version: result.version,
             hardware_version: result.hardware_version,
             serial_number: result.serial_number,
+            supports_fd: result.supports_fd,
             error: result.error,
         }
     }
@@ -115,6 +117,7 @@ fn platform_probe_slcan_device(
             version: None,
             hardware_version: None,
             serial_number: None,
+            supports_fd: None,
             error: Some("Serial ports are not available on iOS".to_string()),
         }
     }

@@ -24,6 +24,8 @@ import {
   alertWarning,
   caption,
   textMedium,
+  textSuccess,
+  textWarning,
 } from "../../../styles";
 import { probeSlcanDevice } from "../../../api/serial";
 import { probeGsUsbDevice } from "../../../api/gs_usb";
@@ -212,6 +214,7 @@ export default function IOProfileDialog({
         success: result.success,
         primaryInfo: result.version,
         secondaryInfo: result.hardware_version,
+        supports_fd: result.supports_fd,
         error: result.error,
       });
       setSlcanProbeState(result.success ? "success" : "error");
@@ -1104,7 +1107,7 @@ export default function IOProfileDialog({
                   primaryLabel="Firmware"
                   secondaryLabel="HW"
                   onRefresh={probeSlcan}
-                  probingText="Checking CANable..."
+                  probingText="Testing connection..."
                   successText="CANable connected"
                   errorText="CANable not responding"
                   idleText="Select a port to check device"
@@ -1163,6 +1166,12 @@ export default function IOProfileDialog({
                   <label htmlFor="slcan_enable_fd" className="text-sm text-[color:var(--text-secondary)]">
                     Enable CAN FD
                   </label>
+                  {slcanProbeResult?.supports_fd === true && (
+                    <span className={`text-xs ${textSuccess}`}>(FD capable)</span>
+                  )}
+                  {slcanProbeResult?.supports_fd === false && profileForm.connection.enable_fd && (
+                    <span className={`text-xs ${textWarning}`}>(device does not support FD)</span>
+                  )}
                 </div>
                 <p className="text-xs text-[color:var(--text-muted)] mt-1 ml-6">
                   Enables CAN Flexible Data-rate for higher throughput and larger payloads (up to 64 bytes).

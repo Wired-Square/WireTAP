@@ -25,6 +25,8 @@ export interface DeviceProbeResponse {
   hardware_version: string | null;
   /** Serial number (if available) */
   serial_number: string | null;
+  /** Whether the device supports CAN FD (null if couldn't determine) */
+  supports_fd: boolean | null;
   /** Error message (if probe failed) */
   error: string | null;
 }
@@ -63,9 +65,9 @@ export async function probeSlcanDevice(
 ): Promise<DeviceProbeResponse> {
   return invoke("platform_probe_slcan_device", {
     port,
-    baudRate,
-    dataBits: framing?.dataBits,
-    stopBits: framing?.stopBits,
+    baud_rate: baudRate,
+    data_bits: framing?.dataBits,
+    stop_bits: framing?.stopBits,
     parity: framing?.parity,
   });
 }
