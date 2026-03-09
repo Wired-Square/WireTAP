@@ -3,8 +3,9 @@
 // Shared session control components for top bars.
 // Handles reader display, stop/resume/leave controls.
 
-import { Star, FileText, Square, Play, GitMerge, Bookmark, LogOut } from "lucide-react";
-import { iconSm } from "../styles/spacing";
+import { useState, useRef, useEffect } from "react";
+import { Star, FileText, Square, Play, GitMerge, Bookmark, LogOut, Pencil, Pin, PinOff } from "lucide-react";
+import { iconSm, iconXs } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
 import type { BufferMetadata } from "../api/buffer";
 import { isBufferProfileId } from "../hooks/useIOSessionManager";
@@ -49,7 +50,7 @@ export function ReaderButton({
   ioProfile,
   ioProfiles,
   multiBusProfiles = [],
-  bufferMetadata: _bufferMetadata,
+  bufferMetadata,
   defaultReadProfileId,
   sessionId,
   ioState,
@@ -70,8 +71,8 @@ export function ReaderButton({
   // Track whether sessionId is already shown in displayName (to avoid duplication)
   let sessionIdInDisplayName = false;
   if (isBufferProfile) {
-    // Buffer: just show the buffer ID (e.g., "buf_123")
-    displayName = ioProfile || "Buffer";
+    // Buffer: show display name if available, otherwise buffer ID
+    displayName = bufferMetadata?.name || ioProfile || "Buffer";
     sessionIdInDisplayName = true; // buffer ID is the session ID
   } else if (showAsMultiBus) {
     // Multi-bus: show sessionId with profile count (e.g., "f_abc123 (2)")
@@ -370,6 +371,14 @@ export interface IOSessionControlsProps {
   onOpenBookmarkPicker?: () => void;
   /** Hide session action buttons (for buffer mode where playback controls are elsewhere) */
   hideSessionControls?: boolean;
+
+  // Buffer action props (shown when viewing a buffer)
+  /** Whether the current buffer is persistent (pinned) */
+  bufferPersistent?: boolean;
+  /** Called when user toggles buffer pin */
+  onToggleBufferPin?: () => void;
+  /** Called when user renames the buffer */
+  onRenameBuffer?: (newName: string) => void;
 }
 
 /**
@@ -402,12 +411,45 @@ export function IOSessionControls({
   onLeave,
   onOpenBookmarkPicker,
   hideSessionControls = false,
+  // Buffer action props
+  bufferPersistent = false,
+  onToggleBufferPin,
+  onRenameBuffer,
 }: IOSessionControlsProps) {
   // Auto-hide session controls when in buffer mode (playback controls are in the toolbar instead)
   const isBufferMode = isBufferProfileId(ioProfile);
   const shouldHideControls = hideSessionControls || isBufferMode;
   // Live session = we have an ioProfile that's not a buffer
   const isLiveSession = ioProfile !== null && !isBufferMode;
+
+  // Rename popover state
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isRenaming && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [isRenaming]);
+
+  const startRename = () => {
+    setRenameValue(bufferMetadata?.name || ioProfile || "");
+    setIsRenaming(true);
+  };
+
+  const commitRename = () => {
+    const trimmed = renameValue.trim();
+    if (trimmed && onRenameBuffer) {
+      onRenameBuffer(trimmed);
+    }
+    setIsRenaming(false);
+  };
+
+  const cancelRename = () => {
+    setIsRenaming(false);
+  };
 
   return (
     <>
@@ -425,6 +467,52 @@ export function IOSessionControls({
         onClick={onOpenIoReaderPicker}
         disabled={isStreaming && !isBufferMode}
       />
+
+      {/* Buffer actions - pin and rename (shown when viewing a buffer) */}
+      {isBufferMode && bufferMetadata?.id && (
+        <div className="relative flex items-center gap-0.5">
+          {onRenameBuffer && (
+            <button
+              onClick={startRename}
+              className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+              title="Rename buffer"
+            >
+              <Pencil className={iconXs} />
+            </button>
+          )}
+          {onToggleBufferPin && (
+            <button
+              onClick={onToggleBufferPin}
+              className={`p-1 rounded transition-colors hover:bg-[var(--hover-bg)] ${
+                bufferPersistent
+                  ? "text-[color:var(--status-warning-text)]"
+                  : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+              }`}
+              title={bufferPersistent ? "Unpin buffer (will be cleared on restart)" : "Pin buffer (survives restart)"}
+            >
+              {bufferPersistent ? <Pin className={iconXs} /> : <PinOff className={iconXs} />}
+            </button>
+          )}
+          {/* Rename popover */}
+          {isRenaming && (
+            <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg shadow-xl p-2">
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitRename();
+                  if (e.key === "Escape") cancelRename();
+                }}
+                className="w-48 px-2 py-1 text-sm bg-transparent border border-[color:var(--status-info-text)] rounded outline-none text-[color:var(--text-primary)]"
+                placeholder="Buffer name"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Speed button - only show if reader supports speed and not in buffer mode */}
       {supportsSpeed && onOpenSpeedPicker && !shouldHideControls && (

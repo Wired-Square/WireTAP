@@ -49,6 +49,14 @@ type Props = {
   /** Called to open bookmark picker */
   onOpenBookmarkPicker?: () => void;
 
+  // Buffer actions
+  /** Whether the current buffer is persistent (pinned) */
+  bufferPersistent?: boolean;
+  /** Called when user toggles buffer pin */
+  onToggleBufferPin?: () => void;
+  /** Called when user renames the buffer */
+  onRenameBuffer?: (newName: string) => void;
+
   // Frame picker
   frameCount: number;
   /** Unique frame IDs seen at the session level (for tooltip) */
@@ -110,6 +118,9 @@ export default function DecoderTopBar({
   onLeave,
   supportsTimeRange = false,
   onOpenBookmarkPicker,
+  bufferPersistent = false,
+  onToggleBufferPin,
+  onRenameBuffer,
   frameCount,
   uniqueFrameCount,
   totalFrameCount,
@@ -161,6 +172,9 @@ export default function DecoderTopBar({
         onResume, // Always show Resume when stopped (resumeFresh handles live return)
         onLeave,
         onOpenBookmarkPicker,
+        bufferPersistent,
+        onToggleBufferPin,
+        onRenameBuffer,
       }}
       framePicker={{
         frameCount,

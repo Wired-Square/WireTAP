@@ -86,6 +86,8 @@ interface LocalSessionState {
     owningSessionId: string | null;
     startTimeUs: number | null;
     endTimeUs: number | null;
+    name: string | null;
+    persistent: boolean;
   };
   /** Whether the session was stopped explicitly by user */
   stoppedExplicitly: boolean;
@@ -177,6 +179,10 @@ export interface UseIOSessionResult {
   bufferStartTimeUs: number | null;
   /** End time of buffer data in microseconds (null if empty or unknown) */
   bufferEndTimeUs: number | null;
+  /** Display name of the buffer (null until fetched) */
+  bufferName: string | null;
+  /** Whether the buffer survives "clear buffers on start" */
+  bufferPersistent: boolean;
   /** Number of apps connected to this session (for showing Detach vs Stop) */
   joinerCount: number;
   /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
@@ -378,6 +384,35 @@ export function useIOSession(
     return () => useFocusStore.getState().removeListenerId(appName);
   }, [appName]);
 
+  // ---- Sync buffer name/persistent from sessionStore ----
+  // When renameSessionBuffer or setSessionBufferPersistent updates the global store,
+  // sync those fields into localState so the UI reflects the change immediately.
+  useEffect(() => {
+    if (!effectiveSessionId) return;
+    const unsub = useSessionStore.subscribe((state, prevState) => {
+      const session = state.sessions[effectiveSessionId];
+      const prevSession = prevState.sessions[effectiveSessionId];
+      if (!session || !prevSession) return;
+      if (
+        session.buffer.name !== prevSession.buffer.name ||
+        session.buffer.persistent !== prevSession.buffer.persistent
+      ) {
+        setLocalState((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            buffer: {
+              ...prev.buffer,
+              name: session.buffer.name,
+              persistent: session.buffer.persistent,
+            },
+          };
+        });
+      }
+    });
+    return unsub;
+  }, [effectiveSessionId]);
+
   // ---- Query Backend + Set Up Event Listeners ----
   // This effect queries the backend for current state on mount/sessionId change,
   // then sets up event listeners that update local state directly.
@@ -421,6 +456,8 @@ export function useIOSession(
               owningSessionId: null,
               startTimeUs: null,
               endTimeUs: null,
+              name: null,
+              persistent: false,
             },
             stoppedExplicitly: false,
             streamEndedReason: null,
@@ -537,6 +574,8 @@ export function useIOSession(
                     owningSessionId: payload.owning_session_id,
                     startTimeUs: payload.time_range?.[0] ?? null,
                     endTimeUs: payload.time_range?.[1] ?? null,
+                    name: prev.buffer?.name ?? null,
+                    persistent: prev.buffer?.persistent ?? false,
                   },
                 }
               : null
@@ -565,6 +604,8 @@ export function useIOSession(
                     owningSessionId: effectiveSessionId,
                     startTimeUs: payload.time_range?.[0] ?? null,
                     endTimeUs: payload.time_range?.[1] ?? null,
+                    name: prev.buffer?.name ?? null,
+                    persistent: prev.buffer?.persistent ?? false,
                   },
                 }
               : null
@@ -594,6 +635,8 @@ export function useIOSession(
                     owningSessionId: effectiveSessionId,
                     startTimeUs: null,
                     endTimeUs: null,
+                    name: null,
+                    persistent: false,
                   },
                 }
               : null
@@ -798,6 +841,8 @@ export function useIOSession(
                 owningSessionId: null,
                 startTimeUs: null,
                 endTimeUs: null,
+                name: null,
+                persistent: false,
               },
               stoppedExplicitly: false,
               streamEndedReason: null,
@@ -1200,6 +1245,8 @@ export function useIOSession(
                 owningSessionId: null,
                 startTimeUs: null,
                 endTimeUs: null,
+                name: null,
+                persistent: false,
               },
               stoppedExplicitly: false,
               streamEndedReason: null,
@@ -1338,6 +1385,8 @@ export function useIOSession(
     bufferOwningSessionId: effectiveState?.buffer?.owningSessionId ?? null,
     bufferStartTimeUs: effectiveState?.buffer?.startTimeUs ?? null,
     bufferEndTimeUs: effectiveState?.buffer?.endTimeUs ?? null,
+    bufferName: effectiveState?.buffer?.name ?? null,
+    bufferPersistent: effectiveState?.buffer?.persistent ?? false,
     joinerCount: effectiveState?.listenerCount ?? 0,
     stoppedExplicitly: effectiveState?.stoppedExplicitly ?? false,
     streamEndedReason: effectiveState?.streamEndedReason ?? null,

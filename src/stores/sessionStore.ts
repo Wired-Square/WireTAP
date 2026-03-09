@@ -295,6 +295,10 @@ export interface Session {
     startTimeUs: number | null;
     /** End time of captured data in microseconds (null if empty or unknown) */
     endTimeUs: number | null;
+    /** Display name of the buffer (null until fetched) */
+    name: string | null;
+    /** Whether the buffer survives "clear buffers on start" */
+    persistent: boolean;
   };
   /** Timestamp when session was created/joined */
   createdAt: number;
@@ -453,6 +457,12 @@ export interface SessionStore {
   seekSessionByFrame: (sessionId: string, frameIndex: number) => Promise<void>;
   /** Switch to buffer replay mode */
   switchToBuffer: (sessionId: string, speed?: number, bufferId?: string) => Promise<void>;
+
+  // ---- Actions: Buffer Metadata ----
+  /** Rename a buffer and update all sessions that reference it */
+  renameSessionBuffer: (bufferId: string, newName: string) => Promise<void>;
+  /** Toggle buffer persistence and update all sessions that reference it */
+  setSessionBufferPersistent: (bufferId: string, persistent: boolean) => Promise<void>;
 
   // ---- Actions: Transmission ----
   /** Transmit a CAN frame through a session */
@@ -632,8 +642,26 @@ async function setupSessionEventListeners(
           owningSessionId: payload.owning_session_id,
           startTimeUs: payload.time_range?.[0] ?? null,
           endTimeUs: payload.time_range?.[1] ?? null,
+          name: useSessionStore.getState().sessions[sessionId]?.buffer?.name ?? null,
+          persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
         },
       });
+      // Fetch buffer metadata to populate name/persistent if not already known
+      if (payload.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
+        import("../api/buffer").then(({ getBufferMetadataById }) =>
+          getBufferMetadataById(payload.buffer_id!).then((meta) => {
+            if (meta) {
+              updateSession(sessionId, {
+                buffer: {
+                  ...useSessionStore.getState().sessions[sessionId]?.buffer!,
+                  name: meta.name,
+                  persistent: meta.persistent,
+                },
+              });
+            }
+          }).catch(() => {/* ignore */})
+        );
+      }
       invokeCallbacks(eventListeners, "onStreamEnded", payload);
     }
   );
@@ -701,8 +729,26 @@ async function setupSessionEventListeners(
           owningSessionId: sessionId,
           startTimeUs: payload.time_range?.[0] ?? null,
           endTimeUs: payload.time_range?.[1] ?? null,
+          name: useSessionStore.getState().sessions[sessionId]?.buffer?.name ?? null,
+          persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
         },
       });
+      // Fetch buffer metadata to populate name/persistent if not already known
+      if (payload.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
+        import("../api/buffer").then(({ getBufferMetadataById }) =>
+          getBufferMetadataById(payload.buffer_id!).then((meta) => {
+            if (meta) {
+              updateSession(sessionId, {
+                buffer: {
+                  ...useSessionStore.getState().sessions[sessionId]?.buffer!,
+                  name: meta.name,
+                  persistent: meta.persistent,
+                },
+              });
+            }
+          }).catch(() => {/* ignore */})
+        );
+      }
       invokeCallbacks(eventListeners, "onSuspended", payload);
     }
   );
@@ -726,6 +772,8 @@ async function setupSessionEventListeners(
           owningSessionId: sessionId,
           startTimeUs: null,
           endTimeUs: null,
+          name: null,
+          persistent: false,
         },
       });
       invokeCallbacks(eventListeners, "onResuming", event.payload);
@@ -897,6 +945,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         capabilities = await createIOSession(createOptions);
         console.log(`[sessionStore:openSession] createIOSession succeeded`);
 
+        // For buffer mode, the session IS the buffer — set buffer ID so actions can find it
+        if (isBufferMode) {
+          bufferId = profileId;
+          bufferType = "frames"; // Buffer sessions default to frames
+        }
+
         // Backend auto-starts the session, so query the actual state
         const currentState = await getIOSessionState(sessionId);
         if (currentState) {
@@ -907,6 +961,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         try {
           const regResult = await registerSessionListener(sessionId, listenerId, appName);
           listenerCount = regResult.listener_count;
+          // Pick up buffer info from the registration result (more accurate than our guess)
+          if (regResult.buffer_id) bufferId = regResult.buffer_id;
+          if (regResult.buffer_type) bufferType = regResult.buffer_type;
           // Handle startup error (error that occurred before listener registered)
           if (regResult.startup_error) {
             get().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
@@ -941,7 +998,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             capabilities: null,
             errorMessage: msg,
             listenerCount: 0,
-            buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null },
+            buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
             createdAt: Date.now(),
             hasQueuedMessages: false,
             stoppedExplicitly: false,
@@ -1087,6 +1144,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           owningSessionId: null,
           startTimeUs: existingSession?.buffer?.startTimeUs ?? null,
           endTimeUs: existingSession?.buffer?.endTimeUs ?? null,
+          name: existingSession?.buffer?.name ?? null,
+          persistent: existingSession?.buffer?.persistent ?? false,
         },
         createdAt: existingSession?.createdAt ?? Date.now(),
         hasQueuedMessages: existingSession?.hasQueuedMessages ?? false,
@@ -1101,6 +1160,32 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         sessions: { ...s.sessions, [sessionId]: session },
       };
     });
+
+    // For buffer-mode sessions, fetch buffer metadata to populate name/persistent
+    if (bufferId) {
+      import("../api/buffer").then(({ getBufferMetadataById }) =>
+        getBufferMetadataById(bufferId!).then((meta) => {
+          if (meta) {
+            const currentSession = get().sessions[sessionId];
+            if (currentSession && currentSession.buffer.id === bufferId) {
+              set((s) => ({
+                sessions: {
+                  ...s.sessions,
+                  [sessionId]: {
+                    ...s.sessions[sessionId],
+                    buffer: {
+                      ...s.sessions[sessionId].buffer,
+                      name: meta.name,
+                      persistent: meta.persistent,
+                    },
+                  },
+                },
+              }));
+            }
+          }
+        }).catch(() => {/* ignore */})
+      );
+    }
 
     tlog.debug(`[sessionStore:openSession] Complete - returning session for ${sessionId}`);
     return get().sessions[sessionId];
@@ -1509,7 +1594,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 owningSessionId: bufferMetadata.owning_session_id,
                 startTimeUs: bufferMetadata.start_time_us,
                 endTimeUs: bufferMetadata.end_time_us,
-              } : s.sessions[sessionId]?.buffer ?? { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null },
+                name: bufferMetadata.name,
+                persistent: bufferMetadata.persistent,
+              } : s.sessions[sessionId]?.buffer ?? { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
             },
           },
         }));
@@ -1648,10 +1735,43 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           ...s.sessions[sessionId],
           capabilities,
           ioState: "stopped",
-          buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null },
+          buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
         },
       },
     }));
+  },
+
+  // ---- Buffer Metadata ----
+  renameSessionBuffer: async (bufferId, newName) => {
+    const { renameBuffer } = await import("../api/buffer");
+    await renameBuffer(bufferId, newName);
+    // Update ALL sessions that share this buffer ID
+    const sessions = get().sessions;
+    const updated: Record<string, Session> = {};
+    for (const [sid, session] of Object.entries(sessions)) {
+      if (session.buffer.id === bufferId) {
+        updated[sid] = { ...session, buffer: { ...session.buffer, name: newName } };
+      }
+    }
+    if (Object.keys(updated).length > 0) {
+      set((s) => ({ sessions: { ...s.sessions, ...updated } }));
+    }
+  },
+
+  setSessionBufferPersistent: async (bufferId, persistent) => {
+    const { setBufferPersistent } = await import("../api/buffer");
+    await setBufferPersistent(bufferId, persistent);
+    // Update ALL sessions that share this buffer ID
+    const sessions = get().sessions;
+    const updated: Record<string, Session> = {};
+    for (const [sid, session] of Object.entries(sessions)) {
+      if (session.buffer.id === bufferId) {
+        updated[sid] = { ...session, buffer: { ...session.buffer, persistent } };
+      }
+    }
+    if (Object.keys(updated).length > 0) {
+      set((s) => ({ sessions: { ...s.sessions, ...updated } }));
+    }
   },
 
   // ---- Transmission ----

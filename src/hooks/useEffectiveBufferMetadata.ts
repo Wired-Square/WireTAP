@@ -13,6 +13,10 @@ interface SessionBufferInfo {
   bufferEndTimeUs: number | null;
   /** Buffer frame/byte count from session */
   bufferCount: number;
+  /** Buffer display name from session (takes priority over local metadata) */
+  bufferName?: string | null;
+  /** Buffer persistent flag from session (takes priority over local metadata) */
+  bufferPersistent?: boolean;
 }
 
 /**
@@ -39,7 +43,7 @@ export function useEffectiveBufferMetadata(
     return {
       id: localMetadata?.id ?? "",
       buffer_type: localMetadata?.buffer_type ?? "frames",
-      name: localMetadata?.name ?? "",
+      name: sessionBuffer.bufferName ?? localMetadata?.name ?? "",
       // Prefer session values for cross-app timeline sync
       start_time_us: sessionBuffer.bufferStartTimeUs ?? localMetadata?.start_time_us,
       end_time_us: sessionBuffer.bufferEndTimeUs ?? localMetadata?.end_time_us,
@@ -47,11 +51,14 @@ export function useEffectiveBufferMetadata(
       created_at: localMetadata?.created_at ?? 0,
       is_streaming: localMetadata?.is_streaming ?? false,
       owning_session_id: localMetadata?.owning_session_id ?? null,
+      persistent: sessionBuffer.bufferPersistent ?? localMetadata?.persistent ?? false,
     } as BufferMetadata;
   }, [
     sessionBuffer.bufferStartTimeUs,
     sessionBuffer.bufferEndTimeUs,
     sessionBuffer.bufferCount,
+    sessionBuffer.bufferName,
+    sessionBuffer.bufferPersistent,
     localMetadata,
   ]);
 }

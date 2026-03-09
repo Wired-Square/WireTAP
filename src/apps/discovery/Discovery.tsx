@@ -616,7 +616,7 @@ export default function Discovery() {
 
   // Merged buffer metadata using session values for cross-app timeline sync
   const effectiveBufferMetadata = useEffectiveBufferMetadata(
-    { bufferStartTimeUs, bufferEndTimeUs, bufferCount },
+    { bufferStartTimeUs, bufferEndTimeUs, bufferCount, bufferName: session.bufferName, bufferPersistent: session.bufferPersistent },
     bufferMetadata
   );
 
@@ -908,7 +908,7 @@ export default function Discovery() {
           ioProfile={ioProfile}
           onIoProfileChange={handlers.handleIoProfileChange}
           defaultReadProfileId={settings?.default_read_profile}
-          bufferMetadata={bufferMetadata}
+          bufferMetadata={effectiveBufferMetadata ?? bufferMetadata}
           sessionId={sessionId}
           isStreaming={isStreaming}
           multiBusProfiles={sessionId ? ioProfiles : []}
@@ -934,6 +934,15 @@ export default function Discovery() {
           serialActiveTab={serialActiveTab}
           onUndoFraming={undoAcceptFraming}
           isModbusProfile={isModbusProfile}
+          bufferPersistent={session.bufferPersistent}
+          onToggleBufferPin={() => {
+            const bid = bufferMetadata?.id ?? sessionBufferId;
+            if (bid) useSessionStore.getState().setSessionBufferPersistent(bid, !session.bufferPersistent);
+          }}
+          onRenameBuffer={(newName) => {
+            const bid = bufferMetadata?.id ?? sessionBufferId;
+            if (bid) useSessionStore.getState().renameSessionBuffer(bid, newName);
+          }}
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
           onSave={openSaveDialog}
           onExport={() => dialogs.export.open()}

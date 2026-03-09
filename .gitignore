@@ -37,3 +37,6 @@ src-tauri/gen/schemas
 
 # Test files and dumps
 *.dump
+
+# Local research notes
+docs/local/

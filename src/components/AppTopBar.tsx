@@ -164,6 +164,9 @@ export default function AppTopBar({
             onLeave={ioSession.onLeave}
             onOpenBookmarkPicker={ioSession.onOpenBookmarkPicker}
             hideSessionControls={ioSession.hideSessionControls}
+            bufferPersistent={ioSession.bufferPersistent}
+            onToggleBufferPin={ioSession.onToggleBufferPin}
+            onRenameBuffer={ioSession.onRenameBuffer}
           />
         )}
 

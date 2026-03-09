@@ -68,6 +68,14 @@ type Props = {
   /** Whether the active profile is Modbus TCP (enables scan tools without data) */
   isModbusProfile?: boolean;
 
+  // Buffer actions
+  /** Whether the current buffer is persistent (pinned) */
+  bufferPersistent?: boolean;
+  /** Called when user toggles buffer pin */
+  onToggleBufferPin?: () => void;
+  /** Called when user renames the buffer */
+  onRenameBuffer?: (newName: string) => void;
+
   // Dialogs
   onOpenIoReaderPicker: () => void;
 
@@ -104,6 +112,9 @@ export default function DiscoveryTopBar({
   serialActiveTab = 'raw',
   onUndoFraming,
   isModbusProfile = false,
+  bufferPersistent = false,
+  onToggleBufferPin,
+  onRenameBuffer,
   supportsTimeRange = false,
   onOpenBookmarkPicker,
   speed = 1,
@@ -118,7 +129,7 @@ export default function DiscoveryTopBar({
 }: Props) {
   // In serial mode, tools are available with raw bytes even without framed data
   const hasFrames = isSerialMode ? (frameCount > 0 || serialBytesCount > 0) : frameCount > 0;
-  const isPersistentBuffer = bufferMetadata?.persistent === true;
+  const isPersistentBuffer = bufferPersistent || bufferMetadata?.persistent === true;
   const canClear = hasFrames && !isPersistentBuffer;
 
   return (
@@ -146,6 +157,9 @@ export default function DiscoveryTopBar({
         onResume, // Always show Resume when stopped (resumeFresh handles live return)
         onLeave,
         onOpenBookmarkPicker,
+        bufferPersistent,
+        onToggleBufferPin,
+        onRenameBuffer,
       }}
       framePicker={{
         frameCount,

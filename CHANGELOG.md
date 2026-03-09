@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Buffer pin/rename in session controls**: Pin and rename buttons now appear in the app top bar when viewing a buffer, matching the existing functionality in the IO source picker dialog. Changes propagate across all apps connected to the same buffer via session store synchronisation.
+
 ## [0.5.5] - 2026-03-09
 
 ### Changed

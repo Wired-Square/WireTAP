@@ -535,7 +535,7 @@ export default function Decoder() {
 
   // Merged buffer metadata using session values for cross-app timeline sync
   const effectiveBufferMetadata = useEffectiveBufferMetadata(
-    { bufferStartTimeUs, bufferEndTimeUs, bufferCount },
+    { bufferStartTimeUs, bufferEndTimeUs, bufferCount, bufferName: session.bufferName, bufferPersistent: session.bufferPersistent },
     bufferMetadata
   );
 
@@ -979,11 +979,20 @@ export default function Decoder() {
             ioProfile={ioProfile}
             onIoProfileChange={handlers.handleIoProfileChange}
             defaultReadProfileId={settings?.default_read_profile}
-            bufferMetadata={bufferMetadata}
+            bufferMetadata={effectiveBufferMetadata ?? bufferMetadata}
             sessionId={sessionId}
             multiBusProfiles={sessionId ? ioProfiles : []}
             ioState={readerState}
             isRealtime={isRealtime}
+            bufferPersistent={session.bufferPersistent}
+            onToggleBufferPin={() => {
+              const bid = bufferMetadata?.id ?? session.bufferId;
+              if (bid) useSessionStore.getState().setSessionBufferPersistent(bid, !session.bufferPersistent);
+            }}
+            onRenameBuffer={(newName) => {
+              const bid = bufferMetadata?.id ?? session.bufferId;
+              if (bid) useSessionStore.getState().renameSessionBuffer(bid, newName);
+            }}
             speed={playbackSpeed}
             supportsSpeed={capabilities?.supports_speed_control ?? false}
             isStreaming={isDecoding || isLoading}
