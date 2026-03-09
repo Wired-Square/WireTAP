@@ -10,6 +10,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **Build warning: smpUpgrade dynamic import**: Removed redundant dynamic `import()` of `smpListImages` in `UploadView.tsx` — the module was already statically imported, so the dynamic import had no effect and produced a Vite warning.
+
 - **iOS safe area (bottom)**: Content no longer clips behind the home indicator on iOS. Uses `tauri-plugin-safe-area-insets-css` to read native safe area values and apply bottom padding. Also switched from `h-screen` (100vh) to percentage-based heights to avoid the iOS viewport height bug.
 
 - **SLCAN probe args**: Fixed `platform_probe_slcan_device` invoke sending camelCase argument names instead of snake_case, which prevented the probe from ever working.

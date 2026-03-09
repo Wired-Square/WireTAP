@@ -15,6 +15,7 @@ import {
   smpTestImage,
   smpResetDevice,
   smpCancelUpload,
+  smpListImages,
 } from "../../../api/smpUpgrade";
 import { pickFileToOpen } from "../../../api/dialogs";
 
@@ -80,7 +81,6 @@ export default function UploadView() {
       setStatusMessage("Marking image for test boot...");
 
       // Re-read slots to find the pending image in slot 1
-      const { smpListImages } = await import("../../../api/smpUpgrade");
       const images = await smpListImages();
       const pendingImage = images.find((img) => img.slot === 1 && img.pending);
 
