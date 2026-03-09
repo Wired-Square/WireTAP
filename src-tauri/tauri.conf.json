@@ -42,6 +42,9 @@
     },
     "macOS": {
       "infoPlist": "Info.plist"
+    },
+    "iOS": {
+      "developmentTeam": "YZ6PQTJH79"
     }
   }
 }

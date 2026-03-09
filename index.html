@@ -65,6 +65,15 @@
           font-size: 15px;
           opacity: 0.6;
         }
+        .splash-spinner {
+          margin: 24px 0 0;
+          width: 24px;
+          height: 24px;
+          border: 2.5px solid rgba(0,0,0,0.12);
+          border-top-color: rgba(0,0,0,0.4);
+          border-radius: 50%;
+          animation: splash-spin 0.7s linear infinite;
+        }
         @media (prefers-color-scheme: dark) {
           .splash {
             background-color: #0f172a;
@@ -74,10 +83,17 @@
             background: rgba(255,255,255,0.95);
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
           }
+          .splash-spinner {
+            border-color: rgba(255,255,255,0.15);
+            border-top-color: rgba(255,255,255,0.5);
+          }
         }
         @keyframes splash-fade-in {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes splash-spin {
+          to { transform: rotate(360deg); }
         }
       </style>
       <div class="splash">
@@ -86,6 +102,7 @@
         <div class="splash-byline">by Wired Square</div>
         <div class="splash-version">v{{VERSION}}</div>
         <div class="splash-formerly">the artist formerly known as CANdor</div>
+        <div class="splash-spinner"></div>
       </div>
     </div>
     <script>

@@ -12,9 +12,9 @@
     "test:watch": "vitest",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "node scripts/bump-version.js && tauri build",
+    "tauri:build": "node scripts/bump-version.js && if [ \"$APPLE_NOTARISE\" = \"true\" ]; then export APPLE_PASSWORD=\"$APPLE_NOTARY_PASSWORD\"; fi && tauri build",
     "ios:init": "tauri ios init",
-    "ios:dev": "tauri ios dev",
+    "ios:dev": "bash scripts/ios-dev.sh",
     "ios:build": "tauri ios build",
     "version:patch": "node scripts/bump-version.js patch",
     "version:minor": "node scripts/bump-version.js minor",
@@ -24,10 +24,10 @@
     "release:minor": "node scripts/release.js minor",
     "release:major": "node scripts/release.js major",
     "release:rebuild": "node scripts/release.js rebuild",
-    "notarise:build": "tauri build",
-    "notarise:history": "xcrun notarytool history --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_PASSWORD\"",
-    "notarise:log": "xcrun notarytool log --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_PASSWORD\"",
-    "notarise:info": "xcrun notarytool info --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_PASSWORD\""
+    "notarise:build": "APPLE_PASSWORD=\"$APPLE_NOTARY_PASSWORD\" tauri build",
+    "notarise:history": "xcrun notarytool history --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_NOTARY_PASSWORD\"",
+    "notarise:log": "xcrun notarytool log --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_NOTARY_PASSWORD\"",
+    "notarise:info": "xcrun notarytool info --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_NOTARY_PASSWORD\""
   },
   "dependencies": {
     "@sentry/react": "^10.39.0",

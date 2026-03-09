@@ -17,6 +17,7 @@
 		58F0C0CF0AB3BB3AE482CD75 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2341CB237F090B8237DEC6B /* Security.framework */; };
 		B28F96463D9D1DA3F9D7277F /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9298E8A9BED4133826997427 /* QuartzCore.framework */; };
 		B74504D55B87813B8F966013 /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2478E852B2E34859152A0298 /* CoreBluetooth.framework */; };
+		D1A2B3C4E5F60718293A4B5C /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E2B3C4D5F6071829A3B4C5D6 /* SystemConfiguration.framework */; };
 		CEA968D0EDEF82EA8294C0D5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3516036D1D2770E3E90CC676 /* Assets.xcassets */; };
 		DF2C33F4F6EE91F09044004B /* libapp.a in Resources */ = {isa = PBXBuildFile; fileRef = 11BF096B354744CBA1A0CEC3 /* libapp.a */; };
 		F6C055E4660A0F338AAF836A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 275CF7D7FF08AB4C3B36055A /* WebKit.framework */; };
@@ -76,6 +77,7 @@
 		9A6A9270CD3501EE59243A9F /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		9EFE10A76AD64E09517389E9 /* framer.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = framer.rs; sourceTree = "<group>"; };
 		A2341CB237F090B8237DEC6B /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		E2B3C4D5F6071829A3B4C5D6 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		A54A6D0D692CC0B59C4636DF /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
 		A553AE357AD3BBC16C55655B /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		AA98AA9223B26C6C438521AB /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
@@ -120,6 +122,7 @@
 				0A2313CC827B04A2F374D498 /* UIKit.framework in Frameworks */,
 				F6C055E4660A0F338AAF836A /* WebKit.framework in Frameworks */,
 				B74504D55B87813B8F966013 /* CoreBluetooth.framework in Frameworks */,
+				D1A2B3C4E5F60718293A4B5C /* SystemConfiguration.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -321,6 +324,7 @@
 				A2341CB237F090B8237DEC6B /* Security.framework */,
 				0EA4C7027D238420A4458240 /* UIKit.framework */,
 				275CF7D7FF08AB4C3B36055A /* WebKit.framework */,
+				E2B3C4D5F6071829A3B4C5D6 /* SystemConfiguration.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -404,11 +408,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					0710301C30D4830DBA8DA57C = {
-						ProvisioningStyle = Automatic;
-					};
-				};
 			};
 			buildConfigurationList = 2A91B9C8A76F1326F34A83D1 /* Build configuration list for PBXProject "wiretap" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -462,7 +461,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+			shellScript = "npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -487,7 +486,7 @@
 				CODE_SIGN_ENTITLEMENTS = wiretap_iOS/wiretap_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = YZ6PQTJH79;
+				DEVELOPMENT_TEAM = "YZ6PQTJH79";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -496,6 +495,7 @@
 				);
 				INFOPLIST_FILE = wiretap_iOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = WireTAP;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -515,7 +515,8 @@
 					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wiredsquare.wiretap;
-				PRODUCT_NAME = WireTAP;
+				PRODUCT_NAME = "WireTAP";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
@@ -650,7 +651,7 @@
 				CODE_SIGN_ENTITLEMENTS = wiretap_iOS/wiretap_iOS.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = YZ6PQTJH79;
+				DEVELOPMENT_TEAM = "YZ6PQTJH79";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -659,6 +660,7 @@
 				);
 				INFOPLIST_FILE = wiretap_iOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = WireTAP;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -678,7 +680,8 @@
 					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.wiredsquare.wiretap;
-				PRODUCT_NAME = WireTAP;
+				PRODUCT_NAME = "WireTAP";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
