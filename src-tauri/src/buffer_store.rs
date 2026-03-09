@@ -293,6 +293,30 @@ pub fn delete_buffer(id: &str) -> Result<(), String> {
     }
 }
 
+/// Clear a buffer's data without deleting the buffer itself.
+/// Resets metadata (count, times, buses) so the session can continue
+/// writing new frames into the same buffer.
+pub fn clear_buffer(id: &str) -> Result<(), String> {
+    {
+        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        if let Some(buffer) = registry.buffers.get_mut(id) {
+            buffer.metadata.count = 0;
+            buffer.metadata.start_time_us = None;
+            buffer.metadata.end_time_us = None;
+            buffer.metadata.buses = Vec::new();
+            buffer.seen_buses.clear();
+        } else {
+            return Err(format!("Buffer '{}' not found", id));
+        }
+    }
+
+    if let Err(e) = buffer_db::delete_buffer_data(id) {
+        tlog!("[BufferStore] Failed to clear buffer data from SQLite: {}", e);
+    }
+    tlog!("[BufferStore] Cleared buffer '{}'", id);
+    Ok(())
+}
+
 /// Get the active buffer ID.
 pub fn get_active_buffer_id() -> Option<String> {
     let registry = BUFFER_REGISTRY.read().unwrap();

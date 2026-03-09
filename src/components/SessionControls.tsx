@@ -4,7 +4,7 @@
 // Handles reader display, stop/resume/leave controls.
 
 import { useState, useRef, useEffect } from "react";
-import { Star, FileText, Square, Play, GitMerge, Bookmark, LogOut, Pencil, Pin, PinOff } from "lucide-react";
+import { Star, FileText, Square, Play, GitMerge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { iconSm, iconXs } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
 import type { BufferMetadata } from "../api/buffer";
@@ -44,6 +44,8 @@ export interface ReaderButtonProps {
   onClick: () => void;
   /** Whether button should be disabled (e.g., while streaming) */
   disabled?: boolean;
+  /** Whether the session is in buffer replay mode */
+  isBufferMode?: boolean;
 }
 
 export function ReaderButton({
@@ -58,8 +60,9 @@ export function ReaderButton({
   totalFrameCount,
   onClick,
   disabled = false,
+  isBufferMode: isBufferModeProp,
 }: ReaderButtonProps) {
-  const isBufferProfile = isBufferProfileId(ioProfile);
+  const isBufferProfile = isBufferModeProp ?? isBufferProfileId(ioProfile);
   const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
 
   // Show as multi-bus when multiBusProfiles has entries
@@ -71,9 +74,9 @@ export function ReaderButton({
   // Track whether sessionId is already shown in displayName (to avoid duplication)
   let sessionIdInDisplayName = false;
   if (isBufferProfile) {
-    // Buffer: show display name if available, otherwise buffer ID
-    displayName = bufferMetadata?.name || ioProfile || "Buffer";
-    sessionIdInDisplayName = true; // buffer ID is the session ID
+    // Buffer: show label if set, then buffer ID, then fallback
+    displayName = bufferMetadata?.name || bufferMetadata?.id || "Buffer";
+    sessionIdInDisplayName = true;
   } else if (showAsMultiBus) {
     // Multi-bus: show sessionId with profile count (e.g., "f_abc123 (2)")
     displayName = sessionId
@@ -137,7 +140,7 @@ export function ReaderButton({
   } else if (selectedProfile) {
     sourceNames = [selectedProfile.name];
   } else if (isBufferProfile) {
-    sourceNames = [ioProfile ?? "Buffer"];
+    sourceNames = [bufferMetadata?.name || bufferMetadata?.id || "Buffer"];
   } else {
     sourceNames = [];
   }
@@ -373,12 +376,20 @@ export interface IOSessionControlsProps {
   hideSessionControls?: boolean;
 
   // Buffer action props (shown when viewing a buffer)
+  /** Whether the session is in buffer replay mode (viewing stored buffer data) */
+  isBufferMode?: boolean;
   /** Whether the current buffer is persistent (pinned) */
   bufferPersistent?: boolean;
   /** Called when user toggles buffer pin */
   onToggleBufferPin?: () => void;
   /** Called when user renames the buffer */
   onRenameBuffer?: (newName: string) => void;
+
+  // Clear buffer props
+  /** Called when user clicks the clear/trash button. If absent, button is hidden. */
+  onClearBuffer?: () => void;
+  /** Whether the app has data that can be cleared (controls disabled state) */
+  hasData?: boolean;
 }
 
 /**
@@ -412,12 +423,16 @@ export function IOSessionControls({
   onOpenBookmarkPicker,
   hideSessionControls = false,
   // Buffer action props
+  isBufferMode: isBufferModeProp,
   bufferPersistent = false,
   onToggleBufferPin,
   onRenameBuffer,
+  // Clear buffer props
+  onClearBuffer,
+  hasData = false,
 }: IOSessionControlsProps) {
   // Auto-hide session controls when in buffer mode (playback controls are in the toolbar instead)
-  const isBufferMode = isBufferProfileId(ioProfile);
+  const isBufferMode = isBufferModeProp ?? isBufferProfileId(ioProfile);
   const shouldHideControls = hideSessionControls || isBufferMode;
   // Live session = we have an ioProfile that's not a buffer
   const isLiveSession = ioProfile !== null && !isBufferMode;
@@ -466,6 +481,7 @@ export function IOSessionControls({
         totalFrameCount={totalFrameCount}
         onClick={onOpenIoReaderPicker}
         disabled={isStreaming && !isBufferMode}
+        isBufferMode={isBufferMode}
       />
 
       {/* Buffer actions - pin and rename (shown when viewing a buffer) */}
@@ -512,6 +528,18 @@ export function IOSessionControls({
             </div>
           )}
         </div>
+      )}
+
+      {/* Clear buffer button — hidden for persistent buffers */}
+      {onClearBuffer && ioProfile && !(isBufferMode && bufferPersistent) && (
+        <button
+          onClick={onClearBuffer}
+          disabled={!hasData}
+          className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] enabled:hover:!bg-red-600 enabled:hover:!text-white disabled:opacity-30 disabled:cursor-not-allowed"
+          title={isBufferMode ? "Delete buffer" : "Clear buffer and start fresh"}
+        >
+          <Trash2 className={iconXs} />
+        </button>
       )}
 
       {/* Speed button - only show if reader supports speed and not in buffer mode */}

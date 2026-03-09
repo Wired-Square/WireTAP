@@ -38,10 +38,16 @@ import { isMultiSourceCapable, buildDefaultBusMappings } from "../utils/profileT
  * Generate a unique session ID for recorded/timeline sources.
  * Pattern: t_{shortId}
  * - t_ = timeline (postgres, csv, or other recorded sources)
+ * - b_ = buffer replay (viewing stored buffer data)
  */
 function generateRecordedSessionId(): string {
   const shortId = Math.random().toString(16).slice(2, 8);
   return `t_${shortId}`;
+}
+
+function generateBufferSessionId(): string {
+  const shortId = Math.random().toString(16).slice(2, 8);
+  return `b_${shortId}`;
 }
 
 /** Reason for session reconfiguration */
@@ -208,6 +214,8 @@ export interface UseIOSessionManagerResult {
   handleLeave: () => Promise<void>;
   /** Destroy the session entirely */
   handleDestroy: () => Promise<void>;
+  /** Clear the session's buffer (real-time/recorded: clear data; buffer: delete + leave) */
+  handleClearBuffer: () => Promise<void>;
 
   // ---- Watch State (for top bar display) ----
   /** Total frame count during watch mode */
@@ -736,6 +744,31 @@ export function useIOSessionManager(
     // Note: the session destruction will emit lifecycle events that update the UI
   }, [session.sessionId, setMultiBusProfiles]);
 
+  // Clear buffer — behaviour depends on source type:
+  // Real-time/recorded: clear buffer data in backend (session keeps running)
+  // Buffer (non-persistent): delete buffer + leave session
+  const handleClearBuffer = useCallback(async () => {
+    const { clearBufferData, deleteBuffer } = await import("../api/buffer");
+    // For buffer sessions, sourceProfileId holds the buf_N ID;
+    // for real-time/recorded sessions the buffer ID is on the session object.
+    const bid = isBufferProfileId(sourceProfileId) ? sourceProfileId : session.bufferId;
+
+    if (isBufferProfileId(sourceProfileId)) {
+      // Buffer mode: delete buffer + leave session (clean leave, no suspend/copy)
+      tlog.info(`[IOSessionManager] Clear buffer: deleting buffer ${bid} and leaving session`);
+      if (bid) await deleteBuffer(bid);
+      await session.leave();
+      setMultiBusProfiles([]);
+      setIoProfile(null);
+      setIsWatching(false);
+      setIsDetached(false);
+    } else {
+      // Real-time or recorded: clear buffer data, session continues streaming
+      tlog.info(`[IOSessionManager] Clear buffer: clearing data for buffer ${bid}`);
+      if (bid) await clearBufferData(bid);
+    }
+  }, [session, ioProfile, setMultiBusProfiles, setIoProfile]);
+
   const resetWatchFrameCount = useCallback(() => {
     setWatchFrameCount(0);
     watchUniqueIdsRef.current = new Set();
@@ -894,8 +927,9 @@ export function useIOSessionManager(
       return;
     }
 
-    // Recorded/non-multi-source-capable sources: generate unique t_ session ID
-    const sessionId = generateRecordedSessionId();
+    // Buffer sessions get b_ IDs; recorded/timeline sources get t_ IDs.
+    const isBuffer = isBufferProfileId(profileId);
+    const sessionId = isBuffer ? generateBufferSessionId() : generateRecordedSessionId();
 
     await session.reinitialize(profileId, {
       startTime: opts.startTime,
@@ -918,7 +952,7 @@ export function useIOSessionManager(
       modbusPollsJson: opts.modbusPollsJson,
     });
 
-    // Clear multi-bus state when switching to a recorded source
+    // Clear multi-bus state when switching to a non-multi source
     setMultiBusProfiles([]);
 
     setIoProfile(sessionId);
@@ -1397,8 +1431,15 @@ export function useIOSessionManager(
   }, [pendingJoin, effectiveSessionId, clearPendingJoin, appName, joinSession]);
 
   // ---- Clear Watch State on Stream End ----
+  // Only reset when streaming transitions from true → false (not on initial mount
+  // or when isWatching is set before the session connects and isStreaming becomes true).
+  const wasStreamingRef = useRef(false);
   useEffect(() => {
-    if (!isStreaming && isWatching) {
+    if (isStreaming) {
+      wasStreamingRef.current = true;
+    } else if (wasStreamingRef.current && isWatching) {
+      // Streaming just stopped
+      wasStreamingRef.current = false;
       setIsWatching(false);
       resetWatchFrameCount();
     }
@@ -1442,6 +1483,7 @@ export function useIOSessionManager(
     handleRejoin,
     handleLeave,
     handleDestroy,
+    handleClearBuffer,
 
     // Watch State
     watchFrameCount,

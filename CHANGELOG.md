@@ -8,10 +8,22 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Buffer pin/rename in session controls**: Pin and rename buttons now appear in the app top bar when viewing a buffer, matching the existing functionality in the IO source picker dialog. Changes propagate across all apps connected to the same buffer via session store synchronisation.
 
+- **Clear buffer button in session controls**: Trash/clear button moved from app-specific actions into the shared session controls. Behaviour varies by source type: real-time/recorded sources clear buffer data and continue streaming; buffer sources delete the buffer and leave the session; persistent buffers hide the button (unpin first). Backed by a new `clear_buffer` Rust command that resets buffer metadata and clears SQLite data without destroying the session.
+
+- **Buffer session IDs**: Buffer replay sessions now use `b_` prefixed session IDs (e.g., `b_a1f3c2`) consistent with other session types (`f_` for frame, `t_` for timeline, `s_` for multi-source).
+
+### Changed
+
+- **Buffer mode passed explicitly**: `isBufferMode` is now passed as an explicit prop through the top bar component hierarchy instead of being derived from `ioProfile` format, decoupling session ID format from buffer mode detection.
+
 ### Fixed
 
 - **Clear All preserves pinned buffers**: The "Clear All" button in the IO source picker no longer deletes persistent (pinned) buffers.
 - **Buffer sources show collapsed view in Data Source dialog**: When opening the Data Source dialog while on a buffer with an active session, the dialog now shows the collapsed source view (matching the behaviour of other source types) instead of the full source list.
+- **Pin toggle state not updating**: Fixed buffer pin/unpin button not reflecting state changes in the top bar. The `expectedStateRef` in `useIOSession` was never cleared for buffer sessions (which don't auto-start and thus never receive streaming events), causing the UI to read stale state.
+- **Session tooltip showing 0 frames during streaming**: Fixed a race condition where `isWatching` was immediately reset to `false` by the "clear on stream end" effect before the session connected. The effect now tracks streaming transitions correctly using a ref.
+- **Session tooltip frame counts for buffer sessions**: Buffer sessions now show buffer frame count and unique IDs from metadata instead of watch counters (which are always 0 for non-streaming sessions).
+- **Buffer session tooltip showing session ID as source**: The tooltip "Source" field now shows the buffer label or buffer ID instead of the raw `b_` session ID.
 
 ## [0.5.5] - 2026-03-09
 

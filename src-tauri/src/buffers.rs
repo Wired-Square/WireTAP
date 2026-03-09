@@ -385,6 +385,13 @@ pub async fn delete_buffer(buffer_id: String) -> Result<(), String> {
     buffer_store::delete_buffer(&buffer_id)
 }
 
+/// Clear a buffer's data without deleting the buffer.
+/// The session keeps its reference and can continue writing new frames.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn clear_buffer(buffer_id: String) -> Result<(), String> {
+    buffer_store::clear_buffer(&buffer_id)
+}
+
 /// Get metadata for a specific buffer by ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_buffer_metadata_by_id(buffer_id: String) -> Result<Option<BufferMetadata>, String> {

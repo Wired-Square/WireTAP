@@ -1,11 +1,10 @@
 // ui/src/apps/discovery/views/DiscoveryTopBar.tsx
 
-import { Search, ChevronRight, Save, Trash2, Info, Wrench, Download, Undo2 } from "lucide-react";
+import { Search, ChevronRight, Save, Info, Wrench, Download, Undo2 } from "lucide-react";
 import type { IOProfile } from "../../../types/common";
 import type { BufferMetadata } from "../../../api/buffer";
 import AppTopBar from "../../../components/AppTopBar";
 import { buttonBase, iconButtonBase } from "../../../styles/buttonStyles";
-import { isBufferProfileId } from "../../../hooks/useIOSessionManager";
 import { iconMd, iconSm } from "../../../styles/spacing";
 
 type Props = {
@@ -69,12 +68,18 @@ type Props = {
   isModbusProfile?: boolean;
 
   // Buffer actions
+  /** Whether the session is in buffer replay mode */
+  isBufferMode?: boolean;
   /** Whether the current buffer is persistent (pinned) */
   bufferPersistent?: boolean;
   /** Called when user toggles buffer pin */
   onToggleBufferPin?: () => void;
   /** Called when user renames the buffer */
   onRenameBuffer?: (newName: string) => void;
+  /** Called when user clicks the clear/trash button (session-level) */
+  onClearBuffer?: () => void;
+  /** Whether the app has data that can be cleared */
+  hasData?: boolean;
 
   // Dialogs
   onOpenIoReaderPicker: () => void;
@@ -82,7 +87,6 @@ type Props = {
   // Actions
   onSave: () => void;
   onExport: () => void;
-  onClear: () => void;
   onInfo: () => void;
   onOpenToolbox: () => void;
 };
@@ -112,9 +116,12 @@ export default function DiscoveryTopBar({
   serialActiveTab = 'raw',
   onUndoFraming,
   isModbusProfile = false,
+  isBufferMode = false,
   bufferPersistent = false,
   onToggleBufferPin,
   onRenameBuffer,
+  onClearBuffer,
+  hasData = false,
   supportsTimeRange = false,
   onOpenBookmarkPicker,
   speed = 1,
@@ -123,14 +130,11 @@ export default function DiscoveryTopBar({
   onOpenIoReaderPicker,
   onSave,
   onExport,
-  onClear,
   onInfo,
   onOpenToolbox,
 }: Props) {
   // In serial mode, tools are available with raw bytes even without framed data
   const hasFrames = isSerialMode ? (frameCount > 0 || serialBytesCount > 0) : frameCount > 0;
-  const isPersistentBuffer = bufferPersistent || bufferMetadata?.persistent === true;
-  const canClear = hasFrames && !isPersistentBuffer;
 
   return (
     <AppTopBar
@@ -153,13 +157,16 @@ export default function DiscoveryTopBar({
         isStreaming,
         isStopped, // Show Resume in both realtime and buffer mode (to return to live)
         supportsTimeRange,
-        onStop: !isBufferProfileId(ioProfile) ? onStopWatch : undefined, // Hide Stop only in buffer mode
+        onStop: !isBufferMode ? onStopWatch : undefined, // Hide Stop only in buffer mode
         onResume, // Always show Resume when stopped (resumeFresh handles live return)
         onLeave,
         onOpenBookmarkPicker,
+        isBufferMode,
         bufferPersistent,
         onToggleBufferPin,
         onRenameBuffer,
+        onClearBuffer,
+        hasData,
       }}
       framePicker={{
         frameCount,
@@ -186,15 +193,6 @@ export default function DiscoveryTopBar({
             title={isSerialMode && serialActiveTab === 'raw' ? "Export bytes to file" : "Export frames to file"}
           >
             <Download className={iconMd} />
-          </button>
-
-          <button
-            onClick={onClear}
-            disabled={!canClear}
-            className={`${iconButtonBase} enabled:hover:!bg-red-600 enabled:hover:!text-white`}
-            title={isPersistentBuffer ? "Cannot clear a pinned buffer" : isSerialMode ? "Clear all bytes" : "Clear all frames"}
-          >
-            <Trash2 className={iconMd} />
           </button>
 
           <button

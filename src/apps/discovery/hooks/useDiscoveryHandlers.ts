@@ -26,10 +26,9 @@ import {
 import { useTimeHandlers, type TimeHandlers } from "../../../hooks/useTimeHandlers";
 import type { PlaybackSpeed, FrameMessage } from "../../../stores/discoveryStore";
 import type { BufferMetadata, TimestampedByte } from "../../../api/buffer";
-import { deleteBuffer } from "../../../api/buffer";
 import type { ExportDataMode } from "../../../dialogs/ExportFramesDialog";
 import type { SelectionSet } from "../../../utils/selectionSets";
-import { isBufferProfileId, type LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
+import { type LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
 
 export interface UseDiscoveryHandlersParams {
@@ -97,6 +96,8 @@ export interface UseDiscoveryHandlersParams {
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   reinitialize: (profileId?: string, options?: any) => Promise<void>;
+  /** Centralised buffer clear from the session manager */
+  handleClearBuffer: () => Promise<void>;
   setSpeed: (speed: number) => Promise<void>;
   setTimeRange: (start: string, end: string) => Promise<void>;
   seek: (timestampUs: number) => Promise<void>;
@@ -263,7 +264,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     onAfterMutate: params.onAfterSelectionSetMutate,
   });
 
-  // Handle clear discovered frames
+  // Handle clear discovered frames — app-specific cleanup + centralised buffer clear
   const handleClearDiscoveredFrames = useCallback(async () => {
     if (params.isSerialMode) {
       params.clearSerialBytes();
@@ -271,24 +272,14 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     }
     params.clearBuffer();
     params.clearFramePicker();
-    if (params.bufferMetadata?.id) {
-      await deleteBuffer(params.bufferMetadata.id);
-    }
-    if (isBufferProfileId(params.ioProfile) && params.sourceProfileId) {
-      params.setIoProfile(params.sourceProfileId);
-      await params.reinitialize(params.sourceProfileId);
-    }
+    await params.handleClearBuffer();
   }, [
     params.isSerialMode,
     params.clearSerialBytes,
     params.resetFraming,
     params.clearBuffer,
     params.clearFramePicker,
-    params.bufferMetadata?.id,
-    params.ioProfile,
-    params.sourceProfileId,
-    params.setIoProfile,
-    params.reinitialize,
+    params.handleClearBuffer,
   ]);
 
   // Handle export click (opens dialog)

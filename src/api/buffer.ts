@@ -432,6 +432,16 @@ export async function deleteBuffer(bufferId: string): Promise<void> {
 }
 
 /**
+ * Clear a buffer's data without deleting the buffer itself.
+ * The session keeps its reference and can continue writing new frames.
+ *
+ * @param bufferId - The buffer ID to clear
+ */
+export async function clearBufferData(bufferId: string): Promise<void> {
+  return invoke("clear_buffer", { buffer_id: bufferId });
+}
+
+/**
  * Rename a buffer.
  *
  * @param bufferId - The buffer ID to rename

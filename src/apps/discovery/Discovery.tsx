@@ -29,7 +29,6 @@ import BookmarkEditorDialog from "../../dialogs/BookmarkEditorDialog";
 import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
-import { isBufferProfileId } from "../../hooks/useIOSessionManager";
 import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
 import { getBufferMetadata, getBufferFramesPaginated, getBufferFramesPaginatedFiltered, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
 import { WINDOW_EVENTS } from "../../events/registry";
@@ -578,7 +577,7 @@ export default function Discovery() {
 
     if (!ioProfile) {
       newIsSerialMode = false;
-    } else if (isBufferProfileId(ioProfile)) {
+    } else if (isBufferMode) {
       // Buffer mode: check buffer metadata for bytes type
       newIsSerialMode = bufferMetadata?.buffer_type === "bytes" || bufferType === "bytes" || framedBufferId !== null;
     } else {
@@ -789,6 +788,7 @@ export default function Discovery() {
     pause,
     resume,
     reinitialize,
+    handleClearBuffer: manager.handleClearBuffer,
     setSpeed,
     setTimeRange,
     seek,
@@ -924,8 +924,8 @@ export default function Discovery() {
           supportsSpeed={capabilities?.supports_speed_control ?? false}
           onOpenSpeedPicker={() => dialogs.speedPicker.open()}
           frameCount={frameList.length}
-          uniqueFrameCount={watchUniqueFrameCount}
-          totalFrameCount={watchFrameCount}
+          uniqueFrameCount={isBufferMode ? frameInfoMap.size : watchUniqueFrameCount}
+          totalFrameCount={isBufferMode ? bufferCount : watchFrameCount}
           selectedFrameCount={selectedFrames.size}
           onOpenFramePicker={() => dialogs.framePicker.open()}
           isSerialMode={isSerialMode}
@@ -934,6 +934,7 @@ export default function Discovery() {
           serialActiveTab={serialActiveTab}
           onUndoFraming={undoAcceptFraming}
           isModbusProfile={isModbusProfile}
+          isBufferMode={isBufferMode}
           bufferPersistent={session.bufferPersistent}
           onToggleBufferPin={() => {
             const bid = bufferMetadata?.id ?? sessionBufferId;
@@ -944,9 +945,10 @@ export default function Discovery() {
             if (bid) useSessionStore.getState().renameSessionBuffer(bid, newName);
           }}
           onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
+          onClearBuffer={handlers.handleClearDiscoveredFrames}
+          hasData={frameList.length > 0 || (isSerialMode && (backendByteCount > 0 || serialBytesBuffer.length > 0))}
           onSave={openSaveDialog}
           onExport={() => dialogs.export.open()}
-          onClear={handlers.handleClearDiscoveredFrames}
           onInfo={openInfoView}
           onOpenToolbox={() => dialogs.toolbox.open()}
         />

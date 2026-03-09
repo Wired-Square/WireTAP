@@ -397,6 +397,22 @@ export function useIOSession(
         session.buffer.name !== prevSession.buffer.name ||
         session.buffer.persistent !== prevSession.buffer.persistent
       ) {
+        // Also update expectedStateRef if it's active (e.g., buffer sessions that
+        // don't auto-start never receive streaming events to clear the ref, so
+        // effectiveState would read stale values from the ref instead of localState)
+        if (expectedStateRef.current?.sessionId === effectiveSessionId) {
+          expectedStateRef.current = {
+            ...expectedStateRef.current,
+            state: {
+              ...expectedStateRef.current.state,
+              buffer: {
+                ...expectedStateRef.current.state.buffer,
+                name: session.buffer.name,
+                persistent: session.buffer.persistent,
+              },
+            },
+          };
+        }
         setLocalState((prev) => {
           if (!prev) return prev;
           return {

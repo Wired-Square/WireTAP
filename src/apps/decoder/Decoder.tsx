@@ -714,6 +714,12 @@ export default function Decoder() {
     totalFrames: effectiveBufferMetadata?.count,
   });
 
+  // Handle clear buffer — app-specific cleanup + centralised buffer clear
+  const handleClearBuffer = useCallback(async () => {
+    clearFrames();
+    await manager.handleClearBuffer();
+  }, [clearFrames, manager.handleClearBuffer]);
+
   // Centralised IO picker handlers
   const ioPickerProps = useIOSourcePickerHandlers({
     manager,
@@ -984,6 +990,7 @@ export default function Decoder() {
             multiBusProfiles={sessionId ? ioProfiles : []}
             ioState={readerState}
             isRealtime={isRealtime}
+            isBufferMode={isBufferMode}
             bufferPersistent={session.bufferPersistent}
             onToggleBufferPin={() => {
               const bid = bufferMetadata?.id ?? session.bufferId;
@@ -993,6 +1000,8 @@ export default function Decoder() {
               const bid = bufferMetadata?.id ?? session.bufferId;
               if (bid) useSessionStore.getState().renameSessionBuffer(bid, newName);
             }}
+            onClearBuffer={handleClearBuffer}
+            hasData={frameList.length > 0 || hasBufferData}
             speed={playbackSpeed}
             supportsSpeed={capabilities?.supports_speed_control ?? false}
             isStreaming={isDecoding || isLoading}
@@ -1003,8 +1012,8 @@ export default function Decoder() {
             supportsTimeRange={capabilities?.supports_time_range ?? false}
             onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
             frameCount={frameList.length}
-            uniqueFrameCount={watchUniqueFrameCount}
-            totalFrameCount={watchFrameCount}
+            uniqueFrameCount={isBufferMode ? frameList.length : watchUniqueFrameCount}
+            totalFrameCount={isBufferMode ? bufferCount : watchFrameCount}
             selectedFrameCount={selectedFrames.size}
             onOpenFramePicker={() => dialogs.framePicker.open()}
             onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}

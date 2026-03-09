@@ -8,7 +8,7 @@ import type { PlaybackSpeed } from "../../../components/TimeController";
 import type { BufferMetadata } from "../../../api/buffer";
 import AppTopBar from "../../../components/AppTopBar";
 import { buttonBase, iconButtonBase, toggleButtonClass } from "../../../styles/buttonStyles";
-import { isBufferProfileId } from "../../../hooks/useIOSessionManager";
+
 
 type Props = {
   // Catalog selection
@@ -50,12 +50,18 @@ type Props = {
   onOpenBookmarkPicker?: () => void;
 
   // Buffer actions
+  /** Whether the session is in buffer replay mode */
+  isBufferMode?: boolean;
   /** Whether the current buffer is persistent (pinned) */
   bufferPersistent?: boolean;
   /** Called when user toggles buffer pin */
   onToggleBufferPin?: () => void;
   /** Called when user renames the buffer */
   onRenameBuffer?: (newName: string) => void;
+  /** Called when user clicks the clear/trash button (session-level) */
+  onClearBuffer?: () => void;
+  /** Whether the app has data that can be cleared */
+  hasData?: boolean;
 
   // Frame picker
   frameCount: number;
@@ -118,9 +124,12 @@ export default function DecoderTopBar({
   onLeave,
   supportsTimeRange = false,
   onOpenBookmarkPicker,
+  isBufferMode = false,
   bufferPersistent = false,
   onToggleBufferPin,
   onRenameBuffer,
+  onClearBuffer,
+  hasData = false,
   frameCount,
   uniqueFrameCount,
   totalFrameCount,
@@ -168,13 +177,16 @@ export default function DecoderTopBar({
         isStreaming,
         isStopped, // Show Resume in both realtime and buffer mode (to return to live)
         supportsTimeRange,
-        onStop: !isBufferProfileId(ioProfile) ? onStopStream : undefined, // Hide Stop only in buffer mode
+        onStop: !isBufferMode ? onStopStream : undefined, // Hide Stop only in buffer mode
         onResume, // Always show Resume when stopped (resumeFresh handles live return)
         onLeave,
         onOpenBookmarkPicker,
+        isBufferMode,
         bufferPersistent,
         onToggleBufferPin,
         onRenameBuffer,
+        onClearBuffer,
+        hasData,
       }}
       framePicker={{
         frameCount,
