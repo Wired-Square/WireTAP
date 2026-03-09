@@ -30,6 +30,7 @@
     "notarise:info": "xcrun notarytool info --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_NOTARY_PASSWORD\""
   },
   "dependencies": {
+    "@saurl/tauri-plugin-safe-area-insets-css-api": "^0.1.0",
     "@sentry/react": "^10.39.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.4.2",

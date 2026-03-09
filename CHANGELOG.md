@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **iOS safe area (bottom)**: Content no longer clips behind the home indicator on iOS. Uses `tauri-plugin-safe-area-insets-css` to read native safe area values and apply bottom padding. Also switched from `h-screen` (100vh) to percentage-based heights to avoid the iOS viewport height bug.
+
 ### Added
 
 - **Keep screen on (iOS)**: Added `keep-screen-on` Tauri plugin capability to prevent the screen from dimming during active sessions on iOS.

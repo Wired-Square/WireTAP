@@ -663,7 +663,12 @@ export default function MainLayout() {
   }
 
   return (
-    <div className={`h-screen flex flex-col ${bgPrimary}`}>
+    <div
+      className={`h-full flex flex-col ${bgPrimary}`}
+      style={{
+        paddingBottom: 'var(--safe-area-inset-bottom, 0px)',
+      }}
+    >
       {/* Dockview container fills the screen */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <DockviewReact

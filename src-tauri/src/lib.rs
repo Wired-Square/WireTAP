@@ -844,6 +844,10 @@ pub fn run() {
     #[cfg(target_os = "ios")]
     let builder = builder.plugin(tauri_plugin_keep_screen_on::init());
 
+    // Expose safe area insets as CSS variables on iOS (works around WebKit env() timing bug)
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(tauri_plugin_safe_area_insets_css::init());
+
     let builder = builder.setup(|app| {
             // Start file logging as early as possible (before anything else logs).
             // Read the settings file synchronously to check the log level.

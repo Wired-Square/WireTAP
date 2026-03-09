@@ -5566,6 +5566,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-safe-area-insets-css"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "561c23b4fcc4ba7afa0f88a4267fecf2e814f7575a7b1b1526f5c50830e293ce"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "tauri-plugin-store"
 version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7257,6 +7269,7 @@ dependencies = [
  "tauri-plugin-keep-screen-on",
  "tauri-plugin-opener",
  "tauri-plugin-os",
+ "tauri-plugin-safe-area-insets-css",
  "tauri-plugin-store",
  "tokio",
  "tokio-modbus",

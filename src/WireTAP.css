@@ -15,6 +15,10 @@ html, body {
   position: fixed;
 }
 
+#root {
+  height: 100%;
+}
+
 /* DSEG7 Classic - 7-segment LED display font */
 @font-face {
   font-family: 'DSEG7';
