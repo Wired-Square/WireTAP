@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/iOS-schema.json",
+  "identifier": "ios",
+  "description": "iOS-only capabilities",
+  "platforms": ["iOS"],
+  "windows": ["*"],
+  "permissions": [
+    "keep-screen-on:allow-keep-screen-on"
+  ]
+}
