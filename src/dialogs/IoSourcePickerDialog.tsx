@@ -1265,21 +1265,21 @@ export default function IoSourcePickerDialog({
     }
   };
 
-  // Clear all non-streaming buffers
+  // Clear all non-streaming, non-persistent buffers
   const handleClearAllBuffers = async () => {
     try {
-      // Only delete buffers that are not streaming
-      const nonStreamingBuffers = buffers.filter(b => !b.is_streaming);
-      for (const buffer of nonStreamingBuffers) {
+      // Only delete buffers that are not streaming and not pinned
+      const clearableBuffers = buffers.filter(b => !b.is_streaming && !b.persistent);
+      for (const buffer of clearableBuffers) {
         await deleteBuffer(buffer.id);
       }
 
-      // Refresh buffer list (keep streaming buffers)
-      const streamingBuffers = buffers.filter(b => b.is_streaming);
-      setBuffers(streamingBuffers);
+      // Refresh buffer list (keep streaming and persistent buffers)
+      const keptBuffers = buffers.filter(b => b.is_streaming || b.persistent);
+      setBuffers(keptBuffers);
 
       // If buffer was selected and it was deleted, clear selection
-      const deletedIds = new Set(nonStreamingBuffers.map(b => b.id));
+      const deletedIds = new Set(clearableBuffers.map(b => b.id));
       if (isBufferProfileId(selectedId)) {
         // Check if the selected buffer was deleted
         const selectedBuffer = buffers.find(b => b.id === selectedId);
