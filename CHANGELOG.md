@@ -4,6 +4,10 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Build: improved code splitting**: Switched Vite `manualChunks` from object form to function form for reliable vendor chunk extraction. Added `dockview-core` as a separate vendor chunk. Main bundle dropped from 506 kB to 116 kB.
+
 ### Fixed
 
 - **iOS safe area (bottom)**: Content no longer clips behind the home indicator on iOS. Uses `tauri-plugin-safe-area-insets-css` to read native safe area values and apply bottom padding. Also switched from `h-screen` (100vh) to percentage-based heights to avoid the iOS viewport height bug.

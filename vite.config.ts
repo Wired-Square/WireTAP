@@ -44,22 +44,26 @@ export default defineConfig(async () => ({
     rollupOptions: {
       output: {
         // Split vendor chunks for better caching
-        manualChunks: {
-          // Core React runtime - loaded by all windows
-          'vendor-react': ['react', 'react-dom'],
-          // Tauri APIs - loaded by all windows
-          'vendor-tauri': [
-            '@tauri-apps/api',
-            '@tauri-apps/plugin-dialog',
-            '@tauri-apps/plugin-opener',
-            '@tauri-apps/plugin-store',
-          ],
-          // State management
-          'vendor-zustand': ['zustand'],
-          // TOML parsing (used by catalog editor)
-          'vendor-toml': ['smol-toml'],
-          // Error tracking
-          'vendor-sentry': ['@sentry/react'],
+        // Function form matches on resolved file paths (more reliable than object form)
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom/') || id.includes('node_modules/react/') || id.includes('node_modules/scheduler/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/dockview-core/') || id.includes('node_modules/dockview/')) {
+            return 'vendor-dockview';
+          }
+          if (id.includes('node_modules/@tauri-apps/')) {
+            return 'vendor-tauri';
+          }
+          if (id.includes('node_modules/zustand/')) {
+            return 'vendor-zustand';
+          }
+          if (id.includes('node_modules/smol-toml/')) {
+            return 'vendor-toml';
+          }
+          if (id.includes('node_modules/@sentry/')) {
+            return 'vendor-sentry';
+          }
         },
       },
     },
