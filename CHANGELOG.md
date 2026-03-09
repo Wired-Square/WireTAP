@@ -6,6 +6,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Added
 
+- **Keep screen on (iOS)**: Added `keep-screen-on` Tauri plugin capability to prevent the screen from dimming during active sessions on iOS.
+
 - **Buffer bus mapping via probe**: Buffers now go through the same probe → bus mapper → connect flow as realtime devices. Selecting a buffer in the Data Source picker shows a bus mapper (e.g. "Bus 0 → Bus 0") and a Connect button, letting you wire individual buses before creating a session. The Rust `probe_device` command handles buffer IDs directly from in-memory metadata. Buffers no longer auto-connect when selected — sessions are only created on Connect.
 
 - **Buffer bus metadata**: Buffers now track which bus numbers are present in their data. This enables bus mapping and wiring when joining a buffer as a source, just like realtime devices. Bus metadata is persisted to SQLite and backfilled automatically for existing buffers on first startup.

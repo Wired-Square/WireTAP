@@ -25,6 +25,7 @@
     "dialog:allow-open",
     "store:default",
     "store:allow-load",
-    "store:allow-save"
+    "store:allow-save",
+    "keep-screen-on:allow-keep-screen-on"
   ]
 }
