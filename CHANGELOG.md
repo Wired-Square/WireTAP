@@ -24,6 +24,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Data Source picker clears device selection on buffer switch**: When a realtime session switches to buffer replay (STOP), `multiBusProfiles` is cleared in the `onSwitchedToBuffer` handler. This prevents the Data Source dialog from pre-selecting the original device profile when the session is now backed by a buffer.
 
+- **`replace_session_device` primitive**: New internal Rust function for in-place device swaps — stops old device, swaps in a new one, updates metadata, optionally auto-starts, and emits `session-device-replaced` event. Session ID and all listeners are preserved. Refactored `stop_and_switch_to_buffer`, `switch_to_buffer_replay`, and `resume_to_live_session` to use this primitive, reducing duplicated swap logic. Frontend receives the new event via `onDeviceReplaced` callback on `useIOSession`.
+
 ### Changed
 
 - **Simplified Session menu architecture**: Merged `update_menu_session_state` and `update_menu_focus_state` Rust commands into a single `update_menu_state` command. Removed the MainLayout event relay — `useMenuSessionControl` now listens directly for native menu events (`menu-session-*`) with a focus guard, eliminating the double-hop through `session-control` intermediate events. ~70 lines removed from MainLayout.

@@ -674,6 +674,24 @@ export interface SessionResumingPayload {
 }
 
 /**
+ * Payload sent when a session's device is replaced in-place.
+ * The session ID and all listeners are preserved.
+ * Event name: session-device-replaced:{sessionId}
+ */
+export interface DeviceReplacedPayload {
+  /** Previous device type (e.g., "multi_source", "buffer") */
+  previous_device_type: string;
+  /** New device type */
+  new_device_type: string;
+  /** New capabilities after the swap */
+  capabilities: IOCapabilities;
+  /** New IO state after the swap */
+  state: string;
+  /** Context hint for the frontend ("buffer", "live", "reinitialize") */
+  transition: string;
+}
+
+/**
  * Payload sent when a session's state changes.
  * Event name: session-state:{sessionId}
  */

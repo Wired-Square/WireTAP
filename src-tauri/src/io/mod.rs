@@ -498,6 +498,33 @@ pub struct StateChangePayload {
     pub buffer_id: Option<String>,
 }
 
+/// Options for replacing a session's device in-place.
+pub struct ReplaceDeviceOptions {
+    /// Human-readable transition name ("buffer", "live", "reinitialize")
+    pub transition: String,
+    /// Whether to auto-start the new device after swapping
+    pub auto_start: bool,
+    /// New source_names to set on the session (None = keep existing)
+    pub source_names: Option<Vec<String>>,
+    /// New source_configs to set on the session (None = keep existing)
+    pub source_configs: Option<Vec<SourceConfig>>,
+}
+
+/// Payload emitted when a session's device is replaced in-place.
+#[derive(Clone, Debug, Serialize)]
+pub struct DeviceReplacedPayload {
+    /// Previous device type (e.g., "multi_source", "buffer")
+    pub previous_device_type: String,
+    /// New device type
+    pub new_device_type: String,
+    /// New capabilities after the swap
+    pub capabilities: IOCapabilities,
+    /// New IO state after the swap
+    pub state: String,
+    /// Context hint for the frontend ("buffer", "live", "reinitialize")
+    pub transition: String,
+}
+
 /// Payload emitted when joiner count changes
 #[derive(Clone, Debug, Serialize)]
 pub struct JoinerCountChangedPayload {
@@ -2024,6 +2051,89 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
     Ok(current)
 }
 
+/// Replace a session's device in-place, keeping the session ID and all listeners.
+///
+/// This is the low-level primitive for device swaps. Callers handle domain-specific
+/// logic (buffer orchestration, profile tracking) before/after calling this.
+///
+/// Steps: stop old device → swap device → optionally update metadata → optionally
+/// auto-start → emit `session-device-replaced` event → emit state change.
+///
+/// Takes `&mut HashMap` so callers can hold the IO_SESSIONS lock across the
+/// full operation (preventing double-lock).
+pub async fn replace_session_device(
+    sessions: &mut HashMap<String, IOSession>,
+    session_id: &str,
+    new_device: Box<dyn IODevice>,
+    opts: ReplaceDeviceOptions,
+) -> Result<DeviceReplacedPayload, String> {
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    // 1. Stop old device (idempotent)
+    let previous_state = session.device.state();
+    if !matches!(previous_state, IOState::Stopped) {
+        let _ = session.device.stop().await;
+    }
+
+    // 2. Record old device info
+    let previous_device_type = session.device.device_type().to_string();
+
+    // 3. Get new device info before swap
+    let capabilities = new_device.capabilities();
+    let new_device_type = new_device.device_type().to_string();
+
+    // 4. Swap the device
+    session.device = new_device;
+
+    // 5. Update metadata if provided
+    if let Some(names) = opts.source_names {
+        session.source_names = names;
+    }
+    if let Some(configs) = opts.source_configs {
+        session.source_configs = configs;
+    }
+
+    // 6. Clear suspension state
+    session.suspended_at = None;
+
+    // 7. Optionally auto-start
+    if opts.auto_start {
+        session.device.start().await?;
+    }
+
+    let current_state = session.device.state();
+    let state_str = state_to_string(&current_state);
+
+    // 8. Emit device-replaced event
+    let payload = DeviceReplacedPayload {
+        previous_device_type: previous_device_type.clone(),
+        new_device_type: new_device_type.clone(),
+        capabilities: capabilities.clone(),
+        state: state_str.clone(),
+        transition: opts.transition.clone(),
+    };
+    emit_to_session(
+        &session.app,
+        "session-device-replaced",
+        session_id,
+        payload.clone(),
+    );
+
+    // 9. Emit state change if different
+    if previous_state != current_state {
+        emit_state_change(&session.app, session_id, &previous_state, &current_state);
+    }
+
+    tlog!(
+        "[io] replace_session_device('{}') {} → {} (transition: {}, state: {})",
+        session_id, previous_device_type, new_device_type, opts.transition, state_str
+    );
+
+    Ok(payload)
+}
+
 /// Stop a realtime session and switch to buffer replay atomically.
 ///
 /// This combines suspend + switch_to_buffer_replay in a single lock acquisition
@@ -2034,21 +2144,20 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
 /// suspend (emits `session-suspended` instead).
 pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
     let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
-    let previous = session.device.state();
-
-    // Stop the device (idempotent if already stopped).
-    // Note: stop() triggers emit_stream_ended which already calls finalize_buffer(),
-    // so we look up the buffer by session ownership afterwards instead.
-    if !matches!(previous, IOState::Stopped) {
-        session.device.stop().await?;
+    // Stop the device first — stop() triggers emit_stream_ended which calls
+    // finalize_buffer(), so we must stop before looking up the buffer.
+    // Scoped to release the mutable borrow before calling replace_session_device.
+    {
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+        if !matches!(session.device.state(), IOState::Stopped) {
+            session.device.stop().await?;
+        }
     }
 
-    // Look up the buffer by session ownership (finalize_buffer() was already
-    // consumed by emit_stream_ended during device.stop())
+    // Look up the buffer by session ownership (finalized during stop())
     let metadata = buffer_store::get_buffer_for_session(session_id)
         .and_then(|id| buffer_store::get_buffer_metadata(&id));
 
@@ -2072,6 +2181,14 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
     if let Some(ref bid) = buffer_id {
         let _ = crate::buffer_store::set_active_buffer(bid);
 
+        // Domain-specific housekeeping before the swap
+        buffer_store::orphan_buffers_for_session(session_id);
+        let profile_ids = sessions::get_session_profile_ids(session_id);
+        for profile_id in &profile_ids {
+            crate::profile_tracker::unregister_usage_by_session(profile_id, session_id);
+        }
+        sessions::replace_session_profiles(session_id, &[bid.clone()]);
+
         let new_reader = BufferReader::new_with_buffer(
             app.clone(),
             session_id.to_string(),
@@ -2079,38 +2196,33 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
             speed,
         );
 
-        let capabilities = new_reader.capabilities();
-        session.device = Box::new(new_reader);
-
-        // Orphan the buffer — BufferReader holds buffer_id directly and doesn't need ownership.
-        // This makes the buffer visible in the Data Source picker's BUFFERS section.
-        buffer_store::orphan_buffers_for_session(session_id);
-
-        // Release device profiles — buffer doesn't need the hardware.
-        let profile_ids = sessions::get_session_profile_ids(session_id);
-        for profile_id in &profile_ids {
-            crate::profile_tracker::unregister_usage_by_session(profile_id, session_id);
-        }
-
-        // Update SESSION_PROFILES: buffer is now the source (original configs stored on IOSession for resume)
-        sessions::replace_session_profiles(session_id, &[bid.clone()]);
-
-        // Emit event so ALL listeners transition to buffer mode
-        emit_to_session(
-            &session.app,
-            "session-switched-to-buffer",
+        // Device is already stopped, so replace_session_device's stop is a no-op
+        let result = replace_session_device(
+            &mut sessions,
             session_id,
-            SessionSwitchedToBufferPayload {
-                buffer_id: Some(bid.clone()),
-                buffer_count,
-                buffer_type,
-                time_range,
-                capabilities: capabilities.clone(),
+            Box::new(new_reader),
+            ReplaceDeviceOptions {
+                transition: "buffer".to_string(),
+                auto_start: false,
+                source_names: None,
+                source_configs: None,
             },
-        );
+        ).await?;
 
-        if previous != session.device.state() {
-            emit_state_change(&session.app, session_id, &previous, &session.device.state());
+        // Emit the specific backwards-compat event
+        if let Some(session) = sessions.get(session_id) {
+            emit_to_session(
+                &session.app,
+                "session-switched-to-buffer",
+                session_id,
+                SessionSwitchedToBufferPayload {
+                    buffer_id: Some(bid.clone()),
+                    buffer_count,
+                    buffer_type,
+                    time_range,
+                    capabilities: result.capabilities.clone(),
+                },
+            );
         }
 
         tlog!(
@@ -2118,9 +2230,13 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
             session_id, bid, buffer_count
         );
 
-        Ok(capabilities)
+        Ok(result.capabilities)
     } else {
         // No buffer — fall back to normal suspend event
+        let session = sessions
+            .get(session_id)
+            .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
         emit_to_session(
             &session.app,
             "session-suspended",
@@ -2133,17 +2249,11 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
             },
         );
 
-        let current = session.device.state();
-        if previous != current {
-            emit_state_change(&session.app, session_id, &previous, &current);
-        }
-
         tlog!(
             "[reader] stop_and_switch_to_buffer('{}') - no buffer, fell back to suspend",
             session_id
         );
 
-        // Return current capabilities (unchanged)
         Ok(session.device.capabilities())
     }
 }
@@ -2468,14 +2578,6 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
         session_id, buffer_id, buffer_count, speed
     );
 
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    // Stop the current reader
-    let _ = session.device.stop().await;
-
     // Set this buffer as the active buffer so getBufferMetadata() returns correct data
     let _ = crate::buffer_store::set_active_buffer(&buffer_id);
 
@@ -2487,18 +2589,20 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
         speed,
     );
 
-    // Get capabilities before replacing
-    let capabilities = new_reader.capabilities();
+    let mut sessions = IO_SESSIONS.lock().await;
+    let result = replace_session_device(
+        &mut sessions,
+        session_id,
+        Box::new(new_reader),
+        ReplaceDeviceOptions {
+            transition: "buffer".to_string(),
+            auto_start: false,
+            source_names: None,
+            source_configs: None,
+        },
+    ).await?;
 
-    // Replace the device
-    session.device = Box::new(new_reader);
-
-    tlog!(
-        "[io] switch_to_buffer_replay: session='{}' now in buffer replay mode",
-        session_id
-    );
-
-    Ok(capabilities)
+    Ok(result.capabilities)
 }
 
 /// Resume a session from buffer playback back to live streaming.
@@ -2507,11 +2611,9 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
 /// remain connected.
 ///
 /// Steps:
-/// 1. Stop the current reader (BufferReader)
-/// 2. Orphan the current buffer (data preserved for later viewing)
-/// 3. Create a fresh buffer for the new live stream
-/// 4. Replace session.device with the new live reader
-/// 5. Start the new reader
+/// 1. Record the current buffer ID (for orphaning notification)
+/// 2. Replace device via `replace_session_device` (stops old, swaps, auto-starts)
+/// 3. Emit `session-resuming` event so apps clear their frame lists
 pub async fn resume_to_live_session(
     session_id: &str,
     new_reader: Box<dyn IODevice>,
@@ -2521,55 +2623,41 @@ pub async fn resume_to_live_session(
         session_id
     );
 
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    // Stop the current reader (BufferReader)
-    let _ = session.device.stop().await;
-
-    // Get the current buffer ID before the reader orphans it
+    // Get the current buffer ID before the swap orphans it
     let old_buffer_id = buffer_store::get_buffer_for_session(session_id);
 
-    // Note: We don't create a buffer here - the reader's start() method handles
-    // buffer creation (including orphaning old buffers). This avoids creating
-    // an intermediary buffer that would immediately get orphaned.
-
-    // Get capabilities before replacing
-    let capabilities = new_reader.capabilities();
-
-    // Replace the device with the new live reader
-    session.device = new_reader;
-
-    // Start the new reader
-    session.device.start().await?;
-
-    let state = session.device.state();
-    emit_state_change(&session.app, session_id, &IOState::Stopped, &state);
+    let mut sessions = IO_SESSIONS.lock().await;
+    let result = replace_session_device(
+        &mut sessions,
+        session_id,
+        new_reader,
+        ReplaceDeviceOptions {
+            transition: "live".to_string(),
+            auto_start: true,
+            source_names: None,
+            source_configs: None,
+        },
+    ).await?;
 
     // Get the new buffer ID created by the reader's start() method
     let new_buffer_id = buffer_store::get_buffer_for_session(session_id);
 
-    tlog!(
-        "[io] resume_to_live_session: session='{}' now back in live mode with buffer '{:?}'",
-        session_id, new_buffer_id
-    );
-
     // Emit session-resuming event so apps clear their frame lists
-    if let Some(ref buffer_id) = new_buffer_id {
-        emit_to_session(
-            &session.app,
-            "session-resuming",
-            session_id,
-            SessionResumingPayload {
-                new_buffer_id: buffer_id.clone(),
-                orphaned_buffer_id: old_buffer_id,
-            },
-        );
+    if let Some(session) = sessions.get(session_id) {
+        if let Some(ref buffer_id) = new_buffer_id {
+            emit_to_session(
+                &session.app,
+                "session-resuming",
+                session_id,
+                SessionResumingPayload {
+                    new_buffer_id: buffer_id.clone(),
+                    orphaned_buffer_id: old_buffer_id,
+                },
+            );
+        }
     }
 
-    Ok(capabilities)
+    Ok(result.capabilities)
 }
 
 /// Destroy a reader session

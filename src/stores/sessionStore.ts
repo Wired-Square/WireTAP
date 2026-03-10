@@ -39,6 +39,7 @@ import {
   type SessionSuspendedPayload,
   type SessionSwitchedToBufferPayload,
   type SessionResumingPayload,
+  type DeviceReplacedPayload,
   type StateChangePayload,
   type CanTransmitFrame,
   type TransmitResult,
@@ -373,6 +374,8 @@ export interface SessionCallbacks {
   onSwitchedToBuffer?: (payload: SessionSwitchedToBufferPayload) => void;
   /** Called when session is resuming with a new buffer - apps should clear their frame lists */
   onResuming?: (payload: SessionResumingPayload) => void;
+  /** Called when the session's device is replaced in-place (caps/state change, listeners preserved) */
+  onDeviceReplaced?: (payload: DeviceReplacedPayload) => void;
 }
 
 /** Session event listeners - one set per session */
@@ -840,6 +843,20 @@ async function setupSessionEventListeners(
     }
   );
   unlistenFunctions.push(unlistenResuming);
+
+  // Session device replaced (in-place swap — caps/state change, listeners preserved)
+  const unlistenDeviceReplaced = await listen<DeviceReplacedPayload>(
+    `session-device-replaced:${sessionId}`,
+    (event) => {
+      tlog.debug(`[sessionStore] Session '${sessionId}' device replaced: ${event.payload.previous_device_type} → ${event.payload.new_device_type} (${event.payload.transition})`);
+      updateSession(sessionId, {
+        capabilities: event.payload.capabilities,
+        ioState: event.payload.state as IOStateType,
+      });
+      invokeCallbacks(eventListeners, "onDeviceReplaced", event.payload);
+    }
+  );
+  unlistenFunctions.push(unlistenDeviceReplaced);
 
   return unlistenFunctions;
 }
