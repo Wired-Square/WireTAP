@@ -66,11 +66,13 @@ pub fn validate_session_traits(interface_traits: &[InterfaceTraits]) -> SessionT
         }
     }
 
-    // Rule 2: Timeline sessions limited to 1 interface
-    if temporal_mode == TemporalMode::Timeline {
+    // Rule 2: Sources with multi_source: false cannot be combined
+    if interface_traits.iter().any(|t| !t.multi_source) {
         return SessionTraitsValidation {
             valid: false,
-            error: Some("Timeline sessions are limited to a single interface".to_string()),
+            error: Some(
+                "One or more sources do not support multi-source sessions".to_string(),
+            ),
             session_traits: None,
         };
     }
@@ -90,6 +92,9 @@ pub fn validate_session_traits(interface_traits: &[InterfaceTraits]) -> SessionT
     // Rule 4: can_transmit = ANY interface can transmit
     let can_transmit = interface_traits.iter().any(|t| t.can_transmit);
 
+    // Rule 5: multi_source = ALL inputs must be multi_source (already validated above)
+    let multi_source = interface_traits.iter().all(|t| t.multi_source);
+
     SessionTraitsValidation {
         valid: true,
         error: None,
@@ -97,6 +102,7 @@ pub fn validate_session_traits(interface_traits: &[InterfaceTraits]) -> SessionT
             temporal_mode,
             protocols: all_protocols,
             can_transmit,
+            multi_source,
         }),
     }
 }
@@ -109,61 +115,73 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
             can_transmit: true,
+            multi_source: true,
         },
         "slcan" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
             can_transmit: true, // Note: silent_mode overrides this at runtime
+            multi_source: true,
         },
         "gs_usb" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
             can_transmit: true, // Note: listen_only overrides this at runtime
+            multi_source: true,
         },
         "socketcan" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
             can_transmit: true,
+            multi_source: true,
         },
         "mqtt" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
             can_transmit: false,
+            multi_source: true,
         },
         "modbus_tcp" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Modbus],
             can_transmit: false,
+            multi_source: true,
         },
         "postgres" => InterfaceTraits {
             temporal_mode: TemporalMode::Timeline,
             protocols: vec![Protocol::Can],
             can_transmit: false,
+            multi_source: false,
         },
         "csv_file" | "csv-file" => InterfaceTraits {
             temporal_mode: TemporalMode::Timeline,
             protocols: vec![Protocol::Can],
             can_transmit: false,
+            multi_source: false,
         },
         "buffer" => InterfaceTraits {
             temporal_mode: TemporalMode::Timeline,
             protocols: vec![Protocol::Can],
             can_transmit: false,
+            multi_source: false,
         },
         "serial" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Serial],
             can_transmit: false,
+            multi_source: true,
         },
         "virtual" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
             can_transmit: true,
+            multi_source: true,
         },
         _ => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![],
             can_transmit: false,
+            multi_source: false,
         },
     }
 }
@@ -178,6 +196,7 @@ mod tests {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
             can_transmit: true,
+            multi_source: true,
         }];
         let result = validate_session_traits(&traits);
         assert!(result.valid);
@@ -191,11 +210,13 @@ mod tests {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
                 can_transmit: true,
+                multi_source: true,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::CanFd],
                 can_transmit: false,
+                multi_source: true,
             },
         ];
         let result = validate_session_traits(&traits);
@@ -203,6 +224,7 @@ mod tests {
         let session = result.session_traits.unwrap();
         assert_eq!(session.temporal_mode, TemporalMode::Realtime);
         assert!(session.can_transmit); // Any interface can transmit
+        assert!(session.multi_source);
         assert!(session.protocols.contains(&Protocol::Can));
         assert!(session.protocols.contains(&Protocol::CanFd));
     }
@@ -214,16 +236,43 @@ mod tests {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
                 can_transmit: true,
+                multi_source: true,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Timeline,
                 protocols: vec![Protocol::Can],
                 can_transmit: false,
+                multi_source: false,
             },
         ];
         let result = validate_session_traits(&traits);
         assert!(!result.valid);
         assert!(result.error.unwrap().contains("temporal mode"));
+    }
+
+    #[test]
+    fn test_non_multi_source_rejected() {
+        // Two realtime sources where one has multi_source: false
+        let traits = vec![
+            InterfaceTraits {
+                temporal_mode: TemporalMode::Realtime,
+                protocols: vec![Protocol::Can],
+                can_transmit: true,
+                multi_source: true,
+            },
+            InterfaceTraits {
+                temporal_mode: TemporalMode::Realtime,
+                protocols: vec![Protocol::Can],
+                can_transmit: false,
+                multi_source: false,
+            },
+        ];
+        let result = validate_session_traits(&traits);
+        assert!(!result.valid);
+        assert!(result
+            .error
+            .unwrap()
+            .contains("do not support multi-source"));
     }
 
     #[test]
@@ -233,16 +282,22 @@ mod tests {
                 temporal_mode: TemporalMode::Timeline,
                 protocols: vec![Protocol::Can],
                 can_transmit: false,
+                multi_source: false,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Timeline,
                 protocols: vec![Protocol::Can],
                 can_transmit: false,
+                multi_source: false,
             },
         ];
         let result = validate_session_traits(&traits);
         assert!(!result.valid);
-        assert!(result.error.unwrap().contains("Timeline sessions are limited"));
+        // Now rejected by multi_source: false rule instead of timeline-specific rule
+        assert!(result
+            .error
+            .unwrap()
+            .contains("do not support multi-source"));
     }
 
     #[test]
@@ -253,11 +308,13 @@ mod tests {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
                 can_transmit: true,
+                multi_source: true,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Serial],
                 can_transmit: true,
+                multi_source: true,
             },
         ];
         let result = validate_session_traits(&traits);

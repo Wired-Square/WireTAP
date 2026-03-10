@@ -170,6 +170,7 @@ impl IODevice for VirtualDeviceReader {
                     temporal_mode: TemporalMode::Realtime,
                     protocols: vec![Protocol::Can],
                     can_transmit: can_transmit_val,
+                    multi_source: true,
                 }),
                 data_streams: Some(SessionDataStreams {
                     emits_frames: true,
@@ -184,6 +185,7 @@ impl IODevice for VirtualDeviceReader {
                     temporal_mode: TemporalMode::Realtime,
                     protocols: vec![Protocol::Can, Protocol::CanFd],
                     can_transmit: can_transmit_val,
+                    multi_source: true,
                 }),
                 data_streams: Some(SessionDataStreams {
                     emits_frames: true,
@@ -199,6 +201,7 @@ impl IODevice for VirtualDeviceReader {
                     temporal_mode: TemporalMode::Realtime,
                     protocols: vec![Protocol::Modbus],
                     can_transmit: false,
+                    multi_source: true,
                 }),
                 data_streams: Some(SessionDataStreams {
                     emits_frames: true,
@@ -216,6 +219,7 @@ impl IODevice for VirtualDeviceReader {
                     temporal_mode: TemporalMode::Realtime,
                     protocols: vec![Protocol::Serial],
                     can_transmit: can_transmit_val,
+                    multi_source: true,
                 }),
                 data_streams: Some(SessionDataStreams {
                     emits_frames: false,

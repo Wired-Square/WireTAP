@@ -343,6 +343,7 @@ fn parse_interfaces_from_profile(
                     temporal_mode: TemporalMode::Realtime,
                     protocols,
                     can_transmit: true,
+                    multi_source: true,
                 }),
             })
         })
@@ -387,6 +388,7 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
             temporal_mode: TemporalMode::Realtime,
             protocols,
             can_transmit,
+            multi_source: true,
         }),
     }]
 }
@@ -2030,6 +2032,7 @@ fn resolve_source_config(
                 temporal_mode: TemporalMode::Realtime,
                 protocols: default_protocols,
                 can_transmit: default_can_transmit,
+                multi_source: true,
             }),
         }]
     } else {

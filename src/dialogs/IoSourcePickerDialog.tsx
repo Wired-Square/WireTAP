@@ -303,6 +303,7 @@ export default function IoSourcePickerDialog({
           temporal_mode: "timeline" as TemporalMode,
           protocols: ["can", "canfd"] as Protocol[],
           can_transmit: false,
+          multi_source: false,
         },
       }));
       setDeviceBusConfigMap((prev) => new Map(prev).set(bufferId, mappings));
@@ -396,6 +397,7 @@ export default function IoSourcePickerDialog({
                     temporal_mode: "timeline" as TemporalMode,
                     protocols: ["can", "canfd"] as Protocol[],
                     can_transmit: false,
+                    multi_source: false,
                   },
                 }));
                 setDeviceBusConfigMap((prev) => new Map(prev).set(matchingBuffer.id, mappings));
@@ -482,11 +484,11 @@ export default function IoSourcePickerDialog({
         const sessions = await listActiveSessions();
         console.log("[IoSourcePickerDialog] All active sessions:", sessions);
         // Show joinable sessions:
-        // - multi_source: multi-bus sessions
+        // - traits.multi_source: sources that can be combined (all realtime)
         // - buffer: sessions switched to buffer replay (e.g., stopped live sessions)
         // - supports_time_range && !is_realtime: recorded sources like PostgreSQL
         const joinableSessions = sessions.filter((s) =>
-          s.deviceType === "multi_source" ||
+          s.capabilities.traits?.multi_source === true ||
           s.deviceType === "buffer" ||
           (s.capabilities.supports_time_range && !s.capabilities.is_realtime)
         );
@@ -1145,6 +1147,7 @@ export default function IoSourcePickerDialog({
           temporal_mode: 'realtime',
           protocols: (protocol === 'can' ? ['can', 'canfd'] : [protocol]) as Protocol[],
           can_transmit: true,
+          multi_source: true,
         },
       }]);
     }

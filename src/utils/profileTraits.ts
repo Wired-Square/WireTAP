@@ -30,7 +30,7 @@ export interface ProfileTraits {
   protocols: Protocol[];
   canTransmit: boolean;
   platforms: Platform[];
-  isMultiSourceCapable: boolean;
+  multiSource: boolean;
 }
 
 /** Validation result when combining interfaces */
@@ -40,7 +40,7 @@ export interface TraitValidation {
 }
 
 // For backward compatibility with existing code expecting InterfaceTraits
-export type InterfaceTraits = Pick<ProfileTraits, "temporalMode" | "protocols" | "canTransmit">;
+export type InterfaceTraits = Pick<ProfileTraits, "temporalMode" | "protocols" | "canTransmit" | "multiSource">;
 
 // ============================================================================
 // Trait Registry
@@ -56,77 +56,77 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     protocols: ["can"],
     canTransmit: true,
     platforms: ["windows", "macos", "linux", "ios"],
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
   gvret_usb: {
     temporalMode: "realtime",
     protocols: ["can"],
     canTransmit: true,
     platforms: ["windows", "macos", "linux"], // No iOS (requires serial port)
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
   serial: {
     temporalMode: "realtime",
     protocols: ["serial"],
     canTransmit: false,
     platforms: ["windows", "macos", "linux"], // No iOS (requires serial port)
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
   slcan: {
     temporalMode: "realtime",
     protocols: ["can"],
     canTransmit: true,
     platforms: ["windows", "macos", "linux"], // No iOS (requires serial port)
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
   gs_usb: {
     temporalMode: "realtime",
     protocols: ["can"],
     canTransmit: true,
     platforms: ["windows", "macos"], // Linux uses SocketCAN kernel driver, no iOS
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
   socketcan: {
     temporalMode: "realtime",
     protocols: ["can"],
     canTransmit: true,
     platforms: ["linux"], // Linux kernel only
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
   mqtt: {
     temporalMode: "realtime",
     protocols: ["can"],
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
   postgres: {
     temporalMode: "timeline",
     protocols: ["can"], // Can also be modbus/serial depending on source_type
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
-    isMultiSourceCapable: false,
+    multiSource: false,
   },
   csv_file: {
     temporalMode: "timeline",
     protocols: ["can"],
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
-    isMultiSourceCapable: false,
+    multiSource: false,
   },
   modbus_tcp: {
     temporalMode: "realtime",
     protocols: ["modbus"],
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
   virtual: {
     temporalMode: "realtime",
     protocols: ["can"],
     canTransmit: true,
     platforms: ["windows", "macos", "linux", "ios"],
-    isMultiSourceCapable: true,
+    multiSource: true,
   },
 };
 
@@ -261,7 +261,7 @@ export function isRealtimeProfile(profile: IOProfile): boolean {
  */
 export function isMultiSourceCapable(profile: IOProfile): boolean {
   const traits = getProfileTraits(profile);
-  return traits?.isMultiSourceCapable ?? false;
+  return traits?.multiSource ?? false;
 }
 
 /**
@@ -338,11 +338,11 @@ export function validateProfileSelection(
     };
   }
 
-  // Timeline sources can only have 1 interface
-  if (newTraits.temporalMode === "timeline") {
+  // Sources with multiSource: false cannot be combined
+  if (!newTraits.multiSource) {
     return {
       valid: false,
-      error: "Timeline sources cannot be combined (single interface only)",
+      error: `${newProfile.kind} does not support multi-source sessions`,
     };
   }
 
@@ -352,14 +352,6 @@ export function validateProfileSelection(
     return {
       valid: false,
       error: `Incompatible protocols: ${newTraits.protocols.join("/")} cannot be combined with ${[...new Set(existingProtocols)].join("/")}`,
-    };
-  }
-
-  // Check if the new profile supports multi-source
-  if (!newTraits.isMultiSourceCapable) {
-    return {
-      valid: false,
-      error: `${newProfile.kind} does not support multi-bus mode`,
     };
   }
 
@@ -387,6 +379,7 @@ export function buildDefaultBusMappings(profile: IOProfile): BusMapping[] {
       temporal_mode: "realtime",
       protocols: (protocol === "can" ? ["can", "canfd"] : [protocol]) as Protocol[],
       can_transmit: traits?.canTransmit ?? false,
+      multi_source: traits?.multiSource ?? true,
     },
   }];
 }

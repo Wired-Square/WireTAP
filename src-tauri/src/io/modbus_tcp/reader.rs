@@ -124,6 +124,7 @@ impl IODevice for ModbusTcpReader {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Modbus],
                 can_transmit: false,
+                multi_source: true,
             }),
             data_streams: Some(SessionDataStreams {
                 emits_frames: true,

@@ -86,62 +86,55 @@ export function useIOSourcePickerHandlers({
     loadError,
     stopLoad,
     stopWatch,
-    watchSingleSource,
-    watchMultiSource,
-    loadSingleSource,
-    loadMultiSource,
+    watchSource,
+    loadSource,
     joinSession,
     skipReader,
     selectMultipleProfiles,
     connectOnly,
   } = manager;
 
-  // Handle Connect/Load from IoSourcePickerDialog
-  const handleDialogStartLoad = useCallback(
-    async (profileId: string, closeDialogFlag: boolean, options: DialogLoadOptions) => {
-      const mode = closeDialogFlag ? "connect" : "load";
-      const mergedOptions = mergeOptions ? mergeOptions(options) : options;
-
-      await withAppError(
-        closeDialogFlag ? "Connect Error" : "Load Error",
-        closeDialogFlag ? "Failed to start connect session" : "Failed to start load",
-        async () => {
-          onBeforeStart?.(profileId, options, mode);
-
-          if (closeDialogFlag) {
-            await watchSingleSource(profileId, mergedOptions);
-            closeDialog();
-          } else {
-            await loadSingleSource(profileId, mergedOptions);
-          }
-        }
-      );
-    },
-    [watchSingleSource, loadSingleSource, closeDialog, mergeOptions, onBeforeStart]
-  );
-
-  // Handle multi-bus Connect/Load
-  const handleDialogStartMultiLoad = useCallback(
+  // Unified handler for Connect/Load from IoSourcePickerDialog
+  const handleDialogStart = useCallback(
     async (profileIds: string[], closeDialogFlag: boolean, options: DialogLoadOptions) => {
       const mode = closeDialogFlag ? "connect" : "load";
       const mergedOptions = mergeOptions ? mergeOptions(options) : options;
 
       await withAppError(
-        closeDialogFlag ? "Multi-Bus Error" : "Multi-Bus Load Error",
-        closeDialogFlag ? "Failed to start multi-bus session" : "Failed to start multi-bus load",
+        closeDialogFlag ? "Connect Error" : "Load Error",
+        closeDialogFlag ? "Failed to start session" : "Failed to start load",
         async () => {
-          onBeforeMultiStart?.(profileIds, options, mode);
+          if (profileIds.length === 1) {
+            onBeforeStart?.(profileIds[0], options, mode);
+          } else {
+            onBeforeMultiStart?.(profileIds, options, mode);
+          }
 
           if (closeDialogFlag) {
-            await watchMultiSource(profileIds, mergedOptions);
+            await watchSource(profileIds, mergedOptions);
             closeDialog();
           } else {
-            await loadMultiSource(profileIds, mergedOptions);
+            await loadSource(profileIds, mergedOptions);
           }
         }
       );
     },
-    [watchMultiSource, loadMultiSource, closeDialog, mergeOptions, onBeforeMultiStart]
+    [watchSource, loadSource, closeDialog, mergeOptions, onBeforeStart, onBeforeMultiStart]
+  );
+
+  // Dialog props wrappers — single and multi share the same internal handler
+  const handleDialogStartLoad = useCallback(
+    async (profileId: string, closeDialogFlag: boolean, options: DialogLoadOptions) => {
+      await handleDialogStart([profileId], closeDialogFlag, options);
+    },
+    [handleDialogStart]
+  );
+
+  const handleDialogStartMultiLoad = useCallback(
+    async (profileIds: string[], closeDialogFlag: boolean, options: DialogLoadOptions) => {
+      await handleDialogStart(profileIds, closeDialogFlag, options);
+    },
+    [handleDialogStart]
   );
 
   // Handle stopping from the dialog - routes to streaming or load stop

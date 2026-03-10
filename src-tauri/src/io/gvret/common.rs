@@ -108,6 +108,7 @@ impl Default for BusMapping {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
                 can_transmit: true,
+                multi_source: true,
             }),
         }
     }
@@ -127,6 +128,7 @@ pub fn default_bus_mappings(bus_count: u8) -> Vec<BusMapping> {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can, Protocol::CanFd],
                 can_transmit: true,
+                multi_source: true,
             }),
         })
         .collect()

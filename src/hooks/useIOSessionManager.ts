@@ -242,9 +242,11 @@ export interface UseIOSessionManagerResult {
   stopLoad: () => Promise<void>;
   /** Clear ingest error */
   clearIngestError: () => void;
-  /** Ingest from a single source (fast ingest, auto-transitions to buffer reader) */
+  /** Unified ingest from one or more sources (fast ingest, auto-transitions to buffer reader) */
+  loadSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
+  /** @deprecated Use loadSource([profileId], opts) */
   loadSingleSource: (profileId: string, options: LoadOptions) => Promise<void>;
-  /** Ingest from multiple sources (fast multi-bus ingest, auto-transitions to buffer reader) */
+  /** @deprecated Use loadSource(profileIds, opts) */
   loadMultiSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
 
   // ---- Multi-Bus Session Handlers ----
@@ -260,9 +262,11 @@ export interface UseIOSessionManagerResult {
   ) => Promise<void>;
 
   // ---- Session Switching Methods ----
-  /** Watch a single source (routes realtime through multi-source backend, recorded through reinitialize) */
+  /** Unified watch for one or more sources (routes based on multi_source trait) */
+  watchSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
+  /** @deprecated Use watchSource([profileId], opts) */
   watchSingleSource: (profileId: string, options: LoadOptions) => Promise<void>;
-  /** Watch multiple sources (start multi-bus session, set speed, start watching) */
+  /** @deprecated Use watchSource(profileIds, opts) */
   watchMultiSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
   /** Stop watching (stop session, clear watch state) */
   stopWatch: () => Promise<void>;
@@ -900,92 +904,94 @@ export function useIOSessionManager(
 
   // ---- Session Switching Methods ----
 
-  // Watch a single source: route multi-source-capable (realtime) profiles through
-  // startMultiBusSession for consistent f_/b_/s_ session IDs. Recorded sources
-  // continue to use session.reinitialize() with generated t_ session IDs.
+  // Unified watch method: handles both single and multi-source sessions.
+  // Routes multi-source-capable (realtime) profiles through startMultiBusSession,
+  // and non-multi-source (timeline/buffer) profiles through session.reinitialize().
+  const watchSource = useCallback(async (
+    profileIds: string[],
+    opts: LoadOptions,
+  ) => {
+    const profiles = profileIds
+      .map((id) => ioProfiles.find((p) => p.id === id))
+      .filter((p): p is IOProfile => p !== undefined);
+    const allMultiSource = profiles.length > 0 && profiles.every((p) => isMultiSourceCapable(p));
+    const isSingleNonMulti = profileIds.length === 1 && !allMultiSource;
+
+    if (isSingleNonMulti) {
+      // Timeline/buffer: reinitialize path
+      onBeforeWatch?.();
+      const profileId = profileIds[0];
+      const isBuffer = isBufferProfileId(profileId);
+      const sessionId = isBuffer ? generateBufferSessionId() : generateRecordedSessionId();
+
+      await session.reinitialize(profileId, {
+        startTime: opts.startTime,
+        endTime: opts.endTime,
+        speed: opts.speed,
+        limit: opts.maxFrames,
+        framingEncoding: opts.framingEncoding,
+        delimiter: opts.delimiter,
+        maxFrameLength: opts.maxFrameLength,
+        frameIdStartByte: opts.frameIdStartByte,
+        frameIdBytes: opts.frameIdBytes,
+        frameIdBigEndian: opts.frameIdStartByte !== undefined ? true : undefined,
+        sourceAddressStartByte: opts.sourceAddressStartByte,
+        sourceAddressBytes: opts.sourceAddressBytes,
+        sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
+        minFrameLength: opts.minFrameLength,
+        emitRawBytes: opts.emitRawBytes,
+        busOverride: opts.busOverride,
+        sessionIdOverride: sessionId,
+        modbusPollsJson: opts.modbusPollsJson,
+      });
+
+      setMultiBusProfiles([]);
+      setIoProfile(sessionId);
+      setSourceProfileId(profileId);
+    } else {
+      // Multi-source path (1 or more realtime profiles)
+      if (profileIds.length === 1) {
+        onBeforeWatch?.();
+      } else {
+        onBeforeMultiWatch?.();
+      }
+
+      // Ensure bus mappings exist for single-profile case
+      if (profileIds.length === 1 && !opts.busMappings && profiles[0]) {
+        const busMappings = new Map([[profileIds[0], buildDefaultBusMappings(profiles[0])]]);
+        await startMultiBusSession(profileIds, { ...opts, busMappings });
+      } else {
+        await startMultiBusSession(profileIds, opts);
+      }
+
+      if (profileIds.length === 1) {
+        setSourceProfileId(profileIds[0]);
+      }
+    }
+
+    if (opts.speed !== undefined) {
+      setPlaybackSpeedProp?.(opts.speed);
+    }
+    setIsWatching(true);
+    resetWatchFrameCount();
+    streamCompletedRef.current = false;
+  }, [session, ioProfiles, onBeforeWatch, onBeforeMultiWatch, startMultiBusSession, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
+
+  /** @deprecated Use watchSource([profileId], opts) */
   const watchSingleSource = useCallback(async (
     profileId: string,
     opts: LoadOptions,
   ) => {
-    onBeforeWatch?.();
+    await watchSource([profileId], opts);
+  }, [watchSource]);
 
-    const profile = ioProfiles.find((p) => p.id === profileId);
-
-    // Multi-source-capable profiles (all realtime sources) go through the multi-source
-    // backend even for a single profile. This gives consistent generated session IDs
-    // and avoids using the profile ID as the session ID.
-    if (profile && isMultiSourceCapable(profile)) {
-      const busMappings = new Map([[profileId, buildDefaultBusMappings(profile)]]);
-      await startMultiBusSession([profileId], { ...opts, busMappings });
-      setSourceProfileId(profileId);
-      if (opts.speed !== undefined) {
-        setPlaybackSpeedProp?.(opts.speed);
-      }
-      setIsWatching(true);
-      resetWatchFrameCount();
-      streamCompletedRef.current = false;
-      return;
-    }
-
-    // Buffer sessions get b_ IDs; recorded/timeline sources get t_ IDs.
-    const isBuffer = isBufferProfileId(profileId);
-    const sessionId = isBuffer ? generateBufferSessionId() : generateRecordedSessionId();
-
-    await session.reinitialize(profileId, {
-      startTime: opts.startTime,
-      endTime: opts.endTime,
-      speed: opts.speed,
-      limit: opts.maxFrames,
-      framingEncoding: opts.framingEncoding,
-      delimiter: opts.delimiter,
-      maxFrameLength: opts.maxFrameLength,
-      frameIdStartByte: opts.frameIdStartByte,
-      frameIdBytes: opts.frameIdBytes,
-      frameIdBigEndian: opts.frameIdStartByte !== undefined ? true : undefined,
-      sourceAddressStartByte: opts.sourceAddressStartByte,
-      sourceAddressBytes: opts.sourceAddressBytes,
-      sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
-      minFrameLength: opts.minFrameLength,
-      emitRawBytes: opts.emitRawBytes,
-      busOverride: opts.busOverride,
-      sessionIdOverride: sessionId,
-      modbusPollsJson: opts.modbusPollsJson,
-    });
-
-    // Clear multi-bus state when switching to a non-multi source
-    setMultiBusProfiles([]);
-
-    setIoProfile(sessionId);
-    setSourceProfileId(profileId);
-    if (opts.speed !== undefined) {
-      setPlaybackSpeedProp?.(opts.speed);
-    }
-
-    setIsWatching(true);
-    resetWatchFrameCount();
-    streamCompletedRef.current = false;
-  }, [session, ioProfiles, onBeforeWatch, startMultiBusSession, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
-
-  // Watch multiple sources: start multi-bus session, set speed, start watching
+  /** @deprecated Use watchSource(profileIds, opts) */
   const watchMultiSource = useCallback(async (
     profileIds: string[],
-    opts: LoadOptions
+    opts: LoadOptions,
   ) => {
-    onBeforeMultiWatch?.();
-
-    // Use existing startMultiBusSession which handles all session creation
-    await startMultiBusSession(profileIds, opts);
-
-    // Set speed
-    if (opts.speed !== undefined) {
-      setPlaybackSpeedProp?.(opts.speed);
-    }
-
-    // Start watching
-    setIsWatching(true);
-    resetWatchFrameCount();
-    streamCompletedRef.current = false;
-  }, [startMultiBusSession, onBeforeMultiWatch, setPlaybackSpeedProp, resetWatchFrameCount]);
+    await watchSource(profileIds, opts);
+  }, [watchSource]);
 
   // Stop watching: suspend session, switch to buffer replay for timeline sources
   // For realtime sources, this suspends and keeps the buffer available for later.
@@ -1062,11 +1068,10 @@ export function useIOSessionManager(
     await session.reinitialize(targetBufferId, { useBuffer: true });
   }, [session, ioProfileName, joinerCount, setMultiBusProfiles]);
 
-  // Ingest a single source: fast ingest without rendering, auto-transitions to buffer reader
-  // Apps join the session but frames are counted only (not rendered) until ingest completes.
-  // After stream ends, session transitions to buffer reader for playback.
-  const loadSingleSource = useCallback(async (
-    profileId: string,
+  // Unified load method: fast ingest without rendering, auto-transitions to buffer reader.
+  // Handles both single and multi-source sessions.
+  const loadSource = useCallback(async (
+    profileIds: string[],
     opts: LoadOptions
   ) => {
     // Pre-ingest cleanup
@@ -1082,43 +1087,54 @@ export function useIOSessionManager(
     const sessionId = generateLoadSessionId();
     tlog.info(`[IOSessionManager:${appName}] Starting ingest with session ID: ${sessionId}`);
 
-    // IMPORTANT: Set refs SYNCHRONOUSLY before reinitialize
-    // With speed=0, the stream can complete DURING reinitialize, before React re-renders.
-    // The stream-ended handler checks these refs, so they must be set first.
+    // IMPORTANT: Set refs SYNCHRONOUSLY before session creation
+    // With speed=0, the stream can complete DURING creation, before React re-renders.
     isLoadingRef.current = true;
     loadSessionIdRef.current = sessionId;
 
+    const profiles = profileIds
+      .map((id) => ioProfiles.find((p) => p.id === id))
+      .filter((p): p is IOProfile => p !== undefined);
+    const allMultiSource = profiles.length > 0 && profiles.every((p) => isMultiSourceCapable(p));
+    const isSingleNonMulti = profileIds.length === 1 && !allMultiSource;
+
     try {
-      // Reinitialize with speed=0 (max speed) for fast ingestion
-      await session.reinitialize(profileId, {
-        startTime: opts.startTime,
-        endTime: opts.endTime,
-        speed: 0, // Max speed - no pacing
-        limit: opts.maxFrames,
-        framingEncoding: opts.framingEncoding,
-        delimiter: opts.delimiter,
-        maxFrameLength: opts.maxFrameLength,
-        frameIdStartByte: opts.frameIdStartByte,
-        frameIdBytes: opts.frameIdBytes,
-        frameIdBigEndian: opts.frameIdStartByte !== undefined ? true : undefined,
-        sourceAddressStartByte: opts.sourceAddressStartByte,
-        sourceAddressBytes: opts.sourceAddressBytes,
-        sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
-        minFrameLength: opts.minFrameLength,
-        emitRawBytes: opts.emitRawBytes,
-        busOverride: opts.busOverride,
-        sessionIdOverride: sessionId,
-      });
+      if (isSingleNonMulti) {
+        // Timeline/buffer: reinitialize path with speed=0
+        const profileId = profileIds[0];
+        await session.reinitialize(profileId, {
+          startTime: opts.startTime,
+          endTime: opts.endTime,
+          speed: 0, // Max speed - no pacing
+          limit: opts.maxFrames,
+          framingEncoding: opts.framingEncoding,
+          delimiter: opts.delimiter,
+          maxFrameLength: opts.maxFrameLength,
+          frameIdStartByte: opts.frameIdStartByte,
+          frameIdBytes: opts.frameIdBytes,
+          frameIdBigEndian: opts.frameIdStartByte !== undefined ? true : undefined,
+          sourceAddressStartByte: opts.sourceAddressStartByte,
+          sourceAddressBytes: opts.sourceAddressBytes,
+          sourceAddressBigEndian: opts.sourceAddressEndianness === "big",
+          minFrameLength: opts.minFrameLength,
+          emitRawBytes: opts.emitRawBytes,
+          busOverride: opts.busOverride,
+          sessionIdOverride: sessionId,
+        });
 
-      // Clear multi-bus state when ingesting from a single source
-      setMultiBusProfiles([]);
+        setMultiBusProfiles([]);
+        setIoProfile(sessionId);
+        setSourceProfileId(profileId);
+      } else {
+        // Multi-source path with speed=0
+        await startMultiBusSession(profileIds, {
+          ...opts,
+          speed: 0, // Max speed - no pacing
+          sessionIdOverride: sessionId,
+        });
+      }
 
-      // Update state - set profile to session ID so callbacks work
-      setIoProfile(sessionId);
-      setSourceProfileId(profileId);
       setLoadSessionId(sessionId);
-
-      // Set ingesting mode - handleFrames will count but not deliver frames
       setIsLoading(true);
       setIsWatching(false);
       streamCompletedRef.current = false;
@@ -1127,64 +1143,28 @@ export function useIOSessionManager(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       tlog.info(`[IOSessionManager:${appName}] Failed to start ingest: ${msg}`);
-      // Reset refs on error
       isLoadingRef.current = false;
       loadSessionIdRef.current = null;
       setLoadError(msg);
       setIsLoading(false);
     }
-  }, [session, appName, setMultiBusProfiles, setIoProfile, setSourceProfileId, streamCompletedRef]);
+  }, [session, appName, ioProfiles, startMultiBusSession, setMultiBusProfiles, setIoProfile, setSourceProfileId, streamCompletedRef]);
 
-  // Ingest multiple sources: fast multi-bus ingest without rendering
+  /** @deprecated Use loadSource([profileId], opts) */
+  const loadSingleSource = useCallback(async (
+    profileId: string,
+    opts: LoadOptions
+  ) => {
+    await loadSource([profileId], opts);
+  }, [loadSource]);
+
+  /** @deprecated Use loadSource(profileIds, opts) */
   const loadMultiSource = useCallback(async (
     profileIds: string[],
     opts: LoadOptions
   ) => {
-    // Pre-ingest cleanup
-    if (onBeforeIngestStartRef.current) {
-      await onBeforeIngestStartRef.current();
-    }
-
-    // Clear any previous ingest state
-    setLoadError(null);
-    setLoadFrameCount(0);
-
-    // Generate session ID for multi-source ingest
-    const sessionId = generateLoadSessionId();
-
-    // IMPORTANT: Set refs SYNCHRONOUSLY before starting session
-    // With speed=0, the stream can complete DURING session creation.
-    isLoadingRef.current = true;
-    loadSessionIdRef.current = sessionId;
-
-    try {
-      // Start multi-bus session with our session ID
-      // Override speed to 0 for max speed ingestion
-      await startMultiBusSession(profileIds, {
-        ...opts,
-        speed: 0, // Max speed - no pacing
-        sessionIdOverride: sessionId,
-      });
-
-      // Store the session ID
-      setLoadSessionId(sessionId);
-
-      // Set ingesting mode - handleFrames will count but not deliver frames
-      setIsLoading(true);
-      setIsWatching(false);
-      streamCompletedRef.current = false;
-
-      tlog.info(`[IOSessionManager:${appName}] Multi-source ingest started with session: ${sessionId}`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      tlog.info(`[IOSessionManager:${appName}] Failed to start multi-source ingest: ${msg}`);
-      // Reset refs on error
-      isLoadingRef.current = false;
-      loadSessionIdRef.current = null;
-      setLoadError(msg);
-      setIsLoading(false);
-    }
-  }, [appName, startMultiBusSession, streamCompletedRef]);
+    await loadSource(profileIds, opts);
+  }, [loadSource]);
 
   // Stop ingest: stop session, clear ingest state
   const stopLoad = useCallback(async () => {
@@ -1499,6 +1479,7 @@ export function useIOSessionManager(
     loadError,
     stopLoad,
     clearIngestError,
+    loadSource,
     loadSingleSource,
     loadMultiSource,
 
@@ -1507,6 +1488,7 @@ export function useIOSessionManager(
     joinExistingSession,
 
     // Session Switching Methods
+    watchSource,
     watchSingleSource,
     watchMultiSource,
     stopWatch,

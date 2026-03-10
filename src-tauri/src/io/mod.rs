@@ -252,6 +252,8 @@ pub struct InterfaceTraits {
     pub protocols: Vec<Protocol>,
     /// Whether the interface can transmit frames
     pub can_transmit: bool,
+    /// Whether this source can be combined with others in a multi-source session
+    pub multi_source: bool,
 }
 
 /// Declares the data streams a session produces.
@@ -467,6 +469,7 @@ impl IOCapabilities {
                 },
                 protocols,
                 can_transmit: self.can_transmit || self.can_transmit_serial,
+                multi_source: self.is_realtime,
             }
         }
     }

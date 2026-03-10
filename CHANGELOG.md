@@ -6,6 +6,16 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Added
 
+- **`multi_source` trait on `InterfaceTraits`**: New boolean trait indicating whether a source can be combined with others in a multi-source session. Set to `true` for all realtime sources, `false` for timeline/buffer sources. Replaces the hardcoded `isMultiSourceCapable` field in the frontend profile trait registry with a backend-authoritative trait. Validation in `validate_session_traits()` now uses this trait instead of a timeline-specific rule.
+
+- **Unified `watchSource()` and `loadSource()` session methods**: New methods in `useIOSessionManager` that handle both single and multi-source sessions through a single entry point. Internal routing based on the `multi_source` trait. The previous four methods (`watchSingleSource`, `watchMultiSource`, `loadSingleSource`, `loadMultiSource`) remain as deprecated wrappers.
+
+### Changed
+
+- **Joinability filter uses `multi_source` trait**: The IO source picker dialog now checks `capabilities.traits.multi_source` instead of hardcoding `deviceType === "multi_source"` for session joinability.
+
+- **Source picker handlers simplified**: `useIOSourcePickerHandlers` now delegates to a single internal `handleDialogStart` that uses `watchSource`/`loadSource` instead of separate single/multi handlers.
+
 - **Buffer pin/rename in session controls**: Pin and rename buttons now appear in the app top bar when viewing a buffer, matching the existing functionality in the IO source picker dialog. Changes propagate across all apps connected to the same buffer via session store synchronisation.
 
 - **Clear buffer button in session controls**: Trash/clear button moved from app-specific actions into the shared session controls. Behaviour varies by source type: real-time/recorded sources clear buffer data and continue streaming; buffer sources delete the buffer and leave the session; persistent buffers hide the button (unpin first). Backed by a new `clear_buffer` Rust command that resets buffer metadata and clears SQLite data without destroying the session.

@@ -33,6 +33,8 @@ export interface InterfaceTraits {
   protocols: Protocol[];
   /** Whether the interface can transmit frames */
   can_transmit: boolean;
+  /** Whether this source can be combined with others in a multi-source session */
+  multi_source: boolean;
 }
 
 /**
@@ -77,6 +79,7 @@ export function getTraits(caps: IOCapabilities): InterfaceTraits {
     temporal_mode: caps.is_realtime ? "realtime" : "timeline",
     protocols,
     can_transmit: caps.can_transmit || caps.can_transmit_serial,
+    multi_source: caps.is_realtime,
   };
 }
 
@@ -1188,6 +1191,7 @@ export function createDefaultBusMappings(
       temporal_mode: "realtime" as TemporalMode,
       protocols: protocol === "can" ? ["can", "canfd"] : [protocol],
       can_transmit: true,
+      multi_source: true,
     },
   }));
 }
