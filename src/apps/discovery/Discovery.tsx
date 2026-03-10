@@ -628,8 +628,9 @@ export default function Discovery() {
 
   const protocolLabel = frames.length > 0 ? frames[0].protocol : "can";
 
-  // Timeline sources (postgres, csv, buffer) have is_realtime=false in capabilities
-  const isRecorded = capabilities?.traits.temporal_mode === "timeline";
+  // Non-realtime sources: timeline (postgres, csv) and buffer replay
+  const isRecorded = capabilities?.traits.temporal_mode === "timeline"
+    || capabilities?.traits.temporal_mode === "buffer";
 
   // Merged buffer metadata using session values for cross-app timeline sync
   const effectiveBufferMetadata = useEffectiveBufferMetadata(

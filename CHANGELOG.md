@@ -14,9 +14,11 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Atomic stop-and-switch-to-buffer command**: New Rust command `stop_and_switch_to_buffer` atomically stops the device, finalises the buffer, creates a BufferReader, and emits a `session-switched-to-buffer` event. All apps sharing the session transition to buffer replay mode together.
 
+- **`TemporalMode::Buffer` variant**: New temporal mode distinguishes buffer replay from timeline sources (PostgreSQL, CSV). BufferReader now reports `temporal_mode: "buffer"` in capabilities. `isBufferMode` in `useIOSessionManager` detects this automatically without needing to change `ioProfile`.
+
 ### Changed
 
-- **STOP switches all shared apps to buffer replay**: Clicking Stop on a realtime source now calls the atomic `stopAndSwitchToBuffer` API, which emits a session-wide event. Every app on the session receives `onSwitchedToBuffer`, sets `isWatching=false`, and transitions to buffer mode. Previously, Stop only affected the calling app's local state.
+- **STOP switches all shared apps to buffer replay**: Clicking Stop on a realtime source now calls the atomic `stopAndSwitchToBuffer` API, which emits a session-wide event. Every app on the session receives `onSwitchedToBuffer`, sets `isWatching=false`, and transitions to buffer mode. Works across windows — `stopWatch` uses session capabilities (`temporal_mode`) instead of `sourceProfileId` lookup. Previously, Stop only affected the calling app's local state.
 
 - **LEAVE fully disconnects with no data**: Leave now performs a complete reset — unregisters the listener, clears `ioProfile`, `sourceProfileId`, `multiSessionId`, and all watching state. No buffer copy is preserved. The old `handleDetach`/`detachWithBufferCopy` functions have been removed entirely.
 

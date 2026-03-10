@@ -1053,7 +1053,7 @@ export default function Decoder() {
           playbackState={getPlaybackState()}
           playbackDirection={playbackDirection}
           capabilities={capabilities}
-          isRecorded={capabilities?.traits.temporal_mode === "timeline"}
+          isRecorded={capabilities?.traits.temporal_mode === "timeline" || capabilities?.traits.temporal_mode === "buffer"}
           onPlay={() => { setPlaybackDirection("forward"); handlers.handlePlay(); }}
           onPlayBackward={() => { setPlaybackDirection("backward"); handlers.handlePlayBackward(); }}
           onPause={handlers.handlePause}

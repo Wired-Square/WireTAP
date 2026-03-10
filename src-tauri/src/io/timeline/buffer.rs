@@ -13,7 +13,7 @@ use std::time::Duration;
 use tauri::AppHandle;
 
 use super::base::{TimelineControl, TimelineReaderState};
-use crate::io::{emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition};
+use crate::io::{emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition, TemporalMode};
 use crate::{buffer_db, buffer_store};
 
 /// Sentinel value meaning "no seek requested"
@@ -89,6 +89,7 @@ impl BufferReader {
 impl IODevice for BufferReader {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::timeline_can()
+            .with_temporal_mode(TemporalMode::Buffer)
             .with_seek(true)
             .with_reverse(true)
             .with_buses(self.buses.clone())

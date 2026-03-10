@@ -12,9 +12,10 @@ import { invoke } from "@tauri-apps/api/core";
 /**
  * Temporal mode of an interface/session.
  * - "realtime": Live streaming from hardware (GVRET, slcan, gs_usb, SocketCAN, MQTT)
- * - "timeline": Recorded playback (PostgreSQL, CSV, Buffer)
+ * - "timeline": Recorded playback (PostgreSQL, CSV)
+ * - "buffer": Buffer replay from captured data
  */
-export type TemporalMode = "realtime" | "timeline";
+export type TemporalMode = "realtime" | "timeline" | "buffer";
 
 /**
  * Protocol family for frame-based communication.

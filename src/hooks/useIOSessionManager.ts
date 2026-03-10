@@ -632,11 +632,12 @@ export function useIOSessionManager(
     onTimeUpdate,
     onStreamEnded: handleStreamEndedWithIngest,
     onSuspended,
-    onSwitchedToBuffer: () => {
-      // Fires for ALL apps on the session (including the one that clicked Stop)
+    onSwitchedToBuffer: (payload) => {
+      // Fires for ALL apps on the session (including the one that clicked Stop).
+      // Session stays the same — isBufferMode is now derived from capabilities
+      // (temporal_mode="buffer"). sourceProfileId stays set so canReturnToLive works.
       setIsWatching(false);
-      // sourceProfileId stays set so canReturnToLive works
-      tlog.debug(`[IOSessionManager:${appName}] Session switched to buffer by event`);
+      tlog.debug(`[IOSessionManager:${appName}] Session switched to buffer by event, buffer=${payload.buffer_id}`);
     },
     onStreamComplete,
     onSpeedChange,
@@ -652,10 +653,11 @@ export function useIOSessionManager(
   const isStreaming = !isDetached && (readerState === "running" || readerState === "paused");
   const isPaused = readerState === "paused";
   const isRealtime = session.capabilities?.traits.temporal_mode === "realtime";
-  // Buffer mode = viewing buffer data (either a buf_N profile directly, or a session backed by a buffer)
-  // Note: Timeline sources (postgres, csv) have temporal_mode="timeline" but are NOT buffer mode -
-  // they're actively streaming from database/file. Only BufferReader (buf_N) is buffer mode.
-  const isBufferMode = isBufferProfileId(ioProfile) || isBufferProfileId(sourceProfileId);
+  // Buffer mode = viewing buffer data. Detected via:
+  // 1. Profile ID is a buffer ID (direct buffer selection), OR
+  // 2. Session capabilities report temporal_mode="buffer" (device switched to BufferReader)
+  const isBufferMode = isBufferProfileId(ioProfile) || isBufferProfileId(sourceProfileId)
+    || session.capabilities?.traits.temporal_mode === "buffer";
   // Stopped with a profile selected (ready to restart)
   // For realtime sources: can restart the live stream
   // For timeline sources: can restart from the beginning
@@ -943,44 +945,38 @@ export function useIOSessionManager(
   }, [session, ioProfiles, onBeforeWatch, onBeforeMultiWatch, startMultiBusSession, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
 
 
-  // Stop watching: suspend session, switch to buffer replay for timeline sources
-  // For realtime sources, this suspends and keeps the buffer available for later.
-  // For timeline sources (postgres, csv), this switches to buffer replay mode
-  // so users can step through the buffered frames.
+  // Stop watching: for realtime sources, atomically stop and switch ALL listeners
+  // to buffer replay. For timeline sources (postgres, csv), suspend and switch to
+  // buffer replay so users can step through buffered frames.
   const stopWatch = useCallback(async () => {
     if (!session.sessionId) return;
 
-    // For realtime sources: stop and switch ALL listeners to buffer replay
-    if (sourceProfileId) {
-      const profile = ioProfiles.find((p) => p.id === sourceProfileId);
-      if (profile && isRealtimeProfile(profile)) {
-        try {
-          await stopAndSwitchToBuffer(session.sessionId, 1.0);
-          tlog.debug(`[IOSessionManager:${appName}] Stopped realtime session and switched to buffer`);
-        } catch (e) {
-          tlog.info(`[IOSessionManager:${appName}] stopAndSwitchToBuffer failed, falling back to suspend: ${e}`);
-          await session.suspend();
-        }
-        setIsWatching(false);
-        return;
+    // Use capabilities to determine source type (works for all windows, even joiners
+    // that don't have sourceProfileId set)
+    const isRealtimeSession = session.capabilities?.traits.temporal_mode === "realtime";
+
+    if (isRealtimeSession) {
+      try {
+        await stopAndSwitchToBuffer(session.sessionId, 1.0);
+        tlog.debug(`[IOSessionManager:${appName}] Stopped realtime session and switched to buffer`);
+      } catch (e) {
+        tlog.info(`[IOSessionManager:${appName}] stopAndSwitchToBuffer failed, falling back to suspend: ${e}`);
+        await session.suspend();
       }
+      setIsWatching(false);
+      return;
     }
 
     // Timeline sources: existing suspend + switchToBufferReplay
     await session.suspend();
-    if (sourceProfileId) {
-      const profile = ioProfiles.find((p) => p.id === sourceProfileId);
-      if (profile && !isRealtimeProfile(profile)) {
-        try {
-          await session.switchToBufferReplay(1.0);
-          tlog.debug(`[IOSessionManager:${appName}] Switched to buffer replay mode after stop`);
-        } catch (e) {
-          tlog.info(`[IOSessionManager:${appName}] Failed to switch to buffer replay after stop: ${e}`);
-        }
-      }
+    try {
+      await session.switchToBufferReplay(1.0);
+      tlog.debug(`[IOSessionManager:${appName}] Switched to buffer replay mode after stop`);
+    } catch (e) {
+      tlog.info(`[IOSessionManager:${appName}] Failed to switch to buffer replay after stop: ${e}`);
     }
     setIsWatching(false);
-  }, [session, sourceProfileId, ioProfiles, appName]);
+  }, [session, appName]);
 
   // Suspend session: alias for stopWatch (kept for backward compatibility)
   const suspendSession = stopWatch;

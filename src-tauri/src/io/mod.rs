@@ -224,8 +224,10 @@ pub enum TransmitPayload {
 pub enum TemporalMode {
     /// Real-time streaming from live devices (GVRET, slcan, gs_usb, SocketCAN, MQTT)
     Realtime,
-    /// Timeline/playback from recorded sources (PostgreSQL, CSV, Buffer)
+    /// Timeline/playback from recorded sources (PostgreSQL, CSV)
     Timeline,
+    /// Buffer replay from in-memory captured data
+    Buffer,
 }
 
 /// Protocol family for frame-based communication
@@ -392,6 +394,12 @@ impl IOCapabilities {
     /// Set reverse playback support (for timeline sources)
     pub fn with_reverse(mut self, supports_reverse: bool) -> Self {
         self.supports_reverse = supports_reverse;
+        self
+    }
+
+    /// Set temporal mode (e.g., buffer replay overrides timeline_can's default)
+    pub fn with_temporal_mode(mut self, mode: TemporalMode) -> Self {
+        self.traits.temporal_mode = mode;
         self
     }
 
@@ -1952,11 +1960,13 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
         return Ok(previous);
     }
 
-    // Stop the device
+    // Stop the device (triggers emit_stream_ended which finalises the buffer)
     session.device.stop().await?;
 
-    // Finalize the buffer but DON'T orphan it - session still owns it
-    let metadata = buffer_store::finalize_buffer();
+    // Look up the buffer by session ownership (finalize_buffer() was already
+    // consumed by emit_stream_ended during device.stop())
+    let metadata = buffer_store::get_buffer_for_session(session_id)
+        .and_then(|id| buffer_store::get_buffer_metadata(&id));
 
     // Emit session-suspended event with buffer info
     let (buffer_id, buffer_count, buffer_type, time_range) = match metadata {
@@ -2015,13 +2025,17 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
 
     let previous = session.device.state();
 
-    // Stop the device (idempotent if already stopped)
+    // Stop the device (idempotent if already stopped).
+    // Note: stop() triggers emit_stream_ended which already calls finalize_buffer(),
+    // so we look up the buffer by session ownership afterwards instead.
     if !matches!(previous, IOState::Stopped) {
         session.device.stop().await?;
     }
 
-    // Finalize the buffer
-    let metadata = buffer_store::finalize_buffer();
+    // Look up the buffer by session ownership (finalize_buffer() was already
+    // consumed by emit_stream_ended during device.stop())
+    let metadata = buffer_store::get_buffer_for_session(session_id)
+        .and_then(|id| buffer_store::get_buffer_metadata(&id));
 
     // Extract buffer info
     let (buffer_id, buffer_count, buffer_type, time_range) = match metadata {

@@ -89,8 +89,8 @@ export function useMenuSessionControl({
       joinerCount: joinerCount ?? 1,
     });
 
-    // Update bookmark menu availability — only enable for timeline sources
-    const bookmarksEnabled = !!bookmarks && capabilities?.traits.temporal_mode === "timeline";
+    // Update bookmark menu availability — enable for timeline and buffer sources
+    const bookmarksEnabled = !!bookmarks && (capabilities?.traits.temporal_mode === "timeline" || capabilities?.traits.temporal_mode === "buffer");
     updateMenuFocusState(true, bookmarksEnabled);
   }, [
     isFocused,
