@@ -300,7 +300,8 @@ export default function IoSourcePickerDialog({
         traits: {
           temporal_mode: "timeline" as TemporalMode,
           protocols: ["can", "canfd"] as Protocol[],
-          can_transmit: false,
+          tx_frames: false,
+          tx_bytes: false,
           multi_source: false,
         },
       }));
@@ -396,7 +397,8 @@ export default function IoSourcePickerDialog({
                   traits: {
                     temporal_mode: "timeline" as TemporalMode,
                     protocols: ["can", "canfd"] as Protocol[],
-                    can_transmit: false,
+                    tx_frames: false,
+                    tx_bytes: false,
                     multi_source: false,
                   },
                 }));
@@ -473,6 +475,27 @@ export default function IoSourcePickerDialog({
     return () => clearInterval(intervalId);
   }, [isOpen, buffers]);
 
+  // Listen for buffer changes from other windows while dialog is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const unlistenFns: (() => void)[] = [];
+    const setup = async () => {
+      // Refresh buffer list on delete/clear/import from another window
+      const u1 = await listen<BufferChangedPayload>(WINDOW_EVENTS.BUFFER_CHANGED, () => {
+        listOrphanedBuffers().then(setBuffers).catch(console.error);
+        useSessionStore.getState().loadBufferIds();
+      });
+      unlistenFns.push(u1);
+      // Refresh buffer list on rename/pin from another window
+      const u2 = await listen(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, () => {
+        listOrphanedBuffers().then(setBuffers).catch(console.error);
+      });
+      unlistenFns.push(u2);
+    };
+    setup();
+    return () => unlistenFns.forEach(fn => fn());
+  }, [isOpen]);
+
   // Fetch active joinable sessions when dialog opens and periodically refresh
   // Includes multi_source sessions AND recorded sessions (like PostgreSQL)
   // Also fetches profile usage info for showing "(in use)" indicators
@@ -488,9 +511,9 @@ export default function IoSourcePickerDialog({
         // - buffer: sessions switched to buffer replay (e.g., stopped live sessions)
         // - supports_time_range && !is_realtime: recorded sources like PostgreSQL
         const joinableSessions = sessions.filter((s) =>
-          s.capabilities.traits?.multi_source === true ||
+          s.capabilities.traits.multi_source === true ||
           s.deviceType === "buffer" ||
-          (s.capabilities.supports_time_range && !s.capabilities.is_realtime)
+          (s.capabilities.supports_time_range && s.capabilities.traits.temporal_mode === "timeline")
         );
         console.log("[IoSourcePickerDialog] Joinable sessions:", joinableSessions);
         setActiveMultiSourceSessions(joinableSessions);
@@ -1146,7 +1169,8 @@ export default function IoSourcePickerDialog({
         traits: {
           temporal_mode: 'realtime',
           protocols: (protocol === 'can' ? ['can', 'canfd'] : [protocol]) as Protocol[],
-          can_transmit: true,
+          tx_frames: true,
+          tx_bytes: false,
           multi_source: true,
         },
       }]);
@@ -1267,6 +1291,9 @@ export default function IoSourcePickerDialog({
     try {
       await deleteBuffer(bufferId);
 
+      // Remove from known buffer IDs so isBufferProfileId() stops matching
+      useSessionStore.getState().removeKnownBufferId(bufferId);
+
       // Refresh buffer list
       const allBuffers = await listOrphanedBuffers();
       setBuffers(allBuffers);
@@ -1278,7 +1305,8 @@ export default function IoSourcePickerDialog({
 
       // Notify other windows that buffer has been deleted
       const payload: BufferChangedPayload = {
-        metadata: null, // Signal a buffer was deleted
+        metadata: null,
+        deletedBufferIds: [bufferId],
         timestamp: Date.now(),
       };
       await emit(WINDOW_EVENTS.BUFFER_CHANGED, payload);
@@ -1294,6 +1322,7 @@ export default function IoSourcePickerDialog({
       const clearableBuffers = buffers.filter(b => !b.is_streaming && !b.persistent);
       for (const buffer of clearableBuffers) {
         await deleteBuffer(buffer.id);
+        useSessionStore.getState().removeKnownBufferId(buffer.id);
       }
 
       // Refresh buffer list (keep streaming and persistent buffers)
@@ -1313,6 +1342,7 @@ export default function IoSourcePickerDialog({
       // Notify other windows that buffers have been cleared
       const payload: BufferChangedPayload = {
         metadata: null,
+        deletedBufferIds: clearableBuffers.map(b => b.id),
         timestamp: Date.now(),
       };
       await emit(WINDOW_EVENTS.BUFFER_CHANGED, payload);

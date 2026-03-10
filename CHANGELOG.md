@@ -52,7 +52,9 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Buffer tooltip shows wrong source and 0 frames after "Leave Session"**: After auto-switching to an orphaned buffer, the tooltip showed the old session ID as the source and frame counts as 0. Fixed by adding an `onSessionDestroyed` callback in Discovery that fetches buffer metadata and enables buffer mode for orphaned buffers.
 
-- **Buffer rename/pin not syncing across windows**: Renaming a buffer or toggling its pin in one window did not propagate to other windows. Fixed by emitting a `BUFFER_METADATA_UPDATED` Tauri event from `renameSessionBuffer` and `setSessionBufferPersistent`, with a global listener that updates the session store in all windows.
+- **Buffer rename/pin/delete not syncing across windows**: Renaming, pinning, or deleting a buffer in one window (via session controls or the Data Source dialog) did not propagate to other windows. Fixed by routing all rename/pin operations through the session store (which emits `BUFFER_METADATA_UPDATED`), including `deletedBufferIds` in `BUFFER_CHANGED` events so other windows can clean up sessions referencing deleted buffers, and adding event listeners in the Data Source dialog to refresh the buffer list on changes from other windows.
+
+- **Pinned buffers show delete button in Data Source dialog**: The trash icon is now hidden for persistent (pinned) buffers in the buffer list. Unpin first to delete.
 
 ## [0.5.5] - 2026-03-09
 

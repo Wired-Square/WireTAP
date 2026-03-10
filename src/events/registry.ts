@@ -64,5 +64,7 @@ export interface BufferChangedPayload {
   metadata: BufferMetadata | null;
   /** What triggered this change: "ingested", "streamed", "imported", "cleared" */
   action?: "ingested" | "streamed" | "imported" | "cleared";
+  /** Buffer IDs that were deleted (for cross-window cleanup) */
+  deletedBufferIds?: string[];
   timestamp?: number;
 }

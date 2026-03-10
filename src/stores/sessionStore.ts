@@ -1945,8 +1945,9 @@ getEventListeners = () => useSessionStore.getState()._eventListeners;
 // Initialize the showAppError getter for error handling
 getGlobalShowAppError = () => useSessionStore.getState().showAppError;
 
-// Listen for buffer metadata updates from other windows (rename, pin)
+// Listen for buffer events from other windows
 import("../events/registry").then(({ WINDOW_EVENTS }) => {
+  // Rename / pin changes
   listen<{ bufferId: string; name?: string; persistent?: boolean }>(
     WINDOW_EVENTS.BUFFER_METADATA_UPDATED,
     (event) => {
@@ -1962,6 +1963,37 @@ import("../events/registry").then(({ WINDOW_EVENTS }) => {
               ...(name !== undefined && { name }),
               ...(persistent !== undefined && { persistent }),
             },
+          };
+        }
+      }
+      if (Object.keys(updated).length > 0) {
+        useSessionStore.setState((s) => ({ sessions: { ...s.sessions, ...updated } }));
+      }
+    }
+  );
+
+  // Buffer deleted — remove from knownBufferIds and clear buffer state on affected sessions
+  listen<{ deletedBufferIds?: string[] }>(
+    WINDOW_EVENTS.BUFFER_CHANGED,
+    (event) => {
+      const ids = event.payload.deletedBufferIds;
+      if (!ids || ids.length === 0) return;
+      const deletedSet = new Set(ids);
+      const state = useSessionStore.getState();
+
+      // Remove from known buffer IDs
+      for (const id of ids) {
+        state.removeKnownBufferId(id);
+      }
+
+      // Clear buffer info on any session referencing a deleted buffer
+      const sessions = state.sessions;
+      const updated: Record<string, Session> = {};
+      for (const [sid, session] of Object.entries(sessions)) {
+        if (session.buffer.id && deletedSet.has(session.buffer.id)) {
+          updated[sid] = {
+            ...session,
+            buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
           };
         }
       }

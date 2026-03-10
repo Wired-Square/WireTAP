@@ -9,7 +9,7 @@ import { badgeSmallInfo } from "../../styles/badgeStyles";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
 import type { BufferMetadata } from "../../api/buffer";
-import { renameBuffer, setBufferPersistent } from "../../api/buffer";
+import { useSessionStore } from "../../stores/sessionStore";
 import DeviceBusConfig from "./DeviceBusConfig";
 import type { BusMapping } from "../../api/io";
 
@@ -77,7 +77,7 @@ export default function BufferList({
       return;
     }
     try {
-      await renameBuffer(renamingId, renameValue.trim());
+      await useSessionStore.getState().renameSessionBuffer(renamingId, renameValue.trim());
       onBufferRenamed?.();
     } catch (e) {
       console.error("[BufferList] Failed to rename buffer:", e);
@@ -92,7 +92,7 @@ export default function BufferList({
   const togglePersistent = async (buffer: BufferMetadata, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await setBufferPersistent(buffer.id, !buffer.persistent);
+      await useSessionStore.getState().setSessionBufferPersistent(buffer.id, !buffer.persistent);
       onBufferPersistenceChanged?.();
     } catch (err) {
       console.error("[BufferList] Failed to toggle persistence:", err);
@@ -214,16 +214,18 @@ export default function BufferList({
               >
                 {buffer.persistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
               </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteBuffer(buffer.id);
-                }}
-                className="p-1 rounded transition-colors hover:bg-[var(--status-danger-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--status-danger-text)]"
-                title="Delete buffer"
-              >
-                <Trash2 className={iconSm} />
-              </button>
+              {!buffer.persistent && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteBuffer(buffer.id);
+                  }}
+                  className="p-1 rounded transition-colors hover:bg-[var(--status-danger-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--status-danger-text)]"
+                  title="Delete buffer"
+                >
+                  <Trash2 className={iconSm} />
+                </button>
+              )}
             </div>
             {/* Show bus mapping UI when this buffer is selected and has buses */}
             {isThisBufferSelected && busConfig && busConfig.length > 0 && onBusConfigChange ? (

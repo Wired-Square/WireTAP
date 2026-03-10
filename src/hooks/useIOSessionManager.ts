@@ -754,7 +754,13 @@ export function useIOSessionManager(
     if (isBufferProfileId(sourceProfileId)) {
       // Buffer mode: delete buffer + leave session (clean leave, no suspend/copy)
       tlog.info(`[IOSessionManager] Clear buffer: deleting buffer ${bid} and leaving session`);
-      if (bid) await deleteBuffer(bid);
+      if (bid) {
+        await deleteBuffer(bid);
+        useSessionStore.getState().removeKnownBufferId(bid);
+        const { emit } = await import("@tauri-apps/api/event");
+        const { WINDOW_EVENTS } = await import("../events/registry");
+        emit(WINDOW_EVENTS.BUFFER_CHANGED, { metadata: null, deletedBufferIds: [bid], timestamp: Date.now() });
+      }
       await session.leave();
       setMultiBusProfiles([]);
       setIoProfile(null);
