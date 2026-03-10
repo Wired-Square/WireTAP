@@ -843,6 +843,7 @@ async fn run_buffer_stream(
     );
 
     // Post-completion pause-wait loop: stay alive for step/seek/resume
+    let mut seeked_during_pause = false;
     loop {
         if control.is_cancelled() {
             break 'outer;
@@ -856,6 +857,7 @@ async fn run_buffer_stream(
             &mut batch_buffer, &mut playback_baseline_secs, &mut wall_clock_baseline,
             &mut last_frame_time_secs,
         ) {
+            seeked_during_pause = true;
             continue;
         }
 
@@ -876,13 +878,17 @@ async fn run_buffer_stream(
             }
         }
 
-        chunk = load_chunk(&buf_id, last_consumed_rowid, CHUNK_SIZE, is_reverse);
-        chunk_idx = 0;
+        // Only reload chunk if no seek occurred — seek already loaded the correct chunk
+        if !seeked_during_pause {
+            chunk = load_chunk(&buf_id, last_consumed_rowid, CHUNK_SIZE, is_reverse);
+            chunk_idx = 0;
+        }
 
         if chunk.is_empty() {
-            // Still at boundary in this direction, re-pause
+            // Still at boundary in this direction, re-pause and notify frontend
             control.pause();
             completed_flag.store(true, Ordering::Relaxed);
+            emit_to_session(&app_handle, "stream-complete", &session_id, "paused".to_string());
             continue;
         }
 

@@ -74,6 +74,10 @@ All notable changes to WireTAP will be documented in this file.
 
 - **"Leave Session" drops to empty buffer view**: After leaving a live session, the app switched to the orphaned buffer but showed no frames. Volatile buffer IDs created during streaming were not registered in `knownBufferIds`, so `isBufferProfileId()` returned false and the code tried to open a regular IO profile instead of a buffer session. Fixed by registering buffer IDs in `knownBufferIds` when `stream-ended` and `session-suspended` events arrive.
 
+- **Buffer playback off-by-one after seek + replay**: After seeking to the start of a buffer during the post-completion pause, resuming playback skipped the first frame because the post-completion resume path unconditionally reloaded the chunk from `last_consumed_rowid` (exclusive boundary), overwriting the chunk that `handle_seek` had already loaded correctly. Fixed by tracking whether a seek occurred during the pause and skipping the redundant chunk reload.
+
+- **Buffer playback stall on replay without seek**: After buffer playback completed, clicking play again without seeking first caused the scrubber to stall — the post-completion resume path loaded an empty chunk (still at EOF) and silently re-paused without emitting `stream-complete`, so the frontend never learned playback was at the boundary. Fixed by emitting `stream-complete` when re-pausing at a boundary.
+
 - **Buffer bin button does nothing after "Leave Session"**: The clear/delete button on an orphaned buffer did nothing because `sourceProfileId` was cleared during session destruction. Fixed by setting `sourceProfileId` to the buffer ID when switching to an orphaned buffer.
 
 - **Buffer tooltip shows wrong source and 0 frames after "Leave Session"**: After auto-switching to an orphaned buffer, the tooltip showed the old session ID as the source and frame counts as 0. Fixed by adding an `onSessionDestroyed` callback in Discovery that fetches buffer metadata and enables buffer mode for orphaned buffers.
