@@ -14,7 +14,7 @@ export interface UseDecoderSessionHandlersParams {
   // Manager session switching methods
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
-  watchSingleSource: (profileId: string, options: LoadOptions) => Promise<void>;
+  watchSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
 
   // Playback (for buffer session speed)
   playbackSpeed: PlaybackSpeed;
@@ -28,7 +28,7 @@ export interface UseDecoderSessionHandlersParams {
 export function useDecoderSessionHandlers({
   stopWatch,
   selectProfile,
-  watchSingleSource,
+  watchSource,
   playbackSpeed,
   setBufferMetadata,
   updateCurrentTime,
@@ -53,7 +53,7 @@ export function useDecoderSessionHandlers({
       if (isBufferProfileId(profileId)) {
         // Create a proper session for the buffer so it appears in the session manager
         // and has playback/timeline controls
-        await watchSingleSource(profileId!, { speed: playbackSpeed });
+        await watchSource([profileId!], { speed: playbackSpeed });
         // Load buffer metadata for the UI
         await switchToBuffer(profileId!);
       } else {
@@ -61,7 +61,7 @@ export function useDecoderSessionHandlers({
         selectProfile(profileId);
       }
     },
-    [selectProfile, watchSingleSource, switchToBuffer, playbackSpeed]
+    [selectProfile, watchSource, switchToBuffer, playbackSpeed]
   );
 
   return {

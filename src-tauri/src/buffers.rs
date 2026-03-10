@@ -379,6 +379,12 @@ pub async fn list_buffers() -> Result<Vec<BufferMetadata>, String> {
     Ok(buffer_store::list_buffers())
 }
 
+/// List all buffer IDs (lightweight — no metadata)
+#[tauri::command(rename_all = "snake_case")]
+pub async fn list_buffer_ids() -> Vec<String> {
+    buffer_store::list_buffer_ids()
+}
+
 /// Delete a specific buffer by ID
 #[tauri::command(rename_all = "snake_case")]
 pub async fn delete_buffer(buffer_id: String) -> Result<(), String> {

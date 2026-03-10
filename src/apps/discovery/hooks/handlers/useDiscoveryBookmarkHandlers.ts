@@ -35,7 +35,7 @@ export function useDiscoveryBookmarkHandlers({
   }, [setBookmarkFrameId, setBookmarkFrameTime, openBookmarkDialog]);
 
   // Handle saving a bookmark
-  // Use sourceProfileId (the original data source) rather than ioProfile (which may be BUFFER_PROFILE_ID)
+  // Use sourceProfileId (the original data source) rather than ioProfile (which may be a buffer ID)
   const handleSaveBookmark = useCallback(async (name: string, fromTime: string, toTime: string) => {
     const profileId = sourceProfileId || ioProfile;
     if (!profileId) return;

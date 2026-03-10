@@ -114,7 +114,7 @@ export default function Transmit() {
   const clearError = useTransmitStore((s) => s.clearError);
 
   // Dialog state
-  const dialogs = useDialogManager(['ioReaderPicker'] as const);
+  const dialogs = useDialogManager(['ioSessionPicker'] as const);
 
   // Store actions for stopping repeats
   const stopAllRepeats = useTransmitStore((s) => s.stopAllRepeats);
@@ -172,14 +172,14 @@ export default function Transmit() {
   const handlers = useTransmitHandlers({
     stopWatch,
     resumeWithNewBuffer,
-    openIoPicker: () => dialogs.ioReaderPicker.open(),
-    closeIoPicker: () => dialogs.ioReaderPicker.close(),
+    openIoPicker: () => dialogs.ioSessionPicker.open(),
+    closeIoPicker: () => dialogs.ioSessionPicker.close(),
   });
 
   // Centralised IO picker dialog handlers
   const ioPickerProps = useIOSourcePickerHandlers({
     manager,
-    closeDialog: () => dialogs.ioReaderPicker.close(),
+    closeDialog: () => dialogs.ioSessionPicker.close(),
   });
 
   // Load profiles on mount
@@ -214,7 +214,7 @@ export default function Transmit() {
       onStopAll: () => {
         if (isStreaming || isPaused) stop();
       },
-      onPicker: () => dialogs.ioReaderPicker.open(),
+      onPicker: () => dialogs.ioSessionPicker.open(),
     },
   });
 
@@ -408,8 +408,8 @@ export default function Transmit() {
       {/* IO Picker Dialog */}
       <IoSourcePickerDialog
         {...ioPickerProps}
-        isOpen={dialogs.ioReaderPicker.isOpen}
-        onClose={() => dialogs.ioReaderPicker.close()}
+        isOpen={dialogs.ioSessionPicker.isOpen}
+        onClose={() => dialogs.ioSessionPicker.close()}
         ioProfiles={transmitProfiles}
         selectedId={ioProfile ?? null}
         defaultId={settings?.default_read_profile}

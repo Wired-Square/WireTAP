@@ -230,7 +230,7 @@ export interface CreateIOSessionOptions {
   listenerId?: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName?: string;
-  /** Buffer ID for buffer reader sessions (e.g., "buf_1") */
+  /** Buffer ID for buffer reader sessions (e.g., "xk9m2p") */
   bufferId?: string;
   /** Modbus TCP poll groups as JSON string (catalog-derived, for modbus_tcp profiles) */
   modbusPollsJson?: string;

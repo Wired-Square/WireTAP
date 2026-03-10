@@ -8,9 +8,15 @@ All notable changes to WireTAP will be documented in this file.
 
 - **`multi_source` trait on `InterfaceTraits`**: New boolean trait indicating whether a source can be combined with others in a multi-source session. Set to `true` for all realtime sources, `false` for timeline/buffer sources. Replaces the hardcoded `isMultiSourceCapable` field in the frontend profile trait registry with a backend-authoritative trait. Validation in `validate_session_traits()` now uses this trait instead of a timeline-specific rule.
 
-- **Unified `watchSource()` and `loadSource()` session methods**: New methods in `useIOSessionManager` that handle both single and multi-source sessions through a single entry point. Internal routing based on the `multi_source` trait. The previous four methods (`watchSingleSource`, `watchMultiSource`, `loadSingleSource`, `loadMultiSource`) remain as deprecated wrappers.
+- **Unified `watchSource()` and `loadSource()` session methods**: New methods in `useIOSessionManager` that handle both single and multi-source sessions through a single entry point. Internal routing based on the `multi_source` trait.
+
+- **Random buffer IDs**: New buffers get random 6-character alphanumeric IDs (e.g., `xk9m2p`) instead of sequential `buf_1`, `buf_2`. Existing `buf_N` buffers continue to work. Buffer detection uses a cached Set lookup from the backend instead of regex pattern matching. Removed the legacy `__imported_buffer__` constant.
 
 ### Changed
+
+- **Removed deprecated session method wrappers**: `watchSingleSource`, `watchMultiSource`, `loadSingleSource`, `loadMultiSource` removed from `useIOSessionManager`. All call sites now use `watchSource`/`loadSource` directly.
+
+- **Reader → Session renames**: `ReaderButton` → `SessionButton`, `onOpenIoReaderPicker` → `onOpenIoSessionPicker`, `ioReaderPicker` → `ioSessionPicker` dialog key across all app files.
 
 - **Joinability filter uses `multi_source` trait**: The IO source picker dialog now checks `capabilities.traits.multi_source` instead of hardcoding `deviceType === "multi_source"` for session joinability.
 
@@ -29,10 +35,15 @@ All notable changes to WireTAP will be documented in this file.
 ### Fixed
 
 - **Clear All preserves pinned buffers**: The "Clear All" button in the IO source picker no longer deletes persistent (pinned) buffers.
+
 - **Buffer sources show collapsed view in Data Source dialog**: When opening the Data Source dialog while on a buffer with an active session, the dialog now shows the collapsed source view (matching the behaviour of other source types) instead of the full source list.
+
 - **Pin toggle state not updating**: Fixed buffer pin/unpin button not reflecting state changes in the top bar. The `expectedStateRef` in `useIOSession` was never cleared for buffer sessions (which don't auto-start and thus never receive streaming events), causing the UI to read stale state.
+
 - **Session tooltip showing 0 frames during streaming**: Fixed a race condition where `isWatching` was immediately reset to `false` by the "clear on stream end" effect before the session connected. The effect now tracks streaming transitions correctly using a ref.
+
 - **Session tooltip frame counts for buffer sessions**: Buffer sessions now show buffer frame count and unique IDs from metadata instead of watch counters (which are always 0 for non-streaming sessions).
+
 - **Buffer session tooltip showing session ID as source**: The tooltip "Source" field now shows the buffer label or buffer ID instead of the raw `b_` session ID.
 
 ## [0.5.5] - 2026-03-09

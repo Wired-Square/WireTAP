@@ -87,7 +87,7 @@ export interface UseDiscoveryHandlersParams {
   // Manager session switching methods
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
-  watchSingleSource: (profileId: string, options: ManagerLoadOptions) => Promise<void>;
+  watchSource: (profileIds: string[], options: ManagerLoadOptions) => Promise<void>;
   jumpToBookmark: (bookmark: TimeRangeFavorite, options?: Omit<ManagerLoadOptions, "startTime" | "endTime" | "maxFrames">) => Promise<void>;
 
   // Session actions
@@ -160,7 +160,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
   // in useIOSourcePickerHandlers, called directly from Discovery.tsx.
   const sessionHandlers = useDiscoverySessionHandlers({
     selectProfile: params.selectProfile,
-    watchSingleSource: params.watchSingleSource,
+    watchSource: params.watchSource,
     updateCurrentTime: params.updateCurrentTime,
     setCurrentFrameIndex: params.setCurrentFrameIndex,
     setMaxBuffer: params.setMaxBuffer,

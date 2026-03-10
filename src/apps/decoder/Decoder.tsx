@@ -53,7 +53,7 @@ export default function Decoder() {
     'bookmarkPicker',
     'saveSelectionSet',
     'framePicker',
-    'ioReaderPicker',
+    'ioSessionPicker',
     'speedPicker',
     'catalogPicker',
     'filter',
@@ -427,11 +427,11 @@ export default function Decoder() {
         });
 
         // Close the dialog and transition to buffer replay mode
-        dialogs.ioReaderPicker.close();
+        dialogs.ioSessionPicker.close();
         setPendingBufferTransition(true);
       }
     }
-  }, [dialogs.ioReaderPicker]);
+  }, [dialogs.ioSessionPicker]);
 
   // Callback for when session is reconfigured (e.g., bookmark jump)
   const handleSessionReconfigured = useCallback((info: SessionReconfigurationInfo) => {
@@ -505,8 +505,7 @@ export default function Decoder() {
     stopWatch,
     resumeWithNewBuffer,
     selectProfile,
-    watchSingleSource,
-    watchMultiSource,
+    watchSource,
     // Bookmark methods
     jumpToBookmark,
     // Watch state
@@ -611,9 +610,9 @@ export default function Decoder() {
           if (modbusPollsJson) {
             tlog.debug(`[Decoder] Modbus catalog loaded — reinitializing session with poll groups`);
             if (ioProfiles.length > 0) {
-              watchMultiSource(ioProfiles, { modbusPollsJson });
+              watchSource(ioProfiles, { modbusPollsJson });
             } else if (sourceProfileId) {
-              watchSingleSource(sourceProfileId, { modbusPollsJson });
+              watchSource([sourceProfileId], { modbusPollsJson });
             }
           }
         }).catch((err) => {
@@ -640,7 +639,7 @@ export default function Decoder() {
     // sessionCatalogPath drives the primary trigger: undefined→null when session is created.
     // ioProfiles/sourceProfileId included in case they arrive in a later render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionCatalogPath, sessionId, ioProfiles, sourceProfileId, watchMultiSource]);
+  }, [sessionCatalogPath, sessionId, ioProfiles, sourceProfileId, watchSource]);
 
   // Use the orchestrator hook for all handlers
   const handlers = useDecoderHandlers({
@@ -693,7 +692,7 @@ export default function Decoder() {
     // Manager session switching methods
     stopWatch,
     selectProfile,
-    watchSingleSource,
+    watchSource,
     jumpToBookmark,
 
     // Dialog controls
@@ -723,7 +722,7 @@ export default function Decoder() {
   // Centralised IO picker handlers
   const ioPickerProps = useIOSourcePickerHandlers({
     manager,
-    closeDialog: () => dialogs.ioReaderPicker.close(),
+    closeDialog: () => dialogs.ioSessionPicker.close(),
     mergeOptions: (options) => {
       const state = useDecoderStore.getState();
       const merged = mergeSerialConfigForWatch(state.serialConfig, options);
@@ -759,7 +758,7 @@ export default function Decoder() {
         if (isStreaming) stopWatch();
       },
       onClear: () => handlers.handleClear(),
-      onPicker: () => dialogs.ioReaderPicker.open(),
+      onPicker: () => dialogs.ioSessionPicker.open(),
       onJumpToBookmark: async (bookmarkId) => {
         if (bookmarkProfileId) {
           const bookmarks = await getFavoritesForProfile(bookmarkProfileId);
@@ -1016,7 +1015,7 @@ export default function Decoder() {
             totalFrameCount={isBufferMode ? bufferCount : watchFrameCount}
             selectedFrameCount={selectedFrames.size}
             onOpenFramePicker={() => dialogs.framePicker.open()}
-            onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
+            onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
             onOpenSpeedPicker={() => dialogs.speedPicker.open()}
             showRawBytes={showRawBytes}
             onToggleRawBytes={toggleShowRawBytes}
@@ -1121,8 +1120,8 @@ export default function Decoder() {
 
       <IoSourcePickerDialog
         {...ioPickerProps}
-        isOpen={dialogs.ioReaderPicker.isOpen}
-        onClose={() => dialogs.ioReaderPicker.close()}
+        isOpen={dialogs.ioSessionPicker.isOpen}
+        onClose={() => dialogs.ioSessionPicker.close()}
         ioProfiles={settings?.io_profiles || []}
         selectedId={ioProfile}
         selectedIds={ioProfiles.length > 0 ? ioProfiles : []}

@@ -7,6 +7,8 @@
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
+use std::hash::{BuildHasher, Hasher};
 use std::sync::RwLock;
 
 use crate::buffer_db;
@@ -41,7 +43,7 @@ pub struct TimestampedByte {
 /// Metadata about a buffer
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BufferMetadata {
-    /// Unique buffer ID (e.g., "buffer_1", "buffer_2")
+    /// Unique buffer ID (e.g., "xk9m2p", "r7f3kw")
     pub id: String,
     /// Buffer type (frames or bytes)
     pub buffer_type: BufferType,
@@ -92,8 +94,6 @@ struct BufferRegistry {
     /// ID of the buffer currently being streamed to (separate from active_id)
     /// This is set during streaming and cleared on finalize
     streaming_id: Option<String>,
-    /// Counter for generating unique buffer IDs
-    next_id: u32,
     /// Last logged streaming_id for list_buffers (reduces log spam)
     last_logged_streaming_id: Option<String>,
     /// Last logged buffer count for list_buffers
@@ -106,7 +106,6 @@ impl Default for BufferRegistry {
             buffers: HashMap::new(),
             active_id: None,
             streaming_id: None,
-            next_id: 1,
             last_logged_streaming_id: None,
             last_logged_buffer_count: 0,
         }
@@ -116,6 +115,22 @@ impl Default for BufferRegistry {
 /// Global buffer registry
 static BUFFER_REGISTRY: Lazy<RwLock<BufferRegistry>> =
     Lazy::new(|| RwLock::new(BufferRegistry::default()));
+
+// ============================================================================
+// Public API - Buffer ID Queries
+// ============================================================================
+
+/// Check if a given ID corresponds to a known buffer.
+pub fn is_known_buffer(id: &str) -> bool {
+    let registry = BUFFER_REGISTRY.read().unwrap();
+    registry.buffers.contains_key(id)
+}
+
+/// Return all known buffer IDs.
+pub fn list_buffer_ids() -> Vec<String> {
+    let registry = BUFFER_REGISTRY.read().unwrap();
+    registry.buffers.keys().cloned().collect()
+}
 
 // ============================================================================
 // Public API - Buffer Creation & Management
@@ -135,12 +150,35 @@ pub fn create_buffer_inactive(buffer_type: BufferType, name: String) -> String {
     create_buffer_internal(buffer_type, name, false)
 }
 
+/// Generate a random 6-character lowercase alphanumeric buffer ID.
+/// Retries on collision (astronomically unlikely with 36^6 ≈ 2.2 billion possibilities).
+fn generate_buffer_id(registry: &BufferRegistry) -> String {
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+    loop {
+        let random_state = RandomState::new();
+        let mut hasher = random_state.build_hasher();
+        hasher.write_u64(std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0));
+        let hash = hasher.finish();
+        let id: String = (0..6)
+            .map(|i| {
+                let idx = ((hash >> (i * 8)) & 0xFF) as usize % CHARSET.len();
+                CHARSET[idx] as char
+            })
+            .collect();
+        if !registry.buffers.contains_key(&id) {
+            return id;
+        }
+    }
+}
+
 /// Internal helper to create a buffer with optional streaming activation.
 fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: bool) -> String {
     let mut registry = BUFFER_REGISTRY.write().unwrap();
 
-    let id = format!("buf_{}", registry.next_id);
-    registry.next_id += 1;
+    let id = generate_buffer_id(&registry);
 
     let created_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -397,18 +435,8 @@ pub fn hydrate_from_db() {
 
     let mut registry = BUFFER_REGISTRY.write().unwrap();
     let mut hydrated = 0u32;
-    let mut max_id = 0u32;
 
     for meta in metadata_rows {
-        // Parse the numeric ID from "buf_N" to track next_id
-        if let Some(num_str) = meta.id.strip_prefix("buf_") {
-            if let Ok(num) = num_str.parse::<u32>() {
-                if num >= max_id {
-                    max_id = num;
-                }
-            }
-        }
-
         // Verify data actually exists in SQLite (skip orphaned metadata)
         let has_data = match meta.buffer_type {
             BufferType::Frames => {
@@ -463,11 +491,6 @@ pub fn hydrate_from_db() {
 
         registry.buffers.insert(buffer.metadata.id.clone(), buffer);
         hydrated += 1;
-    }
-
-    // Ensure next_id won't collide with existing buffer IDs
-    if max_id >= registry.next_id {
-        registry.next_id = max_id + 1;
     }
 
     tlog!("[BufferStore] Hydrated {} buffer(s) from SQLite", hydrated);
@@ -603,8 +626,7 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
     let (id, metadata) = {
         let mut registry = BUFFER_REGISTRY.write().unwrap();
 
-        let id = format!("buf_{}", registry.next_id);
-        registry.next_id += 1;
+        let id = generate_buffer_id(&registry);
 
         let created_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

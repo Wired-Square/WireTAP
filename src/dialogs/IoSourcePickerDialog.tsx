@@ -68,8 +68,6 @@ import {
 import { isBufferProfileId } from "../hooks/useIOSessionManager";
 import type { FramingConfig, InterfaceFramingConfig } from "./io-source-picker";
 
-// Re-export constants for backward compatibility
-export { BUFFER_PROFILE_ID } from "./io-source-picker";
 
 /** Options passed when starting a load or connect operation */
 export interface LoadOptions {
@@ -373,13 +371,15 @@ export default function IoSourcePickerDialog({
   useEffect(() => {
     if (isOpen) {
       getAllFavorites().then(setBookmarks).catch(console.error);
+      // Refresh known buffer IDs so isBufferProfileId() is up-to-date
+      useSessionStore.getState().loadBufferIds();
       // Load all buffers from the registry and initialize selected buffer
       listOrphanedBuffers().then((loadedBuffers) => {
         setBuffers(loadedBuffers);
-        // If a specific buffer is selected (e.g., "buffer_1"), use that
+        // If a specific buffer is selected (e.g., "xk9m2p"), use that
         // Otherwise if legacy buffer ID is selected, use the most recent buffer
         if (isBufferProfileId(selectedId) && loadedBuffers.length > 0) {
-          // Check if selectedId matches a specific buffer (e.g., "buffer_1")
+          // Check if selectedId matches a specific buffer (e.g., "xk9m2p")
           const matchingBuffer = loadedBuffers.find(b => b.id === selectedId);
           if (matchingBuffer) {
             setSelectedBufferId(matchingBuffer.id);

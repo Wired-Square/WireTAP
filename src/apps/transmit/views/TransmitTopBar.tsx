@@ -98,7 +98,7 @@ export default function TransmitTopBar({
         ioState,
         frameCount: uniqueFrameCount,
         totalFrameCount,
-        onOpenIoReaderPicker: onOpenIoPicker,
+        onOpenIoSessionPicker: onOpenIoPicker,
         speed,
         supportsSpeed,
         onOpenSpeedPicker,

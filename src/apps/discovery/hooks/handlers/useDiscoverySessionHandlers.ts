@@ -14,7 +14,7 @@ import { useBufferSession } from "../../../../hooks/useBufferSession";
 export interface UseDiscoverySessionHandlersParams {
   // Session actions
   selectProfile: (profileId: string | null) => void;
-  watchSingleSource: (profileId: string, options: LoadOptions) => Promise<void>;
+  watchSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
 
   // Store actions
   updateCurrentTime?: (timeSeconds: number) => void;
@@ -37,7 +37,7 @@ export interface UseDiscoverySessionHandlersParams {
 
 export function useDiscoverySessionHandlers({
   selectProfile,
-  watchSingleSource,
+  watchSource,
   updateCurrentTime,
   setCurrentFrameIndex,
   setMaxBuffer,
@@ -101,12 +101,12 @@ export function useDiscoverySessionHandlers({
   const handleIoProfileChange = useCallback(async (profileId: string | null) => {
     console.log(`[DiscoverySessionHandlers] handleIoProfileChange called - profileId=${profileId}`);
 
-    // Check if switching to a buffer session (buf_1, buf_2, etc. or legacy __imported_buffer__)
+    // Check if switching to a buffer session
     if (isBufferProfileId(profileId)) {
       // Create a proper session for the buffer so it appears in the session manager
-      // and has playback/timeline controls. watchSingleSource calls onBeforeWatch (clears state),
+      // and has playback/timeline controls. watchSource calls onBeforeWatch (clears state),
       // creates a BufferReader session, and sets sourceProfileId to the buffer ID.
-      await watchSingleSource(profileId!, { speed: 1 });
+      await watchSource([profileId!], { speed: 1 });
       // Load buffer metadata and enable buffer UI (frame picker, pagination)
       await switchToBuffer(profileId!);
     } else {
@@ -123,7 +123,7 @@ export function useDiscoverySessionHandlers({
     }
   }, [
     selectProfile,
-    watchSingleSource,
+    watchSource,
     switchToBuffer,
     clearAnalysisResults,
     clearBuffer,

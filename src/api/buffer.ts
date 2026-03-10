@@ -15,7 +15,7 @@ export type BufferType = "frames" | "bytes";
  * Metadata about a buffer in the registry
  */
 export interface BufferMetadata {
-  /** Unique buffer ID (e.g., "buffer_1", "buffer_2") */
+  /** Unique buffer ID (e.g., "xk9m2p", "r7f3kw") */
   id: string;
   /** Type of data stored: "frames" (CAN, framed serial) or "bytes" (raw serial) */
   buffer_type: BufferType;
@@ -414,6 +414,14 @@ export async function listBuffers(): Promise<BufferMetadata[]> {
 }
 
 /**
+ * List all known buffer IDs (lightweight — no metadata).
+ * Used to populate the known buffer ID set for `isBufferProfileId()` lookups.
+ */
+export async function listBufferIds(): Promise<string[]> {
+  return invoke("list_buffer_ids");
+}
+
+/**
  * List only orphaned buffers (no owning session).
  * These are buffers available for standalone selection in the IO picker.
  * Includes CSV imports and buffers from destroyed sessions.
@@ -428,7 +436,10 @@ export async function listOrphanedBuffers(): Promise<BufferMetadata[]> {
  * @param bufferId - The buffer ID to delete
  */
 export async function deleteBuffer(bufferId: string): Promise<void> {
-  return invoke("delete_buffer", { buffer_id: bufferId });
+  await invoke("delete_buffer", { buffer_id: bufferId });
+  // Remove from known buffer ID cache
+  const { useSessionStore } = await import("../stores/sessionStore");
+  useSessionStore.getState().removeKnownBufferId(bufferId);
 }
 
 /**

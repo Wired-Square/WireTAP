@@ -82,7 +82,7 @@ type Props = {
   hasData?: boolean;
 
   // Dialogs
-  onOpenIoReaderPicker: () => void;
+  onOpenIoSessionPicker: () => void;
 
   // Actions
   onSave: () => void;
@@ -127,7 +127,7 @@ export default function DiscoveryTopBar({
   speed = 1,
   supportsSpeed = false,
   onOpenSpeedPicker,
-  onOpenIoReaderPicker,
+  onOpenIoSessionPicker,
   onSave,
   onExport,
   onInfo,
@@ -150,7 +150,7 @@ export default function DiscoveryTopBar({
         ioState,
         frameCount: uniqueFrameCount,
         totalFrameCount,
-        onOpenIoReaderPicker,
+        onOpenIoSessionPicker,
         speed,
         supportsSpeed,
         onOpenSpeedPicker,

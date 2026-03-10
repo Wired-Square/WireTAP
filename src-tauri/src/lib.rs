@@ -1088,6 +1088,7 @@ pub fn run() {
             buffers::search_buffer_frames,
             // Multi-buffer registry API
             buffers::list_buffers,
+            buffers::list_buffer_ids,
             buffers::delete_buffer,
             buffers::clear_buffer,
             buffers::get_buffer_metadata_by_id,

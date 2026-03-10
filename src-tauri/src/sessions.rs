@@ -1494,7 +1494,7 @@ pub async fn probe_device(
     use crate::io::slcan::reader::probe_slcan_device;
 
     // Buffer IDs — metadata already in memory, no profile lookup needed
-    if profile_id.starts_with("buf_") || profile_id == "__imported_buffer__" {
+    if buffer_store::is_known_buffer(&profile_id) {
         if let Some(meta) = buffer_store::get_buffer_metadata(&profile_id) {
             let bus_count = if meta.buses.is_empty() { 1 } else { meta.buses.len() as u8 };
             let is_multi_bus = meta.buses.len() > 1;

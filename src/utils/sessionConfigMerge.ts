@@ -9,7 +9,7 @@ import type { SerialFrameConfig } from "./frameExport";
 
 /**
  * Merge serial frame config from a catalog into dialog load options,
- * producing ManagerLoadOptions suitable for watchSingleSource/watchMultiSource.
+ * producing ManagerLoadOptions suitable for watchSource.
  *
  * Catalog config takes precedence for frame ID and source address extraction.
  * Dialog options take precedence for speed, time range, and max frames.

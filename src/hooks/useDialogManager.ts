@@ -28,20 +28,20 @@ export type DialogManagerResult<T extends readonly string[]> = {
  * @example
  * ```tsx
  * const dialogs = useDialogManager([
- *   'ioReaderPicker',
+ *   'ioSessionPicker',
  *   'framePicker',
  *   'speedPicker',
  * ] as const);
  *
  * // Usage
- * dialogs.ioReaderPicker.isOpen    // boolean
- * dialogs.ioReaderPicker.open()    // opens the dialog
- * dialogs.ioReaderPicker.close()   // closes the dialog
+ * dialogs.ioSessionPicker.isOpen    // boolean
+ * dialogs.ioSessionPicker.open()    // opens the dialog
+ * dialogs.ioSessionPicker.close()   // closes the dialog
  *
  * // In JSX
  * <IoSourcePickerDialog
- *   isOpen={dialogs.ioReaderPicker.isOpen}
- *   onClose={dialogs.ioReaderPicker.close}
+ *   isOpen={dialogs.ioSessionPicker.isOpen}
+ *   onClose={dialogs.ioSessionPicker.close}
  * />
  * ```
  */
@@ -107,7 +107,7 @@ export function useDialogManager<T extends readonly string[]>(
  * @example
  * ```tsx
  * const dialogs = useDialogManagerWithDefaults({
- *   ioReaderPicker: false,
+ *   ioSessionPicker: false,
  *   framePicker: false,
  *   speedPicker: true, // starts open
  * });

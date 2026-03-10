@@ -18,10 +18,10 @@ import {
 import { getIOKindLabel } from "../utils/ioKindLabel";
 
 // ============================================================================
-// Reader Button - displays current reader with appropriate icon
+// Session Button - displays current source with appropriate icon
 // ============================================================================
 
-export interface ReaderButtonProps {
+export interface SessionButtonProps {
   /** Current IO profile/session ID */
   ioProfile: string | null;
   /** Available IO profiles */
@@ -40,7 +40,7 @@ export interface ReaderButtonProps {
   frameCount?: number;
   /** Total number of frames seen (shown in tooltip when available) */
   totalFrameCount?: number;
-  /** Click handler to open reader picker */
+  /** Click handler to open session picker */
   onClick: () => void;
   /** Whether button should be disabled (e.g., while streaming) */
   disabled?: boolean;
@@ -48,7 +48,7 @@ export interface ReaderButtonProps {
   isBufferMode?: boolean;
 }
 
-export function ReaderButton({
+export function SessionButton({
   ioProfile,
   ioProfiles,
   multiBusProfiles = [],
@@ -61,7 +61,7 @@ export function ReaderButton({
   onClick,
   disabled = false,
   isBufferMode: isBufferModeProp,
-}: ReaderButtonProps) {
+}: SessionButtonProps) {
   const isBufferProfile = isBufferModeProp ?? isBufferProfileId(ioProfile);
   const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
 
@@ -346,8 +346,8 @@ export interface IOSessionControlsProps {
   frameCount?: number;
   /** Total number of frames seen (shown in tooltip when available) */
   totalFrameCount?: number;
-  /** Click handler to open reader picker */
-  onOpenIoReaderPicker: () => void;
+  /** Click handler to open session picker */
+  onOpenIoSessionPicker: () => void;
 
   // Speed props
   /** Current playback speed */
@@ -395,7 +395,7 @@ export interface IOSessionControlsProps {
 /**
  * Combined IO session controls component.
  * Includes reader button, speed picker button, and session action buttons (stop/resume/leave/bookmark).
- * Use this instead of separate ReaderButton + SessionActionButtons for consistent layout.
+ * Use this instead of separate SessionButton + SessionActionButtons for consistent layout.
  */
 export function IOSessionControls({
   // Reader props
@@ -408,7 +408,7 @@ export function IOSessionControls({
   ioState,
   frameCount,
   totalFrameCount,
-  onOpenIoReaderPicker,
+  onOpenIoSessionPicker,
   // Speed props
   speed = 1,
   supportsSpeed = false,
@@ -468,8 +468,8 @@ export function IOSessionControls({
 
   return (
     <>
-      {/* IO Reader Selection */}
-      <ReaderButton
+      {/* IO Session Selection */}
+      <SessionButton
         ioProfile={ioProfile}
         ioProfiles={ioProfiles}
         multiBusProfiles={multiBusProfiles}
@@ -479,7 +479,7 @@ export function IOSessionControls({
         ioState={ioState}
         frameCount={frameCount}
         totalFrameCount={totalFrameCount}
-        onClick={onOpenIoReaderPicker}
+        onClick={onOpenIoSessionPicker}
         disabled={isStreaming && !isBufferMode}
         isBufferMode={isBufferMode}
       />

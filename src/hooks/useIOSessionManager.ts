@@ -17,14 +17,13 @@ import {
   joinMultiSourceSession,
   useSessionStore,
   isBufferProfileId,
-  BUFFER_PROFILE_ID,
   type CreateMultiSourceOptions,
   type PerInterfaceFramingConfig,
   type BusSourceInfo,
 } from "../stores/sessionStore";
 
 // Re-export for backward compatibility
-export { isBufferProfileId, BUFFER_PROFILE_ID };
+export { isBufferProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
@@ -244,10 +243,6 @@ export interface UseIOSessionManagerResult {
   clearIngestError: () => void;
   /** Unified ingest from one or more sources (fast ingest, auto-transitions to buffer reader) */
   loadSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
-  /** @deprecated Use loadSource([profileId], opts) */
-  loadSingleSource: (profileId: string, options: LoadOptions) => Promise<void>;
-  /** @deprecated Use loadSource(profileIds, opts) */
-  loadMultiSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
 
   // ---- Multi-Bus Session Handlers ----
   /** Start a multi-bus session */
@@ -264,10 +259,6 @@ export interface UseIOSessionManagerResult {
   // ---- Session Switching Methods ----
   /** Unified watch for one or more sources (routes based on multi_source trait) */
   watchSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
-  /** @deprecated Use watchSource([profileId], opts) */
-  watchSingleSource: (profileId: string, options: LoadOptions) => Promise<void>;
-  /** @deprecated Use watchSource(profileIds, opts) */
-  watchMultiSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
   /** Stop watching (stop session, clear watch state) */
   stopWatch: () => Promise<void>;
   /** Suspend the session - stops streaming, finalizes buffer, session stays alive */
@@ -977,21 +968,6 @@ export function useIOSessionManager(
     streamCompletedRef.current = false;
   }, [session, ioProfiles, onBeforeWatch, onBeforeMultiWatch, startMultiBusSession, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
 
-  /** @deprecated Use watchSource([profileId], opts) */
-  const watchSingleSource = useCallback(async (
-    profileId: string,
-    opts: LoadOptions,
-  ) => {
-    await watchSource([profileId], opts);
-  }, [watchSource]);
-
-  /** @deprecated Use watchSource(profileIds, opts) */
-  const watchMultiSource = useCallback(async (
-    profileIds: string[],
-    opts: LoadOptions,
-  ) => {
-    await watchSource(profileIds, opts);
-  }, [watchSource]);
 
   // Stop watching: suspend session, switch to buffer replay for timeline sources
   // For realtime sources, this suspends and keeps the buffer available for later.
@@ -1150,21 +1126,6 @@ export function useIOSessionManager(
     }
   }, [session, appName, ioProfiles, startMultiBusSession, setMultiBusProfiles, setIoProfile, setSourceProfileId, streamCompletedRef]);
 
-  /** @deprecated Use loadSource([profileId], opts) */
-  const loadSingleSource = useCallback(async (
-    profileId: string,
-    opts: LoadOptions
-  ) => {
-    await loadSource([profileId], opts);
-  }, [loadSource]);
-
-  /** @deprecated Use loadSource(profileIds, opts) */
-  const loadMultiSource = useCallback(async (
-    profileIds: string[],
-    opts: LoadOptions
-  ) => {
-    await loadSource(profileIds, opts);
-  }, [loadSource]);
 
   // Stop ingest: stop session, clear ingest state
   const stopLoad = useCallback(async () => {
@@ -1201,7 +1162,7 @@ export function useIOSessionManager(
     });
 
     // Mark our listener as INACTIVE so we don't receive frames
-    // This is the key difference from watchSingleSource - we connect but don't stream
+    // This is the key difference from watchSource - we connect but don't stream
     try {
       await setSessionListenerActive(sessionId, appName, false);
     } catch {
@@ -1480,8 +1441,6 @@ export function useIOSessionManager(
     stopLoad,
     clearIngestError,
     loadSource,
-    loadSingleSource,
-    loadMultiSource,
 
     // Multi-Bus Handlers
     startMultiBusSession,
@@ -1489,8 +1448,6 @@ export function useIOSessionManager(
 
     // Session Switching Methods
     watchSource,
-    watchSingleSource,
-    watchMultiSource,
     stopWatch,
     suspendSession,
     resumeWithNewBuffer,

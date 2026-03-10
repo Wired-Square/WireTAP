@@ -138,7 +138,7 @@ export default function Discovery() {
     'export',
     'bookmarkPicker',
     'saveSelectionSet',
-    'ioReaderPicker',
+    'ioSessionPicker',
     'framePicker',
     'toolbox',
   ] as const);
@@ -255,7 +255,7 @@ export default function Discovery() {
         });
       }
 
-      dialogs.ioReaderPicker.close();
+      dialogs.ioSessionPicker.close();
 
       if (payload.buffer_type === "bytes" && meta) {
         console.log(`[Discovery] Loading ${payload.count} bytes from buffer into serial view`);
@@ -297,7 +297,7 @@ export default function Discovery() {
       // The session is now in buffer replay mode, playback controls will work
     }
   }, [
-    dialogs.ioReaderPicker,
+    dialogs.ioSessionPicker,
     clearSerialBytes,
     resetFraming,
     addSerialBytes,
@@ -391,7 +391,7 @@ export default function Discovery() {
     stopWatch,
     resumeWithNewBuffer,
     selectProfile,
-    watchSingleSource,
+    watchSource,
     // Bookmark methods
     jumpToBookmark,
   } = manager;
@@ -481,7 +481,7 @@ export default function Discovery() {
   // Centralised IO picker handlers - ensures consistent behavior with other apps
   const ioPickerProps = useIOSourcePickerHandlers({
     manager,
-    closeDialog: () => dialogs.ioReaderPicker.close(),
+    closeDialog: () => dialogs.ioSessionPicker.close(),
     onJoinSession: (_sessionId, sourceProfileIds) => {
       // Discovery-specific: show bus column for multi-source
       if (sourceProfileIds && sourceProfileIds.length > 1) {
@@ -779,7 +779,7 @@ export default function Discovery() {
     // Manager session switching methods
     stopWatch,
     selectProfile,
-    watchSingleSource,
+    watchSource,
     jumpToBookmark,
 
     // Session actions
@@ -880,7 +880,7 @@ export default function Discovery() {
         if (isStreaming) stopWatch();
       },
       onClear: () => handlers.handleClearDiscoveredFrames(),
-      onPicker: () => dialogs.ioReaderPicker.open(),
+      onPicker: () => dialogs.ioSessionPicker.open(),
       onJumpToBookmark: async (bookmarkId) => {
         const profileId = sourceProfileId || ioProfile;
         if (profileId) {
@@ -944,7 +944,7 @@ export default function Discovery() {
             const bid = bufferMetadata?.id ?? sessionBufferId;
             if (bid) useSessionStore.getState().renameSessionBuffer(bid, newName);
           }}
-          onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
+          onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
           onClearBuffer={handlers.handleClearDiscoveredFrames}
           hasData={frameList.length > 0 || (isSerialMode && (backendByteCount > 0 || serialBytesBuffer.length > 0))}
           onSave={openSaveDialog}
@@ -1070,8 +1070,8 @@ export default function Discovery() {
       />
 
       <IoSourcePickerDialog
-        isOpen={dialogs.ioReaderPicker.isOpen}
-        onClose={() => dialogs.ioReaderPicker.close()}
+        isOpen={dialogs.ioSessionPicker.isOpen}
+        onClose={() => dialogs.ioSessionPicker.close()}
         ioProfiles={settings?.io_profiles || []}
         selectedId={ioProfile}
         selectedIds={ioProfiles.length > 0 ? ioProfiles : undefined}

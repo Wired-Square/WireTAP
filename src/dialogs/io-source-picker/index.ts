@@ -19,7 +19,6 @@ export {
   getLocalTimezoneAbbr,
   formatBufferTimestamp,
   SPEED_OPTIONS,
-  BUFFER_PROFILE_ID,
   CSV_EXTERNAL_ID,
   generateLoadSessionId,
   isRealtimeProfile,

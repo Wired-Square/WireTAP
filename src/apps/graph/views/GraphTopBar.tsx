@@ -33,7 +33,7 @@ interface Props {
   onStop?: () => void;
   onResume?: () => void;
   onLeave?: () => void;
-  onOpenIoReaderPicker: () => void;
+  onOpenIoSessionPicker: () => void;
 
   // Catalog
   catalogs: CatalogMetadata[];
@@ -74,7 +74,7 @@ export default function GraphTopBar({
   onStop,
   onResume,
   onLeave,
-  onOpenIoReaderPicker,
+  onOpenIoSessionPicker,
   catalogs,
   catalogPath,
   onOpenCatalogPicker,
@@ -160,7 +160,7 @@ export default function GraphTopBar({
         ioState,
         frameCount: watchUniqueFrameCount,
         totalFrameCount: watchFrameCount,
-        onOpenIoReaderPicker,
+        onOpenIoSessionPicker,
         isStreaming,
         isStopped,
         supportsTimeRange,

@@ -80,7 +80,7 @@ export interface UseDecoderHandlersParams {
   // Manager session switching methods
   stopWatch: () => Promise<void>;
   selectProfile: (profileId: string | null) => void;
-  watchSingleSource: (profileId: string, options: ManagerLoadOptions) => Promise<void>;
+  watchSource: (profileIds: string[], options: ManagerLoadOptions) => Promise<void>;
   jumpToBookmark: (bookmark: TimeRangeFavorite, options?: Omit<ManagerLoadOptions, "startTime" | "endTime" | "maxFrames">) => Promise<void>;
 
   // Dialog controls
@@ -116,7 +116,7 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
   const sessionHandlers = useDecoderSessionHandlers({
     stopWatch: params.stopWatch,
     selectProfile: params.selectProfile,
-    watchSingleSource: params.watchSingleSource,
+    watchSource: params.watchSource,
     playbackSpeed: params.playbackSpeed,
     setBufferMetadata: params.setBufferMetadata,
     updateCurrentTime: params.updateCurrentTime,

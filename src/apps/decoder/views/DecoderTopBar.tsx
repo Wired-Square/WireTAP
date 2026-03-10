@@ -73,7 +73,7 @@ type Props = {
   onOpenFramePicker: () => void;
 
   // Dialogs
-  onOpenIoReaderPicker: () => void;
+  onOpenIoSessionPicker: () => void;
   onOpenSpeedPicker: () => void;
 
   // Raw bytes toggle
@@ -135,7 +135,7 @@ export default function DecoderTopBar({
   totalFrameCount,
   selectedFrameCount,
   onOpenFramePicker,
-  onOpenIoReaderPicker,
+  onOpenIoSessionPicker,
   onOpenSpeedPicker,
   showRawBytes = false,
   onToggleRawBytes,
@@ -170,7 +170,7 @@ export default function DecoderTopBar({
         ioState,
         frameCount: uniqueFrameCount,
         totalFrameCount,
-        onOpenIoReaderPicker,
+        onOpenIoSessionPicker,
         speed,
         supportsSpeed,
         onOpenSpeedPicker,

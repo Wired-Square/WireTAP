@@ -44,9 +44,6 @@ export const SPEED_OPTIONS: { value: PlaybackSpeed; label: string }[] = [
   { value: 60, label: "60x" },
 ];
 
-// Special ID for the imported buffer "profile"
-export const BUFFER_PROFILE_ID = "__imported_buffer__";
-
 // Special ID for CSV external source
 export const CSV_EXTERNAL_ID = "__csv_external__";
 

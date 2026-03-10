@@ -15,8 +15,8 @@ import type { TimeRangeFavorite } from "../../../utils/favorites";
 
 export interface UseQueryHandlersParams {
   // Session manager actions
-  watchSingleSource: (
-    profileId: string,
+  watchSource: (
+    profileIds: string[],
     options: LoadOptions
   ) => Promise<void>;
   stopWatch: () => Promise<void>;
@@ -25,7 +25,7 @@ export interface UseQueryHandlersParams {
   sourceProfileId: string | null;
 
   // Dialog controls
-  openIoReaderPicker: () => void;
+  openIoSessionPicker: () => void;
   openCatalogPicker: () => void;
   closeCatalogPicker: () => void;
   openErrorDialog: () => void;
@@ -45,7 +45,7 @@ export type QueryHandlers = QuerySessionHandlers & QueryUIHandlers;
 export function useQueryHandlers(params: UseQueryHandlersParams): QueryHandlers {
   // Session handlers (ingest, stop)
   const sessionHandlers = useQuerySessionHandlers({
-    watchSingleSource: params.watchSingleSource,
+    watchSource: params.watchSource,
     stopWatch: params.stopWatch,
     sourceProfileId: params.sourceProfileId,
   });

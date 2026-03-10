@@ -15,7 +15,7 @@ import type { CatalogMetadata } from "../api/catalog";
 
 /**
  * IO Session section props - passed to IOSessionControls.
- * Omit onOpenIoReaderPicker from the type since it's required in IOSessionControlsProps
+ * Omit onOpenIoSessionPicker from the type since it's required in IOSessionControlsProps
  * but we'll handle it in AppTopBar.
  */
 export type IOSessionSectionProps = Omit<IOSessionControlsProps, "isStreaming"> & {
@@ -99,7 +99,7 @@ export interface AppTopBarProps {
  *     ioProfile,
  *     ioProfiles,
  *     isStreaming,
- *     onOpenIoReaderPicker: () => dialogs.ioReaderPicker.open(),
+ *     onOpenIoSessionPicker: () => dialogs.ioSessionPicker.open(),
  *   }}
  *   framePicker={{
  *     frameCount: frameList.length,
@@ -152,7 +152,7 @@ export default function AppTopBar({
             ioState={ioSession.ioState}
             frameCount={ioSession.frameCount}
             totalFrameCount={ioSession.totalFrameCount}
-            onOpenIoReaderPicker={ioSession.onOpenIoReaderPicker}
+            onOpenIoSessionPicker={ioSession.onOpenIoSessionPicker}
             speed={ioSession.speed}
             supportsSpeed={ioSession.supportsSpeed}
             onOpenSpeedPicker={ioSession.onOpenSpeedPicker}

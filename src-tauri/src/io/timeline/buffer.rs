@@ -41,8 +41,8 @@ pub struct BufferReader {
 
 impl BufferReader {
     pub fn new(app: AppHandle, session_id: String, speed: f64) -> Self {
-        // Extract buffer_id from session_id if it matches the buffer_N pattern
-        let buffer_id = if session_id.starts_with("buf_") {
+        // Extract buffer_id from session_id if it is itself a known buffer
+        let buffer_id = if buffer_store::is_known_buffer(&session_id) {
             Some(session_id.clone())
         } else {
             None

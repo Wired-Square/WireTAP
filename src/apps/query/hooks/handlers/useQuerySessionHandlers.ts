@@ -9,8 +9,8 @@ import { useQueryStore } from "../../stores/queryStore";
 
 export interface UseQuerySessionHandlersParams {
   // Session manager actions
-  watchSingleSource: (
-    profileId: string,
+  watchSource: (
+    profileIds: string[],
     options: LoadOptions
   ) => Promise<void>;
   stopWatch: () => Promise<void>;
@@ -20,7 +20,7 @@ export interface UseQuerySessionHandlersParams {
 }
 
 export function useQuerySessionHandlers({
-  watchSingleSource,
+  watchSource,
   stopWatch,
   sourceProfileId,
 }: UseQuerySessionHandlersParams) {
@@ -38,10 +38,10 @@ export function useQuerySessionHandlers({
       ).toISOString();
 
       if (sourceProfileId) {
-        await watchSingleSource(sourceProfileId, { startTime, endTime });
+        await watchSource([sourceProfileId], { startTime, endTime });
       }
     },
-    [sourceProfileId, watchSingleSource]
+    [sourceProfileId, watchSource]
   );
 
   // Handle ingest all results (from selected query)
@@ -50,10 +50,10 @@ export function useQuerySessionHandlers({
       if (sourceProfileId) {
         const startTime = new Date(minTimestampUs / 1000).toISOString();
         const endTime = new Date(maxTimestampUs / 1000).toISOString();
-        await watchSingleSource(sourceProfileId, { startTime, endTime });
+        await watchSource([sourceProfileId], { startTime, endTime });
       }
     },
-    [sourceProfileId, watchSingleSource]
+    [sourceProfileId, watchSource]
   );
 
   // Stop watch handler

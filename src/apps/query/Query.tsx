@@ -99,7 +99,7 @@ export default function Query() {
 
   // Dialog management
   const dialogs = useDialogManager([
-    "ioReaderPicker",
+    "ioSessionPicker",
     "error",
     "catalogPicker",
     "addBookmark",
@@ -178,7 +178,7 @@ export default function Query() {
 
   // Destructure session state and actions from manager
   const {
-    watchSingleSource,
+    watchSource,
     stopWatch,
     ioProfileName,
     sourceProfileId,
@@ -275,22 +275,22 @@ export default function Query() {
       joinerCount,
     },
     callbacks: {
-      onPicker: () => dialogs.ioReaderPicker.open(),
+      onPicker: () => dialogs.ioSessionPicker.open(),
     },
   });
 
   // Centralised IO picker dialog handlers (connect, skip, etc.)
   const ioPickerProps = useIOSourcePickerHandlers({
     manager,
-    closeDialog: () => dialogs.ioReaderPicker.close(),
+    closeDialog: () => dialogs.ioSessionPicker.close(),
   });
 
   // Compose all handlers using the orchestrator hook
   const handlers = useQueryHandlers({
-    watchSingleSource,
+    watchSource,
     stopWatch,
     sourceProfileId,
-    openIoReaderPicker: dialogs.ioReaderPicker.open,
+    openIoSessionPicker: dialogs.ioSessionPicker.open,
     openCatalogPicker: dialogs.catalogPicker.open,
     closeCatalogPicker: dialogs.catalogPicker.close,
     openErrorDialog: dialogs.error.open,
@@ -392,7 +392,7 @@ export default function Query() {
           catalogs={catalogs}
           catalogPath={catalogPath}
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
-          onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
+          onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
           uniqueFrameCount={watchUniqueFrameCount}
           totalFrameCount={watchFrameCount}
           isStreaming={isStreaming || hasSource}
@@ -452,12 +452,12 @@ export default function Query() {
         )}
       </AppTabView>
 
-      {/* IO Reader Picker Dialog - connect mode for database selection */}
+      {/* IO Session Picker Dialog - connect mode for database selection */}
       <IoSourcePickerDialog
         mode="connect"
         {...ioPickerProps}
-        isOpen={dialogs.ioReaderPicker.isOpen}
-        onClose={() => dialogs.ioReaderPicker.close()}
+        isOpen={dialogs.ioSessionPicker.isOpen}
+        onClose={() => dialogs.ioSessionPicker.close()}
         ioProfiles={postgresProfiles}
         selectedId={sourceProfileId}
         defaultId={settings?.default_read_profile}

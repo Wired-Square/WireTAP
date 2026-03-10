@@ -48,7 +48,7 @@ export default function Graph() {
   const [rawViewContent, setRawViewContent] = useState("");
 
   const dialogs = useDialogManager([
-    'ioReaderPicker',
+    'ioSessionPicker',
     'catalogPicker',
     'signalPicker',
     'panelConfig',
@@ -415,7 +415,7 @@ export default function Graph() {
   // Centralised IO picker handlers
   const ioPickerProps = useIOSourcePickerHandlers({
     manager,
-    closeDialog: () => dialogs.ioReaderPicker.close(),
+    closeDialog: () => dialogs.ioSessionPicker.close(),
     mergeOptions: (options) => mergeSerialConfig(useGraphStore.getState().serialConfig, options),
   });
 
@@ -447,7 +447,7 @@ export default function Graph() {
         if (isStreaming) stopWatch();
       },
       onClear: clearData,
-      onPicker: () => dialogs.ioReaderPicker.open(),
+      onPicker: () => dialogs.ioSessionPicker.open(),
     },
   });
 
@@ -519,7 +519,7 @@ export default function Graph() {
           onStop={stopWatch}
           onResume={resumeWithNewBuffer}
           onLeave={!isDetached ? handleLeave : undefined}
-          onOpenIoReaderPicker={() => dialogs.ioReaderPicker.open()}
+          onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
           catalogs={catalogs}
           catalogPath={catalogPath}
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
@@ -561,8 +561,8 @@ export default function Graph() {
 
       <IoSourcePickerDialog
         {...ioPickerProps}
-        isOpen={dialogs.ioReaderPicker.isOpen}
-        onClose={() => dialogs.ioReaderPicker.close()}
+        isOpen={dialogs.ioSessionPicker.isOpen}
+        onClose={() => dialogs.ioSessionPicker.close()}
         ioProfiles={settings?.io_profiles ?? []}
         selectedId={ioProfile}
         defaultId={settings?.default_read_profile}

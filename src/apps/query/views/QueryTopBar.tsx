@@ -24,7 +24,7 @@ interface Props {
   totalFrameCount?: number;
 
   // Dialog trigger
-  onOpenIoReaderPicker: () => void;
+  onOpenIoSessionPicker: () => void;
 
   // Session state (from useIOSessionManager)
   isStreaming: boolean;
@@ -47,7 +47,7 @@ export default function QueryTopBar({
   onOpenCatalogPicker,
   uniqueFrameCount,
   totalFrameCount,
-  onOpenIoReaderPicker,
+  onOpenIoSessionPicker,
   isStreaming,
   isStopped,
   supportsTimeRange,
@@ -66,7 +66,7 @@ export default function QueryTopBar({
         defaultReadProfileId,
         frameCount: uniqueFrameCount,
         totalFrameCount,
-        onOpenIoReaderPicker,
+        onOpenIoSessionPicker,
         isStreaming,
         isStopped,
         supportsTimeRange,
