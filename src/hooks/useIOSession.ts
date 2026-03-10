@@ -262,7 +262,7 @@ export interface UseIOSessionResult {
   switchToBufferReplay: (speed?: number) => Promise<void>;
   /** Rejoin an existing session after leaving (for shared sessions) */
   rejoin: (profileId?: string, profileName?: string) => Promise<void>;
-  /** Transmit a CAN frame (only if capabilities.can_transmit is true) */
+  /** Transmit a CAN frame (only if capabilities.traits.tx_frames is true) */
   transmitFrame: (frame: CanTransmitFrame) => Promise<TransmitResult>;
 }
 

@@ -31,8 +31,10 @@ export interface InterfaceTraits {
   temporal_mode: TemporalMode;
   /** Protocols supported by the interface */
   protocols: Protocol[];
-  /** Whether the interface can transmit frames */
-  can_transmit: boolean;
+  /** Whether the interface can transmit frames (CAN, Modbus, framed serial) */
+  tx_frames: boolean;
+  /** Whether the interface can transmit raw bytes (serial) */
+  tx_bytes: boolean;
   /** Whether this source can be combined with others in a multi-source session */
   multi_source: boolean;
 }
@@ -43,9 +45,9 @@ export interface InterfaceTraits {
  */
 export interface SessionDataStreams {
   /** Whether this session emits framed messages (frame-message events) */
-  emits_frames: boolean;
+  rx_frames: boolean;
   /** Whether this session emits raw byte streams (serial-raw-bytes events) */
-  emits_bytes: boolean;
+  rx_bytes: boolean;
 }
 
 /** A single raw byte with timestamp, as emitted by serial/byte-stream sessions */
@@ -61,42 +63,6 @@ export interface RawBytesPayload {
   port: string;
 }
 
-/**
- * Get traits from IOCapabilities, deriving from legacy fields if not present.
- */
-export function getTraits(caps: IOCapabilities): InterfaceTraits {
-  if (caps.traits) {
-    return caps.traits;
-  }
-  // Derive from legacy fields
-  const protocols: Protocol[] = caps.can_transmit_serial
-    ? ["serial"]
-    : caps.supports_canfd
-      ? ["can", "canfd"]
-      : ["can"];
-
-  return {
-    temporal_mode: caps.is_realtime ? "realtime" : "timeline",
-    protocols,
-    can_transmit: caps.can_transmit || caps.can_transmit_serial,
-    multi_source: caps.is_realtime,
-  };
-}
-
-/**
- * Get data streams from IOCapabilities, deriving from legacy fields if not present.
- */
-export function getDataStreams(caps: IOCapabilities): SessionDataStreams {
-  if (caps.data_streams) {
-    return caps.data_streams;
-  }
-  // Derive from legacy fields
-  return {
-    emits_frames: !caps.emits_raw_bytes || (caps.traits?.protocols ?? []).some((p) => p !== "serial"),
-    emits_bytes: caps.emits_raw_bytes ?? false,
-  };
-}
-
 // ============================================================================
 // IO Capabilities
 // ============================================================================
@@ -109,32 +75,22 @@ export interface IOCapabilities {
   can_pause: boolean;
   /** Supports time range filtering (PostgreSQL: true, GVRET: false) */
   supports_time_range: boolean;
-  /** Is realtime data (GVRET: true, PostgreSQL: false) */
-  is_realtime: boolean;
   /** Supports speed control (PostgreSQL: true, GVRET: false) */
   supports_speed_control: boolean;
   /** Supports seeking to a specific timestamp (BufferReader: true, others: false) */
   supports_seek: boolean;
   /** Supports reverse playback (BufferReader: true, others: false) */
   supports_reverse?: boolean;
-  /** Can transmit CAN frames (slcan in normal mode, GVRET: true) */
-  can_transmit: boolean;
-  /** Can transmit serial bytes (serial port devices) */
-  can_transmit_serial: boolean;
-  /** Supports CAN FD (64 bytes, BRS) */
-  supports_canfd: boolean;
   /** Supports extended (29-bit) CAN IDs */
   supports_extended_id: boolean;
   /** Supports Remote Transmission Request frames */
   supports_rtr: boolean;
   /** Available bus numbers (empty = single bus) */
   available_buses: number[];
-  /** Emits raw bytes (serial sessions without framing or with emit_raw_bytes=true) */
-  emits_raw_bytes?: boolean;
-  /** Formal interface traits (temporal mode, protocols, transmit) */
-  traits?: InterfaceTraits;
+  /** Interface traits (temporal mode, protocols, transmit capability) */
+  traits: InterfaceTraits;
   /** Declares which data streams this session produces */
-  data_streams?: SessionDataStreams;
+  data_streams: SessionDataStreams;
 }
 
 /**
@@ -1190,7 +1146,8 @@ export function createDefaultBusMappings(
     traits: {
       temporal_mode: "realtime" as TemporalMode,
       protocols: protocol === "can" ? ["can", "canfd"] : [protocol],
-      can_transmit: true,
+      tx_frames: true,
+      tx_bytes: false,
       multi_source: true,
     },
   }));

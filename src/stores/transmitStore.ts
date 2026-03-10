@@ -430,7 +430,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       return null;
     }
 
-    if (!session.capabilities?.can_transmit) {
+    if (!session.capabilities?.traits.tx_frames) {
       set({ error: "IO session does not support transmit" });
       return null;
     }
@@ -642,7 +642,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
 
     // Check capabilities based on item type
     if (item.type === "can") {
-      if (!session.capabilities?.can_transmit) {
+      if (!session.capabilities?.traits.tx_frames) {
         set({ error: `Session '${item.profileName}' does not support CAN transmit` });
         return;
       }
@@ -651,7 +651,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         return;
       }
     } else if (item.type === "serial") {
-      if (!session.capabilities?.can_transmit_serial) {
+      if (!session.capabilities?.traits.tx_bytes) {
         set({ error: `Session '${item.profileName}' does not support serial transmit` });
         return;
       }
@@ -874,7 +874,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         set({ error: `Session '${items[0].profileName}' is not connected. Connect to it first.` });
         return;
       }
-      if (!session.capabilities?.can_transmit) {
+      if (!session.capabilities?.traits.tx_frames) {
         set({ error: `Session '${items[0].profileName}' does not support transmit` });
         return;
       }

@@ -90,7 +90,7 @@ export function useMenuSessionControl({
     });
 
     // Update bookmark menu availability — only enable for timeline sources
-    const bookmarksEnabled = !!bookmarks && capabilities?.is_realtime === false;
+    const bookmarksEnabled = !!bookmarks && capabilities?.traits.temporal_mode === "timeline";
     updateMenuFocusState(true, bookmarksEnabled);
   }, [
     isFocused,

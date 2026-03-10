@@ -250,8 +250,10 @@ pub struct InterfaceTraits {
     pub temporal_mode: TemporalMode,
     /// Protocols supported by the interface
     pub protocols: Vec<Protocol>,
-    /// Whether the interface can transmit frames
-    pub can_transmit: bool,
+    /// Whether the interface can transmit frames (CAN, Modbus, framed serial)
+    pub tx_frames: bool,
+    /// Whether the interface can transmit raw bytes (serial)
+    pub tx_bytes: bool,
     /// Whether this source can be combined with others in a multi-source session
     pub multi_source: bool,
 }
@@ -264,9 +266,9 @@ pub struct InterfaceTraits {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionDataStreams {
     /// Whether this session emits framed messages (`frame-message` events)
-    pub emits_frames: bool,
+    pub rx_frames: bool,
     /// Whether this session emits raw byte streams (`serial-raw-bytes` events)
-    pub emits_bytes: bool,
+    pub rx_bytes: bool,
 }
 
 /// IO device capabilities - what this device type supports
@@ -276,8 +278,6 @@ pub struct IOCapabilities {
     pub can_pause: bool,
     /// Supports time range filtering (PostgreSQL: true, GVRET: false)
     pub supports_time_range: bool,
-    /// Is realtime data (GVRET: true, PostgreSQL: false)
-    pub is_realtime: bool,
     /// Supports speed control (PostgreSQL: true, GVRET: false)
     pub supports_speed_control: bool,
     /// Supports seeking to a specific timestamp (Buffer: true, others: false)
@@ -286,15 +286,6 @@ pub struct IOCapabilities {
     /// Supports reverse playback (Buffer: true, others: false)
     #[serde(default)]
     pub supports_reverse: bool,
-    /// Can transmit CAN frames (slcan in normal mode, GVRET: true)
-    #[serde(default)]
-    pub can_transmit: bool,
-    /// Can transmit serial bytes (serial port devices)
-    #[serde(default)]
-    pub can_transmit_serial: bool,
-    /// Supports CAN FD (64 bytes, BRS)
-    #[serde(default)]
-    pub supports_canfd: bool,
     /// Supports extended (29-bit) CAN IDs
     #[serde(default)]
     pub supports_extended_id: bool,
@@ -304,17 +295,10 @@ pub struct IOCapabilities {
     /// Available bus numbers (empty = single bus, [0,1,2] = multi-bus like GVRET)
     #[serde(default)]
     pub available_buses: Vec<u8>,
-    /// Emits raw bytes (serial sessions without server-side framing, or with emit_raw_bytes=true)
-    #[serde(default)]
-    pub emits_raw_bytes: bool,
-    /// Formal interface traits (temporal mode, protocols, transmit capability)
-    /// If None, traits are derived from legacy fields for backward compatibility
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub traits: Option<InterfaceTraits>,
-    /// Declares which data streams this session produces (frames, bytes, or both).
-    /// If None, derived from `emits_raw_bytes` for backward compatibility.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data_streams: Option<SessionDataStreams>,
+    /// Interface traits (temporal mode, protocols, transmit capability)
+    pub traits: InterfaceTraits,
+    /// Declares which data streams this session produces (frames, bytes, or both)
+    pub data_streams: SessionDataStreams,
 }
 
 impl IOCapabilities {
@@ -325,27 +309,28 @@ impl IOCapabilities {
     /// - No time range or speed control
     /// - Supports extended IDs and RTR
     /// - Single bus (override with `with_buses`)
-    /// - No transmit (override with `with_transmit`)
+    /// - No transmit (override with `with_tx`)
     pub fn realtime_can() -> Self {
         Self {
             can_pause: false,
             supports_time_range: false,
-            is_realtime: true,
             supports_speed_control: false,
             supports_seek: false,
             supports_reverse: false,
-            can_transmit: false,
-            can_transmit_serial: false,
-            supports_canfd: false,
             supports_extended_id: true,
             supports_rtr: true,
             available_buses: vec![0],
-            emits_raw_bytes: false,
-            traits: None,
-            data_streams: Some(SessionDataStreams {
-                emits_frames: true,
-                emits_bytes: false,
-            }),
+            traits: InterfaceTraits {
+                temporal_mode: TemporalMode::Realtime,
+                protocols: vec![Protocol::Can],
+                tx_frames: false,
+                tx_bytes: false,
+                multi_source: true,
+            },
+            data_streams: SessionDataStreams {
+                rx_frames: true,
+                rx_bytes: false,
+            },
         }
     }
 
@@ -359,30 +344,30 @@ impl IOCapabilities {
         Self {
             can_pause: true,
             supports_time_range: false,
-            is_realtime: false,
             supports_speed_control: true,
             supports_seek: false,
             supports_reverse: false,
-            can_transmit: false,
-            can_transmit_serial: false,
-            supports_canfd: false,
             supports_extended_id: true,
             supports_rtr: false,
             available_buses: vec![],
-            emits_raw_bytes: false,
-            traits: None,
-            data_streams: Some(SessionDataStreams {
-                emits_frames: true,
-                emits_bytes: false,
-            }),
+            traits: InterfaceTraits {
+                temporal_mode: TemporalMode::Timeline,
+                protocols: vec![Protocol::Can],
+                tx_frames: false,
+                tx_bytes: false,
+                multi_source: false,
+            },
+            data_streams: SessionDataStreams {
+                rx_frames: true,
+                rx_bytes: false,
+            },
         }
     }
 
-    /// Set CAN transmit capability
-    /// Only used by gs_usb which is not available on iOS
-    #[cfg(not(target_os = "ios"))]
-    pub fn with_transmit(mut self, can_transmit: bool) -> Self {
-        self.can_transmit = can_transmit;
+    /// Set transmit capabilities (frames and/or bytes)
+    pub fn with_tx(mut self, tx_frames: bool, tx_bytes: bool) -> Self {
+        self.traits.tx_frames = tx_frames;
+        self.traits.tx_bytes = tx_bytes;
         self
     }
 
@@ -392,9 +377,9 @@ impl IOCapabilities {
         self
     }
 
-    /// Set CAN FD support
-    pub fn with_canfd(mut self, supports_canfd: bool) -> Self {
-        self.supports_canfd = supports_canfd;
+    /// Set protocols
+    pub fn with_protocols(mut self, protocols: Vec<Protocol>) -> Self {
+        self.traits.protocols = protocols;
         self
     }
 
@@ -416,62 +401,13 @@ impl IOCapabilities {
         self
     }
 
-    /// Set raw bytes emission (for serial sources).
-    /// Also updates `data_streams` to reflect the change.
-    pub fn with_emits_raw_bytes(mut self, emits_raw_bytes: bool) -> Self {
-        self.emits_raw_bytes = emits_raw_bytes;
-        // Sync data_streams: serial with raw bytes emits bytes;
-        // framing determines whether it also emits frames (handled at session creation)
-        if let Some(ref mut ds) = self.data_streams {
-            ds.emits_bytes = emits_raw_bytes;
-        }
-        self
-    }
-
     /// Set data streams explicitly
-    pub fn with_data_streams(mut self, emits_frames: bool, emits_bytes: bool) -> Self {
-        self.data_streams = Some(SessionDataStreams {
-            emits_frames,
-            emits_bytes,
-        });
-        // Keep legacy field in sync
-        self.emits_raw_bytes = emits_bytes;
+    pub fn with_data_streams(mut self, rx_frames: bool, rx_bytes: bool) -> Self {
+        self.data_streams = SessionDataStreams {
+            rx_frames,
+            rx_bytes,
+        };
         self
-    }
-
-    /// Set interface traits explicitly
-    #[allow(dead_code)]
-    pub fn with_traits(mut self, traits: InterfaceTraits) -> Self {
-        self.traits = Some(traits);
-        self
-    }
-
-    /// Get the interface traits, deriving from legacy fields if not explicitly set
-    #[allow(dead_code)]
-    pub fn get_traits(&self) -> InterfaceTraits {
-        if let Some(ref traits) = self.traits {
-            traits.clone()
-        } else {
-            // Derive from legacy fields
-            let protocols = if self.can_transmit_serial {
-                vec![Protocol::Serial]
-            } else if self.supports_canfd {
-                vec![Protocol::Can, Protocol::CanFd]
-            } else {
-                vec![Protocol::Can]
-            };
-
-            InterfaceTraits {
-                temporal_mode: if self.is_realtime {
-                    TemporalMode::Realtime
-                } else {
-                    TemporalMode::Timeline
-                },
-                protocols,
-                can_transmit: self.can_transmit || self.can_transmit_serial,
-                multi_source: self.is_realtime,
-            }
-        }
     }
 }
 
@@ -2598,10 +2534,10 @@ pub async fn session_transmit(session_id: &str, payload: &TransmitPayload) -> Re
 
     // Check if the reader supports the requested transmit type
     match payload {
-        TransmitPayload::CanFrame(_) if !caps.can_transmit => {
+        TransmitPayload::CanFrame(_) if !caps.traits.tx_frames => {
             return Err("This session does not support CAN transmission".to_string());
         }
-        TransmitPayload::RawBytes(_) if !caps.can_transmit_serial => {
+        TransmitPayload::RawBytes(_) if !caps.traits.tx_bytes => {
             return Err("This session does not support serial transmission".to_string());
         }
         _ => {}

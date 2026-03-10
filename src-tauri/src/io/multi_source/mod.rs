@@ -25,8 +25,9 @@ use super::socketcan::{encode_frame as encode_socketcan_frame, EncodedFrame};
 use super::traits::{get_traits_for_profile_kind, validate_session_traits};
 use super::types::{SourceMessage, TransmitRequest};
 use super::{
-    CanTransmitFrame, IOCapabilities, IODevice, IOState, InterfaceTraits, Protocol, TemporalMode,
-    TransmitPayload, TransmitResult, VirtualBusState, emit_buffer_orphaned, emit_buffer_created,
+    CanTransmitFrame, IOCapabilities, IODevice, IOState, InterfaceTraits, SessionDataStreams,
+    TransmitPayload, TransmitResult, VirtualBusState, emit_buffer_orphaned,
+    emit_buffer_created,
 };
 use crate::buffer_store::{self, BufferType};
 
@@ -242,50 +243,46 @@ impl MultiSourceReader {
             )
         });
 
+        // Collect all output bus numbers from all source mappings (sorted)
+        let mut buses: Vec<u8> = self
+            .sources
+            .iter()
+            .flat_map(|s| {
+                s.bus_mappings
+                    .iter()
+                    .filter(|m| m.enabled)
+                    .map(|m| m.output_bus)
+            })
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        buses.sort();
+
+        // Emits frames if any source is non-serial, or if any serial source has framing
+        let rx_frames = self.sources.iter().any(|s| {
+            s.profile_kind != "serial"
+                || s.framing_encoding.as_deref().map_or(false, |f| f != "raw")
+        });
+
         IOCapabilities {
             can_pause: false,
             supports_time_range: false,
-            is_realtime: self.session_traits.temporal_mode == TemporalMode::Realtime,
             supports_speed_control: false,
             supports_seek: false,
             supports_reverse: false,
-            // Can transmit CAN frames if we have any CAN-capable transmit routes
-            can_transmit: self.session_traits.can_transmit && has_can_transmit_routes,
-            can_transmit_serial: self.session_traits.protocols.contains(&Protocol::Serial),
-            supports_canfd: self.session_traits.protocols.contains(&Protocol::CanFd),
             supports_extended_id: true,
             supports_rtr: true,
-            // Collect all output bus numbers from all source mappings (sorted)
-            available_buses: {
-                let mut buses: Vec<u8> = self
-                    .sources
-                    .iter()
-                    .flat_map(|s| {
-                        s.bus_mappings
-                            .iter()
-                            .filter(|m| m.enabled)
-                            .map(|m| m.output_bus)
-                    })
-                    .collect::<std::collections::HashSet<_>>()
-                    .into_iter()
-                    .collect();
-                buses.sort();
-                buses
+            available_buses: buses,
+            traits: InterfaceTraits {
+                tx_frames: self.session_traits.tx_frames && has_can_transmit_routes,
+                tx_bytes: self.session_traits.tx_bytes,
+                ..self.session_traits.clone()
             },
-            emits_raw_bytes: false, // Set via builder below
-            // Include the formal session traits
-            traits: Some(self.session_traits.clone()),
-            data_streams: None, // Set via builder below
+            data_streams: SessionDataStreams {
+                rx_frames,
+                rx_bytes: self.emits_raw_bytes,
+            },
         }
-        .with_emits_raw_bytes(self.emits_raw_bytes)
-        .with_data_streams(
-            // Emits frames if any source is non-serial, or if any serial source has framing
-            self.sources.iter().any(|s| {
-                s.profile_kind != "serial"
-                    || s.framing_encoding.as_deref().map_or(false, |f| f != "raw")
-            }),
-            self.emits_raw_bytes,
-        )
     }
 
     /// Route a CAN frame transmit to the appropriate source based on bus number

@@ -254,8 +254,8 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
 
               // All repeat requires IO session with transmit capability
               // For CAN items, check can_transmit; for serial items, check can_transmit_serial
-              const hasCanTransmit = isItemSessionConnected && Boolean(itemSession?.capabilities?.can_transmit);
-              const hasSerialTransmit = isItemSessionConnected && Boolean(itemSession?.capabilities?.can_transmit_serial);
+              const hasCanTransmit = isItemSessionConnected && Boolean(itemSession?.capabilities?.traits.tx_frames);
+              const hasSerialTransmit = isItemSessionConnected && Boolean(itemSession?.capabilities?.traits.tx_bytes);
               const hasIOSession = item.type === "serial" ? hasSerialTransmit : hasCanTransmit;
               const canStartIndividual = !isInGroup && item.enabled && !item.isRepeating && hasIOSession;
               const canStartGroup = isInGroup && isFirstEnabledInGroup && item.enabled && !isGroupRepeating && hasCanTransmit;

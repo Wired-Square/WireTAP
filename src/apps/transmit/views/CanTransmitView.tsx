@@ -28,7 +28,7 @@ export default function CanTransmitView() {
 
   // Get connection state
   const isConnected = activeSession?.lifecycleState === "connected";
-  const canTransmit = activeSession?.capabilities?.can_transmit ?? false;
+  const canTransmit = activeSession?.capabilities?.traits.tx_frames ?? false;
 
   // Build frame preview
   const framePreview = useMemo(() => {

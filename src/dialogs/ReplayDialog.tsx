@@ -51,7 +51,7 @@ export default function ReplayDialog({ isOpen, onClose, bufferId }: Props) {
   const transmitSessions = useMemo(
     () =>
       Object.values(sessions).filter(
-        (s) => s && s.lifecycleState === "connected" && s.capabilities?.can_transmit === true
+        (s) => s && s.lifecycleState === "connected" && s.capabilities?.traits.tx_frames === true
       ),
     [sessions]
   );

@@ -29,7 +29,7 @@ pub fn protocols_compatible(_a: &[Protocol], _b: &[Protocol]) -> bool {
 /// 1. Temporal mode must match across all interfaces
 /// 2. Timeline sessions are limited to 1 interface
 /// 3. Protocols must be compatible (same group)
-/// 4. can_transmit = true if ANY interface can transmit
+/// 4. tx_frames/tx_bytes = true if ANY interface can transmit that type
 pub fn validate_session_traits(interface_traits: &[InterfaceTraits]) -> SessionTraitsValidation {
     if interface_traits.is_empty() {
         return SessionTraitsValidation {
@@ -89,8 +89,9 @@ pub fn validate_session_traits(interface_traits: &[InterfaceTraits]) -> SessionT
         }
     }
 
-    // Rule 4: can_transmit = ANY interface can transmit
-    let can_transmit = interface_traits.iter().any(|t| t.can_transmit);
+    // Rule 4: tx_frames/tx_bytes = true if ANY interface can transmit
+    let tx_frames = interface_traits.iter().any(|t| t.tx_frames);
+    let tx_bytes = interface_traits.iter().any(|t| t.tx_bytes);
 
     // Rule 5: multi_source = ALL inputs must be multi_source (already validated above)
     let multi_source = interface_traits.iter().all(|t| t.multi_source);
@@ -101,7 +102,8 @@ pub fn validate_session_traits(interface_traits: &[InterfaceTraits]) -> SessionT
         session_traits: Some(InterfaceTraits {
             temporal_mode,
             protocols: all_protocols,
-            can_transmit,
+            tx_frames,
+            tx_bytes,
             multi_source,
         }),
     }
@@ -114,73 +116,85 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
         "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
-            can_transmit: true,
+            tx_frames: true,
+            tx_bytes: false,
             multi_source: true,
         },
         "slcan" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
-            can_transmit: true, // Note: silent_mode overrides this at runtime
+            tx_frames: true, // Note: silent_mode overrides this at runtime
+            tx_bytes: false,
             multi_source: true,
         },
         "gs_usb" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
-            can_transmit: true, // Note: listen_only overrides this at runtime
+            tx_frames: true, // Note: listen_only overrides this at runtime
+            tx_bytes: false,
             multi_source: true,
         },
         "socketcan" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
-            can_transmit: true,
+            tx_frames: true,
+            tx_bytes: false,
             multi_source: true,
         },
         "mqtt" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
-            can_transmit: false,
+            tx_frames: false,
+            tx_bytes: false,
             multi_source: true,
         },
         "modbus_tcp" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Modbus],
-            can_transmit: false,
+            tx_frames: false,
+            tx_bytes: false,
             multi_source: true,
         },
         "postgres" => InterfaceTraits {
             temporal_mode: TemporalMode::Timeline,
             protocols: vec![Protocol::Can],
-            can_transmit: false,
+            tx_frames: false,
+            tx_bytes: false,
             multi_source: false,
         },
         "csv_file" | "csv-file" => InterfaceTraits {
             temporal_mode: TemporalMode::Timeline,
             protocols: vec![Protocol::Can],
-            can_transmit: false,
+            tx_frames: false,
+            tx_bytes: false,
             multi_source: false,
         },
         "buffer" => InterfaceTraits {
             temporal_mode: TemporalMode::Timeline,
             protocols: vec![Protocol::Can],
-            can_transmit: false,
+            tx_frames: false,
+            tx_bytes: false,
             multi_source: false,
         },
         "serial" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Serial],
-            can_transmit: false,
+            tx_frames: false,
+            tx_bytes: false,
             multi_source: true,
         },
         "virtual" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
-            can_transmit: true,
+            tx_frames: true,
+            tx_bytes: false,
             multi_source: true,
         },
         _ => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![],
-            can_transmit: false,
+            tx_frames: false,
+            tx_bytes: false,
             multi_source: false,
         },
     }
@@ -195,7 +209,8 @@ mod tests {
         let traits = vec![InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],
-            can_transmit: true,
+            tx_frames: true,
+            tx_bytes: false,
             multi_source: true,
         }];
         let result = validate_session_traits(&traits);
@@ -209,13 +224,15 @@ mod tests {
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
-                can_transmit: true,
+                tx_frames: true,
+                tx_bytes: false,
                 multi_source: true,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::CanFd],
-                can_transmit: false,
+                tx_frames: false,
+                tx_bytes: false,
                 multi_source: true,
             },
         ];
@@ -223,7 +240,7 @@ mod tests {
         assert!(result.valid);
         let session = result.session_traits.unwrap();
         assert_eq!(session.temporal_mode, TemporalMode::Realtime);
-        assert!(session.can_transmit); // Any interface can transmit
+        assert!(session.tx_frames); // Any interface can transmit
         assert!(session.multi_source);
         assert!(session.protocols.contains(&Protocol::Can));
         assert!(session.protocols.contains(&Protocol::CanFd));
@@ -235,13 +252,15 @@ mod tests {
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
-                can_transmit: true,
+                tx_frames: true,
+                tx_bytes: false,
                 multi_source: true,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Timeline,
                 protocols: vec![Protocol::Can],
-                can_transmit: false,
+                tx_frames: false,
+                tx_bytes: false,
                 multi_source: false,
             },
         ];
@@ -257,13 +276,15 @@ mod tests {
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
-                can_transmit: true,
+                tx_frames: true,
+                tx_bytes: false,
                 multi_source: true,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
-                can_transmit: false,
+                tx_frames: false,
+                tx_bytes: false,
                 multi_source: false,
             },
         ];
@@ -281,13 +302,15 @@ mod tests {
             InterfaceTraits {
                 temporal_mode: TemporalMode::Timeline,
                 protocols: vec![Protocol::Can],
-                can_transmit: false,
+                tx_frames: false,
+                tx_bytes: false,
                 multi_source: false,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Timeline,
                 protocols: vec![Protocol::Can],
-                can_transmit: false,
+                tx_frames: false,
+                tx_bytes: false,
                 multi_source: false,
             },
         ];
@@ -307,13 +330,15 @@ mod tests {
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
-                can_transmit: true,
+                tx_frames: true,
+                tx_bytes: false,
                 multi_source: true,
             },
             InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Serial],
-                can_transmit: true,
+                tx_frames: false,
+                tx_bytes: true,
                 multi_source: true,
             },
         ];

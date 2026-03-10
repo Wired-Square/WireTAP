@@ -5,7 +5,7 @@ import { Play, Pause, Square, Trash2, UserMinus, Plus, X, Save, Unplug, Plug } f
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { useSessionStore } from "../../../stores/sessionStore";
-import { getTraits, getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence, addVirtualBus, removeVirtualBus, type ActiveSessionInfo, type VirtualBusState, type IOStateType } from "../../../api/io";
+import { getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence, addVirtualBus, removeVirtualBus, type ActiveSessionInfo, type VirtualBusState, type IOStateType } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { iconSm } from "../../../styles/spacing";
 import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
@@ -298,17 +298,17 @@ function SessionDetails({
           Capabilities
         </label>
         <div className="flex flex-wrap gap-1 mt-1">
-          {getTraits(session.capabilities).protocols.map((protocol) => (
+          {session.capabilities.traits.protocols.map((protocol) => (
             <span key={protocol} className={`px-1.5 py-0.5 text-xs rounded ${protocolBadgeStyle(protocol)}`}>
               {protocolLabel(protocol)}
             </span>
           ))}
-          {session.capabilities.is_realtime && (
+          {session.capabilities.traits.temporal_mode === "realtime" && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-amber-500/20 text-amber-400">
               realtime
             </span>
           )}
-          {session.capabilities.can_transmit && (
+          {session.capabilities.traits.tx_frames && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400">
               transmit
             </span>

@@ -169,42 +169,8 @@ export async function getProfileUsage(
 // This is the preferred approach as it uses the same connection for both
 // reading and transmitting.
 
-/** IO capabilities - what an IO session supports (including transmit) */
-export interface IOCapabilities {
-  /** Supports pause/resume */
-  can_pause: boolean;
-  /** Supports time range filtering */
-  supports_time_range: boolean;
-  /** Is realtime data source */
-  is_realtime: boolean;
-  /** Supports playback speed control */
-  supports_speed_control: boolean;
-  /** Supports seeking to timestamp */
-  supports_seek: boolean;
-  /** Can transmit CAN frames */
-  can_transmit: boolean;
-  /** Can transmit serial bytes */
-  can_transmit_serial: boolean;
-  /** Supports CAN FD (64 bytes, BRS) */
-  supports_canfd: boolean;
-  /** Supports extended (29-bit) CAN IDs */
-  supports_extended_id: boolean;
-  /** Supports Remote Transmission Request frames */
-  supports_rtr: boolean;
-  /** Available bus numbers (empty = single bus) */
-  available_buses: number[];
-}
-
-/**
- * Get IO session capabilities (includes transmit capabilities).
- * @param sessionId - IO session to query
- * @returns Capabilities or null if session doesn't exist
- */
-export async function getIOSessionCapabilities(
-  sessionId: string
-): Promise<IOCapabilities | null> {
-  return invoke("get_io_session_capabilities", { sessionId });
-}
+// IO session capabilities are defined in api/io.ts (IOCapabilities).
+// Use getIOSessionCapabilities from api/io.ts instead.
 
 /**
  * Transmit a CAN frame through an existing IO session.

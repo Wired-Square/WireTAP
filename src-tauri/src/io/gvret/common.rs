@@ -107,7 +107,8 @@ impl Default for BusMapping {
             traits: Some(InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can],
-                can_transmit: true,
+                tx_frames: true,
+                tx_bytes: false,
                 multi_source: true,
             }),
         }
@@ -127,7 +128,8 @@ pub fn default_bus_mappings(bus_count: u8) -> Vec<BusMapping> {
             traits: Some(InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: vec![Protocol::Can, Protocol::CanFd],
-                can_transmit: true,
+                tx_frames: true,
+                tx_bytes: false,
                 multi_source: true,
             }),
         })

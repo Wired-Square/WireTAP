@@ -311,7 +311,7 @@ impl GsUsbReader {
 impl IODevice for GsUsbReader {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::realtime_can()
-            .with_transmit(!self.config.listen_only)
+            .with_tx(!self.config.listen_only, false)
             .with_buses(vec![self.config.channel])
     }
 

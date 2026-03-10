@@ -279,7 +279,7 @@ export default function Transmit() {
           isStreaming={isStreaming}
           isStopped={isStopped || canReturnToLive}
           ioState={session.state}
-          capabilities={capabilities}
+          capabilities={capabilities ? { protocols: capabilities.traits.protocols, available_buses: capabilities.available_buses } : null}
           onOpenIoPicker={handlers.handleOpenIoPicker}
           onStop={handlers.handleStop}
           onResume={handlers.handleResume}

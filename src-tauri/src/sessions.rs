@@ -342,7 +342,8 @@ fn parse_interfaces_from_profile(
                 traits: Some(InterfaceTraits {
                     temporal_mode: TemporalMode::Realtime,
                     protocols,
-                    can_transmit: true,
+                    tx_frames: true,
+                    tx_bytes: false,
                     multi_source: true,
                 }),
             })
@@ -368,7 +369,7 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
     });
 
     // Determine interface traits based on profile kind
-    let (interface_id, protocols, can_transmit) = match profile.kind.as_str() {
+    let (interface_id, protocols, tx_frames) = match profile.kind.as_str() {
         "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" => {
             ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true)
         }
@@ -387,7 +388,8 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
         traits: Some(InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols,
-            can_transmit,
+            tx_frames,
+            tx_bytes: false,
             multi_source: true,
         }),
     }]
@@ -2005,7 +2007,7 @@ fn resolve_source_config(
     let profile_kind = profile.kind.clone();
 
     // Determine interface traits based on profile kind
-    let (default_interface_id, default_protocols, default_can_transmit) = match profile_kind.as_str() {
+    let (default_interface_id, default_protocols, default_tx_frames) = match profile_kind.as_str() {
         "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" => {
             ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true)
         }
@@ -2031,7 +2033,8 @@ fn resolve_source_config(
             traits: Some(InterfaceTraits {
                 temporal_mode: TemporalMode::Realtime,
                 protocols: default_protocols,
-                can_transmit: default_can_transmit,
+                tx_frames: default_tx_frames,
+                tx_bytes: false,
                 multi_source: true,
             }),
         }]

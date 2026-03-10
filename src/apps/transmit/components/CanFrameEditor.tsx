@@ -27,7 +27,7 @@ export default function CanFrameEditor() {
 
   // Get capabilities from active session
   const capabilities = activeSession?.capabilities;
-  const supportsFd = capabilities?.supports_canfd ?? false;
+  const supportsFd = capabilities?.traits.protocols.includes("canfd") ?? false;
   const supportsExtended = capabilities?.supports_extended_id ?? true;
   const supportsRtr = capabilities?.supports_rtr ?? false;
   const availableBuses = capabilities?.available_buses ?? [];

@@ -14,6 +14,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **Consolidated IOCapabilities fields into InterfaceTraits/SessionDataStreams**: Removed redundant top-level fields (`is_realtime`, `can_transmit`, `can_transmit_serial`, `supports_canfd`, `emits_raw_bytes`) from `IOCapabilities`. Transmit capability split into `tx_frames`/`tx_bytes` on `InterfaceTraits`. Data streams renamed to `rx_frames`/`rx_bytes`. Both `traits` and `data_streams` are now required (non-optional) on `IOCapabilities`, eliminating backward-compat derivation helpers (`getTraits`, `getDataStreams`). Duplicate `IOCapabilities` interface removed from `api/transmit.ts`.
+
 - **Removed deprecated session method wrappers**: `watchSingleSource`, `watchMultiSource`, `loadSingleSource`, `loadMultiSource` removed from `useIOSessionManager`. All call sites now use `watchSource`/`loadSource` directly.
 
 - **Reader → Session renames**: `ReaderButton` → `SessionButton`, `onOpenIoReaderPicker` → `onOpenIoSessionPicker`, `ioReaderPicker` → `ioSessionPicker` dialog key across all app files.

@@ -378,7 +378,8 @@ export function buildDefaultBusMappings(profile: IOProfile): BusMapping[] {
     traits: {
       temporal_mode: "realtime",
       protocols: (protocol === "can" ? ["can", "canfd"] : [protocol]) as Protocol[],
-      can_transmit: traits?.canTransmit ?? false,
+      tx_frames: traits?.canTransmit ?? false,
+      tx_bytes: false,
       multi_source: traits?.multiSource ?? true,
     },
   }];

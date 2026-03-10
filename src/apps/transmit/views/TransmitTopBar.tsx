@@ -28,9 +28,7 @@ interface Props {
 
   // Session capabilities
   capabilities?: {
-    can_transmit: boolean;
-    can_transmit_serial: boolean;
-    supports_canfd: boolean;
+    protocols: string[];
     available_buses: number[];
   } | null;
 
@@ -135,7 +133,7 @@ export default function TransmitTopBar({
               Multi-Source
             </span>
           )}
-          {capabilities.supports_canfd && (
+          {capabilities.protocols.includes("canfd") && (
             <span className="text-xs px-2 py-0.5 rounded bg-green-600/30 text-green-400">
               FD
             </span>

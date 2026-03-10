@@ -24,8 +24,8 @@ use tokio::time::{interval, Duration};
 use crate::buffer_store::{self, BufferType, TimestampedByte};
 use crate::io::{
     emit_device_connected, emit_frames, emit_stream_ended, emit_to_session, now_us,
-    CanTransmitFrame, FrameMessage, IOCapabilities, IODevice, IOState, InterfaceTraits, Protocol,
-    SessionDataStreams, TemporalMode, TransmitPayload, TransmitResult, VirtualBusState,
+    CanTransmitFrame, FrameMessage, IOCapabilities, IODevice, IOState, Protocol,
+    TransmitPayload, TransmitResult, VirtualBusState,
 };
 
 // ============================================================================
@@ -162,71 +162,33 @@ impl VirtualDeviceReader {
 impl IODevice for VirtualDeviceReader {
     fn capabilities(&self) -> IOCapabilities {
         let buses: Vec<u8> = self.config.interfaces.iter().map(|i| i.bus).collect();
-        let can_transmit_val = self.config.loopback;
+        let loopback = self.config.loopback;
         match self.config.traffic_type {
-            VirtualTrafficType::Can => IOCapabilities {
-                can_transmit: can_transmit_val,
-                traits: Some(InterfaceTraits {
-                    temporal_mode: TemporalMode::Realtime,
-                    protocols: vec![Protocol::Can],
-                    can_transmit: can_transmit_val,
-                    multi_source: true,
-                }),
-                data_streams: Some(SessionDataStreams {
-                    emits_frames: true,
-                    emits_bytes: false,
-                }),
-                ..IOCapabilities::realtime_can().with_buses(buses)
-            },
-            VirtualTrafficType::CanFd => IOCapabilities {
-                can_transmit: can_transmit_val,
-                supports_canfd: true,
-                traits: Some(InterfaceTraits {
-                    temporal_mode: TemporalMode::Realtime,
-                    protocols: vec![Protocol::Can, Protocol::CanFd],
-                    can_transmit: can_transmit_val,
-                    multi_source: true,
-                }),
-                data_streams: Some(SessionDataStreams {
-                    emits_frames: true,
-                    emits_bytes: false,
-                }),
-                ..IOCapabilities::realtime_can().with_buses(buses)
-            },
-            VirtualTrafficType::Modbus => IOCapabilities {
-                can_transmit: false,
-                supports_extended_id: false,
-                supports_rtr: false,
-                traits: Some(InterfaceTraits {
-                    temporal_mode: TemporalMode::Realtime,
-                    protocols: vec![Protocol::Modbus],
-                    can_transmit: false,
-                    multi_source: true,
-                }),
-                data_streams: Some(SessionDataStreams {
-                    emits_frames: true,
-                    emits_bytes: false,
-                }),
-                ..IOCapabilities::realtime_can().with_buses(buses)
-            },
-            VirtualTrafficType::Serial => IOCapabilities {
-                can_transmit: can_transmit_val,
-                can_transmit_serial: can_transmit_val,
-                supports_extended_id: false,
-                supports_rtr: false,
-                emits_raw_bytes: true,
-                traits: Some(InterfaceTraits {
-                    temporal_mode: TemporalMode::Realtime,
-                    protocols: vec![Protocol::Serial],
-                    can_transmit: can_transmit_val,
-                    multi_source: true,
-                }),
-                data_streams: Some(SessionDataStreams {
-                    emits_frames: false,
-                    emits_bytes: true,
-                }),
-                ..IOCapabilities::realtime_can().with_buses(buses)
-            },
+            VirtualTrafficType::Can => IOCapabilities::realtime_can()
+                .with_buses(buses)
+                .with_tx(loopback, false),
+            VirtualTrafficType::CanFd => IOCapabilities::realtime_can()
+                .with_buses(buses)
+                .with_protocols(vec![Protocol::Can, Protocol::CanFd])
+                .with_tx(loopback, false),
+            VirtualTrafficType::Modbus => {
+                let mut caps = IOCapabilities::realtime_can()
+                    .with_buses(buses)
+                    .with_protocols(vec![Protocol::Modbus]);
+                caps.supports_extended_id = false;
+                caps.supports_rtr = false;
+                caps
+            }
+            VirtualTrafficType::Serial => {
+                let mut caps = IOCapabilities::realtime_can()
+                    .with_buses(buses)
+                    .with_protocols(vec![Protocol::Serial])
+                    .with_tx(false, loopback)
+                    .with_data_streams(false, true);
+                caps.supports_extended_id = false;
+                caps.supports_rtr = false;
+                caps
+            }
         }
     }
 

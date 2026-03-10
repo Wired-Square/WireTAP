@@ -36,7 +36,7 @@ export default function SerialTransmitView() {
 
   // Get connection state and capabilities
   const isConnected = activeSession?.lifecycleState === "connected";
-  const canTransmit = isConnected && activeSession?.capabilities?.can_transmit_serial === true;
+  const canTransmit = isConnected && activeSession?.capabilities?.traits.tx_bytes === true;
 
   // Parse hex input for preview
   const parsedBytes = useMemo(() => {

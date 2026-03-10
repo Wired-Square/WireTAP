@@ -28,8 +28,7 @@ use tokio_modbus::prelude::*;
 use crate::buffer_store::{self, BufferType};
 use crate::io::{
     emit_device_connected, emit_frames, emit_stream_ended, emit_to_session, now_us,
-    FrameMessage, IOCapabilities, IODevice, IOState, InterfaceTraits, Protocol,
-    SessionDataStreams, TemporalMode,
+    FrameMessage, IOCapabilities, IODevice, IOState, Protocol,
 };
 
 // ============================================================================
@@ -106,31 +105,12 @@ impl ModbusTcpReader {
 #[async_trait]
 impl IODevice for ModbusTcpReader {
     fn capabilities(&self) -> IOCapabilities {
-        IOCapabilities {
-            can_pause: false,
-            supports_time_range: false,
-            is_realtime: true,
-            supports_speed_control: false,
-            supports_seek: false,
-            supports_reverse: false,
-            can_transmit: false,
-            can_transmit_serial: false,
-            supports_canfd: false,
-            supports_extended_id: false,
-            supports_rtr: false,
-            available_buses: vec![],
-            emits_raw_bytes: false,
-            traits: Some(InterfaceTraits {
-                temporal_mode: TemporalMode::Realtime,
-                protocols: vec![Protocol::Modbus],
-                can_transmit: false,
-                multi_source: true,
-            }),
-            data_streams: Some(SessionDataStreams {
-                emits_frames: true,
-                emits_bytes: false,
-            }),
-        }
+        let mut caps = IOCapabilities::realtime_can()
+            .with_buses(vec![])
+            .with_protocols(vec![Protocol::Modbus]);
+        caps.supports_extended_id = false;
+        caps.supports_rtr = false;
+        caps
     }
 
     async fn start(&mut self) -> Result<(), String> {
