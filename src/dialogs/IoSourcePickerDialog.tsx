@@ -354,6 +354,18 @@ export default function IoSourcePickerDialog({
   // Get the session for the checked profile (if any) to check its state
   const checkedProfileSession = checkedSourceId ? getSessionForProfile(checkedSourceId) : undefined;
   const isCheckedProfileStopped = checkedProfileSession?.ioState === "stopped";
+  const isCheckedProfileBuffer = checkedProfileSession?.capabilities?.traits?.temporal_mode === "buffer";
+
+  // DEBUG: log source picker state for buffer session diagnosis
+  if (checkedSourceId && checkedProfileSession) {
+    console.log("[SourcePicker] checkedSourceId:", checkedSourceId,
+      "ioState:", checkedProfileSession.ioState,
+      "temporal_mode:", checkedProfileSession.capabilities?.traits?.temporal_mode,
+      "isLive:", isCheckedProfileLive,
+      "isStopped:", isCheckedProfileStopped,
+      "isBuffer:", isCheckedProfileBuffer,
+      "inActiveMultiSource:", activeMultiSourceSessions.some((s) => s.sessionId === checkedSourceId));
+  }
 
   // Find if there's a live multi-source session for the selected profiles (multi-bus mode)
   const liveMultiSourceSession = useMemo(() => {
@@ -1610,8 +1622,8 @@ export default function IoSourcePickerDialog({
           checkedSourceId={checkedSourceId}
           checkedProfile={checkedProfile}
           isBufferSelected={isBufferSelected}
-          isCheckedProfileLive={isCheckedProfileLive}
-          isCheckedProfileStopped={isCheckedProfileStopped}
+          isCheckedProfileLive={isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileBuffer)}
+          isCheckedProfileStopped={isCheckedProfileStopped && !isCheckedProfileBuffer}
           isImporting={isImporting}
           importError={importError}
           onImport={handleImport}
@@ -1624,7 +1636,7 @@ export default function IoSourcePickerDialog({
           multiSelectMode={isMultiBusMode}
           multiSelectCount={checkedSourceIds.length}
           onMultiConnectClick={handleMultiWatchClick}
-          onRelease={listenerId && isCheckedProfileLive ? handleRelease : undefined}
+          onRelease={listenerId && (isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileBuffer)) ? handleRelease : undefined}
           // Only show Restart for profiles, not for selecting existing sessions
           onRestartClick={isCheckedProfileLive && !isCheckedProfileStopped && !checkedMultiSourceSession ? handleRestartClick : undefined}
           isMultiSourceLive={isMultiSourceLive}

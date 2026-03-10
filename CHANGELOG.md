@@ -58,6 +58,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Pin toggle state not updating**: Fixed buffer pin/unpin button not reflecting state changes in the top bar. The `expectedStateRef` in `useIOSession` was never cleared for buffer sessions (which don't auto-start and thus never receive streaming events), causing the UI to read stale state.
 
+- **Source picker shows wrong buttons for stopped buffer sessions**: After stopping a realtime session (which atomically switches to a BufferReader), opening the Data Source dialog showed three buttons (Resume and Join, Load, Connect) instead of just Join. Fixed by treating stopped buffer sessions as live in the source picker — the session is still active, just backed by a buffer device.
+
 - **Session tooltip showing 0 frames during streaming**: Fixed a race condition where `isWatching` was immediately reset to `false` by the "clear on stream end" effect before the session connected. The effect now tracks streaming transitions correctly using a ref.
 
 - **Session tooltip frame counts for buffer sessions**: Buffer sessions now show buffer frame count and unique IDs from metadata instead of watch counters (which are always 0 for non-streaming sessions).
