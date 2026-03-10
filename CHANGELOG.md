@@ -12,7 +12,13 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Random buffer IDs**: New buffers get random 6-character alphanumeric IDs (e.g., `xk9m2p`) instead of sequential `buf_1`, `buf_2`. Existing `buf_N` buffers continue to work. Buffer detection uses a cached Set lookup from the backend instead of regex pattern matching. Removed the legacy `__imported_buffer__` constant.
 
+- **Atomic stop-and-switch-to-buffer command**: New Rust command `stop_and_switch_to_buffer` atomically stops the device, finalises the buffer, creates a BufferReader, and emits a `session-switched-to-buffer` event. All apps sharing the session transition to buffer replay mode together.
+
 ### Changed
+
+- **STOP switches all shared apps to buffer replay**: Clicking Stop on a realtime source now calls the atomic `stopAndSwitchToBuffer` API, which emits a session-wide event. Every app on the session receives `onSwitchedToBuffer`, sets `isWatching=false`, and transitions to buffer mode. Previously, Stop only affected the calling app's local state.
+
+- **LEAVE fully disconnects with no data**: Leave now performs a complete reset — unregisters the listener, clears `ioProfile`, `sourceProfileId`, `multiSessionId`, and all watching state. No buffer copy is preserved. The old `handleDetach`/`detachWithBufferCopy` functions have been removed entirely.
 
 - **Consolidated IOCapabilities fields into InterfaceTraits/SessionDataStreams**: Removed redundant top-level fields (`is_realtime`, `can_transmit`, `can_transmit_serial`, `supports_canfd`, `emits_raw_bytes`) from `IOCapabilities`. Transmit capability split into `tx_frames`/`tx_bytes` on `InterfaceTraits`. Data streams renamed to `rx_frames`/`rx_bytes`. Both `traits` and `data_streams` are now required (non-optional) on `IOCapabilities`, eliminating backward-compat derivation helpers (`getTraits`, `getDataStreams`). Duplicate `IOCapabilities` interface removed from `api/transmit.ts`.
 

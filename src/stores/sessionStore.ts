@@ -37,6 +37,7 @@ import {
   type IOStateType,
   type StreamEndedPayload,
   type SessionSuspendedPayload,
+  type SessionSwitchedToBufferPayload,
   type SessionResumingPayload,
   type StateChangePayload,
   type CanTransmitFrame,
@@ -368,6 +369,8 @@ export interface SessionCallbacks {
   onReconfigure?: (payload: SessionReconfiguredPayload) => void;
   /** Called when session is suspended (stopped with buffer available) */
   onSuspended?: (payload: SessionSuspendedPayload) => void;
+  /** Called when session is stopped and switched to buffer replay (all listeners transition) */
+  onSwitchedToBuffer?: (payload: SessionSwitchedToBufferPayload) => void;
   /** Called when session is resuming with a new buffer - apps should clear their frame lists */
   onResuming?: (payload: SessionResumingPayload) => void;
 }
@@ -765,6 +768,51 @@ async function setupSessionEventListeners(
     }
   );
   unlistenFunctions.push(unlistenSuspended);
+
+  // Session switched to buffer replay (realtime stop → buffer mode for ALL listeners)
+  const unlistenSwitchedToBuffer = await listen<SessionSwitchedToBufferPayload>(
+    `session-switched-to-buffer:${sessionId}`,
+    (event) => {
+      const payload = event.payload;
+      tlog.debug(`[sessionStore] Session '${sessionId}' switched to buffer replay: buffer=${payload.buffer_id}, count=${payload.buffer_count}`);
+      updateSession(sessionId, {
+        ioState: "stopped",
+        capabilities: payload.capabilities,
+        buffer: {
+          available: payload.buffer_count > 0,
+          id: payload.buffer_id,
+          type: payload.buffer_type,
+          count: payload.buffer_count,
+          owningSessionId: sessionId,
+          startTimeUs: payload.time_range?.[0] ?? null,
+          endTimeUs: payload.time_range?.[1] ?? null,
+          name: useSessionStore.getState().sessions[sessionId]?.buffer?.name ?? null,
+          persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
+        },
+      });
+      if (payload.buffer_id) {
+        useSessionStore.getState().addKnownBufferId(payload.buffer_id);
+      }
+      // Fetch buffer metadata for name/persistent
+      if (payload.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
+        import("../api/buffer").then(({ getBufferMetadataById }) =>
+          getBufferMetadataById(payload.buffer_id!).then((meta) => {
+            if (meta) {
+              updateSession(sessionId, {
+                buffer: {
+                  ...useSessionStore.getState().sessions[sessionId]?.buffer!,
+                  name: meta.name,
+                  persistent: meta.persistent,
+                },
+              });
+            }
+          }).catch(() => {/* ignore */})
+        );
+      }
+      invokeCallbacks(eventListeners, "onSwitchedToBuffer", payload);
+    }
+  );
+  unlistenFunctions.push(unlistenSwitchedToBuffer);
 
   // Session resuming (new buffer being created, apps should clear state)
   const unlistenResuming = await listen<SessionResumingPayload>(
@@ -1598,7 +1646,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               ...s.sessions[sessionId],
               capabilities,
               ioState: "stopped",
-              // Set buffer state so handleDetach knows a buffer exists
+              // Set buffer state so handleLeave knows a buffer exists
               buffer: bufferMetadata ? {
                 available: true,
                 id: bufferMetadata.id,

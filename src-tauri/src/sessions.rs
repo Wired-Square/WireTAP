@@ -11,7 +11,7 @@ use crate::{
         get_session_listeners, join_session, leave_session, list_sessions, pause_session,
         reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_listener_active, start_session, stop_session,
-        suspend_session, switch_to_buffer_replay, resume_to_live_session, transmit_frame, unregister_listener,
+        stop_and_switch_to_buffer, suspend_session, switch_to_buffer_replay, resume_to_live_session, transmit_frame, unregister_listener,
         evict_session_listener, add_source_to_session, remove_source_from_session, update_source_bus_mappings, get_session_source_count,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IODevice, IOState,
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, BufferReader, step_frame, StepResult,
@@ -894,6 +894,17 @@ pub async fn resume_reader_session(session_id: String) -> Result<IOState, String
 #[tauri::command(rename_all = "snake_case")]
 pub async fn suspend_reader_session(session_id: String) -> Result<IOState, String> {
     suspend_session(&session_id).await
+}
+
+/// Stop a realtime session and switch all listeners to buffer replay.
+/// Emits `session-switched-to-buffer` event so all apps on the session transition together.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn io_stop_and_switch_to_buffer(
+    app: tauri::AppHandle,
+    session_id: String,
+    speed: Option<f64>,
+) -> Result<IOCapabilities, String> {
+    stop_and_switch_to_buffer(&app, &session_id, speed.unwrap_or(1.0)).await
 }
 
 /// Resume a suspended session with a fresh buffer.

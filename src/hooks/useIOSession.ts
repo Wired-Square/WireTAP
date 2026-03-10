@@ -48,6 +48,7 @@ import {
   type IOStateType,
   type StreamEndedPayload,
   type SessionSuspendedPayload,
+  type SessionSwitchedToBufferPayload,
   type SessionResumingPayload,
   type StateChangePayload,
   type CanTransmitFrame,
@@ -146,6 +147,8 @@ export interface UseIOSessionOptions {
   onReconfigure?: () => void;
   /** Callback when session is suspended (stopped with buffer available) */
   onSuspended?: (payload: SessionSuspendedPayload) => void;
+  /** Callback when session is stopped and switched to buffer replay (all listeners transition) */
+  onSwitchedToBuffer?: (payload: SessionSwitchedToBufferPayload) => void;
   /** Callback when session is resuming with a new buffer - apps should clear their frame lists */
   onResuming?: (payload: SessionResumingPayload) => void;
   /** Callback when session is destroyed externally (e.g., from Session Manager or last-listener auto-destroy) */
@@ -295,6 +298,7 @@ export function useIOSession(
     onSpeedChange,
     onReconfigure,
     onSuspended,
+    onSwitchedToBuffer,
     onResuming,
     onDestroyed,
   } = options;
@@ -358,6 +362,7 @@ export function useIOSession(
     onSpeedChange,
     onReconfigure,
     onSuspended,
+    onSwitchedToBuffer,
     onResuming,
     onDestroyed,
   });
@@ -372,10 +377,11 @@ export function useIOSession(
       onSpeedChange,
       onReconfigure,
       onSuspended,
+      onSwitchedToBuffer,
       onResuming,
       onDestroyed,
     };
-  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onResuming, onDestroyed]);
+  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToBuffer, onResuming, onDestroyed]);
 
   // ---- Register listener ID with focusStore so Visual tab can display it ----
   useEffect(() => {
@@ -630,6 +636,37 @@ export function useIOSession(
       );
       unlistenFns.push(unlistenSuspended);
 
+      // Session switched to buffer replay (realtime stop → buffer mode for ALL listeners)
+      const unlistenSwitchedToBuffer = await listen<SessionSwitchedToBufferPayload>(
+        `session-switched-to-buffer:${effectiveSessionId}`,
+        (event) => {
+          const payload = event.payload;
+          expectedStateRef.current = null;
+          setLocalState((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ioState: "stopped",
+                  capabilities: payload.capabilities,
+                  buffer: {
+                    available: payload.buffer_count > 0,
+                    id: payload.buffer_id,
+                    type: payload.buffer_type,
+                    count: payload.buffer_count,
+                    owningSessionId: effectiveSessionId,
+                    startTimeUs: payload.time_range?.[0] ?? null,
+                    endTimeUs: payload.time_range?.[1] ?? null,
+                    name: prev.buffer?.name ?? null,
+                    persistent: prev.buffer?.persistent ?? false,
+                  },
+                }
+              : null
+          );
+          callbacksRef.current.onSwitchedToBuffer?.(payload);
+        }
+      );
+      unlistenFns.push(unlistenSwitchedToBuffer);
+
       // Session resuming
       const unlistenResuming = await listen<SessionResumingPayload>(
         `session-resuming:${effectiveSessionId}`,
@@ -830,6 +867,7 @@ export function useIOSession(
           onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
           onReconfigure: () => callbacksRef.current.onReconfigure?.(),
           onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
+          onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
         });
         console.log(`[useIOSession:${appName}] registerCallbacks completed`);
@@ -1236,6 +1274,7 @@ export function useIOSession(
           onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
           onReconfigure: () => callbacksRef.current.onReconfigure?.(),
           onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
+          onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
         });
 
@@ -1347,6 +1386,7 @@ export function useIOSession(
         onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
         onReconfigure: () => callbacksRef.current.onReconfigure?.(),
         onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
+        onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
         onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
       });
     } catch (e) {

@@ -454,6 +454,22 @@ pub struct SessionSuspendedPayload {
     pub time_range: Option<(u64, u64)>,
 }
 
+/// Payload emitted when a realtime session is stopped and switched to buffer replay.
+/// All listeners on the session receive this event and should transition to buffer mode.
+#[derive(Clone, Debug, Serialize)]
+pub struct SessionSwitchedToBufferPayload {
+    /// ID of the session's buffer
+    pub buffer_id: Option<String>,
+    /// Number of items in the buffer
+    pub buffer_count: usize,
+    /// Buffer type: "frames" or "bytes"
+    pub buffer_type: Option<String>,
+    /// Time range of captured data [first_us, last_us] or null if empty
+    pub time_range: Option<(u64, u64)>,
+    /// New capabilities after switching to BufferReader
+    pub capabilities: IOCapabilities,
+}
+
 /// Payload emitted when a session is resuming with a new buffer
 #[derive(Clone, Debug, Serialize)]
 pub struct SessionResumingPayload {
@@ -1981,6 +1997,113 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
     );
 
     Ok(current)
+}
+
+/// Stop a realtime session and switch to buffer replay atomically.
+///
+/// This combines suspend + switch_to_buffer_replay in a single lock acquisition
+/// and emits a `session-switched-to-buffer:{sessionId}` event so ALL listeners
+/// on the session transition to buffer mode together.
+///
+/// If no buffer exists (e.g. stopped before any frames), falls back to a normal
+/// suspend (emits `session-suspended` instead).
+pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get_mut(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    let previous = session.device.state();
+
+    // Stop the device (idempotent if already stopped)
+    if !matches!(previous, IOState::Stopped) {
+        session.device.stop().await?;
+    }
+
+    // Finalize the buffer
+    let metadata = buffer_store::finalize_buffer();
+
+    // Extract buffer info
+    let (buffer_id, buffer_count, buffer_type, time_range) = match metadata {
+        Some(ref m) => {
+            let type_str = match m.buffer_type {
+                buffer_store::BufferType::Frames => "frames",
+                buffer_store::BufferType::Bytes => "bytes",
+            };
+            let tr = match (m.start_time_us, m.end_time_us) {
+                (Some(start), Some(end)) => Some((start, end)),
+                _ => None,
+            };
+            (Some(m.id.clone()), m.count, Some(type_str.to_string()), tr)
+        }
+        None => (None, 0, None, None),
+    };
+
+    // Try to switch to buffer replay
+    if let Some(ref bid) = buffer_id {
+        let _ = crate::buffer_store::set_active_buffer(bid);
+
+        let new_reader = BufferReader::new_with_buffer(
+            app.clone(),
+            session_id.to_string(),
+            bid.clone(),
+            speed,
+        );
+
+        let capabilities = new_reader.capabilities();
+        session.device = Box::new(new_reader);
+
+        // Emit event so ALL listeners transition to buffer mode
+        emit_to_session(
+            &session.app,
+            "session-switched-to-buffer",
+            session_id,
+            SessionSwitchedToBufferPayload {
+                buffer_id: Some(bid.clone()),
+                buffer_count,
+                buffer_type,
+                time_range,
+                capabilities: capabilities.clone(),
+            },
+        );
+
+        if previous != session.device.state() {
+            emit_state_change(&session.app, session_id, &previous, &session.device.state());
+        }
+
+        tlog!(
+            "[reader] stop_and_switch_to_buffer('{}') - switched to buffer '{}' ({} items)",
+            session_id, bid, buffer_count
+        );
+
+        Ok(capabilities)
+    } else {
+        // No buffer — fall back to normal suspend event
+        emit_to_session(
+            &session.app,
+            "session-suspended",
+            session_id,
+            SessionSuspendedPayload {
+                buffer_id: None,
+                buffer_count: 0,
+                buffer_type: None,
+                time_range: None,
+            },
+        );
+
+        let current = session.device.state();
+        if previous != current {
+            emit_state_change(&session.app, session_id, &previous, &current);
+        }
+
+        tlog!(
+            "[reader] stop_and_switch_to_buffer('{}') - no buffer, fell back to suspend",
+            session_id
+        );
+
+        // Return current capabilities (unchanged)
+        Ok(session.device.capabilities())
+    }
 }
 
 /// Resume a suspended session with a fresh buffer.

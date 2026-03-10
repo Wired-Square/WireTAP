@@ -643,6 +643,24 @@ export interface SessionSuspendedPayload {
 }
 
 /**
+ * Payload emitted when a realtime session is stopped and switched to buffer replay.
+ * All listeners on the session receive this event and should transition to buffer mode.
+ * Event name: session-switched-to-buffer:{sessionId}
+ */
+export interface SessionSwitchedToBufferPayload {
+  /** ID of the session's buffer */
+  buffer_id: string | null;
+  /** Number of items in the buffer */
+  buffer_count: number;
+  /** Buffer type: "frames" or "bytes" */
+  buffer_type: "frames" | "bytes" | null;
+  /** Time range of captured data [first_us, last_us] or null if empty */
+  time_range: [number, number] | null;
+  /** New capabilities after switching to BufferReader */
+  capabilities: IOCapabilities;
+}
+
+/**
  * Payload sent when a session is resuming with a new buffer.
  * Apps should clear their frame lists when receiving this event.
  * Event name: session-resuming:{sessionId}
@@ -708,6 +726,20 @@ export async function switchSessionToBufferReplay(
   speed?: number
 ): Promise<IOCapabilities> {
   return invoke("switch_session_to_buffer_replay", { session_id: sessionId, speed });
+}
+
+/**
+ * Stop a realtime session and switch all listeners to buffer replay.
+ * Emits `session-switched-to-buffer` event so all apps on the session transition together.
+ * Falls back to normal suspend if no buffer exists.
+ * @param sessionId The session ID
+ * @param speed Initial buffer playback speed (default: 1.0)
+ */
+export async function stopAndSwitchToBuffer(
+  sessionId: string,
+  speed?: number
+): Promise<IOCapabilities> {
+  return invoke("io_stop_and_switch_to_buffer", { session_id: sessionId, speed });
 }
 
 /**

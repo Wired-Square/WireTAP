@@ -23,7 +23,7 @@ export interface SessionControlCallbacks {
   onStopAll?: () => void;
   onClear?: () => void;
   onPicker?: () => void;
-  onDetach?: () => void;
+  onLeave?: () => void;
   onJumpToBookmark?: (bookmarkId: string) => Promise<void>;
   /** Called when "Save Bookmark…" is triggered from the menu. Discovery-specific. */
   onBookmarkSave?: () => void;
@@ -160,7 +160,7 @@ export function useMenuSessionControl({
             cb.onPicker?.();
             break;
           case "detach":
-            cb.onDetach?.();
+            cb.onLeave?.();
             break;
           case "jump-to-bookmark":
             if (bookmarkId) await cb.onJumpToBookmark?.(bookmarkId);

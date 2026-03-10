@@ -27,7 +27,7 @@ export { isBufferProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, type StreamEndedPayload, type IOCapabilities } from "../api/io";
+import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToBuffer, type StreamEndedPayload, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -206,11 +206,9 @@ export interface UseIOSessionManagerResult {
   // ---- Detach/Rejoin State ----
   /** Whether detached from session */
   isDetached: boolean;
-  /** Detach from session without stopping */
-  handleDetach: () => Promise<void>;
   /** Rejoin after detaching */
   handleRejoin: () => Promise<void>;
-  /** Leave session (alias for handleDetach, but always visible in UI) */
+  /** Leave session — unregister listener, fully reset app state (no data preserved) */
   handleLeave: () => Promise<void>;
   /** Destroy the session entirely */
   handleDestroy: () => Promise<void>;
@@ -266,8 +264,6 @@ export interface UseIOSessionManagerResult {
   suspendSession: () => Promise<void>;
   /** Resume a suspended session with a fresh buffer (orphans old buffer) */
   resumeWithNewBuffer: () => Promise<void>;
-  /** Detach from session with a copy of the buffer */
-  detachWithBufferCopy: () => Promise<void>;
   /** Connect to a profile without streaming (creates session in stopped state, for Query app) */
   connectOnly: (profileId: string, options?: LoadOptions) => Promise<void>;
   /** Select a profile (clear multi-bus, set profile, set default speed) */
@@ -636,6 +632,12 @@ export function useIOSessionManager(
     onTimeUpdate,
     onStreamEnded: handleStreamEndedWithIngest,
     onSuspended,
+    onSwitchedToBuffer: () => {
+      // Fires for ALL apps on the session (including the one that clicked Stop)
+      setIsWatching(false);
+      // sourceProfileId stays set so canReturnToLive works
+      tlog.debug(`[IOSessionManager:${appName}] Session switched to buffer by event`);
+    },
     onStreamComplete,
     onSpeedChange,
     onReconfigure: handleReconfigure,
@@ -670,63 +672,26 @@ export function useIOSessionManager(
   // When other listeners remain, we copy the buffer so the session's buffer stays intact.
   // When we're the last listener, we skip the copy — leaving the session orphans the
   // buffer automatically, and we can reference it directly.
-  const handleDetach = useCallback(async () => {
-    let bufferId = session.bufferId;
-
-    // No buffer yet - try to create one by suspending first
-    if (!bufferId && session.sessionId) {
-      if (joinerCount <= 1) {
-        // Sole listener: suspend to create a buffer, then leave
-        await session.suspend();
-        // Read buffer ID from store (suspendSession sets it synchronously)
-        const storeSession = useSessionStore.getState().sessions[session.sessionId];
-        bufferId = storeSession?.buffer?.id ?? null;
-      } else {
-        // Multiple listeners and no buffer: just leave, clear state
-        await session.leave();
-        setMultiBusProfiles([]);
-        setIoProfile(null);
-        setIsWatching(false);
-        setIsDetached(false);
-        return;
-      }
-    }
-
-    if (bufferId) {
-      if (joinerCount > 1) {
-        // Other listeners still need the session's buffer — copy it for ourselves
-        const { copyBufferForDetach } = await import("../api/io");
-        const copyName = `${ioProfileName || "detached"}-${Date.now()}`;
-        const copiedBufferId = await copyBufferForDetach(bufferId, copyName);
-        await session.leave();
-        setMultiBusProfiles([]);
-        setIoProfile(copiedBufferId);
-      } else {
-        // Last listener — leaving will orphan the buffer, so just use it directly
-        await session.leave();
-        setMultiBusProfiles([]);
-        setIoProfile(bufferId);
-      }
-      setIsWatching(false);
-      setIsDetached(false);
-    } else {
-      // No buffer even after suspend - just leave and clear state
-      await session.leave();
-      setMultiBusProfiles([]);
-      setIoProfile(null);
-      setIsWatching(false);
-      setIsDetached(false);
-    }
-  }, [session, ioProfileName, joinerCount, setMultiBusProfiles, setIoProfile]);
+  // Leave session: unregister listener, fully reset app state, no data preserved
+  const handleLeave = useCallback(async () => {
+    // App-specific cleanup (clear frames, decoded data, etc.)
+    onBeforeWatch?.();
+    // Unregister listener from the session
+    await session.leave();
+    // Full state reset
+    setMultiBusProfiles([]);
+    setMultiSessionId(null);
+    setIoProfile(null);
+    setSourceProfileId(null);
+    setIsWatching(false);
+    setIsDetached(false);
+  }, [session, onBeforeWatch, setMultiBusProfiles, setIoProfile]);
 
   const handleRejoin = useCallback(async () => {
     await session.rejoin();
     setIsDetached(false);
     setIsWatching(true);
   }, [session]);
-
-  // Leave is the same as detach - just exposed separately for UI
-  const handleLeave = handleDetach;
 
   // Destroy the session entirely
   const handleDestroy = useCallback(async () => {
@@ -983,15 +948,29 @@ export function useIOSessionManager(
   // For timeline sources (postgres, csv), this switches to buffer replay mode
   // so users can step through the buffered frames.
   const stopWatch = useCallback(async () => {
-    await session.suspend();
+    if (!session.sessionId) return;
 
-    // For timeline sources, switch to buffer replay mode
-    // This enables playback controls (step/skip/seek)
+    // For realtime sources: stop and switch ALL listeners to buffer replay
+    if (sourceProfileId) {
+      const profile = ioProfiles.find((p) => p.id === sourceProfileId);
+      if (profile && isRealtimeProfile(profile)) {
+        try {
+          await stopAndSwitchToBuffer(session.sessionId, 1.0);
+          tlog.debug(`[IOSessionManager:${appName}] Stopped realtime session and switched to buffer`);
+        } catch (e) {
+          tlog.info(`[IOSessionManager:${appName}] stopAndSwitchToBuffer failed, falling back to suspend: ${e}`);
+          await session.suspend();
+        }
+        setIsWatching(false);
+        return;
+      }
+    }
+
+    // Timeline sources: existing suspend + switchToBufferReplay
+    await session.suspend();
     if (sourceProfileId) {
       const profile = ioProfiles.find((p) => p.id === sourceProfileId);
       if (profile && !isRealtimeProfile(profile)) {
-        // Timeline source (postgres, csv) - switch to buffer replay
-        // Use session.switchToBufferReplay which also updates local capabilities
         try {
           await session.switchToBufferReplay(1.0);
           tlog.debug(`[IOSessionManager:${appName}] Switched to buffer replay mode after stop`);
@@ -1000,7 +979,6 @@ export function useIOSessionManager(
         }
       }
     }
-
     setIsWatching(false);
   }, [session, sourceProfileId, ioProfiles, appName]);
 
@@ -1017,41 +995,6 @@ export function useIOSessionManager(
     resetWatchFrameCount();
     streamCompletedRef.current = false;
   }, [session, onBeforeWatch, resetWatchFrameCount]);
-
-  // Detach from session, keeping the buffer data.
-  // Copies the buffer only when other listeners still need the session's buffer.
-  const detachWithBufferCopy = useCallback(async () => {
-    const bufferId = session.bufferId;
-    if (!bufferId) {
-      tlog.debug("[IOSessionManager] Cannot detach - no buffer available");
-      return;
-    }
-
-    let targetBufferId: string;
-    if (joinerCount > 1) {
-      // Other listeners remain — copy so the session's buffer stays intact
-      const { copyBufferForDetach } = await import("../api/io");
-      const copyName = `${ioProfileName}-detached-${Date.now()}`;
-      targetBufferId = await copyBufferForDetach(bufferId, copyName);
-    } else {
-      // Last listener — leaving orphans the buffer, use it directly
-      targetBufferId = bufferId;
-    }
-
-    // Leave the session
-    await session.leave();
-
-    // Clear multi-bus state - we're now viewing a standalone buffer
-    setMultiBusProfiles([]);
-
-    // Set isDetached=false - we're viewing a buffer, not in detached state
-    // This ensures the IO picker shows the buffer, not "Rejoin"
-    setIsDetached(false);
-    setIsWatching(false);
-
-    // Switch to the target buffer
-    await session.reinitialize(targetBufferId, { useBuffer: true });
-  }, [session, ioProfileName, joinerCount, setMultiBusProfiles]);
 
   // Unified load method: fast ingest without rendering, auto-transitions to buffer reader.
   // Handles both single and multi-source sessions.
@@ -1427,9 +1370,8 @@ export function useIOSessionManager(
     currentTimeUs: session.currentTimeUs,
     currentFrameIndex: session.currentFrameIndex,
 
-    // Detach/Rejoin/Leave/Destroy
+    // Rejoin/Leave/Destroy
     isDetached,
-    handleDetach,
     handleRejoin,
     handleLeave,
     handleDestroy,
@@ -1460,7 +1402,6 @@ export function useIOSessionManager(
     stopWatch,
     suspendSession,
     resumeWithNewBuffer,
-    detachWithBufferCopy,
     connectOnly,
     selectProfile,
     selectMultipleProfiles,
