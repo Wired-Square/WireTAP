@@ -2082,6 +2082,10 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
         let capabilities = new_reader.capabilities();
         session.device = Box::new(new_reader);
 
+        // Orphan the buffer — BufferReader holds buffer_id directly and doesn't need ownership.
+        // This makes the buffer visible in the Data Source picker's BUFFERS section.
+        buffer_store::orphan_buffers_for_session(session_id);
+
         // Release device profiles — buffer doesn't need the hardware.
         let profile_ids = sessions::get_session_profile_ids(session_id);
         for profile_id in &profile_ids {

@@ -637,6 +637,7 @@ export function useIOSessionManager(
       // Session stays the same — isBufferMode is now derived from capabilities
       // (temporal_mode="buffer"). sourceProfileId stays set so canReturnToLive works.
       setIsWatching(false);
+      setMultiBusProfiles([]); // Clear device profile IDs so Data Source picker doesn't show old device
       tlog.debug(`[IOSessionManager:${appName}] Session switched to buffer by event, buffer=${payload.buffer_id}`);
     },
     onStreamComplete,

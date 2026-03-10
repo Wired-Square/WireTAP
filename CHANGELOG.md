@@ -22,6 +22,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Buffer source detection in visual graph**: Session Manager visual now detects any non-IOProfile source ID as a buffer source node, replacing the old `buf_N` regex that didn't match new random buffer IDs.
 
+- **Data Source picker clears device selection on buffer switch**: When a realtime session switches to buffer replay (STOP), `multiBusProfiles` is cleared in the `onSwitchedToBuffer` handler. This prevents the Data Source dialog from pre-selecting the original device profile when the session is now backed by a buffer.
+
 ### Changed
 
 - **STOP switches all shared apps to buffer replay**: Clicking Stop on a realtime source now calls the atomic `stopAndSwitchToBuffer` API, which emits a session-wide event. Every app on the session receives `onSwitchedToBuffer`, sets `isWatching=false`, and transitions to buffer mode. Works across windows — `stopWatch` uses session capabilities (`temporal_mode`) instead of `sourceProfileId` lookup. Previously, Stop only affected the calling app's local state.
