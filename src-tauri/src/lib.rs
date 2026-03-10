@@ -300,45 +300,54 @@ fn open_settings_panel(app: AppHandle, state: State<SettingsWindowState>) {
 }
 
 /// Update the Session menu state based on the focused app's session.
-/// Called by the frontend when panel focus or session state changes.
+/// When `has_session` is false, disables all session and bookmark menu items.
+/// When `has_session` is true, updates items based on session state.
 #[cfg(not(target_os = "ios"))]
 #[tauri::command]
-fn update_menu_session_state(
+fn update_menu_state(
     state: State<SessionMenuState>,
+    bookmark_item_state: State<BookmarkMenuItemState>,
+    bookmarks_menu_state: State<BookmarksMenuState>,
+    has_session: bool,
     profile_name: Option<String>,
     is_streaming: bool,
     is_paused: bool,
     can_pause: bool,
     joiner_count: u32,
+    has_bookmarks: bool,
 ) {
     if let Some(items) = state.0.lock().unwrap().as_ref() {
-        // Update source info item text
-        let text = profile_name
-            .as_ref()
-            .map(|n| format!("Source: {}", n))
-            .unwrap_or_else(|| "No source selected".to_string());
-        let _ = items.source.set_text(&text);
+        if has_session {
+            let text = profile_name
+                .as_ref()
+                .map(|n| format!("Source: {}", n))
+                .unwrap_or_else(|| "No source selected".to_string());
+            let _ = items.source.set_text(&text);
+            let _ = items.play.set_enabled(!is_streaming || is_paused);
+            let _ = items.pause.set_enabled(is_streaming && !is_paused && can_pause);
+            let _ = items.stop.set_enabled(is_streaming && !is_paused && can_pause);
+            let _ = items.detach.set_enabled(is_streaming && joiner_count > 1);
+            let _ = items.stop_all.set_enabled(is_streaming);
+            let _ = items.picker.set_enabled(true);
+            let _ = items.clear.set_enabled(true);
+        } else {
+            let _ = items.source.set_text("No source selected");
+            let _ = items.picker.set_enabled(false);
+            let _ = items.play.set_enabled(false);
+            let _ = items.pause.set_enabled(false);
+            let _ = items.stop.set_enabled(false);
+            let _ = items.clear.set_enabled(false);
+            let _ = items.detach.set_enabled(false);
+            let _ = items.stop_all.set_enabled(false);
+        }
+    }
 
-        // Play: enabled when stopped or paused
-        let _ = items.play.set_enabled(!is_streaming || is_paused);
-
-        // Pause: enabled when streaming, not paused, AND source supports pause
-        let _ = items.pause.set_enabled(is_streaming && !is_paused && can_pause);
-
-        // Stop: enabled when streaming, not paused, and source supports pause
-        // (Stop now acts as pause for timeline sources, like the timeline Pause button)
-        let _ = items.stop.set_enabled(is_streaming && !is_paused && can_pause);
-
-        // Detach Session: enabled when streaming and multiple apps connected
-        let _ = items.detach.set_enabled(is_streaming && joiner_count > 1);
-
-        // Stop Session: enabled when streaming (stops entire session for all apps)
-        let _ = items.stop_all.set_enabled(is_streaming);
-
-        // Picker and Clear: always enabled when a session-aware app is focused
-        // (they're disabled entirely via update_menu_focus_state for non-session apps)
-        let _ = items.picker.set_enabled(true);
-        let _ = items.clear.set_enabled(true);
+    // Enable/disable bookmark items
+    if let Some(items) = bookmark_item_state.0.lock().unwrap().as_ref() {
+        let _ = items.save.set_enabled(has_bookmarks);
+    }
+    if let Some(submenu) = bookmarks_menu_state.0.lock().unwrap().as_ref() {
+        let _ = submenu.set_enabled(has_bookmarks);
     }
 }
 
@@ -382,44 +391,6 @@ fn update_bookmarks_menu(
     Ok(())
 }
 
-/// Update menu item availability based on the focused app's capabilities.
-/// Called by the frontend when panel focus changes. Disables session and bookmark
-/// menu items when the focused app doesn't support those features.
-#[cfg(not(target_os = "ios"))]
-#[tauri::command]
-fn update_menu_focus_state(
-    session_state: State<SessionMenuState>,
-    bookmark_item_state: State<BookmarkMenuItemState>,
-    bookmarks_menu_state: State<BookmarksMenuState>,
-    has_session: bool,
-    has_bookmarks: bool,
-) {
-    // Enable/disable all session menu items based on whether focused app uses sessions
-    if let Some(items) = session_state.0.lock().unwrap().as_ref() {
-        if !has_session {
-            let _ = items.source.set_text("No source selected");
-            let _ = items.picker.set_enabled(false);
-            let _ = items.play.set_enabled(false);
-            let _ = items.pause.set_enabled(false);
-            let _ = items.stop.set_enabled(false);
-            let _ = items.clear.set_enabled(false);
-            let _ = items.detach.set_enabled(false);
-            let _ = items.stop_all.set_enabled(false);
-        }
-        // When has_session is true, the app will call update_menu_session_state
-        // with fine-grained state shortly after focus
-    }
-
-    // Enable/disable bookmark items
-    if let Some(items) = bookmark_item_state.0.lock().unwrap().as_ref() {
-        let _ = items.save.set_enabled(has_bookmarks);
-    }
-
-    // Enable/disable jump-to-bookmark submenu
-    if let Some(submenu) = bookmarks_menu_state.0.lock().unwrap().as_ref() {
-        let _ = submenu.set_enabled(has_bookmarks);
-    }
-}
 
 /// Create a new main window with the specified label.
 ///
@@ -522,13 +493,17 @@ async fn create_main_window(_app: AppHandle, _label: String) -> Result<(), Strin
 
 #[cfg(target_os = "ios")]
 #[tauri::command]
-fn update_menu_session_state(
+fn update_menu_state(
     _state: State<SessionMenuState>,
+    _bookmark_item_state: State<BookmarkMenuItemState>,
+    _bookmarks_menu_state: State<BookmarksMenuState>,
+    _has_session: bool,
     _profile_name: Option<String>,
     _is_streaming: bool,
     _is_paused: bool,
     _can_pause: bool,
     _joiner_count: u32,
+    _has_bookmarks: bool,
 ) {
     // No-op on iOS
 }
@@ -541,18 +516,6 @@ fn update_bookmarks_menu(
     _bookmarks: Vec<BookmarkInfo>,
 ) -> Result<(), String> {
     Ok(()) // No-op on iOS
-}
-
-#[cfg(target_os = "ios")]
-#[tauri::command]
-fn update_menu_focus_state(
-    _session_state: State<SessionMenuState>,
-    _bookmark_item_state: State<BookmarkMenuItemState>,
-    _bookmarks_menu_state: State<BookmarksMenuState>,
-    _has_session: bool,
-    _has_bookmarks: bool,
-) {
-    // No-op on iOS
 }
 
 /// Setup menus for desktop platforms (not available on iOS)
@@ -989,9 +952,8 @@ pub fn run() {
             create_main_window,
             settings_panel_closed,
             open_settings_panel,
-            update_menu_session_state,
+            update_menu_state,
             update_bookmarks_menu,
-            update_menu_focus_state,
             catalog::open_catalog,
             catalog::save_catalog,
             catalog::save_binary_file,

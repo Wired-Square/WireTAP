@@ -33,7 +33,7 @@ import {
   removeOpenMainWindow,
   getNextMainWindowNumber,
 } from "../utils/persistence";
-import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuFocusState } from "../api";
+import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuState } from "../api";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
 const logo = "/logo.png";
@@ -531,92 +531,37 @@ export default function MainLayout() {
     };
   }, [handlePanelClick]);
 
-  // Update native menu item availability based on focused panel's capabilities
-  // Session-aware panels manage their own session + bookmark state via useMenuSessionControl,
-  // so we only call updateMenuFocusState here to disable everything for non-session panels.
+  // Disable all session + bookmark menu items when a non-session panel is focused.
+  // Session-aware panels manage their own state via useMenuSessionControl.
   const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "graph"]));
   const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
 
   useEffect(() => {
     const hasSession = focusedPanelId !== null && SESSION_AWARE_PANELS.current.has(focusedPanelId);
     if (!hasSession) {
-      updateMenuFocusState(false, false);
+      updateMenuState({
+        hasSession: false,
+        profileName: null,
+        isStreaming: false,
+        isPaused: false,
+        canPause: false,
+        joinerCount: 0,
+        hasBookmarks: false,
+      });
     }
   }, [focusedPanelId]);
 
-  // Listen for session control menu commands
-  // These are re-emitted as session-control events with the target panel ID
+  // Navigate to Bookmarks tab in Settings (not a session-control event)
   useEffect(() => {
     const currentWindow = getCurrentWebviewWindow();
-
     const setupListeners = async () => {
-      // Helper to emit session-control with current active panel from store
-      const emitSessionControl = (action: string) => {
-        const targetPanelId = useFocusStore.getState().focusedPanelId;
-        currentWindow.emit("session-control", { action, targetPanelId, windowLabel: currentWindow.label });
-      };
-
-      // Session control events - emit to focused app
-      const unlistenPlay = await currentWindow.listen("menu-session-play", () => {
-        emitSessionControl("play");
-      });
-
-      const unlistenPause = await currentWindow.listen("menu-session-pause", () => {
-        emitSessionControl("pause");
-      });
-
-      const unlistenStop = await currentWindow.listen("menu-session-stop", () => {
-        emitSessionControl("stop");
-      });
-
-      // Session connection controls
-      const unlistenDetach = await currentWindow.listen("menu-session-detach", () => {
-        emitSessionControl("detach");
-      });
-
-      const unlistenStopAll = await currentWindow.listen("menu-session-stop-all", () => {
-        emitSessionControl("stopAll");
-      });
-
-      // Clear frames - emit to focused app
-      const unlistenClear = await currentWindow.listen("menu-session-clear", () => {
-        emitSessionControl("clear");
-      });
-
-      // Picker shortcut - emit to focused app to open its IO picker
-      const unlistenPicker = await currentWindow.listen("menu-session-picker", () => {
-        emitSessionControl("picker");
-      });
-
-      // Navigate to Bookmarks tab in Settings (set before Settings mounts)
       const unlistenBookmarkManage = await currentWindow.listen("menu-bookmark-manage", () => {
         useSettingsStore.getState().setSection("bookmarks");
       });
-
-      // Jump to bookmark - emit to focused app with bookmark ID
-      const unlistenJumpToBookmark = await currentWindow.listen<string>("menu-jump-to-bookmark", (event) => {
-        const targetPanelId = useFocusStore.getState().focusedPanelId;
-        currentWindow.emit("session-control", {
-          action: "jump-to-bookmark",
-          targetPanelId,
-          windowLabel: currentWindow.label,
-          bookmarkId: event.payload,
-        });
-      });
-
       return () => {
-        unlistenPlay();
-        unlistenPause();
-        unlistenStop();
-        unlistenDetach();
-        unlistenStopAll();
-        unlistenClear();
-        unlistenPicker();
         unlistenBookmarkManage();
-        unlistenJumpToBookmark();
       };
     };
-
     const cleanup = setupListeners();
     return () => {
       cleanup.then((fn) => fn());

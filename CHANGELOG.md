@@ -26,6 +26,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **Simplified Session menu architecture**: Merged `update_menu_session_state` and `update_menu_focus_state` Rust commands into a single `update_menu_state` command. Removed the MainLayout event relay — `useMenuSessionControl` now listens directly for native menu events (`menu-session-*`) with a focus guard, eliminating the double-hop through `session-control` intermediate events. ~70 lines removed from MainLayout.
+
 - **STOP switches all shared apps to buffer replay**: Clicking Stop on a realtime source now calls the atomic `stopAndSwitchToBuffer` API, which emits a session-wide event. Every app on the session receives `onSwitchedToBuffer`, sets `isWatching=false`, and transitions to buffer mode. Works across windows — `stopWatch` uses session capabilities (`temporal_mode`) instead of `sourceProfileId` lookup. Previously, Stop only affected the calling app's local state.
 
 - **LEAVE fully disconnects with no data**: Leave now performs a complete reset — unregisters the listener, clears `ioProfile`, `sourceProfileId`, `multiSessionId`, and all watching state. No buffer copy is preserved. The old `handleDetach`/`detachWithBufferCopy` functions have been removed entirely.
@@ -51,6 +53,8 @@ All notable changes to WireTAP will be documented in this file.
 - **Buffer mode passed explicitly**: `isBufferMode` is now passed as an explicit prop through the top bar component hierarchy instead of being derived from `ioProfile` format, decoupling session ID format from buffer mode detection.
 
 ### Fixed
+
+- **Session menu shows "Buffer" after stop-to-buffer switch**: The Session menu now shows "Source: Buffer" instead of the stale device name (e.g., "Source: GVRET USB") when a realtime session switches to buffer replay mode.
 
 - **Clear All preserves pinned buffers**: The "Clear All" button in the IO source picker no longer deletes persistent (pinned) buffers.
 

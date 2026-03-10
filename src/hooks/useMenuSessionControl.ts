@@ -1,13 +1,15 @@
 // ui/src/hooks/useMenuSessionControl.ts
 // Centralised hook for session-control event handling and menu state reporting.
 // Replaces duplicated patterns across Decoder, Discovery, Transmit, Query, and Graph.
+//
+// Listens directly for native menu events (menu-session-*) — no MainLayout relay needed.
+// Only the focused panel responds to each event.
 
 import { useEffect, useRef } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useFocusStore } from "../stores/focusStore";
 import {
-  updateMenuSessionState,
-  updateMenuFocusState,
+  updateMenuState,
   updateBookmarksMenu,
   type BookmarkMenuInfo,
 } from "../api/menu";
@@ -25,7 +27,7 @@ export interface SessionControlCallbacks {
   onPicker?: () => void;
   onLeave?: () => void;
   onJumpToBookmark?: (bookmarkId: string) => Promise<void>;
-  /** Called when "Save Bookmark…" is triggered from the menu. Discovery-specific. */
+  /** Called when "Save Bookmark…" is triggered from the menu. */
   onBookmarkSave?: () => void;
 }
 
@@ -57,8 +59,8 @@ export interface UseMenuSessionControlOptions {
 
 /**
  * Centralised hook that handles:
- * 1. Listening for `session-control` events and dispatching to callbacks
- * 2. Reporting session state to the native menu when focused
+ * 1. Reporting session state to the native menu when focused
+ * 2. Listening for native menu events and dispatching to callbacks
  * 3. Reporting bookmarks to the native menu when focused (optional)
  *
  * Uses a single ref updated every render to avoid stale closures —
@@ -81,17 +83,25 @@ export function useMenuSessionControl({
     if (!isFocused) return;
     const { profileName, isStreaming, isPaused, capabilities, joinerCount } =
       sessionState;
-    updateMenuSessionState({
-      profileName,
+
+    // Show "Buffer" instead of the original device name when in buffer mode
+    const effectiveProfileName =
+      capabilities?.traits.temporal_mode === "buffer" ? "Buffer" : profileName;
+
+    const bookmarksEnabled =
+      !!bookmarks &&
+      (capabilities?.traits.temporal_mode === "timeline" ||
+        capabilities?.traits.temporal_mode === "buffer");
+
+    updateMenuState({
+      hasSession: true,
+      profileName: effectiveProfileName,
       isStreaming,
       isPaused,
       canPause: capabilities?.can_pause ?? false,
       joinerCount: joinerCount ?? 1,
+      hasBookmarks: bookmarksEnabled,
     });
-
-    // Update bookmark menu availability — enable for timeline and buffer sources
-    const bookmarksEnabled = !!bookmarks && (capabilities?.traits.temporal_mode === "timeline" || capabilities?.traits.temporal_mode === "buffer");
-    updateMenuFocusState(true, bookmarksEnabled);
   }, [
     isFocused,
     sessionState.profileName,
@@ -121,67 +131,55 @@ export function useMenuSessionControl({
     update();
   }, [isFocused, bookmarks?.profileId]);
 
-  // ── Session-control + bookmark-save event listeners (registered once) ──
+  // ── Native menu event listeners (registered once) ──
+  // Each listener checks isFocused so only the active panel responds.
   useEffect(() => {
     const currentWindow = getCurrentWebviewWindow();
 
     const setupListeners = async () => {
-      // Session control events from menu (only respond when targeted at this panel)
-      const unlistenControl = await currentWindow.listen<{
-        action: string;
-        targetPanelId: string | null;
-        windowLabel?: string;
-        bookmarkId?: string;
-      }>("session-control", async (event) => {
-        const { action, targetPanelId, windowLabel, bookmarkId } =
-          event.payload;
-        if (windowLabel && windowLabel !== currentWindow.label) return;
-        if (targetPanelId !== panelId) return;
+      const guard = () => stateRef.current.isFocused;
+      const cb = () => stateRef.current.callbacks;
 
-        const { callbacks: cb } = stateRef.current;
-
-        switch (action) {
-          case "play":
-            cb.onPlay?.();
-            break;
-          case "pause":
-            cb.onPause?.();
-            break;
-          case "stop":
-            cb.onStop?.();
-            break;
-          case "stopAll":
-            cb.onStopAll?.();
-            break;
-          case "clear":
-            cb.onClear?.();
-            break;
-          case "picker":
-            cb.onPicker?.();
-            break;
-          case "detach":
-            cb.onLeave?.();
-            break;
-          case "jump-to-bookmark":
-            if (bookmarkId) await cb.onJumpToBookmark?.(bookmarkId);
-            break;
+      const unPlay = await currentWindow.listen("menu-session-play", () => {
+        if (guard()) cb().onPlay?.();
+      });
+      const unPause = await currentWindow.listen("menu-session-pause", () => {
+        if (guard()) cb().onPause?.();
+      });
+      const unStop = await currentWindow.listen("menu-session-stop", () => {
+        if (guard()) cb().onStop?.();
+      });
+      const unDetach = await currentWindow.listen("menu-session-detach", () => {
+        if (guard()) cb().onLeave?.();
+      });
+      const unStopAll = await currentWindow.listen("menu-session-stop-all", () => {
+        if (guard()) cb().onStopAll?.();
+      });
+      const unClear = await currentWindow.listen("menu-session-clear", () => {
+        if (guard()) cb().onClear?.();
+      });
+      const unPicker = await currentWindow.listen("menu-session-picker", () => {
+        if (guard()) cb().onPicker?.();
+      });
+      const unJump = await currentWindow.listen<string>("menu-jump-to-bookmark", async (event) => {
+        if (guard() && event.payload) {
+          await cb().onJumpToBookmark?.(event.payload);
         }
       });
-
-      // Save bookmark event (broadcast to window, only respond when focused)
-      const unlistenBookmark = await currentWindow.listen(
-        "menu-bookmark-save",
-        () => {
-          const { isFocused: focused, callbacks: cb } = stateRef.current;
-          if (focused) {
-            cb.onBookmarkSave?.();
-          }
-        },
-      );
+      const unSave = await currentWindow.listen("menu-bookmark-save", () => {
+        if (guard()) cb().onBookmarkSave?.();
+      });
 
       return () => {
-        unlistenControl();
-        unlistenBookmark();
+        unPlay();
+        unPause();
+        unStop();
+        unDetach();
+        unStopAll();
+        unClear();
+        unPicker();
+        unJump();
+        unSave();
       };
     };
 
@@ -189,5 +187,5 @@ export function useMenuSessionControl({
     return () => {
       cleanup.then((fn) => fn());
     };
-  }, [panelId]);
+  }, []);
 }

@@ -45,10 +45,9 @@ export {
 
 // Menu API
 export {
-  updateMenuSessionState,
+  updateMenuState,
   updateBookmarksMenu,
-  updateMenuFocusState,
-  type MenuSessionState,
+  type MenuState,
   type BookmarkMenuInfo,
 } from "./menu";
 
