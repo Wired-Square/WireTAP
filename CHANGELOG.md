@@ -46,6 +46,14 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Buffer session tooltip showing session ID as source**: The tooltip "Source" field now shows the buffer label or buffer ID instead of the raw `b_` session ID.
 
+- **"Leave Session" drops to empty buffer view**: After leaving a live session, the app switched to the orphaned buffer but showed no frames. Volatile buffer IDs created during streaming were not registered in `knownBufferIds`, so `isBufferProfileId()` returned false and the code tried to open a regular IO profile instead of a buffer session. Fixed by registering buffer IDs in `knownBufferIds` when `stream-ended` and `session-suspended` events arrive.
+
+- **Buffer bin button does nothing after "Leave Session"**: The clear/delete button on an orphaned buffer did nothing because `sourceProfileId` was cleared during session destruction. Fixed by setting `sourceProfileId` to the buffer ID when switching to an orphaned buffer.
+
+- **Buffer tooltip shows wrong source and 0 frames after "Leave Session"**: After auto-switching to an orphaned buffer, the tooltip showed the old session ID as the source and frame counts as 0. Fixed by adding an `onSessionDestroyed` callback in Discovery that fetches buffer metadata and enables buffer mode for orphaned buffers.
+
+- **Buffer rename/pin not syncing across windows**: Renaming a buffer or toggling its pin in one window did not propagate to other windows. Fixed by emitting a `BUFFER_METADATA_UPDATED` Tauri event from `renameSessionBuffer` and `setSessionBufferPersistent`, with a global listener that updates the session store in all windows.
+
 ## [0.5.5] - 2026-03-09
 
 ### Changed

@@ -30,7 +30,7 @@ import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
 import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
-import { getBufferMetadata, getBufferFramesPaginated, getBufferFramesPaginatedFiltered, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
+import { getBufferMetadata, getBufferMetadataById, getBufferFramesPaginated, getBufferFramesPaginatedFiltered, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
 import { WINDOW_EVENTS } from "../../events/registry";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import ToolboxDialog from "../../dialogs/ToolboxDialog";
@@ -339,6 +339,23 @@ export default function Discovery() {
     setBackendFrameCount(0);
   }, [clearBuffer, clearFramePicker, clearAnalysisResults, disableBufferMode, clearSerialBytes, resetFraming, setBackendByteCount, setBackendFrameCount]);
 
+  // Handle session destroyed — switch to orphaned buffer if available
+  const handleSessionDestroyed = useCallback(async (orphanedBufferIds: string[]) => {
+    if (orphanedBufferIds.length === 0) return;
+    const bufferId = orphanedBufferIds[0];
+    try {
+      const meta = await getBufferMetadataById(bufferId);
+      if (meta) {
+        setBufferMetadata(meta);
+        enableBufferMode(meta.count);
+        const frameInfoList = await getBufferFrameInfo();
+        setFrameInfoFromBuffer(frameInfoList);
+      }
+    } catch (err) {
+      console.warn('[Discovery] Failed to load buffer after session destroyed:', err);
+    }
+  }, [enableBufferMode, setFrameInfoFromBuffer]);
+
   // Use the IO session manager hook - manages session lifecycle, ingest, multi-bus, and derived state
   const manager = useIOSessionManager({
     appName: "discovery",
@@ -357,6 +374,7 @@ export default function Discovery() {
     onBeforeWatch: clearBeforeWatch,
     onBeforeMultiWatch: clearBeforeWatch,
     onSessionReconfigured: handleSessionReconfigured,
+    onSessionDestroyed: handleSessionDestroyed,
   });
 
   // Destructure everything from the manager
@@ -611,7 +629,7 @@ export default function Discovery() {
   const protocolLabel = frames.length > 0 ? frames[0].protocol : "can";
 
   // Timeline sources (postgres, csv, buffer) have is_realtime=false in capabilities
-  const isRecorded = capabilities?.is_realtime === false;
+  const isRecorded = capabilities?.traits.temporal_mode === "timeline";
 
   // Merged buffer metadata using session values for cross-app timeline sync
   const effectiveBufferMetadata = useEffectiveBufferMetadata(
@@ -959,7 +977,7 @@ export default function Discovery() {
             isStreaming={isStreaming}
             displayTimeFormat={displayTimeFormat}
             isRecorded={isRecorded}
-            emitsRawBytes={capabilities?.emits_raw_bytes ?? true}
+            emitsRawBytes={capabilities?.data_streams.rx_bytes ?? true}
           />
         ) : (
           <DiscoveryFramesView

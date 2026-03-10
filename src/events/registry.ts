@@ -11,6 +11,7 @@ export const WINDOW_EVENTS = {
 
   // Buffer events
   BUFFER_CHANGED: 'buffer:changed',
+  BUFFER_METADATA_UPDATED: 'buffer:metadata-updated',
 
   // Window lifecycle events
   WINDOW_OPENED: 'window:opened',
@@ -47,6 +48,15 @@ export interface WindowReadyPayload {
 export interface LoadHexDataPayload {
   hexData: string;
   timestamp: number;
+}
+
+export interface BufferMetadataUpdatedPayload {
+  /** Buffer ID that was updated */
+  bufferId: string;
+  /** New name (if renamed) */
+  name?: string;
+  /** New persistent flag (if changed) */
+  persistent?: boolean;
 }
 
 export interface BufferChangedPayload {

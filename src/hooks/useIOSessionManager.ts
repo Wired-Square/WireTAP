@@ -142,8 +142,9 @@ export interface UseIOSessionManagerOptions {
   streamCompletedRef?: React.MutableRefObject<boolean>;
   /** Called after session is reconfigured (bookmark jump, time range change) */
   onSessionReconfigured?: (info: SessionReconfigurationInfo) => void;
-  /** Called when session is destroyed externally (e.g., from Sessions app). Apps can clear frame data, etc. */
-  onSessionDestroyed?: () => void;
+  /** Called when session is destroyed externally (e.g., from Sessions app).
+   *  Receives orphaned buffer IDs so apps can switch to buffer mode. */
+  onSessionDestroyed?: (orphanedBufferIds: string[]) => void;
 }
 
 /** Result of the IO session manager hook */
@@ -613,13 +614,15 @@ export function useIOSessionManager(
 
     // Switch to orphaned buffer if available, otherwise clear profile
     if (orphanedBufferIds.length > 0) {
-      setIoProfile(orphanedBufferIds[0]);
+      const bufferId = orphanedBufferIds[0];
+      setIoProfile(bufferId);
+      setSourceProfileId(bufferId);
     } else {
       setIoProfile(null);
     }
 
-    // Notify app
-    onSessionDestroyed?.();
+    // Notify app with orphaned buffer IDs so it can set up buffer mode
+    onSessionDestroyed?.(orphanedBufferIds);
   }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
 
   const sessionOptions: UseIOSessionOptions = {
@@ -646,9 +649,9 @@ export function useIOSessionManager(
   const readerState = session.state;
   const isStreaming = !isDetached && (readerState === "running" || readerState === "paused");
   const isPaused = readerState === "paused";
-  const isRealtime = session.capabilities?.is_realtime === true;
+  const isRealtime = session.capabilities?.traits.temporal_mode === "realtime";
   // Buffer mode = viewing buffer data (either a buf_N profile directly, or a session backed by a buffer)
-  // Note: Timeline sources (postgres, csv) have is_realtime=false but are NOT buffer mode -
+  // Note: Timeline sources (postgres, csv) have temporal_mode="timeline" but are NOT buffer mode -
   // they're actively streaming from database/file. Only BufferReader (buf_N) is buffer mode.
   const isBufferMode = isBufferProfileId(ioProfile) || isBufferProfileId(sourceProfileId);
   // Stopped with a profile selected (ready to restart)

@@ -7,7 +7,7 @@
 import * as Sentry from "@sentry/react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen, emit, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   createIOSession,
   getIOSessionState,
@@ -650,6 +650,10 @@ async function setupSessionEventListeners(
           persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
         },
       });
+      // Register buffer ID so isBufferProfileId() recognises it immediately
+      if (payload.buffer_id) {
+        useSessionStore.getState().addKnownBufferId(payload.buffer_id);
+      }
       // Fetch buffer metadata to populate name/persistent if not already known
       if (payload.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
         import("../api/buffer").then(({ getBufferMetadataById }) =>
@@ -737,6 +741,10 @@ async function setupSessionEventListeners(
           persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
         },
       });
+      // Register buffer ID so isBufferProfileId() recognises it immediately
+      if (payload.buffer_id) {
+        useSessionStore.getState().addKnownBufferId(payload.buffer_id);
+      }
       // Fetch buffer metadata to populate name/persistent if not already known
       if (payload.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
         import("../api/buffer").then(({ getBufferMetadataById }) =>
@@ -1564,7 +1572,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Check if the session is a realtime source - if so, switch to buffer replay mode
     // so timeline controls work. For timeline sources, just stop the reader.
     const session = get().sessions[sessionId];
-    const isRealtime = session?.capabilities?.is_realtime === true;
+    const isRealtime = session?.capabilities?.traits.temporal_mode === "realtime";
     const profileName = session?.profileName ?? sessionId;
 
     if (isRealtime) {
@@ -1581,7 +1589,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           profileId: session?.profileId ?? null,
           profileName,
           appName: null,
-          details: `Switched to buffer replay mode (is_realtime: ${capabilities.is_realtime}, buffer: ${bufferMetadata?.id ?? 'none'})`,
+          details: `Switched to buffer replay mode (temporal_mode: ${capabilities.traits.temporal_mode}, buffer: ${bufferMetadata?.id ?? 'none'})`,
         });
         set((s) => ({
           sessions: {
@@ -1761,6 +1769,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (Object.keys(updated).length > 0) {
       set((s) => ({ sessions: { ...s.sessions, ...updated } }));
     }
+    // Notify other windows
+    const { WINDOW_EVENTS } = await import("../events/registry");
+    emit(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, { bufferId, name: newName });
   },
 
   setSessionBufferPersistent: async (bufferId, persistent) => {
@@ -1777,6 +1788,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (Object.keys(updated).length > 0) {
       set((s) => ({ sessions: { ...s.sessions, ...updated } }));
     }
+    // Notify other windows
+    const { WINDOW_EVENTS } = await import("../events/registry");
+    emit(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, { bufferId, persistent });
   },
 
   // ---- Transmission ----
@@ -1785,7 +1799,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (!session) {
       throw new Error(`Session ${sessionId} not found`);
     }
-    if (!session.capabilities?.can_transmit) {
+    if (!session.capabilities?.traits.tx_frames) {
       throw new Error(`Session ${sessionId} does not support transmission`);
     }
     return sessionTransmitFrame(sessionId, frame);
@@ -1830,7 +1844,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   getTransmitCapableSessions: () =>
     Object.values(get().sessions).filter(
       (s) =>
-        s && s.lifecycleState === "connected" && s.capabilities?.can_transmit === true
+        s && s.lifecycleState === "connected" && s.capabilities?.traits.tx_frames === true
     ),
 
   isProfileInUse: (profileId) =>
@@ -1848,7 +1862,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       (s) =>
         s &&
         ((s.lifecycleState === "connected" &&
-          s.capabilities?.can_transmit === true) ||
+          s.capabilities?.traits.tx_frames === true) ||
         (s.lifecycleState === "disconnected" && s.hasQueuedMessages))
     ),
 
@@ -1931,6 +1945,33 @@ getEventListeners = () => useSessionStore.getState()._eventListeners;
 // Initialize the showAppError getter for error handling
 getGlobalShowAppError = () => useSessionStore.getState().showAppError;
 
+// Listen for buffer metadata updates from other windows (rename, pin)
+import("../events/registry").then(({ WINDOW_EVENTS }) => {
+  listen<{ bufferId: string; name?: string; persistent?: boolean }>(
+    WINDOW_EVENTS.BUFFER_METADATA_UPDATED,
+    (event) => {
+      const { bufferId, name, persistent } = event.payload;
+      const sessions = useSessionStore.getState().sessions;
+      const updated: Record<string, Session> = {};
+      for (const [sid, session] of Object.entries(sessions)) {
+        if (session.buffer.id === bufferId) {
+          updated[sid] = {
+            ...session,
+            buffer: {
+              ...session.buffer,
+              ...(name !== undefined && { name }),
+              ...(persistent !== undefined && { persistent }),
+            },
+          };
+        }
+      }
+      if (Object.keys(updated).length > 0) {
+        useSessionStore.setState((s) => ({ sessions: { ...s.sessions, ...updated } }));
+      }
+    }
+  );
+});
+
 // ============================================================================
 // Convenience Hooks
 // ============================================================================
@@ -1961,7 +2002,7 @@ export function useTransmitCapableSessions(): Session[] {
       Object.values(s.sessions).filter(
         (session) =>
           session.lifecycleState === "connected" &&
-          session.capabilities?.can_transmit === true
+          session.capabilities?.traits.tx_frames === true
       )
     )
   );
@@ -1974,7 +2015,7 @@ export function useTransmitDropdownSessions(): Session[] {
       Object.values(s.sessions).filter(
         (session) =>
           (session.lifecycleState === "connected" &&
-            session.capabilities?.can_transmit === true) ||
+            session.capabilities?.traits.tx_frames === true) ||
           (session.lifecycleState === "disconnected" && session.hasQueuedMessages)
       )
     )
