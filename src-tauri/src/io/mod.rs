@@ -686,6 +686,9 @@ pub struct IOSession {
     pub listeners: HashMap<String, SessionListener>,
     /// Display names of the sources in this session (for logging)
     pub source_names: Vec<String>,
+    /// Original source configs for rebuilding the live reader on resume.
+    /// Empty for non-multi-source sessions (timeline, buffer).
+    pub source_configs: Vec<SourceConfig>,
     /// When all listeners went stale. During this grace period the reader is paused
     /// but the session stays alive, allowing recovery after display sleep / App Nap.
     pub suspended_at: Option<std::time::Instant>,
@@ -1378,6 +1381,7 @@ pub async fn create_session(
     listener_id: Option<String>,
     app_name: Option<String>,
     source_names: Option<Vec<String>>,
+    source_configs: Vec<SourceConfig>,
 ) -> CreateSessionResult {
     // Clear the closing flag in case this is a new session for a previously closed window
     clear_session_closing(&session_id);
@@ -1474,6 +1478,7 @@ pub async fn create_session(
         joiner_count: listener_count,
         listeners,
         source_names: source_names.unwrap_or_default(),
+        source_configs,
         suspended_at: None,
     };
 
@@ -1527,6 +1532,16 @@ pub async fn get_session_source_count(session_id: &str) -> usize {
         .and_then(|s| s.device.multi_source_configs())
         .map(|c| c.len())
         .unwrap_or(0)
+}
+
+/// Get the stored source configs for a session (used for resume-to-live).
+/// Returns empty vec if session doesn't exist or has no stored configs.
+pub async fn get_session_source_configs(session_id: &str) -> Vec<SourceConfig> {
+    let sessions = IO_SESSIONS.lock().await;
+    sessions
+        .get(session_id)
+        .map(|s| s.source_configs.clone())
+        .unwrap_or_default()
 }
 
 /// Result of joining an existing session
@@ -2066,6 +2081,15 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
 
         let capabilities = new_reader.capabilities();
         session.device = Box::new(new_reader);
+
+        // Release device profiles — buffer doesn't need the hardware.
+        let profile_ids = sessions::get_session_profile_ids(session_id);
+        for profile_id in &profile_ids {
+            crate::profile_tracker::unregister_usage_by_session(profile_id, session_id);
+        }
+
+        // Update SESSION_PROFILES: buffer is now the source (original configs stored on IOSession for resume)
+        sessions::replace_session_profiles(session_id, &[bid.clone()]);
 
         // Emit event so ALL listeners transition to buffer mode
         emit_to_session(

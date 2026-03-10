@@ -125,10 +125,10 @@ export function buildSessionGraph(
     });
   });
 
-  // Column 1b: Buffer source nodes (buffer IDs that aren't IOProfiles)
+  // Column 1b: Buffer source nodes (any source ID that isn't an IOProfile)
   const profileIdSet = new Set(profiles.map((p) => p.id));
   const bufferSourceIds = [...activeProfileIds].filter(
-    (id) => !profileIdSet.has(id) && /^buf_\d+$/.test(id)
+    (id) => !profileIdSet.has(id)
   );
   bufferSourceIds.forEach((bufferId, i) => {
     const index = activeProfiles.length + i;

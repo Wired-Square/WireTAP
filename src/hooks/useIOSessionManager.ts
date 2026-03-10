@@ -27,7 +27,7 @@ export { isBufferProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToBuffer, type StreamEndedPayload, type IOCapabilities } from "../api/io";
+import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToBuffer, resumeSessionToLive, type StreamEndedPayload, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -981,16 +981,22 @@ export function useIOSessionManager(
   // Suspend session: alias for stopWatch (kept for backward compatibility)
   const suspendSession = stopWatch;
 
-  // Resume a suspended session with a fresh buffer (orphans old buffer)
+  // Resume a suspended session: return to live if possible, otherwise restart buffer
   const resumeWithNewBuffer = useCallback(async () => {
-    // Clear app state before resuming
     onBeforeWatch?.();
 
-    await session.resumeFresh();
+    if (canReturnToLive && effectiveSessionId) {
+      // Session was stopped from live → buffer; reconnect to the live device
+      await resumeSessionToLive(effectiveSessionId);
+    } else {
+      // Buffer or timeline replay — just restart the buffer
+      await session.resumeFresh();
+    }
+
     setIsWatching(true);
     resetWatchFrameCount();
     streamCompletedRef.current = false;
-  }, [session, onBeforeWatch, resetWatchFrameCount]);
+  }, [session, onBeforeWatch, resetWatchFrameCount, canReturnToLive, effectiveSessionId]);
 
   // Unified load method: fast ingest without rendering, auto-transitions to buffer reader.
   // Handles both single and multi-source sessions.

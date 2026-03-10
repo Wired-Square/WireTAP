@@ -16,6 +16,12 @@ All notable changes to WireTAP will be documented in this file.
 
 - **`TemporalMode::Buffer` variant**: New temporal mode distinguishes buffer replay from timeline sources (PostgreSQL, CSV). BufferReader now reports `temporal_mode: "buffer"` in capabilities. `isBufferMode` in `useIOSessionManager` detects this automatically without needing to change `ioProfile`.
 
+- **Device release on buffer switch**: When a realtime session switches to buffer replay (STOP), device profiles are released from `profile_tracker`. The device becomes available for other sessions while the buffer continues to serve data. `SESSION_PROFILES` is updated to list the buffer ID as the session's source, so the Session Manager visual graph shows the buffer node wired to the session.
+
+- **Resume to live from buffer**: `resumeWithNewBuffer` now calls `resumeSessionToLive` when `canReturnToLive` is true. The Rust command rebuilds the live reader from stored `source_configs` (saved at session creation), re-registers profiles, restores `SESSION_PROFILES` to the original device profile IDs, and supports both single and multi-source sessions. Falls back gracefully if the device has been claimed by another session.
+
+- **Buffer source detection in visual graph**: Session Manager visual now detects any non-IOProfile source ID as a buffer source node, replacing the old `buf_N` regex that didn't match new random buffer IDs.
+
 ### Changed
 
 - **STOP switches all shared apps to buffer replay**: Clicking Stop on a realtime source now calls the atomic `stopAndSwitchToBuffer` API, which emits a session-wide event. Every app on the session receives `onSwitchedToBuffer`, sets `isWatching=false`, and transitions to buffer mode. Works across windows — `stopWatch` uses session capabilities (`temporal_mode`) instead of `sourceProfileId` lookup. Previously, Stop only affected the calling app's local state.

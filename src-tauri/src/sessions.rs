@@ -8,7 +8,7 @@ use crate::{
     credentials,
     io::{
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
-        get_session_listeners, join_session, leave_session, list_sessions, pause_session,
+        get_session_listeners, get_session_source_configs, join_session, leave_session, list_sessions, pause_session,
         reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_listener_active, start_session, stop_session,
         stop_and_switch_to_buffer, suspend_session, switch_to_buffer_replay, resume_to_live_session, transmit_frame, unregister_listener,
@@ -144,6 +144,40 @@ fn take_session_profiles(session_id: &str) -> Vec<String> {
     }
 
     profile_ids
+}
+
+/// Replace all profile IDs for a session (e.g., swap device profiles for buffer ID).
+/// Cleans up old reverse mappings and sets new ones.
+pub fn replace_session_profiles(session_id: &str, new_profile_ids: &[String]) {
+    // Remove old reverse mappings
+    if let Ok(map) = SESSION_PROFILES.lock() {
+        if let Some(old_ids) = map.get(session_id) {
+            if let Ok(mut rev) = PROFILE_SESSIONS.lock() {
+                for old_id in old_ids {
+                    if let Some(sessions) = rev.get_mut(old_id) {
+                        sessions.remove(session_id);
+                        if sessions.is_empty() {
+                            rev.remove(old_id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Set new profile IDs
+    if let Ok(mut map) = SESSION_PROFILES.lock() {
+        map.insert(session_id.to_string(), new_profile_ids.to_vec());
+    }
+
+    // Add new reverse mappings
+    if let Ok(mut rev) = PROFILE_SESSIONS.lock() {
+        for id in new_profile_ids {
+            rev.entry(id.clone())
+                .or_insert_with(std::collections::HashSet::new)
+                .insert(session_id.to_string());
+        }
+    }
 }
 
 /// Get all profile IDs for a session (without removing them).
@@ -795,7 +829,7 @@ pub async fn create_reader_session(
     profile_tracker::register_usage(&profile_id_for_tracking, &session_id);
     register_session_profile(&session_id, &profile_id_for_tracking);
 
-    let result = create_session(app, session_id.clone(), reader, listener_id, app_name, None).await;
+    let result = create_session(app, session_id.clone(), reader, listener_id, app_name, None, vec![]).await;
 
     // Auto-start the session after creation (only for real-time devices)
     // Playback sources (postgres, csv) should NOT auto-start because frames would be emitted
@@ -1081,7 +1115,7 @@ pub async fn create_buffer_reader_session(
         ),
     };
 
-    let result = create_session(app, session_id, Box::new(reader), None, None, None).await;
+    let result = create_session(app, session_id, Box::new(reader), None, None, None, vec![]).await;
     Ok(result.capabilities)
 }
 
@@ -1123,7 +1157,7 @@ pub async fn transition_to_buffer_reader(
         ),
     };
 
-    let result = create_session(app, session_id, Box::new(reader), None, None, None).await;
+    let result = create_session(app, session_id, Box::new(reader), None, None, None, vec![]).await;
     Ok(result.capabilities)
 }
 
@@ -1141,61 +1175,82 @@ pub async fn switch_session_to_buffer_replay(
 }
 
 /// Resume a session from buffer playback back to live streaming.
-/// This is the reverse of switch_session_to_buffer_replay.
-/// It recreates the original reader from the stored profile configuration,
-/// orphans the current buffer (preserving data for later viewing), and starts
-/// streaming into a fresh buffer.
-///
-/// Only supported for realtime devices (gvret, slcan, gs_usb, socketcan).
-/// Returns an error for timeline sources (postgres, csv, mqtt) which don't
-/// have the live/buffer toggle concept.
+/// Uses stored source configs to rebuild the reader (supports multi-source).
+/// Falls back to loading from settings for single-source sessions without stored configs.
+/// Re-registers device profiles with the tracker before reconnecting.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn resume_session_to_live(
     app: tauri::AppHandle,
     session_id: String,
 ) -> Result<IOCapabilities, String> {
-    // Get the profile IDs for this session
-    let profile_ids = get_session_profile_ids(&session_id);
-    if profile_ids.is_empty() {
-        return Err(format!(
-            "No profile IDs found for session '{}'. Cannot resume to live.",
-            session_id
-        ));
+    // Prefer stored source configs (set during session creation)
+    let stored_configs: Vec<SourceConfig> = get_session_source_configs(&session_id).await;
+
+    let configs = if !stored_configs.is_empty() {
+        stored_configs
+    } else {
+        // Fallback: load from settings (legacy single-source path)
+        let profile_ids = get_session_profile_ids(&session_id);
+        if profile_ids.is_empty() {
+            return Err(format!(
+                "No profile IDs or source configs found for session '{}'. Cannot resume to live.",
+                session_id
+            ));
+        }
+
+        let settings = settings::load_settings(app.clone())
+            .await
+            .map_err(|e| format!("Failed to load settings: {}", e))?;
+
+        let profile_id = &profile_ids[0];
+        let profile = settings
+            .io_profiles
+            .iter()
+            .find(|p| p.id == *profile_id)
+            .ok_or_else(|| format!("Profile '{}' not found in settings", profile_id))?;
+
+        if !is_realtime_device(&profile.kind) {
+            return Err(format!(
+                "Cannot resume to live for '{}' device type.",
+                profile.kind
+            ));
+        }
+
+        let source_config = create_source_config_from_profile(profile, None)
+            .ok_or_else(|| format!("Failed to create source config for profile '{}'", profile_id))?;
+
+        vec![source_config]
+    };
+
+    // Check profile availability before committing
+    for config in &configs {
+        crate::profile_tracker::can_use_profile(&config.profile_id, &config.profile_kind)?;
     }
 
-    // Load settings to get profile configs
-    let settings = settings::load_settings(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load settings: {}", e))?;
-
-    // For now, only support single-source sessions (first profile)
-    // Multi-source resume could be added later
-    let profile_id = &profile_ids[0];
-    let profile = settings
-        .io_profiles
-        .iter()
-        .find(|p| p.id == *profile_id)
-        .ok_or_else(|| format!("Profile '{}' not found in settings", profile_id))?;
-
-    // Only realtime devices support live/buffer toggle
-    if !is_realtime_device(&profile.kind) {
-        return Err(format!(
-            "Cannot resume to live for '{}' device type. Only realtime devices (gvret, slcan, gs_usb, socketcan) support live/buffer toggle.",
-            profile.kind
-        ));
+    // Re-register profiles with the tracker
+    for config in &configs {
+        crate::profile_tracker::register_usage(&config.profile_id, &session_id);
     }
 
-    // Create the reader from profile config (same logic as create_reader_session)
-    let source_config = create_source_config_from_profile(profile, None)
-        .ok_or_else(|| format!("Failed to create source config for profile '{}'", profile_id))?;
+    // Restore original profile IDs to SESSION_PROFILES (replacing the buffer ID)
+    let profile_ids: Vec<String> = configs.iter().map(|c| c.profile_id.clone()).collect();
+    replace_session_profiles(&session_id, &profile_ids);
 
-    let new_reader: Box<dyn IODevice> = Box::new(MultiSourceReader::single_source(
-        app.clone(),
-        session_id.clone(),
-        source_config,
-    )?);
+    // Build the new live reader
+    let new_reader: Box<dyn IODevice> = if configs.len() == 1 {
+        Box::new(MultiSourceReader::single_source(
+            app.clone(),
+            session_id.clone(),
+            configs.into_iter().next().unwrap(),
+        )?)
+    } else {
+        Box::new(MultiSourceReader::new(
+            app.clone(),
+            session_id.clone(),
+            configs,
+        )?)
+    };
 
-    // Call the io module to do the actual session manipulation
     resume_to_live_session(&session_id, new_reader).await
 }
 
@@ -2172,6 +2227,7 @@ pub async fn create_multi_source_session(
     let source_display_names: Vec<String> = source_configs.iter()
         .map(|c| c.display_name.clone())
         .collect();
+    let stored_configs = source_configs.clone();
     let reader = MultiSourceReader::new(app.clone(), session_id.clone(), source_configs)?;
 
     // Register profile usage BEFORE create_session so lifecycle event has profile IDs
@@ -2181,7 +2237,7 @@ pub async fn create_multi_source_session(
     // Store all profiles for this session (needed for cleanup on destroy)
     register_session_profiles(&session_id, &profile_ids);
 
-    let result = create_session(app, session_id.clone(), Box::new(reader), listener_id, app_name, Some(source_display_names)).await;
+    let result = create_session(app, session_id.clone(), Box::new(reader), listener_id, app_name, Some(source_display_names), stored_configs).await;
 
     // Auto-start the session if it's new OR if it exists but is stopped
     let should_start = if result.is_new {
