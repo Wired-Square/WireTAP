@@ -1170,6 +1170,11 @@ pub fn run() {
                         smp_upgrade::smp_confirm_image,
                         smp_upgrade::smp_reset_device,
                         smp_upgrade::smp_cancel_upload,
+                        // FrameLink Device API
+                        io::framelink::framelink_probe_device,
+                        io::framelink::framelink_get_interface_signals,
+                        io::framelink::framelink_write_signal,
+                        io::framelink::framelink_read_signal,
         ]);
 
     // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)

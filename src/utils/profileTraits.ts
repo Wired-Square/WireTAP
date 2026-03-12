@@ -121,6 +121,13 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     platforms: ["windows", "macos", "linux", "ios"],
     multiSource: true,
   },
+  framelink: {
+    temporalMode: "realtime",
+    protocols: ["can"], // Refined per-interface by getProfileTraits()
+    canTransmit: true,
+    platforms: ["windows", "macos", "linux", "ios"],
+    multiSource: true,
+  },
   virtual: {
     temporalMode: "realtime",
     protocols: ["can"],
@@ -171,6 +178,17 @@ export function getProfileTraits(profile: IOProfile): ProfileTraits | undefined 
     case "gvret_usb": {
       const ifaces = c?.interfaces as GvretInterfaceConfig[] | undefined;
       if (ifaces?.some((i) => i.protocol === "canfd")) {
+        traits.protocols = ["can", "canfd"];
+      }
+      break;
+    }
+
+    case "framelink": {
+      // interface_type: 1=CAN, 2=CANFD, 3=RS-485
+      const ifaceType = c?.interface_type as number | undefined;
+      if (ifaceType === 3) {
+        traits.protocols = ["serial"];
+      } else if (ifaceType === 2) {
         traits.protocols = ["can", "canfd"];
       }
       break;
@@ -370,16 +388,20 @@ export function validateProfileSelection(
 export function buildDefaultBusMappings(profile: IOProfile): BusMapping[] {
   const traits = getProfileTraits(profile);
   const protocol = traits?.protocols[0] ?? "can";
+  const deviceBus = profile.kind === "framelink"
+    ? (profile.connection?.interface_index as number ?? 0)
+    : 0;
+  const txBytes = profile.kind === "framelink" && protocol === "serial";
   return [{
-    deviceBus: 0,
+    deviceBus,
     enabled: true,
     outputBus: 0,
-    interfaceId: `${protocol}0`,
+    interfaceId: `${protocol}${deviceBus}`,
     traits: {
       temporal_mode: "realtime",
       protocols: (protocol === "can" ? ["can", "canfd"] : [protocol]) as Protocol[],
       tx_frames: traits?.canTransmit ?? false,
-      tx_bytes: false,
+      tx_bytes: txBytes,
       multi_source: traits?.multiSource ?? true,
     },
   }];

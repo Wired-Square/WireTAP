@@ -26,6 +26,7 @@ import {
   smpConnectUdp,
   smpListImages,
 } from "../../../api/smpUpgrade";
+import { framelinkProbeDevice } from "../../../api/framelink";
 
 export default function DevicesScanView() {
   const devices = useDevicesStore((s) => s.data.devices);
@@ -118,24 +119,34 @@ export default function DevicesScanView() {
     const name = device?.name ?? deviceId;
 
     try {
-      // Connect using the appropriate protocol
-      if (transport === "udp" && device?.address && device?.port) {
-        await smpConnectUdp(device.address, device.port);
-      } else if (caps.includes("wifi-provision")) {
-        // WiFi provisioning connect (also covers devices with both caps)
-        await bleConnect(deviceId);
-      } else {
-        // SMP-only BLE device
-        await smpConnectBle(deviceId);
+      // FrameLink-only devices don't need a persistent connection — they're probed on demand
+      const isFrameLinkOnly = caps.includes("framelink") && !caps.includes("wifi-provision") && !caps.includes("smp");
+
+      if (!isFrameLinkOnly) {
+        // Connect using the appropriate protocol
+        if (transport === "udp" && device?.address && device?.port) {
+          await smpConnectUdp(device.address, device.port);
+        } else if (device?.ble_id) {
+          if (caps.includes("wifi-provision")) {
+            await bleConnect(device.ble_id);
+          } else {
+            await smpConnectBle(device.ble_id);
+          }
+        } else {
+          throw new Error("No BLE peripheral ID available for connection");
+        }
       }
 
       setConnectionState("connected");
       setSelectedDevice(deviceId, name, transport, caps);
 
       // Route to the appropriate first step
-      if (caps.includes("wifi-provision")) {
-        // Set up provisioning store state
-        setProvisionSelectedDevice(deviceId, name);
+      if (caps.includes("framelink") && !caps.includes("wifi-provision")) {
+        // FrameLink device — probe interfaces and create IO profiles
+        setStep("framelink-setup");
+      } else if (caps.includes("wifi-provision")) {
+        // Set up provisioning store state (uses BLE peripheral ID for connection)
+        setProvisionSelectedDevice(device?.ble_id ?? deviceId, name);
         setProvisionConnectionState("connected");
 
         // Read current WiFi state from device
@@ -159,7 +170,7 @@ export default function DevicesScanView() {
         setStep("credentials");
       } else if (caps.includes("smp")) {
         // SMP-only device — go straight to inspect
-        setUpgradeSelectedDevice(deviceId, name, transport);
+        setUpgradeSelectedDevice(device?.ble_id ?? deviceId, name, transport);
         setUpgradeConnectionState("connected");
 
         try {
@@ -201,7 +212,8 @@ export default function DevicesScanView() {
       return;
     }
 
-    const deviceId = `udp:${address}:${port}`;
+    let deviceId = `udp:${address}`; // Temporary ID until we can probe for device_id
+    let deviceName = address;
     setError(null);
     setConnectingDeviceId(deviceId);
     setConnectionState("connecting");
@@ -214,10 +226,28 @@ export default function DevicesScanView() {
     try {
       await smpConnectUdp(address, port);
       setConnectionState("connected");
-      setSelectedDevice(deviceId, address, "udp", ["smp"]);
+
+      // Probe FrameLink (port 120) to get the canonical device ID
+      const caps = ["smp"];
+      try {
+        const probe = await framelinkProbeDevice(address, 120, 3);
+        if (probe.device_id) {
+          deviceId = `udp:${probe.device_id}`;
+          deviceName = probe.device_id;
+        }
+        caps.push("framelink");
+      } catch {
+        // Device doesn't have FrameLink — keep address as ID
+      }
+
+      // Add to devices store so UpgradeCompleteView can find address/port
+      const { addDevice } = useDevicesStore.getState();
+      addDevice({ name: deviceName, id: deviceId, transport: "udp", ble_id: null, rssi: null, address, port, capabilities: caps });
+
+      setSelectedDevice(deviceId, deviceName, "udp", caps);
 
       // Set up upgrade store
-      setUpgradeSelectedDevice(deviceId, address, "udp");
+      setUpgradeSelectedDevice(deviceId, deviceName, "udp");
       setUpgradeConnectionState("connected");
 
       try {

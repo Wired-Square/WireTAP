@@ -43,17 +43,20 @@ const MDNS_SERVICE_FRAMELINK: &str = "_framelink._tcp.local.";
 #[derive(Clone, Serialize)]
 pub struct UnifiedDevice {
     pub name: String,
-    /// BLE: peripheral ID string, UDP: "udp:address:port"
+    /// Device name with unique hardware suffix (e.g. "WiredFlexLink-9D04"),
+    /// stable across BLE, mDNS, and IP changes.
     pub id: String,
     /// "ble" or "udp"
     pub transport: String,
+    /// BLE peripheral ID (needed for BLE connections, absent for mDNS-only)
+    pub ble_id: Option<String>,
     /// BLE only
     pub rssi: Option<i16>,
-    /// UDP only: IP address
+    /// mDNS only: IP address
     pub address: Option<String>,
-    /// UDP only: port number
+    /// mDNS only: port number
     pub port: Option<u16>,
-    /// Capabilities: "wifi-provision", "smp"
+    /// Capabilities: "wifi-provision", "smp", "framelink"
     pub capabilities: Vec<String>,
 }
 
@@ -160,8 +163,8 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
 
             if let Ok(peripherals) = adapter.peripherals().await {
                 for peripheral in peripherals {
-                    let id = peripheral.id().to_string();
-                    if seen_ids.contains(&id) {
+                    let ble_id = peripheral.id().to_string();
+                    if seen_ids.contains(&ble_id) {
                         continue;
                     }
 
@@ -170,7 +173,10 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                         None => continue,
                     };
 
-                    let name = props.local_name.clone().unwrap_or_else(|| id.clone());
+                    let name = match &props.local_name {
+                        Some(n) => n.clone(),
+                        None => continue, // Skip unnamed BLE devices
+                    };
                     let rssi = props.rssi;
 
                     // Build capabilities list from advertised services
@@ -193,12 +199,15 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                         continue;
                     }
 
-                    seen_ids.insert(id.clone());
+                    seen_ids.insert(ble_id.clone());
+
+                    // Prefix with transport so BLE and mDNS stay as separate cards
+                    let id = format!("ble:{}", name);
 
                     tlog!(
-                        "[device_scan] BLE matched: {} ({}), RSSI: {:?}, caps: {:?}",
+                        "[device_scan] BLE matched: {} (ble_id={}), RSSI: {:?}, caps: {:?}",
                         name,
-                        id,
+                        ble_id,
                         rssi,
                         capabilities
                     );
@@ -207,6 +216,7 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                         name,
                         id,
                         transport: "ble".to_string(),
+                        ble_id: Some(ble_id),
                         rssi,
                         address: None,
                         port: None,
@@ -274,18 +284,22 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
             MDNS_SERVICE_FRAMELINK
         );
 
-        // Shared seen-IDs set for deduplication across both service browsers
-        let seen_udp_ids = Arc::new(std::sync::Mutex::new(HashSet::<String>::new()));
-
-        // Spawn a blocking receiver task per service type
+        // Spawn a blocking receiver task per service type — each service
+        // becomes its own device card (no cross-service merging).
         let spawn_mdns_receiver = |rx: mdns_sd::Receiver<ServiceEvent>,
                                     svc: &'static str,
-                                    app_handle: AppHandle,
-                                    seen: Arc<std::sync::Mutex<HashSet<String>>>| {
+                                    app_handle: AppHandle| {
             tokio::task::spawn_blocking(move || {
                 let poll_interval = std::time::Duration::from_millis(250);
                 let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
                 let mut event_count = 0u32;
+                let mut seen = HashSet::<String>::new();
+
+                let (cap, transport) = if svc == MDNS_SERVICE_FRAMELINK {
+                    ("framelink", "tcp")
+                } else {
+                    ("smp", "udp")
+                };
 
                 while std::time::Instant::now() < deadline {
                     while let Ok(event) = rx.try_recv() {
@@ -299,14 +313,6 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                             );
                             for addr in info.get_addresses() {
                                 let port = info.get_port();
-                                let id = format!("udp:{}:{}", addr, port);
-
-                                let mut seen_guard = seen.lock().unwrap();
-                                if seen_guard.contains(&id) {
-                                    continue;
-                                }
-                                seen_guard.insert(id.clone());
-                                drop(seen_guard);
 
                                 let name = info
                                     .get_fullname()
@@ -315,23 +321,30 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                                     .unwrap_or("Unknown")
                                     .to_string();
 
+                                let id = format!("{}:{}", transport, name);
+                                if seen.contains(&id) {
+                                    continue;
+                                }
+                                seen.insert(id.clone());
+
                                 tlog!(
-                                    "[device_scan] mDNS emitting device: {} at {}:{} ({})",
+                                    "[device_scan] mDNS emitting device: {} at {}:{} ({}, cap={})",
                                     name,
                                     addr,
                                     port,
-                                    svc
+                                    svc,
+                                    cap
                                 );
 
-                                // UDP/mDNS devices get "smp" capability
                                 let device = UnifiedDevice {
                                     name,
                                     id,
-                                    transport: "udp".to_string(),
+                                    transport: transport.to_string(),
+                                    ble_id: None,
                                     rssi: None,
                                     address: Some(addr.to_string()),
                                     port: Some(port),
-                                    capabilities: vec!["smp".to_string()],
+                                    capabilities: vec![cap.to_string()],
                                 };
                                 let _ = app_handle.emit("device-discovered", &device);
                             }
@@ -353,13 +366,11 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
             receiver_mcumgr,
             MDNS_SERVICE_MCUMGR,
             app.clone(),
-            seen_udp_ids.clone(),
         );
         let h2 = spawn_mdns_receiver(
             receiver_framelink,
             MDNS_SERVICE_FRAMELINK,
             app.clone(),
-            seen_udp_ids,
         );
 
         // Wait for both receiver tasks to finish

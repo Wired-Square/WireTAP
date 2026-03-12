@@ -28,6 +28,7 @@ import ProvisionCompleteView from "./components/ProvisionCompleteView";
 import InspectView from "./components/InspectView";
 import UploadView from "./components/UploadView";
 import UpgradeCompleteView from "./components/UpgradeCompleteView";
+import FrameLinkSetupView from "./components/FrameLinkSetupView";
 import StatusIndicator from "./components/StatusIndicator";
 
 export default function Devices() {
@@ -147,6 +148,7 @@ export default function Devices() {
         {step === "inspect" && <InspectView />}
         {step === "upload" && <UploadView />}
         {step === "upgrade-complete" && <UpgradeCompleteView />}
+        {step === "framelink-setup" && <FrameLinkSetupView />}
       </div>
     </div>
   );

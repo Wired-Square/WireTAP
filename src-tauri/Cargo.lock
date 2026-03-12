@@ -1526,6 +1526,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "framelink"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml 0.8.2",
+]
+
+[[package]]
 name = "futf"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5823,6 +5833,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
+ "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2 0.6.2",
@@ -7247,6 +7258,7 @@ dependencies = [
  "can-dbc",
  "chrono",
  "dirs 5.0.1",
+ "framelink",
  "futures",
  "hex",
  "keepawake",

@@ -58,12 +58,15 @@ export default function UpgradeCompleteView() {
 
     try {
       // Reconnect to the device after reboot
-      if (selectedDeviceTransport === "udp" && selectedDeviceId.startsWith("udp:")) {
-        const parts = selectedDeviceId.split(":");
-        const address = parts.slice(1, -1).join(":");
-        const port = parseInt(parts[parts.length - 1], 10);
-        await smpConnectUdp(address, port);
+      if (selectedDeviceTransport === "udp") {
+        const device = useDevicesStore.getState().data.devices.find((d) => d.id === selectedDeviceId);
+        if (device?.address && device?.port) {
+          await smpConnectUdp(device.address, device.port);
+        } else {
+          throw new Error("No address available for UDP reconnection");
+        }
       } else {
+        // BLE reconnect — selectedDeviceId is the BLE peripheral ID
         await smpConnectBle(selectedDeviceId);
       }
       setUpgradeConnectionState("connected");

@@ -23,6 +23,7 @@ use crate::io::{now_us, FrameMessage};
 use crate::io::serial::{parse_profile_for_source, run_source as run_serial_source};
 #[cfg(not(target_os = "ios"))]
 use crate::io::slcan::run_slcan_source;
+use crate::io::framelink::reader::run_source as run_framelink_source;
 use crate::io::types::{SourceMessage, TransmitRequest};
 use crate::settings::IOProfile;
 use super::{VirtualBusCommand, VirtualBusControl, VirtualBusControls};
@@ -106,6 +107,9 @@ pub(super) async fn run_source_reader(
                 tx,
             )
             .await;
+        }
+        "framelink" => {
+            run_framelink_reader(source_idx, &profile, bus_mappings, stop_flag, tx).await;
         }
         "virtual" => {
             run_virtual_reader(source_idx, &profile, bus_mappings, stop_flag, tx, virtual_bus_controls, virtual_cmd_rx).await;
@@ -483,6 +487,43 @@ async fn run_serial_reader(
         tx,
     )
     .await;
+}
+
+// ============================================================================
+// FrameLink Source
+// ============================================================================
+
+async fn run_framelink_reader(
+    source_idx: usize,
+    profile: &IOProfile,
+    bus_mappings: Vec<BusMapping>,
+    stop_flag: Arc<AtomicBool>,
+    tx: mpsc::Sender<SourceMessage>,
+) {
+    let host = match profile.connection.get("host").and_then(|v| v.as_str()) {
+        Some(h) => h.to_string(),
+        None => {
+            let _ = tx
+                .send(SourceMessage::Error(
+                    source_idx,
+                    "FrameLink profile missing 'host'".to_string(),
+                ))
+                .await;
+            return;
+        }
+    };
+    let port = profile
+        .connection
+        .get("port")
+        .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+        .unwrap_or(120) as u16;
+    let timeout = profile
+        .connection
+        .get("timeout")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(5.0);
+
+    run_framelink_source(source_idx, host, port, timeout, bus_mappings, stop_flag, tx).await;
 }
 
 // ============================================================================

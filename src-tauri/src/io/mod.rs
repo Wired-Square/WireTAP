@@ -24,6 +24,7 @@ mod virtual_device;
 pub mod serial; // pub for Tauri command access (list_serial_ports)
 #[cfg(not(target_os = "ios"))]
 pub mod slcan; // pub for slcan transmit_frame access
+pub mod framelink;
 mod socketcan;
 
 // Re-export timeline readers

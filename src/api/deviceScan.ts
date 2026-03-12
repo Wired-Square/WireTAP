@@ -9,17 +9,19 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface UnifiedDevice {
   name: string;
-  /** BLE: peripheral ID string, UDP: "udp:address:port" */
+  /** Device name with unique hardware suffix (e.g. "WiredFlexLink-9D04") */
   id: string;
-  /** "ble" or "udp" */
-  transport: "ble" | "udp";
+  /** "ble", "udp", or "tcp" */
+  transport: "ble" | "udp" | "tcp";
+  /** BLE peripheral ID (needed for BLE connections, absent for mDNS-only) */
+  ble_id: string | null;
   /** BLE only */
   rssi: number | null;
-  /** UDP only: IP address */
+  /** mDNS only: IP address */
   address: string | null;
-  /** UDP only: port number */
+  /** mDNS only: port number */
   port: number | null;
-  /** Capabilities: "wifi-provision", "smp" */
+  /** Capabilities: "wifi-provision", "smp", "framelink" */
   capabilities: string[];
 }
 

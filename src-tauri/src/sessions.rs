@@ -276,7 +276,7 @@ fn choose_profile_by_id(settings: &AppSettings, profile_id: Option<&str>) -> Opt
 fn is_realtime_device(kind: &str) -> bool {
     matches!(
         kind,
-        "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" | "slcan" | "gs_usb" | "socketcan" | "serial" | "modbus_tcp" | "virtual"
+        "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" | "slcan" | "gs_usb" | "socketcan" | "serial" | "modbus_tcp" | "virtual" | "framelink"
     )
 }
 
@@ -403,19 +403,39 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
     });
 
     // Determine interface traits based on profile kind
-    let (interface_id, protocols, tx_frames) = match profile.kind.as_str() {
+    let (device_bus, interface_id, protocols, tx_frames, tx_bytes) = match profile.kind.as_str() {
         "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" => {
-            ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true)
+            (0, "can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true, false)
         }
-        "slcan" => ("can0".to_string(), vec![Protocol::Can], true),
-        "gs_usb" => ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true),
-        "socketcan" => ("can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true),
-        "modbus_tcp" => ("modbus0".to_string(), vec![Protocol::Modbus], false),
-        _ => ("can0".to_string(), vec![Protocol::Can], true),
+        "slcan" => (0, "can0".to_string(), vec![Protocol::Can], true, false),
+        "gs_usb" => (0, "can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true, false),
+        "socketcan" => (0, "can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true, false),
+        "modbus_tcp" => (0, "modbus0".to_string(), vec![Protocol::Modbus], false, false),
+        "framelink" => {
+            let iface_index = profile.connection.get("interface_index")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as u8;
+            let iface_type = profile.connection.get("interface_type")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1) as u8;
+            // IFACE_CAN=1, IFACE_CANFD=2, IFACE_RS485=3
+            let (protos, tx_f, tx_b) = match iface_type {
+                3 => (vec![Protocol::Serial], false, true),
+                2 => (vec![Protocol::Can, Protocol::CanFd], true, false),
+                _ => (vec![Protocol::Can], true, false),
+            };
+            let iface_id = if iface_type == 3 {
+                format!("serial{}", iface_index)
+            } else {
+                format!("can{}", iface_index)
+            };
+            (iface_index, iface_id, protos, tx_f, tx_b)
+        }
+        _ => (0, "can0".to_string(), vec![Protocol::Can], true, false),
     };
 
     vec![BusMapping {
-        device_bus: 0,
+        device_bus,
         output_bus,
         enabled: true,
         interface_id,
@@ -423,7 +443,7 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
             temporal_mode: TemporalMode::Realtime,
             protocols,
             tx_frames,
-            tx_bytes: false,
+            tx_bytes,
             multi_source: true,
         }),
     }]
@@ -1933,6 +1953,47 @@ pub async fn probe_device(
                     secondary_info: Some(addr),
                     supports_fd: None,
                     error: Some(format!("Connection timed out after {}s", timeout_sec)),
+                }),
+            }
+        }
+
+        // FrameLink device — single-interface profile, TCP probe to verify reachability
+        "framelink" => {
+            let host = profile.connection.get("host")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "FrameLink profile missing 'host'".to_string())?;
+            let port = profile.connection.get("port")
+                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                .unwrap_or(120) as u16;
+            let timeout_sec = profile.connection.get("timeout")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(5.0);
+            let iface_name = profile.connection.get("interface_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown");
+
+            match crate::io::framelink::probe_framelink(host, port, timeout_sec).await {
+                Ok(_) => {
+                    Ok(DeviceProbeResult {
+                        success: true,
+                        device_type: "framelink".to_string(),
+                        is_multi_bus: false,
+                        bus_count: 1,
+                        primary_info: Some(iface_name.to_string()),
+                        secondary_info: Some(format!("{}:{}", host, port)),
+                        supports_fd: None,
+                        error: None,
+                    })
+                }
+                Err(e) => Ok(DeviceProbeResult {
+                    success: false,
+                    device_type: "framelink".to_string(),
+                    is_multi_bus: false,
+                    bus_count: 0,
+                    primary_info: None,
+                    secondary_info: None,
+                    supports_fd: None,
+                    error: Some(e.to_string()),
                 }),
             }
         }

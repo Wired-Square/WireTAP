@@ -50,6 +50,7 @@ uuid = "1"
 mcumgr-smp = { version = "0.8", default-features = false, features = ["transport-ble-async", "transport-udp-async", "payload-cbor"] }
 mdns-sd = "0.13"
 sha2 = "0.10"
+framelink = { path = "../../framelink-rs" }
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 serialport = "4.3"

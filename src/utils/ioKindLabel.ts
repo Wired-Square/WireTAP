@@ -30,6 +30,8 @@ export function getIOKindLabel(kind: string | undefined): string {
       return "Modbus TCP";
     case "virtual":
       return "Virtual";
+    case "framelink":
+      return "FrameLink";
     default:
       return kind ?? "Unknown";
   }

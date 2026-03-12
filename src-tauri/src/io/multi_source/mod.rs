@@ -17,6 +17,7 @@ use tokio::sync::mpsc;
 /// Capacity for the async frame/bytes channel between source readers and the merge task.
 const SOURCE_CHANNEL_CAPACITY: usize = 1024;
 
+use super::framelink::{encode_framelink_can_tx, encode_framelink_serial_tx};
 use super::gvret::{encode_gvret_frame, validate_gvret_frame, BusMapping};
 #[cfg(not(target_os = "ios"))]
 use super::slcan::encode_transmit_frame as encode_slcan_frame;
@@ -239,7 +240,7 @@ impl MultiSourceReader {
         let has_can_transmit_routes = self.transmit_routes.values().any(|route| {
             matches!(
                 route.profile_kind.as_str(),
-                "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan" | "virtual"
+                "gvret_tcp" | "gvret_usb" | "slcan" | "gs_usb" | "socketcan" | "virtual" | "framelink"
             )
         });
 
@@ -335,6 +336,7 @@ impl MultiSourceReader {
                     EncodedFrame::Fd(buf) => buf.to_vec(),
                 }
             }
+            "framelink" => encode_framelink_can_tx(&routed_frame),
             "virtual" => {
                 // Simple binary loopback encoding: frame_id(4 LE) + bus(1) + is_extended(1) + is_fd(1) + dlc(1) + data
                 let mut buf = Vec::with_capacity(8 + routed_frame.data.len());
@@ -373,8 +375,8 @@ impl MultiSourceReader {
         let serial_route = self
             .transmit_routes
             .values()
-            .find(|route| route.profile_kind == "serial")
-            .ok_or_else(|| "No serial source configured in this session".to_string())?;
+            .find(|route| route.profile_kind == "serial" || route.profile_kind == "framelink")
+            .ok_or_else(|| "No serial or FrameLink source configured in this session".to_string())?;
 
         let channels = self
             .transmit_channels
@@ -392,9 +394,15 @@ impl MultiSourceReader {
             .clone();
         drop(channels); // Release lock before blocking
 
+        let data = if serial_route.profile_kind == "framelink" {
+            encode_framelink_serial_tx(bytes, serial_route.device_bus)
+        } else {
+            bytes.to_vec()
+        };
+
         let (result_tx, result_rx) = std_mpsc::sync_channel(1);
         tx.try_send(TransmitRequest {
-            data: bytes.to_vec(),
+            data,
             result_tx,
         })
         .map_err(|e| format!("Failed to queue serial transmit request: {}", e))?;

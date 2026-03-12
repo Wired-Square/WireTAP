@@ -284,6 +284,9 @@ function applyConnectionDefaults(profile: IOProfile): IOProfile {
       if (!processed.connection.host) processed.connection.host = '192.168.1.100';
       if (!processed.connection.port) processed.connection.port = '23';
       break;
+    case 'framelink':
+      if (!processed.connection.port) processed.connection.port = '120';
+      break;
     case 'slcan':
       if (!processed.connection.baud_rate) processed.connection.baud_rate = '115200';
       if (!processed.connection.bitrate) processed.connection.bitrate = '500000';

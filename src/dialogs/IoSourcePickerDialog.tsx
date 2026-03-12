@@ -1172,17 +1172,22 @@ export default function IoSourcePickerDialog({
       const readerProtocols = profile ? getReaderProtocols(profile.kind, profile.connection) : ['can'];
       const protocol = readerProtocols[0] || 'can';
 
-      // Single-bus devices have device bus 0, mapped to the selected output bus
+      // FrameLink profiles use interface_index as device bus (each profile handles one interface)
+      const deviceBus = profile?.kind === "framelink"
+        ? (typeof profile.connection?.interface_index === "number" ? profile.connection.interface_index : 0)
+        : 0;
+      const txBytes = profile?.kind === "framelink" && protocol === "serial";
+
       combinedBusMappings.set(profileId, [{
-        deviceBus: 0,
+        deviceBus,
         enabled: true,
         outputBus,
-        interfaceId: `${protocol}0`,
+        interfaceId: `${protocol}${deviceBus}`,
         traits: {
           temporal_mode: 'realtime',
           protocols: (protocol === 'can' ? ['can', 'canfd'] : [protocol]) as Protocol[],
-          tx_frames: true,
-          tx_bytes: false,
+          tx_frames: !txBytes,
+          tx_bytes: txBytes,
           multi_source: true,
         },
       }]);

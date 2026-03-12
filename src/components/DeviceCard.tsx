@@ -3,9 +3,9 @@
 // Shared device card used by WiFi provisioning (BLE only) and firmware
 // upgrade (BLE + mDNS/UDP). Renders differently based on transport type.
 
-import { Bluetooth, Globe, Wifi, HardDriveDownload, Plug } from "lucide-react";
+import { Bluetooth, Globe, Wifi, HardDriveDownload, Plug, Cable } from "lucide-react";
 import { cardDefault } from "../styles/cardStyles";
-import { textPrimary, badgeInfo, badgeWarning } from "../styles";
+import { textPrimary, badgeInfo, badgeWarning, badgeSuccess } from "../styles";
 import { iconMd, gapSmall } from "../styles/spacing";
 import { PrimaryButton } from "./forms";
 
@@ -17,7 +17,7 @@ interface DeviceCardDevice {
   name: string;
   id: string;
   rssi?: number | null;
-  transport?: "ble" | "udp";
+  transport?: "ble" | "udp" | "tcp";
   address?: string | null;
   port?: number | null;
   capabilities?: string[];
@@ -70,7 +70,7 @@ const SummaryBadge = ({ label, value }: { label: string; value: string }) => (
 export default function DeviceCard({ device, onConnect, connectingDeviceId }: DeviceCardProps) {
   const isThisConnecting = connectingDeviceId === device.id;
   const anyConnecting = connectingDeviceId !== null;
-  const isUdp = device.transport === "udp";
+  const isNetwork = device.transport === "udp" || device.transport === "tcp";
   const caps = device.capabilities ?? [];
 
   return (
@@ -78,7 +78,7 @@ export default function DeviceCard({ device, onConnect, connectingDeviceId }: De
       <div className="flex-1">
         {/* Row 1: name + badges */}
         <div className={`flex items-center ${gapSmall}`}>
-          {isUdp ? (
+          {isNetwork ? (
             <Globe className={`${iconMd} text-teal-400 shrink-0`} />
           ) : (
             <Bluetooth className={`${iconMd} text-sky-400 shrink-0`} />
@@ -94,12 +94,18 @@ export default function DeviceCard({ device, onConnect, connectingDeviceId }: De
                 <HardDriveDownload className="w-3 h-3" />
                 SMP
               </span>
+              {caps.includes("framelink") && (
+                <span className={`${badgeSuccess} gap-1`}>
+                  <Cable className="w-3 h-3" />
+                  FrameLink
+                </span>
+              )}
             </>
           )}
         </div>
         {/* Row 2: metadata summary badges */}
         <div className="mt-2 flex flex-wrap gap-2">
-          {isUdp ? (
+          {isNetwork ? (
             <>
               <SummaryBadge label="addr" value={device.address ?? ""} />
               {device.port != null && <SummaryBadge label="port" value={String(device.port)} />}
@@ -111,7 +117,7 @@ export default function DeviceCard({ device, onConnect, connectingDeviceId }: De
       </div>
 
       <div className={`flex items-center ${gapSmall}`}>
-        {!isUdp && <SignalBars rssi={device.rssi} />}
+        {!isNetwork && <SignalBars rssi={device.rssi} />}
         <PrimaryButton
           onClick={() => onConnect(device.id)}
           disabled={anyConnecting}

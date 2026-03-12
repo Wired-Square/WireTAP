@@ -31,7 +31,7 @@ interface UpgradeState {
     /** Selected device name (for display after disconnect) */
     selectedDeviceName: string | null;
     /** Transport type of the selected device */
-    selectedDeviceTransport: "ble" | "udp" | null;
+    selectedDeviceTransport: "ble" | "udp" | "tcp" | null;
     /** Firmware image slot info from device */
     images: ImageSlotInfo[];
     /** Path to selected firmware file */
@@ -63,7 +63,7 @@ interface UpgradeState {
   // Data actions
   addDevice: (device: DiscoveredDevice) => void;
   clearDevices: () => void;
-  setSelectedDevice: (id: string | null, name: string | null, transport: "ble" | "udp" | null) => void;
+  setSelectedDevice: (id: string | null, name: string | null, transport: "ble" | "udp" | "tcp" | null) => void;
   setImages: (images: ImageSlotInfo[]) => void;
   setSelectedFile: (path: string | null, name: string | null, size: number | null) => void;
   setUploadProgress: (progress: UploadProgress | null) => void;
@@ -86,7 +86,7 @@ const initialData = {
   devices: [] as DiscoveredDevice[],
   selectedDeviceId: null as string | null,
   selectedDeviceName: null as string | null,
-  selectedDeviceTransport: null as "ble" | "udp" | null,
+  selectedDeviceTransport: null as "ble" | "udp" | "tcp" | null,
   images: [] as ImageSlotInfo[],
   selectedFilePath: null as string | null,
   selectedFileName: null as string | null,

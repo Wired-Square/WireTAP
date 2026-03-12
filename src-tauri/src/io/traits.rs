@@ -183,6 +183,13 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
             tx_bytes: false,
             multi_source: true,
         },
+        "framelink" => InterfaceTraits {
+            temporal_mode: TemporalMode::Realtime,
+            protocols: vec![Protocol::Can],
+            tx_frames: true,
+            tx_bytes: false,
+            multi_source: true,
+        },
         "virtual" => InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Can],

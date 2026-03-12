@@ -248,6 +248,19 @@ const renderConnectionSummary = (profile: IOProfile) => {
     );
   }
 
+  if (profile.kind === "framelink") {
+    const host = c.host || "";
+    const port = c.port || "120";
+    const ifaceName = c.interface_name || "";
+    return (
+      <div className="flex flex-wrap gap-2">
+        {ifaceName && <SummaryBadge label="interface" value={ifaceName} />}
+        {host && <SummaryBadge label="host" value={host} />}
+        <SummaryBadge label="port" value={port} />
+      </div>
+    );
+  }
+
   if (profile.kind === "virtual") {
     const interfaces: { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[] =
       c.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: c.frame_rate_hz || 10 }];

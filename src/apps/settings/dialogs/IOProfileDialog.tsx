@@ -12,6 +12,12 @@ import GsUsbDevicePicker from "../components/GsUsbDevicePicker";
 import LinuxCanSetupHelper from "../components/LinuxCanSetupHelper";
 import SecurePasswordField from "../components/SecurePasswordField";
 import IODeviceStatus, { type DeviceProbeState, type DeviceProbeResult } from "../components/IODeviceStatus";
+import FrameLinkSignalControl, { signalSortKey } from "../components/FrameLinkSignalControl";
+import {
+  framelinkGetInterfaceSignals,
+  framelinkWriteSignal,
+  type SignalDescriptor,
+} from "../../../api/framelink";
 import { DeviceBusConfig, type BusMappingWithProtocol } from "../../../dialogs/io-source-picker";
 import { Input, Select, FormField, PrimaryButton, SecondaryButton } from "../../../components/forms";
 import BaudRateSelect from "../../../components/forms/BaudRateSelect";
@@ -92,6 +98,77 @@ export default function IOProfileDialog({
   const [gvretProbeState, setGvretProbeState] = useState<DeviceProbeState>("idle");
   const [gvretDeviceInfo, setGvretDeviceInfo] = useState<GvretDeviceInfo | null>(null);
   const [gvretProbeError, setGvretProbeError] = useState<string | null>(null);
+
+  // FrameLink interface configuration state
+  const [flSignals, setFlSignals] = useState<SignalDescriptor[]>([]);
+  const [flLoading, setFlLoading] = useState(false);
+  const [flFetched, setFlFetched] = useState(false);
+  const [flError, setFlError] = useState<string | null>(null);
+  const [flPersist, setFlPersist] = useState(true);
+
+  // Reset FrameLink config state when dialog closes or profile type changes
+  useEffect(() => {
+    if (!isOpen || profileForm.kind !== "framelink") {
+      setFlSignals([]);
+      setFlError(null);
+      setFlLoading(false);
+      setFlFetched(false);
+    }
+  }, [isOpen, profileForm.kind]);
+
+  const loadFlSignals = useCallback(async () => {
+    const host = profileForm.connection.host;
+    const port = Number(profileForm.connection.port) || 120;
+    const timeout = Number(profileForm.connection.timeout) || 5;
+    const ifaceIndex = Number(profileForm.connection.interface_index);
+    if (!host || isNaN(ifaceIndex)) {
+      setFlError("Host and interface index are required");
+      return;
+    }
+    setFlLoading(true);
+    setFlError(null);
+    try {
+      const signals = await framelinkGetInterfaceSignals(host, port, ifaceIndex, timeout);
+      setFlSignals(signals);
+      setFlFetched(true);
+    } catch (e) {
+      setFlError(e instanceof Error ? e.message : String(e));
+      setFlSignals([]);
+      setFlFetched(false);
+    } finally {
+      setFlLoading(false);
+    }
+  }, [profileForm.connection.host, profileForm.connection.port, profileForm.connection.timeout, profileForm.connection.interface_index]);
+
+  // Auto-fetch signals when dialog opens for a framelink profile with valid connection
+  useEffect(() => {
+    if (
+      isOpen &&
+      profileForm.kind === "framelink" &&
+      profileForm.connection.host &&
+      profileForm.connection.interface_index != null &&
+      !isNaN(Number(profileForm.connection.interface_index))
+    ) {
+      loadFlSignals();
+    }
+  }, [isOpen, profileForm.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFlWriteSignal = useCallback(
+    async (signalId: number, value: number) => {
+      const host = profileForm.connection.host;
+      const port = Number(profileForm.connection.port) || 120;
+      const timeout = Number(profileForm.connection.timeout) || 5;
+      if (!host) return;
+      await framelinkWriteSignal(host, port, signalId, value, flPersist, timeout);
+      // Update local state to reflect the written value
+      setFlSignals((prev) =>
+        prev.map((s) =>
+          s.signal_id === signalId ? { ...s, value, formatted_value: String(value) } : s,
+        ),
+      );
+    },
+    [profileForm.connection.host, profileForm.connection.port, profileForm.connection.timeout, flPersist],
+  );
 
   // Reset GVRET probe state when dialog closes or profile type changes
   useEffect(() => {
@@ -366,6 +443,7 @@ export default function IOProfileDialog({
               }
             >
               {availableKinds.includes("csv_file") && <option value="csv_file">Data File</option>}
+              {availableKinds.includes("framelink") && <option value="framelink">FrameLink</option>}
               {availableKinds.includes("gs_usb") && <option value="gs_usb">gs_usb (candleLight)</option>}
               {availableKinds.includes("gvret_tcp") && <option value="gvret_tcp">GVRET TCP</option>}
               {availableKinds.includes("gvret_usb") && <option value="gvret_usb">GVRET USB (Serial)</option>}
@@ -967,6 +1045,121 @@ export default function IOProfileDialog({
                 {editingProfileId && getDeviceBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
                   <p className="text-sm text-[color:var(--text-muted)]">
                     Click "Probe Device" to detect available interfaces.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* FrameLink (WiredFlexLink) */}
+          {profileForm.kind === "framelink" && (
+            <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
+              <h3 className={h3}>FrameLink Connection</h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Host" required variant="default">
+                  <Input
+                    variant="default"
+                    value={profileForm.connection.host || ""}
+                    onChange={(e) => onUpdateConnectionField("host", e.target.value)}
+                    placeholder="192.168.1.100"
+                  />
+                </FormField>
+                <FormField label="Port" variant="default">
+                  <Input
+                    variant="default"
+                    type="number"
+                    value={profileForm.connection.port || ""}
+                    onChange={(e) => onUpdateConnectionField("port", e.target.value)}
+                    placeholder="120"
+                  />
+                </FormField>
+              </div>
+
+              <FormField label="Connection Timeout (seconds)" variant="default">
+                <Input
+                  variant="default"
+                  type="number"
+                  value={profileForm.connection.timeout || "5"}
+                  onChange={(e) => onUpdateConnectionField("timeout", e.target.value)}
+                  placeholder="5"
+                />
+              </FormField>
+
+              {/* Interface Configuration */}
+              <div className={`border-t ${borderDefault} pt-4 mt-4`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className={h3}>Interface Configuration</h3>
+                  <SecondaryButton
+                    onClick={loadFlSignals}
+                    disabled={flLoading}
+                  >
+                    {flLoading ? (
+                      <>
+                        <RefreshCw className={`${iconXs} animate-spin`} />
+                        Reading...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className={iconXs} />
+                        Refresh
+                      </>
+                    )}
+                  </SecondaryButton>
+                </div>
+
+                {flError && (
+                  <div className={alertWarning}>
+                    <p className="text-sm text-[color:var(--text-warning)]">{flError}</p>
+                  </div>
+                )}
+
+                {flSignals.length > 0 && (
+                  <div className={spaceYDefault}>
+                    {/* Group signals by group name */}
+                    {Object.entries(
+                      flSignals.reduce<Record<string, SignalDescriptor[]>>((acc, sig) => {
+                        const g = sig.group || "Other";
+                        (acc[g] ??= []).push(sig);
+                        return acc;
+                      }, {}),
+                    ).map(([group, signals]) => (
+                      <div key={group}>
+                        <h4 className={`${caption} uppercase tracking-wide mb-2`}>{group}</h4>
+                        <div className={spaceYDefault}>
+                          {[...signals].sort((a, b) => signalSortKey(a.name) - signalSortKey(b.name)).map((sig) => (
+                            <FrameLinkSignalControl
+                              key={sig.signal_id}
+                              signal={sig}
+                              isFetched={flFetched}
+                              onWrite={handleFlWriteSignal}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Persist checkbox */}
+                    {flSignals.some((s) => s.persistable) && (
+                      <label className={`flex items-center gap-2 ${caption} mt-2`}>
+                        <input
+                          type="checkbox"
+                          checked={flPersist}
+                          onChange={(e) => setFlPersist(e.target.checked)}
+                        />
+                        Save changes to device (persist across reboots)
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {flLoading && flSignals.length === 0 && (
+                  <p className={caption}>Reading configuration from device...</p>
+                )}
+
+                {!flLoading && flSignals.length === 0 && !flError && !flFetched && (
+                  <p className={caption}>
+                    Configuration will be loaded when the device is reachable.
                   </p>
                 )}
               </div>

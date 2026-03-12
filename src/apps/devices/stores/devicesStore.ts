@@ -21,7 +21,9 @@ export type DevicesStep =
   // Upgrade sub-flow
   | "inspect"
   | "upload"
-  | "upgrade-complete";
+  | "upgrade-complete"
+  // FrameLink sub-flow
+  | "framelink-setup";
 
 export type ConnectionState = "idle" | "connecting" | "connected";
 
@@ -38,7 +40,7 @@ interface DevicesState {
     /** Selected device name (for display) */
     selectedDeviceName: string | null;
     /** Selected device transport */
-    selectedDeviceTransport: "ble" | "udp" | null;
+    selectedDeviceTransport: "ble" | "udp" | "tcp" | null;
     /** Selected device capabilities */
     selectedDeviceCapabilities: string[];
   };
@@ -59,7 +61,7 @@ interface DevicesState {
   setSelectedDevice: (
     id: string | null,
     name: string | null,
-    transport: "ble" | "udp" | null,
+    transport: "ble" | "udp" | "tcp" | null,
     capabilities: string[],
   ) => void;
 
@@ -77,7 +79,7 @@ const initialData = {
   devices: [] as UnifiedDevice[],
   selectedDeviceId: null as string | null,
   selectedDeviceName: null as string | null,
-  selectedDeviceTransport: null as "ble" | "udp" | null,
+  selectedDeviceTransport: null as "ble" | "udp" | "tcp" | null,
   selectedDeviceCapabilities: [] as string[],
 };
 
@@ -96,14 +98,23 @@ export const useDevicesStore = create<DevicesState>((set) => ({
 
   addDevice: (device) =>
     set((s) => {
-      // Update if already seen, otherwise add
+      // Update if already seen (merge capabilities and transport-specific fields), otherwise add
       const existing = s.data.devices.find((d) => d.id === device.id);
       if (existing) {
+        const mergedCaps = [...new Set([...(existing.capabilities ?? []), ...(device.capabilities ?? [])])];
         return {
           data: {
             ...s.data,
             devices: s.data.devices.map((d) =>
-              d.id === device.id ? { ...d, rssi: device.rssi, name: device.name } : d,
+              d.id === device.id ? {
+                ...d,
+                rssi: device.rssi ?? d.rssi,
+                name: device.name,
+                ble_id: device.ble_id ?? d.ble_id,
+                address: device.address ?? d.address,
+                port: device.port ?? d.port,
+                capabilities: mergedCaps,
+              } : d,
             ),
           },
         };

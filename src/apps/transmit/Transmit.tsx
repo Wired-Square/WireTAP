@@ -66,6 +66,10 @@ function getTransmitStatus(p: IOProfile): { canTransmit: boolean; reason?: strin
   if (p.kind === "virtual") {
     return { canTransmit: true };
   }
+  // framelink supports CAN + serial transmit
+  if (p.kind === "framelink") {
+    return { canTransmit: true };
+  }
   return { canTransmit: false, reason: "Not a transmit interface" };
 }
 
@@ -88,6 +92,7 @@ export default function Transmit() {
         if (p.kind === "socketcan") return true;
         if (p.kind === "serial") return true;
         if (p.kind === "virtual") return true;
+        if (p.kind === "framelink") return true;
         return false;
       }),
     [ioProfiles]
