@@ -40,35 +40,7 @@ pub struct BufferReader {
 }
 
 impl BufferReader {
-    pub fn new(app: AppHandle, session_id: String, speed: f64) -> Self {
-        // Extract buffer_id from session_id if it is itself a known buffer
-        let buffer_id = if buffer_store::is_known_buffer(&session_id) {
-            Some(session_id.clone())
-        } else {
-            None
-        };
-
-        let buses = buffer_id
-            .as_ref()
-            .and_then(|id| buffer_store::get_buffer_metadata(id))
-            .map(|m| m.buses)
-            .unwrap_or_default();
-
-        Self {
-            app,
-            reader_state: TimelineReaderState::new(session_id, speed),
-            seek_target_us: Arc::new(AtomicI64::new(NO_SEEK)),
-            seek_target_frame: Arc::new(AtomicI64::new(NO_SEEK_FRAME)),
-            completed_flag: Arc::new(AtomicBool::new(false)),
-            buffer_id,
-            buses,
-        }
-    }
-
-    /// Create a BufferReader that reads from a specific buffer by ID.
-    /// Use this when the session_id doesn't match the buffer_N pattern
-    /// (e.g., for ingest sessions like "ingest_a7f3c9" that own a buffer).
-    pub fn new_with_buffer(app: AppHandle, session_id: String, buffer_id: String, speed: f64) -> Self {
+    pub fn new(app: AppHandle, session_id: String, buffer_id: String, speed: f64) -> Self {
         let buses = buffer_store::get_buffer_metadata(&buffer_id)
             .map(|m| m.buses)
             .unwrap_or_default();
@@ -104,7 +76,7 @@ impl IODevice for BufferReader {
         self.reader_state.check_can_start()?;
 
         // Check if buffer has data
-        if !buffer_store::has_data() {
+        if !buffer_store::has_any_data() {
             return Err("No data in buffer. Please import a CSV file first.".to_string());
         }
 
@@ -214,13 +186,13 @@ pub struct StepResult {
 pub fn step_frame(
     app: &AppHandle,
     session_id: &str,
+    buffer_id: &str,
     current_frame_index: Option<usize>,
     current_timestamp_us: Option<i64>,
     backward: bool,
     filter_frame_ids: Option<&[u32]>,
 ) -> Result<Option<StepResult>, String> {
-    let buf_id = buffer_store::find_frame_buffer_id()
-        .ok_or_else(|| "No frame buffer found".to_string())?;
+    let buf_id = buffer_id;
 
     let total_frames = buffer_store::get_buffer_count(&buf_id);
     if total_frames == 0 {
@@ -307,11 +279,7 @@ fn spawn_buffer_stream(
 
 /// Resolve the buffer ID to use for streaming.
 fn resolve_buffer_id(buffer_id: &Option<String>) -> Option<String> {
-    if let Some(id) = buffer_id {
-        Some(id.clone())
-    } else {
-        buffer_store::find_frame_buffer_id()
-    }
+    buffer_id.clone()
 }
 
 /// Load a chunk of frames from SQLite for the current playback direction.
@@ -519,7 +487,7 @@ async fn run_buffer_stream(
         }
     };
 
-    let metadata = buffer_store::get_metadata();
+    let metadata = buffer_store::get_buffer_metadata(&buf_id);
     let initial_speed = control.read_speed();
     let initial_pacing = control.is_pacing_enabled();
     tlog!(

@@ -85,6 +85,8 @@ interface DiscoverySerialState {
   backendByteCount: number;
   /** Pagination state for raw bytes view */
   rawBytesPageSize: number;
+  /** ID of the active bytes buffer (null = no bytes buffer loaded) */
+  bytesBufferId: string | null;
   /** ID of the frame buffer created by backend framing (null = no framing applied) */
   framedBufferId: string | null;
   /** Frame count from backend framing (updated each time framing is applied) */
@@ -111,7 +113,7 @@ interface DiscoverySerialState {
   addSerialBytes: (entries: SerialBytesEntry[]) => void;
   clearSerialBytes: (preserveBackendCount?: boolean) => void;
   setFramingConfig: (config: FramingConfig | null) => Promise<void>;
-  applyFraming: (streamStartTimeUs: number | null) => Promise<FrameMessage[]>;
+  applyFraming: (streamStartTimeUs: number | null, sessionId?: string) => Promise<FrameMessage[]>;
   acceptFraming: () => FrameMessage[];
   resetFraming: () => void;
   undoAcceptFraming: () => void;
@@ -125,9 +127,10 @@ interface DiscoverySerialState {
   setActiveTab: (tab: SerialTabId) => void;
   setFramedPageSize: (size: number) => void;
   // Backend buffer actions
+  setBytesBufferId: (id: string | null) => void;
   setBackendByteCount: (count: number) => void;
   incrementBackendByteCount: (delta: number) => void;
-  fetchBytesFromBackend: (offset: number, limit: number) => Promise<PaginatedBytesResponse>;
+  fetchBytesFromBackend: (bufferId: string, offset: number, limit: number) => Promise<PaginatedBytesResponse>;
   setRawBytesPageSize: (size: number) => void;
   triggerBufferReady: () => void;
   // Filter actions
@@ -155,6 +158,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
   activeTab: 'raw',
   framedPageSize: 100, // Default page size for framed data
   backendByteCount: 0, // Total bytes in backend buffer
+  bytesBufferId: null, // ID of active bytes buffer
   rawBytesPageSize: 1000, // Default page size for raw bytes view
   framedBufferId: null, // ID of backend frame buffer
   backendFrameCount: 0, // Frame count from backend framing
@@ -183,6 +187,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
       framingAccepted: false,
       activeTab: 'raw',
       backendByteCount: 0,
+      bytesBufferId: null,
       framedBufferId: null,
       backendFrameCount: 0,
       minFrameLength: 0,
@@ -229,6 +234,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
       framedData: [],
       framingAccepted: false,
       backendByteCount: preserveBackendCount ? state.backendByteCount : 0,
+      bytesBufferId: preserveBackendCount ? state.bytesBufferId : null,
       framedBufferId: null,
       backendFrameCount: 0,
       minFrameLength: 0,
@@ -263,7 +269,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
     }
   },
 
-  applyFraming: async (_streamStartTimeUs) => {
+  applyFraming: async (_streamStartTimeUs, sessionId) => {
     const { backendByteCount, framingConfig, framedBufferId: previousBufferId, minFrameLength, frameIdExtractionConfig, sourceExtractionConfig } = get();
     if (!framingConfig) {
       set({ framedData: [], framedBufferId: null, backendFrameCount: 0, filteredFrameCount: 0, filteredBufferId: null, filteredFrames: [] });
@@ -299,7 +305,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
     try {
       // Call backend to apply framing - this creates a new frame buffer
       // Pass previous buffer ID to reuse it (avoids buffer proliferation during live framing)
-      const result = await applyFramingToBuffer(backendConfig, previousBufferId);
+      const result = await applyFramingToBuffer(sessionId ?? '', backendConfig, previousBufferId);
 
       // Store the buffer ID and frame count for FramedDataView
       // Also store filtered frame count and buffer ID for the Filtered tab
@@ -487,15 +493,17 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
   setFramedPageSize: (size) => set({ framedPageSize: size }),
 
   // Backend buffer actions
+  setBytesBufferId: (id) => set({ bytesBufferId: id }),
+
   setBackendByteCount: (count) => set({ backendByteCount: count }),
 
   incrementBackendByteCount: (delta) => set((state) => ({
     backendByteCount: state.backendByteCount + delta,
   })),
 
-  fetchBytesFromBackend: async (offset, limit) => {
+  fetchBytesFromBackend: async (bufferId, offset, limit) => {
     try {
-      return await getBufferBytesPaginated(offset, limit);
+      return await getBufferBytesPaginated(bufferId, offset, limit);
     } catch (error) {
       tlog.info(`[discoverySerialStore] Failed to fetch bytes from backend: ${error}`);
       return { bytes: [], total_count: 0, offset, limit };

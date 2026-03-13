@@ -737,10 +737,16 @@ fn state_to_string(state: &IOState) -> String {
 fn emit_state_change(app: &AppHandle, session_id: &str, previous: &IOState, current: &IOState) {
     use crate::buffer_store;
 
+    let buffer_id = buffer_store::get_session_buffer_ids(session_id)
+        .into_iter()
+        .find(|id| buffer_store::get_buffer_metadata(id)
+            .map(|m| m.buffer_type == buffer_store::BufferType::Frames)
+            .unwrap_or(false));
+
     let payload = StateChangePayload {
         previous: state_to_string(previous),
         current: state_to_string(current),
-        buffer_id: buffer_store::get_active_buffer_id(),
+        buffer_id,
     };
 
     emit_to_session(app, "session-state", session_id, payload);
@@ -1258,10 +1264,14 @@ pub fn emit_stream_ended(
 ) {
     use crate::buffer_store::{self, BufferType};
 
-    let metadata = buffer_store::finalize_buffer();
+    let finalized = buffer_store::finalize_session_buffers(session_id);
+    // Use the frame buffer metadata for the payload (primary), fall back to first finalized
+    let metadata = finalized.iter()
+        .find(|m| m.buffer_type == BufferType::Frames)
+        .or(finalized.first());
 
     let (buffer_id, buffer_type, count, time_range, buffer_available) = match metadata {
-        Some(ref m) => {
+        Some(m) => {
             let type_str = match m.buffer_type {
                 BufferType::Frames => "frames",
                 BufferType::Bytes => "bytes",
@@ -1601,17 +1611,13 @@ pub async fn join_session(session_id: &str) -> Result<JoinSessionResult, String>
     // Emit joiner count change event to all listeners (legacy join - no listener ID)
     emit_joiner_count_change(&app, session_id, joiner_count, None, None, Some("joined"));
 
-    // Get active buffer info
-    let (buffer_id, buffer_type) = match crate::buffer_store::get_active_buffer_id() {
-        Some(id) => {
-            let btype = crate::buffer_store::get_buffer_type(&id).map(|t| match t {
-                crate::buffer_store::BufferType::Frames => "frames".to_string(),
-                crate::buffer_store::BufferType::Bytes => "bytes".to_string(),
-            });
-            (Some(id), btype)
-        }
-        None => (None, None),
-    };
+    // Get session's frame buffer
+    let buffer_ids = crate::buffer_store::get_session_buffer_ids(session_id);
+    let (buffer_id, buffer_type) = buffer_ids.iter()
+        .filter_map(|id| crate::buffer_store::get_buffer_metadata(id))
+        .find(|m| m.buffer_type == crate::buffer_store::BufferType::Frames)
+        .map(|m| (Some(m.id), Some("frames".to_string())))
+        .unwrap_or((None, None));
 
     Ok(JoinSessionResult {
         capabilities: session.device.capabilities(),
@@ -2006,10 +2012,11 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
     // Stop the device (triggers emit_stream_ended which finalises the buffer)
     session.device.stop().await?;
 
-    // Look up the buffer by session ownership (finalize_buffer() was already
-    // consumed by emit_stream_ended during device.stop())
-    let metadata = buffer_store::get_buffer_for_session(session_id)
-        .and_then(|id| buffer_store::get_buffer_metadata(&id));
+    // Look up the buffer by session ownership (finalized during device.stop())
+    let buffer_ids = buffer_store::get_session_buffer_ids(session_id);
+    let metadata = buffer_ids.iter()
+        .filter_map(|id| buffer_store::get_buffer_metadata(id))
+        .find(|m| m.buffer_type == buffer_store::BufferType::Frames);
 
     // Emit session-suspended event with buffer info
     let (buffer_id, buffer_count, buffer_type, time_range) = match metadata {
@@ -2159,8 +2166,10 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
     }
 
     // Look up the buffer by session ownership (finalized during stop())
-    let metadata = buffer_store::get_buffer_for_session(session_id)
-        .and_then(|id| buffer_store::get_buffer_metadata(&id));
+    let buffer_ids = buffer_store::get_session_buffer_ids(session_id);
+    let metadata = buffer_ids.iter()
+        .filter_map(|id| buffer_store::get_buffer_metadata(id))
+        .find(|m| m.buffer_type == buffer_store::BufferType::Frames);
 
     // Extract buffer info
     let (buffer_id, buffer_count, buffer_type, time_range) = match metadata {
@@ -2180,7 +2189,7 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
 
     // Try to switch to buffer replay
     if let Some(ref bid) = buffer_id {
-        let _ = crate::buffer_store::set_active_buffer(bid);
+        let _ = crate::buffer_store::mark_buffer_active(bid);
 
         // Domain-specific housekeeping before the swap
         buffer_store::orphan_buffers_for_session(session_id);
@@ -2190,7 +2199,7 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
         }
         sessions::replace_session_profiles(session_id, &[bid.clone()]);
 
-        let new_reader = BufferReader::new_with_buffer(
+        let new_reader = BufferReader::new(
             app.clone(),
             session_id.to_string(),
             bid.clone(),
@@ -2280,7 +2289,7 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
     }
 
     // Get the current buffer ID before the device orphans it
-    let old_buffer_id = buffer_store::get_buffer_for_session(session_id);
+    let old_buffer_id = buffer_store::get_session_buffer_ids(session_id).into_iter().next();
 
     // Emit session-resuming event so apps clear their frame lists
     // Note: The device's start() will orphan old buffer and create new one
@@ -2552,10 +2561,13 @@ pub async fn update_session_direction(session_id: &str, reverse: bool) -> Result
 /// owned buffer. The session stays alive and all listeners remain connected.
 /// Use this after ingest completes to enable playback without destroying the session.
 pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
-    // Get the session's owned buffer
-    let buffer_id = crate::buffer_store::get_buffer_for_session(session_id)
+    // Get the session's owned frame buffer
+    let buffer_ids = crate::buffer_store::get_session_buffer_ids(session_id);
+    let buffer_id = buffer_ids.iter()
+        .filter_map(|id| crate::buffer_store::get_buffer_metadata(id).map(|m| (id.clone(), m)))
+        .find(|(_id, m)| m.buffer_type == crate::buffer_store::BufferType::Frames)
+        .map(|(id, _m)| id)
         .ok_or_else(|| {
-            // Log all buffers for debugging
             let buffers = crate::buffer_store::list_buffers();
             tlog!(
                 "[io] switch_to_buffer_replay: No buffer found for session '{}'. Available buffers:",
@@ -2579,11 +2591,10 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
         session_id, buffer_id, buffer_count, speed
     );
 
-    // Set this buffer as the active buffer so getBufferMetadata() returns correct data
-    let _ = crate::buffer_store::set_active_buffer(&buffer_id);
+    let _ = crate::buffer_store::mark_buffer_active(&buffer_id);
 
     // Create a new BufferReader that reads from the session's buffer
-    let new_reader = BufferReader::new_with_buffer(
+    let new_reader = BufferReader::new(
         app.clone(),
         session_id.to_string(),
         buffer_id,
@@ -2625,7 +2636,7 @@ pub async fn resume_to_live_session(
     );
 
     // Get the current buffer ID before the swap orphans it
-    let old_buffer_id = buffer_store::get_buffer_for_session(session_id);
+    let old_buffer_id = buffer_store::get_session_buffer_ids(session_id).into_iter().next();
 
     let mut sessions = IO_SESSIONS.lock().await;
     let result = replace_session_device(
@@ -2641,7 +2652,7 @@ pub async fn resume_to_live_session(
     ).await?;
 
     // Get the new buffer ID created by the reader's start() method
-    let new_buffer_id = buffer_store::get_buffer_for_session(session_id);
+    let new_buffer_id = buffer_store::get_session_buffer_ids(session_id).into_iter().next();
 
     // Emit session-resuming event so apps clear their frame lists
     if let Some(session) = sessions.get(session_id) {
@@ -2739,7 +2750,7 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
             let source_profile_ids = sessions::get_session_profile_ids(session_id);
 
             // Get buffer info if this session owns a buffer
-            let buffer_id = buffer_store::get_buffer_for_session(session_id);
+            let buffer_id = buffer_store::get_session_buffer_ids(session_id).into_iter().next();
             let buffer_frame_count = buffer_id
                 .as_ref()
                 .map(|id| buffer_store::get_buffer_count(id));
@@ -2905,17 +2916,13 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
         emit_joiner_count_change(&session.app, session_id, session.listeners.len(), Some(listener_id), Some(&resolved_app_name), Some("joined"));
     }
 
-    // Get buffer info
-    let (buffer_id, buffer_type) = match crate::buffer_store::get_active_buffer_id() {
-        Some(id) => {
-            let btype = crate::buffer_store::get_buffer_type(&id).map(|t| match t {
-                crate::buffer_store::BufferType::Frames => "frames".to_string(),
-                crate::buffer_store::BufferType::Bytes => "bytes".to_string(),
-            });
-            (Some(id), btype)
-        }
-        None => (None, None),
-    };
+    // Get session's frame buffer
+    let buffer_ids = crate::buffer_store::get_session_buffer_ids(session_id);
+    let (buffer_id, buffer_type) = buffer_ids.iter()
+        .filter_map(|id| crate::buffer_store::get_buffer_metadata(id))
+        .find(|m| m.buffer_type == crate::buffer_store::BufferType::Frames)
+        .map(|m| (Some(m.id), Some("frames".to_string())))
+        .unwrap_or((None, None));
 
     // Resume from suspension if needed (the reader was paused when listeners went stale)
     if needs_resume {
@@ -3018,7 +3025,7 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
 pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_id: &str) -> Result<Vec<String>, String> {
     // Copy the buffer before unregistering (so the evicted listener gets a snapshot)
     let mut copied_buffer_ids = Vec::new();
-    if let Some(buffer_id) = crate::buffer_store::get_buffer_for_session(session_id) {
+    if let Some(buffer_id) = crate::buffer_store::get_session_buffer_ids(session_id).into_iter().next() {
         let copy_name = format!("{} (evicted)", listener_id);
         match crate::buffer_store::copy_buffer(&buffer_id, copy_name) {
             Ok(copied_id) => {

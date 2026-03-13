@@ -7,7 +7,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import type { SerialBytesEntry, RawBytesViewConfig } from '../../../../stores/discoveryStore';
 import { useDiscoverySerialStore } from '../../../../stores/discoverySerialStore';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
-import { getBufferBytesPaginated, getBufferMetadata, findBufferBytesOffsetForTimestamp, type TimestampedByte } from '../../../../api/buffer';
+import { getBufferBytesPaginated, getBufferMetadataById, findBufferBytesOffsetForTimestamp, type TimestampedByte } from '../../../../api/buffer';
 import { byteToHex, byteToAscii } from '../../../../utils/byteUtils';
 import { formatHumanUs, formatIsoUs, renderDeltaNode } from '../../../../utils/timeFormat';
 import { PaginationToolbar, TimelineSection, BYTE_PAGE_SIZE_OPTIONS } from '../../components';
@@ -78,6 +78,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
 
   // Backend buffer state from store
   const backendByteCount = useDiscoverySerialStore((s) => s.backendByteCount);
+  const bytesBufferId = useDiscoverySerialStore((s) => s.bytesBufferId);
   const rawBytesPageSize = useDiscoverySerialStore((s) => s.rawBytesPageSize);
   const setRawBytesPageSize = useDiscoverySerialStore((s) => s.setRawBytesPageSize);
   const bufferReadyTrigger = useDiscoverySerialStore((s) => s.bufferReadyTrigger);
@@ -124,7 +125,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
 
     const fetchMetadata = async () => {
       try {
-        const metadata = await getBufferMetadata();
+        const metadata = await getBufferMetadataById(bytesBufferId ?? '');
         if (metadata && metadata.start_time_us !== null && metadata.end_time_us !== null) {
           setTimeRange({ min: metadata.start_time_us, max: metadata.end_time_us });
         }
@@ -155,7 +156,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
       try {
         // Pagination mode: show page based on currentPage
         const offset = currentPage * pageSize;
-        const response = await getBufferBytesPaginated(offset, pageSize);
+        const response = await getBufferBytesPaginated(bytesBufferId ?? '', offset, pageSize);
 
         // Only update state if this effect instance is still current
         if (cancelled) return;
@@ -292,7 +293,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
 
     try {
       // Use backend binary search to find byte offset for timestamp
-      const offset = await findBufferBytesOffsetForTimestamp(targetTimeUs);
+      const offset = await findBufferBytesOffsetForTimestamp(bytesBufferId ?? '', targetTimeUs);
       const targetPage = Math.floor(offset / pageSize);
       setCurrentPage(targetPage);
     } catch (error) {

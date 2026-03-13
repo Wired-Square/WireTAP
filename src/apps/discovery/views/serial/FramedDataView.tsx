@@ -382,7 +382,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
     if (useBackendBuffer) {
       // Use backend binary search to find offset
       try {
-        const offset = await findBufferOffsetForTimestamp(targetTimeUs, []);
+        const offset = await findBufferOffsetForTimestamp(framedBufferId!, targetTimeUs, []);
         const targetPage = Math.floor(offset / effectivePageSize);
         setCurrentPage(targetPage);
       } catch (error) {

@@ -1645,16 +1645,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       tlog.info(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to buffer replay`);
       try {
         const capabilities = await switchSessionToBufferReplay(sessionId, 1.0);
-        // Get buffer metadata - Rust sets the active buffer during switch, so we can query it
-        const { getBufferMetadata } = await import("../api/buffer");
-        const bufferMetadata = await getBufferMetadata();
+        // Buffer state will be updated by the session-switched-to-buffer event handler.
+        // Use existing session buffer state for the log message if already available.
+        const existingBuffer = get().sessions[sessionId]?.buffer;
         addSessionLog({
           eventType: "state-change",
           sessionId,
           profileId: session?.profileId ?? null,
           profileName,
           appName: null,
-          details: `Switched to buffer replay mode (temporal_mode: ${capabilities.traits.temporal_mode}, buffer: ${bufferMetadata?.id ?? 'none'})`,
+          details: `Switched to buffer replay mode (temporal_mode: ${capabilities.traits.temporal_mode}, buffer: ${existingBuffer?.id ?? 'none'})`,
         });
         set((s) => ({
           sessions: {
@@ -1663,18 +1663,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               ...s.sessions[sessionId],
               capabilities,
               ioState: "stopped",
-              // Set buffer state so handleLeave knows a buffer exists
-              buffer: bufferMetadata ? {
-                available: true,
-                id: bufferMetadata.id,
-                type: bufferMetadata.buffer_type,
-                count: bufferMetadata.count,
-                owningSessionId: bufferMetadata.owning_session_id,
-                startTimeUs: bufferMetadata.start_time_us,
-                endTimeUs: bufferMetadata.end_time_us,
-                name: bufferMetadata.name,
-                persistent: bufferMetadata.persistent,
-              } : s.sessions[sessionId]?.buffer ?? { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
+              // Buffer state is populated by the session-switched-to-buffer event handler
             },
           },
         }));
@@ -1805,7 +1794,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   switchToBuffer: async (sessionId, speed, bufferId) => {
-    const capabilities = await transitionToBufferReader(sessionId, speed, bufferId);
+    const capabilities = await transitionToBufferReader(sessionId, bufferId ?? '', speed);
     set((s) => ({
       sessions: {
         ...s.sessions,

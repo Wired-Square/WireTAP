@@ -12,6 +12,9 @@ export interface UsePlaybackHandlersParams {
   // Session ID for direction control
   sessionId: string;
 
+  // Buffer ID for step operations (required for stepBufferFrame)
+  bufferId?: string;
+
   // Session actions
   start: () => Promise<void>;
   stop: () => Promise<void>;
@@ -43,6 +46,7 @@ export interface UsePlaybackHandlersParams {
 
 export function usePlaybackHandlers({
   sessionId,
+  bufferId,
   start,
   stop,
   pause,
@@ -126,7 +130,7 @@ export function usePlaybackHandlers({
 
     // Allow stepping when paused, or when stopped (before first play / after completion)
     const canStep = isPaused || isStopped;
-    if (!canStep || (currentFrameIndex == null && currentTimestampUs == null)) {
+    if (!canStep || !bufferId || (currentFrameIndex == null && currentTimestampUs == null)) {
       tlog.debug('[PlaybackHandlers] handleStepBackward early return - guard condition met');
       return;
     }
@@ -135,7 +139,7 @@ export function usePlaybackHandlers({
       const filter = selectedFrameIds && selectedFrameIds.size > 0
         ? Array.from(selectedFrameIds)
         : undefined;
-      const result = await stepBufferFrame(sessionId, currentFrameIndex ?? null, currentTimestampUs ?? null, true, filter);
+      const result = await stepBufferFrame(sessionId, bufferId, currentFrameIndex ?? null, currentTimestampUs ?? null, true, filter);
       // Update the store immediately with the new frame index and timestamp
       if (result != null) {
         setCurrentFrameIndex?.(result.frame_index);
@@ -144,7 +148,7 @@ export function usePlaybackHandlers({
     } catch (e) {
       tlog.debug(`[PlaybackHandlers] Failed to step backward: ${e}`);
     }
-  }, [sessionId, isPaused, isStopped, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
+  }, [sessionId, bufferId, isPaused, isStopped, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
 
   // Handle step forward (one frame later, respecting filter)
   const handleStepForward = useCallback(async () => {
@@ -152,7 +156,7 @@ export function usePlaybackHandlers({
 
     // Allow stepping when paused, or when stopped (before first play / after completion)
     const canStep = isPaused || isStopped;
-    if (!canStep || (currentFrameIndex == null && currentTimestampUs == null)) {
+    if (!canStep || !bufferId || (currentFrameIndex == null && currentTimestampUs == null)) {
       tlog.debug('[PlaybackHandlers] handleStepForward early return - guard condition met');
       return;
     }
@@ -161,7 +165,7 @@ export function usePlaybackHandlers({
       const filter = selectedFrameIds && selectedFrameIds.size > 0
         ? Array.from(selectedFrameIds)
         : undefined;
-      const result = await stepBufferFrame(sessionId, currentFrameIndex ?? null, currentTimestampUs ?? null, false, filter);
+      const result = await stepBufferFrame(sessionId, bufferId, currentFrameIndex ?? null, currentTimestampUs ?? null, false, filter);
       // Update the store immediately with the new frame index and timestamp
       if (result != null) {
         setCurrentFrameIndex?.(result.frame_index);
@@ -170,7 +174,7 @@ export function usePlaybackHandlers({
     } catch (e) {
       tlog.debug(`[PlaybackHandlers] Failed to step forward: ${e}`);
     }
-  }, [sessionId, isPaused, isStopped, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
+  }, [sessionId, bufferId, isPaused, isStopped, currentFrameIndex, currentTimestampUs, selectedFrameIds, setCurrentFrameIndex, updateCurrentTime]);
 
   return {
     handlePlay,

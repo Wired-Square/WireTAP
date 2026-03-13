@@ -187,6 +187,7 @@ export default function FilteredTabContent({
       try {
         const offset = currentPage * pageSize;
         const response = await getBufferFramesPaginatedFiltered(
+          bufferMetadata?.id ?? '',
           offset,
           pageSize,
           filteredOutIds

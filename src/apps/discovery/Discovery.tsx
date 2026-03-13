@@ -115,6 +115,7 @@ export default function Discovery() {
   const serialBytesBuffer = useDiscoveryStore((state) => state.serialBytesBuffer);
   const backendByteCount = useDiscoveryStore((state) => state.backendByteCount);
   const incrementBackendByteCount = useDiscoveryStore((state) => state.incrementBackendByteCount);
+  const setBytesBufferId = useDiscoveryStore((state) => state.setBytesBufferId);
   const setBackendByteCount = useDiscoveryStore((state) => state.setBackendByteCount);
   const framedBufferId = useDiscoveryStore((state) => state.framedBufferId);
   const backendFrameCount = useDiscoveryStore((state) => state.backendFrameCount);
@@ -220,15 +221,15 @@ export default function Discovery() {
   // Handle session suspended (from any app sharing this session)
   // This fetches buffer metadata and frame info so Discovery can show timeline controls
   const handleSessionSuspended = useCallback(async (payload: import("../../api/io").SessionSuspendedPayload) => {
-    if (payload.buffer_count > 0) {
-      const meta = await getBufferMetadata();
+    if (payload.buffer_count > 0 && payload.buffer_id) {
+      const meta = await getBufferMetadata(payload.buffer_id);
       if (meta) {
         setBufferMetadata(meta);
         enableBufferMode(meta.count);
 
         // Fetch frame info from backend buffer (populates frame picker)
         try {
-          const frameInfoList = await getBufferFrameInfo();
+          const frameInfoList = await getBufferFrameInfo(payload.buffer_id);
           console.log(`[Discovery] Session suspended - loaded ${frameInfoList.length} unique frame IDs from buffer`);
           setFrameInfoFromBuffer(frameInfoList);
         } catch (err) {
@@ -244,8 +245,8 @@ export default function Discovery() {
 
   // Ingest complete handler - passed to useIOSessionManager
   const handleIngestComplete = useCallback(async (payload: StreamEndedPayload) => {
-    if (payload.buffer_available && payload.count > 0) {
-      const meta = await getBufferMetadata();
+    if (payload.buffer_available && payload.count > 0 && payload.buffer_id) {
+      const meta = await getBufferMetadata(payload.buffer_id);
       if (meta) {
         setBufferMetadata(meta);
 
@@ -268,6 +269,7 @@ export default function Discovery() {
           clearSerialBytes();
           resetFraming();
           addSerialBytes(entries);
+          setBytesBufferId(meta.id);
           setBackendByteCount(meta.count);
           console.log(`[Discovery] Loaded ${bytes.length} bytes`);
         } catch (e) {
@@ -283,7 +285,7 @@ export default function Discovery() {
 
         // Load frame info for the frame picker
         try {
-          const frameInfoList = await getBufferFrameInfo();
+          const frameInfoList = await getBufferFrameInfo(payload.buffer_id);
           console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from buffer`);
           setFrameInfoFromBuffer(frameInfoList);
         } catch (e) {
@@ -301,6 +303,7 @@ export default function Discovery() {
     clearSerialBytes,
     resetFraming,
     addSerialBytes,
+    setBytesBufferId,
     setBackendByteCount,
     clearBuffer,
     enableBufferMode,
@@ -337,6 +340,10 @@ export default function Discovery() {
     resetFraming();
     setBackendByteCount(0);
     setBackendFrameCount(0);
+    // Reset refs checked by handleFrames — prevents stale values from a previous
+    // session (e.g., buffer mode after stop) from silently dropping frames
+    isPausedRef.current = false;
+    inBufferModeRef.current = false;
   }, [clearBuffer, clearFramePicker, clearAnalysisResults, disableBufferMode, clearSerialBytes, resetFraming, setBackendByteCount, setBackendFrameCount]);
 
   // Handle session destroyed — switch to orphaned buffer if available
@@ -348,7 +355,7 @@ export default function Discovery() {
       if (meta) {
         setBufferMetadata(meta);
         enableBufferMode(meta.count);
-        const frameInfoList = await getBufferFrameInfo();
+        const frameInfoList = await getBufferFrameInfo(bufferId);
         setFrameInfoFromBuffer(frameInfoList);
       }
     } catch (err) {
@@ -460,7 +467,7 @@ export default function Discovery() {
   // - Joining a session already in buffer mode (another app stopped)
   // - Session is paused with buffered data (for stepping through frames)
   useEffect(() => {
-    const shouldFetchMetadata = sessionId && !bufferMetadata && (
+    const shouldFetchMetadata = sessionId && sessionBufferId && !bufferMetadata && (
       (isBufferMode && !isStreaming) ||  // Explicit buffer mode
       (isPaused && bufferCount > 0)       // Paused with buffered frames
     );
@@ -469,13 +476,13 @@ export default function Discovery() {
       (async () => {
         try {
           // Fetch buffer metadata
-          const meta = await getBufferMetadata();
+          const meta = await getBufferMetadata(sessionBufferId);
           if (meta) {
             setBufferMetadata(meta);
             enableBufferMode(meta.count);
 
             // Fetch frame info from backend buffer (populates frame picker)
-            const frameInfoList = await getBufferFrameInfo();
+            const frameInfoList = await getBufferFrameInfo(sessionBufferId);
             console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from buffer`);
             setFrameInfoFromBuffer(frameInfoList);
           }
@@ -484,7 +491,7 @@ export default function Discovery() {
         }
       })();
     }
-  }, [isBufferMode, isStreaming, isPaused, bufferCount, bufferMetadata, sessionId, enableBufferMode, setFrameInfoFromBuffer]);
+  }, [isBufferMode, isStreaming, isPaused, bufferCount, bufferMetadata, sessionId, sessionBufferId, enableBufferMode, setFrameInfoFromBuffer]);
 
   // Keep paused ref in sync with manager state (for callbacks that can't access manager directly)
   useEffect(() => {
@@ -838,8 +845,8 @@ export default function Discovery() {
     applySelectionSet,
 
     // API functions (for export/other features)
-    getBufferBytesPaginated,
-    getBufferFramesPaginated,
+    getBufferBytesPaginated: (offset, limit) => getBufferBytesPaginated((bufferMetadata?.id ?? sessionBufferId)!, offset, limit),
+    getBufferFramesPaginated: (offset, limit) => getBufferFramesPaginated((bufferMetadata?.id ?? sessionBufferId)!, offset, limit),
     getBufferFramesPaginatedById,
     bufferMetadata,
     pickFileToSave,
@@ -862,8 +869,9 @@ export default function Discovery() {
     } else {
       // Buffer-only mode: look up timestamp from buffer
       const selectedIds = Array.from(selectedFrames);
+      const frameBufferId = bufferMetadata?.id ?? sessionBufferId;
       try {
-        const response = await getBufferFramesPaginatedFiltered(frameIndex, 1, selectedIds);
+        const response = await getBufferFramesPaginatedFiltered(frameBufferId!, frameIndex, 1, selectedIds);
         if (response.frames.length > 0) {
           updateCurrentTime(response.frames[0].timestamp_us / 1_000_000);
         }
@@ -871,7 +879,7 @@ export default function Discovery() {
         // Best effort — timestamp syncs when page loads
       }
     }
-  }, [sessionId, capabilities, seekByFrame, selectedFrames, setCurrentFrameIndex, updateCurrentTime]);
+  }, [sessionId, capabilities, seekByFrame, selectedFrames, bufferMetadata, sessionBufferId, setCurrentFrameIndex, updateCurrentTime]);
 
   // ── Menu session control ──
   const bookmarkProfileId = sourceProfileId || ioProfile;

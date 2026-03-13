@@ -162,14 +162,19 @@ mod desktop {
     /// This avoids buffer proliferation during live framing.
     #[tauri::command(rename_all = "snake_case")]
     pub async fn apply_framing_to_buffer(
+        session_id: String,
         config: BackendFramingConfig,
         reuse_buffer_id: Option<String>,
     ) -> Result<FramingResult, String> {
         tlog!("[framing] apply_framing_to_buffer called with min_length={:?}", config.min_length);
 
-        // Get active byte buffer
-        let buffer_id = buffer_store::get_active_buffer_id()
-            .ok_or_else(|| "No active buffer".to_string())?;
+        // Get session's byte buffer
+        let buffer_id = buffer_store::get_session_buffer_ids(&session_id)
+            .into_iter()
+            .find(|id| buffer_store::get_buffer_metadata(id)
+                .map(|m| m.buffer_type == buffer_store::BufferType::Bytes)
+                .unwrap_or(false))
+            .ok_or_else(|| "No byte buffer found for session".to_string())?;
 
         let bytes = buffer_store::get_buffer_bytes(&buffer_id)
             .ok_or_else(|| format!("Buffer '{}' not found or is not a byte buffer", buffer_id))?;
@@ -333,36 +338,34 @@ mod desktop {
         // Reuse existing buffer if provided and valid, otherwise create a new one.
         // This avoids buffer proliferation during live streaming.
         let target_buffer_id = if let Some(ref existing_id) = reuse_buffer_id {
-            // Check if the buffer exists and is a frames buffer
             if buffer_store::get_buffer_type(existing_id) == Some(buffer_store::BufferType::Frames) {
-                // Clear the existing buffer and reuse it
                 buffer_store::clear_and_refill_buffer(existing_id, frame_messages);
                 existing_id.clone()
             } else {
-                // Buffer doesn't exist or is wrong type - create a new one
                 let new_id = buffer_store::create_buffer_inactive(
                     buffer_store::BufferType::Frames,
                     format!("Framed from {}", buffer_id),
                 );
+                let _ = buffer_store::set_buffer_owner(&new_id, &session_id);
                 buffer_store::append_frames_to_buffer(&new_id, frame_messages);
                 new_id
             }
         } else {
-            // No buffer to reuse - create a new one
             let new_id = buffer_store::create_buffer_inactive(
                 buffer_store::BufferType::Frames,
                 format!("Framed from {}", buffer_id),
             );
+            let _ = buffer_store::set_buffer_owner(&new_id, &session_id);
             buffer_store::append_frames_to_buffer(&new_id, frame_messages);
             new_id
         };
 
-        // Create filtered frames buffer if there are any filtered frames
         let filtered_buffer_id = if !filtered_messages.is_empty() {
             let filtered_id = buffer_store::create_buffer_inactive(
                 buffer_store::BufferType::Frames,
                 format!("Filtered from {}", buffer_id),
             );
+            let _ = buffer_store::set_buffer_owner(&filtered_id, &session_id);
             buffer_store::append_frames_to_buffer(&filtered_id, filtered_messages);
             Some(filtered_id)
         } else {

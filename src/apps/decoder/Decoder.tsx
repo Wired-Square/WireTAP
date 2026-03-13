@@ -375,8 +375,8 @@ export default function Decoder() {
   // Handle stream ended - update buffer metadata and trigger transition if needed
   const handleStreamEnded = useCallback(async (payload: StreamEndedPayload) => {
     // Update buffer metadata
-    if (payload.buffer_available) {
-      const meta = await getBufferMetadata();
+    if (payload.buffer_available && payload.buffer_id) {
+      const meta = await getBufferMetadata(payload.buffer_id);
       setBufferMetadata(meta);
 
       // Notify other windows about the buffer change
@@ -414,9 +414,9 @@ export default function Decoder() {
 
   // Ingest complete handler - passed to useIOSessionManager
   const handleIngestComplete = useCallback(async (payload: StreamEndedPayload) => {
-    if (payload.buffer_available && payload.count > 0) {
+    if (payload.buffer_available && payload.count > 0 && payload.buffer_id) {
       // Get the updated buffer metadata
-      const meta = await getBufferMetadata();
+      const meta = await getBufferMetadata(payload.buffer_id);
       if (meta) {
         setBufferMetadata(meta);
 
@@ -445,8 +445,8 @@ export default function Decoder() {
   // Handle session suspended (from any app sharing this session)
   // This fetches buffer metadata so Decoder can show timeline controls
   const handleSessionSuspended = useCallback(async (payload: import("../../api/io").SessionSuspendedPayload) => {
-    if (payload.buffer_count > 0) {
-      const meta = await getBufferMetadata();
+    if (payload.buffer_count > 0 && payload.buffer_id) {
+      const meta = await getBufferMetadata(payload.buffer_id);
       setBufferMetadata(meta);
     }
   }, []);
@@ -548,13 +548,17 @@ export default function Decoder() {
   // This handles the case where another app stopped the session before we joined
   useEffect(() => {
     if (isBufferMode && !isStreaming && !bufferMetadata && sessionId) {
-      getBufferMetadata().then(meta => {
-        if (meta) {
-          setBufferMetadata(meta);
-        }
-      }).catch(err => {
-        console.warn('[Decoder] Failed to fetch buffer metadata:', err);
-      });
+      const sess = useSessionStore.getState().sessions[sessionId];
+      const bid = sess?.buffer?.id;
+      if (bid) {
+        getBufferMetadata(bid).then(meta => {
+          if (meta) {
+            setBufferMetadata(meta);
+          }
+        }).catch(err => {
+          console.warn('[Decoder] Failed to fetch buffer metadata:', err);
+        });
+      }
     }
   }, [isBufferMode, isStreaming, bufferMetadata, sessionId]);
 
@@ -779,7 +783,9 @@ export default function Decoder() {
       // Transition to buffer replay mode
       switchToBufferReplay(playbackSpeed).then(async () => {
         // Refresh buffer metadata after transition
-        const meta = await getBufferMetadata();
+        const sess = useSessionStore.getState().sessions[sessionId!];
+        const bid = sess?.buffer?.id;
+        const meta = bid ? await getBufferMetadata(bid) : null;
         setBufferMetadata(meta);
         // Use the actual buffer ID for unique session naming
         if (meta) {
@@ -841,13 +847,6 @@ export default function Decoder() {
     init().catch((e) => console.error("Failed to init decoder", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
-
-  // Load buffer metadata on mount (in case data was imported in another app)
-  useEffect(() => {
-    getBufferMetadata()
-      .then((meta) => setBufferMetadata(meta))
-      .catch((e) => console.error("Failed to get buffer metadata:", e));
-  }, []);
 
   // Listen for buffer changes from other windows
   useEffect(() => {

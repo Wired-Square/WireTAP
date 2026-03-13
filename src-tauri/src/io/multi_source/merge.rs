@@ -32,7 +32,7 @@ pub(super) async fn run_merge_task(
     session_id: String,
     sources: Vec<SourceConfig>,
     _emits_raw_bytes: bool,
-    bytes_buffer_id: Option<String>,
+    _bytes_buffer_id: Option<String>,
     stop_flag: Arc<AtomicBool>,
     mut rx: mpsc::Receiver<SourceMessage>,
     tx: mpsc::Sender<SourceMessage>,
@@ -232,18 +232,14 @@ pub(super) async fn run_merge_task(
         if should_emit {
             if !pending_frames.is_empty() {
                 pending_frames.sort_by_key(|f| f.timestamp_us);
-                buffer_store::append_frames(pending_frames.clone());
+                buffer_store::append_frames_to_session(&session_id, pending_frames.clone());
                 emit_frames(&app, &session_id, pending_frames);
                 pending_frames = Vec::new();
             }
 
             if !pending_bytes.is_empty() {
                 pending_bytes.sort_by_key(|b| b.timestamp_us);
-                if let Some(ref buf_id) = bytes_buffer_id {
-                    buffer_store::append_raw_bytes_to_buffer(buf_id, pending_bytes.clone());
-                } else {
-                    buffer_store::append_raw_bytes(pending_bytes.clone());
-                }
+                buffer_store::append_raw_bytes_to_session(&session_id, pending_bytes.clone());
                 let payload = RawBytesPayload {
                     bytes: pending_bytes,
                     source: "multi-source".to_string(),
@@ -259,18 +255,14 @@ pub(super) async fn run_merge_task(
     // Emit any remaining frames
     if !pending_frames.is_empty() {
         pending_frames.sort_by_key(|f| f.timestamp_us);
-        buffer_store::append_frames(pending_frames.clone());
+        buffer_store::append_frames_to_session(&session_id, pending_frames.clone());
         emit_frames(&app, &session_id, pending_frames);
     }
 
     // Emit any remaining bytes
     if !pending_bytes.is_empty() {
         pending_bytes.sort_by_key(|b| b.timestamp_us);
-        if let Some(ref buf_id) = bytes_buffer_id {
-            buffer_store::append_raw_bytes_to_buffer(buf_id, pending_bytes.clone());
-        } else {
-            buffer_store::append_raw_bytes(pending_bytes.clone());
-        }
+        buffer_store::append_raw_bytes_to_session(&session_id, pending_bytes.clone());
         let payload = RawBytesPayload {
             bytes: pending_bytes,
             source: "multi-source".to_string(),

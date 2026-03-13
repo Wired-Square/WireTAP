@@ -76,6 +76,8 @@ export type CsvColumnMapperDialogProps = {
   allFilePaths?: string[];
   /** Per-file header detection (parallel to allFilePaths). Auto-detected if not provided. */
   hasHeaderPerFile?: boolean[];
+  /** Session ID to associate the imported buffer with */
+  sessionId: string;
   onCancel: () => void;
   /** Called when import succeeds — returns the buffer metadata */
   onImportComplete: (metadata: BufferMetadata) => void;
@@ -86,6 +88,7 @@ export default function CsvColumnMapperDialog({
   filePath,
   allFilePaths,
   hasHeaderPerFile,
+  sessionId,
   onCancel,
   onImportComplete,
 }: CsvColumnMapperDialogProps) {
@@ -259,12 +262,12 @@ export default function CsvColumnMapperDialog({
 
         // Build per-file header flags: use provided detection or fall back to current hasHeader for all
         const perFileHeaders = hasHeaderPerFile ?? allFilePaths.map(() => hasHeader);
-        result = await importCsvBatchWithMapping(allFilePaths, mappings, perFileHeaders, timestampUnit, negateTimestamps, delimiter);
+        result = await importCsvBatchWithMapping(sessionId, allFilePaths, mappings, perFileHeaders, timestampUnit, negateTimestamps, delimiter);
 
         unlistenRef.current?.();
         unlistenRef.current = null;
       } else {
-        result = await importCsvWithMapping(filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter);
+        result = await importCsvWithMapping(sessionId, filePath, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter);
       }
 
       setImportSummary(result);
@@ -276,7 +279,7 @@ export default function CsvColumnMapperDialog({
       unlistenRef.current?.();
       unlistenRef.current = null;
     }
-  }, [filePath, allFilePaths, isMultiFile, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter, onImportComplete]);
+  }, [sessionId, filePath, allFilePaths, isMultiFile, mappings, hasHeader, timestampUnit, negateTimestamps, delimiter, onImportComplete]);
 
   // Validation
   const hasFrameId = mappings.some((m) => m.role === "frame_id" || m.role === "frame_id_data");

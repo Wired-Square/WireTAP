@@ -39,9 +39,16 @@ export function useEffectiveBufferMetadata(
       return null;
     }
 
+    // Need a real buffer ID to be useful — without one, downstream code
+    // incorrectly enters buffer-first mode with an empty string ID
+    const id = localMetadata?.id;
+    if (!id) {
+      return null;
+    }
+
     // Merge session values with local metadata, preferring session for sync
     return {
-      id: localMetadata?.id ?? "",
+      id,
       buffer_type: localMetadata?.buffer_type ?? "frames",
       name: sessionBuffer.bufferName ?? localMetadata?.name ?? "",
       // Prefer session values for cross-app timeline sync

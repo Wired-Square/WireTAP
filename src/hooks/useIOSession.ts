@@ -337,6 +337,8 @@ export function useIOSession(
   const transmitFrameAction = useSessionStore((s) => s.transmitFrame);
 
   const initializingRef = useRef(false);
+  // Track which session ID is currently being initialized (to allow new sessions through)
+  const initializingSessionIdRef = useRef<string | null>(null);
   // Track whether setup completed successfully (for cleanup)
   const setupCompleteRef = useRef(false);
   // Track whether component is mounted (to prevent cleanup after remount)
@@ -816,8 +818,8 @@ export function useIOSession(
       return;
     }
 
-    if (initializingRef.current) {
-      console.log(`[useIOSession:${appName}] already initializing, skipping`);
+    if (initializingRef.current && initializingSessionIdRef.current === effectiveSessionId) {
+      console.log(`[useIOSession:${appName}] already initializing session '${effectiveSessionId}', skipping`);
       return;
     }
 
@@ -841,6 +843,7 @@ export function useIOSession(
 
     const setup = async () => {
       initializingRef.current = true;
+      initializingSessionIdRef.current = effectiveSessionId;
       console.log(`[useIOSession:${appName}] setup() starting...`);
 
       try {
@@ -858,6 +861,7 @@ export function useIOSession(
           // Unregister from Rust since we registered during openSession
           leaveSession(effectiveSessionId, listenerIdRef.current).catch(() => {});
           initializingRef.current = false;
+          initializingSessionIdRef.current = null;
           return;
         }
 
@@ -934,6 +938,7 @@ export function useIOSession(
         }
       } finally {
         initializingRef.current = false;
+        initializingSessionIdRef.current = null;
       }
     };
 

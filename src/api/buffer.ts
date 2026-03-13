@@ -50,8 +50,8 @@ export interface BufferMetadata {
  * @param filePath - Full path to the CSV file
  * @returns Metadata about the imported data
  */
-export async function importCsvToBuffer(filePath: string): Promise<BufferMetadata> {
-  return invoke("import_csv_to_buffer", { file_path: filePath });
+export async function importCsvToBuffer(sessionId: string, filePath: string): Promise<BufferMetadata> {
+  return invoke("import_csv_to_buffer", { session_id: sessionId, file_path: filePath });
 }
 
 // ============================================================================
@@ -172,6 +172,7 @@ export async function previewCsv(
  * @returns Buffer metadata for the imported data
  */
 export async function importCsvWithMapping(
+  sessionId: string,
   filePath: string,
   mappings: CsvColumnMapping[],
   skipFirstRow: boolean,
@@ -180,6 +181,7 @@ export async function importCsvWithMapping(
   delimiter: Delimiter
 ): Promise<CsvImportResult> {
   return invoke("import_csv_with_mapping", {
+    session_id: sessionId,
     file_path: filePath,
     mappings,
     skip_first_row: skipFirstRow,
@@ -202,6 +204,7 @@ export async function importCsvWithMapping(
  * @returns Buffer metadata for the merged data
  */
 export async function importCsvBatchWithMapping(
+  sessionId: string,
   filePaths: string[],
   mappings: CsvColumnMapping[],
   skipFirstRowPerFile: boolean[],
@@ -210,6 +213,7 @@ export async function importCsvBatchWithMapping(
   delimiter: Delimiter
 ): Promise<CsvImportResult> {
   return invoke("import_csv_batch_with_mapping", {
+    session_id: sessionId,
     file_paths: filePaths,
     mappings,
     skip_first_row_per_file: skipFirstRowPerFile,
@@ -220,11 +224,13 @@ export async function importCsvBatchWithMapping(
 }
 
 /**
- * Get the current buffer metadata.
- * Returns null if no data is loaded.
+ * Get metadata for a specific buffer.
+ * Returns null if the buffer doesn't exist.
+ *
+ * @param bufferId - The buffer ID to look up
  */
-export async function getBufferMetadata(): Promise<BufferMetadata | null> {
-  return invoke("get_buffer_metadata");
+export async function getBufferMetadata(bufferId: string): Promise<BufferMetadata | null> {
+  return invoke("get_buffer_metadata", { buffer_id: bufferId });
 }
 
 /**
@@ -248,8 +254,8 @@ export interface BufferFrame {
  * Returns an empty array if no data is loaded.
  * WARNING: For large buffers (>100k frames), use getBufferFramesPaginated instead.
  */
-export async function getBufferFrames(): Promise<BufferFrame[]> {
-  return invoke("get_buffer_frames");
+export async function getBufferFrames(bufferId: string): Promise<BufferFrame[]> {
+  return invoke("get_buffer_frames", { buffer_id: bufferId });
 }
 
 /**
@@ -272,10 +278,11 @@ export interface PaginatedFramesResponse {
  * @param limit - Maximum number of frames to return
  */
 export async function getBufferFramesPaginated(
+  bufferId: string,
   offset: number,
   limit: number
 ): Promise<PaginatedFramesResponse> {
-  return invoke("get_buffer_frames_paginated", { offset, limit });
+  return invoke("get_buffer_frames_paginated", { buffer_id: bufferId, offset, limit });
 }
 
 /**
@@ -287,11 +294,13 @@ export async function getBufferFramesPaginated(
  * @param selectedIds - Array of frame IDs to include (empty = all frames)
  */
 export async function getBufferFramesPaginatedFiltered(
+  bufferId: string,
   offset: number,
   limit: number,
   selectedIds: number[]
 ): Promise<PaginatedFramesResponse> {
   return invoke("get_buffer_frames_paginated_filtered", {
+    buffer_id: bufferId,
     offset,
     limit,
     selected_ids: selectedIds,
@@ -317,10 +326,12 @@ export interface TailResponse {
  * @param selectedIds - Array of frame IDs to filter by (empty = all frames)
  */
 export async function getBufferFramesTail(
+  bufferId: string,
   limit: number,
   selectedIds: number[]
 ): Promise<TailResponse> {
   return invoke("get_buffer_frames_tail", {
+    buffer_id: bufferId,
     limit,
     selected_ids: selectedIds,
   });
@@ -361,8 +372,8 @@ export interface BufferFrameInfo {
  * Get unique frame IDs and their metadata from the buffer.
  * Used to build the frame picker after a large ingest.
  */
-export async function getBufferFrameInfo(): Promise<BufferFrameInfo[]> {
-  return invoke("get_buffer_frame_info");
+export async function getBufferFrameInfo(bufferId: string): Promise<BufferFrameInfo[]> {
+  return invoke("get_buffer_frame_info", { buffer_id: bufferId });
 }
 
 /**
@@ -374,10 +385,12 @@ export async function getBufferFrameInfo(): Promise<BufferFrameInfo[]> {
  * @returns Offset of the first frame at or after the given timestamp
  */
 export async function findBufferOffsetForTimestamp(
+  bufferId: string,
   timestampUs: number,
   selectedIds: number[]
 ): Promise<number> {
   return invoke("find_buffer_offset_for_timestamp", {
+    buffer_id: bufferId,
     timestamp_us: timestampUs,
     selected_ids: selectedIds,
   });
@@ -393,10 +406,12 @@ export async function findBufferOffsetForTimestamp(
  */
 export async function createBufferReaderSession(
   sessionId: string,
+  bufferId: string,
   speed?: number
 ): Promise<IOCapabilities> {
   return invoke("create_buffer_reader_session", {
     session_id: sessionId,
+    buffer_id: bufferId,
     speed,
   });
 }
@@ -536,10 +551,11 @@ export async function setActiveBuffer(bufferId: string): Promise<void> {
  * @returns Metadata of the created buffer
  */
 export async function createFrameBufferFromFrames(
+  sessionId: string,
   name: string,
   frames: BufferFrame[]
 ): Promise<BufferMetadata> {
-  return invoke("create_frame_buffer_from_frames", { name, frames });
+  return invoke("create_frame_buffer_from_frames", { session_id: sessionId, name, frames });
 }
 
 // ============================================================================
@@ -564,17 +580,18 @@ export interface PaginatedBytesResponse {
  * @param limit - Maximum number of bytes to return
  */
 export async function getBufferBytesPaginated(
+  bufferId: string,
   offset: number,
   limit: number
 ): Promise<PaginatedBytesResponse> {
-  return invoke("get_buffer_bytes_paginated", { offset, limit });
+  return invoke("get_buffer_bytes_paginated", { buffer_id: bufferId, offset, limit });
 }
 
 /**
  * Get the total byte count from the active buffer.
  */
-export async function getBufferBytesCount(): Promise<number> {
-  return invoke("get_buffer_bytes_count");
+export async function getBufferBytesCount(bufferId: string): Promise<number> {
+  return invoke("get_buffer_bytes_count", { buffer_id: bufferId });
 }
 
 /**
@@ -669,10 +686,12 @@ export interface FramingResult {
  * @returns Result with frame count and buffer ID (same as reuseBufferId if reused, or new ID)
  */
 export async function applyFramingToBuffer(
+  sessionId: string,
   config: BackendFramingConfig,
   reuseBufferId?: string | null
 ): Promise<FramingResult> {
   return invoke("apply_framing_to_buffer", {
+    session_id: sessionId,
     config,
     reuse_buffer_id: reuseBufferId ?? null,
   });
@@ -686,9 +705,10 @@ export async function applyFramingToBuffer(
  * @returns Offset of the first byte at or after the given timestamp
  */
 export async function findBufferBytesOffsetForTimestamp(
+  bufferId: string,
   targetTimeUs: number
 ): Promise<number> {
-  return invoke("find_buffer_bytes_offset_for_timestamp", { target_time_us: targetTimeUs });
+  return invoke("find_buffer_bytes_offset_for_timestamp", { buffer_id: bufferId, target_time_us: targetTimeUs });
 }
 
 /**

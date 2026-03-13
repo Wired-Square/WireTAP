@@ -213,6 +213,7 @@ export default function IoSourcePickerDialog({
   // CSV column mapper state
   const [csvMapperFilePath, setCsvMapperFilePath] = useState<string | null>(null);
   const [csvMapperFilePaths, setCsvMapperFilePaths] = useState<string[] | null>(null);
+  const [csvImportSessionId, setCsvImportSessionId] = useState<string | null>(null);
   const [showCsvMapper, setShowCsvMapper] = useState(false);
   const [showFileOrderDialog, setShowFileOrderDialog] = useState(false);
   const [pendingFilePaths, setPendingFilePaths] = useState<string[] | null>(null);
@@ -1242,6 +1243,7 @@ export default function IoSourcePickerDialog({
         // Single file — go straight to column mapper
         setCsvMapperFilePath(filePaths[0]);
         setCsvMapperFilePaths(null);
+        setCsvImportSessionId(generateLoadSessionId());
         setShowCsvMapper(true);
       } else {
         // Multiple files — show order confirmation first
@@ -1264,6 +1266,7 @@ export default function IoSourcePickerDialog({
     setCsvMapperFilePath(orderedPaths[0]);
     setCsvMapperFilePaths(orderedPaths);
     setCsvHasHeaderPerFile(hasHeaderPerFile);
+    setCsvImportSessionId(generateLoadSessionId());
     setShowCsvMapper(true);
   };
 
@@ -1277,6 +1280,7 @@ export default function IoSourcePickerDialog({
     setCsvMapperFilePath(null);
     setCsvMapperFilePaths(null);
     setCsvHasHeaderPerFile(null);
+    setCsvImportSessionId(null);
 
     // Refresh buffer list
     const allBuffers = await listOrphanedBuffers();
@@ -1301,6 +1305,7 @@ export default function IoSourcePickerDialog({
     setCsvMapperFilePath(null);
     setCsvMapperFilePaths(null);
     setCsvHasHeaderPerFile(null);
+    setCsvImportSessionId(null);
   };
 
   // Delete a specific buffer by ID
@@ -1666,12 +1671,13 @@ export default function IoSourcePickerDialog({
     )}
 
     {/* CSV column mapper dialog (opens after file pick or order confirmation) */}
-    {showCsvMapper && csvMapperFilePath && (
+    {showCsvMapper && csvMapperFilePath && csvImportSessionId && (
       <CsvColumnMapperDialog
         isOpen={showCsvMapper}
         filePath={csvMapperFilePath}
         allFilePaths={csvMapperFilePaths ?? undefined}
         hasHeaderPerFile={csvHasHeaderPerFile ?? undefined}
+        sessionId={csvImportSessionId}
         onCancel={handleCsvMapperCancel}
         onImportComplete={handleCsvMapperComplete}
       />

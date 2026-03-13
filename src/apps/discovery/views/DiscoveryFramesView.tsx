@@ -197,7 +197,8 @@ function DiscoveryFramesView({
 
   // Use buffer-first hook when bufferId is available
   // This provides a unified interface for streaming (tail poll) and stopped (pagination)
-  const effectiveBufferId = bufferId ?? bufferMetadata?.id ?? null;
+  // Use || to treat empty string IDs as absent (stale effectiveBufferMetadata can produce id: "")
+  const effectiveBufferId = bufferId || bufferMetadata?.id || null;
   const useBufferFirstMode = effectiveBufferId !== null;
 
   // Buffer playback = pagination mode (not tail-follow). True for: recorded source, paused stream, or store-level buffer mode (after ingest)

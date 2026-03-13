@@ -509,7 +509,7 @@ async fn run_postgres_stream(
             // Emit batch when full (use larger batch for no-limit mode)
             if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
                 // Buffer frames for replay
-                buffer_store::append_frames(batch_buffer.clone());
+                buffer_store::append_frames_to_session(&session_id,batch_buffer.clone());
 
                 emit_frames(&app_handle, &session_id, batch_buffer.clone());
                 batch_buffer.clear();
@@ -569,7 +569,7 @@ async fn run_postgres_stream(
                 last_pacing_check = std::time::Instant::now();
 
                 // Buffer frames for replay
-                buffer_store::append_frames(batch_buffer.clone());
+                buffer_store::append_frames_to_session(&session_id,batch_buffer.clone());
 
                 emit_frames(&app_handle, &session_id, batch_buffer.clone());
                 batch_buffer.clear();
@@ -594,7 +594,7 @@ async fn run_postgres_stream(
             // Normal speed: emit any pending batch first
             if !batch_buffer.is_empty() {
                 // Buffer frames for replay
-                buffer_store::append_frames(batch_buffer.clone());
+                buffer_store::append_frames_to_session(&session_id,batch_buffer.clone());
 
                 emit_frames(&app_handle, &session_id, batch_buffer.clone());
                 batch_buffer.clear();
@@ -615,7 +615,7 @@ async fn run_postgres_stream(
 
             // Emit single frame with active listener filtering
             // Buffer frames for replay
-            buffer_store::append_frames(vec![frame.clone()]);
+            buffer_store::append_frames_to_session(&session_id,vec![frame.clone()]);
 
             emit_frames(&app_handle, &session_id, vec![frame]);
             total_emitted += 1;
@@ -632,7 +632,7 @@ async fn run_postgres_stream(
     // Emit any remaining frames in batch buffer with active listener filtering
     if !batch_buffer.is_empty() {
         // Buffer frames for replay
-        buffer_store::append_frames(batch_buffer.clone());
+        buffer_store::append_frames_to_session(&session_id,batch_buffer.clone());
 
         emit_frames(&app_handle, &session_id, batch_buffer);
     }

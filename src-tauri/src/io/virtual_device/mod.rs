@@ -525,7 +525,7 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames(vec![frame.clone()]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
                     emit_frames(&app, &session_id, vec![frame]);
                 }
                 VirtualTrafficType::CanFd => {
@@ -554,7 +554,7 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames(vec![frame.clone()]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
                     emit_frames(&app, &session_id, vec![frame]);
                 }
                 VirtualTrafficType::Modbus => {
@@ -577,7 +577,7 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames(vec![frame.clone()]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
                     emit_frames(&app, &session_id, vec![frame]);
                 }
                 VirtualTrafficType::Serial => {
@@ -590,7 +590,7 @@ fn spawn_bus_generator(
                         })
                         .collect();
 
-                    buffer_store::append_raw_bytes(entries.clone());
+                    buffer_store::append_raw_bytes_to_session(&session_id, entries.clone());
                     let payload = RawBytesPayload {
                         bytes: entries,
                         source: "virtual".to_string(),
@@ -639,7 +639,7 @@ fn spawn_loopback_handler(
                         incomplete: None,
                         direction: Some("rx".to_string()),
                     };
-                    buffer_store::append_frames(vec![frame.clone()]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
                     emit_frames(&app, &session_id, vec![frame]);
                 }
                 Some(LoopbackMessage::RawBytes(bytes)) => {
@@ -653,7 +653,7 @@ fn spawn_loopback_handler(
                             bus: 0,
                         })
                         .collect();
-                    buffer_store::append_raw_bytes(entries.clone());
+                    buffer_store::append_raw_bytes_to_session(&session_id, entries.clone());
                     let payload = RawBytesPayload {
                         bytes: entries,
                         source: "virtual".to_string(),

@@ -88,7 +88,7 @@ export function useDiscoverySessionHandlers({
         enableBufferMode(meta.count);
         setMaxBuffer?.(meta.count);
         try {
-          const frameInfoList = await getBufferFrameInfo();
+          const frameInfoList = await getBufferFrameInfo(meta.id);
           setFrameInfoFromBuffer(frameInfoList);
         } catch (e) {
           console.error("[DiscoverySessionHandlers] Failed to load frame info:", e);

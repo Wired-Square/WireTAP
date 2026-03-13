@@ -89,13 +89,12 @@ struct NamedBuffer {
 struct BufferRegistry {
     /// All buffers indexed by ID
     buffers: HashMap<String, NamedBuffer>,
-    /// ID of the currently active buffer (for viewing/operating on)
-    active_id: Option<String>,
-    /// ID of the buffer currently being streamed to (separate from active_id)
-    /// This is set during streaming and cleared on finalize
-    streaming_id: Option<String>,
-    /// Last logged streaming_id for list_buffers (reduces log spam)
-    last_logged_streaming_id: Option<String>,
+    /// Buffer IDs currently receiving streaming data
+    streaming_ids: HashSet<String>,
+    /// Buffer IDs currently being rendered by UI panels
+    active_ids: HashSet<String>,
+    /// Last logged streaming state for list_buffers (reduces log spam)
+    last_logged_streaming_ids: Option<HashSet<String>>,
     /// Last logged buffer count for list_buffers
     last_logged_buffer_count: usize,
 }
@@ -104,9 +103,9 @@ impl Default for BufferRegistry {
     fn default() -> Self {
         Self {
             buffers: HashMap::new(),
-            active_id: None,
-            streaming_id: None,
-            last_logged_streaming_id: None,
+            streaming_ids: HashSet::new(),
+            active_ids: HashSet::new(),
+            last_logged_streaming_ids: None,
             last_logged_buffer_count: 0,
         }
     }
@@ -203,8 +202,7 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
     registry.buffers.insert(id.clone(), buffer);
 
     if set_streaming {
-        registry.streaming_id = Some(id.clone());
-        registry.active_id = Some(id.clone());
+        registry.streaming_ids.insert(id.clone());
     }
 
     // Drop registry lock before touching SQLite
@@ -223,59 +221,30 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
     id
 }
 
-/// Finalize the streaming buffer (stop streaming to it).
-/// Clears streaming_id but leaves active_id unchanged (for viewing/operating).
-/// Returns the buffer metadata if there was a streaming buffer.
-pub fn finalize_buffer() -> Option<BufferMetadata> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
-
-    if let Some(id) = registry.streaming_id.take() {
-        if let Some(buffer) = registry.buffers.get(&id) {
-            let meta = buffer.metadata.clone();
-            tlog!(
-                "[BufferStore] Finalized buffer '{}' with {} items",
-                id, meta.count
-            );
-
-            // Drop registry lock before touching SQLite
-            drop(registry);
-
-            // Persist final metadata (count/timestamps are now settled)
-            if let Err(e) = buffer_db::save_buffer_metadata(&meta) {
-                tlog!("[BufferStore] Failed to persist finalized buffer metadata: {}", e);
-            }
-
-            return Some(meta);
-        }
-    }
-    None
-}
-
 /// List all buffers (returns metadata only, not data).
 /// Sets is_streaming=true for the buffer currently being streamed to.
 pub fn list_buffers() -> Vec<BufferMetadata> {
     let mut registry = BUFFER_REGISTRY.write().unwrap();
 
-    // Check if state changed since last log
-    let streaming_id = registry.streaming_id.clone();
+    let current_streaming = registry.streaming_ids.clone();
     let buffer_count = registry.buffers.len();
-    let should_log = streaming_id != registry.last_logged_streaming_id
+    let should_log = Some(&current_streaming) != registry.last_logged_streaming_ids.as_ref()
         || buffer_count != registry.last_logged_buffer_count;
 
     if should_log {
         tlog!(
-            "[BufferStore] list_buffers - streaming_id: {:?}, buffers: {}",
-            streaming_id.as_deref(),
+            "[BufferStore] list_buffers - streaming: {:?}, buffers: {}",
+            current_streaming,
             buffer_count
         );
         for b in registry.buffers.values() {
-            let is_streaming = streaming_id.as_deref() == Some(b.metadata.id.as_str());
+            let is_streaming = current_streaming.contains(&b.metadata.id);
             tlog!(
                 "[BufferStore]   buffer '{}' is_streaming: {}",
                 b.metadata.id, is_streaming
             );
         }
-        registry.last_logged_streaming_id = streaming_id.clone();
+        registry.last_logged_streaming_ids = Some(current_streaming.clone());
         registry.last_logged_buffer_count = buffer_count;
     }
 
@@ -284,7 +253,7 @@ pub fn list_buffers() -> Vec<BufferMetadata> {
         .values()
         .map(|b| {
             let mut meta = b.metadata.clone();
-            meta.is_streaming = streaming_id.as_deref() == Some(meta.id.as_str());
+            meta.is_streaming = current_streaming.contains(&meta.id);
             meta
         })
         .collect();
@@ -295,10 +264,9 @@ pub fn list_buffers() -> Vec<BufferMetadata> {
 /// Sets is_streaming=true if this buffer is being streamed to.
 pub fn get_buffer_metadata(id: &str) -> Option<BufferMetadata> {
     let registry = BUFFER_REGISTRY.read().unwrap();
-    let streaming_id = registry.streaming_id.as_deref();
     registry.buffers.get(id).map(|b| {
         let mut meta = b.metadata.clone();
-        meta.is_streaming = Some(meta.id.as_str()) == streaming_id;
+        meta.is_streaming = registry.streaming_ids.contains(&meta.id);
         meta
     })
 }
@@ -308,12 +276,8 @@ pub fn get_buffer_metadata(id: &str) -> Option<BufferMetadata> {
 pub fn delete_buffer(id: &str) -> Result<(), String> {
     let mut registry = BUFFER_REGISTRY.write().unwrap();
 
-    if registry.active_id.as_deref() == Some(id) {
-        registry.active_id = None;
-    }
-    if registry.streaming_id.as_deref() == Some(id) {
-        registry.streaming_id = None;
-    }
+    registry.active_ids.remove(id);
+    registry.streaming_ids.remove(id);
 
     if registry.buffers.remove(id).is_some() {
         // Drop the registry lock before touching SQLite
@@ -353,25 +317,6 @@ pub fn clear_buffer(id: &str) -> Result<(), String> {
     }
     tlog!("[BufferStore] Cleared buffer '{}'", id);
     Ok(())
-}
-
-/// Get the active buffer ID.
-pub fn get_active_buffer_id() -> Option<String> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
-    registry.active_id.clone()
-}
-
-/// Set a specific buffer as active.
-/// Returns an error if the buffer doesn't exist.
-pub fn set_active_buffer(buffer_id: &str) -> Result<(), String> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
-    if registry.buffers.contains_key(buffer_id) {
-        registry.active_id = Some(buffer_id.to_string());
-        tlog!("[BufferStore] Set active buffer: {}", buffer_id);
-        Ok(())
-    } else {
-        Err(format!("Buffer '{}' not found", buffer_id))
-    }
 }
 
 /// Rename a buffer.
@@ -581,21 +526,137 @@ pub fn orphan_buffers_for_session(session_id: &str) -> Vec<OrphanedBufferInfo> {
     orphaned
 }
 
-/// Get the buffer ID owned by a session (if any).
-pub fn get_buffer_for_session(session_id: &str) -> Option<String> {
+/// Get all buffer IDs owned by a session (frames + bytes).
+pub fn get_session_buffer_ids(session_id: &str) -> Vec<String> {
     let registry = BUFFER_REGISTRY.read().unwrap();
     registry
         .buffers
         .values()
-        .find(|b| b.metadata.owning_session_id.as_deref() == Some(session_id))
+        .filter(|b| b.metadata.owning_session_id.as_deref() == Some(session_id))
         .map(|b| b.metadata.id.clone())
+        .collect()
+}
+
+/// Append frames to this session's frame buffer.
+/// Resolves the buffer by finding the buffer owned by session_id with
+/// buffer_type == Frames. No-op if session has no frame buffer.
+pub fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>) {
+    if new_frames.is_empty() { return; }
+    let buffer_id = {
+        let registry = BUFFER_REGISTRY.read().unwrap();
+        registry.buffers.values()
+            .find(|b| b.metadata.owning_session_id.as_deref() == Some(session_id)
+                    && b.metadata.buffer_type == BufferType::Frames)
+            .map(|b| b.metadata.id.clone())
+    };
+    if let Some(id) = buffer_id {
+        append_frames_to_buffer(&id, new_frames);
+    }
+}
+
+/// Append raw bytes to this session's byte buffer.
+/// Resolves the buffer by finding the buffer owned by session_id with
+/// buffer_type == Bytes. No-op if session has no byte buffer.
+pub fn append_raw_bytes_to_session(session_id: &str, new_bytes: Vec<TimestampedByte>) {
+    if new_bytes.is_empty() { return; }
+    let buffer_id = {
+        let registry = BUFFER_REGISTRY.read().unwrap();
+        registry.buffers.values()
+            .find(|b| b.metadata.owning_session_id.as_deref() == Some(session_id)
+                    && b.metadata.buffer_type == BufferType::Bytes)
+            .map(|b| b.metadata.id.clone())
+    };
+    if let Some(id) = buffer_id {
+        append_raw_bytes_to_buffer(&id, new_bytes);
+    }
+}
+
+/// Finalize all streaming buffers owned by this session.
+/// Removes them from streaming_ids, persists final metadata.
+pub fn finalize_session_buffers(session_id: &str) -> Vec<BufferMetadata> {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+
+    let owned: Vec<String> = {
+        let streaming = &registry.streaming_ids;
+        registry.buffers.values()
+            .filter(|b| b.metadata.owning_session_id.as_deref() == Some(session_id)
+                     && streaming.contains(&b.metadata.id))
+            .map(|b| b.metadata.id.clone())
+            .collect()
+    };
+
+    let mut finalized = Vec::new();
+    for id in &owned {
+        registry.streaming_ids.remove(id);
+        if let Some(buffer) = registry.buffers.get(id) {
+            let meta = buffer.metadata.clone();
+            tlog!("[BufferStore] Finalized buffer '{}' with {} items", id, meta.count);
+            finalized.push(meta);
+        }
+    }
+
+    drop(registry);
+
+    for meta in &finalized {
+        if let Err(e) = buffer_db::save_buffer_metadata(meta) {
+            tlog!("[BufferStore] Failed to persist finalized buffer metadata: {}", e);
+        }
+    }
+
+    finalized
+}
+
+/// Finalize a specific buffer by ID. Removes from streaming_ids.
+fn finalize_buffer_by_id(buffer_id: &str) -> Option<BufferMetadata> {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    registry.streaming_ids.remove(buffer_id);
+    if let Some(buffer) = registry.buffers.get(buffer_id) {
+        let meta = buffer.metadata.clone();
+        tlog!("[BufferStore] Finalized buffer '{}' with {} items", buffer_id, meta.count);
+        drop(registry);
+        if let Err(e) = buffer_db::save_buffer_metadata(&meta) {
+            tlog!("[BufferStore] Failed to persist finalized buffer metadata: {}", e);
+        }
+        return Some(meta);
+    }
+    None
+}
+
+/// Mark a buffer as being rendered by a UI panel.
+pub fn mark_buffer_active(buffer_id: &str) -> Result<(), String> {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    if registry.buffers.contains_key(buffer_id) {
+        registry.active_ids.insert(buffer_id.to_string());
+        tlog!("[BufferStore] Marked buffer active: {}", buffer_id);
+        Ok(())
+    } else {
+        Err(format!("Buffer '{}' not found", buffer_id))
+    }
+}
+
+/// Mark a buffer as no longer being rendered.
+pub fn mark_buffer_inactive(buffer_id: &str) {
+    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    registry.active_ids.remove(buffer_id);
+    tlog!("[BufferStore] Marked buffer inactive: {}", buffer_id);
+}
+
+/// Check if a buffer is currently being rendered.
+pub fn is_buffer_active(buffer_id: &str) -> bool {
+    let registry = BUFFER_REGISTRY.read().unwrap();
+    registry.active_ids.contains(buffer_id)
+}
+
+/// Get all buffer IDs currently being rendered.
+pub fn get_active_buffer_ids() -> Vec<String> {
+    let registry = BUFFER_REGISTRY.read().unwrap();
+    registry.active_ids.iter().cloned().collect()
 }
 
 /// List only orphaned buffers (no owning session).
 /// These are available for standalone selection.
 pub fn list_orphaned_buffers() -> Vec<BufferMetadata> {
     let registry = BUFFER_REGISTRY.read().unwrap();
-    let streaming_id = registry.streaming_id.as_deref();
 
     registry
         .buffers
@@ -603,7 +664,7 @@ pub fn list_orphaned_buffers() -> Vec<BufferMetadata> {
         .filter(|b| b.metadata.owning_session_id.is_none())
         .map(|b| {
             let mut meta = b.metadata.clone();
-            meta.is_streaming = Some(meta.id.as_str()) == streaming_id;
+            meta.is_streaming = registry.streaming_ids.contains(&meta.id);
             meta
         })
         .collect()
@@ -672,56 +733,6 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
 // ============================================================================
 // Public API - Data Access (Frame Buffers)
 // ============================================================================
-
-/// Append frames to the active buffer.
-/// Silently returns if there's no active buffer or it's not a frame buffer.
-pub fn append_frames(new_frames: Vec<FrameMessage>) {
-    if new_frames.is_empty() {
-        return;
-    }
-
-    let active_id = {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
-
-        let active_id = match &registry.active_id {
-            Some(id) => id.clone(),
-            None => return,
-        };
-
-        if let Some(buffer) = registry.buffers.get_mut(&active_id) {
-            if buffer.metadata.buffer_type != BufferType::Frames {
-                return;
-            }
-            // Update metadata in RAM
-            if buffer.metadata.start_time_us.is_none() {
-                buffer.metadata.start_time_us = new_frames.first().map(|f| f.timestamp_us);
-            }
-            buffer.metadata.end_time_us = new_frames.last().map(|f| f.timestamp_us);
-            buffer.metadata.count += new_frames.len();
-
-            // Track distinct buses
-            let prev_len = buffer.seen_buses.len();
-            for f in &new_frames {
-                buffer.seen_buses.insert(f.bus);
-            }
-            if buffer.seen_buses.len() != prev_len {
-                let mut sorted: Vec<u8> = buffer.seen_buses.iter().copied().collect();
-                sorted.sort();
-                buffer.metadata.buses = sorted;
-            }
-        } else {
-            return;
-        }
-
-        active_id
-        // Registry lock dropped here
-    };
-
-    // Insert into SQLite (separate lock)
-    if let Err(e) = buffer_db::insert_frames(&active_id, &new_frames) {
-        tlog!("[BufferStore] Failed to insert frames: {}", e);
-    }
-}
 
 /// Append frames to a specific buffer by ID.
 /// Silently returns if buffer doesn't exist or is not a frame buffer.
@@ -989,53 +1000,6 @@ pub fn find_buffer_offset_for_timestamp(
 // Public API - Data Access (Byte Buffers)
 // ============================================================================
 
-/// Append raw bytes to the active buffer.
-/// Silently returns if there's no active buffer or it's not a byte buffer.
-pub fn append_raw_bytes(new_bytes: Vec<TimestampedByte>) {
-    if new_bytes.is_empty() {
-        return;
-    }
-
-    let active_id = {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
-
-        let active_id = match &registry.active_id {
-            Some(id) => id.clone(),
-            None => return,
-        };
-
-        if let Some(buffer) = registry.buffers.get_mut(&active_id) {
-            if buffer.metadata.buffer_type != BufferType::Bytes {
-                return;
-            }
-            if buffer.metadata.start_time_us.is_none() {
-                buffer.metadata.start_time_us = new_bytes.first().map(|b| b.timestamp_us);
-            }
-            buffer.metadata.end_time_us = new_bytes.last().map(|b| b.timestamp_us);
-            buffer.metadata.count += new_bytes.len();
-
-            // Track distinct buses
-            let prev_len = buffer.seen_buses.len();
-            for b in &new_bytes {
-                buffer.seen_buses.insert(b.bus);
-            }
-            if buffer.seen_buses.len() != prev_len {
-                let mut sorted: Vec<u8> = buffer.seen_buses.iter().copied().collect();
-                sorted.sort();
-                buffer.metadata.buses = sorted;
-            }
-        } else {
-            return;
-        }
-
-        active_id
-    };
-
-    if let Err(e) = buffer_db::insert_bytes(&active_id, &new_bytes) {
-        tlog!("[BufferStore] Failed to insert bytes: {}", e);
-    }
-}
-
 /// Append raw bytes to a specific buffer by ID.
 /// Silently returns if buffer doesn't exist or is not a byte buffer.
 pub fn append_raw_bytes_to_buffer(buffer_id: &str, new_bytes: Vec<TimestampedByte>) {
@@ -1109,23 +1073,17 @@ pub fn get_buffer_bytes_paginated(id: &str, offset: usize, limit: usize) -> (Vec
     }
 }
 
-/// Find the byte offset for a given timestamp in the active byte buffer.
-/// Returns the index of the first byte at or after the target timestamp.
-pub fn find_buffer_bytes_offset_for_timestamp(target_time_us: u64) -> usize {
-    let active_id = {
+/// Find the byte offset for a given timestamp in a specific byte buffer.
+pub fn find_buffer_bytes_offset_for_timestamp_by_id(buffer_id: &str, target_time_us: u64) -> usize {
+    {
         let registry = BUFFER_REGISTRY.read().unwrap();
-        match &registry.active_id {
-            Some(id) => {
-                match registry.buffers.get(id) {
-                    Some(b) if b.metadata.buffer_type == BufferType::Bytes => id.clone(),
-                    _ => return 0,
-                }
-            }
-            None => return 0,
+        match registry.buffers.get(buffer_id) {
+            Some(b) if b.metadata.buffer_type == BufferType::Bytes => {},
+            _ => return 0,
         }
-    };
+    }
 
-    match buffer_db::find_bytes_offset_for_timestamp(&active_id, target_time_us) {
+    match buffer_db::find_bytes_offset_for_timestamp(buffer_id, target_time_us) {
         Ok(offset) => offset,
         Err(e) => {
             tlog!("[BufferStore] Failed to find bytes offset for timestamp: {}", e);
@@ -1156,122 +1114,4 @@ pub fn get_buffer_type(id: &str) -> Option<BufferType> {
     registry.buffers.get(id).map(|b| b.metadata.buffer_type.clone())
 }
 
-// ============================================================================
-// Backward Compatibility Layer
-// ============================================================================
 
-// These functions maintain backward compatibility with the old single-buffer API.
-// They operate on the most recently created buffer or the first buffer found.
-
-/// Find the ID of the active frame buffer, or fall back to the first frame buffer.
-pub fn find_frame_buffer_id() -> Option<String> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
-
-    // First try active buffer if it's a frame buffer
-    if let Some(active_id) = &registry.active_id {
-        if let Some(buffer) = registry.buffers.get(active_id) {
-            if buffer.metadata.buffer_type == BufferType::Frames {
-                return Some(active_id.clone());
-            }
-        }
-    }
-
-    // Fall back to first frame buffer
-    registry.buffers.iter()
-        .find(|(_, buffer)| buffer.metadata.buffer_type == BufferType::Frames)
-        .map(|(id, _)| id.clone())
-}
-
-/// Get the first buffer's metadata (backward compat).
-/// Sets is_streaming=true if this buffer is the active streaming buffer.
-pub fn get_metadata() -> Option<BufferMetadata> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
-    let active_id = registry.active_id.as_deref();
-
-    // First try active buffer
-    if let Some(id) = &registry.active_id {
-        if let Some(buffer) = registry.buffers.get(id) {
-            let mut meta = buffer.metadata.clone();
-            meta.is_streaming = true;
-            return Some(meta);
-        }
-    }
-
-    // Fall back to first buffer
-    registry.buffers.values().next().map(|b| {
-        let mut meta = b.metadata.clone();
-        meta.is_streaming = Some(meta.id.as_str()) == active_id;
-        meta
-    })
-}
-
-/// Get all frames from the active buffer (or first frame buffer as fallback).
-pub fn get_frames() -> Vec<FrameMessage> {
-    let id = match find_frame_buffer_id() {
-        Some(id) => id,
-        None => return Vec::new(),
-    };
-
-    match buffer_db::get_all_frames(&id) {
-        Ok(frames) => frames,
-        Err(e) => {
-            tlog!("[BufferStore] get_frames failed: {}", e);
-            Vec::new()
-        }
-    }
-}
-
-/// Check if any buffer has frame data (backward compat).
-pub fn has_data() -> bool {
-    has_any_data()
-}
-
-/// Get paginated frames from the active buffer (or first frame buffer as fallback).
-pub fn get_frames_paginated(offset: usize, limit: usize) -> (Vec<FrameMessage>, Vec<usize>, usize) {
-    match find_frame_buffer_id() {
-        Some(id) => get_buffer_frames_paginated(&id, offset, limit),
-        None => (Vec::new(), Vec::new(), 0),
-    }
-}
-
-/// Get paginated filtered frames from the active buffer (or first frame buffer as fallback).
-pub fn get_frames_paginated_filtered(
-    offset: usize,
-    limit: usize,
-    selected_ids: &std::collections::HashSet<u32>,
-) -> (Vec<FrameMessage>, Vec<usize>, usize) {
-    match find_frame_buffer_id() {
-        Some(id) => get_buffer_frames_paginated_filtered(&id, offset, limit, selected_ids),
-        None => (Vec::new(), Vec::new(), 0),
-    }
-}
-
-/// Get frame info from the active buffer (or first frame buffer as fallback).
-pub fn get_frame_info_map() -> Vec<BufferFrameInfo> {
-    match find_frame_buffer_id() {
-        Some(id) => {
-            tlog!("[BufferStore] get_frame_info_map using buffer '{}'", id);
-            get_buffer_frame_info(&id)
-        }
-        None => Vec::new(),
-    }
-}
-
-/// Find offset for timestamp from the active buffer (or first frame buffer as fallback).
-pub fn find_offset_for_timestamp(
-    target_time_us: u64,
-    selected_ids: &std::collections::HashSet<u32>,
-) -> usize {
-    match find_frame_buffer_id() {
-        Some(id) => find_buffer_offset_for_timestamp(&id, target_time_us, selected_ids),
-        None => 0,
-    }
-}
-
-/// Legacy set_buffer (imports frames, creates new buffer).
-pub fn set_buffer(frames: Vec<FrameMessage>, filename: String) {
-    let id = create_buffer(BufferType::Frames, filename);
-    append_frames(frames);
-    finalize_buffer();
-    tlog!("[BufferStore] Imported frames into buffer '{}'", id);
-}

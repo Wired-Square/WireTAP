@@ -168,6 +168,7 @@ export function useBufferFrameView(
     const fetchTail = async () => {
       try {
         const response = await getBufferFramesTail(
+          bufferId,
           tailSize,
           selectedIdsRef.current
         );
@@ -217,6 +218,7 @@ export function useBufferFrameView(
       try {
         const offset = currentPage * pageSize;
         const response = await getBufferFramesPaginatedFiltered(
+          bufferId,
           offset,
           pageSize,
           selectedIdsRef.current
@@ -254,6 +256,7 @@ export function useBufferFrameView(
         // Ensure integer timestamp (backend expects u64)
         const timeUsInt = Math.round(timeUs);
         const offset = await findBufferOffsetForTimestamp(
+          bufferId,
           timeUsInt,
           selectedIdsRef.current
         );
@@ -281,7 +284,7 @@ export function useBufferFrameView(
   // Shared follow-navigate helper used by both the effect and the catchup path
   const doFollowNavigate = useCallback((timeUs: number) => {
     const timeUsInt = Math.round(timeUs);
-    findBufferOffsetForTimestamp(timeUsInt, selectedIdsRef.current)
+    findBufferOffsetForTimestamp(bufferId ?? '', timeUsInt, selectedIdsRef.current)
       .then((offset) => {
         const targetPage = Math.floor(offset / pageSizeRef.current);
         setCurrentPage(targetPage);

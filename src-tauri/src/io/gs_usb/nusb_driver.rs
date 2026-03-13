@@ -123,6 +123,64 @@ fn encode_fd_frame(frame: &CanTransmitFrame, channel: u8) -> Vec<u8> {
 /// Timeout for USB control transfers
 const CONTROL_TIMEOUT: Duration = Duration::from_millis(1000);
 
+/// Default bulk IN max packet size (full-speed USB) used when descriptor
+/// lookup fails.
+const DEFAULT_MAX_PACKET_SIZE: usize = 32;
+
+/// Discovered bulk endpoint addresses and max packet size.
+struct BulkEndpoints {
+    in_addr: u8,
+    out_addr: u8,
+    max_packet_size: usize,
+}
+
+/// Discover bulk IN and OUT endpoint addresses and max packet size from USB
+/// descriptors. Falls back to standard gs_usb addresses (0x81/0x02) and
+/// DEFAULT_MAX_PACKET_SIZE if the descriptor tree can't be read.
+fn discover_bulk_endpoints(device: &nusb::Device) -> BulkEndpoints {
+    use nusb::descriptors::TransferType;
+    use nusb::transfer::Direction;
+
+    let config = match device.active_configuration() {
+        Ok(c) => c,
+        Err(_) => {
+            return BulkEndpoints {
+                in_addr: 0x81,
+                out_addr: 0x02,
+                max_packet_size: DEFAULT_MAX_PACKET_SIZE,
+            };
+        }
+    };
+
+    let mut in_addr: Option<u8> = None;
+    let mut out_addr: Option<u8> = None;
+    let mut max_pkt = DEFAULT_MAX_PACKET_SIZE;
+
+    for iface_group in config.interfaces() {
+        for alt in iface_group.alt_settings() {
+            for ep in alt.endpoints() {
+                if ep.transfer_type() == TransferType::Bulk {
+                    match ep.direction() {
+                        Direction::In => {
+                            in_addr = Some(ep.address());
+                            max_pkt = ep.max_packet_size();
+                        }
+                        Direction::Out => {
+                            out_addr = Some(ep.address());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    BulkEndpoints {
+        in_addr: in_addr.unwrap_or(0x81),
+        out_addr: out_addr.unwrap_or(0x02),
+        max_packet_size: max_pkt,
+    }
+}
+
 // ============================================================================
 // Device Matching
 // ============================================================================
@@ -131,7 +189,7 @@ const CONTROL_TIMEOUT: Duration = Duration::from_millis(1000);
 /// Returns true if:
 /// - serial is Some and matches the device's serial number, OR
 /// - serial is None and bus:address matches
-fn device_matches(dev: &nusb::DeviceInfo, serial: Option<&str>, bus: u8, address: u8) -> bool {
+pub fn device_matches(dev: &nusb::DeviceInfo, serial: Option<&str>, bus: u8, address: u8) -> bool {
     // Must be a gs_usb device
     if dev.vendor_id() != GS_USB_VID || !GS_USB_PIDS.contains(&dev.product_id()) {
         return false;
@@ -527,22 +585,29 @@ async fn run_gs_usb_stream(
         }
     };
 
+    // Discover bulk endpoints from USB descriptors
+    let endpoints = discover_bulk_endpoints(&usb_device);
+
     tlog!(
-        "[gs_usb:{}] Opened device at {}:{} (bitrate: {}, listen_only: {})",
-        session_id, config.bus, config.address, config.bitrate, config.listen_only
+        "[gs_usb:{}] Opened device at {}:{} (bitrate: {}, listen_only: {}, EP_IN: 0x{:02X}, EP_OUT: 0x{:02X}, max_pkt: {})",
+        session_id, config.bus, config.address, config.bitrate, config.listen_only,
+        endpoints.in_addr, endpoints.out_addr, endpoints.max_packet_size
     );
 
     // Initialize device
-    if let Err(e) = initialize_device(&interface, &config).await {
-        emit_session_error(&app_handle, &session_id, IoError::protocol(&device_name, format!("initialize: {}", e)).to_string());
-        emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
-        return;
-    }
+    let pad_enabled = match initialize_device(&interface, &config).await {
+        Ok(pad) => pad,
+        Err(e) => {
+            emit_session_error(&app_handle, &session_id, IoError::protocol(&device_name, format!("initialize: {}", e)).to_string());
+            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
+            return;
+        }
+    };
 
-    tlog!("[gs_usb:{}] Device initialized, starting stream", session_id);
+    tlog!("[gs_usb:{}] Device initialized (pad_enabled: {}), starting stream", session_id, pad_enabled);
 
-    // Bulk IN endpoint (usually 0x81 = EP1 IN)
-    let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(0x81) {
+    // Bulk IN endpoint — use discovered address
+    let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(endpoints.in_addr) {
         Ok(ep) => ep,
         Err(e) => {
             emit_session_error(&app_handle, &session_id, IoError::protocol(&device_name, format!("open bulk IN endpoint: {}", e)).to_string());
@@ -554,8 +619,8 @@ async fn run_gs_usb_stream(
     // Spawn a dedicated transmit task if we have a transmit channel.
     // This ensures transmits are processed immediately without waiting for reads.
     let transmit_task = if let Some(rx) = transmit_rx {
-        // Bulk OUT endpoint for transmit (0x02 = EP2 OUT)
-        match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::Out>(0x02) {
+        // Bulk OUT endpoint for transmit — use discovered address
+        match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::Out>(endpoints.out_addr) {
             Ok(ep) => {
                 tlog!("[gs_usb:{}] Bulk OUT endpoint opened for transmit", session_id);
                 let mut writer = ep.writer(64);
@@ -601,15 +666,26 @@ async fn run_gs_usb_stream(
     let mut last_emit_time = std::time::Instant::now();
     let emit_interval = Duration::from_millis(25);
 
-    // Buffer size: must accommodate padding to USB max packet size (64 bytes for full-speed).
-    // Devices with PAD_PKTS_TO_MAX_PKT_SIZE round up to the next packet boundary.
-    // FD frame = 76 bytes → padded to 128 bytes; classic = 32 bytes → padded to 64 bytes.
-    let buf_size = if config.enable_fd { 128 } else { 64 };
+    // Buffer size: use the actual max packet size from USB descriptors.
+    let buf_size = endpoints.max_packet_size;
 
     // Pre-submit multiple read requests for better throughput
     for _ in 0..4 {
         bulk_in.submit(bulk_in.allocate(buf_size));
     }
+
+    // Determine frame stride for multi-frame transfer parsing
+    let frame_size = if config.enable_fd { GsHostFrameFd::SIZE } else { GsHostFrame::SIZE };
+    let frame_stride = if pad_enabled { buf_size } else { frame_size };
+
+    // Diagnostic counters
+    let mut usb_completions: u64 = 0;
+    let mut rx_frames: u64 = 0;
+    let mut tx_echoes: u64 = 0;
+    let mut parse_fail: u64 = 0;
+    let mut transfer_errors: u64 = 0;
+    let mut multi_frame_transfers: u64 = 0;
+    let mut last_diag = std::time::Instant::now();
 
     // Read loop - only handles reading, transmit is handled by the dedicated task
     loop {
@@ -641,73 +717,53 @@ async fn run_gs_usb_stream(
             Ok(completion) => {
                 match completion.status {
                     Ok(()) => {
-                        let len = completion.actual_len;
-                        let data = &completion.buffer[..len];
+                        usb_completions += 1;
+                        let actual_len = completion.actual_len;
+                        let data = &completion.buffer[..actual_len];
 
-                        // Parse frame - check flags byte and DLC to determine if FD.
-                        // Some firmware versions don't set the FD flag on received frames,
-                        // so also detect FD by DLC > 8 when FD mode is enabled.
-                        let frame_msg = if len >= GsHostFrame::SIZE {
-                            let has_fd_flag = len >= 12 && (data[10] & can_fd_flags::FD) != 0;
-                            let is_fd_frame = has_fd_flag || (config.enable_fd && data[8] > 8);
-
-                            if is_fd_frame && len >= GsHostFrameFd::SIZE {
-                                // Parse as FD frame
-                                GsHostFrameFd::from_bytes(data).and_then(|gs_frame| {
-                                    if gs_frame.is_rx() {
-                                        let actual_len = DLC_LEN[(gs_frame.can_dlc as usize).min(15)];
-                                        Some(FrameMessage {
-                                            protocol: "can".to_string(),
-                                            timestamp_us: now_us(),
-                                            frame_id: gs_frame.get_can_id(),
-                                            bus: config.bus_override.unwrap_or(gs_frame.channel),
-                                            dlc: actual_len as u8,
-                                            bytes: gs_frame.get_data().to_vec(),
-                                            is_extended: gs_frame.is_extended(),
-                                            is_fd: true,
-                                            source_address: None,
-                                            incomplete: None,
-                                            direction: None,
-                                        })
-                                    } else {
-                                        None
-                                    }
-                                })
-                            } else {
-                                // Parse as classic CAN frame
-                                GsHostFrame::from_bytes(data).and_then(|gs_frame| {
-                                    if gs_frame.is_rx() {
-                                        Some(FrameMessage {
-                                            protocol: "can".to_string(),
-                                            timestamp_us: now_us(),
-                                            frame_id: gs_frame.get_can_id(),
-                                            bus: config.bus_override.unwrap_or(gs_frame.channel),
-                                            dlc: gs_frame.can_dlc,
-                                            bytes: gs_frame.get_data().to_vec(),
-                                            is_extended: gs_frame.is_extended(),
-                                            is_fd: false,
-                                            source_address: None,
-                                            incomplete: None,
-                                            direction: None,
-                                        })
-                                    } else {
-                                        None
-                                    }
-                                })
-                            }
+                        // Determine how many frames are in this transfer
+                        let frame_count = if actual_len > frame_stride {
+                            multi_frame_transfers += 1;
+                            actual_len / frame_stride
                         } else {
-                            None
+                            1
                         };
 
-                        if let Some(frame) = frame_msg {
-                            pending_frames.push(frame);
-                            total_frames += 1;
+                        // Parse each frame in the transfer
+                        let mut offset = 0;
+                        for _ in 0..frame_count {
+                            if offset + 4 > actual_len {
+                                break;
+                            }
+
+                            let end = actual_len.min(offset + frame_stride);
+                            let frame_data = &data[offset..end];
+
+                            if let Some(mut frame) = parse_host_frame(frame_data) {
+                                let is_tx = frame.direction.as_deref() == Some("tx");
+                                if is_tx {
+                                    tx_echoes += 1;
+                                } else {
+                                    rx_frames += 1;
+                                }
+                                // Apply bus override if configured
+                                if let Some(bus_override) = config.bus_override {
+                                    frame.bus = bus_override;
+                                }
+                                pending_frames.push(frame);
+                                total_frames += 1;
+                            } else {
+                                parse_fail += 1;
+                            }
+
+                            offset += frame_stride;
                         }
 
                         // Resubmit for continuous reading
                         bulk_in.submit(bulk_in.allocate(buf_size));
                     }
                     Err(e) => {
+                        transfer_errors += 1;
                         tlog!("[gs_usb:{}] Bulk transfer error: {:?}", session_id, e);
                         stream_reason = "error";
                         break;
@@ -722,11 +778,25 @@ async fn run_gs_usb_stream(
         // Emit batched frames periodically
         if last_emit_time.elapsed() >= emit_interval && !pending_frames.is_empty() {
             let frames = std::mem::take(&mut pending_frames);
-            buffer_store::append_frames(frames.clone());
+            buffer_store::append_frames_to_session(&session_id, frames.clone());
             emit_frames(&app_handle, &session_id, frames);
             last_emit_time = std::time::Instant::now();
         }
+
+        // Periodic diagnostic logging
+        if last_diag.elapsed().as_secs() >= 30 && usb_completions > 0 {
+            tlog!(
+                "[gs_usb:{}] DIAG: completions={}, rx={}, tx_echo={}, parse_fail={}, errors={}, multi_frame={}",
+                session_id, usb_completions, rx_frames, tx_echoes, parse_fail, transfer_errors, multi_frame_transfers
+            );
+            last_diag = std::time::Instant::now();
+        }
     }
+
+    tlog!(
+        "[gs_usb:{}] Stream ended ({}): completions={}, rx={}, tx_echo={}, parse_fail={}, errors={}, multi_frame={}",
+        session_id, stream_reason, usb_completions, rx_frames, tx_echoes, parse_fail, transfer_errors, multi_frame_transfers
+    );
 
     // Abort the transmit task when the read loop exits
     if let Some(task) = transmit_task {
@@ -735,7 +805,7 @@ async fn run_gs_usb_stream(
 
     // Emit remaining frames
     if !pending_frames.is_empty() {
-        buffer_store::append_frames(pending_frames.clone());
+        buffer_store::append_frames_to_session(&session_id, pending_frames.clone());
         emit_frames(&app_handle, &session_id, pending_frames);
     }
 
@@ -746,7 +816,8 @@ async fn run_gs_usb_stream(
 }
 
 /// Initialize the gs_usb device
-pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> Result<(), String> {
+/// Initialize a gs_usb device. Returns whether PAD_PKTS_TO_MAX_PKT_SIZE is enabled.
+pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> Result<bool, String> {
     // 1. Send HOST_FORMAT (byte order negotiation)
     let host_format = GS_USB_HOST_FORMAT.to_le_bytes();
     interface
@@ -777,7 +848,14 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
 
     // Parse full BT_CONST to get clock, features, and constraints
     let bt_const = GsDeviceBtConst::from_bytes(&bt_const_data);
-    let fclk_can = bt_const.map(|c| c.fclk_can).unwrap_or(48_000_000);
+    let reported_fclk = bt_const.map(|c| c.fclk_can).unwrap_or(48_000_000);
+    let fclk_can = config.can_clock_override.unwrap_or(reported_fclk);
+    if config.can_clock_override.is_some() {
+        tlog!(
+            "[gs_usb] CAN clock override: {} Hz (device reported {} Hz)",
+            fclk_can, reported_fclk
+        );
+    }
     let nominal_constraints = bt_const.map(|c| c.constraints());
 
     if let Some(ref c) = bt_const {
@@ -991,8 +1069,8 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
     }
 
     // Enable packet padding if device supports it (matches Linux gs_usb driver)
-    let has_pad = bt_const.map(|c| c.feature & can_feature::PAD_PKTS_TO_MAX_PKT_SIZE != 0).unwrap_or(false);
-    if has_pad {
+    let pad_enabled = bt_const.map(|c| c.feature & can_feature::PAD_PKTS_TO_MAX_PKT_SIZE != 0).unwrap_or(false);
+    if pad_enabled {
         mode_flags |= can_mode::PAD_PKTS_TO_MAX_PKT_SIZE;
     }
 
@@ -1020,7 +1098,7 @@ pub async fn initialize_device(interface: &Interface, config: &GsUsbConfig) -> R
         .await
         .map_err(|e| format!("MODE failed: {:?}", e))?;
 
-    Ok(())
+    Ok(pad_enabled)
 }
 
 /// Stop the gs_usb device
@@ -1053,7 +1131,8 @@ pub async fn stop_device(interface: &Interface, config: &GsUsbConfig) -> Result<
     Ok(())
 }
 
-/// Parse a gs_usb host frame from raw bytes (classic CAN or FD)
+/// Parse a gs_usb host frame from raw bytes (classic CAN or FD).
+/// Returns the frame with direction set: "rx" for received, "tx" for echo responses.
 pub fn parse_host_frame(data: &[u8]) -> Option<FrameMessage> {
     if data.len() < GsHostFrame::SIZE {
         return None;
@@ -1066,11 +1145,8 @@ pub fn parse_host_frame(data: &[u8]) -> Option<FrameMessage> {
     let is_fd_frame = has_fd_flag || data[8] > 8;
 
     if is_fd_frame && data.len() >= GsHostFrameFd::SIZE {
-        // Parse as FD frame
         let gs_frame = GsHostFrameFd::from_bytes(data)?;
-        if !gs_frame.is_rx() {
-            return None;
-        }
+        let direction = if gs_frame.is_rx() { "rx" } else { "tx" };
         let actual_len = DLC_LEN[(gs_frame.can_dlc as usize).min(15)];
         Some(FrameMessage {
             protocol: "can".to_string(),
@@ -1083,14 +1159,11 @@ pub fn parse_host_frame(data: &[u8]) -> Option<FrameMessage> {
             is_fd: true,
             source_address: None,
             incomplete: None,
-            direction: None,
+            direction: Some(direction.to_string()),
         })
     } else {
-        // Parse as classic CAN frame
         let gs_frame = GsHostFrame::from_bytes(data)?;
-        if !gs_frame.is_rx() {
-            return None;
-        }
+        let direction = if gs_frame.is_rx() { "rx" } else { "tx" };
         Some(FrameMessage {
             protocol: "can".to_string(),
             timestamp_us: now_us(),
@@ -1102,7 +1175,7 @@ pub fn parse_host_frame(data: &[u8]) -> Option<FrameMessage> {
             is_fd: false,
             source_address: None,
             incomplete: None,
-            direction: None,
+            direction: Some(direction.to_string()),
         })
     }
 }
@@ -1157,6 +1230,8 @@ pub async fn run_source(
         }
     };
 
+    let endpoints = discover_bulk_endpoints(&device);
+
     let interface = match device.claim_interface(0).await {
         Ok(i) => i,
         Err(e) => {
@@ -1185,22 +1260,27 @@ pub async fn run_source(
         enable_fd,
         data_bitrate,
         data_sample_point,
+        can_clock_override: None,
     };
 
     // Initialize device
-    if let Err(e) = initialize_device(&interface, &config).await {
-        let _ = tx
-            .send(SourceMessage::Error(
-                source_idx,
-                format!("Failed to initialize device: {}", e),
-            ))
-            .await;
-        return;
-    }
+    let pad_enabled = match initialize_device(&interface, &config).await {
+        Ok(pad) => pad,
+        Err(e) => {
+            let _ = tx
+                .send(SourceMessage::Error(
+                    source_idx,
+                    format!("Failed to initialize device: {}", e),
+                ))
+                .await;
+            return;
+        }
+    };
 
     tlog!(
-        "[gs_usb] Source {} connected to {}:{} (bitrate: {}, listen_only: {})",
-        source_idx, bus, address, bitrate, listen_only
+        "[gs_usb] Source {} connected to {}:{} (bitrate: {}, listen_only: {}, EP_IN: 0x{:02X}, EP_OUT: 0x{:02X}, max_pkt: {}, pad: {})",
+        source_idx, bus, address, bitrate, listen_only,
+        endpoints.in_addr, endpoints.out_addr, endpoints.max_packet_size, pad_enabled
     );
 
     // Emit device-connected event
@@ -1209,8 +1289,8 @@ pub async fn run_source(
         .send(SourceMessage::Connected(source_idx, "gs_usb".to_string(), addr_str, Some(channel)))
         .await;
 
-    // Bulk IN endpoint
-    let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(0x81) {
+    // Bulk IN endpoint — use discovered address
+    let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(endpoints.in_addr) {
         Ok(ep) => ep,
         Err(e) => {
             let _ = tx
@@ -1225,7 +1305,7 @@ pub async fn run_source(
 
     // Setup transmit channel if not in listen-only mode
     let transmit_task = if !listen_only {
-        match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::Out>(0x02) {
+        match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::Out>(endpoints.out_addr) {
             Ok(ep) => {
                 let (transmit_tx, transmit_rx) =
                     std_mpsc::sync_channel::<TransmitRequest>(32);
@@ -1268,9 +1348,11 @@ pub async fn run_source(
         None
     };
 
-    // Buffer size: must accommodate padding to USB max packet size (64 bytes for full-speed).
-    // FD frame = 76 bytes → padded to 128 bytes; classic = 32 bytes → padded to 64 bytes.
-    let buf_size = if enable_fd { 128 } else { 64 };
+    let buf_size = endpoints.max_packet_size;
+
+    // Determine frame stride for multi-frame transfer parsing
+    let frame_size = if enable_fd { GsHostFrameFd::SIZE } else { GsHostFrame::SIZE };
+    let frame_stride = if pad_enabled { buf_size } else { frame_size };
 
     // Pre-submit read requests
     for _ in 0..4 {
@@ -1278,6 +1360,15 @@ pub async fn run_source(
     }
 
     // Read loop
+    let mut usb_completions: u64 = 0;
+    let mut parse_fail: u64 = 0;
+    let mut rx_frames: u64 = 0;
+    let mut tx_echoes: u64 = 0;
+    let mut bus_filtered: u64 = 0;
+    let mut forwarded: u64 = 0;
+    let mut multi_frame_transfers: u64 = 0;
+    let mut last_diag = std::time::Instant::now();
+
     while !stop_flag.load(Ordering::Relaxed) {
         let read_result =
             tokio::time::timeout(BULK_TRANSFER_TIMEOUT, bulk_in.next_complete()).await;
@@ -1285,17 +1376,53 @@ pub async fn run_source(
         match read_result {
             Ok(completion) => match completion.status {
                 Ok(()) => {
-                    let len = completion.actual_len;
-                    let data = &completion.buffer[..len];
+                    usb_completions += 1;
+                    let actual_len = completion.actual_len;
+                    let data = &completion.buffer[..actual_len];
 
-                    // Parse frame using shared function (handles both classic and FD)
-                    if let Some(mut frame_msg) = parse_host_frame(data) {
-                        // Apply bus mapping
-                        if apply_bus_mapping(&mut frame_msg, &bus_mappings) {
-                            let _ = tx
-                                .send(SourceMessage::Frames(source_idx, vec![frame_msg]))
-                                .await;
+                    // Determine how many frames are in this transfer
+                    let frame_count = if actual_len > frame_stride {
+                        multi_frame_transfers += 1;
+                        actual_len / frame_stride
+                    } else {
+                        1
+                    };
+
+                    // Parse each frame in the transfer
+                    let mut offset = 0;
+                    let mut batch = Vec::new();
+                    for _ in 0..frame_count {
+                        if offset + 4 > actual_len {
+                            break;
                         }
+
+                        let end = actual_len.min(offset + frame_stride);
+                        let frame_data = &data[offset..end];
+
+                        if let Some(mut frame_msg) = parse_host_frame(frame_data) {
+                            let is_tx = frame_msg.direction.as_deref() == Some("tx");
+                            if is_tx {
+                                tx_echoes += 1;
+                            } else {
+                                rx_frames += 1;
+                            }
+                            if apply_bus_mapping(&mut frame_msg, &bus_mappings) {
+                                forwarded += 1;
+                                batch.push(frame_msg);
+                            } else {
+                                bus_filtered += 1;
+                            }
+                        } else {
+                            parse_fail += 1;
+                        }
+
+                        offset += frame_stride;
+                    }
+
+                    if !batch.is_empty() {
+                        let _ = tx
+                            .send(SourceMessage::Frames(source_idx, batch))
+                            .await;
                     }
 
                     bulk_in.submit(bulk_in.allocate(buf_size));
@@ -1314,7 +1441,20 @@ pub async fn run_source(
                 // Timeout - continue
             }
         }
+
+        if last_diag.elapsed().as_secs() >= 30 && usb_completions > 0 {
+            tlog!(
+                "[gs_usb] Source {} DIAG: completions={}, rx={}, tx_echo={}, parse_fail={}, bus_filtered={}, forwarded={}, multi_frame={}",
+                source_idx, usb_completions, rx_frames, tx_echoes, parse_fail, bus_filtered, forwarded, multi_frame_transfers
+            );
+            last_diag = std::time::Instant::now();
+        }
     }
+
+    tlog!(
+        "[gs_usb] Source {} ended: completions={}, rx={}, tx_echo={}, parse_fail={}, forwarded={}, multi_frame={}",
+        source_idx, usb_completions, rx_frames, tx_echoes, parse_fail, forwarded, multi_frame_transfers
+    );
 
     // Cleanup
     if let Some(task) = transmit_task {

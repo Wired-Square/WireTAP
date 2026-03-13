@@ -310,7 +310,7 @@ fn spawn_mqtt_stream(
                                 };
 
                                 // Buffer frame for replay
-                                buffer_store::append_frames(vec![frame.clone()]);
+                                buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
 
                                 // Emit to frontend
                                 emit_frames(&app_handle, &session_id, vec![frame]);

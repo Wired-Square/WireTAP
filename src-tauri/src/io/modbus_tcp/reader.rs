@@ -343,7 +343,7 @@ fn spawn_poll_task(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames(vec![frame.clone()]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
                     emit_frames(&app, &session_id, vec![frame]);
                 }
                 Err(e) => {

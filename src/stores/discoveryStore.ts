@@ -167,6 +167,7 @@ type CombinedDiscoveryState = {
   setSerialViewConfig: (config: import('./discoverySerialStore').SerialViewConfig) => void;
   toggleShowAscii: () => void;
   setSerialActiveTab: (tab: import('./discoverySerialStore').SerialTabId) => void;
+  setBytesBufferId: (id: string | null) => void;
   setBackendByteCount: (count: number) => void;
   incrementBackendByteCount: (delta: number) => void;
   setBackendFrameCount: (count: number) => void;
@@ -346,7 +347,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     addSerialBytes: serialStore.addSerialBytes,
     clearSerialBytes: serialStore.clearSerialBytes,
     setFramingConfig: serialStore.setFramingConfig,
-    applyFraming: () => serialStore.applyFraming(frameStore.streamStartTimeUs),
+    applyFraming: () => serialStore.applyFraming(frameStore.streamStartTimeUs, uiStore.ioProfile ?? undefined),
     acceptFraming: async (bufferName?: string) => {
       // Get backend buffer info BEFORE calling acceptFraming (which clears serialBytes)
       const { framedBufferId, backendFrameCount } = serialStore;
@@ -361,7 +362,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         // Load frame info from the backend buffer for the frame picker
         try {
           const { getBufferFrameInfo } = await import('../api/buffer');
-          const frameInfoList = await getBufferFrameInfo();
+          const frameInfoList = await getBufferFrameInfo(framedBufferId);
           // Pass 'serial' protocol since this is from serial framing
           frameStore.setFrameInfoFromBuffer(frameInfoList, 'serial');
           frameStore.enableBufferMode(backendFrameCount);
@@ -442,7 +443,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         const completeFrames = frames.filter(f => !f.incomplete);
         if (completeFrames.length > 0) {
           try {
-            await createFrameBufferFromFrames(name, completeFrames);
+            await createFrameBufferFromFrames(uiStore.ioProfile ?? '', name, completeFrames);
           } catch (e) {
             tlog.info(`[discoveryStore] Failed to create frame buffer: ${e}`);
           }
@@ -460,6 +461,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     setSerialViewConfig: serialStore.setSerialViewConfig,
     toggleShowAscii: serialStore.toggleShowAscii,
     setSerialActiveTab: serialStore.setActiveTab,
+    setBytesBufferId: serialStore.setBytesBufferId,
     setBackendByteCount: serialStore.setBackendByteCount,
     incrementBackendByteCount: serialStore.incrementBackendByteCount,
     setBackendFrameCount: serialStore.setBackendFrameCount,
@@ -557,8 +559,11 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         if (selectedFrameData.length === 0) return;
       } else if (bufferMode.enabled) {
         const { getBufferFramesPaginatedFiltered } = await import('../api/buffer');
+        const { useSessionStore } = await import('./sessionStore');
+        const sessionId = uiStore.ioProfile ?? '';
+        const bufferId = useSessionStore.getState().sessions[sessionId]?.buffer?.id ?? '';
         const selectedIds = Array.from(targetIds);
-        if (selectedIds.length === 0) return;
+        if (selectedIds.length === 0 || !bufferId) return;
 
         toolboxStore.setIsRunning(true);
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -568,13 +573,13 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         let offset = 0;
 
         try {
-          const firstResponse = await getBufferFramesPaginatedFiltered(0, BATCH_SIZE, selectedIds);
+          const firstResponse = await getBufferFramesPaginatedFiltered(bufferId, 0, BATCH_SIZE, selectedIds);
           const totalCount = firstResponse.total_count;
           selectedFrameData.push(...(firstResponse.frames as FrameMessage[]));
           offset = firstResponse.frames.length;
 
           while (offset < totalCount) {
-            const response = await getBufferFramesPaginatedFiltered(offset, BATCH_SIZE, selectedIds);
+            const response = await getBufferFramesPaginatedFiltered(bufferId, offset, BATCH_SIZE, selectedIds);
             selectedFrameData.push(...(response.frames as FrameMessage[]));
             offset += response.frames.length;
           }

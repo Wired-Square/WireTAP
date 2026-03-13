@@ -594,6 +594,7 @@ export interface PlaybackPosition {
  */
 export async function stepBufferFrame(
   sessionId: string,
+  bufferId: string,
   currentFrameIndex: number | null,
   currentTimestampUs: number | null,
   backward: boolean,
@@ -601,6 +602,7 @@ export async function stepBufferFrame(
 ): Promise<StepResult | null> {
   return invoke("step_buffer_frame", {
     session_id: sessionId,
+    buffer_id: bufferId,
     current_frame_index: currentFrameIndex,
     current_timestamp_us: currentTimestampUs,
     backward,
@@ -726,8 +728,8 @@ export function parseStateString(stateStr: string): IOStateType {
  */
 export async function transitionToBufferReader(
   sessionId: string,
+  bufferId: string,
   speed?: number,
-  bufferId?: string
 ): Promise<IOCapabilities> {
   return invoke("transition_to_buffer_reader", { session_id: sessionId, buffer_id: bufferId, speed });
 }
@@ -1064,8 +1066,6 @@ export async function setSessionListenerActive(
   listenerId: string,
   isActive: boolean
 ): Promise<void> {
-  console.log(`[setSessionListenerActive] session=${sessionId}, listener=${listenerId}, isActive=${isActive}`);
-  console.log(`[setSessionListenerActive] stack:`, new Error().stack);
   return invoke("set_session_listener_active", {
     session_id: sessionId,
     listener_id: listenerId,
