@@ -271,12 +271,11 @@ DLC codes 0–8 map directly to byte count. Codes 9–15 map to larger payloads:
 
 ### 4.7 Packet Padding
 
-Devices that advertise the `PAD_PKTS_TO_MAX_PKT_SIZE` feature flag pad bulk transfers to the next USB maximum packet size boundary. For full-speed USB (64-byte max packet):
+Devices that advertise the `PAD_PKTS_TO_MAX_PKT_SIZE` feature flag pad bulk transfers to the USB maximum packet size boundary. The maximum packet size is **not static** — it is read from the bulk IN endpoint descriptor in the device's USB topology. Common values are 32 bytes (full-speed) or 512 bytes (high-speed), but the actual value depends on the device.
 
-- Classic CAN frame (20 bytes) → padded to 32 or 64 bytes
-- CAN FD frame (76 bytes) → padded to 128 bytes
+When padding is enabled, frames are padded to the endpoint's max packet size. When padding is disabled, frames are their native size (20 bytes for classic CAN, 76 bytes for CAN FD).
 
-WireTAP enables packet padding when the device supports it, and sizes read buffers accordingly (64 bytes for classic, 128 bytes for FD).
+WireTAP discovers the max packet size via `discover_bulk_endpoints()`, which reads the endpoint descriptor. If the descriptor cannot be read, it falls back to 32 bytes. Read buffers are sized to the discovered max packet size, and the frame stride (used to parse multi-frame transfers) is set to either the max packet size (padded) or the native frame size (unpadded).
 
 ---
 

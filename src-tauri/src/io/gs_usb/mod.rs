@@ -514,6 +514,11 @@ pub struct GsUsbConfig {
     /// Lower sample points are recommended for higher data rates.
     #[serde(default = "default_data_sample_point")]
     pub data_sample_point: f32,
+    /// Override the CAN clock frequency reported by the device (Hz).
+    /// Use when firmware reports an incorrect clock (e.g., reports 160 MHz but
+    /// the actual CAN peripheral clock is 170 MHz).
+    #[serde(default)]
+    pub can_clock_override: Option<u32>,
 }
 
 fn default_sample_point() -> f32 {
@@ -544,6 +549,7 @@ impl Default for GsUsbConfig {
             enable_fd: false,
             data_bitrate: 2_000_000,
             data_sample_point: 75.0,
+            can_clock_override: None,
         }
     }
 }
