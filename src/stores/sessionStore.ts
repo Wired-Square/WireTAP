@@ -32,15 +32,13 @@ import {
   reinitializeSessionIfSafe,
   createMultiSourceSession,
   getStateType,
-  parseStateString,
   type IOCapabilities,
   type IOStateType,
-  type StreamEndedPayload,
+  type StreamEndedInfo,
   type SessionSuspendedPayload,
   type SessionSwitchedToBufferPayload,
   type SessionResumingPayload,
   type DeviceReplacedPayload,
-  type StateChangePayload,
   type CanTransmitFrame,
   type TransmitResult,
   type CreateIOSessionOptions,
@@ -52,10 +50,23 @@ import {
 } from "../api/io";
 import type { FrameMessage } from "../types/frame";
 import { tlog } from "../api/settings";
+import { trackAlloc } from "../services/memoryDiag";
 import {
   useSessionLogStore,
   type SessionLogEventType,
 } from "../apps/session-manager/stores/sessionLogStore";
+import { wsTransport } from "../services/wsTransport";
+import {
+  MsgType,
+  HEADER_SIZE,
+  decodeFrameBatch,
+  decodeSessionState,
+  decodeStreamEnded,
+  decodeSessionError,
+  decodePlaybackPosition,
+  decodeSessionInfo,
+  decodeScopedSessionLifecycle,
+} from "../services/wsProtocol";
 
 // ============================================================================
 // Visibility: Log changes and send immediate heartbeats on wake.
@@ -65,7 +76,12 @@ import {
 // backend can resume the session before the grace period expires.
 // ============================================================================
 
-document.addEventListener("visibilitychange", () => {
+// HMR guard: remove previous handler before adding
+let _visibilityHandler: (() => void) | null = null;
+if (_visibilityHandler) {
+  document.removeEventListener("visibilitychange", _visibilityHandler);
+}
+_visibilityHandler = () => {
   tlog.info(`[visibility] ${document.visibilityState}`);
 
   if (document.visibilityState === "visible" && getEventListeners) {
@@ -83,7 +99,8 @@ document.addEventListener("visibilitychange", () => {
       }
     }
   }
-});
+};
+document.addEventListener("visibilitychange", _visibilityHandler);
 
 // ============================================================================
 // Session Logging Helper
@@ -118,137 +135,11 @@ export function isBufferProfileId(profileId: string | null): boolean {
   return useSessionStore.getState().knownBufferIds.has(profileId);
 }
 
-/** Frame batch payload from Rust - includes active listeners for filtering */
-interface FrameBatchPayload {
-  frames: FrameMessage[];
-  active_listeners: string[];
-}
-
-// ============================================================================
-// Adaptive Frame Throttling
-// ============================================================================
-// Balances latency vs. UI performance with two triggers:
-// 1. Batch size threshold - flush immediately when enough frames accumulate
-// 2. Time interval - flush after max interval even with few frames
-//
-// This gives low latency for low-frequency data (flushes quickly when idle)
-// while batching high-frequency data to prevent UI overload.
-
-/** Minimum interval between flushes (ms) - prevents overwhelming UI */
-const MIN_FLUSH_INTERVAL_MS = 16; // ~60fps max update rate
-
-/** Maximum interval before forcing a flush (ms) - caps latency for sparse data */
-const MAX_FLUSH_INTERVAL_MS = 50; // 20Hz minimum update rate
-
-/** Batch size threshold - flush immediately when this many frames accumulate */
-const BATCH_SIZE_THRESHOLD = 50;
-
-/** Pending frames per session, keyed by session ID */
-const pendingFramesMap = new Map<string, {
-  /** Frames accumulated since last flush */
-  frames: FrameMessage[];
-  /** Which listeners should receive frames (empty = all) */
-  activeListeners: string[];
-  /** Timestamp of last flush for this session */
-  lastFlushTime: number;
-}>();
-
-/** Timeout ID for the scheduled flush (null if none scheduled) */
-let flushTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
 /** Getter for event listeners - set after store is created */
 let getEventListeners: (() => Record<string, SessionEventListeners>) | null = null;
 
 /** Getter for showAppError - set after store is created */
 let getGlobalShowAppError: (() => ((title: string, message: string, details?: string) => void) | null) | null = null;
-
-/** Flush all pending frames to their callbacks */
-function flushPendingFrames() {
-  flushTimeoutId = null;
-  const now = performance.now();
-
-  if (!getEventListeners) return;
-  const eventListenersMap = getEventListeners();
-
-  for (const [sessionId, pending] of pendingFramesMap.entries()) {
-    if (pending.frames.length === 0) continue;
-
-    const eventListeners = eventListenersMap[sessionId];
-    if (!eventListeners) continue;
-
-    // Check if any callbacks are registered before consuming frames
-    // This prevents losing frames when they arrive before registerCallbacks() is called
-    if (eventListeners.callbacks.size === 0) {
-      // No callbacks registered yet - keep frames pending, reschedule flush
-      scheduleFlush(false);
-      continue;
-    }
-
-    const frames = pending.frames;
-    const listeners = pending.activeListeners;
-
-    // Clear pending before dispatching (in case callbacks add more)
-    pending.frames = [];
-    pending.activeListeners = [];
-    pending.lastFlushTime = now;
-
-    // Dispatch to callbacks
-    for (const [listenerId, callbacks] of eventListeners.callbacks.entries()) {
-      if (listeners.length === 0 || listeners.includes(listenerId)) {
-        if (callbacks.onFrames) {
-          callbacks.onFrames(frames);
-        }
-      }
-    }
-  }
-
-}
-
-/** Schedule a flush with adaptive timing */
-function scheduleFlush(immediate: boolean) {
-  if (immediate) {
-    // Flush immediately (but still async to batch same-tick arrivals)
-    if (flushTimeoutId !== null) {
-      clearTimeout(flushTimeoutId);
-    }
-    flushTimeoutId = setTimeout(flushPendingFrames, 0);
-  } else if (flushTimeoutId === null) {
-    // Schedule for max interval if not already scheduled
-    flushTimeoutId = setTimeout(flushPendingFrames, MAX_FLUSH_INTERVAL_MS);
-  }
-  // If already scheduled and not immediate, let existing timer run
-}
-
-/** Accumulate frames for throttled delivery */
-function accumulateFrames(sessionId: string, frames: FrameMessage[], activeListeners: string[]) {
-  // Guard against null/undefined frames (can happen during session transitions)
-  if (!frames || !Array.isArray(frames)) {
-    return;
-  }
-
-  const now = performance.now();
-  let pending = pendingFramesMap.get(sessionId);
-  if (!pending) {
-    pending = { frames: [], activeListeners: [], lastFlushTime: 0 };
-    pendingFramesMap.set(sessionId, pending);
-  }
-
-  // Append frames
-  pending.frames.push(...frames);
-
-  // Merge active listeners (use the most recent non-empty list)
-  if (activeListeners.length > 0) {
-    pending.activeListeners = activeListeners;
-  }
-
-  // Determine if we should flush immediately
-  const timeSinceLastFlush = now - pending.lastFlushTime;
-  const shouldFlushNow =
-    pending.frames.length >= BATCH_SIZE_THRESHOLD &&
-    timeSinceLastFlush >= MIN_FLUSH_INTERVAL_MS;
-
-  scheduleFlush(shouldFlushNow);
-}
 
 // ============================================================================
 // Types
@@ -310,6 +201,8 @@ export interface Session {
   playbackPosition: PlaybackPosition | null;
   /** Decoder catalog path for this session (frontend-only, shared across apps) */
   catalogPath: string | null;
+  /** Buffer ID for raw bytes streams (set when buffer-changed signal fires) */
+  bytesBufferId: string | null;
 }
 
 /** Options for creating a session */
@@ -350,11 +243,8 @@ export interface CreateSessionOptions {
   modbusPollsJson?: string;
 }
 
-/** Payload for session-reconfigured event */
-export interface SessionReconfiguredPayload {
-  start: string | null;
-  end: string | null;
-}
+/** Payload for session-reconfigured event (now empty — apps just clear state) */
+export type SessionReconfiguredPayload = Record<string, never>;
 
 /** Callbacks for a session - stored per listener in the frontend */
 export interface SessionCallbacks {
@@ -362,7 +252,7 @@ export interface SessionCallbacks {
   onBytes?: (payload: RawBytesPayload) => void;
   onError?: (error: string) => void;
   onTimeUpdate?: (position: PlaybackPosition) => void;
-  onStreamEnded?: (payload: StreamEndedPayload) => void;
+  onStreamEnded?: (payload: StreamEndedInfo) => void;
   onStreamComplete?: () => void;
   onStateChange?: (state: IOStateType) => void;
   onSpeedChange?: (speed: number) => void;
@@ -380,8 +270,12 @@ export interface SessionCallbacks {
 
 /** Session event listeners - one set per session */
 interface SessionEventListeners {
+  /** Session ID this listener set belongs to (for WS unsubscribe on cleanup) */
+  sessionId: string;
   /** Unlisten functions for Tauri events */
   unlistenFunctions: UnlistenFn[];
+  /** Unlisten functions for WebSocket message handlers */
+  wsUnlistenFunctions: (() => void)[];
   /** Callbacks registered by listeners, keyed by listener ID */
   callbacks: Map<string, SessionCallbacks>;
   /** Heartbeat interval ID (for keeping listeners alive in Rust backend) */
@@ -553,312 +447,204 @@ async function setupSessionEventListeners(
   eventListeners: SessionEventListeners,
   updateSession: (id: string, updates: Partial<Session>) => void
 ): Promise<UnlistenFn[]> {
-  const unlistenFunctions: UnlistenFn[] = [];
+  // ==========================================================================
+  // WebSocket binary message handlers (sole push path — Tauri events removed)
+  // ==========================================================================
 
-  // Frame messages - throttled to 10Hz for UI performance
-  // Frames are accumulated and flushed periodically instead of immediately dispatched
-  const unlistenFrames = await listen<FrameBatchPayload>(
-    `frame-message:${sessionId}`,
-    (event) => {
-      const { frames, active_listeners } = event.payload;
-      const listeners = active_listeners ?? [];
-      accumulateFrames(sessionId, frames, listeners);
-    }
-  );
-  unlistenFunctions.push(unlistenFrames);
+  // Subscribe to WS channel
+  if (wsTransport.isConnected) {
+    wsTransport.subscribe(sessionId).catch(() => {});
+  }
 
-  // Raw bytes (serial byte streams)
-  const unlistenBytes = await listen<RawBytesPayload>(
-    `serial-raw-bytes:${sessionId}`,
-    (event) => {
-      invokeCallbacks(eventListeners, "onBytes", event.payload);
-    }
-  );
-  unlistenFunctions.push(unlistenBytes);
+  if (wsTransport.isConnected) {
+    // FrameData (0x01)
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.FrameData, (_payload, raw) => {
+        const frames = decodeFrameBatch(raw, HEADER_SIZE);
+        if (frames.length > 0) {
+          trackAlloc("session.onFrames", frames.length * 300);
+          invokeCallbacks(eventListeners, "onFrames", frames);
+        }
+      })
+    );
 
-  // Errors
-  const unlistenError = await listen<string>(
-    `session-error:${sessionId}`,
-    (event) => {
-      const error = event.payload;
-      // Don't show error dialog for expected/transient errors
-      // Modbus poll errors are non-fatal (individual register groups may not exist on all models)
-      const isExpectedError =
-        error === "No IO profile configured" ||
-        error.includes("not found") ||
-        error.includes("Modbus read error");
-      if (!isExpectedError) {
-        invokeCallbacks(eventListeners, "onError", error);
-        // Show global error dialog
-        // Note: showAppError will be called after store is created
-        if (typeof getGlobalShowAppError === "function") {
-          const showAppError = getGlobalShowAppError();
-          if (showAppError) {
-            showAppError("Stream Error", "An error occurred while streaming.", error);
+    // SessionState (0x02) — state string + optional error decoded from binary
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.SessionState, (payload) => {
+        const { state, errorMsg } = decodeSessionState(payload);
+        const stateType = state as IOStateType;
+        updateSession(sessionId, {
+          ioState: stateType,
+          ...(errorMsg ? { errorMessage: errorMsg } : {}),
+        });
+        invokeCallbacks(eventListeners, "onStateChange", stateType);
+      })
+    );
+
+    // StreamEnded (0x03) — full stream-ended info decoded from binary
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.StreamEnded, (payload) => {
+        const info = decodeStreamEnded(payload);
+        const ioState = info.reason === "paused" ? "paused" : "stopped";
+        updateSession(sessionId, {
+          ioState: ioState as IOStateType,
+          streamEndedReason: info.reason as Session["streamEndedReason"],
+          buffer: {
+            available: info.buffer_available,
+            id: info.buffer_id,
+            type: info.buffer_type as "frames" | "bytes" | null,
+            count: info.count,
+            owningSessionId: sessionId,
+            startTimeUs: info.time_range?.[0] ?? null,
+            endTimeUs: info.time_range?.[1] ?? null,
+            name: useSessionStore.getState().sessions[sessionId]?.buffer?.name ?? null,
+            persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
+          },
+        });
+        if (info.buffer_id) {
+          useSessionStore.getState().addKnownBufferId(info.buffer_id);
+        }
+        if (info.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
+          import("../api/buffer").then(({ getBufferMetadataById }) =>
+            getBufferMetadataById(info.buffer_id!).then((meta) => {
+              if (meta) {
+                updateSession(sessionId, {
+                  buffer: {
+                    ...useSessionStore.getState().sessions[sessionId]?.buffer!,
+                    name: meta.name,
+                    persistent: meta.persistent,
+                  },
+                });
+              }
+            }).catch(() => {/* ignore */})
+          );
+        }
+        invokeCallbacks(eventListeners, "onStreamEnded", info);
+        if (info.reason === "paused") {
+          invokeCallbacks(eventListeners, "onStreamComplete", undefined as never);
+        }
+      })
+    );
+
+    // SessionError (0x04) — error string decoded from binary
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.SessionError, (payload) => {
+        const error = decodeSessionError(
+          new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength)
+        );
+        if (error) {
+          const isExpectedError =
+            error === "No IO profile configured" ||
+            error.includes("not found") ||
+            error.includes("Modbus read error");
+          if (!isExpectedError) {
+            invokeCallbacks(eventListeners, "onError", error);
+            if (typeof getGlobalShowAppError === "function") {
+              const showAppError = getGlobalShowAppError();
+              if (showAppError) {
+                showAppError("Stream Error", "An error occurred while streaming.", error);
+              }
+            }
+            updateSession(sessionId, {
+              ioState: "error",
+              errorMessage: error,
+            });
           }
         }
-        updateSession(sessionId, {
-          ioState: "error",
-          errorMessage: error,
-        });
-      }
-    }
-  );
-  unlistenFunctions.push(unlistenError);
+      })
+    );
 
-  // Playback time (Buffer reader, PostgreSQL reader)
-  // Store position in session state for centralised access by all apps
-  const unlistenPlaybackTime = await listen<PlaybackPosition>(
-    `playback-time:${sessionId}`,
-    (event) => {
-      updateSession(sessionId, { playbackPosition: event.payload });
-      invokeCallbacks(eventListeners, "onTimeUpdate", event.payload);
-    }
-  );
-  unlistenFunctions.push(unlistenPlaybackTime);
+    // PlaybackPosition (0x05) — position decoded from binary
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.PlaybackPosition, (payload) => {
+        const pos = decodePlaybackPosition(payload);
+        updateSession(sessionId, { playbackPosition: pos });
+        invokeCallbacks(eventListeners, "onTimeUpdate", pos);
+      })
+    );
 
-  // Stream complete (buffer reader finished)
-  const unlistenStreamComplete = await listen<string | boolean>(
-    `stream-complete:${sessionId}`,
-    (event) => {
-      // Buffer readers emit "paused" to indicate they stay alive at end position.
-      // Other readers emit true/boolean and should transition to "stopped".
-      const newState = typeof event.payload === "string"
-        ? event.payload
-        : "stopped";
-      updateSession(sessionId, { ioState: newState as IOStateType });
-      invokeCallbacks(eventListeners, "onStreamComplete", undefined as never);
-    }
-  );
-  unlistenFunctions.push(unlistenStreamComplete);
+    // SessionInfo (0x09) — speed + listener count decoded from binary
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.SessionInfo, (payload) => {
+        const info = decodeSessionInfo(payload);
+        updateSession(sessionId, { listenerCount: info.listener_count });
+      })
+    );
 
-  // Stream ended (GVRET disconnect, PostgreSQL complete)
-  const unlistenStreamEnded = await listen<StreamEndedPayload>(
-    `stream-ended:${sessionId}`,
-    (event) => {
-      // Flush any pending frames before processing stream-ended
-      // This ensures fast playback (e.g., PostgreSQL no-limit) delivers all frames
-      flushPendingFrames();
+    // Reconfigured (0x0A) — signal-only, no payload to decode
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.Reconfigured, () => {
+        tlog.debug(`[sessionStore] Session '${sessionId}' reconfigured (WS)`);
+        invokeCallbacks(eventListeners, "onReconfigure", {} as SessionReconfiguredPayload);
+      })
+    );
 
-      const payload = event.payload;
-      updateSession(sessionId, {
-        ioState: "stopped",
-        streamEndedReason: payload.reason as Session["streamEndedReason"],
-        buffer: {
-          available: payload.buffer_available,
-          id: payload.buffer_id,
-          type: payload.buffer_type,
-          count: payload.count,
-          owningSessionId: payload.owning_session_id,
-          startTimeUs: payload.time_range?.[0] ?? null,
-          endTimeUs: payload.time_range?.[1] ?? null,
-          name: useSessionStore.getState().sessions[sessionId]?.buffer?.name ?? null,
-          persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
-        },
-      });
-      // Register buffer ID so isBufferProfileId() recognises it immediately
-      if (payload.buffer_id) {
-        useSessionStore.getState().addKnownBufferId(payload.buffer_id);
-      }
-      // Fetch buffer metadata to populate name/persistent if not already known
-      if (payload.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
-        import("../api/buffer").then(({ getBufferMetadataById }) =>
-          getBufferMetadataById(payload.buffer_id!).then((meta) => {
-            if (meta) {
-              updateSession(sessionId, {
-                buffer: {
-                  ...useSessionStore.getState().sessions[sessionId]?.buffer!,
-                  name: meta.name,
-                  persistent: meta.persistent,
-                },
-              });
-            }
-          }).catch(() => {/* ignore */})
-        );
-      }
-      invokeCallbacks(eventListeners, "onStreamEnded", payload);
-    }
-  );
-  unlistenFunctions.push(unlistenStreamEnded);
+    // SessionLifecycle (0x08) — state + capabilities decoded from binary payload
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.SessionLifecycle, (payload) => {
+        const { stateType, capabilities } = decodeScopedSessionLifecycle(payload);
+        const prevSession = useSessionStore.getState().sessions[sessionId];
+        const prevState = prevSession?.ioState;
 
-  // State changes
-  const unlistenStateChange = await listen<StateChangePayload>(
-    `session-state:${sessionId}`,
-    (event) => {
-      const newState = parseStateString(event.payload.current);
-      const errorMessage =
-        newState === "error" && event.payload.current.startsWith("error:")
-          ? event.payload.current.slice(6)
-          : null;
-      updateSession(sessionId, {
-        ioState: newState,
-        errorMessage,
-      });
-      invokeCallbacks(eventListeners, "onStateChange", newState);
-    }
-  );
-  unlistenFunctions.push(unlistenStateChange);
+        const updates: Partial<Session> = { ioState: stateType as Session["ioState"] };
+        if (capabilities) {
+          updates.capabilities = capabilities as IOCapabilities;
+        }
 
-  // Session reconfigured (e.g., bookmark jump) - apps should clear their state
-  const unlistenReconfigured = await listen<SessionReconfiguredPayload>(
-    `session-reconfigured:${sessionId}`,
-    (event) => {
-      tlog.debug(`[sessionStore] Session '${sessionId}' reconfigured: ${JSON.stringify(event.payload)}`);
-      invokeCallbacks(eventListeners, "onReconfigure", event.payload);
-    }
-  );
-  unlistenFunctions.push(unlistenReconfigured);
+        const isNowRunning = stateType === "running" || stateType === "starting";
+        const wasStoppedOrPaused = prevState === "stopped" || prevState === "paused";
+        const isNowStopped = stateType === "stopped";
 
-  // Listener count changes (from Rust backend)
-  const unlistenListenerCount = await listen<{ count: number; listener_id: string | null; change: string | null }>(
-    `joiner-count-changed:${sessionId}`,
-    (event) => {
-      updateSession(sessionId, { listenerCount: event.payload.count });
-    }
-  );
-  unlistenFunctions.push(unlistenListenerCount);
+        if (isNowRunning && wasStoppedOrPaused) {
+          updates.stoppedExplicitly = false;
+          updates.streamEndedReason = null;
+          updates.buffer = {
+            available: false,
+            id: null,
+            type: null,
+            count: 0,
+            owningSessionId: sessionId,
+            startTimeUs: null,
+            endTimeUs: null,
+            name: null,
+            persistent: false,
+          };
+          updateSession(sessionId, updates);
+          invokeCallbacks(eventListeners, "onResuming", { new_buffer_id: "", orphaned_buffer_id: null });
+        } else if (isNowStopped && (capabilities as IOCapabilities | null)?.traits.temporal_mode === "buffer") {
+          updateSession(sessionId, updates);
+          invokeCallbacks(eventListeners, "onSwitchedToBuffer", {
+            buffer_id: prevSession?.buffer?.id ?? null,
+            buffer_count: prevSession?.buffer?.count ?? 0,
+            buffer_type: prevSession?.buffer?.type ?? null,
+            time_range: null,
+            capabilities: capabilities as IOCapabilities,
+          });
+        } else if (isNowStopped) {
+          updateSession(sessionId, updates);
+          invokeCallbacks(eventListeners, "onSuspended", {
+            buffer_id: prevSession?.buffer?.id ?? null,
+            buffer_count: prevSession?.buffer?.count ?? 0,
+            buffer_type: prevSession?.buffer?.type ?? null,
+            time_range: null,
+          });
+        } else {
+          updateSession(sessionId, updates);
+          if (capabilities) {
+            invokeCallbacks(eventListeners, "onDeviceReplaced", {
+              previous_device_type: "",
+              new_device_type: "",
+              capabilities: capabilities as IOCapabilities,
+              state: stateType,
+              transition: "",
+            });
+          }
+        }
+      })
+    );
+  }
 
-  // Speed changes (from Rust backend - when any listener changes speed)
-  const unlistenSpeedChange = await listen<number>(
-    `speed-changed:${sessionId}`,
-    (event) => {
-      updateSession(sessionId, { speed: event.payload });
-      invokeCallbacks(eventListeners, "onSpeedChange", event.payload);
-    }
-  );
-  unlistenFunctions.push(unlistenSpeedChange);
-
-  // Session suspended (stopped with buffer available, session stays alive)
-  const unlistenSuspended = await listen<SessionSuspendedPayload>(
-    `session-suspended:${sessionId}`,
-    (event) => {
-      const payload = event.payload;
-      updateSession(sessionId, {
-        ioState: "stopped",
-        buffer: {
-          available: payload.buffer_count > 0,
-          id: payload.buffer_id,
-          type: payload.buffer_type,
-          count: payload.buffer_count,
-          owningSessionId: sessionId,
-          startTimeUs: payload.time_range?.[0] ?? null,
-          endTimeUs: payload.time_range?.[1] ?? null,
-          name: useSessionStore.getState().sessions[sessionId]?.buffer?.name ?? null,
-          persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
-        },
-      });
-      // Register buffer ID so isBufferProfileId() recognises it immediately
-      if (payload.buffer_id) {
-        useSessionStore.getState().addKnownBufferId(payload.buffer_id);
-      }
-      // Fetch buffer metadata to populate name/persistent if not already known
-      if (payload.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
-        import("../api/buffer").then(({ getBufferMetadataById }) =>
-          getBufferMetadataById(payload.buffer_id!).then((meta) => {
-            if (meta) {
-              updateSession(sessionId, {
-                buffer: {
-                  ...useSessionStore.getState().sessions[sessionId]?.buffer!,
-                  name: meta.name,
-                  persistent: meta.persistent,
-                },
-              });
-            }
-          }).catch(() => {/* ignore */})
-        );
-      }
-      invokeCallbacks(eventListeners, "onSuspended", payload);
-    }
-  );
-  unlistenFunctions.push(unlistenSuspended);
-
-  // Session switched to buffer replay (realtime stop → buffer mode for ALL listeners)
-  const unlistenSwitchedToBuffer = await listen<SessionSwitchedToBufferPayload>(
-    `session-switched-to-buffer:${sessionId}`,
-    (event) => {
-      const payload = event.payload;
-      tlog.debug(`[sessionStore] Session '${sessionId}' switched to buffer replay: buffer=${payload.buffer_id}, count=${payload.buffer_count}`);
-      updateSession(sessionId, {
-        ioState: "stopped",
-        capabilities: payload.capabilities,
-        buffer: {
-          available: payload.buffer_count > 0,
-          id: payload.buffer_id,
-          type: payload.buffer_type,
-          count: payload.buffer_count,
-          owningSessionId: sessionId,
-          startTimeUs: payload.time_range?.[0] ?? null,
-          endTimeUs: payload.time_range?.[1] ?? null,
-          name: useSessionStore.getState().sessions[sessionId]?.buffer?.name ?? null,
-          persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
-        },
-      });
-      if (payload.buffer_id) {
-        useSessionStore.getState().addKnownBufferId(payload.buffer_id);
-      }
-      // Fetch buffer metadata for name/persistent
-      if (payload.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
-        import("../api/buffer").then(({ getBufferMetadataById }) =>
-          getBufferMetadataById(payload.buffer_id!).then((meta) => {
-            if (meta) {
-              updateSession(sessionId, {
-                buffer: {
-                  ...useSessionStore.getState().sessions[sessionId]?.buffer!,
-                  name: meta.name,
-                  persistent: meta.persistent,
-                },
-              });
-            }
-          }).catch(() => {/* ignore */})
-        );
-      }
-      invokeCallbacks(eventListeners, "onSwitchedToBuffer", payload);
-    }
-  );
-  unlistenFunctions.push(unlistenSwitchedToBuffer);
-
-  // Session resuming (new buffer being created, apps should clear state)
-  const unlistenResuming = await listen<SessionResumingPayload>(
-    `session-resuming:${sessionId}`,
-    (event) => {
-      tlog.debug(`[sessionStore] Session '${sessionId}' resuming with new buffer: ${JSON.stringify(event.payload)}`);
-      // Clear buffer state since we're starting fresh
-      updateSession(sessionId, {
-        ioState: "starting",
-        stoppedExplicitly: false,
-        streamEndedReason: null,
-        buffer: {
-          available: false,
-          id: event.payload.new_buffer_id,
-          type: null,
-          count: 0,
-          owningSessionId: sessionId,
-          startTimeUs: null,
-          endTimeUs: null,
-          name: null,
-          persistent: false,
-        },
-      });
-      invokeCallbacks(eventListeners, "onResuming", event.payload);
-    }
-  );
-  unlistenFunctions.push(unlistenResuming);
-
-  // Session device replaced (in-place swap — caps/state change, listeners preserved)
-  const unlistenDeviceReplaced = await listen<DeviceReplacedPayload>(
-    `session-device-replaced:${sessionId}`,
-    (event) => {
-      tlog.debug(`[sessionStore] Session '${sessionId}' device replaced: ${event.payload.previous_device_type} → ${event.payload.new_device_type} (${event.payload.transition})`);
-      updateSession(sessionId, {
-        capabilities: event.payload.capabilities,
-        ioState: event.payload.state as IOStateType,
-      });
-      invokeCallbacks(eventListeners, "onDeviceReplaced", event.payload);
-    }
-  );
-  unlistenFunctions.push(unlistenDeviceReplaced);
-
-  return unlistenFunctions;
+  return [];
 }
 
 /** Clean up session event listeners */
@@ -874,6 +660,14 @@ function cleanupEventListeners(eventListeners: SessionEventListeners) {
     unlisten();
   }
   eventListeners.unlistenFunctions = [];
+
+  // Unlisten from WebSocket message handlers and unsubscribe channel
+  for (const unlisten of eventListeners.wsUnlistenFunctions) {
+    unlisten();
+  }
+  eventListeners.wsUnlistenFunctions = [];
+  wsTransport.unsubscribe(eventListeners.sessionId);
+
   eventListeners.callbacks.clear();
   eventListeners.registeredListeners.clear();
 }
@@ -1084,6 +878,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             speed: null,
             playbackPosition: null,
             catalogPath: null,
+            bytesBufferId: null,
           };
           set((s) => ({
             sessions: { ...s.sessions, [sessionId]: errorSession },
@@ -1101,7 +896,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // Create the structure first and immediately set it in the store
       // This prevents race conditions where another caller also tries to create
       eventListeners = {
+        sessionId,
         unlistenFunctions: [],
+        wsUnlistenFunctions: [],
         callbacks: new Map(),
         heartbeatIntervalId: null,
         registeredListeners: new Set(),
@@ -1141,11 +938,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           updateSession
         );
 
-        // Start heartbeat interval to keep listeners alive in Rust backend.
-        // The Rust watchdog removes listeners without heartbeat after 30 seconds,
-        // then enters a 5-minute grace period (session paused, not destroyed).
-        // We send heartbeats every 5 seconds to stay well within the timeout.
-        if (!eventListeners.heartbeatIntervalId) {
+        // Heartbeat keepalive for the Rust IO session watchdog.
+        // When WS is connected, the WS server bridges its 10s heartbeat to
+        // touch IO listener timestamps — no invoke polling needed.
+        // Fall back to invoke-based heartbeats only when WS is unavailable.
+        if (!eventListeners.heartbeatIntervalId && !wsTransport.isConnected) {
           const heartbeatSessionId = sessionId;
           eventListeners.heartbeatIntervalId = setInterval(async () => {
             const listeners = get()._eventListeners[heartbeatSessionId];
@@ -1155,7 +952,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               `[heartbeat:${heartbeatSessionId}] sending for ${listeners.registeredListeners.size} listener(s)`
             );
 
-            // Send heartbeat for each registered listener
             for (const lid of listeners.registeredListeners) {
               try {
                 await registerSessionListener(heartbeatSessionId, lid);
@@ -1200,7 +996,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // The `listenerCount` variable may be stale by now.
     set((s) => {
       // Check if session already exists with a higher listener count
-      // (could have been updated by joiner-count-changed event)
+      // (could have been updated by session-info event)
       const existingSession = s.sessions[sessionId];
       const currentListenerCount = existingSession?.listenerCount ?? 0;
       const finalListenerCount = Math.max(listenerCount, currentListenerCount);
@@ -1232,6 +1028,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         speed: existingSession?.speed ?? null,
         playbackPosition: existingSession?.playbackPosition ?? null,
         catalogPath: existingSession?.catalogPath ?? null,
+        bytesBufferId: existingSession?.bytesBufferId ?? null,
       };
 
       return {
@@ -1385,9 +1182,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Note: Don't call leaveReaderSession - unregisterSessionListener already handles it.
     // The backend auto-destroys sessions when the last listener unregisters.
 
-    // Clear any pending frames for this session
-    pendingFramesMap.delete(sessionId);
-
     // Remove from store
     set((s) => {
       const { [sessionId]: _, ...remainingSessions } = s.sessions;
@@ -1406,9 +1200,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (eventListeners) {
       cleanupEventListeners(eventListeners);
     }
-
-    // Clear any pending frames for this session
-    pendingFramesMap.delete(sessionId);
 
     // Remove from store (no backend calls - session is already gone)
     set((s) => {
@@ -1434,7 +1225,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // If no more local callbacks, full cleanup (like cleanupDestroyedSession)
       if (eventListeners.callbacks.size === 0) {
         cleanupEventListeners(eventListeners);
-        pendingFramesMap.delete(sessionId);
 
         set((s) => {
           const { [sessionId]: _, ...remainingSessions } = s.sessions;
@@ -1645,7 +1435,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       tlog.info(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to buffer replay`);
       try {
         const capabilities = await switchSessionToBufferReplay(sessionId, 1.0);
-        // Buffer state will be updated by the session-switched-to-buffer event handler.
+        // Buffer state will be updated by the session-lifecycle event handler.
         // Use existing session buffer state for the log message if already available.
         const existingBuffer = get().sessions[sessionId]?.buffer;
         addSessionLog({
@@ -1663,7 +1453,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               ...s.sessions[sessionId],
               capabilities,
               ioState: "stopped",
-              // Buffer state is populated by the session-switched-to-buffer event handler
+              // Buffer state is populated by the session-lifecycle event handler
             },
           },
         }));
@@ -1999,8 +1789,16 @@ getEventListeners = () => useSessionStore.getState()._eventListeners;
 // Initialize the showAppError getter for error handling
 getGlobalShowAppError = () => useSessionStore.getState().showAppError;
 
-// Listen for buffer events from other windows
+// Listen for buffer events from other windows.
+// App-lifetime listeners; HMR guard prevents double-registration during dev.
+let _unlistenBufferMeta: (() => void) | null = null;
+let _unlistenBufferChanged: (() => void) | null = null;
+
 import("../events/registry").then(({ WINDOW_EVENTS }) => {
+  // Clean up previous registrations (HMR guard)
+  _unlistenBufferMeta?.();
+  _unlistenBufferChanged?.();
+
   // Rename / pin changes
   listen<{ bufferId: string; name?: string; persistent?: boolean }>(
     WINDOW_EVENTS.BUFFER_METADATA_UPDATED,
@@ -2024,7 +1822,7 @@ import("../events/registry").then(({ WINDOW_EVENTS }) => {
         useSessionStore.setState((s) => ({ sessions: { ...s.sessions, ...updated } }));
       }
     }
-  );
+  ).then(fn => { _unlistenBufferMeta = fn; });
 
   // Buffer deleted — remove from knownBufferIds and clear buffer state on affected sessions
   listen<{ deletedBufferIds?: string[] }>(
@@ -2055,7 +1853,7 @@ import("../events/registry").then(({ WINDOW_EVENTS }) => {
         useSessionStore.setState((s) => ({ sessions: { ...s.sessions, ...updated } }));
       }
     }
-  );
+  ).then(fn => { _unlistenBufferChanged = fn; });
 });
 
 // ============================================================================
@@ -2297,7 +2095,9 @@ export async function createAndStartMultiSourceSession(
   let eventListeners = store._eventListeners[sessionId];
   if (!eventListeners) {
     eventListeners = {
+      sessionId,
       unlistenFunctions: [],
+      wsUnlistenFunctions: [],
       callbacks: new Map(),
       heartbeatIntervalId: null,
       registeredListeners: new Set(),
@@ -2332,8 +2132,9 @@ export async function createAndStartMultiSourceSession(
         updateSession
       );
 
-      // Start heartbeat interval to keep listeners alive in Rust backend
-      if (!eventListeners.heartbeatIntervalId) {
+      // Heartbeat keepalive — WS server bridges its heartbeat to IO listeners.
+      // Fall back to invoke-based heartbeats only when WS is unavailable.
+      if (!eventListeners.heartbeatIntervalId && !wsTransport.isConnected) {
         const heartbeatSessionId = sessionId;
         eventListeners.heartbeatIntervalId = setInterval(async () => {
           const listeners = useSessionStore.getState()._eventListeners[heartbeatSessionId];
@@ -2400,7 +2201,9 @@ export async function joinMultiSourceSession(
   let eventListeners = store._eventListeners[sessionId];
   if (!eventListeners) {
     eventListeners = {
+      sessionId,
       unlistenFunctions: [],
+      wsUnlistenFunctions: [],
       callbacks: new Map(),
       heartbeatIntervalId: null,
       registeredListeners: new Set(),
@@ -2435,8 +2238,9 @@ export async function joinMultiSourceSession(
         updateSession
       );
 
-      // Start heartbeat interval to keep listeners alive in Rust backend
-      if (!eventListeners.heartbeatIntervalId) {
+      // Heartbeat keepalive — WS server bridges its heartbeat to IO listeners.
+      // Fall back to invoke-based heartbeats only when WS is unavailable.
+      if (!eventListeners.heartbeatIntervalId && !wsTransport.isConnected) {
         const heartbeatSessionId = sessionId;
         eventListeners.heartbeatIntervalId = setInterval(async () => {
           const listeners = useSessionStore.getState()._eventListeners[heartbeatSessionId];

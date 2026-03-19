@@ -43,15 +43,14 @@ import {
   getIOSessionCapabilities,
   getReaderSessionJoinerCount,
   getStateType,
-  parseStateString,
+  getOrphanedBufferIds,
   type IOCapabilities,
   type IOStateType,
-  type StreamEndedPayload,
+  type StreamEndedInfo,
   type SessionSuspendedPayload,
   type SessionSwitchedToBufferPayload,
   type SessionResumingPayload,
   type DeviceReplacedPayload,
-  type StateChangePayload,
   type CanTransmitFrame,
   type TransmitResult,
   type PlaybackPosition,
@@ -139,7 +138,7 @@ export interface UseIOSessionOptions {
   /** Callback when playback position updates (timestamp and frame index) */
   onTimeUpdate?: (position: PlaybackPosition) => void;
   /** Callback when stream ends (GVRET disconnect, PostgreSQL complete, etc.) */
-  onStreamEnded?: (payload: StreamEndedPayload) => void;
+  onStreamEnded?: (payload: StreamEndedInfo) => void;
   /** Callback when buffer playback completes naturally (reached end of buffer) */
   onStreamComplete?: () => void;
   /** Callback when playback speed changes (from any listener on this session) */
@@ -354,8 +353,6 @@ export function useIOSession(
   // Track the expected state from reinitialize - used to return correct state before React commits the update
   // This is needed because Zustand updates (setIoProfile) trigger re-renders before React state (setLocalState) is committed
   const expectedStateRef = useRef<{ sessionId: string; state: LocalSessionState } | null>(null);
-  // Track orphaned buffer IDs from buffer-orphaned events (set before session-lifecycle "destroyed")
-  const orphanedBufferIdsRef = useRef<string[]>([]);
 
   // Store callbacks in refs to keep them current
   const callbacksRef = useRef({
@@ -450,12 +447,8 @@ export function useIOSession(
   useEffect(() => {
     if (!effectiveSessionId) {
       setLocalState(null);
-      orphanedBufferIdsRef.current = [];
       return;
     }
-
-    // Reset orphaned buffer IDs when session changes
-    orphanedBufferIdsRef.current = [];
 
     let cancelled = false;
     const unlistenFns: UnlistenFn[] = [];
@@ -508,236 +501,16 @@ export function useIOSession(
         // Session may not exist yet - that's fine, openSession will create it
       }
 
-      // Set up event listeners that update local state
-      // These are in addition to sessionStore listeners (which handle callback routing)
-
-      // State changes
-      const unlistenState = await listen<StateChangePayload>(
-        `session-state:${effectiveSessionId}`,
-        (event) => {
-          const newState = parseStateString(event.payload.current);
-          const errorMessage =
-            newState === "error" && event.payload.current.startsWith("error:")
-              ? event.payload.current.slice(6)
-              : null;
-          // Clear expectedStateRef so this state update takes effect
-          // (expectedStateRef is only used during the brief reinitialize window)
-          expectedStateRef.current = null;
-          setLocalState((prev) =>
-            prev
-              ? { ...prev, ioState: newState, errorMessage, isReady: true }
-              : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenState);
-
-      // Joiner count changes
-      const unlistenJoiner = await listen<{ count: number }>(
-        `joiner-count-changed:${effectiveSessionId}`,
-        (event) => {
-          setLocalState((prev) =>
-            prev ? { ...prev, listenerCount: event.payload.count } : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenJoiner);
-
-      // Speed changes
-      const unlistenSpeed = await listen<number>(
-        `speed-changed:${effectiveSessionId}`,
-        (event) => {
-          setLocalState((prev) =>
-            prev ? { ...prev, speed: event.payload } : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenSpeed);
-
-      // Playback position
-      const unlistenPosition = await listen<PlaybackPosition>(
-        `playback-time:${effectiveSessionId}`,
-        (event) => {
-          setLocalState((prev) =>
-            prev ? { ...prev, playbackPosition: event.payload } : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenPosition);
-
-      // Stream complete
-      const unlistenComplete = await listen<string | boolean>(
-        `stream-complete:${effectiveSessionId}`,
-        (event) => {
-          // Clear expectedStateRef so this state update takes effect
-          expectedStateRef.current = null;
-          // Buffer readers emit "paused" to indicate they stay alive at end position.
-          // Other readers emit true/boolean and should transition to "stopped".
-          const newState = typeof event.payload === "string"
-            ? event.payload
-            : "stopped";
-          setLocalState((prev) =>
-            prev ? { ...prev, ioState: newState as IOStateType } : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenComplete);
-
-      // Stream ended
-      const unlistenEnded = await listen<StreamEndedPayload>(
-        `stream-ended:${effectiveSessionId}`,
-        (event) => {
-          const payload = event.payload;
-          // Clear expectedStateRef so this state update takes effect
-          expectedStateRef.current = null;
-          setLocalState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  ioState: "stopped",
-                  streamEndedReason: payload.reason as LocalSessionState["streamEndedReason"],
-                  buffer: {
-                    available: payload.buffer_available,
-                    id: payload.buffer_id,
-                    type: payload.buffer_type,
-                    count: payload.count,
-                    owningSessionId: payload.owning_session_id,
-                    startTimeUs: payload.time_range?.[0] ?? null,
-                    endTimeUs: payload.time_range?.[1] ?? null,
-                    name: prev.buffer?.name ?? null,
-                    persistent: prev.buffer?.persistent ?? false,
-                  },
-                }
-              : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenEnded);
-
-      // Session suspended
-      const unlistenSuspended = await listen<SessionSuspendedPayload>(
-        `session-suspended:${effectiveSessionId}`,
-        (event) => {
-          const payload = event.payload;
-          // Clear expectedStateRef so this state update takes effect
-          expectedStateRef.current = null;
-          setLocalState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  ioState: "stopped",
-                  buffer: {
-                    available: payload.buffer_count > 0,
-                    id: payload.buffer_id,
-                    type: payload.buffer_type,
-                    count: payload.buffer_count,
-                    owningSessionId: effectiveSessionId,
-                    startTimeUs: payload.time_range?.[0] ?? null,
-                    endTimeUs: payload.time_range?.[1] ?? null,
-                    name: prev.buffer?.name ?? null,
-                    persistent: prev.buffer?.persistent ?? false,
-                  },
-                }
-              : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenSuspended);
-
-      // Session switched to buffer replay (realtime stop → buffer mode for ALL listeners)
-      const unlistenSwitchedToBuffer = await listen<SessionSwitchedToBufferPayload>(
-        `session-switched-to-buffer:${effectiveSessionId}`,
-        (event) => {
-          const payload = event.payload;
-          expectedStateRef.current = null;
-          setLocalState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  ioState: "stopped",
-                  capabilities: payload.capabilities,
-                  buffer: {
-                    available: payload.buffer_count > 0,
-                    id: payload.buffer_id,
-                    type: payload.buffer_type,
-                    count: payload.buffer_count,
-                    owningSessionId: effectiveSessionId,
-                    startTimeUs: payload.time_range?.[0] ?? null,
-                    endTimeUs: payload.time_range?.[1] ?? null,
-                    name: prev.buffer?.name ?? null,
-                    persistent: prev.buffer?.persistent ?? false,
-                  },
-                }
-              : null
-          );
-          callbacksRef.current.onSwitchedToBuffer?.(payload);
-        }
-      );
-      unlistenFns.push(unlistenSwitchedToBuffer);
-
-      // Session resuming
-      const unlistenResuming = await listen<SessionResumingPayload>(
-        `session-resuming:${effectiveSessionId}`,
-        (event) => {
-          // Clear expectedStateRef so this state update takes effect
-          expectedStateRef.current = null;
-          setLocalState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  ioState: "running", // Session is starting again
-                  stoppedExplicitly: false,
-                  streamEndedReason: null,
-                  buffer: {
-                    available: false,
-                    id: event.payload.new_buffer_id,
-                    type: null,
-                    count: 0,
-                    owningSessionId: effectiveSessionId,
-                    startTimeUs: null,
-                    endTimeUs: null,
-                    name: null,
-                    persistent: false,
-                  },
-                }
-              : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenResuming);
-
-      // Session error
-      const unlistenError = await listen<string>(
-        `session-error:${effectiveSessionId}`,
-        (event) => {
-          setLocalState((prev) =>
-            prev
-              ? { ...prev, ioState: "error", errorMessage: event.payload }
-              : null
-          );
-        }
-      );
-      unlistenFns.push(unlistenError);
-
-      // Buffer orphaned - fires when session's buffers are orphaned (before session-lifecycle "destroyed").
-      // Captures buffer IDs so the onDestroyed callback can transition to buffer mode.
-      const unlistenBufferOrphaned = await listen<{ buffer_id: string; buffer_name: string; buffer_type: string; count: number }>(
-        `buffer-orphaned:${effectiveSessionId}`,
-        (event) => {
-          if (cancelled) return;
-          const id = event.payload.buffer_id;
-          if (id && !orphanedBufferIdsRef.current.includes(id)) {
-            orphanedBufferIdsRef.current = [...orphanedBufferIdsRef.current, id];
-          }
-        }
-      );
-      unlistenFns.push(unlistenBufferOrphaned);
+      // Session-scoped event listeners removed — all push communication now flows
+      // through the WebSocket handlers in sessionStore. Only global Tauri events
+      // remain (session-lifecycle for destroy, listener-evicted).
 
       // Session destroyed externally (from Session Manager, last-listener auto-destroy, etc.)
       // This is a global event - we filter by our session ID.
+      // Orphaned buffer IDs are fetched from the post-session cache.
       const unlistenLifecycle = await listen<{ session_id: string; event_type: string }>(
         "session-lifecycle",
-        (event) => {
+        async (event) => {
           if (cancelled) return;
           if (
             event.payload.event_type === "destroyed" &&
@@ -753,9 +526,13 @@ export function useIOSession(
             useSessionStore.getState().cleanupDestroyedSession(effectiveSessionId);
             // Clear local state
             setLocalState(null);
-            // Notify higher-level hooks with orphaned buffer IDs
-            const bufferIds = orphanedBufferIdsRef.current;
-            orphanedBufferIdsRef.current = [];
+            // Fetch orphaned buffer IDs from post-session cache
+            let bufferIds: string[] = [];
+            try {
+              bufferIds = await getOrphanedBufferIds(effectiveSessionId);
+            } catch {
+              // Cache may have expired
+            }
             callbacksRef.current.onDestroyed?.(bufferIds);
           }
         }

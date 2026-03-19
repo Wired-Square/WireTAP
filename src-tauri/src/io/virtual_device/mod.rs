@@ -12,7 +12,6 @@
 //   If interfaces is absent, a single bus is created with defaults.
 
 use async_trait::async_trait;
-use serde::Serialize;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
@@ -23,8 +22,8 @@ use tokio::time::{interval, Duration};
 
 use crate::buffer_store::{self, BufferType, TimestampedByte};
 use crate::io::{
-    emit_device_connected, emit_frames, emit_stream_ended, emit_to_session, now_us,
-    CanTransmitFrame, FrameMessage, IOCapabilities, IODevice, IOState, Protocol,
+    emit_device_connected, emit_stream_ended, now_us, signal_bytes_ready, signal_frames_ready,
+    CanTransmitFrame, FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle,
     TransmitPayload, TransmitResult, VirtualBusState,
 };
 
@@ -100,13 +99,6 @@ pub const MODBUS_REGISTERS: &[u32] = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 enum LoopbackMessage {
     CanFrame(CanTransmitFrame),
     RawBytes(Vec<u8>),
-}
-
-/// Payload for raw bytes event
-#[derive(Clone, Serialize)]
-struct RawBytesPayload {
-    bytes: Vec<TimestampedByte>,
-    source: String,
 }
 
 // ============================================================================
@@ -235,7 +227,6 @@ impl IODevice for VirtualDeviceReader {
 
         // Emit connected event
         emit_device_connected(
-            &self.app,
             &self.session_id,
             "virtual",
             &format!("virtual://{}", traffic_type_name.to_lowercase()),
@@ -304,7 +295,7 @@ impl IODevice for VirtualDeviceReader {
         }
 
         tlog!("[Virtual:{}] Stream ended", self.session_id);
-        emit_stream_ended(&self.app, &self.session_id, "stopped", "Virtual");
+        emit_stream_ended(&self.session_id, "stopped", "Virtual");
 
         self.state = IOState::Stopped;
         Ok(())
@@ -446,7 +437,7 @@ pub fn canfd_patterns() -> Vec<(u32, Vec<u8>)> {
 
 /// Spawn a background task that generates traffic for a single bus interface
 fn spawn_bus_generator(
-    app: AppHandle,
+    _app: AppHandle,
     session_id: String,
     traffic_type: VirtualTrafficType,
     iface: VirtualInterfaceConfig,
@@ -459,6 +450,7 @@ fn spawn_bus_generator(
         let mut current_interval_us = (1_000_000.0 / hz) as u64;
         let mut ticker = interval(Duration::from_micros(current_interval_us));
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut throttle = SignalThrottle::new();
 
         // Pre-compute CAN-FD patterns (heap-allocated, done once)
         let canfd_pats = if traffic_type == VirtualTrafficType::CanFd {
@@ -525,8 +517,10 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
-                    emit_frames(&app, &session_id, vec![frame]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    if throttle.should_signal("frames-ready") {
+                        signal_frames_ready(&session_id);
+                    }
                 }
                 VirtualTrafficType::CanFd => {
                     let pattern_idx = (counter as usize) % (canfd_pats.len() + 1);
@@ -554,8 +548,10 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
-                    emit_frames(&app, &session_id, vec![frame]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    if throttle.should_signal("frames-ready") {
+                        signal_frames_ready(&session_id);
+                    }
                 }
                 VirtualTrafficType::Modbus => {
                     let reg_idx = (counter as usize) % MODBUS_REGISTERS.len();
@@ -577,8 +573,10 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
-                    emit_frames(&app, &session_id, vec![frame]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    if throttle.should_signal("frames-ready") {
+                        signal_frames_ready(&session_id);
+                    }
                 }
                 VirtualTrafficType::Serial => {
                     let byte_val = (counter & 0xFF) as u8;
@@ -590,12 +588,10 @@ fn spawn_bus_generator(
                         })
                         .collect();
 
-                    buffer_store::append_raw_bytes_to_session(&session_id, entries.clone());
-                    let payload = RawBytesPayload {
-                        bytes: entries,
-                        source: "virtual".to_string(),
-                    };
-                    emit_to_session(&app, "serial-raw-bytes", &session_id, payload);
+                    buffer_store::append_raw_bytes_to_session(&session_id, entries);
+                    if throttle.should_signal("bytes-ready") {
+                        signal_bytes_ready(&session_id);
+                    }
                 }
             }
 
@@ -610,13 +606,14 @@ fn spawn_bus_generator(
 
 /// Spawn a task that handles loopback: echoes transmitted frames/bytes back as received
 fn spawn_loopback_handler(
-    app: AppHandle,
+    _app: AppHandle,
     session_id: String,
     traffic_type: VirtualTrafficType,
     cancel_flag: Arc<AtomicBool>,
     mut loopback_rx: tokio::sync::mpsc::UnboundedReceiver<LoopbackMessage>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
+        let mut throttle = SignalThrottle::new();
         loop {
             if cancel_flag.load(Ordering::Relaxed) {
                 break;
@@ -639,8 +636,10 @@ fn spawn_loopback_handler(
                         incomplete: None,
                         direction: Some("rx".to_string()),
                     };
-                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
-                    emit_frames(&app, &session_id, vec![frame]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    if throttle.should_signal("frames-ready") {
+                        signal_frames_ready(&session_id);
+                    }
                 }
                 Some(LoopbackMessage::RawBytes(bytes)) => {
                     let ts = now_us();
@@ -653,12 +652,10 @@ fn spawn_loopback_handler(
                             bus: 0,
                         })
                         .collect();
-                    buffer_store::append_raw_bytes_to_session(&session_id, entries.clone());
-                    let payload = RawBytesPayload {
-                        bytes: entries,
-                        source: "virtual".to_string(),
-                    };
-                    emit_to_session(&app, "serial-raw-bytes", &session_id, payload);
+                    buffer_store::append_raw_bytes_to_session(&session_id, entries);
+                    if throttle.should_signal("bytes-ready") {
+                        signal_bytes_ready(&session_id);
+                    }
                 }
                 None => {
                     // Sender dropped (device stopped) — exit

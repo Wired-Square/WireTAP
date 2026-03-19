@@ -28,6 +28,8 @@ interface DataViewTimelineSectionProps {
   currentFrameIndex?: number;
   /** Called when user scrubs to a new frame index (for frame mode) */
   onFrameChange?: (frameIndex: number) => void;
+  /** Whether to use local timezone for time display */
+  useLocalTimezone?: boolean;
 }
 
 export default function DataViewTimelineSection({
@@ -42,6 +44,7 @@ export default function DataViewTimelineSection({
   totalFrames,
   currentFrameIndex,
   onFrameChange,
+  useLocalTimezone = false,
 }: DataViewTimelineSectionProps) {
   if (!show) {
     return null;
@@ -61,6 +64,7 @@ export default function DataViewTimelineSection({
         showLabels={true}
         displayTimeFormat={displayTimeFormat}
         streamStartTimeUs={streamStartTimeUs ?? undefined}
+        useLocalTimezone={useLocalTimezone}
       />
     </div>
   );

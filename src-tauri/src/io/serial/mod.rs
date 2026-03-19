@@ -4,7 +4,7 @@
 // Provides cross-platform serial communication for WireTAP.
 //
 // Features:
-// - Raw byte streaming (serial-raw-bytes events)
+// - Raw byte streaming (bytes-ready signal + buffer fetch)
 // - Framed message extraction (SLIP, Modbus RTU, delimiter-based)
 // - Bidirectional communication (read + transmit)
 

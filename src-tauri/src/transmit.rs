@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter};
 
-use crate::io::{self, CanTransmitFrame, IOCapabilities};
+use crate::io::{self, CanTransmitFrame, IOCapabilities, SignalThrottle};
 use crate::settings::{load_settings, IOProfile};
 
 // ============================================================================
@@ -211,7 +211,7 @@ pub async fn get_profile_usage(
 /// Transmit a CAN frame through an existing IO session
 #[tauri::command]
 pub async fn io_transmit_can_frame(
-    app: AppHandle,
+    _app: AppHandle,
     session_id: String,
     frame: CanTransmitFrame,
 ) -> Result<crate::io::TransmitResult, String> {
@@ -227,14 +227,14 @@ pub async fn io_transmit_can_frame(
         result.success,
         result.error.as_deref(),
     );
-    let _ = app.emit("transmit-history-updated", ());
+    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
     Ok(result)
 }
 
 /// Transmit raw serial bytes through an IO session
 #[tauri::command]
 pub async fn io_transmit_serial(
-    app: AppHandle,
+    _app: AppHandle,
     session_id: String,
     bytes: Vec<u8>,
 ) -> Result<crate::io::TransmitResult, String> {
@@ -247,7 +247,7 @@ pub async fn io_transmit_serial(
         result.success,
         result.error.as_deref(),
     );
-    let _ = app.emit("transmit-history-updated", ());
+    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
     Ok(result)
 }
 
@@ -363,11 +363,10 @@ pub async fn io_start_repeat_transmit(
     let queue_id_for_task = queue_id.clone();
 
     let handle = tauri::async_runtime::spawn(async move {
-        const NOTIFY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
-        let mut last_notify: Option<std::time::Instant> = None;
+        let mut throttle = SignalThrottle::new();
 
-        // Write this frame's transmit result to SQLite and rate-limit the UI notification.
-        let write_and_notify = |app: &AppHandle, result: &Result<crate::io::TransmitResult, String>, last_notify: &mut Option<std::time::Instant>| -> (bool, Option<String>) {
+        // Write this frame's transmit result to SQLite and throttle the UI notification.
+        let write_and_notify = |_app: &AppHandle, result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> (bool, Option<String>) {
             let (success, error) = match result {
                 Ok(r) => (r.success, r.error.clone()),
                 Err(e) => (false, Some(e.clone())),
@@ -383,10 +382,8 @@ pub async fn io_start_repeat_transmit(
                 success,
                 error.as_deref(),
             );
-            let should_emit = last_notify.as_ref().map_or(true, |t| t.elapsed() >= NOTIFY_INTERVAL);
-            if should_emit {
-                let _ = app.emit("transmit-history-updated", ());
-                *last_notify = Some(std::time::Instant::now());
+            if throttle.should_signal("transmit-updated") {
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
             }
             (success, error)
         };
@@ -398,7 +395,7 @@ pub async fn io_start_repeat_transmit(
         }
 
         let (result, should_stop) = do_transmit(&session_id_clone, &frame).await;
-        let (_, error) = write_and_notify(&app, &result, &mut last_notify);
+        let (_, error) = write_and_notify(&app, &result, &mut throttle);
 
         if should_stop {
             let reason = error.unwrap_or_else(|| "Permanent error".to_string());
@@ -410,7 +407,7 @@ pub async fn io_start_repeat_transmit(
                 queue_id: queue_id_for_task.clone(),
                 reason,
             });
-            let _ = app.emit("transmit-history-updated", ());
+            crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
             return;
         }
 
@@ -430,7 +427,7 @@ pub async fn io_start_repeat_transmit(
 
             // Transmit with retry for transient errors
             let (result, should_stop) = do_transmit(&session_id_clone, &frame).await;
-            let (_, error) = write_and_notify(&app, &result, &mut last_notify);
+            let (_, error) = write_and_notify(&app, &result, &mut throttle);
 
             // Stop on permanent errors (device gone, session invalid)
             if should_stop {
@@ -444,7 +441,7 @@ pub async fn io_start_repeat_transmit(
                     queue_id: queue_id_for_task.clone(),
                     reason,
                 });
-                let _ = app.emit("transmit-history-updated", ());
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
                 break;
             }
         }
@@ -524,10 +521,9 @@ pub async fn io_start_serial_repeat_transmit(
     let queue_id_for_task = queue_id.clone();
 
     let handle = tauri::async_runtime::spawn(async move {
-        const NOTIFY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
-        let mut last_notify: Option<std::time::Instant> = None;
+        let mut throttle = SignalThrottle::new();
 
-        let write_and_notify = |result: &Result<crate::io::TransmitResult, String>, last_notify: &mut Option<std::time::Instant>| -> Option<String> {
+        let write_and_notify = |result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> Option<String> {
             let (success, error) = match result {
                 Ok(r) => (r.success, r.error.clone()),
                 Err(e) => (false, Some(e.clone())),
@@ -540,10 +536,8 @@ pub async fn io_start_serial_repeat_transmit(
                 success,
                 error.as_deref(),
             );
-            let should_emit = last_notify.as_ref().map_or(true, |t| t.elapsed() >= NOTIFY_INTERVAL);
-            if should_emit {
-                let _ = app.emit("transmit-history-updated", ());
-                *last_notify = Some(std::time::Instant::now());
+            if throttle.should_signal("transmit-updated") {
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
             }
             error
         };
@@ -555,7 +549,7 @@ pub async fn io_start_serial_repeat_transmit(
         }
 
         let (result, should_stop) = do_serial_transmit(&session_id_clone, &bytes).await;
-        let error = write_and_notify(&result, &mut last_notify);
+        let error = write_and_notify(&result, &mut throttle);
 
         if should_stop {
             let reason = error.unwrap_or_else(|| "Permanent error".to_string());
@@ -567,7 +561,7 @@ pub async fn io_start_serial_repeat_transmit(
                 queue_id: queue_id_for_task.clone(),
                 reason,
             });
-            let _ = app.emit("transmit-history-updated", ());
+            crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
             return;
         }
 
@@ -587,7 +581,7 @@ pub async fn io_start_serial_repeat_transmit(
 
             // Transmit with retry for transient errors
             let (result, should_stop) = do_serial_transmit(&session_id_clone, &bytes).await;
-            let error = write_and_notify(&result, &mut last_notify);
+            let error = write_and_notify(&result, &mut throttle);
 
             // Stop on permanent errors (device gone, session invalid)
             if should_stop {
@@ -601,7 +595,7 @@ pub async fn io_start_serial_repeat_transmit(
                     queue_id: queue_id_for_task.clone(),
                     reason,
                 });
-                let _ = app.emit("transmit-history-updated", ());
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
                 break;
             }
         }
@@ -666,11 +660,10 @@ pub async fn io_start_repeat_group(
     );
 
     let handle = tauri::async_runtime::spawn(async move {
-        const NOTIFY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
-        let mut last_notify: Option<std::time::Instant> = None;
+        let mut throttle = SignalThrottle::new();
 
-        // Write a CAN frame result to SQLite and rate-limit the UI notification.
-        let write_frame = |frame: &CanTransmitFrame, result: &Result<crate::io::TransmitResult, String>, last_notify: &mut Option<std::time::Instant>| -> Option<String> {
+        // Write a CAN frame result to SQLite and throttle the UI notification.
+        let write_frame = |frame: &CanTransmitFrame, result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> Option<String> {
             let (success, error) = match result {
                 Ok(r) => (r.success, r.error.clone()),
                 Err(e) => (false, Some(e.clone())),
@@ -686,10 +679,8 @@ pub async fn io_start_repeat_group(
                 success,
                 error.as_deref(),
             );
-            let should_emit = last_notify.as_ref().map_or(true, |t| t.elapsed() >= NOTIFY_INTERVAL);
-            if should_emit {
-                let _ = app.emit("transmit-history-updated", ());
-                *last_notify = Some(std::time::Instant::now());
+            if throttle.should_signal("transmit-updated") {
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
             }
             error
         };
@@ -702,7 +693,7 @@ pub async fn io_start_repeat_group(
 
         for frame in &frames {
             let (result, should_stop) = do_transmit(&session_id_clone, frame).await;
-            let error = write_frame(frame, &result, &mut last_notify);
+            let error = write_frame(frame, &result, &mut throttle);
 
             if should_stop {
                 let reason = error.unwrap_or_else(|| "Permanent error".to_string());
@@ -714,7 +705,7 @@ pub async fn io_start_repeat_group(
                     queue_id: group_id_for_task.clone(),
                     reason,
                 });
-                let _ = app.emit("transmit-history-updated", ());
+                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
                 return;
             }
         }
@@ -737,7 +728,7 @@ pub async fn io_start_repeat_group(
             for frame in &frames {
                 // Transmit with retry for transient errors
                 let (result, should_stop) = do_transmit(&session_id_clone, frame).await;
-                let error = write_frame(frame, &result, &mut last_notify);
+                let error = write_frame(frame, &result, &mut throttle);
 
                 // Stop on permanent errors (device gone, session invalid)
                 if should_stop {
@@ -751,7 +742,7 @@ pub async fn io_start_repeat_group(
                         queue_id: group_id_for_task.clone(),
                         reason,
                     });
-                    let _ = app.emit("transmit-history-updated", ());
+                    crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
                     break 'outer;
                 }
             }

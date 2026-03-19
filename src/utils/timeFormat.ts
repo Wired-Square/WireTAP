@@ -6,49 +6,62 @@ import React from "react";
  * Formats a timestamp in microseconds into ISO-like string with microsecond precision.
  * Epoch timestamps (≥ year 2000): full ISO "YYYY-MM-DDTHH:MM:SS.mmmmmm Z"
  * Relative/normalised timestamps (< year 2000): time-only "HH:MM:SS.mmmuuuZ"
+ *
+ * @param useLocal When true, format in local timezone instead of UTC.
  */
-export function formatIsoUs(ts_us: number): string {
+export function formatIsoUs(ts_us: number, useLocal?: boolean): string {
   const msPart = Math.floor(ts_us / 1000);
   const usRemainder = ts_us % 1000;
-  const isoMs = new Date(msPart).toISOString(); // includes milliseconds
+  const date = new Date(msPart);
   const isRelative = ts_us < 946684800_000_000;
+
+  if (useLocal && !isRelative) {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    const seconds = date.getSeconds().toString().padStart(2, "0");
+    const ms = date.getMilliseconds().toString().padStart(3, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}${usRemainder.toString().padStart(3, "0")}`;
+  }
+
+  const isoMs = date.toISOString();
   if (isRelative) {
-    // Strip date portion: "1970-01-01T00:00:14.865Z" → "00:00:14.865"
-    const timePart = isoMs.slice(11, -1); // "HH:MM:SS.mmm"
+    const timePart = isoMs.slice(11, -1);
     return `${timePart}${usRemainder.toString().padStart(3, "0")}Z`;
   }
-  const isoNoZ = isoMs.slice(0, -1); // drop trailing Z
+  const isoNoZ = isoMs.slice(0, -1);
   return `${isoNoZ}${usRemainder.toString().padStart(3, "0")}Z`;
 }
 
 /**
- * Formats a timestamp in microseconds into a human-readable UTC date and time.
+ * Formats a timestamp in microseconds into a human-readable date and time.
  * Epoch timestamps (≥ year 2000): "YYYY-MM-DD HH:MM:SS.mmmuuu"
  * Relative/normalised timestamps (< year 2000): "HH:MM:SS.mmmuuu"
+ *
+ * @param useLocal When true, format in local timezone instead of UTC.
  */
-export function formatHumanUs(ts_us: number): string {
+export function formatHumanUs(ts_us: number, useLocal?: boolean): string {
   const msPart = Math.floor(ts_us / 1000);
   const usRemainder = ts_us % 1000;
   const date = new Date(msPart);
 
-  // Timestamps before year 2000 in µs are relative (e.g. normalised CSV imports).
-  // Show elapsed time only, no calendar date.
   const isRelative = ts_us < 946684800_000_000;
 
   const datePart = isRelative
     ? ""
     : (() => {
-        const year = date.getUTCFullYear();
-        const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-        const day = date.getUTCDate().toString().padStart(2, "0");
+        const year = useLocal ? date.getFullYear() : date.getUTCFullYear();
+        const month = (useLocal ? date.getMonth() + 1 : date.getUTCMonth() + 1).toString().padStart(2, "0");
+        const day = (useLocal ? date.getDate() : date.getUTCDate()).toString().padStart(2, "0");
         return `${year}-${month}-${day} `;
       })();
 
-  // Format time part (UTC)
-  const hours = date.getUTCHours().toString().padStart(2, "0");
-  const minutes = date.getUTCMinutes().toString().padStart(2, "0");
-  const seconds = date.getUTCSeconds().toString().padStart(2, "0");
-  const ms = date.getUTCMilliseconds().toString().padStart(3, "0");
+  const hours = (useLocal ? date.getHours() : date.getUTCHours()).toString().padStart(2, "0");
+  const minutes = (useLocal ? date.getMinutes() : date.getUTCMinutes()).toString().padStart(2, "0");
+  const seconds = (useLocal ? date.getSeconds() : date.getUTCSeconds()).toString().padStart(2, "0");
+  const ms = (useLocal ? date.getMilliseconds() : date.getUTCMilliseconds()).toString().padStart(3, "0");
 
   return `${datePart}${hours}:${minutes}:${seconds}.${ms}${usRemainder.toString().padStart(3, "0")}`;
 }

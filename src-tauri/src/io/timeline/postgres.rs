@@ -11,8 +11,9 @@ use tokio_postgres::{NoTls, Row};
 
 use super::base::{TimelineControl, TimelineReaderState};
 use crate::io::{
-    emit_frames, emit_stream_ended, emit_to_session, emit_buffer_orphaned, emit_buffer_created,
-    FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition,
+    emit_session_error, emit_stream_ended, emit_buffer_changed, signal_playback_position,
+    signal_frames_ready, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition,
+    SignalThrottle,
 };
 use crate::buffer_store::{self, BufferType};
 
@@ -136,12 +137,11 @@ impl IODevice for PostgresReader {
         // Create buffer synchronously BEFORE spawning task (matches MultiSource pattern)
         // This prevents double buffer creation when resume_session_fresh() is called,
         // and ensures buffer exists before any frames are emitted.
-        let orphaned = buffer_store::orphan_buffers_for_session(&session_id);
-        emit_buffer_orphaned(&app, &session_id, orphaned);
+        let _orphaned = buffer_store::orphan_buffers_for_session(&session_id);
 
         let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
-        emit_buffer_created(&app, &session_id, &buffer_id, &session_id, "frames");
         let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
+        emit_buffer_changed(&session_id);
 
         let config = self.config.clone();
         let options = self.options.clone();
@@ -232,9 +232,7 @@ fn spawn_postgres_stream(
         {
             // run_postgres_stream emits stream-ended on error paths before returning Err,
             // so we only need to emit session-error for additional context.
-            emit_to_session(
-                &app_handle,
-                "session-error",
+            emit_session_error(
                 &session_id,
                 format!("PostgreSQL error: {}", e),
             );
@@ -243,7 +241,7 @@ fn spawn_postgres_stream(
 }
 
 async fn run_postgres_stream(
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
     session_id: String,
     config: PostgresConfig,
     options: PostgresReaderOptions,
@@ -266,7 +264,7 @@ async fn run_postgres_stream(
         Ok(conn) => conn,
         Err(e) => {
             stream_reason = "error";
-            emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
+            emit_stream_ended(&session_id, stream_reason, "PostgreSQL");
             return Err(format!(
                 "Failed to connect to PostgreSQL at {}:{}/{}: {}",
                 config.host, config.port, config.database, e
@@ -295,7 +293,7 @@ async fn run_postgres_stream(
         Ok(tx) => tx,
         Err(e) => {
             stream_reason = "error";
-            emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
+            emit_stream_ended(&session_id, stream_reason, "PostgreSQL");
             return Err(format!("Failed to start transaction: {}", e).into());
         }
     };
@@ -305,7 +303,7 @@ async fn run_postgres_stream(
         Ok(p) => p,
         Err(e) => {
             stream_reason = "error";
-            emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
+            emit_stream_ended(&session_id, stream_reason, "PostgreSQL");
             return Err(format!("Failed to bind query: {}", e).into());
         }
     };
@@ -385,13 +383,13 @@ async fn run_postgres_stream(
     .await
     {
         stream_reason = "error";
-        emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
+        emit_stream_ended(&session_id, stream_reason, "PostgreSQL");
         return Err(e);
     }
 
     if frame_queue.is_empty() {
         tlog!("[PostgreSQL:{}] No frames returned from query", session_id);
-        emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
+        emit_stream_ended(&session_id, stream_reason, "PostgreSQL");
         return Ok(());
     }
 
@@ -406,6 +404,7 @@ async fn run_postgres_stream(
 
     // High-speed batch buffer for when delays are < 1ms
     let mut batch_buffer: Vec<FrameMessage> = Vec::new();
+    let mut throttle = SignalThrottle::new();
 
     // Track wall-clock time vs playback time for proper pacing
     // These are reset when speed changes to avoid a flood of frames
@@ -500,29 +499,28 @@ async fn run_postgres_stream(
         // (frontend expects absolute time, not relative to stream start)
         let playback_time_us = (frame_time_secs * 1_000_000.0) as i64;
 
-        // When pacing is disabled, use maximum batch size and emit without delays
+        // When pacing is disabled, use maximum batch size
         if !is_pacing {
             batch_buffer.push(frame);
             total_emitted += 1;
             last_frame_time_secs = Some(frame_time_secs);
 
-            // Emit batch when full (use larger batch for no-limit mode)
             if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
-                // Buffer frames for replay
-                buffer_store::append_frames_to_session(&session_id,batch_buffer.clone());
+                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
 
-                emit_frames(&app_handle, &session_id, batch_buffer.clone());
-                batch_buffer.clear();
+                if throttle.should_signal("frames-ready") {
+                    signal_frames_ready(&session_id);
+                }
 
-                // Emit playback time with the batch
-                emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
+                crate::io::store_playback_position(&session_id, PlaybackPosition {
                     timestamp_us: playback_time_us,
-                    frame_index: (total_emitted - 1) as usize, // Index of last emitted frame
+                    frame_index: (total_emitted - 1) as usize,
                     frame_count: Some(total_emitted as usize),
                 });
+                if throttle.should_signal("playback-position") {
+                    signal_playback_position(&session_id);
+                }
 
-                // Brief delay to allow UI event loop to process button clicks
-                // 2ms per 1000 frames = 2 seconds total for 1M frames
                 tokio::time::sleep(Duration::from_millis(NO_LIMIT_YIELD_MS)).await;
             }
             continue;
@@ -533,7 +531,6 @@ async fn run_postgres_stream(
             let delta_secs = frame_time_secs - last_time;
             (delta_secs * 1000.0 / current_speed).max(0.0)
         } else {
-            // First frame - no delay
             0.0
         };
 
@@ -545,20 +542,15 @@ async fn run_postgres_stream(
             batch_buffer.push(frame);
             total_emitted += 1;
 
-            // Check if we should emit the batch:
-            // 1. Batch is full, OR
-            // 2. It's been long enough since last pacing check (time-based pacing)
             let time_since_pacing = last_pacing_check.elapsed().as_millis() as u64;
             let should_emit = batch_buffer.len() >= HIGH_SPEED_BATCH_SIZE
                 || time_since_pacing >= PACING_INTERVAL_MS;
 
             if should_emit && !batch_buffer.is_empty() {
-                // Calculate where we should be in wall-clock time (using baseline for speed changes)
                 let playback_elapsed_secs = frame_time_secs - playback_baseline_secs;
                 let expected_wall_time_ms = (playback_elapsed_secs * 1000.0 / current_speed) as u64;
                 let actual_wall_time_ms = wall_clock_baseline.elapsed().as_millis() as u64;
 
-                // If we're ahead of schedule, wait to catch up
                 if expected_wall_time_ms > actual_wall_time_ms {
                     let wait_ms = expected_wall_time_ms - actual_wall_time_ms;
                     if wait_ms > 0 {
@@ -568,39 +560,37 @@ async fn run_postgres_stream(
 
                 last_pacing_check = std::time::Instant::now();
 
-                // Buffer frames for replay
-                buffer_store::append_frames_to_session(&session_id,batch_buffer.clone());
+                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
 
-                emit_frames(&app_handle, &session_id, batch_buffer.clone());
-                batch_buffer.clear();
+                if throttle.should_signal("frames-ready") {
+                    signal_frames_ready(&session_id);
+                }
 
-                // Emit playback time with the batch
-                emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
+                crate::io::store_playback_position(&session_id, PlaybackPosition {
                     timestamp_us: playback_time_us,
                     frame_index: (total_emitted - 1) as usize,
                     frame_count: Some(total_emitted as usize),
                 });
+                if throttle.should_signal("playback-position") {
+                    signal_playback_position(&session_id);
+                }
 
-                // Yield to allow event processing (prevents app from becoming unresponsive)
                 tokio::task::yield_now().await;
 
-                // Pause check (cancel is handled at loop start)
                 if control.is_paused() {
-                    // Will be handled at start of next loop iteration
                     continue;
                 }
             }
         } else {
-            // Normal speed: emit any pending batch first
+            // Normal speed: store any pending batch first
             if !batch_buffer.is_empty() {
-                // Buffer frames for replay
-                buffer_store::append_frames_to_session(&session_id,batch_buffer.clone());
-
-                emit_frames(&app_handle, &session_id, batch_buffer.clone());
-                batch_buffer.clear();
+                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
+                if throttle.should_signal("frames-ready") {
+                    signal_frames_ready(&session_id);
+                }
             }
 
-            // Sleep for the inter-frame delay (cap at 10 seconds to avoid long waits)
+            // Sleep for the inter-frame delay (cap at 10 seconds)
             let capped_delay_ms = delay_ms.min(10000.0);
             if capped_delay_ms >= 1.0 {
                 tokio::time::sleep(Duration::from_millis(capped_delay_ms as u64)).await;
@@ -608,33 +598,34 @@ async fn run_postgres_stream(
 
             // Re-check pause after sleeping (cancel handled at loop start)
             if control.is_paused() {
-                // Put frame back and continue (will be re-processed after unpause)
                 frame_queue.push_front(frame);
                 continue;
             }
 
-            // Emit single frame with active listener filtering
-            // Buffer frames for replay
-            buffer_store::append_frames_to_session(&session_id,vec![frame.clone()]);
-
-            emit_frames(&app_handle, &session_id, vec![frame]);
+            // Store single frame
+            buffer_store::append_frames_to_session(&session_id, vec![frame]);
             total_emitted += 1;
 
-            // Emit playback time
-            emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
+            if throttle.should_signal("frames-ready") {
+                signal_frames_ready(&session_id);
+            }
+
+            crate::io::store_playback_position(&session_id, PlaybackPosition {
                 timestamp_us: playback_time_us,
                 frame_index: (total_emitted - 1) as usize,
                 frame_count: Some(total_emitted as usize),
             });
+            if throttle.should_signal("playback-position") {
+                signal_playback_position(&session_id);
+            }
         }
     }
 
-    // Emit any remaining frames in batch buffer with active listener filtering
+    // Store and signal any remaining frames
     if !batch_buffer.is_empty() {
-        // Buffer frames for replay
-        buffer_store::append_frames_to_session(&session_id,batch_buffer.clone());
-
-        emit_frames(&app_handle, &session_id, batch_buffer);
+        buffer_store::append_frames_to_session(&session_id, batch_buffer);
+        throttle.flush();
+        signal_frames_ready(&session_id);
     }
 
     // Only emit stream-ended for natural completion or error, not for cancellation.
@@ -650,7 +641,7 @@ async fn run_postgres_stream(
             "[PostgreSQL:{}] Stream ended (reason: {}, fetched: {}, emitted: {})",
             session_id, stream_reason, total_fetched, total_emitted
         );
-        emit_stream_ended(&app_handle, &session_id, stream_reason, "PostgreSQL");
+        emit_stream_ended(&session_id, stream_reason, "PostgreSQL");
     }
 
     Ok(())

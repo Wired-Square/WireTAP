@@ -37,7 +37,7 @@ import {
   createDefaultBusMappings,
   listActiveSessions,
   getProfilesUsage,
-  type StreamEndedPayload,
+  type StreamEndedInfo,
   type GvretDeviceInfo,
   type BusMapping,
   type ActiveSessionInfo,
@@ -750,7 +750,7 @@ export default function IoSourcePickerDialog({
 
   // Handle load completion (internal state only)
   const handleInternalLoadComplete = useCallback(
-    async (payload: StreamEndedPayload) => {
+    async (payload: StreamEndedInfo) => {
       console.log("Load complete:", payload);
       setInternalIsLoading(false);
       setInternalLoadProfileId(null);
@@ -805,17 +805,38 @@ export default function IoSourcePickerDialog({
 
     try {
       // Set up event listeners for this session
-      const unlistenStreamEnded = await listen<StreamEndedPayload>(
+      const unlistenStreamEnded = await listen<void>(
         `stream-ended:${sessionId}`,
-        (event) => handleInternalLoadComplete(event.payload)
+        async () => {
+          const { getStreamEndedInfo } = await import("../api/io");
+          const info = await getStreamEndedInfo(sessionId);
+          if (info) {
+            handleInternalLoadComplete(info);
+          }
+        }
       );
-      const unlistenError = await listen<string>(`session-error:${sessionId}`, (event) => {
-        setInternalLoadError(event.payload);
+      const unlistenError = await listen<void>(`session-error:${sessionId}`, async () => {
+        const { getSessionError } = await import("../api/io");
+        const error = await getSessionError(sessionId);
+        if (error) {
+          setInternalLoadError(error);
+        }
       });
-      const unlistenFrames = await listen<{ frames: unknown[] } | unknown[]>(`frame-message:${sessionId}`, (event) => {
-        // Handle both legacy array format and new FrameBatchPayload format
-        const frames = Array.isArray(event.payload) ? event.payload : event.payload.frames;
-        setInternalLoadFrameCount((prev) => prev + frames.length);
+      const unlistenFrames = await listen<void>(`frames-ready:${sessionId}`, async () => {
+        // Fetch current buffer count from backend
+        try {
+          const session = useSessionStore.getState().sessions[sessionId];
+          const bufferId = session?.buffer?.id;
+          if (bufferId) {
+            const { getBufferMetadata } = await import("../api/buffer");
+            const meta = await getBufferMetadata(bufferId);
+            if (meta) {
+              setInternalLoadFrameCount(meta.count);
+            }
+          }
+        } catch {
+          // Buffer may not exist yet
+        }
       });
 
       unlistenRefs.current = [unlistenStreamEnded, unlistenError, unlistenFrames];

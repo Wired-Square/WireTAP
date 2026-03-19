@@ -25,6 +25,7 @@ import {
   ioStartReplay,
   ioStopReplay,
 } from "../api/transmit";
+import type { ReplayState } from "../api/io";
 
 import { useSessionStore } from "./sessionStore";
 
@@ -268,14 +269,10 @@ export interface TransmitState {
   stopReplay: (replayId: string) => Promise<void>;
   /** Restart a replay from the beginning using its cached params */
   restartReplay: (replayId: string) => Promise<void>;
-  /** Called by `replay-started` event — records metadata for the progress banner */
-  markReplayStarted: (replayId: string, totalFrames: number, speed: number, loopReplay: boolean) => void;
-  /** Called by `replay-progress` event — updates frame count in the banner */
-  updateReplayProgress: (replayId: string, framesSent: number) => void;
-  /** Mark a replay as stopped (called by backend `repeat-stopped` event); adds a log entry */
-  markReplayStopped: (replayId: string, reason?: string) => void;
-  /** Called by `replay-loop-restarted` event — adds a loopRestarted log entry */
-  markReplayLoopRestarted: (replayId: string, pass: number, framesSent: number) => void;
+  /** Called by `replay-lifecycle` signal — handles start, loop restart, completion, stop, and error */
+  handleReplayLifecycle: (state: ReplayState) => void;
+  /** Called by `replay-progress` signal — updates frame count in the progress banner */
+  updateReplayProgress: (state: ReplayState) => void;
   /** Add a replay lifecycle log entry */
   addReplayLogEntry: (entry: Omit<ReplayLogEntry, "id">) => void;
   /** Clear the replay log */
@@ -1007,8 +1004,8 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
   stopReplay: async (replayId) => {
     try {
       await ioStopReplay(replayId);
-      // Don't clear replayProgress here — markReplayStopped will handle it
-      // when the backend fires the repeat-stopped event
+      // Don't clear replayProgress here — handleReplayLifecycle will handle it
+      // when the backend fires the replay-lifecycle signal with status "stopped"
       set((state) => {
         const nextReplays = new Set(state.activeReplays);
         nextReplays.delete(replayId);
@@ -1019,27 +1016,54 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     }
   },
 
-  markReplayStarted: (replayId, totalFrames, speed, loopReplay) => {
+  handleReplayLifecycle: (replayState) => {
+    const { replay_id: replayId, status, total_frames: totalFrames, frames_sent: framesSent, speed, loop_replay: loopReplay, pass } = replayState;
     set((state) => {
-      const existing = state.replayProgress.get(replayId);
-      const next = new Map(state.replayProgress);
-      next.set(replayId, { totalFrames, framesSent: existing?.framesSent ?? 0, speed, loopReplay, profileName: existing?.profileName ?? "" });
-      return { replayProgress: next };
-    });
-  },
+      if (status === "running") {
+        // Start or loop restart — update/initialise progress entry
+        const existing = state.replayProgress.get(replayId);
+        const nextProgress = new Map(state.replayProgress);
+        nextProgress.set(replayId, {
+          totalFrames,
+          framesSent: existing?.framesSent ?? 0,
+          speed,
+          loopReplay,
+          profileName: existing?.profileName ?? "",
+        });
 
-  updateReplayProgress: (replayId, framesSent) => {
-    set((state) => {
-      const existing = state.replayProgress.get(replayId);
-      if (!existing) return {};
-      const next = new Map(state.replayProgress);
-      next.set(replayId, { ...existing, framesSent });
-      return { replayProgress: next };
-    });
-  },
+        if (!existing) {
+          // First "running" signal — treat as started (no log entry here; startReplay already adds one)
+          return {
+            activeReplays: new Set([...state.activeReplays, replayId]),
+            replayProgress: nextProgress,
+          };
+        }
 
-  markReplayStopped: (replayId, reason) => {
-    set((state) => {
+        // Subsequent "running" with pass > 1 means a loop restart
+        if (pass > 1) {
+          const last = state.replayLog.find(e => e.replayId === replayId && e.kind === "loopRestarted");
+          if (last?.pass === pass && last?.framesSent === framesSent) {
+            return { replayProgress: nextProgress };
+          }
+          const entry: ReplayLogEntry = {
+            id: `replay-loop-${replayId}-${pass}-${Date.now()}`,
+            replayId,
+            profileName: existing.profileName,
+            totalFrames,
+            speed,
+            loopReplay: true,
+            timestamp: Date.now(),
+            kind: "loopRestarted",
+            framesSent,
+            pass,
+          };
+          return { replayProgress: nextProgress, replayLog: [entry, ...state.replayLog] };
+        }
+
+        return { replayProgress: nextProgress };
+      }
+
+      // Terminal states: completed, stopped, error
       const info = state.replayProgress.get(replayId);
       const nextReplays = new Set(state.activeReplays);
       nextReplays.delete(replayId);
@@ -1050,26 +1074,23 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         return { activeReplays: nextReplays, replayProgress: nextProgress };
       }
 
-      const completed = reason?.startsWith("Replay complete") ?? false;
-      const stoppedByUser = reason?.startsWith("Replay stopped") ?? false;
-      const framesSent = completed && !info.loopReplay ? info.totalFrames : info.framesSent;
-
       let kind: ReplayLogKind;
-      if (completed) kind = "completed";
-      else if (stoppedByUser) kind = "stoppedByUser";
+      if (status === "completed") kind = "completed";
+      else if (status === "stopped") kind = "stoppedByUser";
       else kind = "deviceError";
+
+      const finalFramesSent = status === "completed" && !loopReplay ? totalFrames : framesSent;
 
       const summaryEntry: ReplayLogEntry = {
         id: `replay-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         replayId,
         profileName: info.profileName,
-        totalFrames: info.totalFrames,
-        speed: info.speed,
-        loopReplay: info.loopReplay,
+        totalFrames,
+        speed,
+        loopReplay,
         timestamp: Date.now(),
         kind,
-        framesSent,
-        errorMessage: kind === "deviceError" ? reason : undefined,
+        framesSent: finalFramesSent,
       };
 
       return {
@@ -1077,6 +1098,17 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
         replayProgress: nextProgress,
         replayLog: [summaryEntry, ...state.replayLog],
       };
+    });
+  },
+
+  updateReplayProgress: (replayState) => {
+    const { replay_id: replayId, frames_sent: framesSent } = replayState;
+    set((state) => {
+      const existing = state.replayProgress.get(replayId);
+      if (!existing) return {};
+      const next = new Map(state.replayProgress);
+      next.set(replayId, { ...existing, framesSent });
+      return { replayProgress: next };
     });
   },
 
@@ -1111,31 +1143,6 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     } catch (e) {
       set({ error: String(e) });
     }
-  },
-
-  markReplayLoopRestarted: (replayId, pass, framesSent) => {
-    set((state) => {
-      const info = state.replayProgress.get(replayId);
-      if (!info) return {};
-      // Deduplicate: the async listener cleanup pattern can produce two events for
-      // the same pass. Skip if the most recent loopRestarted entry for this replay
-      // already records the same pass and framesSent.
-      const last = state.replayLog.find(e => e.replayId === replayId && e.kind === "loopRestarted");
-      if (last?.pass === pass && last?.framesSent === framesSent) return {};
-      const entry: ReplayLogEntry = {
-        id: `replay-loop-${replayId}-${pass}-${Date.now()}`,
-        replayId,
-        profileName: info.profileName,
-        totalFrames: info.totalFrames,
-        speed: info.speed,
-        loopReplay: true,
-        timestamp: Date.now(),
-        kind: "loopRestarted",
-        framesSent,
-        pass,
-      };
-      return { replayLog: [entry, ...state.replayLog] };
-    });
   },
 
   addReplayLogEntry: (entry) => {

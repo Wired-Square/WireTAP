@@ -7,12 +7,15 @@ import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hook
 import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers';
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
 import { useSessionStore } from '../../stores/sessionStore';
-import { useDiscoveryStore, type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
+import { type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
+import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
-import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
-import type { StreamEndedPayload, PlaybackPosition, ModbusScanConfig, UnitIdScanConfig } from '../../api/io';
-import { startModbusScan, startModbusUnitIdScan, cancelModbusScan } from '../../api/io';
+import { useDiscoverySerialStore } from "../../stores/discoverySerialStore";
 import { useDiscoveryToolboxStore } from "../../stores/discoveryToolboxStore";
+import { useShallow } from "zustand/react/shallow";
+import { useDiscoveryHandlers } from "./hooks/useDiscoveryHandlers";
+import type { StreamEndedInfo, PlaybackPosition, ModbusScanConfig, UnitIdScanConfig } from '../../api/io';
+import { startModbusScan, startModbusUnitIdScan, cancelModbusScan, getModbusScanState } from '../../api/io';
 import { REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import AppLayout from "../../components/AppLayout";
 import DiscoveryTopBar from "./views/DiscoveryTopBar";
@@ -45,85 +48,168 @@ export default function Discovery() {
 
 
 
-  // Zustand store selectors
-  const frames = useDiscoveryStore((state) => state.frames);
-  const frameInfoMap = useDiscoveryStore((state) => state.frameInfoMap);
-  const selectedFrames = useDiscoveryStore((state) => state.selectedFrames);
-  const maxBuffer = useDiscoveryStore((state) => state.maxBuffer);
-  const ioProfile = useDiscoveryStore((state) => state.ioProfile);
-  const playbackSpeed = useDiscoveryStore((state) => state.playbackSpeed);
-  const showSaveDialog = useDiscoveryStore((state) => state.showSaveDialog);
-  const saveMetadata = useDiscoveryStore((state) => state.saveMetadata);
-  const startTime = useDiscoveryStore((state) => state.startTime);
-  const endTime = useDiscoveryStore((state) => state.endTime);
-  const currentTime = useDiscoveryStore((state) => state.currentTime);
-  const currentFrameIndex = useDiscoveryStore((state) => state.currentFrameIndex);
-  const toolboxIsRunning = useDiscoveryStore((state) => state.toolbox.isRunning);
-  const toolboxActiveView = useDiscoveryStore((state) => state.toolbox.activeView);
-  const showInfoView = useDiscoveryStore((state) => state.showInfoView);
-  const knowledge = useDiscoveryStore((state) => state.knowledge);
-  const activeSelectionSetId = useDiscoveryStore((state) => state.activeSelectionSetId);
-  const selectionSetDirty = useDiscoveryStore((state) => state.selectionSetDirty);
-  const streamStartTimeUs = useDiscoveryStore((state) => state.streamStartTimeUs);
+  // ── Frame store ──
+  const frames = getDiscoveryFrameBuffer();
+  const { frameInfoMap, selectedFrames, seenIds, streamStartTimeUs, bufferMode } =
+    useDiscoveryFrameStore(useShallow((s) => ({
+      frameInfoMap: s.frameInfoMap,
+      selectedFrames: s.selectedFrames,
+      seenIds: s.seenIds,
+      streamStartTimeUs: s.streamStartTimeUs,
+      bufferMode: s.bufferMode,
+    })));
+  // Subscribe to frameVersion so components re-render when the mutable buffer changes
+  useDiscoveryFrameStore((s) => s.frameVersion);
+  const setStreamStartTimeUs = useDiscoveryFrameStore((s) => s.setStreamStartTimeUs);
+  const clearBuffer = useDiscoveryFrameStore((s) => s.clearBuffer);
+  const clearFramePicker = useDiscoveryFrameStore((s) => s.clearFramePicker);
+  const enableBufferMode = useDiscoveryFrameStore((s) => s.enableBufferMode);
+  const disableBufferMode = useDiscoveryFrameStore((s) => s.disableBufferMode);
+  const setFrameInfoFromBuffer = useDiscoveryFrameStore((s) => s.setFrameInfoFromBuffer);
 
-  const seenIds = useDiscoveryStore((state) => state.seenIds);
-  const framesViewActiveTab = useDiscoveryUIStore((state) => state.framesViewActiveTab);
-  const setShowBusColumn = useDiscoveryUIStore((state) => state.setShowBusColumn);
-  const setModbusExportConfig = useDiscoveryUIStore((state) => state.setModbusExportConfig);
+  // ── UI store ──
+  const { maxBuffer, ioProfile, playbackSpeed, showSaveDialog, saveMetadata,
+    startTime, endTime, currentTime, currentFrameIndex,
+    activeSelectionSetId, selectionSetDirty } =
+    useDiscoveryUIStore(useShallow((s) => ({
+      maxBuffer: s.maxBuffer,
+      ioProfile: s.ioProfile,
+      playbackSpeed: s.playbackSpeed,
+      showSaveDialog: s.showSaveDialog,
+      saveMetadata: s.saveMetadata,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      currentTime: s.currentTime,
+      currentFrameIndex: s.currentFrameIndex,
+      activeSelectionSetId: s.activeSelectionSetId,
+      selectionSetDirty: s.selectionSetDirty,
+    })));
+  const framesViewActiveTab = useDiscoveryUIStore((s) => s.framesViewActiveTab);
+  const setShowBusColumn = useDiscoveryUIStore((s) => s.setShowBusColumn);
+  const setModbusExportConfig = useDiscoveryUIStore((s) => s.setModbusExportConfig);
+  const setMaxBuffer = useDiscoveryUIStore((s) => s.setMaxBuffer);
+  const setIoProfile = useDiscoveryUIStore((s) => s.setIoProfile);
+  const setPlaybackSpeed = useDiscoveryUIStore((s) => s.setPlaybackSpeed);
+  const updateCurrentTime = useDiscoveryUIStore((s) => s.updateCurrentTime);
+  const setCurrentFrameIndex = useDiscoveryUIStore((s) => s.setCurrentFrameIndex);
+  const closeSaveDialog = useDiscoveryUIStore((s) => s.closeSaveDialog);
+  const updateSaveMetadata = useDiscoveryUIStore((s) => s.updateSaveMetadata);
+  const setStartTime = useDiscoveryUIStore((s) => s.setStartTime);
+  const setEndTime = useDiscoveryUIStore((s) => s.setEndTime);
+  const setSerialConfig = useDiscoveryUIStore((s) => s.setSerialConfig);
+  const setSelectionSetDirty = useDiscoveryUIStore((s) => s.setSelectionSetDirty);
+
+  // ── Serial store ──
+  const { isSerialMode, framedData, framingAccepted, serialBytesBuffer,
+    backendByteCount, backendFrameCount, framedBufferId } =
+    useDiscoverySerialStore(useShallow((s) => ({
+      isSerialMode: s.isSerialMode,
+      framedData: s.framedData,
+      framingAccepted: s.framingAccepted,
+      serialBytesBuffer: s.serialBytesBuffer,
+      backendByteCount: s.backendByteCount,
+      backendFrameCount: s.backendFrameCount,
+      framedBufferId: s.framedBufferId,
+    })));
+  const serialActiveTab = useDiscoverySerialStore((s) => s.activeTab);
+  const setSerialMode = useDiscoverySerialStore((s) => s.setSerialMode);
+  const addSerialBytes = useDiscoverySerialStore((s) => s.addSerialBytes);
+  const clearSerialBytes = useDiscoverySerialStore((s) => s.clearSerialBytes);
+  const resetFraming = useDiscoverySerialStore((s) => s.resetFraming);
+  const undoAcceptFraming = useDiscoverySerialStore((s) => s.undoAcceptFraming);
+  const incrementBackendByteCount = useDiscoverySerialStore((s) => s.incrementBackendByteCount);
+  const setBytesBufferId = useDiscoverySerialStore((s) => s.setBytesBufferId);
+  const setBackendByteCount = useDiscoverySerialStore((s) => s.setBackendByteCount);
+  const incrementBackendFrameCount = useDiscoverySerialStore((s) => s.incrementBackendFrameCount);
+  const setBackendFrameCount = useDiscoverySerialStore((s) => s.setBackendFrameCount);
+  const setFramingConfig = useDiscoverySerialStore((s) => s.setFramingConfig);
+
+  // ── Toolbox store ──
+  const toolboxIsRunning = useDiscoveryToolboxStore((s) => s.toolbox.isRunning);
+  const toolboxActiveView = useDiscoveryToolboxStore((s) => s.toolbox.activeView);
+  const showInfoView = useDiscoveryToolboxStore((s) => s.showInfoView);
+  const knowledge = useDiscoveryToolboxStore((s) => s.knowledge);
+  const closeInfoView = useDiscoveryToolboxStore((s) => s.closeInfoView);
+  const clearAnalysisResults = useDiscoveryToolboxStore((s) => s.clearAnalysisResults);
 
   // Global error dialog
-  const showAppError = useSessionStore((state) => state.showAppError);
+  const showAppError = useSessionStore((s) => s.showAppError);
 
-  // Zustand store actions
-  const setStreamStartTimeUs = useDiscoveryStore((state) => state.setStreamStartTimeUs);
-  const addFrames = useDiscoveryStore((state) => state.addFrames);
-  const clearBuffer = useDiscoveryStore((state) => state.clearBuffer);
-  const clearFramePicker = useDiscoveryStore((state) => state.clearFramePicker);
-  const toggleFrameSelection = useDiscoveryStore((state) => state.toggleFrameSelection);
-  const bulkSelectBus = useDiscoveryStore((state) => state.bulkSelectBus);
-  const setMaxBuffer = useDiscoveryStore((state) => state.setMaxBuffer);
-  const setIoProfile = useDiscoveryStore((state) => state.setIoProfile);
-  const setPlaybackSpeed = useDiscoveryStore((state) => state.setPlaybackSpeed);
-  const updateCurrentTime = useDiscoveryStore((state) => state.updateCurrentTime);
-  const setCurrentFrameIndex = useDiscoveryStore((state) => state.setCurrentFrameIndex);
-  const openSaveDialog = useDiscoveryStore((state) => state.openSaveDialog);
-  const closeSaveDialog = useDiscoveryStore((state) => state.closeSaveDialog);
-  const updateSaveMetadata = useDiscoveryStore((state) => state.updateSaveMetadata);
-  const saveFrames = useDiscoveryStore((state) => state.saveFrames);
-  const setStartTime = useDiscoveryStore((state) => state.setStartTime);
-  const setEndTime = useDiscoveryStore((state) => state.setEndTime);
-  const openInfoView = useDiscoveryStore((state) => state.openInfoView);
-  const closeInfoView = useDiscoveryStore((state) => state.closeInfoView);
-  const clearAnalysisResults = useDiscoveryStore((state) => state.clearAnalysisResults);
-  const selectAllFrames = useDiscoveryStore((state) => state.selectAllFrames);
-  const deselectAllFrames = useDiscoveryStore((state) => state.deselectAllFrames);
-  const setActiveSelectionSet = useDiscoveryStore((state) => state.setActiveSelectionSet);
-  const setSelectionSetDirty = useDiscoveryStore((state) => state.setSelectionSetDirty);
-  const enableBufferMode = useDiscoveryStore((state) => state.enableBufferMode);
-  const disableBufferMode = useDiscoveryStore((state) => state.disableBufferMode);
-  const setFrameInfoFromBuffer = useDiscoveryStore((state) => state.setFrameInfoFromBuffer);
-  const applySelectionSet = useDiscoveryStore((state) => state.applySelectionSet);
-  const setSerialConfig = useDiscoveryStore((state) => state.setSerialConfig);
-  const isSerialMode = useDiscoveryStore((state) => state.isSerialMode);
-  const setSerialMode = useDiscoveryStore((state) => state.setSerialMode);
-  const addSerialBytes = useDiscoveryStore((state) => state.addSerialBytes);
-  const clearSerialBytes = useDiscoveryStore((state) => state.clearSerialBytes);
-  const resetFraming = useDiscoveryStore((state) => state.resetFraming);
-  const undoAcceptFraming = useDiscoveryStore((state) => state.undoAcceptFraming);
-  const framedData = useDiscoveryStore((state) => state.framedData);
-  const framingAccepted = useDiscoveryStore((state) => state.framingAccepted);
-  const serialBytesBuffer = useDiscoveryStore((state) => state.serialBytesBuffer);
-  const backendByteCount = useDiscoveryStore((state) => state.backendByteCount);
-  const incrementBackendByteCount = useDiscoveryStore((state) => state.incrementBackendByteCount);
-  const setBytesBufferId = useDiscoveryStore((state) => state.setBytesBufferId);
-  const setBackendByteCount = useDiscoveryStore((state) => state.setBackendByteCount);
-  const framedBufferId = useDiscoveryStore((state) => state.framedBufferId);
-  const backendFrameCount = useDiscoveryStore((state) => state.backendFrameCount);
-  const incrementBackendFrameCount = useDiscoveryStore((state) => state.incrementBackendFrameCount);
-  const setBackendFrameCount = useDiscoveryStore((state) => state.setBackendFrameCount);
-  const serialActiveTab = useDiscoveryStore((state) => state.serialActiveTab);
-  const bufferMode = useDiscoveryStore((state) => state.bufferMode);
-  const setFramingConfig = useDiscoveryStore((state) => state.setFramingConfig);
+  // ── Coordinated actions (cross-store wrappers) ──
+  const addFrames = useCallback((newFrames: FrameMessage[], skipFramePicker?: boolean) => {
+    const { maxBuffer: mb, activeSelectionSetSelectedIds } = useDiscoveryUIStore.getState();
+    useDiscoveryFrameStore.getState().addFrames(newFrames, mb, skipFramePicker, activeSelectionSetSelectedIds);
+  }, []);
+
+  const toggleFrameSelection = useCallback((id: number) => {
+    const { activeSelectionSetId: asid, setSelectionSetDirty: ssd } = useDiscoveryUIStore.getState();
+    useDiscoveryFrameStore.getState().toggleFrameSelection(id, asid, ssd);
+  }, []);
+
+  const bulkSelectBus = useCallback((bus: number | null, select: boolean) => {
+    const { activeSelectionSetId: asid, setSelectionSetDirty: ssd } = useDiscoveryUIStore.getState();
+    useDiscoveryFrameStore.getState().bulkSelectBus(bus, select, asid, ssd);
+  }, []);
+
+  const selectAllFrames = useCallback(() => {
+    const { activeSelectionSetId: asid, setSelectionSetDirty: ssd } = useDiscoveryUIStore.getState();
+    useDiscoveryFrameStore.getState().selectAllFrames(asid, ssd);
+  }, []);
+
+  const deselectAllFrames = useCallback(() => {
+    const { activeSelectionSetId: asid, setSelectionSetDirty: ssd } = useDiscoveryUIStore.getState();
+    useDiscoveryFrameStore.getState().deselectAllFrames(asid, ssd);
+  }, []);
+
+  const applySelectionSet = useCallback((selectionSet: import('../../utils/selectionSets').SelectionSet) => {
+    const uiState = useDiscoveryUIStore.getState();
+    useDiscoveryFrameStore.getState().applySelectionSet(
+      selectionSet, uiState.setActiveSelectionSet, uiState.setSelectionSetDirty
+    );
+    uiState.setActiveSelectionSetSelectedIds(
+      new Set(selectionSet.selectedIds ?? selectionSet.frameIds)
+    );
+  }, []);
+
+  const setActiveSelectionSet = useCallback((id: string | null) => {
+    const uiState = useDiscoveryUIStore.getState();
+    uiState.setActiveSelectionSet(id);
+    if (id === null) {
+      uiState.setActiveSelectionSetSelectedIds(null);
+    }
+  }, []);
+
+  const openSaveDialog = useCallback(() => {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
+    let protocol = 'can';
+    const fInfoMap = useDiscoveryFrameStore.getState().frameInfoMap;
+    for (const info of fInfoMap.values()) {
+      if (info.protocol) { protocol = info.protocol; break; }
+    }
+    const frameBuffer = getDiscoveryFrameBuffer();
+    if (protocol === 'can' && frameBuffer.length > 0) {
+      protocol = frameBuffer[0].protocol || 'can';
+    }
+    if (useDiscoverySerialStore.getState().isSerialMode) {
+      protocol = 'serial';
+    }
+    const filename = `${dateStr}-${timeStr}-${protocol}.toml`;
+    const uiState = useDiscoveryUIStore.getState();
+    uiState.updateSaveMetadata({ ...uiState.saveMetadata, filename });
+    uiState.openSaveDialog();
+  }, []);
+
+  const saveFrames = useCallback((decoderDir: string, saveFrameIdFormat: 'hex' | 'decimal') => {
+    const { selectedFrames: sf, frameInfoMap: fim } = useDiscoveryFrameStore.getState();
+    return useDiscoveryUIStore.getState().saveFrames(decoderDir, saveFrameIdFormat, sf, fim);
+  }, []);
+
+  const openInfoView = useCallback(() => {
+    const fim = useDiscoveryFrameStore.getState().frameInfoMap;
+    useDiscoveryToolboxStore.getState().openInfoView(fim);
+  }, []);
 
   const displayFrameIdFormat = getDisplayFrameIdFormat(settings);
   const displayTimeFormat = settings?.display_time_format ?? "human";
@@ -244,7 +330,7 @@ export default function Discovery() {
   }, [setPlaybackSpeed]);
 
   // Ingest complete handler - passed to useIOSessionManager
-  const handleIngestComplete = useCallback(async (payload: StreamEndedPayload) => {
+  const handleIngestComplete = useCallback(async (payload: StreamEndedInfo) => {
     if (payload.buffer_available && payload.count > 0 && payload.buffer_id) {
       const meta = await getBufferMetadata(payload.buffer_id);
       if (meta) {
@@ -670,38 +756,44 @@ export default function Discovery() {
     return `${formatFilenameDate()}-${protocol}`;
   }, [exportDataMode, protocolLabel]);
 
-  // Modbus scan: listen for scan events and route to toolbox store
+  // Modbus scan: listen for session-scoped signal and fetch accumulated state
   useEffect(() => {
-    if (!isScanning) return;
+    if (!isScanning || !sessionId) return;
 
-    let unlistenFrames: (() => void) | null = null;
-    let unlistenProgress: (() => void) | null = null;
-    let unlistenDeviceInfo: (() => void) | null = null;
+    let unlisten: (() => void) | null = null;
+    // Track delivered frame count to avoid re-adding frames from the full snapshot
+    let deliveredFrameCount = 0;
 
     const setup = async () => {
-      unlistenFrames = await listen<FrameMessage[]>("modbus-scan-frame", (event) => {
-        if (event.payload && event.payload.length > 0) {
-          addModbusScanFrames(event.payload);
+      unlisten = await listen(`modbus-scan:${sessionId}`, async () => {
+        const state = await getModbusScanState(sessionId);
+        if (state) {
+          const newFrames = state.frames.slice(deliveredFrameCount);
+          if (newFrames.length > 0) {
+            addModbusScanFrames(newFrames);
+            deliveredFrameCount = state.frames.length;
+          }
+          if (state.progress) {
+            updateModbusScanProgress(state.progress);
+          }
+          for (const info of state.device_info) {
+            addModbusScanDeviceInfo({
+              unit_id: info.unit_id,
+              vendor: info.vendor ?? undefined,
+              product_code: info.product_code ?? undefined,
+              revision: info.revision ?? undefined,
+            });
+          }
         }
-      });
-
-      unlistenProgress = await listen<{ current: number; total: number; found_count: number }>("modbus-scan-progress", (event) => {
-        updateModbusScanProgress(event.payload);
-      });
-
-      unlistenDeviceInfo = await listen<{ unit_id: number; vendor?: string; product_code?: string; revision?: string }>("modbus-scan-device-info", (event) => {
-        addModbusScanDeviceInfo(event.payload);
       });
     };
 
     setup();
 
     return () => {
-      unlistenFrames?.();
-      unlistenProgress?.();
-      unlistenDeviceInfo?.();
+      unlisten?.();
     };
-  }, [isScanning, addModbusScanFrames, updateModbusScanProgress, addModbusScanDeviceInfo]);
+  }, [isScanning, sessionId, addModbusScanFrames, updateModbusScanProgress, addModbusScanDeviceInfo]);
 
   // Modbus scan handlers
   const handleStartModbusScan = useCallback(async (config: ModbusScanConfig) => {
@@ -714,14 +806,14 @@ export default function Discovery() {
       default_interval: 1000,
     });
     try {
-      const result = await startModbusScan(config);
+      const result = await startModbusScan(config, sessionId ?? undefined);
       console.log(`[Discovery] Modbus register scan complete: found ${result.found_count} of ${result.total_scanned} in ${result.duration_ms}ms`);
     } catch (e) {
       showAppError("Scan Error", "An error occurred during Modbus register scan.", String(e));
     } finally {
       finishModbusScan();
     }
-  }, [startModbusScanStore, finishModbusScan, showAppError, setModbusExportConfig]);
+  }, [startModbusScanStore, finishModbusScan, showAppError, setModbusExportConfig, sessionId]);
 
   const handleStartModbusUnitIdScan = useCallback(async (config: UnitIdScanConfig) => {
     startModbusScanStore('unit-id');
@@ -733,14 +825,14 @@ export default function Discovery() {
       default_interval: 1000,
     });
     try {
-      const result = await startModbusUnitIdScan(config);
+      const result = await startModbusUnitIdScan(config, sessionId ?? undefined);
       console.log(`[Discovery] Modbus unit ID scan complete: found ${result.found_count} of ${result.total_scanned} in ${result.duration_ms}ms`);
     } catch (e) {
       showAppError("Scan Error", "An error occurred during Modbus unit ID scan.", String(e));
     } finally {
       finishModbusScan();
     }
-  }, [startModbusScanStore, finishModbusScan, showAppError, setModbusExportConfig]);
+  }, [startModbusScanStore, finishModbusScan, showAppError, setModbusExportConfig, sessionId]);
 
   const handleCancelModbusScan = useCallback(async () => {
     try {
@@ -1035,6 +1127,7 @@ export default function Discovery() {
             isLiveStreaming={isRecorded && isStreaming && !isPaused && !isBufferMode}
             isStreamPaused={isRecorded && isPaused && !isBufferMode}
             onResumeStream={resume}
+            useLocalTimezone={settings?.display_timezone === 'local'}
           />
         )}
 

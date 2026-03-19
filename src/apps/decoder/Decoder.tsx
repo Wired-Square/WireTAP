@@ -17,7 +17,7 @@ import { buildCatalogPath } from "../../utils/catalogUtils";
 import { tlog } from "../../api/settings";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { UI_UPDATE_INTERVAL_MS, COPY_FEEDBACK_TIMEOUT_MS, REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
-import type { StreamEndedPayload, PlaybackPosition } from '../../api/io';
+import type { StreamEndedInfo, PlaybackPosition } from '../../api/io';
 import AppLayout from "../../components/AppLayout";
 import DecoderTopBar from "./views/DecoderTopBar";
 import DecoderFramesView from "./views/DecoderFramesView";
@@ -373,7 +373,7 @@ export default function Decoder() {
   const [pendingBufferTransition, setPendingBufferTransition] = useState(false);
 
   // Handle stream ended - update buffer metadata and trigger transition if needed
-  const handleStreamEnded = useCallback(async (payload: StreamEndedPayload) => {
+  const handleStreamEnded = useCallback(async (payload: StreamEndedInfo) => {
     // Update buffer metadata
     if (payload.buffer_available && payload.buffer_id) {
       const meta = await getBufferMetadata(payload.buffer_id);
@@ -413,7 +413,7 @@ export default function Decoder() {
   }, [updateCurrentTime]);
 
   // Ingest complete handler - passed to useIOSessionManager
-  const handleIngestComplete = useCallback(async (payload: StreamEndedPayload) => {
+  const handleIngestComplete = useCallback(async (payload: StreamEndedInfo) => {
     if (payload.buffer_available && payload.count > 0 && payload.buffer_id) {
       // Get the updated buffer metadata
       const meta = await getBufferMetadata(payload.buffer_id);

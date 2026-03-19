@@ -32,8 +32,9 @@ use crate::io::error::IoError;
 use crate::io::gvret::{apply_bus_mapping, BusMapping};
 use crate::io::types::{SourceMessage, TransmitRequest, TransmitSender};
 use crate::io::{
-    emit_frames, emit_session_error, emit_stream_ended, now_us, CanTransmitFrame, FrameMessage,
-    IOCapabilities, IODevice, IOState, TransmitPayload, TransmitResult,
+    emit_session_error, emit_stream_ended, now_us, signal_frames_ready, CanTransmitFrame,
+    FrameMessage, IOCapabilities, IODevice, IOState, SignalThrottle, TransmitPayload,
+    TransmitResult,
 };
 
 /// Encode a CAN frame into gs_usb format.
@@ -533,7 +534,7 @@ fn spawn_gs_usb_stream(
 }
 
 async fn run_gs_usb_stream(
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
     session_id: String,
     config: GsUsbConfig,
     cancel_flag: Arc<AtomicBool>,
@@ -561,8 +562,8 @@ async fn run_gs_usb_stream(
     let device_info = match device_info {
         Ok(d) => d,
         Err(e) => {
-            emit_session_error(&app_handle, &session_id, e);
-            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
+            emit_session_error(&session_id, e);
+            emit_stream_ended(&session_id, "error", "gs_usb");
             return;
         }
     };
@@ -570,8 +571,8 @@ async fn run_gs_usb_stream(
     let usb_device = match device_info.open().await {
         Ok(d) => d,
         Err(e) => {
-            emit_session_error(&app_handle, &session_id, IoError::connection(&device_name, e.to_string()).to_string());
-            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
+            emit_session_error(&session_id, IoError::connection(&device_name, e.to_string()).to_string());
+            emit_stream_ended(&session_id, "error", "gs_usb");
             return;
         }
     };
@@ -579,8 +580,8 @@ async fn run_gs_usb_stream(
     let interface = match usb_device.claim_interface(0).await {
         Ok(i) => i,
         Err(_) => {
-            emit_session_error(&app_handle, &session_id, IoError::busy(&device_name).to_string());
-            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
+            emit_session_error(&session_id, IoError::busy(&device_name).to_string());
+            emit_stream_ended(&session_id, "error", "gs_usb");
             return;
         }
     };
@@ -598,8 +599,8 @@ async fn run_gs_usb_stream(
     let pad_enabled = match initialize_device(&interface, &config).await {
         Ok(pad) => pad,
         Err(e) => {
-            emit_session_error(&app_handle, &session_id, IoError::protocol(&device_name, format!("initialize: {}", e)).to_string());
-            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
+            emit_session_error(&session_id, IoError::protocol(&device_name, format!("initialize: {}", e)).to_string());
+            emit_stream_ended(&session_id, "error", "gs_usb");
             return;
         }
     };
@@ -610,8 +611,8 @@ async fn run_gs_usb_stream(
     let mut bulk_in = match interface.endpoint::<nusb::transfer::Bulk, nusb::transfer::In>(endpoints.in_addr) {
         Ok(ep) => ep,
         Err(e) => {
-            emit_session_error(&app_handle, &session_id, IoError::protocol(&device_name, format!("open bulk IN endpoint: {}", e)).to_string());
-            emit_stream_ended(&app_handle, &session_id, "error", "gs_usb");
+            emit_session_error(&session_id, IoError::protocol(&device_name, format!("open bulk IN endpoint: {}", e)).to_string());
+            emit_stream_ended(&session_id, "error", "gs_usb");
             return;
         }
     };
@@ -665,6 +666,7 @@ async fn run_gs_usb_stream(
     let mut pending_frames: Vec<FrameMessage> = Vec::with_capacity(32);
     let mut last_emit_time = std::time::Instant::now();
     let emit_interval = Duration::from_millis(25);
+    let mut throttle = SignalThrottle::new();
 
     // Buffer size: use the actual max packet size from USB descriptors.
     let buf_size = endpoints.max_packet_size;
@@ -775,11 +777,13 @@ async fn run_gs_usb_stream(
             }
         }
 
-        // Emit batched frames periodically
+        // Store batched frames periodically
         if last_emit_time.elapsed() >= emit_interval && !pending_frames.is_empty() {
             let frames = std::mem::take(&mut pending_frames);
-            buffer_store::append_frames_to_session(&session_id, frames.clone());
-            emit_frames(&app_handle, &session_id, frames);
+            buffer_store::append_frames_to_session(&session_id, frames);
+            if throttle.should_signal("frames-ready") {
+                signal_frames_ready(&session_id);
+            }
             last_emit_time = std::time::Instant::now();
         }
 
@@ -803,16 +807,17 @@ async fn run_gs_usb_stream(
         task.abort();
     }
 
-    // Emit remaining frames
+    // Store and signal remaining frames
     if !pending_frames.is_empty() {
-        buffer_store::append_frames_to_session(&session_id, pending_frames.clone());
-        emit_frames(&app_handle, &session_id, pending_frames);
+        buffer_store::append_frames_to_session(&session_id, pending_frames);
+        throttle.flush();
+        signal_frames_ready(&session_id);
     }
 
     // Stop the device
     let _ = stop_device(&interface, &config).await;
 
-    emit_stream_ended(&app_handle, &session_id, stream_reason, "gs_usb");
+    emit_stream_ended(&session_id, stream_reason, "gs_usb");
 }
 
 /// Initialize the gs_usb device

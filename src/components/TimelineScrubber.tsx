@@ -31,6 +31,8 @@ type Props = {
   displayTimeFormat?: TimeDisplayFormat;
   /** Stream start time in microseconds (for delta-start format) */
   streamStartTimeUs?: number | null;
+  /** Whether to use local timezone for time display */
+  useLocalTimezone?: boolean;
 };
 
 export default function TimelineScrubber({
@@ -45,6 +47,7 @@ export default function TimelineScrubber({
   showLabels = true,
   displayTimeFormat = "human",
   streamStartTimeUs,
+  useLocalTimezone = false,
 }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -182,18 +185,18 @@ export default function TimelineScrubber({
       return formatDeltaUs(us - streamStartTimeUs);
     }
     // Default: show time portion (HH:MM:SS)
-    const full = formatHumanUs(us);
+    const full = formatHumanUs(us, useLocalTimezone);
     const timePart = full.split(" ")[1];
     return timePart ? timePart.substring(0, 8) : full;
-  }, [displayTimeFormat, streamStartTimeUs]);
+  }, [displayTimeFormat, streamStartTimeUs, useLocalTimezone]);
 
   // Format time for tooltip based on display format
   const formatTooltipTime = useCallback((us: number) => {
     if ((displayTimeFormat === "delta-start" || displayTimeFormat === "delta-last") && streamStartTimeUs != null) {
       return formatDeltaUs(us - streamStartTimeUs);
     }
-    return formatHumanUs(us);
-  }, [displayTimeFormat, streamStartTimeUs]);
+    return formatHumanUs(us, useLocalTimezone);
+  }, [displayTimeFormat, streamStartTimeUs, useLocalTimezone]);
 
   // Calculate hover position percentage for tooltip
   const hoverPercent = useMemo(() => {

@@ -70,6 +70,8 @@ interface DataViewControllerProps {
   timelineCurrentFrameIndex?: number;
   /** Called when user scrubs to a new frame index */
   timelineOnFrameChange?: (frameIndex: number) => void;
+  /** Whether to use local timezone for timeline labels */
+  timelineUseLocalTimezone?: boolean;
 }
 
 /**
@@ -127,6 +129,7 @@ export default function DataViewController({
   timelineTotalFrames,
   timelineCurrentFrameIndex,
   timelineOnFrameChange,
+  timelineUseLocalTimezone = false,
 }: DataViewControllerProps) {
   return (
     <>
@@ -181,6 +184,7 @@ export default function DataViewController({
         displayTimeFormat={displayTimeFormat}
         streamStartTimeUs={streamStartTimeUs}
         disabled={timelineDisabled}
+        useLocalTimezone={timelineUseLocalTimezone}
       />
     </>
   );

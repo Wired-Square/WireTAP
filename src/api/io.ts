@@ -4,6 +4,7 @@
 // Provides a unified interface for reading and writing CAN data.
 
 import { invoke } from "@tauri-apps/api/core";
+import type { FrameMessage } from "../types/frame";
 
 // ============================================================================
 // Interface Traits
@@ -611,26 +612,6 @@ export async function stepBufferFrame(
 }
 
 /**
- * Payload sent when a stream ends (GVRET disconnect, PostgreSQL query complete, etc.)
- */
-export interface StreamEndedPayload {
-  /** Reason for stream ending: "complete", "disconnected", "error", "stopped" */
-  reason: string;
-  /** Whether the buffer has data available for replay */
-  buffer_available: boolean;
-  /** ID of the buffer that was created (if any) */
-  buffer_id: string | null;
-  /** Type of buffer: "frames" or "bytes" */
-  buffer_type: "frames" | "bytes" | null;
-  /** Number of items in the buffer (frames or bytes depending on type) */
-  count: number;
-  /** Time range of captured data [first_us, last_us] or null if empty */
-  time_range: [number, number] | null;
-  /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
-  owning_session_id: string;
-}
-
-/**
  * Payload sent when a session is suspended (stopped with buffer available).
  * Event name: session-suspended:{sessionId}
  */
@@ -751,7 +732,7 @@ export async function switchSessionToBufferReplay(
 
 /**
  * Stop a realtime session and switch all listeners to buffer replay.
- * Emits `session-switched-to-buffer` event so all apps on the session transition together.
+ * Emits `session-lifecycle` signal so all apps on the session refresh state.
  * Falls back to normal suspend if no buffer exists.
  * @param sessionId The session ID
  * @param speed Initial buffer playback speed (default: 1.0)
@@ -1510,16 +1491,131 @@ export interface ScanCompletePayload {
 }
 
 /** Scan a range of Modbus registers to discover which ones exist. */
-export async function startModbusScan(config: ModbusScanConfig): Promise<ScanCompletePayload> {
-  return invoke("modbus_scan_registers", { config });
+export async function startModbusScan(
+  config: ModbusScanConfig,
+  sessionId?: string
+): Promise<ScanCompletePayload> {
+  return invoke("modbus_scan_registers", { config, session_id: sessionId ?? null });
 }
 
 /** Scan for active Modbus unit IDs on the network. */
-export async function startModbusUnitIdScan(config: UnitIdScanConfig): Promise<ScanCompletePayload> {
-  return invoke("modbus_scan_unit_ids", { config });
+export async function startModbusUnitIdScan(
+  config: UnitIdScanConfig,
+  sessionId?: string
+): Promise<ScanCompletePayload> {
+  return invoke("modbus_scan_unit_ids", { config, session_id: sessionId ?? null });
 }
 
 /** Cancel a running Modbus scan operation. */
 export async function cancelModbusScan(): Promise<void> {
   return invoke("cancel_modbus_scan");
+}
+
+// ============================================================================
+// Signal-then-fetch query API
+// ============================================================================
+
+/** Fetch current playback position for a timeline/buffer session. */
+export async function getPlaybackPosition(
+  sessionId: string
+): Promise<PlaybackPosition | null> {
+  return invoke("get_playback_position_cmd", { session_id: sessionId });
+}
+
+
+/** Fetch stream-ended info (survives session destruction via TTL cache). */
+export async function getStreamEndedInfo(
+  sessionId: string
+): Promise<StreamEndedInfo | null> {
+  return invoke("get_stream_ended_info", { session_id: sessionId });
+}
+
+export interface StreamEndedInfo {
+  reason: string;
+  buffer_available: boolean;
+  buffer_id: string | null;
+  buffer_type: string | null;
+  count: number;
+  time_range: [number, number] | null;
+}
+
+/** Fetch the last session error (from post-session cache or startup errors). */
+export async function getSessionError(
+  sessionId: string
+): Promise<string | null> {
+  return invoke("get_session_error", { session_id: sessionId });
+}
+
+/** Fetch connected sources for a session. */
+export async function getSessionSources(
+  sessionId: string
+): Promise<SourceInfo[]> {
+  return invoke("get_session_sources", { session_id: sessionId });
+}
+
+export interface SourceInfo {
+  device_type: string;
+  address: string;
+  bus: number | null;
+}
+
+/** Fetch orphaned buffer IDs from post-session cache. */
+export async function getOrphanedBufferIds(
+  sessionId: string
+): Promise<string[]> {
+  return invoke("get_orphaned_buffer_ids", { session_id: sessionId });
+}
+
+/** Fetch current replay state. */
+export async function getReplayState(
+  replayId: string
+): Promise<ReplayState | null> {
+  return invoke("get_replay_state", { replay_id: replayId });
+}
+
+export interface ReplayState {
+  status: string;
+  replay_id: string;
+  frames_sent: number;
+  total_frames: number;
+  speed: number;
+  loop_replay: boolean;
+  pass: number;
+}
+
+/** Fetch current modbus scan state. */
+export async function getModbusScanState(
+  sessionId: string
+): Promise<ModbusScanState | null> {
+  return invoke("get_modbus_scan_state_cmd", { session_id: sessionId });
+}
+
+export interface DeviceInfoEntry {
+  unit_id: number;
+  vendor: string | null;
+  product_code: string | null;
+  revision: string | null;
+}
+
+export interface ModbusScanState {
+  status: string;
+  frames: FrameMessage[];
+  progress: ScanProgressPayload | null;
+  device_info: DeviceInfoEntry[];
+}
+
+/** Fetch the most recent bytes from a buffer (tail view). */
+export async function getBufferBytesTail(
+  bufferId: string,
+  tailSize: number
+): Promise<BytesTailResponse> {
+  return invoke("get_buffer_bytes_tail", {
+    buffer_id: bufferId,
+    tail_size: tailSize,
+  });
+}
+
+export interface BytesTailResponse {
+  bytes: RawByteEntry[];
+  total_count: number;
 }
