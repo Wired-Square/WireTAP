@@ -829,44 +829,6 @@ pub fn find_rowid_for_timestamp(
     Ok(result)
 }
 
-/// Build a snapshot: most recent frame for each unique frame_id at or before the given rowid,
-/// limited by a minimum timestamp (for lookback window).
-pub fn build_snapshot(
-    buffer_id: &str,
-    up_to_rowid: i64,
-    min_timestamp_us: u64,
-) -> Result<Vec<FrameMessage>, String> {
-    let guard = DB.lock().unwrap();
-    let conn = guard.as_ref().ok_or("Database not initialised")?;
-
-    let mut stmt = conn
-        .prepare_cached(
-            "SELECT f.rowid, f.protocol, f.timestamp_us, f.frame_id, f.bus, f.dlc, f.payload,
-                    f.is_extended, f.is_fd, f.source_address, f.incomplete, f.direction
-             FROM frames f
-             INNER JOIN (
-                 SELECT frame_id, MAX(rowid) as max_rowid
-                 FROM frames
-                 WHERE buffer_id = ?1 AND rowid <= ?2 AND timestamp_us >= ?3
-                 GROUP BY frame_id
-             ) latest ON f.rowid = latest.max_rowid
-             ORDER BY f.frame_id",
-        )
-        .map_err(|e| format!("Failed to prepare: {}", e))?;
-
-    let rows = stmt
-        .query_map(
-            params![buffer_id, up_to_rowid, min_timestamp_us as i64],
-            |row| row_to_frame(row),
-        )
-        .map_err(|e| format!("Failed to query: {}", e))?;
-
-    let mut result = Vec::new();
-    for row in rows {
-        result.push(row.map_err(|e| format!("Failed to read row: {}", e))?);
-    }
-    Ok(result)
-}
 
 /// Get the frame at a specific index (0-based) within a buffer.
 /// Returns (rowid, FrameMessage) or None if index out of bounds.

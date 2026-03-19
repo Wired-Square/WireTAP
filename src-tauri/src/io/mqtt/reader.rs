@@ -23,7 +23,7 @@ use std::sync::{
 use tauri::AppHandle;
 use tokio::time::Duration;
 
-use crate::io::{emit_device_connected, emit_frames, emit_stream_ended, emit_to_session, now_us, FrameMessage, IOCapabilities, IODevice, IOState, Protocol};
+use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready, FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle};
 use crate::buffer_store::{self, BufferType};
 
 // ============================================================================
@@ -224,7 +224,7 @@ impl IODevice for MqttReader {
 // ============================================================================
 
 fn spawn_mqtt_stream(
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
     session_id: String,
     config: MqttConfig,
     cancel_flag: Arc<AtomicBool>,
@@ -234,6 +234,8 @@ fn spawn_mqtt_stream(
         let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
         // Assign buffer ownership to this session
         let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
+
+        let mut throttle = SignalThrottle::new();
 
         #[allow(unused_assignments)]
         let mut stream_reason = "disconnected";
@@ -257,14 +259,12 @@ fn spawn_mqtt_stream(
 
         // Subscribe to topic
         if let Err(e) = client.subscribe(&config.topic, QoS::AtMostOnce).await {
-            emit_to_session(
-                &app_handle,
-                "session-error",
+            emit_session_error(
                 &session_id,
                 format!("Failed to subscribe to {}: {}", config.topic, e),
             );
             stream_reason = "error";
-            emit_stream_ended(&app_handle, &session_id, stream_reason, "MQTT");
+            emit_stream_ended(&session_id, stream_reason, "MQTT");
             return;
         }
 
@@ -275,7 +275,7 @@ fn spawn_mqtt_stream(
 
         // Emit device-connected event
         let address = format!("{}:{}", config.host, config.port);
-        emit_device_connected(&app_handle, &session_id, "mqtt", &address, None);
+        emit_device_connected(&session_id, "mqtt", &address, None);
 
         // Process incoming messages
         loop {
@@ -310,10 +310,11 @@ fn spawn_mqtt_stream(
                                 };
 
                                 // Buffer frame for replay
-                                buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
+                                buffer_store::append_frames_to_session(&session_id, vec![frame]);
 
-                                // Emit to frontend
-                                emit_frames(&app_handle, &session_id, vec![frame]);
+                                if throttle.should_signal("frames-ready") {
+                                    signal_frames_ready(&session_id);
+                                }
                             }
                             Err(e) => {
                                 // Log parse error but continue (might be non-CAN message)
@@ -327,9 +328,7 @@ fn spawn_mqtt_stream(
                 }
                 Ok(Err(e)) => {
                     // Connection error
-                    emit_to_session(
-                        &app_handle,
-                        "session-error",
+                    emit_session_error(
                         &session_id,
                         format!("MQTT error: {}", e),
                     );
@@ -342,11 +341,15 @@ fn spawn_mqtt_stream(
             }
         }
 
+        // Final signal so frontend sees all buffered frames
+        throttle.flush();
+        signal_frames_ready(&session_id);
+
         // Disconnect cleanly
         let _ = client.disconnect().await;
 
         tlog!("[MQTT:{}] Stream ended: {}", session_id, stream_reason);
-        emit_stream_ended(&app_handle, &session_id, stream_reason, "MQTT");
+        emit_stream_ended(&session_id, stream_reason, "MQTT");
     })
 }
 

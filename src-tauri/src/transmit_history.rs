@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS transmit_history (
 );
 
 CREATE INDEX IF NOT EXISTS idx_transmit_history_id ON transmit_history(id DESC);
+CREATE INDEX IF NOT EXISTS idx_transmit_history_ts ON transmit_history(timestamp_us);
 ";
 
 // ============================================================================
@@ -217,6 +218,47 @@ pub fn query(offset: i64, limit: i64) -> Vec<TransmitHistoryRow> {
     }
 }
 
+/// Return the min and max timestamp_us in the history table, or None if empty.
+pub fn time_range() -> Option<(i64, i64)> {
+    let db = match DB.lock() {
+        Ok(g) => g,
+        Err(_) => return None,
+    };
+    let conn = match db.as_ref() {
+        Some(c) => c,
+        None => return None,
+    };
+    conn.query_row(
+        "SELECT MIN(timestamp_us), MAX(timestamp_us) FROM transmit_history",
+        [],
+        |r| {
+            let min: Option<i64> = r.get(0)?;
+            let max: Option<i64> = r.get(1)?;
+            Ok(min.zip(max))
+        },
+    )
+    .unwrap_or(None)
+}
+
+/// Find the row offset for a given timestamp (number of rows with timestamp >= target,
+/// matching the DESC ordering used by query()).
+pub fn find_offset(timestamp_us: i64) -> i64 {
+    let db = match DB.lock() {
+        Ok(g) => g,
+        Err(_) => return 0,
+    };
+    let conn = match db.as_ref() {
+        Some(c) => c,
+        None => return 0,
+    };
+    conn.query_row(
+        "SELECT COUNT(*) FROM transmit_history WHERE timestamp_us > ?1",
+        params![timestamp_us],
+        |r| r.get(0),
+    )
+    .unwrap_or(0)
+}
+
 // ============================================================================
 // Tauri Commands
 // ============================================================================
@@ -235,4 +277,14 @@ pub fn transmit_history_count() -> Result<i64, String> {
 pub fn transmit_history_clear() -> Result<(), String> {
     clear();
     Ok(())
+}
+
+#[tauri::command]
+pub fn transmit_history_time_range() -> Result<Option<(i64, i64)>, String> {
+    Ok(time_range())
+}
+
+#[tauri::command]
+pub fn transmit_history_find_offset(timestamp_us: i64) -> Result<i64, String> {
+    Ok(find_offset(timestamp_us))
 }

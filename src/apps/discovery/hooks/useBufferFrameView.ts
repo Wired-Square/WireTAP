@@ -13,6 +13,9 @@ import {
   type BufferFrame,
 } from "../../../api/buffer";
 import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
+import { wsTransport } from "../../../services/wsTransport";
+import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../../stores/discoveryFrameStore";
+import { trackAlloc } from "../../../services/memoryDiag";
 import type { FrameMessage } from "../../../types/frame";
 
 /** Frame with pre-computed hex bytes for display */
@@ -158,13 +161,45 @@ export function useBufferFrameView(
     fetchMetadata();
   }, [bufferId]);
 
-  // TAIL MODE: Poll for latest frames during live streaming (not buffer playback)
   useEffect(() => {
-    // Only use tail mode for live streaming, not buffer playback
     if (!bufferId || !isStreaming || isBufferPlayback) return;
 
-    let isMounted = true;
+    if (wsTransport.isConnected) {
+      // WS mode: read frames directly from the discovery frame buffer
+      // (populated by WS FrameData → onFrames → addFrames). Zero invoke.
+      const updateFromBuffer = () => {
+        const allFrames = getDiscoveryFrameBuffer();
+        const selectedIds = selectedIdsRef.current;
+        const filtered = selectedIds.length > 0
+          ? allFrames.filter((f) => selectedIds.includes(f.frame_id))
+          : allFrames;
+        const tail = filtered.slice(-tailSize);
+        trackAlloc("bufferView.hexFrames", tail.length * 450);
+        setFrames(
+          tail.map((f) => ({
+            ...f,
+            hexBytes: f.bytes.map((b) => b.toString(16).padStart(2, "0").toUpperCase()),
+          }))
+        );
+        setBufferIndices([]);
+        setTotalCount(filtered.length);
+      };
 
+      updateFromBuffer();
+
+      // Re-render when frameVersion bumps (new frames added to buffer)
+      const unsubscribe = useDiscoveryFrameStore.subscribe(
+        (state, prevState) => {
+          if (state.frameVersion !== prevState.frameVersion) {
+            updateFromBuffer();
+          }
+        }
+      );
+      return () => unsubscribe();
+    }
+
+    // Fallback: poll buffer store when WS is unavailable
+    let isMounted = true;
     const fetchTail = async () => {
       try {
         const response = await getBufferFramesTail(
@@ -173,33 +208,18 @@ export function useBufferFrameView(
           selectedIdsRef.current
         );
         if (!isMounted) return;
-
-        const withHex = addHexBytes(response.frames);
-        setFrames(withHex);
+        setFrames(addHexBytes(response.frames));
         setBufferIndices(response.buffer_indices);
         setTotalCount(response.total_filtered_count);
-
-        // Update time range end if we have new data
         if (response.buffer_end_time_us != null) {
-          setTimeRange((prev) => {
-            if (!prev) return null;
-            return {
-              ...prev,
-              endUs: response.buffer_end_time_us!,
-            };
-          });
+          setTimeRange((prev) => prev ? { ...prev, endUs: response.buffer_end_time_us! } : null);
         }
       } catch (e) {
         console.error("[useBufferFrameView] tail fetch error:", e);
       }
     };
-
-    // Initial fetch
     fetchTail();
-
-    // Poll interval
     const intervalId = setInterval(fetchTail, pollIntervalMs);
-
     return () => {
       isMounted = false;
       clearInterval(intervalId);

@@ -1,11 +1,9 @@
 // ui/src/apps/discovery/components/FrameDataTable.tsx
 //
 // Shared frame data table component for Discovery views.
-// Displays frames in a dark-themed table with configurable columns and actions.
+// Optimised for streaming: SVG sprites, event delegation, stable keys.
 
-import { ReactNode, useMemo, forwardRef, useRef, useEffect } from 'react';
-import { Calculator, Bookmark } from 'lucide-react';
-import { iconXs } from '../../../styles/spacing';
+import { ReactNode, useMemo, forwardRef, useRef, useEffect, useCallback, type MouseEvent } from 'react';
 import { formatFrameId as formatId } from '../../../utils/frameIds';
 import { sendHexDataToCalculator } from '../../../utils/windowCommunication';
 import { bytesToHex, bytesToAscii } from '../../../utils/byteUtils';
@@ -95,6 +93,66 @@ export interface FrameDataTableProps {
   pageFrameCount?: number;
   /** 1-based original buffer positions for each frame. When provided, used for # column instead of computed page offset. */
   bufferIndices?: number[];
+  /** Optional leading status column — renders per-row status indicator with matching header */
+  renderRowStatus?: (frame: FrameRow, index: number) => ReactNode;
+  /** Header label for the status column (default: empty) */
+  statusHeader?: string;
+  /** Whether to use local timezone for tooltip timestamps */
+  useLocalTimezone?: boolean;
+}
+
+// ============================================================================
+// SVG icon sprites — defined once, referenced via <use> in each row.
+// ============================================================================
+
+function IconSprites() {
+  return (
+    <svg className="hidden" aria-hidden="true">
+      <defs>
+        <symbol id="fdt-bookmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+        </symbol>
+        <symbol id="fdt-calculator" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <rect width="16" height="20" x="4" y="2" rx="2" />
+          <line x1="8" x2="16" y1="6" y2="6" />
+          <line x1="16" x2="16" y1="14" y2="18" />
+          <path d="M16 10h.01" /><path d="M12 10h.01" /><path d="M8 10h.01" />
+          <path d="M12 14h.01" /><path d="M8 14h.01" />
+          <path d="M12 18h.01" /><path d="M8 18h.01" />
+        </symbol>
+      </defs>
+    </svg>
+  );
+}
+
+function UseIcon({ id, className }: { id: string; className?: string }) {
+  return (
+    <svg className={className} aria-hidden="true">
+      <use href={`#${id}`} />
+    </svg>
+  );
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Walk up from event target to find the closest <tr> with data-idx. */
+function rowIndexFromEvent(e: MouseEvent): number | null {
+  const tr = (e.target as HTMLElement).closest<HTMLElement>('tr[data-idx]');
+  if (!tr) return null;
+  const idx = parseInt(tr.dataset.idx!, 10);
+  return Number.isFinite(idx) ? idx : null;
+}
+
+/** Default byte renderer — hex string with colour based on completeness */
+function DefaultBytes({ frame }: { frame: FrameRow }) {
+  const hexBytes = frame.hexBytes ?? frame.bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase());
+  return (
+    <span className={`whitespace-nowrap ${frame.incomplete ? textDataOrange : textDataGreen}`}>
+      {hexBytes.join(' ')}
+    </span>
+  );
 }
 
 // ============================================================================
@@ -126,14 +184,27 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   framesReversed = false,
   pageFrameCount = 0,
   bufferIndices,
+  renderRowStatus,
+  statusHeader = '',
+  useLocalTimezone = false,
 }, ref) => {
-  // Internal ref for scrolling (use forwarded ref if provided, otherwise internal)
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (ref as React.RefObject<HTMLDivElement>) || internalRef;
   const wasAtBottom = useRef(true);
   const highlightedRowRef = useRef<HTMLTableRowElement>(null);
 
-  // Track if user has scrolled up
+  // Keep mutable refs for callbacks used in event delegation so handlers are stable
+  const framesRef = useRef(frames);
+  framesRef.current = frames;
+  const onBookmarkRef = useRef(onBookmark);
+  onBookmarkRef.current = onBookmark;
+  const onCalculatorRef = useRef(onCalculator);
+  onCalculatorRef.current = onCalculator;
+  const onRowClickRef = useRef(onRowClick);
+  onRowClickRef.current = onRowClick;
+  const onContextMenuRef = useRef(onContextMenu);
+  onContextMenuRef.current = onContextMenu;
+
   const handleScroll = () => {
     const container = containerRef.current;
     if (!container) return;
@@ -141,7 +212,6 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
     wasAtBottom.current = scrollTop + clientHeight >= scrollHeight - 10;
   };
 
-  // Auto-scroll to bottom when new frames arrive (streaming mode)
   useEffect(() => {
     const container = containerRef.current;
     if (autoScroll && wasAtBottom.current && container) {
@@ -149,10 +219,8 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
     }
   }, [frames, autoScroll, containerRef]);
 
-  // Scroll to keep highlighted row visible when stepping or page changes
   useEffect(() => {
     if (highlightedRowIndex != null && highlightedRowRef.current) {
-      // Use requestAnimationFrame to ensure DOM has updated after page change
       requestAnimationFrame(() => {
         highlightedRowRef.current?.scrollIntoView({
           behavior: 'smooth',
@@ -162,31 +230,53 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
     }
   }, [highlightedRowIndex, frames]);
 
-  // Check if any frame has source_address
   const hasSourceAddress = useMemo(() => {
     if (showSourceAddress) return true;
     return frames.some(frame => frame.source_address !== undefined);
   }, [frames, showSourceAddress]);
 
-  // Default calculator handler
-  const handleCalculator = async (bytes: number[]) => {
-    if (onCalculator) {
-      onCalculator(bytes);
-    } else {
-      const hexData = bytesToHex(bytes);
-      await sendHexDataToCalculator(hexData);
-    }
-  };
+  // ---- Event delegation handlers (stable — no per-row closures) ----
 
-  // Default byte renderer
-  const defaultRenderBytes = (frame: FrameRow) => {
-    const hexBytes = frame.hexBytes ?? frame.bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase());
-    return (
-      <span className={`whitespace-nowrap ${frame.incomplete ? textDataOrange : textDataGreen}`}>
-        {hexBytes.join(' ')}
-      </span>
-    );
-  };
+  const handleBodyClick = useCallback((e: MouseEvent) => {
+    // Check for action buttons first
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-action]');
+    if (btn) {
+      const idx = rowIndexFromEvent(e);
+      if (idx == null) return;
+      const frame = framesRef.current[idx];
+      if (!frame) return;
+
+      const action = btn.dataset.action;
+      if (action === 'bookmark' && onBookmarkRef.current) {
+        onBookmarkRef.current(frame.frame_id, frame.timestamp_us);
+      } else if (action === 'calculator') {
+        if (onCalculatorRef.current) {
+          onCalculatorRef.current(frame.bytes);
+        } else {
+          sendHexDataToCalculator(bytesToHex(frame.bytes));
+        }
+      }
+      return;
+    }
+
+    // Row click
+    if (onRowClickRef.current) {
+      const idx = rowIndexFromEvent(e);
+      if (idx != null) onRowClickRef.current(idx);
+    }
+  }, []);
+
+  const handleBodyContextMenu = useCallback((e: MouseEvent) => {
+    if (!onContextMenuRef.current) return;
+    const idx = rowIndexFromEvent(e);
+    if (idx == null) return;
+    const frame = framesRef.current[idx];
+    if (!frame) return;
+    e.preventDefault();
+    onContextMenuRef.current(frame, { x: e.clientX, y: e.clientY });
+  }, []);
+
+  const srcPadding = sourceByteCount * 2;
 
   return (
     <div
@@ -194,9 +284,13 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
       className={`flex-1 min-h-0 overflow-auto font-mono text-xs ${bgDataView}`}
       onScroll={handleScroll}
     >
+      <IconSprites />
       <table className="w-full">
         <thead className={`sticky top-0 z-10 ${bgDataView} ${textDataSecondary}`}>
           <tr onContextMenu={onHeaderContextMenu ? (e) => { e.preventDefault(); onHeaderContextMenu({ x: e.clientX, y: e.clientY }); } : undefined}>
+            {renderRowStatus && (
+              <th className={`px-1 py-1.5 w-8 border-b ${borderDataView} ${textDataSecondary}`}>{statusHeader}</th>
+            )}
             {onBookmark && (
               <th className={`px-1 py-1.5 w-6 border-b ${borderDataView}`}></th>
             )}
@@ -223,37 +317,33 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             )}
           </tr>
         </thead>
-        <tbody>
+        <tbody onClick={handleBodyClick} onContextMenu={handleBodyContextMenu}>
           {frames.map((frame, idx, arr) => {
             const prevFrame = idx > 0 ? arr[idx - 1] : null;
-            const srcPadding = sourceByteCount * 2;
             const isCurrentFrame = highlightedRowIndex != null && idx === highlightedRowIndex;
-            // Calculate actual frame index - if reversed, count down from end of page
             const frameIndex = framesReversed
               ? pageStartIndex + pageFrameCount - 1 - idx
               : pageStartIndex + idx;
-            // Use buffer index (1-based buffer position) when available, otherwise fall back to page offset
             const displayIndex = bufferIndices?.[idx] ?? (frameIndex + 1);
-            // Cell highlight class - apply to each td for consistent rendering across browsers
             const cellHighlight = isCurrentFrame ? bgCyan : '';
 
             return (
               <tr
                 ref={isCurrentFrame ? highlightedRowRef : undefined}
-                key={`${frame.timestamp_us}-${frame.frame_id}-${idx}`}
+                key={`${frame.timestamp_us}-${frame.frame_id}-${frame.bus ?? 0}`}
+                data-idx={idx}
                 className={`${isCurrentFrame ? '' : hoverDataRow} ${frame.incomplete ? 'opacity-60' : ''} ${isCurrentFrame ? 'ring-1 ring-[color:var(--status-cyan-border)]' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
                 title={`Frame ${displayIndex}${frame.incomplete ? ' - Incomplete (no delimiter found)' : ''}`}
-                onClick={onRowClick ? () => onRowClick(idx) : undefined}
-                onContextMenu={onContextMenu ? (e) => { e.preventDefault(); onContextMenu(frame, { x: e.clientX, y: e.clientY }); } : undefined}
               >
+                {renderRowStatus && (
+                  <td className={`px-1 py-0.5 ${cellHighlight}`}>
+                    {renderRowStatus(frame, idx)}
+                  </td>
+                )}
                 {onBookmark && (
                   <td className={`px-1 py-0.5 ${cellHighlight}`}>
-                    <button
-                      onClick={() => onBookmark(frame.frame_id, frame.timestamp_us)}
-                      className={tableIconButtonDark}
-                      title="Add bookmark at this frame's time"
-                    >
-                      <Bookmark className={`${iconXs} ${textDataAmber}`} />
+                    <button data-action="bookmark" className={tableIconButtonDark} title="Add bookmark at this frame's time">
+                      <UseIcon id="fdt-bookmark" className={`w-3 h-3 ${textDataAmber}`} />
                     </button>
                   </td>
                 )}
@@ -264,7 +354,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 )}
                 <td
                   className={`px-2 py-0.5 ${cellHighlight}`}
-                  title={formatHumanUs(frame.timestamp_us)}
+                  title={formatHumanUs(frame.timestamp_us, useLocalTimezone)}
                 >
                   <span className={textDataTertiary}>{formatTime(frame.timestamp_us, prevFrame?.timestamp_us ?? null)}</span>
                 </td>
@@ -290,17 +380,13 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 <td className={`px-2 py-0.5 ${textDataSecondary} ${cellHighlight}`}>{frame.dlc}</td>
                 {showCalculator && (
                   <td className={`px-1 py-0.5 ${cellHighlight}`}>
-                    <button
-                      onClick={() => handleCalculator(frame.bytes)}
-                      className={tableIconButtonDark}
-                      title="Send to Frame Calculator"
-                    >
-                      <Calculator className={`${iconXs} ${textDataOrange}`} />
+                    <button data-action="calculator" className={tableIconButtonDark} title="Send to Frame Calculator">
+                      <UseIcon id="fdt-calculator" className={`w-3 h-3 ${textDataOrange}`} />
                     </button>
                   </td>
                 )}
                 <td className={`px-2 py-0.5 ${cellHighlight}`}>
-                  {renderBytes ? renderBytes(frame) : defaultRenderBytes(frame)}
+                  {renderBytes ? renderBytes(frame) : <DefaultBytes frame={frame} />}
                 </td>
                 {showAscii && (
                   <td className={`px-2 py-0.5 ${textDataYellow} whitespace-nowrap ${cellHighlight}`}>
@@ -318,7 +404,6 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
           <p className={emptyStateText}>{emptyMessage}</p>
         </div>
       ) : (
-        /* Bottom padding for scroll comfort */
         <div className="h-8" />
       )}
     </div>

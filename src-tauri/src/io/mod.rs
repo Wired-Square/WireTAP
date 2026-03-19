@@ -7,6 +7,9 @@
 // Core modules
 pub mod codec; // Frame codec trait and implementations
 mod error;
+mod signal_throttle;
+pub use signal_throttle::SignalThrottle;
+pub mod post_session;
 pub mod traits; // InterfaceTraits validation
 mod types;
 
@@ -117,18 +120,7 @@ pub struct FrameMessage {
     pub direction: Option<String>,
 }
 
-/// Frame batch payload - includes frames and the list of active listeners
-/// Frontend should only invoke callbacks for listeners in the active_listeners list
-#[derive(Clone, Serialize)]
-pub struct FrameBatchPayload {
-    /// The frames in this batch
-    pub frames: Vec<FrameMessage>,
-    /// List of listener IDs that should receive these frames
-    /// Empty list means all listeners should receive (fallback behavior)
-    pub active_listeners: Vec<String>,
-}
-
-/// Playback position - emitted with playback-time events during buffer streaming
+/// Playback position - stored and signalled via playback-position events during buffer streaming
 #[derive(Clone, Serialize)]
 pub struct PlaybackPosition {
     /// Current timestamp in microseconds
@@ -270,7 +262,7 @@ pub struct InterfaceTraits {
 pub struct SessionDataStreams {
     /// Whether this session emits framed messages (`frame-message` events)
     pub rx_frames: bool,
-    /// Whether this session emits raw byte streams (`serial-raw-bytes` events)
+    /// Whether this session emits raw byte streams (`bytes-ready` signal)
     pub rx_bytes: bool,
 }
 
@@ -431,74 +423,6 @@ pub enum IOState {
     Error(String),
 }
 
-/// Payload emitted when a stream ends (naturally, by disconnect, or by error)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StreamEndedPayload {
-    /// Why the stream ended: "complete", "disconnected", "error", "stopped"
-    pub reason: String,
-    /// Whether buffer data is available for replay
-    pub buffer_available: bool,
-    /// ID of the buffer that was created (if any)
-    pub buffer_id: Option<String>,
-    /// Type of buffer: "frames" or "bytes"
-    pub buffer_type: Option<String>,
-    /// Number of items in the buffer (frames or bytes depending on type)
-    pub count: usize,
-    /// Time range of buffered data (first_us, last_us)
-    pub time_range: Option<(u64, u64)>,
-    /// Session ID that owns this buffer (for detecting ingest/cross-app buffers)
-    pub owning_session_id: String,
-}
-
-/// Payload emitted when a session is suspended (stopped with buffer available)
-#[derive(Clone, Debug, Serialize)]
-pub struct SessionSuspendedPayload {
-    /// ID of the session's buffer
-    pub buffer_id: Option<String>,
-    /// Number of items in the buffer
-    pub buffer_count: usize,
-    /// Buffer type: "frames" or "bytes"
-    pub buffer_type: Option<String>,
-    /// Time range of captured data [first_us, last_us] or null if empty
-    pub time_range: Option<(u64, u64)>,
-}
-
-/// Payload emitted when a realtime session is stopped and switched to buffer replay.
-/// All listeners on the session receive this event and should transition to buffer mode.
-#[derive(Clone, Debug, Serialize)]
-pub struct SessionSwitchedToBufferPayload {
-    /// ID of the session's buffer
-    pub buffer_id: Option<String>,
-    /// Number of items in the buffer
-    pub buffer_count: usize,
-    /// Buffer type: "frames" or "bytes"
-    pub buffer_type: Option<String>,
-    /// Time range of captured data [first_us, last_us] or null if empty
-    pub time_range: Option<(u64, u64)>,
-    /// New capabilities after switching to BufferReader
-    pub capabilities: IOCapabilities,
-}
-
-/// Payload emitted when a session is resuming with a new buffer
-#[derive(Clone, Debug, Serialize)]
-pub struct SessionResumingPayload {
-    /// ID of the new buffer being created
-    pub new_buffer_id: String,
-    /// ID of the old buffer that was orphaned (available for standalone viewing)
-    pub orphaned_buffer_id: Option<String>,
-}
-
-/// Payload emitted when session state changes
-#[derive(Clone, Debug, Serialize)]
-pub struct StateChangePayload {
-    /// Previous state (serialized as string for simpler TypeScript handling)
-    pub previous: String,
-    /// Current state
-    pub current: String,
-    /// Active buffer ID if streaming to a buffer
-    pub buffer_id: Option<String>,
-}
-
 /// Options for replacing a session's device in-place.
 pub struct ReplaceDeviceOptions {
     /// Human-readable transition name ("buffer", "live", "reinitialize")
@@ -524,19 +448,6 @@ pub struct DeviceReplacedPayload {
     pub state: String,
     /// Context hint for the frontend ("buffer", "live", "reinitialize")
     pub transition: String,
-}
-
-/// Payload emitted when joiner count changes
-#[derive(Clone, Debug, Serialize)]
-pub struct JoinerCountChangedPayload {
-    /// New total listener count
-    pub count: usize,
-    /// The listener that triggered the change (if known)
-    pub listener_id: Option<String>,
-    /// Human-readable app name (e.g., "discovery", "decoder")
-    pub app_name: Option<String>,
-    /// Whether the listener joined or left ("joined" | "left" | null for sync)
-    pub change: Option<String>,
 }
 
 /// Trait for all IO devices (CAN adapters, serial ports, replay sources, etc.)
@@ -734,53 +645,52 @@ fn state_to_string(state: &IOState) -> String {
 }
 
 /// Emit a state change event for a session
-fn emit_state_change(app: &AppHandle, session_id: &str, previous: &IOState, current: &IOState) {
-    use crate::buffer_store;
-
-    let buffer_id = buffer_store::get_session_buffer_ids(session_id)
-        .into_iter()
-        .find(|id| buffer_store::get_buffer_metadata(id)
-            .map(|m| m.buffer_type == buffer_store::BufferType::Frames)
-            .unwrap_or(false));
-
-    let payload = StateChangePayload {
-        previous: state_to_string(previous),
-        current: state_to_string(current),
-        buffer_id,
-    };
-
-    emit_to_session(app, "session-state", session_id, payload);
+fn emit_state_change(session_id: &str, _previous: &IOState, current: &IOState) {
+    crate::ws::dispatch::send_session_state(session_id, current);
 }
 
 /// Emit a joiner count change event for a session
 fn emit_joiner_count_change(
-    app: &AppHandle,
     session_id: &str,
     joiner_count: usize,
-    listener_id: Option<&str>,
-    app_name: Option<&str>,
-    change: Option<&str>,
+    _listener_id: Option<&str>,
+    _app_name: Option<&str>,
+    _change: Option<&str>,
 ) {
-    let payload = JoinerCountChangedPayload {
-        count: joiner_count,
-        listener_id: listener_id.map(|s| s.to_string()),
-        app_name: app_name.map(|s| s.to_string()),
-        change: change.map(|s| s.to_string()),
-    };
-    emit_to_session(app, "joiner-count-changed", session_id, payload);
+    crate::ws::dispatch::send_session_info(session_id, 0.0, joiner_count as u16);
 }
 
 /// Emit a speed change event for a session
-fn emit_speed_change(app: &AppHandle, session_id: &str, speed: f64) {
-    emit_to_session(app, "speed-changed", session_id, speed);
+fn emit_speed_change(session_id: &str, speed: f64) {
+    crate::ws::dispatch::send_session_info(session_id, speed, 0);
 }
 
 /// Global session manager
 static IO_SESSIONS: Lazy<Mutex<HashMap<String, IOSession>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// Playback position cache — updated during buffer/timeline streaming, polled by frontend
+static PLAYBACK_POSITIONS: Lazy<RwLock<HashMap<String, PlaybackPosition>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+pub fn store_playback_position(session_id: &str, position: PlaybackPosition) {
+    if let Ok(mut positions) = PLAYBACK_POSITIONS.write() {
+        positions.insert(session_id.to_string(), position);
+    }
+}
+
+pub fn get_playback_position(session_id: &str) -> Option<PlaybackPosition> {
+    PLAYBACK_POSITIONS.read().ok().and_then(|p| p.get(session_id).cloned())
+}
+
+pub fn clear_playback_position(session_id: &str) {
+    if let Ok(mut positions) = PLAYBACK_POSITIONS.write() {
+        positions.remove(session_id);
+    }
+}
+
 /// Sessions that are currently closing (window close in progress)
-/// Uses RwLock (not async Mutex) so it can be checked synchronously in emit_to_session
+/// Uses RwLock (not async Mutex) so it can be checked synchronously
 static CLOSING_SESSIONS: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
 // ============================================================================
@@ -1008,9 +918,10 @@ async fn check_webview_health() {
         let misses = counter.saturating_sub(state.last_pong_counter);
 
         if misses > PROBE_MAX_MISSES {
+            let rss = get_rss_mb().map(|m| format!("{:.1} MB", m)).unwrap_or_else(|| "unknown".to_string());
             tlog!(
-                "[webview health] {} pings with no pong — content process appears dead",
-                misses
+                "[webview health] {} pings with no pong — content process appears dead (RSS: {})",
+                misses, rss
             );
             should_recover = true;
         } else {
@@ -1051,27 +962,31 @@ async fn trigger_webview_recovery(app: &AppHandle) {
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     // Navigate to the app root (fresh navigation, safer than reload())
+    // Wrap in catch_unwind because wry can panic with unwrap() on None
+    // when the WKWebView content process has been jettisoned by macOS.
     if let Some(window) = app.get_webview_window("dashboard") {
-        // Resolve the app URL — in dev this is http://localhost:PORT,
-        // in production it's tauri://localhost/
-        match window.url() {
-            Ok(current_url) => {
-                // Navigate to the root of the current origin
-                let mut root_url = current_url.clone();
-                root_url.set_path("/");
-                root_url.set_query(None);
-                root_url.set_fragment(None);
-                match window.navigate(root_url) {
-                    Ok(()) => tlog!("[webview recovery] navigate() succeeded"),
-                    Err(e) => tlog!("[webview recovery] navigate() failed: {}", e),
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            match window.url() {
+                Ok(current_url) => {
+                    let mut root_url = current_url.clone();
+                    root_url.set_path("/");
+                    root_url.set_query(None);
+                    root_url.set_fragment(None);
+                    match window.navigate(root_url) {
+                        Ok(()) => tlog!("[webview recovery] navigate() succeeded"),
+                        Err(e) => tlog!("[webview recovery] navigate() failed: {}", e),
+                    }
+                }
+                Err(e) => {
+                    tlog!("[webview recovery] Failed to get current URL: {} — trying tauri://localhost", e);
+                    if let Ok(fallback) = "tauri://localhost/".parse() {
+                        let _ = window.navigate(fallback);
+                    }
                 }
             }
-            Err(e) => {
-                tlog!("[webview recovery] Failed to get current URL: {} — trying tauri://localhost", e);
-                if let Ok(fallback) = "tauri://localhost/".parse() {
-                    let _ = window.navigate(fallback);
-                }
-            }
+        }));
+        if result.is_err() {
+            tlog!("[webview recovery] WebView navigate panicked (content process gone) — recovery not possible");
         }
     } else {
         tlog!("[webview recovery] No dashboard window found");
@@ -1094,7 +1009,7 @@ async fn trigger_webview_recovery(app: &AppHandle) {
 // ============================================================================
 
 /// Startup errors for sessions (errors that occurred before any listener registered).
-/// Uses RwLock (not async Mutex) so it can be set synchronously from emit_to_session.
+/// Uses RwLock (not async Mutex) so it can be set synchronously.
 /// The error is retrieved and cleared when the first listener registers.
 static STARTUP_ERRORS: Lazy<RwLock<HashMap<String, String>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
@@ -1113,6 +1028,11 @@ pub fn take_startup_error(session_id: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Read the startup error without removing it (for signal-then-fetch polling)
+pub fn get_startup_error(session_id: &str) -> Option<String> {
+    STARTUP_ERRORS.read().ok().and_then(|e| e.get(session_id).cloned())
 }
 
 /// Clear any startup error for a session (called on session destroy)
@@ -1146,52 +1066,6 @@ fn clear_session_closing(session_id: &str) {
     }
 }
 
-/// Check if a session is currently closing
-fn is_session_closing(session_id: &str) -> bool {
-    CLOSING_SESSIONS
-        .read()
-        .map(|s| s.contains(session_id))
-        .unwrap_or(false)
-}
-
-/// Emit an event scoped to a specific session
-///
-/// Checks if the session is closing and if the main window still exists
-/// before emitting to prevent crashes when events are sent to a destroyed
-/// WebView (macOS Tahoe issue).
-pub fn emit_to_session<S: Serialize + Clone>(
-    app: &AppHandle,
-    event: &str,
-    session_id: &str,
-    payload: S,
-) {
-    // Check closing flag FIRST (prevents emit during window destruction)
-    // This catches the race between window close and event emission
-    if is_session_closing(session_id) {
-        tlog!("[emit_to_session] Blocked event '{}:{}' - session is closing", event, session_id);
-        return;
-    }
-
-    // Check if any webview window exists.
-    // On macOS 26.2+, emitting to a destroyed WebView can crash in
-    // WebKit::WebPageProxy::dispatchSetObscuredContentInsets()
-    // The app can run in multi-window mode (separate windows for discovery, decoder, etc.)
-    // so we check if at least one window is open to receive events.
-    let has_window = app.get_webview_window("dashboard").is_some()
-        || app.get_webview_window("discovery").is_some()
-        || app.get_webview_window("decoder").is_some()
-        || app.get_webview_window("catalog-editor").is_some()
-        || app.get_webview_window("settings").is_some()
-        || app.get_webview_window("frame-calculator").is_some()
-        || app.get_webview_window("transmit").is_some();
-    if !has_window {
-        tlog!("[emit_to_session] Blocked event '{}:{}' - no window found", event, session_id);
-        return;
-    }
-
-    let scoped_event = format!("{}:{}", event, session_id);
-    let _ = app.emit(&scoped_event, payload);
-}
 
 /// Payload for global session lifecycle events (emitted to all windows)
 #[derive(Clone, Debug, Serialize)]
@@ -1219,45 +1093,46 @@ pub fn emit_session_lifecycle(app: &AppHandle, payload: SessionLifecyclePayload)
         "[lifecycle_event] Emitting '{}' for session '{}' (profiles: {:?})",
         payload.event_type, payload.session_id, payload.source_profile_ids
     );
-    let _ = app.emit("session-lifecycle", payload);
+    let _ = app.emit("session-lifecycle", &payload);
+    crate::ws::dispatch::send_session_lifecycle(&payload);
 }
 
-/// Emit a session error event and store it for later retrieval.
+/// Emit a session error signal and store for later retrieval.
 ///
-/// This is the preferred way to emit errors - it both:
-/// 1. Emits the error as a Tauri event (for listeners that are already set up)
-/// 2. Stores the error so it can be returned when a listener registers
-///
-/// This solves the race condition where errors occur before frontend listeners are set up.
-pub fn emit_session_error(app: &AppHandle, session_id: &str, error: String) {
-    // Store the error for later retrieval (in case no listeners are set up yet)
+/// Stores the error in both the startup-error map (for listener registration)
+/// and the post-session TTL cache (for late-arriving fetches after session
+/// destruction), then emits an empty signal for the frontend to fetch.
+pub fn emit_session_error(session_id: &str, error: String) {
     store_startup_error(session_id, error.clone());
-    // Also emit the event (in case listeners ARE set up)
-    emit_to_session(app, "session-error", session_id, error);
+    post_session::store_error(session_id, error.clone());
+    crate::ws::dispatch::send_session_error(session_id, &error);
 }
 
-/// Emit frames to a session with active listener filtering.
-/// This is the preferred way to emit frames - it includes the active listeners
-/// so the frontend can filter callbacks appropriately.
-pub fn emit_frames(
-    app: &AppHandle,
-    session_id: &str,
-    frames: Vec<FrameMessage>,
-) {
-    let active_listeners = get_active_listeners_sync(session_id);
-    let payload = FrameBatchPayload {
-        frames,
-        active_listeners,
-    };
-    emit_to_session(app, "frame-message", session_id, payload);
+/// Signal the frontend that the playback position has changed.
+/// The frontend reads the stored position from PLAYBACK_POSITIONS.
+pub fn signal_playback_position(session_id: &str) {
+    if let Some(pos) = get_playback_position(session_id) {
+        crate::ws::dispatch::send_playback_position(session_id, &pos);
+    }
 }
 
-/// Emit stream-ended event with buffer info.
+/// Signal the frontend that new frames are available for a session.
+/// The frontend fetches frames via get_buffer_frames_tail.
+pub fn signal_frames_ready(session_id: &str) {
+    crate::ws::dispatch::send_new_frames(session_id);
+}
+
+/// Signal the frontend that new bytes are available for a session.
+/// The frontend fetches bytes via get_buffer_bytes_tail.
+pub fn signal_bytes_ready(session_id: &str) {
+    crate::ws::dispatch::send_buffer_changed(session_id);
+}
+
+/// Emit stream-ended signal with buffer info.
 ///
-/// Finalises the buffer and emits the stream-ended event with metadata.
-/// This is the shared helper used by all IO drivers.
+/// Finalises the buffer, stores info in the post-session cache for late-arriving
+/// fetches, then emits an empty signal for the frontend to fetch via command.
 pub fn emit_stream_ended(
-    app_handle: &AppHandle,
     session_id: &str,
     reason: &str,
     log_prefix: &str,
@@ -1265,7 +1140,7 @@ pub fn emit_stream_ended(
     use crate::buffer_store::{self, BufferType};
 
     let finalized = buffer_store::finalize_session_buffers(session_id);
-    // Use the frame buffer metadata for the payload (primary), fall back to first finalized
+    // Use the frame buffer metadata (primary), fall back to first finalized
     let metadata = finalized.iter()
         .find(|m| m.buffer_type == BufferType::Frames)
         .or(finalized.first());
@@ -1290,88 +1165,52 @@ pub fn emit_stream_ended(
         None => (None, None, 0, None, false),
     };
 
-    emit_to_session(
-        app_handle,
-        "stream-ended",
-        session_id,
-        StreamEndedPayload {
-            reason: reason.to_string(),
-            buffer_available,
-            buffer_id,
-            buffer_type,
-            count,
-            time_range,
-            owning_session_id: session_id.to_string(),
-        },
-    );
+    // Store in post-session cache for late-arriving fetches
+    let stream_ended_info = post_session::StreamEndedInfo {
+        reason: reason.to_string(),
+        buffer_available,
+        buffer_id: buffer_id.clone(),
+        buffer_type: buffer_type.clone(),
+        count,
+        time_range,
+    };
+    post_session::store_stream_ended(session_id, stream_ended_info.clone());
+
+    crate::ws::dispatch::send_stream_ended(session_id, &stream_ended_info);
     tlog!(
         "[{}:{}] Stream ended (reason: {}, count: {})",
         log_prefix, session_id, reason, count
     );
 }
 
-/// Payload for buffer-orphaned event
-#[derive(Clone, Debug, Serialize)]
-pub struct BufferOrphanedPayload {
-    pub buffer_id: String,
-    pub buffer_name: String,
-    pub buffer_type: String,
-    pub count: usize,
+/// Emit buffer-changed signal when session buffers are created or orphaned.
+/// Frontend fetches current buffer state via commands.
+pub fn emit_buffer_changed(session_id: &str) {
+    crate::ws::dispatch::send_buffer_changed(session_id);
 }
 
-/// Emit buffer-orphaned event when buffers are made available for standalone use.
-pub fn emit_buffer_orphaned(app: &AppHandle, session_id: &str, orphaned: Vec<crate::buffer_store::OrphanedBufferInfo>) {
-    use crate::buffer_store::BufferType;
-
-    for info in orphaned {
-        let type_str = match info.buffer_type {
-            BufferType::Frames => "frames",
-            BufferType::Bytes => "bytes",
-        };
-        let payload = BufferOrphanedPayload {
-            buffer_id: info.buffer_id.clone(),
-            buffer_name: info.buffer_name,
-            buffer_type: type_str.to_string(),
-            count: info.count,
-        };
-        emit_to_session(app, "buffer-orphaned", session_id, payload);
+/// Orphan buffers for a session and emit buffer-changed.
+/// Stores orphaned buffer IDs in the post-session cache so the frontend
+/// can fetch them (e.g., for the onDestroyed callback).
+pub fn emit_buffer_orphaned_as_changed(session_id: &str, orphaned: Vec<crate::buffer_store::OrphanedBufferInfo>) {
+    if !orphaned.is_empty() {
+        let ids: Vec<String> = orphaned.iter().map(|o| o.buffer_id.clone()).collect();
+        post_session::store_orphaned_buffer_ids(session_id, ids);
+        emit_buffer_changed(session_id);
     }
 }
 
-/// Payload for buffer-created event
-#[derive(Clone, Debug, Serialize)]
-pub struct BufferCreatedPayload {
-    pub buffer_id: String,
-    pub buffer_name: String,
-    pub buffer_type: String,
-}
-
-/// Emit buffer-created event when a new buffer is created for a session.
-pub fn emit_buffer_created(app: &AppHandle, session_id: &str, buffer_id: &str, buffer_name: &str, buffer_type: &str) {
-    let payload = BufferCreatedPayload {
-        buffer_id: buffer_id.to_string(),
-        buffer_name: buffer_name.to_string(),
-        buffer_type: buffer_type.to_string(),
-    };
-    emit_to_session(app, "buffer-created", session_id, payload);
-}
-
-/// Payload for device-connected event
-#[derive(Clone, Debug, Serialize)]
-pub struct DeviceConnectedPayload {
-    pub device_type: String,
-    pub address: String,
-    pub bus_number: Option<u8>,
-}
-
-/// Emit device-connected event when a device successfully connects.
-pub fn emit_device_connected(app: &AppHandle, session_id: &str, device_type: &str, address: &str, bus_number: Option<u8>) {
-    let payload = DeviceConnectedPayload {
+/// Emit device-connected signal when a device successfully connects.
+///
+/// Stores source info in the post-session TTL cache for late-arriving fetches,
+/// then emits an empty signal for the frontend to fetch via command.
+pub fn emit_device_connected(session_id: &str, device_type: &str, address: &str, bus_number: Option<u8>) {
+    post_session::store_source(session_id, post_session::SourceInfo {
         device_type: device_type.to_string(),
         address: address.to_string(),
-        bus_number,
-    };
-    emit_to_session(app, "device-connected", session_id, payload);
+        bus: bus_number,
+    });
+    crate::ws::dispatch::send_device_connected(session_id, device_type, address, bus_number);
 }
 
 /// Payload for device-probe event (global, not session-scoped)
@@ -1467,7 +1306,7 @@ pub async fn create_session(
                 );
 
                 // Emit joiner count change
-                emit_joiner_count_change(&existing.app, &session_id, existing.listeners.len(), Some(&lid), Some(&resolved_name), Some("joined"));
+                emit_joiner_count_change(&session_id, existing.listeners.len(), Some(&lid), Some(&resolved_name), Some("joined"));
             }
             listener_count = existing.listeners.len();
         } else {
@@ -1606,10 +1445,9 @@ pub async fn join_session(session_id: &str) -> Result<JoinSessionResult, String>
 
     session.joiner_count += 1;
     let joiner_count = session.joiner_count;
-    let app = session.app.clone();
 
     // Emit joiner count change event to all listeners (legacy join - no listener ID)
-    emit_joiner_count_change(&app, session_id, joiner_count, None, None, Some("joined"));
+    emit_joiner_count_change(session_id, joiner_count, None, None, Some("joined"));
 
     // Get session's frame buffer
     let buffer_ids = crate::buffer_store::get_session_buffer_ids(session_id);
@@ -1636,10 +1474,9 @@ pub async fn leave_session(session_id: &str) -> Result<usize, String> {
     if let Some(session) = sessions.get_mut(session_id) {
         session.joiner_count = session.joiner_count.saturating_sub(1);
         let joiner_count = session.joiner_count;
-        let app = session.app.clone();
 
         // Emit joiner count change event to remaining listeners (legacy leave - no listener ID)
-        emit_joiner_count_change(&app, session_id, joiner_count, None, None, Some("left"));
+        emit_joiner_count_change(session_id, joiner_count, None, None, Some("left"));
 
         // If no joiners left, stop the session to prevent emitting to destroyed WebViews
         if joiner_count == 0 {
@@ -1648,7 +1485,7 @@ pub async fn leave_session(session_id: &str) -> Result<usize, String> {
                 let _ = session.device.stop().await;
                 let current = session.device.state();
                 if previous != current {
-                    emit_state_change(&app, session_id, &previous, &current);
+                    emit_state_change(session_id, &previous, &current);
                 }
             }
         }
@@ -1657,6 +1494,22 @@ pub async fn leave_session(session_id: &str) -> Result<usize, String> {
     } else {
         // Session doesn't exist (may have been destroyed), that's fine
         Ok(0)
+    }
+}
+
+/// Touch `last_heartbeat` for all listeners on the given sessions.
+/// Called by the WS server when a client heartbeat arrives, bridging the WS
+/// keepalive to the IO session watchdog so the frontend can skip per-listener
+/// `register_session_listener` invoke polling.
+pub async fn touch_listener_heartbeats(session_ids: &[String]) {
+    let mut sessions = IO_SESSIONS.lock().await;
+    let now = std::time::Instant::now();
+    for sid in session_ids {
+        if let Some(session) = sessions.get_mut(sid.as_str()) {
+            for listener in session.listeners.values_mut() {
+                listener.last_heartbeat = now;
+            }
+        }
     }
 }
 
@@ -1744,7 +1597,7 @@ pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
                     );
 
                     // Emit joiner count change (sync - no specific listener)
-                    emit_joiner_count_change(&session.app, session_id, after_count, None, None, None);
+                    emit_joiner_count_change(session_id, after_count, None, None, None);
 
                     // If no listeners left, enter suspension grace period instead of destroying
                     if after_count == 0 {
@@ -1961,7 +1814,7 @@ pub async fn start_session(session_id: &str) -> Result<IOState, String> {
     let current = session.device.state();
     tlog!("[reader] start_session('{}') - current state: {:?}", session_id, current);
     if previous != current {
-        emit_state_change(&session.app, session_id, &previous, &current);
+        emit_state_change(session_id, &previous, &current);
     }
 
     Ok(current)
@@ -1986,7 +1839,7 @@ pub async fn stop_session(session_id: &str) -> Result<IOState, String> {
 
     let current = session.device.state();
     if previous != current {
-        emit_state_change(&session.app, session_id, &previous, &current);
+        emit_state_change(session_id, &previous, &current);
     }
 
     Ok(current)
@@ -2012,43 +1865,13 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
     // Stop the device (triggers emit_stream_ended which finalises the buffer)
     session.device.stop().await?;
 
-    // Look up the buffer by session ownership (finalized during device.stop())
-    let buffer_ids = buffer_store::get_session_buffer_ids(session_id);
-    let metadata = buffer_ids.iter()
-        .filter_map(|id| buffer_store::get_buffer_metadata(id))
-        .find(|m| m.buffer_type == buffer_store::BufferType::Frames);
-
-    // Emit session-suspended event with buffer info
-    let (buffer_id, buffer_count, buffer_type, time_range) = match metadata {
-        Some(ref m) => {
-            let type_str = match m.buffer_type {
-                buffer_store::BufferType::Frames => "frames",
-                buffer_store::BufferType::Bytes => "bytes",
-            };
-            let tr = match (m.start_time_us, m.end_time_us) {
-                (Some(start), Some(end)) => Some((start, end)),
-                _ => None,
-            };
-            (Some(m.id.clone()), m.count, Some(type_str.to_string()), tr)
-        }
-        None => (None, 0, None, None),
-    };
-
-    emit_to_session(
-        &session.app,
-        "session-suspended",
-        session_id,
-        SessionSuspendedPayload {
-            buffer_id,
-            buffer_count,
-            buffer_type,
-            time_range,
-        },
-    );
-
+    // Emit session-lifecycle signal with inline state + capabilities
     let current = session.device.state();
+    let caps = session.device.capabilities();
+    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &current, &caps);
+
     if previous != current {
-        emit_state_change(&session.app, session_id, &previous, &current);
+        emit_state_change(session_id, &previous, &current);
     }
 
     tlog!(
@@ -2065,7 +1888,7 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
 /// logic (buffer orchestration, profile tracking) before/after calling this.
 ///
 /// Steps: stop old device → swap device → optionally update metadata → optionally
-/// auto-start → emit `session-device-replaced` event → emit state change.
+/// auto-start → emit `session-lifecycle` signal → emit state change.
 ///
 /// Takes `&mut HashMap` so callers can hold the IO_SESSIONS lock across the
 /// full operation (preventing double-lock).
@@ -2114,7 +1937,7 @@ pub async fn replace_session_device(
     let current_state = session.device.state();
     let state_str = state_to_string(&current_state);
 
-    // 8. Emit device-replaced event
+    // 8. Build result payload (still returned to callers, just not emitted as event)
     let payload = DeviceReplacedPayload {
         previous_device_type: previous_device_type.clone(),
         new_device_type: new_device_type.clone(),
@@ -2122,16 +1945,13 @@ pub async fn replace_session_device(
         state: state_str.clone(),
         transition: opts.transition.clone(),
     };
-    emit_to_session(
-        &session.app,
-        "session-device-replaced",
-        session_id,
-        payload.clone(),
-    );
 
-    // 9. Emit state change if different
+    // 9. Emit session-lifecycle signal with inline state + capabilities
+    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &current_state, &capabilities);
+
+    // 10. Emit state change if different
     if previous_state != current_state {
-        emit_state_change(&session.app, session_id, &previous_state, &current_state);
+        emit_state_change(session_id, &previous_state, &current_state);
     }
 
     tlog!(
@@ -2145,11 +1965,11 @@ pub async fn replace_session_device(
 /// Stop a realtime session and switch to buffer replay atomically.
 ///
 /// This combines suspend + switch_to_buffer_replay in a single lock acquisition
-/// and emits a `session-switched-to-buffer:{sessionId}` event so ALL listeners
-/// on the session transition to buffer mode together.
+/// and emits a `session-lifecycle:{sessionId}` signal so ALL listeners
+/// on the session refresh their state.
 ///
 /// If no buffer exists (e.g. stopped before any frames), falls back to a normal
-/// suspend (emits `session-suspended` instead).
+/// suspend.
 pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
     let mut sessions = IO_SESSIONS.lock().await;
 
@@ -2167,25 +1987,10 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
 
     // Look up the buffer by session ownership (finalized during stop())
     let buffer_ids = buffer_store::get_session_buffer_ids(session_id);
-    let metadata = buffer_ids.iter()
+    let buffer_id = buffer_ids.iter()
         .filter_map(|id| buffer_store::get_buffer_metadata(id))
-        .find(|m| m.buffer_type == buffer_store::BufferType::Frames);
-
-    // Extract buffer info
-    let (buffer_id, buffer_count, buffer_type, time_range) = match metadata {
-        Some(ref m) => {
-            let type_str = match m.buffer_type {
-                buffer_store::BufferType::Frames => "frames",
-                buffer_store::BufferType::Bytes => "bytes",
-            };
-            let tr = match (m.start_time_us, m.end_time_us) {
-                (Some(start), Some(end)) => Some((start, end)),
-                _ => None,
-            };
-            (Some(m.id.clone()), m.count, Some(type_str.to_string()), tr)
-        }
-        None => (None, 0, None, None),
-    };
+        .find(|m| m.buffer_type == buffer_store::BufferType::Frames)
+        .map(|m| m.id.clone());
 
     // Try to switch to buffer replay
     if let Some(ref bid) = buffer_id {
@@ -2207,6 +2012,7 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
         );
 
         // Device is already stopped, so replace_session_device's stop is a no-op
+        // replace_session_device emits session-lifecycle internally
         let result = replace_session_device(
             &mut sessions,
             session_id,
@@ -2219,52 +2025,28 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
             },
         ).await?;
 
-        // Emit the specific backwards-compat event
-        if let Some(session) = sessions.get(session_id) {
-            emit_to_session(
-                &session.app,
-                "session-switched-to-buffer",
-                session_id,
-                SessionSwitchedToBufferPayload {
-                    buffer_id: Some(bid.clone()),
-                    buffer_count,
-                    buffer_type,
-                    time_range,
-                    capabilities: result.capabilities.clone(),
-                },
-            );
-        }
-
         tlog!(
-            "[reader] stop_and_switch_to_buffer('{}') - switched to buffer '{}' ({} items)",
-            session_id, bid, buffer_count
+            "[reader] stop_and_switch_to_buffer('{}') - switched to buffer '{}'",
+            session_id, bid
         );
 
         Ok(result.capabilities)
     } else {
-        // No buffer — fall back to normal suspend event
+        // No buffer — fall back to normal suspend
         let session = sessions
             .get(session_id)
             .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
-        emit_to_session(
-            &session.app,
-            "session-suspended",
-            session_id,
-            SessionSuspendedPayload {
-                buffer_id: None,
-                buffer_count: 0,
-                buffer_type: None,
-                time_range: None,
-            },
-        );
+        let state = session.device.state();
+        let caps = session.device.capabilities();
+        crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &state, &caps);
 
         tlog!(
             "[reader] stop_and_switch_to_buffer('{}') - no buffer, fell back to suspend",
             session_id
         );
 
-        Ok(session.device.capabilities())
+        Ok(caps)
     }
 }
 
@@ -2288,20 +2070,9 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
         ));
     }
 
-    // Get the current buffer ID before the device orphans it
-    let old_buffer_id = buffer_store::get_session_buffer_ids(session_id).into_iter().next();
-
-    // Emit session-resuming event so apps clear their frame lists
-    // Note: The device's start() will orphan old buffer and create new one
-    emit_to_session(
-        &session.app,
-        "session-resuming",
-        session_id,
-        SessionResumingPayload {
-            new_buffer_id: String::new(), // Will be set by device's start()
-            orphaned_buffer_id: old_buffer_id,
-        },
-    );
+    // Emit session-lifecycle signal with current state + capabilities before restart
+    let caps = session.device.capabilities();
+    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &previous, &caps);
 
     // Start the device - this will orphan old buffer and create new one
     // Timeline readers (PostgreSQL, CSV, Buffer) handle buffer creation in start()
@@ -2309,7 +2080,7 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
 
     let current = session.device.state();
     if previous != current {
-        emit_state_change(&session.app, session_id, &previous, &current);
+        emit_state_change(session_id, &previous, &current);
     }
 
     tlog!(
@@ -2339,7 +2110,7 @@ pub async fn pause_session(session_id: &str) -> Result<IOState, String> {
 
     let current = session.device.state();
     if previous != current {
-        emit_state_change(&session.app, session_id, &previous, &current);
+        emit_state_change(session_id, &previous, &current);
     }
 
     Ok(current)
@@ -2364,7 +2135,7 @@ pub async fn resume_session(session_id: &str) -> Result<IOState, String> {
 
     let current = session.device.state();
     if previous != current {
-        emit_state_change(&session.app, session_id, &previous, &current);
+        emit_state_change(session_id, &previous, &current);
     }
 
     Ok(current)
@@ -2440,7 +2211,7 @@ pub async fn update_session_speed(session_id: &str, speed: f64) -> Result<(), St
     session.device.set_speed(speed)?;
 
     // Emit speed change event to all listeners
-    emit_speed_change(&session.app, session_id, speed);
+    emit_speed_change(session_id, speed);
 
     Ok(())
 }
@@ -2500,15 +2271,7 @@ pub async fn reconfigure_session(
     // This ensures the event ordering in the frontend is:
     //   [stale frames from old stream] → [session-reconfigured] → [new frames]
     // The frontend clears stale frames when it receives this event.
-    emit_to_session(
-        &session.app,
-        "session-reconfigured",
-        session_id,
-        serde_json::json!({
-            "start": start,
-            "end": end,
-        }),
-    );
+    crate::ws::dispatch::send_reconfigured(session_id);
 
     // Phase 2: Start the new stream (orphans old buffer, creates new one)
     let result = session.device.complete_reconfigure().await;
@@ -2521,7 +2284,7 @@ pub async fn reconfigure_session(
             state_after
         );
         // Force emit Stopped -> current to ensure UI updates to streaming state
-        emit_state_change(&session.app, session_id, &IOState::Stopped, &state_after);
+        emit_state_change(session_id, &IOState::Stopped, &state_after);
     }
     result
 }
@@ -2623,9 +2386,8 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
 /// remain connected.
 ///
 /// Steps:
-/// 1. Record the current buffer ID (for orphaning notification)
-/// 2. Replace device via `replace_session_device` (stops old, swaps, auto-starts)
-/// 3. Emit `session-resuming` event so apps clear their frame lists
+/// 1. Replace device via `replace_session_device` (stops old, swaps, auto-starts)
+/// 2. `replace_session_device` emits `session-lifecycle` signal so apps refresh state
 pub async fn resume_to_live_session(
     session_id: &str,
     new_reader: Box<dyn IODevice>,
@@ -2635,10 +2397,8 @@ pub async fn resume_to_live_session(
         session_id
     );
 
-    // Get the current buffer ID before the swap orphans it
-    let old_buffer_id = buffer_store::get_session_buffer_ids(session_id).into_iter().next();
-
     let mut sessions = IO_SESSIONS.lock().await;
+    // replace_session_device emits session-lifecycle internally
     let result = replace_session_device(
         &mut sessions,
         session_id,
@@ -2651,24 +2411,6 @@ pub async fn resume_to_live_session(
         },
     ).await?;
 
-    // Get the new buffer ID created by the reader's start() method
-    let new_buffer_id = buffer_store::get_session_buffer_ids(session_id).into_iter().next();
-
-    // Emit session-resuming event so apps clear their frame lists
-    if let Some(session) = sessions.get(session_id) {
-        if let Some(ref buffer_id) = new_buffer_id {
-            emit_to_session(
-                &session.app,
-                "session-resuming",
-                session_id,
-                SessionResumingPayload {
-                    new_buffer_id: buffer_id.clone(),
-                    orphaned_buffer_id: old_buffer_id,
-                },
-            );
-        }
-    }
-
     Ok(result.capabilities)
 }
 
@@ -2678,12 +2420,11 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
     if let Some(mut session) = sessions.remove(session_id) {
         // Stop the reader first
         let _ = session.device.stop().await;
-        // Orphan buffers and emit buffer-orphaned BEFORE the lifecycle event.
-        // This ensures the frontend receives buffer IDs before the "destroyed"
-        // lifecycle event, so apps can transition to buffer mode.
+        // Orphan buffers and store IDs in post-session cache before lifecycle event.
+        // The frontend fetches orphaned buffer IDs via command when it handles "destroyed".
         let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
-        emit_buffer_orphaned(&session.app, session_id, orphaned);
-        // Now emit lifecycle event - frontend can use buffer IDs it already received
+        emit_buffer_orphaned_as_changed(session_id, orphaned);
+        // Now emit lifecycle event
         let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
         emit_session_lifecycle(&session.app, SessionLifecyclePayload {
             session_id: session_id.to_string(),
@@ -2699,6 +2440,9 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
     clear_session_closing(session_id);
     // Clear any stored startup error
     clear_startup_error(session_id);
+    clear_playback_position(session_id);
+    // Don't sweep_expired here — the orphaned buffer IDs were just stored
+    // and need to survive long enough for the frontend to fetch them.
     Ok(())
 }
 
@@ -2913,7 +2657,7 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
         );
 
         // Emit joiner count change
-        emit_joiner_count_change(&session.app, session_id, session.listeners.len(), Some(listener_id), Some(&resolved_app_name), Some("joined"));
+        emit_joiner_count_change(session_id, session.listeners.len(), Some(listener_id), Some(&resolved_app_name), Some("joined"));
     }
 
     // Get session's frame buffer
@@ -2931,7 +2675,7 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
             Ok(()) => {
                 let current = session.device.state();
                 if previous != current {
-                    emit_state_change(&session.app, session_id, &previous, &current);
+                    emit_state_change(session_id, &previous, &current);
                 }
                 tlog!("[reader] Session '{}' reader resumed successfully", session_id);
             }
@@ -2976,17 +2720,15 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
             );
 
             // Emit joiner count change
-            emit_joiner_count_change(&app, session_id, remaining, Some(listener_id), Some(&removed_app_name), Some("left"));
+            emit_joiner_count_change(session_id, remaining, Some(listener_id), Some(&removed_app_name), Some("left"));
 
             // If no listeners left, stop and destroy the session
             if remaining == 0 {
                 tlog!("[reader] Session '{}' has no listeners left, destroying", session_id);
                 let _ = session.device.stop().await;
-                // Orphan buffers and emit buffer-orphaned BEFORE the lifecycle event.
-                // This ensures the frontend receives buffer IDs before "destroyed",
-                // so apps can transition to buffer mode.
+                // Orphan buffers and store IDs in post-session cache before lifecycle event.
                 let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
-                emit_buffer_orphaned(&app, session_id, orphaned);
+                emit_buffer_orphaned_as_changed(session_id, orphaned);
                 // Now emit lifecycle event
                 let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
                 emit_session_lifecycle(&app, SessionLifecyclePayload {
@@ -3002,6 +2744,7 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
                 sessions.remove(session_id);
                 // Clear any closing flag
                 clear_session_closing(session_id);
+                clear_playback_position(session_id);
                 // Clean up profile tracking (release single-handle device locks)
                 crate::sessions::cleanup_session_profiles(session_id);
                 tlog!("[reader] Session '{}' destroyed", session_id);
@@ -3336,45 +3079,6 @@ pub async fn reinitialize_session_if_safe(
         reason: None,
         other_listeners: vec![],
     })
-}
-
-/// Get the list of active listener IDs for a session.
-/// Used by frame emitters to filter which listeners should receive frames.
-#[tauri::command]
-pub async fn get_active_listeners(session_id: String) -> Result<Vec<String>, String> {
-    let sessions = IO_SESSIONS.lock().await;
-    Ok(sessions
-        .get(&session_id)
-        .map(|session| {
-            session
-                .listeners
-                .values()
-                .filter(|l| l.is_active)
-                .map(|l| l.listener_id.clone())
-                .collect()
-        })
-        .unwrap_or_default())
-}
-
-/// Get the list of active listener IDs synchronously (non-async version).
-/// Uses try_lock to avoid blocking; returns empty list if lock is held.
-pub fn get_active_listeners_sync(session_id: &str) -> Vec<String> {
-    if let Ok(sessions) = IO_SESSIONS.try_lock() {
-        sessions
-            .get(session_id)
-            .map(|session| {
-                session
-                    .listeners
-                    .values()
-                    .filter(|l| l.is_active)
-                    .map(|l| l.listener_id.clone())
-                    .collect()
-            })
-            .unwrap_or_default()
-    } else {
-        // Lock held by another task, return empty (rare case)
-        vec![]
-    }
 }
 
 /// Set the active state of a listener.

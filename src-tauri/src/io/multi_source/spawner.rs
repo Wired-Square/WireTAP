@@ -531,7 +531,7 @@ async fn run_framelink_reader(
 // ============================================================================
 
 /// Virtual CAN source for multi-source sessions: generates synthetic frames and sends
-/// them via the merge channel (no direct emit_frames call — merge task handles that).
+/// them via the merge channel (merge task handles emission).
 ///
 /// Parses the same `interfaces` array config as `VirtualDeviceReader` in virtual_device/mod.rs,
 /// spawning one generator task per bus with independent frame rates and patterns.

@@ -33,3 +33,11 @@ export async function transmitHistoryCount(): Promise<number> {
 export async function transmitHistoryClear(): Promise<void> {
   return invoke("transmit_history_clear");
 }
+
+export async function transmitHistoryTimeRange(): Promise<[number, number] | null> {
+  return invoke("transmit_history_time_range");
+}
+
+export async function transmitHistoryFindOffset(timestampUs: number): Promise<number> {
+  return invoke("transmit_history_find_offset", { timestampUs });
+}

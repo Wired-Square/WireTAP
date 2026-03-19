@@ -243,7 +243,7 @@ export default function Transmit() {
   }, [isConnected, effectiveSessionId]);
 
   // Count active repeats in queue
-  const activeRepeats = queue.filter((q) => q.isRepeating).length;
+  const activeRepeats = queue.reduce((n, q) => n + (q.isRepeating ? 1 : 0), 0);
 
   // Determine interface type from protocol traits
   // Serial protocol = bytes/serial frames, CAN/CANFD protocol = CAN frames
@@ -264,7 +264,7 @@ export default function Transmit() {
       case "queue":
         return <TransmitQueueView outputBusToSource={outputBusToSource} />;
       case "history":
-        return <TransmitHistoryView outputBusToSource={outputBusToSource} />;
+        return <TransmitHistoryView outputBusToSource={outputBusToSource} sessionId={effectiveSessionId} />;
       case "replay":
         return <TransmitReplayView />;
       default:

@@ -373,7 +373,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
               </thead>
               <tbody>
                 {lines.map((line, i) => (
-                  <tr key={i} className={hoverDataRow}>
+                  <tr key={line.timestampUs ?? i} className={hoverDataRow}>
                     <td
                       className={`${textDataTertiary} px-2 py-0.5 whitespace-nowrap`}
                       title={line.timestampUs !== null ? formatHumanUs(line.timestampUs) : undefined}

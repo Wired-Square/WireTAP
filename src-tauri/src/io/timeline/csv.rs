@@ -11,7 +11,8 @@ use std::time::Duration;
 use tauri::AppHandle;
 
 use super::base::{TimelineControl, TimelineReaderState};
-use crate::io::{emit_frames, emit_to_session, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition};
+use crate::io::{emit_session_error, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition, SignalThrottle};
+use crate::buffer_store;
 
 /// CSV reader options for playback control
 #[derive(Clone, Debug)]
@@ -1452,9 +1453,7 @@ fn spawn_csv_stream(
         if let Err(e) = run_csv_stream(app_handle.clone(), session_id.clone(), options, control)
             .await
         {
-            emit_to_session(
-                &app_handle,
-                "session-error",
+            emit_session_error(
                 &session_id,
                 format!("CSV error: {}", e),
             );
@@ -1463,7 +1462,7 @@ fn spawn_csv_stream(
 }
 
 async fn run_csv_stream(
-    app_handle: AppHandle,
+    _app_handle: AppHandle,
     session_id: String,
     options: CsvReaderOptions,
     control: TimelineControl,
@@ -1522,6 +1521,7 @@ async fn run_csv_stream(
     // Buffer settings (shared with buffer and PostgreSQL readers)
     use super::pacing::*;
 
+    let mut throttle = SignalThrottle::new();
     let mut total_emitted = 0i64;
 
     // Get stream start time from first frame
@@ -1607,14 +1607,20 @@ async fn run_csv_stream(
             last_frame_time_secs = Some(frame_time_secs);
 
             if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
-                emit_frames(&app_handle, &session_id, batch_buffer.clone());
-                batch_buffer.clear();
+                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
 
-                emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
+                if throttle.should_signal("frames-ready") {
+                    signal_frames_ready(&session_id);
+                }
+
+                crate::io::store_playback_position(&session_id, PlaybackPosition {
                     timestamp_us: playback_time_us,
                     frame_index: (total_emitted - 1) as usize,
                     frame_count: Some(total_emitted as usize),
                 });
+                if throttle.should_signal("playback-position") {
+                    signal_playback_position(&session_id);
+                }
 
                 tokio::time::sleep(Duration::from_millis(NO_LIMIT_YIELD_MS)).await;
             }
@@ -1654,22 +1660,30 @@ async fn run_csv_stream(
 
                 last_pacing_check = std::time::Instant::now();
 
-                emit_frames(&app_handle, &session_id, batch_buffer.clone());
-                batch_buffer.clear();
+                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
 
-                emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
+                if throttle.should_signal("frames-ready") {
+                    signal_frames_ready(&session_id);
+                }
+
+                crate::io::store_playback_position(&session_id, PlaybackPosition {
                     timestamp_us: playback_time_us,
                     frame_index: (total_emitted - 1) as usize,
                     frame_count: Some(total_emitted as usize),
                 });
+                if throttle.should_signal("playback-position") {
+                    signal_playback_position(&session_id);
+                }
 
                 tokio::task::yield_now().await;
             }
         } else {
-            // Normal speed: emit any pending batch first
+            // Normal speed: store any pending batch first
             if !batch_buffer.is_empty() {
-                emit_frames(&app_handle, &session_id, batch_buffer.clone());
-                batch_buffer.clear();
+                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
+                if throttle.should_signal("frames-ready") {
+                    signal_frames_ready(&session_id);
+                }
             }
 
             // Sleep for inter-frame delay (cap at 10 seconds)
@@ -1684,21 +1698,30 @@ async fn run_csv_stream(
                 continue;
             }
 
-            // Emit single frame with active listener filtering
-            emit_frames(&app_handle, &session_id, vec![frame]);
+            // Store single frame
+            buffer_store::append_frames_to_session(&session_id, vec![frame]);
             total_emitted += 1;
 
-            emit_to_session(&app_handle, "playback-time", &session_id, PlaybackPosition {
+            if throttle.should_signal("frames-ready") {
+                signal_frames_ready(&session_id);
+            }
+
+            crate::io::store_playback_position(&session_id, PlaybackPosition {
                 timestamp_us: playback_time_us,
                 frame_index: (total_emitted - 1) as usize,
                 frame_count: Some(total_emitted as usize),
             });
+            if throttle.should_signal("playback-position") {
+                signal_playback_position(&session_id);
+            }
         }
     }
 
-    // Emit any remaining frames in batch buffer with active listener filtering
+    // Store and signal any remaining frames
     if !batch_buffer.is_empty() {
-        emit_frames(&app_handle, &session_id, batch_buffer);
+        buffer_store::append_frames_to_session(&session_id, batch_buffer);
+        throttle.flush();
+        signal_frames_ready(&session_id);
     }
 
     tlog!(

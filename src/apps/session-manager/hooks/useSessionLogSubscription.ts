@@ -10,10 +10,9 @@ import { useSessionLogStore } from "../stores/sessionLogStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import {
   listActiveSessions,
-  type StreamEndedPayload,
-  type SessionSuspendedPayload,
-  type SessionResumingPayload,
-  type StateChangePayload,
+  getIOSessionState,
+  getStateType,
+  getReaderSessionJoinerCount,
 } from "../../../api/io";
 
 /** Payload for session-lifecycle event from Rust */
@@ -28,45 +27,6 @@ interface SessionLifecyclePayload {
   creator_listener_id: string | null;
 }
 
-/** Payload for session-reconfigured event */
-interface SessionReconfiguredPayload {
-  start: string | null;
-  end: string | null;
-}
-
-/** Payload for joiner-count-changed event */
-interface JoinerCountChangedPayload {
-  /** New total listener count */
-  count: number;
-  /** The listener instance ID that triggered the change (if known) */
-  listener_id: string | null;
-  /** Human-readable app name (e.g., "discovery", "decoder") */
-  app_name: string | null;
-  /** Whether the listener joined or left ("joined" | "left" | null for sync) */
-  change: "joined" | "left" | null;
-}
-
-/** Payload for buffer-orphaned event */
-interface BufferOrphanedPayload {
-  buffer_id: string;
-  buffer_name: string;
-  buffer_type: string;
-  count: number;
-}
-
-/** Payload for buffer-created event */
-interface BufferCreatedPayload {
-  buffer_id: string;
-  buffer_name: string;
-  buffer_type: string;
-}
-
-/** Payload for device-connected event */
-interface DeviceConnectedPayload {
-  device_type: string;
-  address: string;
-  bus_number: number | null;
-}
 
 /** Payload for device-probe event (global, not session-scoped) */
 interface DeviceProbePayload {
@@ -355,125 +315,120 @@ async function setupPerSessionListeners(
     return { profileId: null, profileName: cachedName ?? sessionId };
   };
 
+  // Guard helper: after each async listen(), check if cleanup ran while we
+  // were awaiting. If so, unlisten everything registered so far and abort.
+  const aborted = () => !listenersMap.has(sessionId);
+  const pushOrAbort = (unlisten: UnlistenFn): boolean => {
+    unlistenFns.push(unlisten);
+    if (aborted()) {
+      for (const fn of unlistenFns) fn();
+      return true;
+    }
+    return false;
+  };
+
   try {
-    unlistenFns.push(
-      await listen<string>(`session-error:${sessionId}`, async (e) => {
-        const { profileId, profileName } = await getProfileInfo();
-        addEntry({ eventType: "session-error", sessionId, profileId, profileName, appName: null, details: e.payload });
+    if (pushOrAbort(
+      await listen<void>(`session-error:${sessionId}`, async () => {
+        const { getSessionError } = await import("../../../api/io");
+        const error = await getSessionError(sessionId);
+        if (error) {
+          const { profileId, profileName } = await getProfileInfo();
+          addEntry({ eventType: "session-error", sessionId, profileId, profileName, appName: null, details: error });
+        }
       })
-    );
+    )) return;
 
-    unlistenFns.push(
-      await listen<StreamEndedPayload>(`stream-ended:${sessionId}`, async (e) => {
-        const { profileId, profileName } = await getProfileInfo();
-        addEntry({
-          eventType: "stream-ended",
-          sessionId,
-          profileId,
-          profileName,
-          appName: null,
-          details: `Reason: ${e.payload.reason}, buffer: ${e.payload.buffer_available ? `${e.payload.count} items` : "none"}`,
-        });
+    if (pushOrAbort(
+      await listen<void>(`stream-ended:${sessionId}`, async () => {
+        const { getStreamEndedInfo } = await import("../../../api/io");
+        const info = await getStreamEndedInfo(sessionId);
+        if (info) {
+          const { profileId, profileName } = await getProfileInfo();
+          // "paused" reason = buffer reader completion (old stream-complete)
+          const eventType = info.reason === "paused" ? "stream-complete" : "stream-ended";
+          const details = info.reason === "paused"
+            ? "Stream completed"
+            : `Reason: ${info.reason}, buffer: ${info.buffer_available ? `${info.count} items` : "none"}`;
+          addEntry({ eventType, sessionId, profileId, profileName, appName: null, details });
+        }
       })
-    );
+    )) return;
 
-    unlistenFns.push(
-      await listen<boolean>(`stream-complete:${sessionId}`, async () => {
+    // Session info changes — speed or listener count changed; fetch count and diff for join/leave
+    // Start from 0 so the first session-info event (e.g., count=1) is logged as a join
+    let prevListenerCount = 0;
+
+    if (pushOrAbort(
+      await listen<void>(`session-info:${sessionId}`, async () => {
+        const count = await getReaderSessionJoinerCount(sessionId);
+        if (count === prevListenerCount) return; // Only a speed change — nothing to log
         const { profileId, profileName } = await getProfileInfo();
-        addEntry({ eventType: "stream-complete", sessionId, profileId, profileName, appName: null, details: "Stream completed" });
+        if (count > prevListenerCount) {
+          addEntry({ eventType: "session-joined", sessionId, profileId, profileName, appName: null, details: `Listener joined (${count} listeners)` });
+        } else if (count < prevListenerCount) {
+          addEntry({ eventType: "session-left", sessionId, profileId, profileName, appName: null, details: `Listener left (${count} listeners)` });
+        }
+        prevListenerCount = count;
       })
-    );
+    )) return;
 
-    unlistenFns.push(
-      await listen<number>(`speed-changed:${sessionId}`, async (e) => {
+    // Session lifecycle (session-scoped): suspend, device-replace, buffer-switch, resume
+    if (pushOrAbort(
+      await listen<void>(`session-lifecycle:${sessionId}`, async () => {
         const { profileId, profileName } = await getProfileInfo();
-        addEntry({ eventType: "speed-changed", sessionId, profileId, profileName, appName: null, details: `Speed: ${e.payload}x` });
+        addEntry({ eventType: "state-change", sessionId, profileId, profileName, appName: null, details: "Session lifecycle event (state refreshed)" });
       })
-    );
+    )) return;
 
-    // Suspended merged into state-change with buffer info
-    unlistenFns.push(
-      await listen<SessionSuspendedPayload>(`session-suspended:${sessionId}`, async (e) => {
+    // Session reconfigured (bookmark jump)
+    if (pushOrAbort(
+      await listen<void>(`session-reconfigured:${sessionId}`, async () => {
         const { profileId, profileName } = await getProfileInfo();
-        addEntry({ eventType: "state-change", sessionId, profileId, profileName, appName: null, details: `State: running → stopped (buffer finalized: ${e.payload.buffer_count} ${e.payload.buffer_type ?? "items"})` });
+        addEntry({ eventType: "session-reconfigured", sessionId, profileId, profileName, appName: null, details: "Session reconfigured" });
       })
-    );
+    )) return;
 
-    // Resuming merged into state-change with buffer info
-    unlistenFns.push(
-      await listen<SessionResumingPayload>(`session-resuming:${sessionId}`, async (e) => {
+    // Buffer changed (created or orphaned)
+    if (pushOrAbort(
+      await listen<void>(`buffer-changed:${sessionId}`, async () => {
         const { profileId, profileName } = await getProfileInfo();
-        addEntry({ eventType: "state-change", sessionId, profileId, profileName, appName: null, details: `State: stopped → running (new buffer: ${e.payload.new_buffer_id}, orphaned: ${e.payload.orphaned_buffer_id})` });
+        addEntry({ eventType: "buffer-changed", sessionId, profileId, profileName, appName: null, details: "Session buffers changed" });
       })
-    );
+    )) return;
 
-    unlistenFns.push(
-      await listen<SessionReconfiguredPayload>(`session-reconfigured:${sessionId}`, async (e) => {
+    // Device connection events — fetch sources from post-session cache on signal
+    if (pushOrAbort(
+      await listen<void>(`device-connected:${sessionId}`, async () => {
+        const { getSessionSources } = await import("../../../api/io");
+        const sources = await getSessionSources(sessionId);
         const { profileId, profileName } = await getProfileInfo();
-        addEntry({ eventType: "session-reconfigured", sessionId, profileId, profileName, appName: null, details: `Time range: ${e.payload.start ?? "start"} → ${e.payload.end ?? "end"}` });
+        // Log the most recently added source (last in the array)
+        const latest = sources[sources.length - 1];
+        if (latest) {
+          const busInfo = latest.bus !== null ? ` (bus ${latest.bus})` : "";
+          addEntry({ eventType: "device-connected", sessionId, profileId, profileName, appName: null, details: `${latest.device_type} connected: ${latest.address}${busInfo}` });
+        }
       })
-    );
+    )) return;
 
-    // Buffer events
-    unlistenFns.push(
-      await listen<BufferOrphanedPayload>(`buffer-orphaned:${sessionId}`, async (e) => {
+    // Track state changes (play/stop/pause) — fetch current state on signal
+    if (pushOrAbort(
+      await listen<void>(`session-changed:${sessionId}`, async () => {
+        const state = await getIOSessionState(sessionId);
+        if (!state) return;
         const { profileId, profileName } = await getProfileInfo();
-        addEntry({ eventType: "buffer-orphaned", sessionId, profileId, profileName, appName: null, details: `Buffer available: ${e.payload.buffer_id} (${e.payload.count} ${e.payload.buffer_type})` });
-      })
-    );
-
-    unlistenFns.push(
-      await listen<BufferCreatedPayload>(`buffer-created:${sessionId}`, async (e) => {
-        const { profileId, profileName } = await getProfileInfo();
-        addEntry({ eventType: "buffer-created", sessionId, profileId, profileName, appName: null, details: `Buffer: ${e.payload.buffer_id} (${e.payload.buffer_type})` });
-      })
-    );
-
-    // Device connection events
-    unlistenFns.push(
-      await listen<DeviceConnectedPayload>(`device-connected:${sessionId}`, async (e) => {
-        const { profileId, profileName } = await getProfileInfo();
-        const busInfo = e.payload.bus_number !== null ? ` (bus ${e.payload.bus_number})` : "";
-        addEntry({ eventType: "device-connected", sessionId, profileId, profileName, appName: null, details: `${e.payload.device_type} connected: ${e.payload.address}${busInfo}` });
-      })
-    );
-
-    // Track state changes (play/stop/pause)
-    unlistenFns.push(
-      await listen<StateChangePayload>(`session-state:${sessionId}`, async (e) => {
-        const { profileId, profileName } = await getProfileInfo();
+        const stateLabel = state.type === "Error" ? `error: ${state.message}` : getStateType(state);
         addEntry({
           eventType: "state-change",
           sessionId,
           profileId,
           profileName,
           appName: null,
-          details: `State: ${e.payload.previous} → ${e.payload.current}`,
+          details: `State: ${stateLabel}`,
         });
       })
-    );
-
-    // Track listener count changes (joins/leaves) - merged into session-joined/session-left
-    // Start from 0 so the first joiner-count-changed event (e.g., count=1) is logged as a join
-    let prevListenerCount = 0;
-
-    unlistenFns.push(
-      await listen<JoinerCountChangedPayload>(`joiner-count-changed:${sessionId}`, async (e) => {
-        const { count, listener_id, app_name, change } = e.payload;
-        console.log(`[SessionLog:joiner] ${sessionId}: prev=${prevListenerCount} new=${count} listener=${listener_id} app=${app_name} change=${change}`);
-        if (count === prevListenerCount) {
-          return; // No change
-        }
-        const { profileId, profileName } = await getProfileInfo();
-        const listenerName = app_name ?? listener_id ?? "unknown";
-        if (count > prevListenerCount) {
-          addEntry({ eventType: "session-joined", sessionId, profileId, profileName, appName: app_name ?? listener_id, details: `${listenerName} joined (${count} listeners)` });
-        } else if (count < prevListenerCount) {
-          addEntry({ eventType: "session-left", sessionId, profileId, profileName, appName: app_name ?? listener_id, details: `${listenerName} left (${count} listeners)` });
-        }
-        prevListenerCount = count;
-      })
-    );
+    )) return;
 
     listenersMap.set(sessionId, unlistenFns);
   } catch (error) {

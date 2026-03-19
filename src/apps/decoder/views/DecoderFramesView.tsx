@@ -499,14 +499,17 @@ function FrameCard({
     }
   }
 
-  // Get colour for a specific byte, with optional flash brightening
-  const getByteColour = (byteIdx: number) => {
-    const baseColour = byteColourMap.get(byteIdx) ?? signalColours?.none;
-    if (brightByteIndices.has(byteIdx) && baseColour) {
-      return brightenColour(baseColour, 0.7);
-    }
-    return baseColour;
-  };
+  // Pre-compute byte colour styles array — avoids creating inline style objects per byte per render
+  const byteColourStyles = useMemo(() => {
+    if (!rawBytes) return [];
+    return rawBytes.map((_, byteIdx) => {
+      const baseColour = byteColourMap.get(byteIdx) ?? signalColours?.none;
+      const colour = (brightByteIndices.has(byteIdx) && baseColour)
+        ? brightenColour(baseColour, 0.7)
+        : baseColour;
+      return colour ? { color: colour } : undefined;
+    });
+  }, [rawBytes, byteColourMap, brightByteIndices, signalColours?.none]);
 
   const headerFields = decodedFrame?.headerFields ?? [];
 
@@ -645,7 +648,7 @@ function FrameCard({
               <span
                 key={idx}
                 className="transition-colors duration-200"
-                style={{ color: getByteColour(idx) }}
+                style={byteColourStyles[idx]}
               >
                 {idx > 0 ? ' ' : ''}
                 {b.toString(16).toUpperCase().padStart(2, '0')}
@@ -716,7 +719,7 @@ function FrameCard({
 
             return (
               <div
-                key={`${decoded.muxValue ?? 'plain'}-${decoded.name}-${idx}`}
+                key={`${decoded.muxValue ?? 'plain'}-${decoded.name}`}
                 className={`px-3 py-2 text-sm ${rowBg} flex items-center justify-between transition-colors duration-200`}
                 onContextMenu={onSignalContextMenu ? (e) => {
                   e.preventDefault();
@@ -1589,7 +1592,7 @@ export default function DecoderFramesView({
                 <p className={emptyStateText}>No unmatched frames.</p>
               </div>
             ) : (
-              unmatchedFrames.slice(-100).reverse().map((frame, idx) => {
+              unmatchedFrames.slice(-100).reverse().map((frame) => {
                 const date = new Date(frame.timestamp * 1000);
                 const timeStr = date.toLocaleTimeString('en-US', {
                   hour12: false,
@@ -1603,7 +1606,7 @@ export default function DecoderFramesView({
                 const asciiStr = frame.bytes.map(byteToAscii).join('');
                 return (
                   <div
-                    key={`${frame.timestamp}-${frame.frameId}-${idx}`}
+                    key={`${frame.timestamp}-${frame.frameId}`}
                     className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
                     onContextMenu={(e) => handleUnmatchedContextMenu(e, frame)}
                   >
@@ -1650,7 +1653,7 @@ export default function DecoderFramesView({
             ))}
             {filteredFrames.length > 0 && (
               <div className="space-y-1">
-                {filteredFrames.slice(-100).reverse().map((frame, idx) => {
+                {filteredFrames.slice(-100).reverse().map((frame) => {
                   const date = new Date(frame.timestamp * 1000);
                   const timeStr = date.toLocaleTimeString('en-US', {
                     hour12: false,
@@ -1664,7 +1667,7 @@ export default function DecoderFramesView({
                   const asciiStr = frame.bytes.map(byteToAscii).join('');
                   return (
                     <div
-                      key={`${frame.timestamp}-${frame.frameId}-${idx}`}
+                      key={`${frame.timestamp}-${frame.frameId}`}
                       className={`flex items-center gap-3 px-3 py-1.5 ${bgDataView} rounded text-sm font-mono`}
                       onContextMenu={(e) => handleUnmatchedContextMenu(e, frame)}
                     >

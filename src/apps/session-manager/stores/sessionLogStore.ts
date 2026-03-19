@@ -34,6 +34,7 @@ export type SessionLogEventType =
   | "session-stats"
   | "buffer-orphaned"
   | "buffer-created"
+  | "buffer-changed"
   | "device-connected"
   | "device-probe";
 
@@ -221,6 +222,7 @@ export const EVENT_TYPE_LABELS: Record<SessionLogEventType, string> = {
   "session-stats": "Stats",
   "buffer-orphaned": "Buffer",
   "buffer-created": "Buffer",
+  "buffer-changed": "Buffer",
   "device-connected": "Connected",
   "device-probe": "Probe",
 };
@@ -241,6 +243,7 @@ export const EVENT_TYPE_COLOURS: Record<SessionLogEventType, string> = {
   "session-stats": `${badgeSmallNeutral} border border-[color:var(--border-default)]`,
   "buffer-orphaned": badgeSmallPurple,
   "buffer-created": badgeSmallSuccess,
+  "buffer-changed": badgeSmallInfo,
   "device-connected": badgeSmallSuccess,
   "device-probe": badgeSmallInfo,
 };
@@ -261,6 +264,7 @@ export const ALL_EVENT_TYPES: SessionLogEventType[] = [
   "session-stats",
   "buffer-orphaned",
   "buffer-created",
+  "buffer-changed",
   "device-connected",
   "device-probe",
 ];

@@ -256,12 +256,20 @@ pub(crate) async fn session_release(host: &str, port: u16) {
     let pool = POOL.lock().await;
 
     if let Some(conn) = pool.get(&key) {
-        let prev = conn.session_refs.fetch_sub(1, Ordering::SeqCst);
-        tlog!(
-            "[framelink:{}] Session released (refs={})",
-            key,
-            prev - 1
-        );
+        let prev = conn.session_refs.load(Ordering::SeqCst);
+        if prev == 0 {
+            tlog!(
+                "[framelink:{}] Session release called but refs already 0 — skipping decrement",
+                key
+            );
+        } else {
+            conn.session_refs.fetch_sub(1, Ordering::SeqCst);
+            tlog!(
+                "[framelink:{}] Session released (refs={})",
+                key,
+                prev - 1
+            );
+        }
     }
 }
 

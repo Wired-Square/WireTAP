@@ -14,7 +14,7 @@ mod dbc_import;
 mod dbquery;
 mod device_scan;
 mod framing;
-mod io;
+pub mod io;
 mod profile_tracker;
 mod sessions;
 mod settings;
@@ -23,6 +23,7 @@ mod store_manager;
 mod transmit;
 mod transmit_history;
 mod replay;
+pub mod ws;
 
 use std::sync::Mutex;
 #[cfg(not(target_os = "ios"))]
@@ -798,6 +799,26 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+// ============================================================================
+// WebSocket Transport Config
+// ============================================================================
+
+#[derive(serde::Serialize)]
+pub struct WsConfig {
+    pub port: u16,
+    pub token: String,
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn get_ws_config() -> Result<WsConfig, String> {
+    let server = crate::ws::server::ws_server()
+        .ok_or_else(|| "WebSocket server not started".to_string())?;
+    Ok(WsConfig {
+        port: server.port(),
+        token: server.token().to_string(),
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -910,6 +931,16 @@ pub fn run() {
             // Start the heartbeat watchdog to clean up stale session joiners
             // and probe WebView health (detects content process jettison on macOS)
             io::start_heartbeat_watchdog(app.handle().clone());
+
+            // Start WebSocket binary transport server
+            match ws::server::WsServer::start() {
+                Ok((port, _token)) => {
+                    tlog!("[ws] Binary transport server listening on 127.0.0.1:{}", port);
+                }
+                Err(e) => {
+                    tlog!("[ws] Failed to start binary transport server: {}", e);
+                }
+            }
 
             // Install example decoders on app startup (only copies missing files)
             let app_handle = app.handle().clone();
@@ -1026,13 +1057,19 @@ pub fn run() {
             sessions::get_profile_sessions,
             sessions::get_profile_session_count,
             sessions::get_profiles_usage,
+            // Signal-then-fetch query commands
+            sessions::get_playback_position_cmd,
+            sessions::get_stream_ended_info,
+            sessions::get_session_error,
+            sessions::get_session_sources,
+            sessions::get_orphaned_buffer_ids,
+            sessions::get_modbus_scan_state_cmd,
             // Power management API
             sessions::set_wake_settings,
             // Modbus scanning API
             sessions::modbus_scan_registers,
             sessions::modbus_scan_unit_ids,
             sessions::cancel_modbus_scan,
-            io::get_active_listeners,
             io::webview_health_pong,
             io::check_recovery_occurred,
             // Buffer / CSV Import API
@@ -1060,6 +1097,7 @@ pub fn run() {
             buffers::set_active_buffer,
             buffers::create_frame_buffer_from_frames,
             // Byte buffer API (Serial Discovery)
+            buffers::get_buffer_bytes_tail,
             buffers::get_buffer_bytes_paginated,
             buffers::get_buffer_bytes_count,
             buffers::get_buffer_bytes_paginated_by_id,
@@ -1110,10 +1148,13 @@ pub fn run() {
             replay::io_start_replay,
             replay::io_stop_replay,
             replay::io_stop_all_replays,
+            replay::get_replay_state,
             // Transmit history (SQLite-backed)
             transmit_history::transmit_history_query,
             transmit_history::transmit_history_count,
             transmit_history::transmit_history_clear,
+            transmit_history::transmit_history_time_range,
+            transmit_history::transmit_history_find_offset,
             // Centralised store API (replaces tauri-plugin-store for multi-window support)
             store_manager::store_get,
             store_manager::store_set,
@@ -1175,6 +1216,8 @@ pub fn run() {
                         io::framelink::framelink_get_interface_signals,
                         io::framelink::framelink_write_signal,
                         io::framelink::framelink_read_signal,
+                        // WebSocket binary transport
+                        get_ws_config,
         ]);
 
     // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)

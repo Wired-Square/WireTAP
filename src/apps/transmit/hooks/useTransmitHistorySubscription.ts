@@ -1,74 +1,65 @@
 // src/apps/transmit/hooks/useTransmitHistorySubscription.ts
 //
 // Subscribes to transmit-related events from the backend.
-// Handles replay lifecycle events and the transmit-history-updated notification
+// Handles replay state updates and the transmit-updated notification
 // that signals new rows have been written to the SQLite history database.
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTransmitStore } from "../../../stores/transmitStore";
-import { transmitHistoryCount } from "../../../api/transmitHistory";
-import type {
-  RepeatStoppedEvent,
-  ReplayStartedEvent,
-  ReplayProgressEvent,
-  ReplayLoopRestartedEvent,
-} from "../../../api/transmit";
+import type { RepeatStoppedEvent } from "../../../api/transmit";
+import { wsTransport } from "../../../services/wsTransport";
+import { MsgType, HEADER_SIZE, decodeTransmitUpdated } from "../../../services/wsProtocol";
+
+const sharedTextDecoder = new TextDecoder();
 
 /**
  * Subscribes to transmit history events and updates the store.
  *
- * Listens for:
- * - `transmit-history-updated`: SQLite rows written — refetch count
- * - `replay-started`: Replay began
- * - `replay-progress`: Replay frame count update
- * - `replay-loop-restarted`: Looping replay completed a pass and is restarting
- * - `repeat-stopped`: Repeating transmission or replay stopped
+ * WebSocket handlers for:
+ * - TransmitUpdated (0x0B): SQLite rows written — refetch count
+ * - ReplayState (0x0C): Replay lifecycle/progress — full state in JSON payload
+ *
+ * Tauri events (global, staying on Tauri):
+ * - `repeat-stopped`: Repeating transmission stopped (transmit queues only)
  */
 export function useTransmitHistorySubscription(): void {
   const markRepeatStopped = useTransmitStore((s) => s.markRepeatStopped);
-  const markReplayStopped = useTransmitStore((s) => s.markReplayStopped);
-  const markReplayStarted = useTransmitStore((s) => s.markReplayStarted);
+  const handleReplayLifecycle = useTransmitStore((s) => s.handleReplayLifecycle);
   const updateReplayProgress = useTransmitStore((s) => s.updateReplayProgress);
-  const markReplayLoopRestarted = useTransmitStore((s) => s.markReplayLoopRestarted);
 
   useEffect(() => {
-    // SQLite history updated — fetch the new count so TransmitHistoryView can refresh
-    const unlistenHistoryUpdated = listen("transmit-history-updated", async () => {
-      try {
-        const count = await transmitHistoryCount();
-        useTransmitStore.setState({ historyDbCount: count });
-      } catch {
-        // Non-critical — the view will still show whatever it last fetched
-      }
-    });
+    const unlistenFns: (() => void)[] = [];
 
-    // Replay lifecycle events
-    const unlistenReplayStarted = listen<ReplayStartedEvent>(
-      "replay-started",
-      (event) => {
-        const { replay_id, total_frames, speed, loop_replay } = event.payload;
-        markReplayStarted(replay_id, total_frames, speed, loop_replay);
-      }
-    );
+    // WS: TransmitUpdated — count is inlined in the binary payload
+    if (wsTransport.isConnected) {
+      unlistenFns.push(
+        wsTransport.onGlobalMessage(MsgType.TransmitUpdated, (payload) => {
+          const { count } = decodeTransmitUpdated(payload);
+          useTransmitStore.setState({ historyDbCount: count });
+        })
+      );
 
-    const unlistenReplayProgress = listen<ReplayProgressEvent>(
-      "replay-progress",
-      (event) => {
-        const { replay_id, frames_sent } = event.payload;
-        updateReplayProgress(replay_id, frames_sent);
-      }
-    );
+      // WS: ReplayState — full replay state as JSON payload
+      unlistenFns.push(
+        wsTransport.onGlobalMessage(MsgType.ReplayState, (_payload, raw) => {
+          try {
+            const jsonBytes = new Uint8Array(raw, HEADER_SIZE);
+            const text = sharedTextDecoder.decode(jsonBytes);
+            const state = JSON.parse(text);
+            if (state.status === "running" && state.frames_sent > 0) {
+              updateReplayProgress(state);
+            } else {
+              handleReplayLifecycle(state);
+            }
+          } catch {
+            // Malformed payload — ignore
+          }
+        })
+      );
+    }
 
-    const unlistenLoopRestarted = listen<ReplayLoopRestartedEvent>(
-      "replay-loop-restarted",
-      (event) => {
-        const { replay_id, pass, frames_sent } = event.payload;
-        markReplayLoopRestarted(replay_id, pass, frames_sent);
-      }
-    );
-
-    // Repeat stopped events (due to permanent error or completion)
+    // Tauri: repeat-stopped (stays on Tauri — infrequent, needs queue_id payload)
     const unlistenStopped = listen<RepeatStoppedEvent>(
       "repeat-stopped",
       (event) => {
@@ -76,18 +67,13 @@ export function useTransmitHistorySubscription(): void {
         console.warn(
           `[Transmit] Repeat stopped for ${data.queue_id}: ${data.reason}`
         );
-        // May be a queue repeat OR a replay — call both handlers (no-op if not applicable)
         markRepeatStopped(data.queue_id);
-        markReplayStopped(data.queue_id, data.reason);
       }
     );
 
     return () => {
-      unlistenHistoryUpdated.then((fn) => fn());
-      unlistenReplayStarted.then((fn) => fn());
-      unlistenReplayProgress.then((fn) => fn());
-      unlistenLoopRestarted.then((fn) => fn());
+      for (const fn of unlistenFns) fn();
       unlistenStopped.then((fn) => fn());
     };
-  }, [markRepeatStopped, markReplayStopped, markReplayStarted, updateReplayProgress, markReplayLoopRestarted]);
+  }, [markRepeatStopped, handleReplayLifecycle, updateReplayProgress]);
 }

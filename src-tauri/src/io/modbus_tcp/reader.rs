@@ -27,8 +27,8 @@ use tokio_modbus::prelude::*;
 
 use crate::buffer_store::{self, BufferType};
 use crate::io::{
-    emit_device_connected, emit_frames, emit_stream_ended, emit_to_session, now_us,
-    FrameMessage, IOCapabilities, IODevice, IOState, Protocol,
+    emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready,
+    FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle,
 };
 
 // ============================================================================
@@ -149,7 +149,6 @@ impl IODevice for ModbusTcpReader {
         // Emit connected event
         let address = format!("{}:{}", self.config.host, self.config.port);
         emit_device_connected(
-            &self.app,
             &self.session_id,
             "modbus_tcp",
             &address,
@@ -192,7 +191,7 @@ impl IODevice for ModbusTcpReader {
 
         // Disconnect (the context is dropped when all Arc refs are released)
         tlog!("[ModbusTCP:{}] Stopped", self.session_id);
-        emit_stream_ended(&self.app, &self.session_id, "stopped", "ModbusTCP");
+        emit_stream_ended(&self.session_id, "stopped", "ModbusTCP");
 
         self.state = IOState::Stopped;
         Ok(())
@@ -236,7 +235,7 @@ impl IODevice for ModbusTcpReader {
 // ============================================================================
 
 fn spawn_poll_task(
-    app: AppHandle,
+    _app: AppHandle,
     session_id: String,
     unit_id: u8,
     poll: PollGroup,
@@ -254,6 +253,7 @@ fn spawn_poll_task(
         };
         let mut first_poll = true;
         let mut consecutive_errors: u32 = 0;
+        let mut throttle = SignalThrottle::new();
 
         tlog!(
             "[ModbusTCP:{}] Poll task started: {} reg {} count {} every {}ms (frame_id={})",
@@ -343,8 +343,10 @@ fn spawn_poll_task(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames_to_session(&session_id, vec![frame.clone()]);
-                    emit_frames(&app, &session_id, vec![frame]);
+                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    if throttle.should_signal("frames-ready") {
+                        signal_frames_ready(&session_id);
+                    }
                 }
                 Err(e) => {
                     consecutive_errors += 1;
@@ -355,9 +357,7 @@ fn spawn_poll_task(
                         consecutive_errors,
                         if max_register_errors > 0 { max_register_errors.to_string() } else { "∞".to_string() }
                     );
-                    emit_to_session(
-                        &app,
-                        "session-error",
+                    emit_session_error(
                         &session_id,
                         format!(
                             "Modbus read error ({} @ {}): {}",
@@ -370,9 +370,7 @@ fn spawn_poll_task(
                             "[ModbusTCP:{}] Stopped polling {} reg {} after {} consecutive errors",
                             session_id, type_name, poll.start_register, consecutive_errors
                         );
-                        emit_to_session(
-                            &app,
-                            "session-error",
+                        emit_session_error(
                             &session_id,
                             format!(
                                 "Stopped polling {} @ {} after {} consecutive errors",

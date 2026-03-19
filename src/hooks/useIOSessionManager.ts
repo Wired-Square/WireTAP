@@ -10,7 +10,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useIOSession, type UseIOSessionOptions, type UseIOSessionResult } from "./useIOSession";
-import type { StreamEndedPayload as IngestStreamEndedPayload } from "../api/io";
+import type { StreamEndedInfo as IngestStreamEndedInfo } from "../api/io";
 import { tlog } from "../api/settings";
 import {
   createAndStartMultiSourceSession,
@@ -27,7 +27,7 @@ export { isBufferProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToBuffer, resumeSessionToLive, type StreamEndedPayload, type IOCapabilities } from "../api/io";
+import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToBuffer, resumeSessionToLive, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -111,7 +111,7 @@ export interface UseIOSessionManagerOptions {
   /** Callback before ingest starts (e.g., to clear buffer) */
   onBeforeIngestStart?: () => Promise<void>;
   /** Callback when ingest completes */
-  onIngestComplete?: (payload: IngestStreamEndedPayload) => Promise<void>;
+  onIngestComplete?: (payload: IngestStreamEndedInfo) => Promise<void>;
   /** Only join sessions that produce frames (not raw bytes) */
   requireFrames?: boolean;
   /** Callback when frames are received */
@@ -123,7 +123,7 @@ export interface UseIOSessionManagerOptions {
   /** Callback when playback position updates (timestamp and frame index) */
   onTimeUpdate?: (position: PlaybackPosition) => void;
   /** Callback when stream ends */
-  onStreamEnded?: (payload: StreamEndedPayload) => void;
+  onStreamEnded?: (payload: StreamEndedInfo) => void;
   /** Callback when session is suspended (stopped with buffer available) */
   onSuspended?: (payload: import("../api/io").SessionSuspendedPayload) => void;
   /** Callback when buffer playback completes */
@@ -549,7 +549,7 @@ export function useIOSessionManager(
   }, [appName, onBeforeWatch, streamCompletedRef]);
 
   // Handle stream-ended with auto-transition for ingest mode
-  const handleStreamEndedWithIngest = useCallback(async (payload: StreamEndedPayload) => {
+  const handleStreamEndedWithIngest = useCallback(async (payload: StreamEndedInfo) => {
     tlog.debug(`[IOSessionManager:${appName}] Stream ended, isLoading=${isLoadingRef.current}, payload: ${JSON.stringify(payload)}`);
 
     if (isLoadingRef.current && payload.buffer_available) {

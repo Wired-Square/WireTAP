@@ -7,6 +7,7 @@ use crate::{
     buffer_store,
     credentials,
     io::{
+        self,
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
         get_session_listeners, get_session_source_configs, join_session, leave_session, list_sessions, pause_session,
         reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
@@ -951,7 +952,7 @@ pub async fn suspend_reader_session(session_id: String) -> Result<IOState, Strin
 }
 
 /// Stop a realtime session and switch all listeners to buffer replay.
-/// Emits `session-switched-to-buffer` event so all apps on the session transition together.
+/// Emits `session-lifecycle` signal so all apps on the session refresh state.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn io_stop_and_switch_to_buffer(
     app: tauri::AppHandle,
@@ -1097,7 +1098,7 @@ pub async fn destroy_reader_session(session_id: String) -> Result<(), String> {
     }
 
     // Buffer orphaning is handled by destroy_session() which also emits
-    // the buffer-orphaned event. Don't orphan here to avoid a double-call
+    // the buffer-changed signal. Don't orphan here to avoid a double-call
     // that would cause destroy_session's emit to have an empty buffer list.
     destroy_session(&session_id).await
 }
@@ -2376,12 +2377,14 @@ static MODBUS_SCAN_CANCEL: Lazy<Arc<AtomicBool>> =
 pub async fn modbus_scan_registers(
     app: tauri::AppHandle,
     config: ModbusScanConfig,
+    session_id: Option<String>,
 ) -> Result<ScanCompletePayload, String> {
     MODBUS_SCAN_CANCEL.store(false, Ordering::Relaxed);
     crate::io::modbus_tcp::scanner::modbus_scan_registers(
         app,
         config,
         MODBUS_SCAN_CANCEL.clone(),
+        session_id,
     )
     .await
 }
@@ -2392,12 +2395,14 @@ pub async fn modbus_scan_registers(
 pub async fn modbus_scan_unit_ids(
     app: tauri::AppHandle,
     config: UnitIdScanConfig,
+    session_id: Option<String>,
 ) -> Result<ScanCompletePayload, String> {
     MODBUS_SCAN_CANCEL.store(false, Ordering::Relaxed);
     crate::io::modbus_tcp::scanner::modbus_scan_unit_ids(
         app,
         config,
         MODBUS_SCAN_CANCEL.clone(),
+        session_id,
     )
     .await
 }
@@ -2407,4 +2412,39 @@ pub async fn modbus_scan_unit_ids(
 pub fn cancel_modbus_scan() {
     MODBUS_SCAN_CANCEL.store(true, Ordering::Relaxed);
     tlog!("[ModbusScan] Cancel requested");
+}
+
+// ============================================================================
+// Signal-then-fetch query commands
+// ============================================================================
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_playback_position_cmd(session_id: String) -> Option<io::PlaybackPosition> {
+    io::get_playback_position(&session_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_stream_ended_info(session_id: String) -> Option<io::post_session::StreamEndedInfo> {
+    io::post_session::get_stream_ended(&session_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_session_error(session_id: String) -> Option<String> {
+    io::post_session::get_error(&session_id)
+        .or_else(|| io::get_startup_error(&session_id))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_session_sources(session_id: String) -> Vec<io::post_session::SourceInfo> {
+    io::post_session::get_sources(&session_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_orphaned_buffer_ids(session_id: String) -> Vec<String> {
+    io::post_session::get_orphaned_buffer_ids(&session_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_modbus_scan_state_cmd(session_id: String) -> Option<crate::io::modbus_tcp::scanner::ModbusScanState> {
+    crate::io::modbus_tcp::scanner::get_scan_state(&session_id)
 }

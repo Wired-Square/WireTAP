@@ -6,13 +6,15 @@
 //   - Standalone scanning (not a session) — one-shot discovery operations
 //   - Register scan: chunked reads with binary subdivision for efficiency
 //   - Unit ID scan: sequential probe of slave addresses 1–247
-//   - Results emitted as FrameMessage events for Discovery app consumption
+//   - Results accumulated into ModbusScanState; frontend fetches via get_modbus_scan_state_cmd
 
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, RwLock,
 };
 use tauri::{AppHandle, Emitter};
 use tokio::time::{Duration, sleep};
@@ -20,7 +22,7 @@ use tokio_modbus::client::tcp;
 use tokio_modbus::prelude::*;
 
 use super::reader::{coils_to_bytes, registers_to_bytes, RegisterType};
-use crate::io::{now_us, FrameMessage};
+use crate::io::{now_us, FrameMessage, SignalThrottle};
 
 /// Device identification info discovered via FC43 (Read Device Identification)
 #[derive(Clone, Debug, Serialize)]
@@ -29,6 +31,38 @@ pub struct DeviceInfoPayload {
     pub vendor: Option<String>,
     pub product_code: Option<String>,
     pub revision: Option<String>,
+}
+
+// ============================================================================
+// Scan State (signal-then-fetch)
+// ============================================================================
+
+/// Snapshot of a scan's accumulated results, polled by the frontend via get_modbus_scan_state_cmd.
+#[derive(Clone, Debug, Serialize)]
+pub struct ModbusScanState {
+    pub status: String,
+    pub frames: Vec<FrameMessage>,
+    pub progress: Option<ScanProgressPayload>,
+    pub device_info: Vec<DeviceInfoPayload>,
+}
+
+static SCAN_STATES: Lazy<RwLock<HashMap<String, ModbusScanState>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+pub fn store_scan_state(session_id: &str, state: ModbusScanState) {
+    if let Ok(mut states) = SCAN_STATES.write() {
+        states.insert(session_id.to_string(), state);
+    }
+}
+
+pub fn get_scan_state(session_id: &str) -> Option<ModbusScanState> {
+    SCAN_STATES.read().ok().and_then(|s| s.get(session_id).cloned())
+}
+
+pub fn clear_scan_state(session_id: &str) {
+    if let Ok(mut states) = SCAN_STATES.write() {
+        states.remove(session_id);
+    }
 }
 
 // ============================================================================
@@ -116,8 +150,12 @@ pub async fn modbus_scan_registers(
     app: AppHandle,
     config: ModbusScanConfig,
     cancel_flag: Arc<AtomicBool>,
+    session_id: Option<String>,
 ) -> Result<ScanCompletePayload, String> {
     let start_time = std::time::Instant::now();
+    let mut throttle = SignalThrottle::new();
+    let mut scan_frames: Vec<FrameMessage> = Vec::new();
+    let mut scan_progress: Option<ScanProgressPayload> = None;
 
     // Validate
     if config.start_register > config.end_register {
@@ -184,13 +222,12 @@ pub async fn modbus_scan_registers(
 
         match result {
             Ok(ReadResult::Registers(data)) => {
-                // Success — emit one FrameMessage per register
+                // Success — accumulate one FrameMessage per register
                 let bytes = registers_to_bytes(&data);
-                let mut frames = Vec::with_capacity(data.len());
                 for i in 0..data.len() {
                     let reg_addr = start + i as u16;
                     let reg_bytes = vec![bytes[i * 2], bytes[i * 2 + 1]];
-                    frames.push(FrameMessage {
+                    scan_frames.push(FrameMessage {
                         protocol: "modbus".to_string(),
                         timestamp_us: now_us(),
                         frame_id: reg_addr as u32,
@@ -204,15 +241,13 @@ pub async fn modbus_scan_registers(
                         direction: Some("rx".to_string()),
                     });
                 }
-                found_count += frames.len() as u32;
-                let _ = app.emit("modbus-scan-frame", &frames);
+                found_count += data.len() as u32;
             }
             Ok(ReadResult::Coils(data)) => {
-                // Success — emit one FrameMessage per coil (1 byte each with 0/1)
-                let mut frames = Vec::with_capacity(data.len());
+                // Success — accumulate one FrameMessage per coil (1 byte each with 0/1)
                 for (i, &coil) in data.iter().enumerate() {
                     let reg_addr = start + i as u16;
-                    frames.push(FrameMessage {
+                    scan_frames.push(FrameMessage {
                         protocol: "modbus".to_string(),
                         timestamp_us: now_us(),
                         frame_id: reg_addr as u32,
@@ -226,8 +261,7 @@ pub async fn modbus_scan_registers(
                         direction: Some("rx".to_string()),
                     });
                 }
-                found_count += frames.len() as u32;
-                let _ = app.emit("modbus-scan-frame", &frames);
+                found_count += data.len() as u32;
             }
             Ok(ReadResult::ModbusException) => {
                 // Modbus exception — some or all registers in this chunk don't exist
@@ -256,15 +290,28 @@ pub async fn modbus_scan_registers(
         // Count scanned registers (only for leaf-level reads, not subdivided chunks)
         scanned_count += count as u32;
 
-        // Emit progress
-        let _ = app.emit(
-            "modbus-scan-progress",
-            ScanProgressPayload {
-                current: scanned_count,
-                total: total_registers,
-                found_count,
-            },
-        );
+        // Accumulate progress and emit throttled signal
+        let progress = ScanProgressPayload {
+            current: scanned_count,
+            total: total_registers,
+            found_count,
+        };
+        scan_progress = Some(progress);
+
+        if let Some(sid) = &session_id {
+            if throttle.should_signal("modbus-scan") {
+                store_scan_state(
+                    sid,
+                    ModbusScanState {
+                        status: "scanning".to_string(),
+                        frames: scan_frames.clone(),
+                        progress: scan_progress.clone(),
+                        device_info: vec![],
+                    },
+                );
+                let _ = app.emit(&format!("modbus-scan:{}", sid), ());
+            }
+        }
 
         // Inter-request delay
         if config.inter_request_delay_ms > 0 {
@@ -282,6 +329,22 @@ pub async fn modbus_scan_registers(
         duration_ms
     );
 
+    // Final flush: emit complete state and clear
+    if let Some(sid) = &session_id {
+        throttle.flush();
+        store_scan_state(
+            sid,
+            ModbusScanState {
+                status: "complete".to_string(),
+                frames: scan_frames.clone(),
+                progress: scan_progress.clone(),
+                device_info: vec![],
+            },
+        );
+        let _ = app.emit(&format!("modbus-scan:{}", sid), ());
+        clear_scan_state(sid);
+    }
+
     Ok(ScanCompletePayload {
         found_count,
         total_scanned: total_registers,
@@ -297,14 +360,19 @@ pub async fn modbus_scan_registers(
 ///
 /// For each unit ID, attempts FC43 first to get vendor/product/revision info.
 /// Falls back to a single register read if FC43 is not supported.
-/// Emits `modbus-scan-frame` for each responding unit and
-/// `modbus-scan-device-info` with identification details when available.
+/// Accumulates results into `ModbusScanState` and emits a throttled `modbus-scan`
+/// session-scoped signal for the frontend to fetch via `get_modbus_scan_state_cmd`.
 pub async fn modbus_scan_unit_ids(
     app: AppHandle,
     config: UnitIdScanConfig,
     cancel_flag: Arc<AtomicBool>,
+    session_id: Option<String>,
 ) -> Result<ScanCompletePayload, String> {
     let start_time = std::time::Instant::now();
+    let mut throttle = SignalThrottle::new();
+    let mut scan_frames: Vec<FrameMessage> = Vec::new();
+    let mut scan_device_info: Vec<DeviceInfoPayload> = Vec::new();
+    let mut scan_progress: Option<ScanProgressPayload> = None;
 
     if config.start_unit_id > config.end_unit_id {
         return Err("Start unit ID must be <= end unit ID".to_string());
@@ -346,16 +414,24 @@ pub async fn modbus_scan_unit_ids(
         let mut ctx = match connect_result {
             Ok(ctx) => ctx,
             Err(_) => {
-                // Connection failed — emit progress and continue
+                // Connection failed — update progress and emit throttled signal
                 let scanned = (unit_id - config.start_unit_id + 1) as u32;
-                let _ = app.emit(
-                    "modbus-scan-progress",
-                    ScanProgressPayload {
-                        current: scanned,
-                        total,
-                        found_count,
-                    },
-                );
+                let progress = ScanProgressPayload { current: scanned, total, found_count };
+                scan_progress = Some(progress);
+                if let Some(sid) = &session_id {
+                    if throttle.should_signal("modbus-scan") {
+                        store_scan_state(
+                            sid,
+                            ModbusScanState {
+                                status: "scanning".to_string(),
+                                frames: scan_frames.clone(),
+                                progress: scan_progress.clone(),
+                                device_info: scan_device_info.clone(),
+                            },
+                        );
+                        let _ = app.emit(&format!("modbus-scan:{}", sid), ());
+                    }
+                }
                 if config.inter_request_delay_ms > 0 {
                     sleep(Duration::from_millis(config.inter_request_delay_ms)).await;
                 }
@@ -414,18 +490,13 @@ pub async fn modbus_scan_unit_ids(
                         direction: Some("rx".to_string()),
                     };
                     found_count += 1;
-                    let _ = app.emit("modbus-scan-frame", vec![frame]);
-
-                    // Emit device identification detail event
-                    let _ = app.emit(
-                        "modbus-scan-device-info",
-                        DeviceInfoPayload {
-                            unit_id,
-                            vendor,
-                            product_code,
-                            revision,
-                        },
-                    );
+                    scan_frames.push(frame);
+                    scan_device_info.push(DeviceInfoPayload {
+                        unit_id,
+                        vendor,
+                        product_code,
+                        revision,
+                    });
 
                     tlog!(
                         "[ModbusScan] Unit ID {} identified via FC43: {}",
@@ -457,10 +528,23 @@ pub async fn modbus_scan_unit_ids(
                             ctx = new_ctx;
                         } else {
                             let scanned = (unit_id - config.start_unit_id + 1) as u32;
-                            let _ = app.emit(
-                                "modbus-scan-progress",
-                                ScanProgressPayload { current: scanned, total, found_count },
-                            );
+                            let progress =
+                                ScanProgressPayload { current: scanned, total, found_count };
+                            scan_progress = Some(progress);
+                            if let Some(sid) = &session_id {
+                                if throttle.should_signal("modbus-scan") {
+                                    store_scan_state(
+                                        sid,
+                                        ModbusScanState {
+                                            status: "scanning".to_string(),
+                                            frames: scan_frames.clone(),
+                                            progress: scan_progress.clone(),
+                                            device_info: scan_device_info.clone(),
+                                        },
+                                    );
+                                    let _ = app.emit(&format!("modbus-scan:{}", sid), ());
+                                }
+                            }
                             continue;
                         }
                     }
@@ -477,7 +561,7 @@ pub async fn modbus_scan_unit_ids(
             match result {
                 Ok(ReadResult::Registers(data)) => {
                     let bytes = registers_to_bytes(&data);
-                    let frame = FrameMessage {
+                    scan_frames.push(FrameMessage {
                         protocol: "modbus".to_string(),
                         timestamp_us: now_us(),
                         frame_id: config.test_register as u32,
@@ -489,9 +573,8 @@ pub async fn modbus_scan_unit_ids(
                         source_address: None,
                         incomplete: None,
                         direction: Some("rx".to_string()),
-                    };
+                    });
                     found_count += 1;
-                    let _ = app.emit("modbus-scan-frame", vec![frame]);
                     tlog!(
                         "[ModbusScan] Unit ID {} responded ({} reg {})",
                         unit_id,
@@ -501,7 +584,7 @@ pub async fn modbus_scan_unit_ids(
                 }
                 Ok(ReadResult::Coils(data)) => {
                     let bytes = coils_to_bytes(&data);
-                    let frame = FrameMessage {
+                    scan_frames.push(FrameMessage {
                         protocol: "modbus".to_string(),
                         timestamp_us: now_us(),
                         frame_id: config.test_register as u32,
@@ -513,9 +596,8 @@ pub async fn modbus_scan_unit_ids(
                         source_address: None,
                         incomplete: None,
                         direction: Some("rx".to_string()),
-                    };
+                    });
                     found_count += 1;
-                    let _ = app.emit("modbus-scan-frame", vec![frame]);
                     tlog!(
                         "[ModbusScan] Unit ID {} responded ({} reg {})",
                         unit_id,
@@ -525,7 +607,7 @@ pub async fn modbus_scan_unit_ids(
                 }
                 Ok(ReadResult::ModbusException) => {
                     // Unit is alive but doesn't have this register
-                    let frame = FrameMessage {
+                    scan_frames.push(FrameMessage {
                         protocol: "modbus".to_string(),
                         timestamp_us: now_us(),
                         frame_id: config.test_register as u32,
@@ -537,9 +619,8 @@ pub async fn modbus_scan_unit_ids(
                         source_address: None,
                         incomplete: None,
                         direction: Some("rx".to_string()),
-                    };
+                    });
                     found_count += 1;
-                    let _ = app.emit("modbus-scan-frame", vec![frame]);
                     tlog!(
                         "[ModbusScan] Unit ID {} alive (exception on reg {})",
                         unit_id,
@@ -552,16 +633,25 @@ pub async fn modbus_scan_unit_ids(
             }
         }
 
-        // Emit progress
+        // Accumulate progress and emit throttled signal
         let scanned = (unit_id - config.start_unit_id + 1) as u32;
-        let _ = app.emit(
-            "modbus-scan-progress",
-            ScanProgressPayload {
-                current: scanned,
-                total,
-                found_count,
-            },
-        );
+        let progress = ScanProgressPayload { current: scanned, total, found_count };
+        scan_progress = Some(progress);
+
+        if let Some(sid) = &session_id {
+            if throttle.should_signal("modbus-scan") {
+                store_scan_state(
+                    sid,
+                    ModbusScanState {
+                        status: "scanning".to_string(),
+                        frames: scan_frames.clone(),
+                        progress: scan_progress.clone(),
+                        device_info: scan_device_info.clone(),
+                    },
+                );
+                let _ = app.emit(&format!("modbus-scan:{}", sid), ());
+            }
+        }
 
         // Inter-request delay
         if config.inter_request_delay_ms > 0 {
@@ -578,6 +668,22 @@ pub async fn modbus_scan_unit_ids(
         duration_ms,
         if fc43_supported { "yes" } else { "no" }
     );
+
+    // Final flush: emit complete state and clear
+    if let Some(sid) = &session_id {
+        throttle.flush();
+        store_scan_state(
+            sid,
+            ModbusScanState {
+                status: "complete".to_string(),
+                frames: scan_frames.clone(),
+                progress: scan_progress.clone(),
+                device_info: scan_device_info.clone(),
+            },
+        );
+        let _ = app.emit(&format!("modbus-scan:{}", sid), ());
+        clear_scan_state(sid);
+    }
 
     Ok(ScanCompletePayload {
         found_count,

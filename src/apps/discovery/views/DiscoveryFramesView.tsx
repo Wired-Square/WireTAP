@@ -3,9 +3,10 @@ import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "
 import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw, Copy, ClipboardCopy, Target, Send, BarChart3, Bookmark, Search, Play } from "lucide-react";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
-import { useDiscoveryStore, TOOL_TAB_CONFIG } from "../../../stores/discoveryStore";
-import { getDiscoveryFrameBuffer } from "../../../stores/discoveryFrameStore";
+import { TOOL_TAB_CONFIG } from "../../../stores/discoveryStore";
+import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
+import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
 import { type BufferMetadata, searchBufferFrames } from "../../../api/buffer";
 import { FrameDataTable, type TabDefinition, FRAME_PAGE_SIZE_OPTIONS } from "../components";
 import DiscoveryFindBar, { type FindSearchMode } from "../components/DiscoveryFindBar";
@@ -29,6 +30,7 @@ import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommuni
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useGraphStore } from "../../../stores/graphStore";
 import { useSessionStore } from "../../../stores/sessionStore";
+import { trackAlloc } from "../../../services/memoryDiag";
 import type { FrameRow } from "../components/FrameDataTable";
 import BulkAddToTransmitDialog from "../../../dialogs/BulkAddToTransmitDialog";
 import ReplayDialog from "../../../dialogs/ReplayDialog";
@@ -99,6 +101,9 @@ type Props = {
 
   /** Called to cancel a running modbus scan */
   onCancelScan?: () => void;
+
+  /** Whether to use local timezone for time display */
+  useLocalTimezone?: boolean;
 };
 
 function DiscoveryFramesView({
@@ -140,21 +145,36 @@ function DiscoveryFramesView({
   isStreamPaused = false,
   onResumeStream,
   onCancelScan,
+  useLocalTimezone = false,
 }: Props) {
 
-  const renderBuffer = useDiscoveryStore((s) => s.renderBuffer);
-  const setRenderBuffer = useDiscoveryStore((s) => s.setRenderBuffer);
-  const selectedFrames = useDiscoveryStore((s) => s.selectedFrames);
+  // ── UI store ──
+  const renderBuffer = useDiscoveryUIStore((s) => s.renderBuffer);
+  const setRenderBuffer = useDiscoveryUIStore((s) => s.setRenderBuffer);
+
+  // ── Frame store ──
+  const selectedFrames = useDiscoveryFrameStore((s) => s.selectedFrames);
   // frameVersion triggers re-renders when the mutable frame buffer changes
-  const frameVersion = useDiscoveryStore((s) => s.frameVersion);
-  const seenIds = useDiscoveryStore((s) => s.seenIds);
-  const bufferMode = useDiscoveryStore((s) => s.bufferMode);
-  const toolboxResults = useDiscoveryStore((s) => s.toolbox);
-  const toggleFrameSelection = useDiscoveryStore((s) => s.toggleFrameSelection);
-  const deselectAllFrames = useDiscoveryStore((s) => s.deselectAllFrames);
-  const renderFrozen = useDiscoveryStore((s) => s.renderFrozen);
-  const setRenderFrozen = useDiscoveryStore((s) => s.setRenderFrozen);
-  const refreshFrozenView = useDiscoveryStore((s) => s.refreshFrozenView);
+  const frameVersion = useDiscoveryFrameStore((s) => s.frameVersion);
+  const seenIds = useDiscoveryFrameStore((s) => s.seenIds);
+  const bufferMode = useDiscoveryFrameStore((s) => s.bufferMode);
+  const renderFrozen = useDiscoveryFrameStore((s) => s.renderFrozen);
+  const setRenderFrozen = useDiscoveryFrameStore((s) => s.setRenderFrozen);
+  const refreshFrozenView = useDiscoveryFrameStore((s) => s.refreshFrozenView);
+
+  // ── Toolbox store ──
+  const toolboxResults = useDiscoveryToolboxStore((s) => s.toolbox);
+
+  // ── Coordinated actions (cross-store wrappers) ──
+  const toggleFrameSelection = useCallback((id: number) => {
+    const { activeSelectionSetId, setSelectionSetDirty } = useDiscoveryUIStore.getState();
+    useDiscoveryFrameStore.getState().toggleFrameSelection(id, activeSelectionSetId, setSelectionSetDirty);
+  }, []);
+
+  const deselectAllFrames = useCallback(() => {
+    const { activeSelectionSetId, setSelectionSetDirty } = useDiscoveryUIStore.getState();
+    useDiscoveryFrameStore.getState().deselectAllFrames(activeSelectionSetId, setSelectionSetDirty);
+  }, []);
 
   // Find bar state
   const [findOpen, setFindOpen] = useState(false);
@@ -322,10 +342,10 @@ function DiscoveryFramesView({
         if (effectiveStartTimeUs == null) return "0.000000s";
         return renderDelta(ts_us - effectiveStartTimeUs);
       case "timestamp":
-        return formatIsoUs(ts_us);
+        return formatIsoUs(ts_us, useLocalTimezone);
       case "human":
       default:
-        return formatHumanUs(ts_us);
+        return formatHumanUs(ts_us, useLocalTimezone);
     }
   };
 
@@ -367,6 +387,7 @@ function DiscoveryFramesView({
       hexBytes: frame.bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()),
     }));
 
+    trackAlloc("streaming.hexFrames", withHex.length * 450);
     return { visibleFrames: withHex, filteredCount: -1, indices };
   }, [frameVersion, selectedFrames, renderBuffer, isStreaming]);
 
@@ -382,7 +403,10 @@ function DiscoveryFramesView({
     // When streaming stops, defer the heavy computation
     setIsFiltering(true);
 
-    // Use setTimeout to allow UI to update first (show loading state)
+    // Use setTimeout to allow UI to update first (show loading state).
+    // isCancelled prevents orphaned recursive setTimeout chains from
+    // accumulating when the effect re-triggers before processing completes.
+    let isCancelled = false;
     const timeoutId = setTimeout(() => {
       // Do the filtering in chunks to avoid blocking UI completely
       const CHUNK_SIZE = 100000;
@@ -390,6 +414,8 @@ function DiscoveryFramesView({
       let currentIndex = 0;
 
       const processChunk = () => {
+        if (isCancelled) return;
+
         const endIndex = Math.min(currentIndex + CHUNK_SIZE, frames.length);
 
         for (let i = currentIndex; i < endIndex; i++) {
@@ -403,8 +429,9 @@ function DiscoveryFramesView({
 
         if (currentIndex < frames.length) {
           // More chunks to process - yield to UI
-          setTimeout(processChunk, 0);
+          if (!isCancelled) setTimeout(processChunk, 0);
         } else {
+          if (isCancelled) return;
           // Done filtering, compute final result
           let slice: FrameMessage[];
           if (renderBuffer === -1) {
@@ -429,6 +456,7 @@ function DiscoveryFramesView({
     }, 50); // Small delay to let React render the loading state
 
     return () => {
+      isCancelled = true;
       clearTimeout(timeoutId);
     };
   }, [isStreaming, frameVersion, selectedFrames, renderBuffer, currentPage]);
@@ -711,7 +739,7 @@ function DiscoveryFramesView({
   }, [frameCount, filteredOutCount, toolboxResults.messageOrderResults, toolboxResults.changesResults, toolboxResults.checksumDiscoveryResults, toolboxResults.modbusRegisterScanResults, toolboxResults.modbusUnitIdScanResults]);
 
   // Handle closing a tool output tab
-  const clearToolResult = useDiscoveryStore((s) => s.clearToolResult);
+  const clearToolResult = useDiscoveryToolboxStore((s) => s.clearToolResult);
   const handleTabClose = useCallback((tabId: string) => {
     clearToolResult(tabId);
     if (activeTab === tabId) {
@@ -1214,6 +1242,7 @@ function DiscoveryFramesView({
               totalFrames: effectiveTotalFrames,
               currentFrameIndex: currentFrameIndex ?? undefined,
               onFrameChange: handleFrameScrub,
+              useLocalTimezone,
             }
           : undefined
       }
@@ -1259,6 +1288,7 @@ function DiscoveryFramesView({
             bufferIndices={useBufferFirstMode ? bufferFrameView.bufferIndices : streamingIndices}
             onContextMenu={handleContextMenu}
             onHeaderContextMenu={handleHeaderContextMenu}
+            useLocalTimezone={useLocalTimezone}
           />
         </>
       )}
@@ -1270,6 +1300,7 @@ function DiscoveryFramesView({
           isStreaming={isStreaming}
           streamStartTimeUs={effectiveStartTimeUs}
           bufferMetadata={bufferMetadata}
+          useLocalTimezone={useLocalTimezone}
         />
       )}
 

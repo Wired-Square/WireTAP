@@ -11,6 +11,8 @@ import { useAppErrorDialog, useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./apps/settings/stores/settingsStore";
 import { checkRecoveryOccurred } from "./api/io";
 import { checkCandorMigration, tlog } from "./api/settings";
+import { initWsTransport } from "./services/wsTransport";
+import "./services/memoryDiag"; // Memory diagnostic counters
 import type { CandorMigrationInfo } from "./api/settings";
 import ErrorDialog from "./dialogs/ErrorDialog";
 import TelemetryConsentDialog from "./dialogs/TelemetryConsentDialog";
@@ -89,6 +91,13 @@ export default function WireTAP() {
       checkCandorMigration().then((info) => {
         if (info) setMigrationInfo(info);
       });
+    }
+  }, [settingsLoaded]);
+
+  // Establish binary WebSocket transport once settings are ready
+  useEffect(() => {
+    if (settingsLoaded) {
+      initWsTransport();
     }
   }, [settingsLoaded]);
 

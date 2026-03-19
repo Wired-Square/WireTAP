@@ -2,6 +2,7 @@
 //
 // Replay tab: shows active replay progress banners and the replay lifecycle log.
 
+import { useMemo } from "react";
 import { Check, X, Play, StopCircle, Trash2, RefreshCw } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import type { ReplayLogEntry } from "../../../stores/transmitStore";
@@ -34,13 +35,14 @@ export default function TransmitReplayView() {
   const clearReplayLog = useTransmitStore((s) => s.clearReplayLog);
 
   const isEmpty = replayProgress.size === 0 && replayLog.length === 0;
+  const replayEntries = useMemo(() => [...replayProgress.entries()], [replayProgress]);
 
   return (
     <div className="flex flex-col h-full">
       {/* Active replay banners */}
-      {replayProgress.size > 0 && (
+      {replayEntries.length > 0 && (
         <div className={`border-b ${borderDataView}`}>
-          {[...replayProgress.entries()].map(([replayId, info]) => {
+          {replayEntries.map(([replayId, info]) => {
             const pct =
               info.totalFrames > 0
                 ? Math.round((info.framesSent / info.totalFrames) * 100)

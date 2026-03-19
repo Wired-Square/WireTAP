@@ -5,15 +5,18 @@
 
 import { create } from 'zustand';
 import { tlog } from '../api/settings';
+import { trackAlloc } from '../services/memoryDiag';
 import type { FrameMessage } from '../types/frame';
 import type { SelectionSet } from '../utils/selectionSets';
 
 // Frame buffer for throttling UI updates
 let pendingFrames: FrameMessage[] = [];
 let flushTimeout: ReturnType<typeof setTimeout> | null = null;
-const FLUSH_INTERVAL_MS = 40;
+// 500ms (2Hz) — fast enough for human perception, avoids overwhelming GC with
+// transient object allocations from Zustand selectors and React reconciliation.
+const FLUSH_INTERVAL_MS = 500;
 // Allow the frame buffer to temporarily overshoot maxBuffer by this many frames
-// before compacting. This avoids O(100k) splice every 40ms — compaction happens
+// before compacting. This avoids O(100k) splice every flush — compaction happens
 // once every few minutes instead of 25x/sec, dramatically reducing GC pressure.
 const COMPACT_THRESHOLD = 10_000;
 
@@ -125,6 +128,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
         flushTimeout = null;
         const framesToProcess = pendingFrames;
         pendingFrames = [];
+        try {
 
         if (framesToProcess.length === 0) return;
 
@@ -146,6 +150,8 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
         // Only compact when overshooting by COMPACT_THRESHOLD instead of splicing
         // every flush. This avoids O(100k) element shifts 25x/sec.
         _frameBuffer.push(...framesToProcess);
+        trackAlloc("frameBuffer.push", framesToProcess.length * 300);
+        trackAlloc("frameBuffer.size", _frameBuffer.length * 300);
         if (_frameBuffer.length > maxBuffer + COMPACT_THRESHOLD) {
           _frameBuffer = _frameBuffer.slice(-maxBuffer);
         }
@@ -187,6 +193,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
                 nextSelectedFrames.add(id);
               }
             });
+            trackAlloc("frameStore.newSet", nextSeenIds.size * 60);
             stateUpdate.seenIds = nextSeenIds;
             stateUpdate.selectedFrames = nextSelectedFrames;
           }
@@ -231,11 +238,15 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
               }
             }
 
+            trackAlloc("frameStore.newMap", nextFrameInfoMap.size * 100);
             stateUpdate.frameInfoMap = nextFrameInfoMap;
           }
         }
 
         set(stateUpdate);
+        } catch (e) {
+          console.error('[discoveryFrameStore] flush error:', e);
+        }
       }, FLUSH_INTERVAL_MS);
     }
   },

@@ -29,6 +29,7 @@ type Props = {
   isStreaming: boolean;
   streamStartTimeUs?: number | null;
   bufferMetadata?: BufferMetadata | null;
+  useLocalTimezone?: boolean;
 };
 
 export default function FilteredTabContent({
@@ -37,6 +38,7 @@ export default function FilteredTabContent({
   isStreaming,
   streamStartTimeUs,
   bufferMetadata,
+  useLocalTimezone = false,
 }: Props) {
   const frames = useDiscoveryStore((s) => s.frames);
   const frameVersion = useDiscoveryStore((s) => s.frameVersion);
@@ -117,13 +119,13 @@ export default function FilteredTabContent({
           if (effectiveStartTimeUs == null) return "0.000000s";
           return renderDeltaNode(ts_us - effectiveStartTimeUs);
         case "timestamp":
-          return formatIsoUs(ts_us);
+          return formatIsoUs(ts_us, useLocalTimezone);
         case "human":
         default:
-          return formatHumanUs(ts_us);
+          return formatHumanUs(ts_us, useLocalTimezone);
       }
     },
-    [displayTimeFormat, effectiveStartTimeUs]
+    [displayTimeFormat, effectiveStartTimeUs, useLocalTimezone]
   );
 
   // Non-buffer mode: filter frames from the in-memory buffer
@@ -310,6 +312,7 @@ export default function FilteredTabContent({
         emptyMessage={loading ? "Loading filtered frames..." : "No filtered frames to display"}
         onContextMenu={handleContextMenu}
         onHeaderContextMenu={handleHeaderContextMenu}
+        useLocalTimezone={useLocalTimezone}
       />
     </div>
 

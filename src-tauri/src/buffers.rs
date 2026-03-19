@@ -531,6 +531,23 @@ pub async fn search_buffer_frames(
     crate::buffer_db::search_frames(&buffer_id, &query, search_id, search_data, &selected_ids)
 }
 
+/// Response for tail-mode byte buffer queries
+#[derive(Clone, serde::Serialize)]
+pub struct BytesTailResponse {
+    pub bytes: Vec<TimestampedByte>,
+    pub total_count: usize,
+}
+
+/// Get the most recent bytes from a buffer (tail view for serial discovery).
+#[tauri::command(rename_all = "snake_case")]
+pub fn get_buffer_bytes_tail(buffer_id: String, tail_size: usize) -> BytesTailResponse {
+    let total_count = buffer_store::get_buffer_count(&buffer_id);
+    let offset = total_count.saturating_sub(tail_size);
+    let limit = tail_size.min(total_count);
+    let (bytes, _) = buffer_store::get_buffer_bytes_paginated(&buffer_id, offset, limit);
+    BytesTailResponse { bytes, total_count }
+}
+
 // ============================================================================
 // Session-Aware Buffer Commands
 // ============================================================================

@@ -111,30 +111,6 @@ export interface RepeatStoppedEvent {
   reason: string;
 }
 
-/** Emitted once when a replay task begins */
-export interface ReplayStartedEvent {
-  replay_id: string;
-  total_frames: number;
-  speed: number;
-  loop_replay: boolean;
-}
-
-/** Emitted ~4× per second during a replay to report progress */
-export interface ReplayProgressEvent {
-  replay_id: string;
-  frames_sent: number;
-  total_frames: number;
-}
-
-/** Emitted when a looping replay finishes a pass and is about to restart */
-export interface ReplayLoopRestartedEvent {
-  replay_id: string;
-  /** Pass number that just completed (1-based) */
-  pass: number;
-  /** Cumulative frames sent across all passes so far */
-  frames_sent: number;
-}
-
 // ============================================================================
 // Profile Query API
 // ============================================================================

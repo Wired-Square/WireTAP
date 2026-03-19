@@ -537,6 +537,19 @@ pub fn get_session_buffer_ids(session_id: &str) -> Vec<String> {
         .collect()
 }
 
+/// Get the frame buffer ID for a session, if one exists.
+pub fn get_session_frame_buffer_id(session_id: &str) -> Option<String> {
+    let registry = BUFFER_REGISTRY.read().unwrap();
+    registry
+        .buffers
+        .values()
+        .find(|b| {
+            b.metadata.owning_session_id.as_deref() == Some(session_id)
+                && b.metadata.buffer_type == BufferType::Frames
+        })
+        .map(|b| b.metadata.id.clone())
+}
+
 /// Append frames to this session's frame buffer.
 /// Resolves the buffer by finding the buffer owned by session_id with
 /// buffer_type == Frames. No-op if session has no frame buffer.
@@ -551,6 +564,8 @@ pub fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>)
     };
     if let Some(id) = buffer_id {
         append_frames_to_buffer(&id, new_frames);
+    } else {
+        tlog!("[BufferStore] WARN: append_frames_to_session('{}') — no frame buffer found for session (dropped {} frames)", session_id, new_frames.len());
     }
 }
 
@@ -606,22 +621,6 @@ pub fn finalize_session_buffers(session_id: &str) -> Vec<BufferMetadata> {
     finalized
 }
 
-/// Finalize a specific buffer by ID. Removes from streaming_ids.
-fn finalize_buffer_by_id(buffer_id: &str) -> Option<BufferMetadata> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
-    registry.streaming_ids.remove(buffer_id);
-    if let Some(buffer) = registry.buffers.get(buffer_id) {
-        let meta = buffer.metadata.clone();
-        tlog!("[BufferStore] Finalized buffer '{}' with {} items", buffer_id, meta.count);
-        drop(registry);
-        if let Err(e) = buffer_db::save_buffer_metadata(&meta) {
-            tlog!("[BufferStore] Failed to persist finalized buffer metadata: {}", e);
-        }
-        return Some(meta);
-    }
-    None
-}
-
 /// Mark a buffer as being rendered by a UI panel.
 pub fn mark_buffer_active(buffer_id: &str) -> Result<(), String> {
     let mut registry = BUFFER_REGISTRY.write().unwrap();
@@ -632,25 +631,6 @@ pub fn mark_buffer_active(buffer_id: &str) -> Result<(), String> {
     } else {
         Err(format!("Buffer '{}' not found", buffer_id))
     }
-}
-
-/// Mark a buffer as no longer being rendered.
-pub fn mark_buffer_inactive(buffer_id: &str) {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
-    registry.active_ids.remove(buffer_id);
-    tlog!("[BufferStore] Marked buffer inactive: {}", buffer_id);
-}
-
-/// Check if a buffer is currently being rendered.
-pub fn is_buffer_active(buffer_id: &str) -> bool {
-    let registry = BUFFER_REGISTRY.read().unwrap();
-    registry.active_ids.contains(buffer_id)
-}
-
-/// Get all buffer IDs currently being rendered.
-pub fn get_active_buffer_ids() -> Vec<String> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
-    registry.active_ids.iter().cloned().collect()
 }
 
 /// List only orphaned buffers (no owning session).

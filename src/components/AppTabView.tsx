@@ -50,6 +50,8 @@ interface TimelineConfig {
   currentFrameIndex?: number;
   /** Called when user scrubs to a new frame index */
   onFrameChange?: (frameIndex: number) => void;
+  /** Whether to use local timezone for timeline labels */
+  useLocalTimezone?: boolean;
 }
 
 /**
@@ -227,6 +229,7 @@ export default function AppTabView({
         timelineTotalFrames={timeline?.totalFrames}
         timelineCurrentFrameIndex={timeline?.currentFrameIndex}
         timelineOnFrameChange={timeline?.onFrameChange}
+        timelineUseLocalTimezone={timeline?.useLocalTimezone}
       />
 
       {/* Content Area */}

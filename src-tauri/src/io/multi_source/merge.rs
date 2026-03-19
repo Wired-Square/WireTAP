@@ -14,8 +14,8 @@ use super::types::{SourceConfig, TransmitChannels};
 use super::{MergeCommand, VirtualBusCommand, VirtualBusControls, VirtualCmdTx};
 use crate::settings;
 use crate::buffer_store::{self, TimestampedByte};
-use crate::io::types::{RawBytesPayload, SourceMessage};
-use crate::io::{emit_device_connected, emit_frames, emit_session_error, emit_stream_ended, emit_to_session, FrameMessage};
+use crate::io::types::SourceMessage;
+use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, signal_bytes_ready, signal_frames_ready, FrameMessage, SignalThrottle};
 
 /// Minimum pending frames before emission.
 const FRAME_BATCH_THRESHOLD: usize = 100;
@@ -46,7 +46,7 @@ pub(super) async fn run_merge_task(
         Ok(s) => s,
         Err(e) => {
             tlog!("[MultiSourceReader] Failed to load settings: {}", e);
-            emit_stream_ended(&app, &session_id, "error", "MultiSourceReader");
+            emit_stream_ended(&session_id, "error", "MultiSourceReader");
             return;
         }
     };
@@ -92,6 +92,7 @@ pub(super) async fn run_merge_task(
     let mut pending_frames: Vec<FrameMessage> = Vec::new();
     let mut pending_bytes: Vec<TimestampedByte> = Vec::new();
     let mut last_emit = std::time::Instant::now();
+    let mut throttle = SignalThrottle::new();
 
     // Track frames per bus for periodic logging
     let mut frames_per_bus: std::collections::HashMap<u8, usize> = std::collections::HashMap::new();
@@ -138,7 +139,7 @@ pub(super) async fn run_merge_task(
                         if let Ok(mut channels) = transmit_channels.lock() {
                             channels.remove(&source_idx);
                         }
-                        emit_session_error(&app, &session_id, error);
+                        emit_session_error(&session_id, error);
                         active_sources = active_sources.saturating_sub(1);
                     }
                     Some(SourceMessage::TransmitReady(source_idx, tx_sender)) => {
@@ -149,7 +150,7 @@ pub(super) async fn run_merge_task(
                     }
                     Some(SourceMessage::Connected(source_idx, device_type, address, bus_number)) => {
                         tlog!("[MultiSourceReader] Source {} connected: {} at {}", source_idx, device_type, address);
-                        emit_device_connected(&app, &session_id, &device_type, &address, bus_number);
+                        emit_device_connected(&session_id, &device_type, &address, bus_number);
                     }
                     None => {
                         // Channel closed
@@ -232,42 +233,40 @@ pub(super) async fn run_merge_task(
         if should_emit {
             if !pending_frames.is_empty() {
                 pending_frames.sort_by_key(|f| f.timestamp_us);
-                buffer_store::append_frames_to_session(&session_id, pending_frames.clone());
-                emit_frames(&app, &session_id, pending_frames);
+                buffer_store::append_frames_to_session(&session_id, pending_frames);
                 pending_frames = Vec::new();
+                if throttle.should_signal("frames-ready") {
+                    signal_frames_ready(&session_id);
+                }
             }
 
             if !pending_bytes.is_empty() {
                 pending_bytes.sort_by_key(|b| b.timestamp_us);
-                buffer_store::append_raw_bytes_to_session(&session_id, pending_bytes.clone());
-                let payload = RawBytesPayload {
-                    bytes: pending_bytes,
-                    source: "multi-source".to_string(),
-                };
-                emit_to_session(&app, "serial-raw-bytes", &session_id, payload);
+                buffer_store::append_raw_bytes_to_session(&session_id, pending_bytes);
                 pending_bytes = Vec::new();
+                if throttle.should_signal("bytes-ready") {
+                    signal_bytes_ready(&session_id);
+                }
             }
 
             last_emit = std::time::Instant::now();
         }
     }
 
-    // Emit any remaining frames
+    // Store and signal any remaining frames
     if !pending_frames.is_empty() {
         pending_frames.sort_by_key(|f| f.timestamp_us);
-        buffer_store::append_frames_to_session(&session_id, pending_frames.clone());
-        emit_frames(&app, &session_id, pending_frames);
+        buffer_store::append_frames_to_session(&session_id, pending_frames);
+        throttle.flush();
+        signal_frames_ready(&session_id);
     }
 
-    // Emit any remaining bytes
+    // Store and signal any remaining bytes
     if !pending_bytes.is_empty() {
         pending_bytes.sort_by_key(|b| b.timestamp_us);
-        buffer_store::append_raw_bytes_to_session(&session_id, pending_bytes.clone());
-        let payload = RawBytesPayload {
-            bytes: pending_bytes,
-            source: "multi-source".to_string(),
-        };
-        emit_to_session(&app, "serial-raw-bytes", &session_id, payload);
+        buffer_store::append_raw_bytes_to_session(&session_id, pending_bytes);
+        throttle.flush();
+        signal_bytes_ready(&session_id);
     }
 
     // Wait for all source tasks to finish
@@ -281,7 +280,7 @@ pub(super) async fn run_merge_task(
     } else {
         "complete"
     };
-    emit_stream_ended(&app, &session_id, reason, "MultiSourceReader");
+    emit_stream_ended(&session_id, reason, "MultiSourceReader");
 }
 
 /// Spawn a single source reader task. Creates a virtual command channel for virtual sources.

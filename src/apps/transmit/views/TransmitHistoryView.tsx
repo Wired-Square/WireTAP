@@ -1,21 +1,15 @@
 // ui/src/apps/transmit/views/TransmitHistoryView.tsx
 //
-// Paginated, SQLite-backed transmit history view.
-// Fetches rows from the Rust backend on mount and whenever historyDbCount
-// changes (signalled by the transmit-history-updated event).
+// SQLite-backed transmit history view with pagination.
+// Reuses FrameDataTable for visual consistency with Discovery Frames.
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Trash2, Check, X, Download, ChevronDown } from "lucide-react";
-import { useTransmitStore } from "../../../stores/transmitStore";
+import React, { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Trash2, Download, Radio, Check, X } from "lucide-react";
+
 import type { BusSourceInfo } from "../../../stores/sessionStore";
 import { useSettings } from "../../../hooks/useSettings";
-import {
-  bgDataToolbar,
-  borderDataView,
-  textDataSecondary,
-  hoverDataRow,
-} from "../../../styles/colourTokens";
-import { flexRowGap2 } from "../../../styles/spacing";
+import { textDataSecondary, textDataGreen } from "../../../styles/colourTokens";
+import { textDanger } from "../../../styles";
 import { buttonBase } from "../../../styles/buttonStyles";
 import {
   emptyStateContainer,
@@ -27,69 +21,46 @@ import { byteToHex } from "../../../utils/byteUtils";
 import { buildCsv } from "../../../utils/csvBuilder";
 import { formatFrameId } from "../../../utils/frameIds";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
-import { formatBusLabel } from "../../../utils/busFormat";
-import {
-  transmitHistoryQuery,
-  transmitHistoryClear,
-  type TransmitHistoryRow,
-} from "../../../api/transmitHistory";
-
-const PAGE_SIZE = 200;
+import { transmitHistoryQuery, type TransmitHistoryRow } from "../../../api/transmitHistory";
+import { useTransmitHistoryView } from "../hooks/useTransmitHistoryView";
+import { FrameDataTable, type FrameRow, FRAME_PAGE_SIZE_OPTIONS } from "../../discovery/components";
+import DataViewPaginationToolbar from "../../../components/DataViewPaginationToolbar";
+import TimelineScrubber from "../../../components/TimelineScrubber";
 
 interface TransmitHistoryViewProps {
-  outputBusToSource: Map<number, BusSourceInfo>;
+  outputBusToSource?: Map<number, BusSourceInfo>;
+  sessionId?: string | null;
 }
 
-export default function TransmitHistoryView({ outputBusToSource }: TransmitHistoryViewProps) {
-  const { settings } = useSettings();
-  const historyDbCount = useTransmitStore((s) => s.historyDbCount);
+function historyRowToFrameRow(row: TransmitHistoryRow): FrameRow {
+  return {
+    timestamp_us: row.timestamp_us,
+    frame_id: row.frame_id ?? 0,
+    is_extended: row.is_extended,
+    dlc: row.dlc ?? 0,
+    bytes: row.bytes,
+    bus: row.bus,
+  };
+}
 
-  const [rows, setRows] = useState<TransmitHistoryRow[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewProps) {
+  const { settings } = useSettings();
+  const [pageSize, setPageSize] = useState(20);
+  const {
+    rows, totalCount, isLive, isLoading, currentPage, totalPages,
+    setCurrentPage, setIsLive, clear, timeRange, navigateToTimestamp,
+  } = useTransmitHistoryView({ pageSize, sessionId });
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handlePageSizeChange = useCallback((size: number) => {
+    setPageSize(size);
+    setCurrentPage(0);
+  }, [setCurrentPage]);
 
   const timestampFormat = settings?.display_time_format ?? "human";
+  const useLocalTimezone = settings?.display_timezone === "local";
 
-  // Fetch the first page (newest PAGE_SIZE rows). Called on mount and when historyDbCount changes.
-  const fetchFirstPage = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const newRows = await transmitHistoryQuery(0, PAGE_SIZE);
-      setRows(newRows);
-      setOffset(newRows.length);
-      setHasMore(newRows.length === PAGE_SIZE);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchFirstPage();
-  }, [historyDbCount, fetchFirstPage]);
-
-  const handleLoadMore = useCallback(async () => {
-    if (isLoading || !hasMore) return;
-    setIsLoading(true);
-    try {
-      const newRows = await transmitHistoryQuery(offset, PAGE_SIZE);
-      setRows((prev) => [...prev, ...newRows]);
-      setOffset((prev) => prev + newRows.length);
-      setHasMore(newRows.length === PAGE_SIZE);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoading, hasMore, offset]);
-
-  const handleClear = useCallback(async () => {
-    await transmitHistoryClear();
-    setRows([]);
-    setOffset(0);
-    setHasMore(false);
-    useTransmitStore.setState({ historyDbCount: 0 });
-  }, []);
-
-  // Oldest timestamp for delta-start (rows are newest-first, so last row is oldest)
+  // Oldest timestamp in the visible window (rows are newest-first, so last row is oldest)
   const oldestTimestampUs = useMemo(() => {
     if (rows.length === 0) return null;
     return rows[rows.length - 1].timestamp_us;
@@ -99,7 +70,7 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
     (timestampUs: number, prevTimestampUs: number | null): React.ReactNode => {
       switch (timestampFormat) {
         case "timestamp":
-          return formatIsoUs(timestampUs);
+          return formatIsoUs(timestampUs, useLocalTimezone);
         case "delta-start":
           if (oldestTimestampUs === null) return "0.000000s";
           return renderDeltaNode(timestampUs - oldestTimestampUs);
@@ -108,34 +79,55 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
           return renderDeltaNode(timestampUs - prevTimestampUs);
         case "human":
         default:
-          return formatHumanUs(timestampUs);
+          return formatHumanUs(timestampUs, useLocalTimezone);
       }
     },
-    [timestampFormat, oldestTimestampUs]
+    [timestampFormat, oldestTimestampUs, useLocalTimezone]
   );
 
   const formatTimestampString = useCallback(
     (timestampUs: number): string => {
       switch (timestampFormat) {
         case "timestamp":
-          return formatIsoUs(timestampUs);
+          return formatIsoUs(timestampUs, useLocalTimezone);
         case "delta-start":
         case "delta-last":
           return `${(timestampUs / 1_000_000).toFixed(6)}`;
         case "human":
         default:
-          return formatHumanUs(timestampUs);
+          return formatHumanUs(timestampUs, useLocalTimezone);
       }
     },
-    [timestampFormat]
+    [timestampFormat, useLocalTimezone]
   );
 
+  // Map history rows → FrameRow for FrameDataTable
+  const frameRows: FrameRow[] = useMemo(
+    () => rows.map(historyRowToFrameRow),
+    [rows]
+  );
+
+  // Render status indicator per row (success/error)
+  const renderRowStatus = useCallback((_frame: FrameRow, index: number): ReactNode => {
+    const row = rows[index];
+    if (!row) return null;
+    if (row.success) {
+      return <Check size={12} className={textDataGreen} />;
+    }
+    return (
+      <span title={row.error_msg ?? "Transmit failed"}>
+        <X size={12} className={textDanger} />
+      </span>
+    );
+  }, [rows]);
+
+  const displayFrameIdFormat = settings?.display_frame_id_format === "decimal" ? "decimal" : "hex";
+
   const handleExport = useCallback(async () => {
-    if (rows.length === 0 && historyDbCount === 0) return;
-    setIsLoading(true);
+    if (totalCount === 0) return;
+    setIsExporting(true);
     try {
-      // Fetch all rows for export (no pagination limit)
-      const allRows = await transmitHistoryQuery(0, Math.max(historyDbCount, rows.length) + 1);
+      const allRows = await transmitHistoryQuery(0, totalCount + 1);
       const headers = ["Timestamp", "Session", "Kind", "Frame ID", "DLC", "Data", "Bus", "Flags", "Success", "Error"];
       const csvRows: (string | number)[][] = allRows.map((row) => {
         const frameIdStr = row.kind === "can" && row.frame_id != null
@@ -168,192 +160,110 @@ export default function TransmitHistoryView({ outputBusToSource }: TransmitHisto
       a.click();
       URL.revokeObjectURL(url);
     } finally {
-      setIsLoading(false);
+      setIsExporting(false);
     }
-  }, [rows.length, historyDbCount, formatTimestampString]);
+  }, [totalCount, formatTimestampString]);
 
-  const failedCount = useMemo(() => rows.filter((r) => !r.success).length, [rows]);
+  // Current time for timeline scrubber (midpoint of visible rows)
+  const currentTimeUs = useMemo(() => {
+    if (rows.length === 0) return timeRange?.startUs ?? 0;
+    return rows[0].timestamp_us;
+  }, [rows, timeRange]);
 
   return (
     <div className="flex flex-col h-full">
       {/* Empty state */}
-      {rows.length === 0 && !isLoading && (
+      {totalCount === 0 && !isLoading && (
         <div className={emptyStateContainer}>
           <div className={emptyStateText}>
             <p className={emptyStateHeading}>No History</p>
             <p className={emptyStateDescription}>
-              Transmitted packets will appear here.
+              Transmitted frames will appear here.
             </p>
           </div>
         </div>
       )}
 
-      {rows.length > 0 && (
+      {totalCount > 0 && (
         <>
           {/* Toolbar */}
-          <div
-            className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar} border-b ${borderDataView}`}
-          >
-            <span className={`${textDataSecondary} text-sm`}>
-              {historyDbCount > 0 ? historyDbCount.toLocaleString() : rows.length} packet{historyDbCount !== 1 ? "s" : ""}
-              {failedCount > 0 && (
-                <span className="text-red-400 ml-2">
-                  ({failedCount} failed)
+          <DataViewPaginationToolbar
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            pageSizeOptions={FRAME_PAGE_SIZE_OPTIONS}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={handlePageSizeChange}
+            disabled={isLive}
+            hidePagination={isLive}
+            leftContent={
+              <div className="flex items-center gap-3">
+                <span className={`${textDataSecondary} text-sm`}>
+                  {totalCount.toLocaleString()} frame{totalCount !== 1 ? "s" : ""}
                 </span>
-              )}
-            </span>
-
-            <div className="flex-1" />
-
-            <button
-              onClick={handleExport}
-              disabled={isLoading}
-              className={buttonBase}
-              title="Export as CSV"
-            >
-              <Download size={14} />
-              <span className="text-sm ml-1">Export</span>
-            </button>
-
-            <button
-              onClick={handleClear}
-              className={buttonBase}
-              title="Clear history"
-            >
-              <Trash2 size={14} />
-              <span className="text-sm ml-1">Clear</span>
-            </button>
-          </div>
-
-          {/* History table */}
-          <div className="flex-1 overflow-auto">
-            <table className="w-full text-sm">
-              <thead
-                className={`${bgDataToolbar} sticky top-0 ${textDataSecondary} text-xs`}
-              >
-                <tr>
-                  <th className="text-left px-4 py-2 w-10"></th>
-                  <th className="text-left px-4 py-2">Timestamp</th>
-                  <th className="text-left px-4 py-2">Bus</th>
-                  <th className="text-left px-4 py-2 w-16">Kind</th>
-                  <th className="text-left px-4 py-2">Frame / Data</th>
-                  <th className="text-left px-4 py-2">Error</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => {
-                  const prevTimestampUs =
-                    index < rows.length - 1 ? rows[index + 1].timestamp_us : null;
-
-                  const isCanRow = row.kind === "can";
-                  const frameIdStr = isCanRow && row.frame_id != null
-                    ? formatFrameId(row.frame_id, "hex", row.is_extended)
-                    : null;
-                  const dlcStr = row.dlc != null ? `[${row.dlc}]` : "";
-                  const dataStr = row.bytes.slice(0, 8).map(byteToHex).join(" ");
-                  const truncated = row.bytes.length > 8 ? " …" : "";
-                  const flags = [
-                    row.is_extended && "EXT",
-                    row.is_fd && "FD",
-                  ].filter((f): f is string => Boolean(f));
-
-                  return (
-                    <tr
-                      key={row.id}
-                      className={`border-b ${borderDataView} ${hoverDataRow}`}
-                    >
-                      {/* Status */}
-                      <td className="px-4 py-2">
-                        {row.success ? (
-                          <Check size={14} className="text-green-400" />
-                        ) : (
-                          <X size={14} className="text-red-400" />
-                        )}
-                      </td>
-
-                      {/* Timestamp */}
-                      <td className="px-4 py-2">
-                        <span className="font-mono text-gray-400 text-xs">
-                          {formatTimestamp(row.timestamp_us, prevTimestampUs)}
-                        </span>
-                      </td>
-
-                      {/* Bus */}
-                      <td className="px-4 py-2">
-                        <span
-                          className={`${textDataSecondary} text-xs truncate max-w-[120px] block`}
-                          title={formatBusLabel(row.session_id, isCanRow ? row.bus : null, outputBusToSource)}
-                        >
-                          {formatBusLabel(row.session_id, isCanRow ? row.bus : null, outputBusToSource)}
-                        </span>
-                      </td>
-
-                      {/* Kind badge */}
-                      <td className="px-4 py-2">
-                        <span
-                          className={`text-xs px-1.5 py-0.5 rounded ${
-                            isCanRow
-                              ? "bg-blue-600/30 text-blue-400"
-                              : "bg-purple-600/30 text-purple-400"
-                          }`}
-                        >
-                          {isCanRow ? "CAN" : "Serial"}
-                        </span>
-                      </td>
-
-                      {/* Frame / Data */}
-                      <td className="px-4 py-2">
-                        <div className={flexRowGap2}>
-                          {frameIdStr && (
-                            <code className="font-mono text-green-400">
-                              {frameIdStr}
-                            </code>
-                          )}
-                          <code className="font-mono text-gray-400 text-xs">
-                            {dlcStr} {dataStr}{truncated}
-                          </code>
-                          {flags.map((flag) => (
-                            <span
-                              key={flag}
-                              className="text-[10px] text-amber-400 uppercase"
-                            >
-                              {flag}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-
-                      {/* Error */}
-                      <td className="px-4 py-2">
-                        {row.error_msg && (
-                          <span className="text-red-400 text-xs">{row.error_msg}</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {/* Load more / loading indicator */}
-            {hasMore && (
-              <div className="flex justify-center py-3">
                 <button
-                  onClick={handleLoadMore}
-                  disabled={isLoading}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border ${borderDataView} ${textDataSecondary} hover:brightness-95 transition-colors disabled:opacity-50`}
+                  onClick={() => setIsLive(!isLive)}
+                  className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded ${
+                    isLive
+                      ? "bg-green-600/30 text-green-400"
+                      : "bg-amber-600/30 text-amber-400"
+                  }`}
+                  title={isLive ? "Showing latest frames (click to browse)" : "Browsing history (click for live)"}
                 >
-                  <ChevronDown size={13} />
-                  {isLoading ? "Loading…" : `Load more (${Math.max(0, historyDbCount - offset)} remaining)`}
+                  <Radio size={10} />
+                  {isLive ? "Live" : "Browsing"}
                 </button>
               </div>
-            )}
-            {isLoading && rows.length === 0 && (
-              <div className="flex justify-center py-8">
-                <span className={`text-sm ${textDataSecondary}`}>Loading…</span>
+            }
+            rightContent={
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className={buttonBase}
+                  title="Export as CSV"
+                >
+                  <Download size={14} />
+                  <span className="text-sm ml-1">{isExporting ? "Exporting…" : "Export"}</span>
+                </button>
+                <button
+                  onClick={clear}
+                  className={buttonBase}
+                  title="Clear history"
+                >
+                  <Trash2 size={14} />
+                  <span className="text-sm ml-1">Clear</span>
+                </button>
               </div>
-            )}
-          </div>
+            }
+          />
+
+          {/* Timeline scrubber — always visible when there's a time range, disabled in live mode */}
+          {timeRange && (
+            <TimelineScrubber
+              minTimeUs={timeRange.startUs}
+              maxTimeUs={timeRange.endUs}
+              currentTimeUs={currentTimeUs}
+              onPositionChange={navigateToTimestamp}
+              displayTimeFormat={timestampFormat}
+              disabled={isLive}
+              useLocalTimezone={useLocalTimezone}
+            />
+          )}
+
+          {/* Frame table — matches Discovery Frames styling */}
+          <FrameDataTable
+            frames={frameRows}
+            displayFrameIdFormat={displayFrameIdFormat}
+            formatTime={formatTimestamp}
+            showCalculator={false}
+            showRef={false}
+            showBus={true}
+            autoScroll={isLive}
+            emptyMessage={isLoading ? "Loading…" : "No frames to display"}
+            renderRowStatus={renderRowStatus}
+            useLocalTimezone={useLocalTimezone}
+          />
         </>
       )}
     </div>
