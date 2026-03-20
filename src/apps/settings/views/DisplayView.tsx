@@ -36,6 +36,10 @@ type DisplayViewProps = {
   binaryUnusedColour: string;
   onChangeBinaryUnusedColour: (val: string) => void;
   onResetBinaryUnusedColour: () => void;
+  // Frame editor signal colours
+  frameEditorColours: string[];
+  onChangeFrameEditorColour: (index: number, val: string) => void;
+  onResetFrameEditorColours: () => void;
   // Theme settings
   themeMode: ThemeMode;
   onChangeThemeMode: (mode: ThemeMode) => void;
@@ -63,6 +67,9 @@ export default function DisplayView({
   binaryUnusedColour,
   onChangeBinaryUnusedColour,
   onResetBinaryUnusedColour,
+  frameEditorColours,
+  onChangeFrameEditorColour,
+  onResetFrameEditorColours,
   themeMode,
   onChangeThemeMode,
   themeColours,
@@ -400,6 +407,33 @@ export default function DisplayView({
               ↺
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className={`text-sm font-semibold ${textPrimary}`}>Frame Editor</h3>
+          <button
+            type="button"
+            onClick={onResetFrameEditorColours}
+            className={`text-xs px-2 py-1 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
+          >
+            Reset All
+          </button>
+        </div>
+        <p className={`text-sm ${textTertiary}`}>
+          Colours for signal slots in the frame definition bit grid editor.
+        </p>
+        <div className="space-y-2">
+          {frameEditorColours.map((colour, i) => (
+            <div key={i} className={flexRowGap2}>
+              <ColourPicker
+                label={`Signal ${i + 1}`}
+                value={colour}
+                onChange={(val) => onChangeFrameEditorColour(i, val)}
+              />
+            </div>
+          ))}
         </div>
       </div>
     </div>
