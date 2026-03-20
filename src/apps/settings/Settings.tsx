@@ -106,6 +106,11 @@ export default function Settings() {
     (s) => s.resetBinaryUnusedColour,
   );
 
+  // Frame editor colours
+  const frameEditorColours = useSettingsStore((s) => s.display.frameEditorColours);
+  const setFrameEditorColour = useSettingsStore((s) => s.setFrameEditorColour);
+  const resetFrameEditorColours = useSettingsStore((s) => s.resetFrameEditorColours);
+
   // Theme
   const themeMode = useSettingsStore((s) => s.display.themeMode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
@@ -445,6 +450,9 @@ export default function Settings() {
               binaryUnusedColour={binaryUnusedColour}
               onChangeBinaryUnusedColour={setBinaryUnusedColour}
               onResetBinaryUnusedColour={resetBinaryUnusedColour}
+              frameEditorColours={frameEditorColours}
+              onChangeFrameEditorColour={setFrameEditorColour}
+              onResetFrameEditorColours={resetFrameEditorColours}
               themeMode={themeMode}
               onChangeThemeMode={setThemeMode}
               themeColours={themeColours}

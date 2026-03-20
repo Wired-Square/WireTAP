@@ -4,6 +4,7 @@
 // Connects via TCP, streams CAN and RS-485 frames.
 
 pub mod reader;
+pub mod rules;
 mod shared;
 
 use std::collections::HashMap;
@@ -221,9 +222,7 @@ pub async fn framelink_get_interface_signals(
     let iface_type = shared::get_iface_type(&host, port, iface_index).await.unwrap_or(0);
 
     // 3. Load board def for metadata
-    let board_def = shared::get_cached_board_info(&host, port)
-        .await
-        .and_then(|(name, rev)| framelink::board::load_board_def(&name, &rev));
+    let board_def = shared::load_board_def(&host, port).await;
 
     // 4. Read current value for each signal and build descriptors
     let mut descriptors = Vec::with_capacity(iface_signals.len());

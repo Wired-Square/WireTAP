@@ -1,0 +1,162 @@
+// Copyright 2026 Wired Square Pty Ltd
+// SPDX-License-Identifier: Apache-2.0
+
+import { useState } from "react";
+import Dialog from "../../../components/Dialog";
+import { inputSimple, labelDefault } from "../../../styles/inputStyles";
+import { textPrimary, textSecondary } from "../../../styles";
+import { panelFooter } from "../../../styles/cardStyles";
+import type { FrameHeader } from "../utils/bitGrid";
+
+interface FrameDefDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (headerInfo: {
+    frameDefId: number;
+    interfaceType: number;
+    header: FrameHeader;
+    payloadBytes: number;
+  }) => void;
+  interfaces: { index: number; iface_type: number; name: string }[];
+  nextId: number;
+}
+
+export default function FrameDefDialog({
+  isOpen,
+  onClose,
+  onSubmit,
+  interfaces,
+  nextId,
+}: FrameDefDialogProps) {
+  const [frameDefId, setFrameDefId] = useState(nextId);
+  const [interfaceType, setInterfaceType] = useState(
+    interfaces[0]?.iface_type ?? 1,
+  );
+  const [canId, setCanId] = useState("0");
+  const [dlc, setDlc] = useState(8);
+  const [extended, setExtended] = useState(false);
+  const [payloadLength, setPayloadLength] = useState(64);
+
+  const handleSubmit = () => {
+    const isCan = interfaceType === 1 || interfaceType === 2;
+    if (isCan) {
+      const canIdNum = parseInt(canId, 16);
+      if (isNaN(canIdNum)) return;
+    }
+    const header: FrameHeader = isCan
+      ? { type: "can", canId: parseInt(canId, 16) || 0, dlc, extended }
+      : { type: "serial", framingMode: 0 };
+    onSubmit({
+      frameDefId,
+      interfaceType,
+      header,
+      payloadBytes: isCan ? dlc : payloadLength,
+    });
+    onClose();
+  };
+
+  const isCan = interfaceType === 1 || interfaceType === 2;
+
+  return (
+    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
+      <div className="p-6">
+        <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
+          Add Frame Definition
+        </h2>
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className={labelDefault}>Frame Def ID</label>
+            <input
+              type="number"
+              className={inputSimple}
+              value={frameDefId}
+              onChange={(e) => setFrameDefId(parseInt(e.target.value) || 0)}
+            />
+          </div>
+          <div>
+            <label className={labelDefault}>Interface Type</label>
+            <select
+              className={inputSimple}
+              value={interfaceType}
+              onChange={(e) => setInterfaceType(parseInt(e.target.value))}
+            >
+              {interfaces.map((iface) => (
+                <option key={iface.index} value={iface.iface_type}>
+                  {iface.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {isCan && (
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className={labelDefault}>CAN ID (hex)</label>
+              <input
+                type="text"
+                className={`${inputSimple} font-mono`}
+                value={canId}
+                onChange={(e) => setCanId(e.target.value)}
+                placeholder="1A0"
+              />
+            </div>
+            <div>
+              <label className={labelDefault}>DLC</label>
+              <input
+                type="number"
+                className={inputSimple}
+                value={dlc}
+                min={1}
+                max={64}
+                onChange={(e) => setDlc(parseInt(e.target.value) || 8)}
+              />
+            </div>
+            <div className="flex items-end pb-2">
+              <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
+                <input
+                  type="checkbox"
+                  checked={extended}
+                  onChange={(e) => setExtended(e.target.checked)}
+                />
+                Extended ID
+              </label>
+            </div>
+          </div>
+        )}
+
+        {!isCan && (
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className={labelDefault}>Payload Length (bytes)</label>
+              <input
+                type="number"
+                className={inputSimple}
+                value={payloadLength}
+                min={1}
+                max={512}
+                onChange={(e) => setPayloadLength(Math.min(512, parseInt(e.target.value) || 64))}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={`${panelFooter} flex justify-end gap-2`}>
+        <button
+          onClick={onClose}
+          className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+        >
+          Add Frame Definition
+        </button>
+      </div>
+    </Dialog>
+  );
+}

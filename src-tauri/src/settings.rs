@@ -40,6 +40,11 @@ pub struct AppSettings {
     pub signal_colour_high: String,
     #[serde(default = "default_binary_one_colour")]
     pub binary_one_colour: String,
+
+    // Frame editor signal colours (8 slots for the bit grid)
+    #[serde(default = "default_frame_editor_colours")]
+    pub frame_editor_colours: Vec<String>,
+
     #[serde(default = "default_display_timezone")]
     pub display_timezone: String, // "local" | "utc"
     #[serde(default = "default_session_manager_stats_interval")]
@@ -167,6 +172,18 @@ fn default_signal_colour_high() -> String {
 }
 fn default_binary_one_colour() -> String {
     "#14b8a6".to_string() // teal-500
+}
+fn default_frame_editor_colours() -> Vec<String> {
+    vec![
+        "#22d3ee".to_string(), // cyan
+        "#4ade80".to_string(), // green
+        "#facc15".to_string(), // yellow
+        "#c084fc".to_string(), // magenta
+        "#60a5fa".to_string(), // blue
+        "#f87171".to_string(), // red
+        "#67e8f9".to_string(), // light cyan
+        "#86efac".to_string(), // light green
+    ]
 }
 fn default_display_timezone() -> String {
     "local".to_string()
@@ -327,6 +344,7 @@ impl Default for AppSettings {
             signal_colour_medium: default_signal_colour_medium(),
             signal_colour_high: default_signal_colour_high(),
             binary_one_colour: default_binary_one_colour(),
+            frame_editor_colours: default_frame_editor_colours(),
             display_timezone: default_display_timezone(),
             session_manager_stats_interval: default_session_manager_stats_interval(),
             graph_buffer_size: default_graph_buffer_size(),
@@ -407,6 +425,7 @@ impl AppSettings {
             signal_colour_medium: default_signal_colour_medium(),
             signal_colour_high: default_signal_colour_high(),
             binary_one_colour: default_binary_one_colour(),
+            frame_editor_colours: default_frame_editor_colours(),
             display_timezone: default_display_timezone(),
             session_manager_stats_interval: default_session_manager_stats_interval(),
             graph_buffer_size: default_graph_buffer_size(),
@@ -654,6 +673,9 @@ pub async fn run_candor_migration(app: AppHandle) -> Result<String, String> {
                 current.signal_colour_medium = old.signal_colour_medium;
                 current.signal_colour_high = old.signal_colour_high;
                 current.binary_one_colour = old.binary_one_colour;
+                if !old.frame_editor_colours.is_empty() {
+                    current.frame_editor_colours = old.frame_editor_colours;
+                }
                 current.session_manager_stats_interval = old.session_manager_stats_interval;
                 current.graph_buffer_size = old.graph_buffer_size;
                 current.theme_mode = old.theme_mode;

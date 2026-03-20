@@ -115,6 +115,7 @@ interface AppSettings {
   binary_one_colour?: string;
   binary_zero_colour?: string;
   binary_unused_colour?: string;
+  frame_editor_colours?: string[];
   discovery_history_buffer?: number;
   query_result_limit?: number;
   session_manager_stats_interval?: number;
@@ -227,6 +228,10 @@ const defaultSignalColours: SignalColours = {
   high: '#22c55e',
 };
 
+export function defaultFrameEditorColours(): string[] {
+  return ['#22d3ee', '#4ade80', '#facc15', '#c084fc', '#60a5fa', '#f87171', '#67e8f9', '#86efac'];
+}
+
 export const defaultThemeColours: ThemeColours = {
   // Light mode
   bgPrimaryLight: '#ffffff',      // white
@@ -304,6 +309,7 @@ interface SettingsState {
     binaryOneColour: string;
     binaryZeroColour: string;
     binaryUnusedColour: string;
+    frameEditorColours: string[];
     themeMode: ThemeMode;
     themeColours: ThemeColours;
   };
@@ -396,6 +402,8 @@ interface SettingsState {
   resetBinaryOneColour: () => void;
   resetBinaryZeroColour: () => void;
   resetBinaryUnusedColour: () => void;
+  setFrameEditorColour: (index: number, colour: string) => void;
+  resetFrameEditorColours: () => void;
   setThemeMode: (mode: ThemeMode) => void;
   setThemeColour: (key: keyof ThemeColours, colour: string) => void;
   resetThemeColours: () => void;
@@ -473,6 +481,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     binaryOneColour: '#14b8a6',
     binaryZeroColour: '#94a3b8',
     binaryUnusedColour: '#64748b',
+    frameEditorColours: defaultFrameEditorColours(),
     themeMode: 'auto',
     themeColours: { ...defaultThemeColours },
   },
@@ -645,6 +654,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           binaryOneColour: normalized.binary_one_colour || '#14b8a6',
           binaryZeroColour: normalized.binary_zero_colour || '#94a3b8',
           binaryUnusedColour: normalized.binary_unused_colour || '#64748b',
+          frameEditorColours: (normalized.frame_editor_colours?.length === 8
+            ? normalized.frame_editor_colours
+            : defaultFrameEditorColours()) as string[],
           themeMode: normalized.theme_mode || 'auto',
           themeColours: {
             bgPrimaryLight: normalized.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
@@ -779,6 +791,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_one_colour: display.binaryOneColour,
         binary_zero_colour: display.binaryZeroColour,
         binary_unused_colour: display.binaryUnusedColour,
+        frame_editor_colours: display.frameEditorColours,
         // Buffers
         clear_buffers_on_start: buffers.clearBuffersOnStart,
         buffer_storage: buffers.bufferStorage,
@@ -862,6 +875,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       binary_one_colour: display.binaryOneColour,
       binary_zero_colour: display.binaryZeroColour,
       binary_unused_colour: display.binaryUnusedColour,
+      frame_editor_colours: display.frameEditorColours,
       // Buffers
       clear_buffers_on_start: buffers.clearBuffersOnStart,
       discovery_history_buffer: buffers.discoveryHistoryBuffer,
@@ -1148,6 +1162,21 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   resetBinaryUnusedColour: () => {
     set((state) => ({
       display: { ...state.display, binaryUnusedColour: '#64748b' },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setFrameEditorColour: (index, colour) => {
+    set((state) => {
+      const colours = [...state.display.frameEditorColours];
+      colours[index] = colour;
+      return { display: { ...state.display, frameEditorColours: colours } };
+    });
+    scheduleSave(get().saveSettings);
+  },
+  resetFrameEditorColours: () => {
+    set((state) => ({
+      display: { ...state.display, frameEditorColours: defaultFrameEditorColours() },
     }));
     scheduleSave(get().saveSettings);
   },
