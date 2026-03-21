@@ -31,6 +31,8 @@ export const MsgType = {
   Unsubscribe: 0x11,
   SubscribeAck: 0x12,
   SubscribeNack: 0x13,
+  Command: 0x20,
+  CommandResponse: 0x21,
   Heartbeat: 0xfe,
   Auth: 0xff,
 } as const;
@@ -353,4 +355,70 @@ export function decodeScopedSessionLifecycle(payload: DataView): {
   }
 
   return { stateType, capabilities };
+}
+
+// ============================================================================
+// Command / CommandResponse  (0x20 / 0x21)
+// ============================================================================
+
+const commandEncoder = new TextEncoder();
+
+/**
+ * Encode a Command message (client → server).
+ * Payload: [correlation_id: u32 LE][op_name_len: u16 LE][op_name: UTF-8][params: JSON bytes]
+ */
+export function encodeCommand(
+  correlationId: number,
+  opName: string,
+  params: object,
+): ArrayBuffer {
+  const opNameBytes = commandEncoder.encode(opName);
+  const paramsBytes = commandEncoder.encode(JSON.stringify(params));
+  const payloadLen = 4 + 2 + opNameBytes.byteLength + paramsBytes.byteLength;
+  const payload = new Uint8Array(payloadLen);
+  const view = new DataView(payload.buffer);
+  view.setUint32(0, correlationId, true);
+  view.setUint16(4, opNameBytes.byteLength, true);
+  payload.set(opNameBytes, 6);
+  payload.set(paramsBytes, 6 + opNameBytes.byteLength);
+  return concat(buildHeader(MsgType.Command, 0), payload);
+}
+
+const commandDecoder = new TextDecoder();
+
+/**
+ * Decode a CommandResponse payload (server → client).
+ * Payload: [correlation_id: u32 LE][status: u8 (0=ok, 1=error)][payload: JSON bytes or error string]
+ */
+export function decodeCommandResponse(payload: DataView): {
+  correlationId: number;
+  status: number;
+  data: unknown;
+  error?: string;
+} {
+  const correlationId = payload.getUint32(0, true);
+  const status = payload.getUint8(4);
+  const bodyBytes = new Uint8Array(
+    payload.buffer,
+    payload.byteOffset + 5,
+    payload.byteLength - 5,
+  );
+  if (status !== 0) {
+    return {
+      correlationId,
+      status,
+      data: null,
+      error: commandDecoder.decode(bodyBytes),
+    };
+  }
+  let data: unknown = null;
+  if (bodyBytes.byteLength > 0) {
+    try {
+      data = JSON.parse(commandDecoder.decode(bodyBytes));
+    } catch {
+      // Non-JSON response — return raw string
+      data = commandDecoder.decode(bodyBytes);
+    }
+  }
+  return { correlationId, status, data };
 }

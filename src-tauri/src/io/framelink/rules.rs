@@ -709,20 +709,9 @@ async fn cmd_gen_enable(params: Value) -> Result<Value, String> {
 // Persistence operations
 // ============================================================================
 
-async fn unlock_device(host: &str, port: u16, timeout: f64) -> Result<(), String> {
-    let challenge_frame =
-        shared::request(host, port, MSG_WRITE_CHALLENGE, FLAG_ACK_REQ, &[], timeout).await?;
-    let nonce = dsig::parse_challenge_response(&challenge_frame.payload)
-        .map_err(|e| format!("Failed to parse challenge: {e}"))?;
-    let unlock_payload = dsig::build_unlock_request(nonce);
-    shared::request(host, port, MSG_WRITE_UNLOCK, FLAG_ACK_REQ, &unlock_payload, timeout).await?;
-    Ok(())
-}
-
 async fn cmd_persist_save(params: Value) -> Result<Value, String> {
     let (host, port) = get_host_port(&params).await?;
     let timeout = get_timeout(&params);
-    unlock_device(&host, port, timeout).await?;
     let payload = persist::build_persist_save();
     shared::request(&host, port, MSG_PERSIST_SAVE, FLAG_ACK_REQ, &payload, timeout).await?;
     Ok(Value::Null)
@@ -739,7 +728,6 @@ async fn cmd_persist_load(params: Value) -> Result<Value, String> {
 async fn cmd_persist_clear(params: Value) -> Result<Value, String> {
     let (host, port) = get_host_port(&params).await?;
     let timeout = get_timeout(&params);
-    unlock_device(&host, port, timeout).await?;
     let payload = persist::build_persist_clear();
     shared::request(
         &host, port, MSG_PERSIST_CLEAR, FLAG_ACK_REQ, &payload, timeout,
@@ -848,14 +836,6 @@ async fn cmd_dsig_write(params: Value) -> Result<Value, String> {
         .or_else(|| params["value"].as_i64().map(|v| v as u64))
         .ok_or("Missing 'value'")?;
 
-    // Challenge → unlock → write
-    let challenge_frame =
-        shared::request(&host, port, MSG_WRITE_CHALLENGE, FLAG_ACK_REQ, &[], timeout).await?;
-    let nonce = dsig::parse_challenge_response(&challenge_frame.payload)
-        .map_err(|e| format!("Failed to parse challenge: {e}"))?;
-    let unlock_payload = dsig::build_unlock_request(nonce);
-    shared::request(&host, port, MSG_WRITE_UNLOCK, FLAG_ACK_REQ, &unlock_payload, timeout).await?;
-
     let write_payload = dsig::build_write_request(signal_id, value);
     shared::request(&host, port, MSG_DSIG_WRITE, FLAG_ACK_REQ, &write_payload, timeout).await?;
     Ok(Value::Null)
@@ -952,9 +932,6 @@ async fn cmd_indicator_configure(params: Value) -> Result<Value, String> {
     // Parse the DiscoveredLed from params (signal IDs + index needed for trigger building)
     let led: DiscoveredLed =
         serde_json::from_value(params["led"].clone()).map_err(|e| format!("Invalid led: {e}"))?;
-
-    // Unlock device for writes
-    unlock_device(&host, port, timeout).await?;
 
     let mut messages: Vec<(u8, u8, Vec<u8>)> = Vec::new();
 
@@ -1103,8 +1080,6 @@ async fn cmd_indicator_remove(params: Value) -> Result<Value, String> {
     let led_index = params["led_index"].as_u64().ok_or("Missing 'led_index'")? as usize;
     let colour_signal_id = params["colour_signal_id"].as_u64().ok_or("Missing 'colour_signal_id'")? as u16;
     let state_signal_id = params["state_signal_id"].as_u64().ok_or("Missing 'state_signal_id'")? as u16;
-
-    unlock_device(&host, port, timeout).await?;
 
     let mut messages: Vec<(u8, u8, Vec<u8>)> = Vec::new();
 

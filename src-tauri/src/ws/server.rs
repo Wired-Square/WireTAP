@@ -64,7 +64,8 @@ impl WsServer {
         let cmd_tx_for_accept = cmd_tx.clone();
 
         // Spawn connection manager (owns all mutable connection/channel state)
-        tauri::async_runtime::spawn(connection_manager_task(cmd_rx));
+        let cmd_tx_for_manager = cmd_tx.clone();
+        tauri::async_runtime::spawn(connection_manager_task(cmd_rx, cmd_tx_for_manager));
 
         // Spawn accept loop
         tauri::async_runtime::spawn(async move {
@@ -147,6 +148,13 @@ enum ServerCommand {
     /// Sent when a client Heartbeat message is received, bridging WS keepalive
     /// to the IO session watchdog so the frontend can skip `register_session_listener` polling.
     HeartbeatListeners { conn_id: usize },
+    /// Execute a command received from a client and send the response back.
+    ExecuteCommand {
+        conn_id: usize,
+        correlation_id: u32,
+        op_name: String,
+        params: Vec<u8>,
+    },
 }
 
 type SplitSink = futures::stream::SplitSink<WebSocketStream<TcpStream>, Message>;
@@ -221,7 +229,10 @@ struct Connection {
 // Connection manager task
 // ============================================================================
 
-async fn connection_manager_task(mut cmd_rx: mpsc::UnboundedReceiver<ServerCommand>) {
+async fn connection_manager_task(
+    mut cmd_rx: mpsc::UnboundedReceiver<ServerCommand>,
+    cmd_tx: mpsc::UnboundedSender<ServerCommand>,
+) {
     let mut connections: HashMap<usize, Connection> = HashMap::new();
     let mut channel_map = ChannelMap::new();
     // Track how many connections subscribe to each channel
@@ -347,6 +358,30 @@ async fn connection_manager_task(mut cmd_rx: mpsc::UnboundedReceiver<ServerComma
                                 tauri::async_runtime::spawn(touch_listener_heartbeats(session_ids));
                             }
                         }
+                    }
+
+                    ServerCommand::ExecuteCommand { conn_id, correlation_id, op_name, params } => {
+                        let cmd_tx_clone = cmd_tx.clone(); // send response back through the command channel
+                        tauri::async_runtime::spawn(async move {
+                            let result = crate::ws::dispatch::dispatch_command(&op_name, &params).await;
+                            let (status, payload) = match result {
+                                Ok(value) => {
+                                    let json = serde_json::to_vec(&value).unwrap_or_default();
+                                    (0u8, json)
+                                }
+                                Err(err) => (1u8, err.into_bytes()),
+                            };
+                            let response_payload = super::protocol::encode_command_response(
+                                correlation_id, status, &payload,
+                            );
+                            let msg = super::protocol::encode_message(
+                                super::protocol::MsgType::CommandResponse, 0, &response_payload,
+                            );
+                            let _ = cmd_tx_clone.send(ServerCommand::SendToConn {
+                                conn_id,
+                                data: msg,
+                            });
+                        });
                     }
 
                 }
@@ -549,6 +584,26 @@ async fn connection_read_task(
                         // connection is subscribed to, bridging WS keepalive to
                         // the IO session watchdog.
                         let _ = cmd_tx.send(ServerCommand::HeartbeatListeners { conn_id });
+                    }
+
+                    MsgType::Command => {
+                        if !authenticated {
+                            tlog!("[ws] Connection {conn_id}: command before auth, ignoring");
+                            continue;
+                        }
+                        match super::protocol::decode_command(payload) {
+                            Ok(cmd) => {
+                                let _ = cmd_tx.send(ServerCommand::ExecuteCommand {
+                                    conn_id,
+                                    correlation_id: cmd.correlation_id,
+                                    op_name: cmd.op_name,
+                                    params: cmd.params,
+                                });
+                            }
+                            Err(e) => {
+                                tlog!("[ws] Connection {conn_id}: invalid command payload: {e:?}");
+                            }
+                        }
                     }
 
                     _ => {

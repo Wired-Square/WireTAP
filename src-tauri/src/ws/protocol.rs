@@ -23,6 +23,8 @@ pub enum MsgType {
     Unsubscribe      = 0x11,
     SubscribeAck     = 0x12,
     SubscribeNack    = 0x13,
+    Command          = 0x20,
+    CommandResponse  = 0x21,
     Heartbeat        = 0xFE,
     Auth             = 0xFF,
 }
@@ -48,6 +50,8 @@ impl TryFrom<u8> for MsgType {
             0x11 => Ok(MsgType::Unsubscribe),
             0x12 => Ok(MsgType::SubscribeAck),
             0x13 => Ok(MsgType::SubscribeNack),
+            0x20 => Ok(MsgType::Command),
+            0x21 => Ok(MsgType::CommandResponse),
             0xFE => Ok(MsgType::Heartbeat),
             0xFF => Ok(MsgType::Auth),
             other => Err(ProtocolError::InvalidMsgType(other)),
@@ -603,6 +607,58 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
         };
         out.extend_from_slice(&envelope.encode());
     }
+    out
+}
+
+// ============================================================================
+// Command / CommandResponse  (0x20 / 0x21)
+//
+// Command payload (client → server):
+//   [correlation_id: u32 LE][op_name_len: u16 LE][op_name: UTF-8][params: JSON bytes]
+//
+// CommandResponse payload (server → client):
+//   [correlation_id: u32 LE][status: u8 (0=ok, 1=error)][payload: JSON bytes or error string]
+// ============================================================================
+
+pub struct CommandMsg {
+    pub correlation_id: u32,
+    pub op_name: String,
+    pub params: Vec<u8>,
+}
+
+pub fn decode_command(payload: &[u8]) -> Result<CommandMsg, ProtocolError> {
+    if payload.len() < 6 {
+        return Err(ProtocolError::InsufficientData {
+            needed: 6,
+            available: payload.len(),
+        });
+    }
+    let correlation_id = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+    let op_name_len = u16::from_le_bytes([payload[4], payload[5]]) as usize;
+    let op_start = 6;
+    let op_end = op_start + op_name_len;
+    if payload.len() < op_end {
+        return Err(ProtocolError::InsufficientData {
+            needed: op_end,
+            available: payload.len(),
+        });
+    }
+    let op_name = std::str::from_utf8(&payload[op_start..op_end])
+        .map_err(|_| ProtocolError::TooShort)?
+        .to_string();
+    let params = payload[op_end..].to_vec();
+    Ok(CommandMsg {
+        correlation_id,
+        op_name,
+        params,
+    })
+}
+
+pub fn encode_command_response(correlation_id: u32, status: u8, payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(5 + payload.len());
+    out.extend_from_slice(&correlation_id.to_le_bytes());
+    out.push(status);
+    out.extend_from_slice(payload);
     out
 }
 

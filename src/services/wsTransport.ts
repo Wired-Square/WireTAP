@@ -12,10 +12,12 @@ import {
   decodeHeader,
   decodeSessionError,
   decodeSubscribeAck,
+  decodeCommandResponse,
   encodeAuth,
   encodeSubscribe,
   encodeUnsubscribe,
   encodeHeartbeat,
+  encodeCommand,
   MsgType,
   HEADER_SIZE,
 } from "./wsProtocol";
@@ -64,6 +66,13 @@ class WsTransport {
   // Heartbeat
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
+  // Command RPC
+  private nextCorrelationId: number = 1;
+  private pendingCommands: Map<
+    number,
+    { resolve: (data: unknown) => void; reject: (err: Error) => void; timer: ReturnType<typeof setTimeout> }
+  > = new Map();
+
   /** Connect to the WS server. Call once at app startup. */
   async connect(): Promise<void> {
     const config = await invoke<WsConfig>("get_ws_config");
@@ -105,6 +114,12 @@ class WsTransport {
         this.connected = false;
         this.authenticated = false;
         this.stopHeartbeat();
+        // Reject all pending commands
+        for (const [, pending] of this.pendingCommands) {
+          clearTimeout(pending.timer);
+          pending.reject(new Error("WebSocket disconnected"));
+        }
+        this.pendingCommands.clear();
         if (this.shouldReconnect) {
           this.scheduleReconnect();
         }
@@ -214,6 +229,34 @@ class WsTransport {
     };
   }
 
+  /**
+   * Send a command to the backend and await the response.
+   * Returns the parsed JSON response data on success, throws on error or timeout.
+   */
+  async command<T = unknown>(opName: string, params: object = {}, timeoutMs = 10000): Promise<T> {
+    if (!this.ws || !this.authenticated) {
+      throw new Error("WebSocket not connected");
+    }
+
+    const correlationId = this.nextCorrelationId++;
+    // Wrap to avoid u32 overflow
+    if (this.nextCorrelationId > 0xffffffff) this.nextCorrelationId = 1;
+
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingCommands.delete(correlationId);
+        reject(new Error(`Command '${opName}' timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.pendingCommands.set(correlationId, {
+        resolve: resolve as (data: unknown) => void,
+        reject,
+        timer,
+      });
+      this.ws!.send(encodeCommand(correlationId, opName, params));
+    });
+  }
+
   /** Whether the transport is connected and authenticated. */
   get isConnected(): boolean {
     return this.connected && this.authenticated;
@@ -235,6 +278,9 @@ class WsTransport {
         return;
       case MsgType.SubscribeNack:
         this.handleSubscribeNack(buf);
+        return;
+      case MsgType.CommandResponse:
+        this.handleCommandResponse(buf);
         return;
       case MsgType.Heartbeat:
         this.ws?.send(encodeHeartbeat());
@@ -282,6 +328,21 @@ class WsTransport {
     if (pending) {
       pending.resolve(channel);
       this.pendingSubscribes.delete(sessionId);
+    }
+  }
+
+  private handleCommandResponse(buf: ArrayBuffer): void {
+    const payload = new DataView(buf, HEADER_SIZE);
+    if (payload.byteLength < 5) return;
+    const { correlationId, status, data, error } = decodeCommandResponse(payload);
+    const pending = this.pendingCommands.get(correlationId);
+    if (!pending) return;
+    this.pendingCommands.delete(correlationId);
+    clearTimeout(pending.timer);
+    if (status !== 0) {
+      pending.reject(new Error(error ?? "Command failed"));
+    } else {
+      pending.resolve(data);
     }
   }
 
