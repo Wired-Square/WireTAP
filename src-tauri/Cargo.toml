@@ -86,3 +86,9 @@ features = ["derive"]
 socketcan = "3.3"
 # sync-secret-service uses DBus Secret Service (GNOME Keyring, KWallet)
 keyring = { version = "3", features = ["sync-secret-service"] }
+
+# Local path override for development — Cargo uses this when the path exists,
+# falls back to the git dependency above when it doesn't (CI, other machines).
+# The path is relative to this Cargo.toml (src-tauri/).
+[patch."ssh://git@github.com/Wired-Square/framelink-rs.git"]
+framelink = { path = "../../framelink-rs" }

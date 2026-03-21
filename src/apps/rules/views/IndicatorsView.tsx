@@ -19,7 +19,7 @@ import {
   type DiscoveredLed,
 } from "../../../api/framelinkRules";
 import PaletteEditorDialog from "../dialogs/PaletteEditorDialog";
-import IndicatorConfigDialog from "../dialogs/IndicatorConfigDialog";
+import IndicatorConfigDialog, { type LedUpdateValues } from "../dialogs/IndicatorConfigDialog";
 
 const STATE_OPTIONS = [
   { value: 0, label: "Off" },
@@ -149,7 +149,16 @@ export default function IndicatorsView() {
         <IndicatorConfigDialog
           key={configLed.index}
           isOpen={!!configLed}
-          onClose={() => setConfigLed(null)}
+          onClose={(updated?: LedUpdateValues) => {
+            if (updated) {
+              setIndicators((prev) =>
+                prev.map((led) =>
+                  led.index === configLed.index ? { ...led, ...updated } : led,
+                ),
+              );
+            }
+            setConfigLed(null);
+          }}
           onConfigured={loadIndicators}
           deviceId={deviceId}
           led={configLed}

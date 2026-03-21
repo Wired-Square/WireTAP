@@ -1,4 +1,5 @@
-// io/framelink/reader.rs
+// Copyright (c) 2026, Wired Square Pty Ltd
+// SPDX-License-Identifier: Apache-2.0
 //
 // FrameLink source reader — subscribes to the shared connection for a device
 // and forwards frames matching this source's bus mappings to the merge task.
@@ -12,7 +13,7 @@ use framelink::protocol::stream::parse_frame_rx;
 use tokio::sync::mpsc;
 
 use super::convert_stream_frame;
-use super::shared::{self, ConnCommand};
+use super::shared;
 use crate::io::gvret::BusMapping;
 use crate::io::types::{SourceMessage, TransmitRequest};
 
@@ -30,7 +31,6 @@ pub async fn run_source(
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
-    // Acquire shared connection (creates if first, reuses if exists)
     let conn = match shared::session_acquire(&host, port, timeout_sec).await {
         Ok(c) => c,
         Err(e) => {
@@ -41,26 +41,19 @@ pub async fn run_source(
         }
     };
 
-    // Subscribe to frame broadcast
-    let mut frame_rx = conn.frame_tx.subscribe();
+    let mut frame_rx = conn.session.subscribe_frames();
 
-    // Request stream start for our interfaces
     for mapping in &bus_mappings {
         if mapping.enabled {
-            let _ = conn
-                .cmd_tx
-                .send(ConnCommand::StartStream(mapping.device_bus))
-                .await;
+            let _ = conn.session.start_stream(mapping.device_bus).await;
         }
     }
 
-    // Create transmit channel
     let (transmit_tx, transmit_rx) = std_mpsc::sync_channel::<TransmitRequest>(32);
     let _ = tx
         .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
         .await;
 
-    // Send Connected
     let _ = tx
         .send(SourceMessage::Connected(
             source_idx,
@@ -78,41 +71,34 @@ pub async fn run_source(
         bus_mappings.len()
     );
 
-    // Build a set of interface indices this source cares about for fast filtering
     let my_interfaces: std::collections::HashSet<u8> = bus_mappings
         .iter()
         .filter(|m| m.enabled)
         .map(|m| m.device_bus)
         .collect();
 
-    // Main loop
     loop {
         if stop_flag.load(Ordering::SeqCst) {
             break;
         }
 
-        // Drain pending transmit requests (non-blocking)
         while let Ok(req) = transmit_rx.try_recv() {
-            let _ = conn
-                .cmd_tx
-                .send(ConnCommand::Transmit {
-                    data: req.data,
-                    result_tx: req.result_tx,
-                })
-                .await;
+            let result = conn
+                .session
+                .transmit(&req.data)
+                .await
+                .map_err(|e| e.to_string());
+            let _ = req.result_tx.send(result);
         }
 
-        // Receive broadcast frames, filtered by our interface set
         match tokio::time::timeout(Duration::from_millis(1), frame_rx.recv()).await {
-            Ok(Ok(bf)) => {
-                // Skip frames for interfaces we don't handle
-                if !my_interfaces.contains(&bf.iface_index) {
+            Ok(Ok(sf)) => {
+                if !my_interfaces.contains(&sf.iface_index) {
                     continue;
                 }
-                // Re-parse from raw payload and convert to WireTAP frame
-                if let Ok(sf) = parse_frame_rx(&bf.payload) {
+                if let Ok(parsed) = parse_frame_rx(&sf.payload) {
                     if let Some(msg) =
-                        convert_stream_frame(&sf, &bus_mappings, &conn.iface_types)
+                        convert_stream_frame(&parsed, &bus_mappings, &conn.iface_types)
                     {
                         let _ = tx
                             .send(SourceMessage::Frames(source_idx, vec![msg]))
@@ -124,7 +110,6 @@ pub async fn run_source(
                 tlog!("[framelink] Source {} lagged {} frames", source_idx, n);
             }
             Ok(Err(_)) => {
-                // Sender dropped — connection lost
                 let _ = tx
                     .send(SourceMessage::Ended(
                         source_idx,
@@ -134,11 +119,10 @@ pub async fn run_source(
                 shared::session_release(&host, port).await;
                 return;
             }
-            Err(_) => {} // timeout — loop again
+            Err(_) => {}
         }
     }
 
-    // Release session reference (idle timeout handles cleanup)
     shared::session_release(&host, port).await;
     let _ = tx
         .send(SourceMessage::Ended(source_idx, "stopped".to_string()))

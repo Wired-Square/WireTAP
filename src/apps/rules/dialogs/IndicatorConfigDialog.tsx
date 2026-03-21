@@ -28,9 +28,15 @@ const STATE_OPTIONS = [
   { value: 2, label: "Blink" },
 ] as const;
 
+export interface LedUpdateValues {
+  colour: number;
+  state: number;
+  blink_period: number;
+}
+
 interface IndicatorConfigDialogProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (updated?: LedUpdateValues) => void;
   onConfigured: () => void;
   deviceId: string;
   led: DiscoveredLed;
@@ -98,6 +104,10 @@ export default function IndicatorConfigDialog({
     }, 150);
   }, [deviceId, led.colour_signal_id]);
 
+  const closeWithValues = useCallback(() => {
+    onClose({ colour: ledColour, state: ledState, blink_period: blinkPeriod });
+  }, [onClose, ledColour, ledState, blinkPeriod]);
+
   const handleClear = useCallback(async () => {
     try {
       await framelinkIndicatorRemove(deviceId, led.index, led.colour_signal_id, led.state_signal_id);
@@ -105,6 +115,11 @@ export default function IndicatorConfigDialog({
       onClose();
     } catch (e) { setError(String(e)); }
   }, [deviceId, led, onConfigured, onClose]);
+
+  // Clear pending colour write on unmount
+  useEffect(() => {
+    return () => clearTimeout(colourDebounceRef.current);
+  }, []);
 
   // Load palettes when dialog opens
   useEffect(() => {
@@ -197,7 +212,7 @@ export default function IndicatorConfigDialog({
   // Note: activityColour is derived from led.colour, included in deps via led
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
+    <Dialog isOpen={isOpen} onBackdropClick={closeWithValues} maxWidth="max-w-2xl">
       <div className="p-6 max-h-[80vh] overflow-y-auto">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
           Configure {led.label}
@@ -405,7 +420,7 @@ export default function IndicatorConfigDialog({
           Clear Indicator
         </button>
         <div className="flex gap-2">
-          <button onClick={onClose} className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}>
+          <button onClick={closeWithValues} className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}>
             Close
           </button>
           <button

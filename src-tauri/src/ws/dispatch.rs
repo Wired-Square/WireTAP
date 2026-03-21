@@ -269,6 +269,30 @@ pub fn send_transmit_updated(count: i64) {
     server.send_global(msg);
 }
 
+// ============================================================================
+// Command dispatch (0x20 → 0x21)
+// ============================================================================
+
+/// Route a WS command to the appropriate handler.
+/// Returns Ok(json_value) on success, Err(error_string) on failure.
+pub async fn dispatch_command(
+    op_name: &str,
+    params: &[u8],
+) -> Result<serde_json::Value, String> {
+    let params: serde_json::Value = if params.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_slice(params).map_err(|e| format!("Invalid JSON params: {e}"))?
+    };
+
+    match op_name {
+        name if name.starts_with("framelink.") => {
+            crate::io::framelink::rules::dispatch_framelink_command(name, params).await
+        }
+        _ => Err(format!("Unknown command: {op_name}")),
+    }
+}
+
 /// Send replay state update (global, channel 0).
 pub fn send_replay_state(state: &crate::replay::ReplayState) {
     let server = match ws_server() {

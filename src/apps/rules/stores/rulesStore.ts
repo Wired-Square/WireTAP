@@ -48,6 +48,12 @@ export type RulesTab =
 
 export type RulePersistenceState = "existing" | "temporary" | "persisted";
 
+export interface StatusBarEntry {
+  text: string;
+  type: "success" | "error" | "info";
+  timestamp: number;
+}
+
 interface DeviceState {
   /** Unique device identity from capabilities (e.g. "WiredFlexLink-9D04") */
   deviceId: string;
@@ -81,7 +87,7 @@ interface RulesState {
   temporaryRules: Set<string>;
   selectedItemId: string | null;
   error: string | null;
-  statusMessage: string | null;
+  statusBar: StatusBarEntry | null;
 }
 
 interface RulesActions {
@@ -107,7 +113,7 @@ interface RulesActions {
   removeUserSignal: (signalId: number) => Promise<void>;
   selectItem: (id: string | null) => void;
   clearError: () => void;
-  setStatusMessage: (msg: string | null) => void;
+  setStatusBar: (entry: StatusBarEntry | null) => void;
   reset: () => void;
 }
 
@@ -128,8 +134,24 @@ const initialState: RulesState = {
   temporaryRules: new Set(),
   selectedItemId: null,
   error: null,
-  statusMessage: null,
+  statusBar: null,
 };
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function statusSuccess(text: string): StatusBarEntry {
+  return { text, type: "success", timestamp: Date.now() };
+}
+
+function statusError(text: string): StatusBarEntry {
+  return { text, type: "error", timestamp: Date.now() };
+}
+
+function statusInfo(text: string): StatusBarEntry {
+  return { text, type: "info", timestamp: Date.now() };
+}
 
 // ============================================================================
 // Store
@@ -200,6 +222,7 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
       set({
         device: { deviceId: "", label, host, port, connecting: true, connected: false, error: null, interfaces: [] },
         error: null,
+        statusBar: statusInfo(`Connecting to ${label}...`),
       });
       try {
         // Probe device via WS command — the backend connection manager handles the TCP connection
@@ -220,11 +243,13 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
           },
           frameDefs,
           temporaryRules: new Set(),
+          statusBar: statusSuccess(`Connected to ${label || resolvedId}`),
         });
       } catch (e) {
         set({
           device: { deviceId: "", label, host, port, connecting: false, connected: false, error: String(e), interfaces: [] },
           error: `Connection failed: ${e}`,
+          statusBar: statusError(`Connection failed: ${e}`),
         });
       }
     },
@@ -246,97 +271,158 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
 
     addFrameDef: async (frameDef) => {
       await framelinkFrameDefAdd(deviceId(), frameDef);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.add(`framedef:${frameDef.frame_def_id}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.add(`framedef:${frameDef.frame_def_id}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("Frame definition added") };
+      });
       await loadTab("frame-defs");
     },
 
     removeFrameDef: async (frameDefId) => {
       await framelinkFrameDefRemove(deviceId(), frameDefId);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.delete(`framedef:${frameDefId}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.delete(`framedef:${frameDefId}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("Frame definition removed") };
+      });
       await loadTab("frame-defs");
     },
 
     addBridge: async (bridge) => {
       await framelinkBridgeAdd(deviceId(), bridge);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.add(`bridge:${bridge.bridge_id}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.add(`bridge:${bridge.bridge_id}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("Bridge added") };
+      });
       await loadTab("bridges");
     },
 
     removeBridge: async (bridgeId) => {
       await framelinkBridgeRemove(deviceId(), bridgeId);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.delete(`bridge:${bridgeId}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.delete(`bridge:${bridgeId}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("Bridge removed") };
+      });
       await loadTab("bridges");
     },
 
     enableBridge: async (bridgeId, enabled) => {
       await framelinkBridgeEnable(deviceId(), bridgeId, enabled);
+      set({ statusBar: statusSuccess(`Bridge ${enabled ? "enabled" : "disabled"}`) });
       await loadTab("bridges");
     },
 
     addTransformer: async (transformer) => {
       await framelinkXformAdd(deviceId(), transformer);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.add(`xform:${transformer.transformer_id}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.add(`xform:${transformer.transformer_id}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("Transformer added") };
+      });
       await loadTab("transformers");
     },
 
     removeTransformer: async (transformerId) => {
       await framelinkXformRemove(deviceId(), transformerId);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.delete(`xform:${transformerId}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.delete(`xform:${transformerId}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("Transformer removed") };
+      });
       await loadTab("transformers");
     },
 
     enableTransformer: async (transformerId, enabled) => {
       await framelinkXformEnable(deviceId(), transformerId, enabled);
+      set({ statusBar: statusSuccess(`Transformer ${enabled ? "enabled" : "disabled"}`) });
       await loadTab("transformers");
     },
 
     addGenerator: async (generator) => {
       await framelinkGenAdd(deviceId(), generator);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.add(`gen:${generator.generator_id}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.add(`gen:${generator.generator_id}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("Generator added") };
+      });
       await loadTab("generators");
     },
 
     removeGenerator: async (generatorId) => {
       await framelinkGenRemove(deviceId(), generatorId);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.delete(`gen:${generatorId}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.delete(`gen:${generatorId}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("Generator removed") };
+      });
       await loadTab("generators");
     },
 
     enableGenerator: async (generatorId, enabled) => {
       await framelinkGenEnable(deviceId(), generatorId, enabled);
+      set({ statusBar: statusSuccess(`Generator ${enabled ? "enabled" : "disabled"}`) });
       await loadTab("generators");
     },
 
     persistSave: async () => {
-      await framelinkPersistSave(deviceId());
-      set({ temporaryRules: new Set(), statusMessage: "Rules persisted to device" });
+      set({ statusBar: statusInfo("Saving configuration to NVS...") });
+      try {
+        await framelinkPersistSave(deviceId());
+        set({ temporaryRules: new Set(), statusBar: statusSuccess("Configuration saved to NVS") });
+      } catch (e) {
+        set({ statusBar: statusError(`Persist failed: ${e}`) });
+        throw e;
+      }
     },
 
     persistLoad: async () => {
-      await framelinkPersistLoad(deviceId());
-      set({ temporaryRules: new Set() });
-      await loadTab(get().activeTab);
+      set({ statusBar: statusInfo("Loading persisted configuration...") });
+      try {
+        await framelinkPersistLoad(deviceId());
+        set({ temporaryRules: new Set(), statusBar: statusSuccess("Persisted configuration loaded") });
+        await loadTab(get().activeTab);
+      } catch (e) {
+        set({ statusBar: statusError(`Load failed: ${e}`) });
+        throw e;
+      }
     },
 
     persistClear: async () => {
-      await framelinkPersistClear(deviceId());
-      set({ statusMessage: "Persisted rules cleared" });
-      await loadTab(get().activeTab);
+      set({ statusBar: statusInfo("Clearing persisted rules...") });
+      try {
+        await framelinkPersistClear(deviceId());
+        set({ statusBar: statusSuccess("Persisted rules cleared") });
+        await loadTab(get().activeTab);
+      } catch (e) {
+        set({ statusBar: statusError(`Clear failed: ${e}`) });
+        throw e;
+      }
     },
 
     addUserSignal: async (signalId) => {
       await framelinkUserSignalAdd(deviceId(), signalId);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.add(`usersig:${signalId}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.add(`usersig:${signalId}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("User signal added") };
+      });
     },
 
     removeUserSignal: async (signalId) => {
       await framelinkUserSignalRemove(deviceId(), signalId);
-      set((s) => { const temp = new Set(s.temporaryRules); temp.delete(`usersig:${signalId}`); return { temporaryRules: temp }; });
+      set((s) => {
+        const temp = new Set(s.temporaryRules);
+        temp.delete(`usersig:${signalId}`);
+        return { temporaryRules: temp, statusBar: statusSuccess("User signal removed") };
+      });
     },
 
     selectItem: (id) => set({ selectedItemId: id }),
     clearError: () => set({ error: null }),
-    setStatusMessage: (msg) => set({ statusMessage: msg }),
+    setStatusBar: (entry) => set({ statusBar: entry }),
     reset: () => set({ ...initialState, temporaryRules: new Set() }),
   };
 });

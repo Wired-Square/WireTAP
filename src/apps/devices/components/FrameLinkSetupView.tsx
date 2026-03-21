@@ -91,6 +91,7 @@ export default function FrameLinkSetupView() {
         connection: {
           host,
           port: String(port),
+          device_id: probeResult.device_id ?? undefined,
           interface_index: iface.index,
           interface_type: iface.iface_type,
           interface_name: iface.name,

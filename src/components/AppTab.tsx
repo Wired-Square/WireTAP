@@ -3,10 +3,10 @@
 
 import { useState, useEffect } from "react";
 import { type IDockviewPanelHeaderProps } from "dockview-react";
-import { Search, Activity, FileText, Calculator, GitCompare, ListOrdered, Scan, Send, Settings, DatabaseZap, Network, BarChart3, X } from "lucide-react";
+import { Search, Activity, FileText, Calculator, GitCompare, ListOrdered, Scan, Send, Settings, DatabaseZap, Network, BarChart3, Workflow, X } from "lucide-react";
 import { iconMd, iconXs } from "../styles/spacing";
 
-type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "serial-frame-analysis" | "transmit" | "query" | "session-manager" | "graph" | "settings";
+type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "serial-frame-analysis" | "transmit" | "query" | "session-manager" | "graph" | "rules" | "settings";
 
 // Icon and color config for each panel
 const panelConfig: Record<PanelId, { icon: typeof Search; color: string }> = {
@@ -21,6 +21,7 @@ const panelConfig: Record<PanelId, { icon: typeof Search; color: string }> = {
   query: { icon: DatabaseZap, color: "text-amber-400" },
   "session-manager": { icon: Network, color: "text-cyan-400" },
   graph: { icon: BarChart3, color: "text-pink-400" },
+  rules: { icon: Workflow, color: "text-indigo-400" },
   settings: { icon: Settings, color: "text-orange-400" },
 };
 

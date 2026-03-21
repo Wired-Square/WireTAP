@@ -1,7 +1,7 @@
 // ui/src/components/LogoMenu.tsx
 
 import { useState, useRef, useEffect } from "react";
-import { Search, Activity, FileText, Calculator, Settings, Send, ArrowUpCircle, DatabaseZap, Network, BarChart3 } from "lucide-react";
+import { Search, Activity, FileText, Calculator, Settings, Send, ArrowUpCircle, DatabaseZap, Network, BarChart3, Workflow } from "lucide-react";
 import { iconMd, marginAppContent } from "../styles/spacing";
 import { bgSurface, borderDefault, textPrimary } from "../styles";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -9,7 +9,7 @@ const logo = "/logo.png";
 import { useUpdateStore } from "../stores/updateStore";
 import { openSettingsPanel } from "../api";
 
-export type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "transmit" | "query" | "session-manager" | "graph" | "settings";
+export type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "transmit" | "query" | "session-manager" | "graph" | "rules" | "settings";
 
 interface LogoMenuProps {
   onPanelClick: (panelId: PanelId) => void;
@@ -60,6 +60,13 @@ const menuItems: MenuItem[] = [
     label: "Graph",
     color: "text-pink-400",
     bgColor: "hover:bg-pink-500/10",
+  },
+  {
+    id: "rules",
+    icon: Workflow,
+    label: "Rules",
+    color: "text-indigo-400",
+    bgColor: "hover:bg-indigo-500/10",
   },
   {
     id: "catalog-editor",

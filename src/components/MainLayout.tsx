@@ -1,6 +1,6 @@
 // ui/src/components/MainLayout.tsx
 
-import { useRef, useState, useCallback, useEffect, lazy, Suspense } from "react";
+import React, { useRef, useState, useCallback, useEffect, lazy, Suspense } from "react";
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -49,6 +49,7 @@ const FrameOrderAnalysis = lazy(() => import("../apps/analysis/FrameOrderAnalysi
 const Query = lazy(() => import("../apps/query/Query"));
 const SessionManager = lazy(() => import("../apps/session-manager/SessionManager"));
 const Graph = lazy(() => import("../apps/graph/Graph"));
+const Rules = lazy(() => import("../apps/rules/Rules"));
 const Settings = lazy(() => import("../apps/settings/Settings"));
 
 // Get layout key for a specific window (per-window persistence)
@@ -70,14 +71,49 @@ function PanelLoading() {
   );
 }
 
+// Error boundary so a single panel crash cannot take down the Dockview layout
+class PanelErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[PanelErrorBoundary]", error, info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className={`flex items-center justify-center h-full ${bgPrimary}`}>
+          <div className="flex flex-col items-center gap-3 p-6 max-w-md text-center">
+            <span className={`text-sm font-medium ${textPrimary}`}>Panel Error</span>
+            <span className={`text-xs ${textTertiary} break-all`}>{this.state.error.message}</span>
+            <button
+              onClick={() => this.setState({ error: null })}
+              className="mt-2 px-3 py-1 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Panel wrapper to ensure proper height constraints within Dockview panels
 // Panels use h-full (not h-screen) since they're inside the Dockview container
 function PanelWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-full overflow-hidden">
-      <Suspense fallback={<PanelLoading />}>
-        {children}
-      </Suspense>
+      <PanelErrorBoundary>
+        <Suspense fallback={<PanelLoading />}>
+          {children}
+        </Suspense>
+      </PanelErrorBoundary>
     </div>
   );
 }
@@ -123,6 +159,10 @@ function GraphPanel(_props: IDockviewPanelProps) {
   return <PanelWrapper><Graph /></PanelWrapper>;
 }
 
+function RulesPanel(_props: IDockviewPanelProps) {
+  return <PanelWrapper><Rules /></PanelWrapper>;
+}
+
 function SettingsPanel(_props: IDockviewPanelProps) {
   return <PanelWrapper><Settings /></PanelWrapper>;
 }
@@ -139,6 +179,7 @@ const components = {
   query: QueryPanel,
   "session-manager": SessionManagerPanel,
   graph: GraphPanel,
+  rules: RulesPanel,
   settings: SettingsPanel,
 };
 
@@ -281,6 +322,7 @@ const panelTitles: Record<PanelId, string> = {
   query: "Query",
   "session-manager": "Sessions",
   graph: "Graph",
+  rules: "Rules",
   settings: "Settings",
 };
 

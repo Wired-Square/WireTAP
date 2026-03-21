@@ -13,7 +13,7 @@ use framelink::protocol::dsig;
 use framelink::protocol::stream::{build_frame_tx, FrameMetadata, StreamFrame};
 use framelink::protocol::types::{
     FLAG_ACK_REQ, IFACE_CANFD, MSG_CAPABILITIES_REQ, MSG_DSIG_LIST, MSG_DSIG_READ,
-    MSG_DSIG_WRITE, MSG_PERSIST_SAVE, MSG_WRITE_CHALLENGE, MSG_WRITE_UNLOCK,
+    MSG_DSIG_WRITE, MSG_PERSIST_SAVE,
 };
 use serde::Serialize;
 
@@ -293,18 +293,6 @@ pub async fn framelink_write_signal(
     timeout: Option<f64>,
 ) -> Result<(), String> {
     let timeout_sec = timeout.unwrap_or(5.0);
-
-    // Challenge → unlock → write
-    let challenge_frame = shared::request(
-        &host, port, MSG_WRITE_CHALLENGE, FLAG_ACK_REQ, &[], timeout_sec,
-    )
-    .await?;
-    let nonce = dsig::parse_challenge_response(&challenge_frame.payload)
-        .map_err(|e| format!("Failed to parse challenge: {}", e))?;
-
-    let unlock_payload = dsig::build_unlock_request(nonce);
-    shared::request(&host, port, MSG_WRITE_UNLOCK, FLAG_ACK_REQ, &unlock_payload, timeout_sec)
-        .await?;
 
     let write_payload = dsig::build_write_request(signal_id, value);
     shared::request(&host, port, MSG_DSIG_WRITE, FLAG_ACK_REQ, &write_payload, timeout_sec)

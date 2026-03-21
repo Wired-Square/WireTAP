@@ -75,7 +75,7 @@ export default function Rules() {
     device,
     activeTab,
     error,
-    statusMessage,
+    statusBar,
     loading,
     setActiveTab,
     connectDevice,
@@ -83,13 +83,12 @@ export default function Rules() {
     refreshTab,
     persistSave,
     clearError,
-    setStatusMessage,
   } = useRulesStore(
     useShallow((s) => ({
       device: s.device,
       activeTab: s.activeTab,
       error: s.error,
-      statusMessage: s.statusMessage,
+      statusBar: s.statusBar,
       loading: s.loading,
       setActiveTab: s.setActiveTab,
       connectDevice: s.connectDevice,
@@ -97,7 +96,6 @@ export default function Rules() {
       refreshTab: s.refreshTab,
       persistSave: s.persistSave,
       clearError: s.clearError,
-      setStatusMessage: s.setStatusMessage,
     })),
   );
 
@@ -112,14 +110,6 @@ export default function Rules() {
     connectDevice(d.host, d.port, d.label);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [framelinkDevices]);
-
-  // Auto-clear status messages
-  useEffect(() => {
-    if (statusMessage) {
-      const t = setTimeout(() => setStatusMessage(null), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [statusMessage, setStatusMessage]);
 
   const handleDeviceChange = useCallback(
     (selectedDeviceId: string) => {
@@ -217,13 +207,6 @@ export default function Rules() {
         </div>
       )}
 
-      {/* Status message */}
-      {statusMessage && (
-        <div className="mx-2 mt-1 px-3 py-2 text-xs bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg">
-          {statusMessage}
-        </div>
-      )}
-
       {/* No devices configured */}
       {!hasFramelinkProfiles && (
         <div className={`flex-1 flex items-center justify-center ${textTertiary}`}>
@@ -312,6 +295,31 @@ export default function Rules() {
             {activeTab === "indicators" && <IndicatorsView />}
             {activeTab === "user-signals" && <UserSignalsView />}
             {activeTab === "overview" && <DeviceOverview />}
+          </div>
+
+          {/* Status bar */}
+          <div className={`flex items-center justify-between px-3 py-1 border-t ${borderDefault} bg-[var(--bg-surface)] text-xs`}>
+            {statusBar ? (
+              <>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    statusBar.type === "success" ? "bg-green-400" :
+                    statusBar.type === "error" ? "bg-red-400" :
+                    "bg-blue-400 animate-pulse"
+                  }`} />
+                  <span className={`truncate ${
+                    statusBar.type === "error" ? "text-red-400" : textSecondary
+                  }`}>
+                    {statusBar.text}
+                  </span>
+                </div>
+                <span className={`${textTertiary} shrink-0 ml-3`}>
+                  {new Date(statusBar.timestamp).toLocaleTimeString()}
+                </span>
+              </>
+            ) : (
+              <span className={textTertiary}>Ready</span>
+            )}
           </div>
         </div>
       )}
