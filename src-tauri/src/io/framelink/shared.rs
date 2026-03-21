@@ -193,6 +193,7 @@ async fn fetch_capabilities(
                 index: iface.index,
                 iface_type: iface.iface_type,
                 name,
+                type_name: framelink::protocol::types::interface_name(iface.iface_type).to_string(),
             }
         })
         .collect();

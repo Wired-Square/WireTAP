@@ -26,6 +26,8 @@ pub struct ProbeInterface {
     pub index: u8,
     pub iface_type: u8,
     pub name: String,
+    /// Human-readable interface type name from the protocol library.
+    pub type_name: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

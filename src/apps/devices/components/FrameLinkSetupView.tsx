@@ -68,15 +68,6 @@ export default function FrameLinkSetupView() {
     setStep("scan");
   };
 
-  const ifaceTypeName = (t: number) => {
-    switch (t) {
-      case 1: return "CAN";
-      case 2: return "CAN FD";
-      case 3: return "RS-485";
-      default: return "Unknown";
-    }
-  };
-
   // Use device_id from capabilities as the canonical label (e.g. "WiredFlexLink-9D04")
   const deviceLabel = probeResult?.device_id ?? selectedDeviceName ?? "FrameLink";
 
@@ -97,6 +88,7 @@ export default function FrameLinkSetupView() {
           index: iface.index,
           iface_type: iface.iface_type,
           name: iface.name,
+          type_name: iface.type_name,
         })),
       },
     };
@@ -154,7 +146,7 @@ export default function FrameLinkSetupView() {
               <div key={iface.index} className={`${cardDefault} p-3 flex items-center justify-between`}>
                 <div>
                   <span className={`text-sm font-medium ${textPrimary}`}>{iface.name}</span>
-                  <span className={`text-xs ${textSecondary} ml-2`}>{ifaceTypeName(iface.iface_type)}</span>
+                  <span className={`text-xs ${textSecondary} ml-2`}>{iface.type_name}</span>
                 </div>
                 <span className={`text-xs ${textSecondary}`}>Index {iface.index}</span>
               </div>

@@ -188,6 +188,7 @@ export default function IOProfileDialog({
         index: i.index,
         iface_type: i.iface_type,
         name: i.name,
+        type_name: i.type_name,
       })) as any);
       if (probe.device_id) onUpdateConnectionField("device_id", probe.device_id);
       if (probe.board_name) onUpdateConnectionField("board_name", probe.board_name);
@@ -1138,12 +1139,10 @@ export default function IOProfileDialog({
                     </SecondaryButton>
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    {(profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string }>).map((iface) => (
+                    {(profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string; type_name?: string }>).map((iface) => (
                       <div key={iface.index} className="flex items-center justify-between py-1.5 px-2 rounded bg-[var(--bg-primary)]">
                         <span className={textMedium}>{iface.name}</span>
-                        <span className={caption}>
-                          {iface.iface_type === 1 ? "CAN" : iface.iface_type === 2 ? "CAN FD" : iface.iface_type === 3 ? "RS-485" : "Unknown"}
-                        </span>
+                        <span className={caption}>{iface.type_name ?? "Unknown"}</span>
                       </div>
                     ))}
                   </div>
