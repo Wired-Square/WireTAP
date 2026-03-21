@@ -8,6 +8,8 @@ export interface ProbeInterface {
   index: number;
   iface_type: number; // 1=CAN, 2=CANFD, 3=RS-485
   name: string;
+  /** Human-readable interface type name from the protocol library. */
+  type_name: string;
 }
 
 export interface FrameLinkProbeResult {
