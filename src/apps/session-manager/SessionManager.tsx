@@ -250,7 +250,7 @@ export default function SessionManager() {
   const addSourceSession = addSourceSessionId
     ? sessions.find((s) => s.sessionId === addSourceSessionId)
     : null;
-  const realtimeKinds = new Set(["gvret_tcp", "gvret_usb", "slcan", "gs_usb", "socketcan", "serial"]);
+  const realtimeKinds = new Set(["gvret_tcp", "gvret_usb", "slcan", "gs_usb", "socketcan", "serial", "mqtt", "modbus_tcp", "framelink", "virtual"]);
   const availableProfiles = addSourceSession
     ? profiles.filter(
         (p) =>

@@ -38,24 +38,18 @@ interface FramelinkDevice {
   label: string;
 }
 
-/** Deduplicate framelink profiles by device_id to get unique devices. */
+/** Extract unique FrameLink devices from profiles. */
 function deriveDevices(profiles: IOProfile[]): FramelinkDevice[] {
-  const seen = new Map<string, FramelinkDevice>();
+  const devices: FramelinkDevice[] = [];
   for (const p of profiles) {
     if (p.kind !== "framelink") continue;
     const host = p.connection?.host as string | undefined;
     if (!host) continue;
     const port = Number(p.connection?.port) || 120;
     const did = (p.connection?.device_id as string) ?? `${host}:${port}`;
-    if (!seen.has(did)) {
-      const ifaceName = (p.connection?.interface_name as string) ?? "";
-      const label = ifaceName && p.name.endsWith(ifaceName)
-        ? p.name.slice(0, -ifaceName.length).trim()
-        : p.name;
-      seen.set(did, { deviceId: did, host, port, label: label || did });
-    }
+    devices.push({ deviceId: did, host, port, label: p.name || did });
   }
-  return Array.from(seen.values());
+  return devices;
 }
 
 export default function Rules() {

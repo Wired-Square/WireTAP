@@ -1,7 +1,7 @@
 // ui/src/apps/devices/components/FrameLinkSetupView.tsx
 //
 // FrameLink device setup — probes the device, shows discovered interfaces,
-// and creates one IO profile per interface.
+// and creates a single grouped IO profile with all interfaces.
 
 import { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Check, Loader2 } from "lucide-react";
@@ -80,26 +80,27 @@ export default function FrameLinkSetupView() {
   // Use device_id from capabilities as the canonical label (e.g. "WiredFlexLink-9D04")
   const deviceLabel = probeResult?.device_id ?? selectedDeviceName ?? "FrameLink";
 
-  const handleAddProfiles = () => {
+  const handleAddProfile = () => {
     if (!probeResult) return;
 
-    for (const iface of probeResult.interfaces) {
-      const profile: IOProfile = {
-        id: `io_fl_${Date.now()}_${iface.index}`,
-        name: `${deviceLabel} ${iface.name}`,
-        kind: "framelink",
-        connection: {
-          host,
-          port: String(port),
-          device_id: probeResult.device_id ?? undefined,
-          interface_index: iface.index,
-          interface_type: iface.iface_type,
-          interface_name: iface.name,
-        },
-      };
-      addProfile(profile);
-    }
-
+    const profile: IOProfile = {
+      id: `io_fl_${Date.now()}`,
+      name: deviceLabel,
+      kind: "framelink",
+      connection: {
+        host,
+        port: String(port),
+        device_id: probeResult.device_id ?? undefined,
+        board_name: probeResult.board_name ?? undefined,
+        board_revision: probeResult.board_revision ?? undefined,
+        interfaces: probeResult.interfaces.map((iface) => ({
+          index: iface.index,
+          iface_type: iface.iface_type,
+          name: iface.name,
+        })),
+      },
+    };
+    addProfile(profile);
     setAdded(true);
   };
 
@@ -161,16 +162,16 @@ export default function FrameLinkSetupView() {
           </div>
 
           {!added ? (
-            <PrimaryButton onClick={handleAddProfiles} className="mt-2">
+            <PrimaryButton onClick={handleAddProfile} className="mt-2">
               <span className="flex items-center justify-center gap-1.5">
                 <Plus className={iconMd} />
-                Add {probeResult.interfaces.length} Interface{probeResult.interfaces.length !== 1 ? "s" : ""} to Data I/O
+                Add Device to Data I/O
               </span>
             </PrimaryButton>
           ) : (
             <div className="flex items-center gap-2 p-3 text-sm text-green-700 bg-green-50 rounded-lg border border-green-200">
               <Check className={iconMd} />
-              {probeResult.interfaces.length} profile{probeResult.interfaces.length !== 1 ? "s" : ""} added to Data I/O. You can configure them in Settings.
+              Device added to Data I/O with {probeResult.interfaces.length} interface{probeResult.interfaces.length !== 1 ? "s" : ""}. You can configure it in Settings.
             </div>
           )}
         </>

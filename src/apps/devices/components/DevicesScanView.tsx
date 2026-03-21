@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Globe, ChevronDown, ChevronRight } from "lucide-react";
 import { textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
-import { PrimaryButton, SecondaryButton, Input } from "../../../components/forms";
+import { PrimaryButton, SecondaryButton, Input, Select } from "../../../components/forms";
 import { useDevicesStore } from "../stores/devicesStore";
 import { useProvisioningStore } from "../../provisioning/stores/provisioningStore";
 import { useUpgradeStore } from "../../upgrade/stores/upgradeStore";
@@ -57,6 +57,7 @@ export default function DevicesScanView() {
   const [connectingDeviceId, setConnectingDeviceId] = useState<string | null>(null);
   const [showManualIp, setShowManualIp] = useState(false);
   const [manualAddress, setManualAddress] = useState("");
+  const [manualProtocol, setManualProtocol] = useState<"smp" | "framelink">("smp");
   const [manualPort, setManualPort] = useState(() =>
     String(useSettingsStore.getState().general.smpPort),
   );
@@ -199,7 +200,7 @@ export default function DevicesScanView() {
     }
   };
 
-  /** Connect to a manually entered IP address (UDP/SMP only). */
+  /** Connect to a manually entered IP address. */
   const handleManualConnect = async () => {
     const address = manualAddress.trim();
     if (!address) {
@@ -209,6 +210,35 @@ export default function DevicesScanView() {
     const port = parseInt(manualPort, 10);
     if (isNaN(port) || port < 1 || port > 65535) {
       setError("Please enter a valid port number (1-65535)");
+      return;
+    }
+
+    // FrameLink direct connect — probe and go to framelink-setup
+    if (manualProtocol === "framelink") {
+      setError(null);
+      const tempId = `fl:${address}`;
+      setConnectingDeviceId(tempId);
+      setConnectionState("connecting");
+      if (isScanning) {
+        try { await deviceScanStop(); } catch { /* ignore */ }
+        setScanning(false);
+      }
+      try {
+        const probe = await framelinkProbeDevice(address, port, 5);
+        const deviceName = probe.device_id ?? address;
+        const deviceId = `fl:${probe.device_id ?? address}`;
+        const caps = ["framelink"];
+        const { addDevice } = useDevicesStore.getState();
+        addDevice({ name: deviceName, id: deviceId, transport: "udp", ble_id: null, rssi: null, address, port, capabilities: caps });
+        setSelectedDevice(deviceId, deviceName, "udp", caps);
+        setConnectionState("connected");
+        setStep("framelink-setup");
+      } catch (e) {
+        setConnectionState("idle");
+        setError(String(e));
+      } finally {
+        setConnectingDeviceId(null);
+      }
       return;
     }
 
@@ -337,6 +367,21 @@ export default function DevicesScanView() {
 
         {showManualIp && (
           <div className="flex items-end gap-2 mt-2">
+            <div className="w-32">
+              <label className={`text-xs ${textSecondary} mb-1 block`}>Type</label>
+              <Select
+                value={manualProtocol}
+                onChange={(e) => {
+                  const proto = e.target.value as "smp" | "framelink";
+                  setManualProtocol(proto);
+                  setManualPort(proto === "framelink" ? "120" : String(useSettingsStore.getState().general.smpPort));
+                }}
+                disabled={connecting}
+              >
+                <option value="smp">SMP</option>
+                <option value="framelink">FrameLink</option>
+              </Select>
+            </div>
             <div className="flex-1">
               <label className={`text-xs ${textSecondary} mb-1 block`}>IP Address</label>
               <Input
@@ -351,7 +396,7 @@ export default function DevicesScanView() {
               <Input
                 value={manualPort}
                 onChange={(e) => setManualPort(e.target.value)}
-                placeholder="1337"
+                placeholder={manualProtocol === "framelink" ? "120" : "1337"}
                 disabled={connecting}
               />
             </div>

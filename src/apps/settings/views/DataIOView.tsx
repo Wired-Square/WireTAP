@@ -251,12 +251,14 @@ const renderConnectionSummary = (profile: IOProfile) => {
   if (profile.kind === "framelink") {
     const host = c.host || "";
     const port = c.port || "120";
-    const ifaceName = c.interface_name || "";
+    const deviceId = c.device_id || "";
+    const interfaces = c.interfaces as Array<{ name: string; iface_type: number }> | undefined;
     return (
       <div className="flex flex-wrap gap-2">
-        {ifaceName && <SummaryBadge label="interface" value={ifaceName} />}
+        {deviceId && <SummaryBadge label="device" value={deviceId} />}
         {host && <SummaryBadge label="host" value={host} />}
         <SummaryBadge label="port" value={port} />
+        {interfaces && <SummaryBadge label="interfaces" value={interfaces.length} />}
       </div>
     );
   }
