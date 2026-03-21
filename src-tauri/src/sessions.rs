@@ -413,13 +413,44 @@ fn create_default_bus_mapping(profile: &IOProfile, bus_override: Option<u8>) -> 
         "socketcan" => (0, "can0".to_string(), vec![Protocol::Can, Protocol::CanFd], true, false),
         "modbus_tcp" => (0, "modbus0".to_string(), vec![Protocol::Modbus], false, false),
         "framelink" => {
+            // Grouped profile with interfaces[] array
+            if let Some(interfaces) = profile.connection.get("interfaces").and_then(|v| v.as_array()) {
+                return interfaces.iter().enumerate().map(|(idx, iface)| {
+                    let iface_index = iface.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as u8;
+                    let iface_type = iface.get("iface_type").and_then(|v| v.as_u64()).unwrap_or(1) as u8;
+                    let (protos, tx_f, tx_b) = match iface_type {
+                        3 => (vec![Protocol::Serial], false, true),
+                        2 => (vec![Protocol::Can, Protocol::CanFd], true, false),
+                        _ => (vec![Protocol::Can], true, false),
+                    };
+                    let iface_id = if iface_type == 3 {
+                        format!("serial{}", iface_index)
+                    } else {
+                        format!("can{}", iface_index)
+                    };
+                    let out_bus = bus_override.map(|b| b + idx as u8).unwrap_or(idx as u8);
+                    BusMapping {
+                        device_bus: iface_index,
+                        output_bus: out_bus,
+                        enabled: true,
+                        interface_id: iface_id,
+                        traits: Some(InterfaceTraits {
+                            temporal_mode: TemporalMode::Realtime,
+                            protocols: protos,
+                            tx_frames: tx_f,
+                            tx_bytes: tx_b,
+                            multi_source: true,
+                        }),
+                    }
+                }).collect();
+            }
+            // Legacy single-interface fallback
             let iface_index = profile.connection.get("interface_index")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0) as u8;
             let iface_type = profile.connection.get("interface_type")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(1) as u8;
-            // IFACE_CAN=1, IFACE_CANFD=2, IFACE_RS485=3
             let (protos, tx_f, tx_b) = match iface_type {
                 3 => (vec![Protocol::Serial], false, true),
                 2 => (vec![Protocol::Can, Protocol::CanFd], true, false),
@@ -1938,7 +1969,7 @@ pub async fn probe_device(
             }
         }
 
-        // FrameLink device — single-interface profile, TCP probe to verify reachability
+        // FrameLink device — grouped profile with interfaces[], TCP probe to verify reachability
         "framelink" => {
             let host = profile.connection.get("host")
                 .and_then(|v| v.as_str())
@@ -1949,18 +1980,22 @@ pub async fn probe_device(
             let timeout_sec = profile.connection.get("timeout")
                 .and_then(|v| v.as_f64())
                 .unwrap_or(5.0);
-            let iface_name = profile.connection.get("interface_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Unknown");
+            let device_id = profile.connection.get("device_id")
+                .and_then(|v| v.as_str());
+            let iface_count = profile.connection.get("interfaces")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len() as u8)
+                .unwrap_or(1);
 
             match crate::io::framelink::probe_framelink(host, port, timeout_sec).await {
-                Ok(_) => {
+                Ok(probe) => {
+                    let bus_count = probe.interfaces.len().max(iface_count as usize) as u8;
                     Ok(DeviceProbeResult {
                         success: true,
                         device_type: "framelink".to_string(),
-                        is_multi_bus: false,
-                        bus_count: 1,
-                        primary_info: Some(iface_name.to_string()),
+                        is_multi_bus: bus_count > 1,
+                        bus_count,
+                        primary_info: device_id.map(|s| s.to_string()),
                         secondary_info: Some(format!("{}:{}", host, port)),
                         supports_fd: None,
                         error: None,
@@ -1969,9 +2004,9 @@ pub async fn probe_device(
                 Err(e) => Ok(DeviceProbeResult {
                     success: false,
                     device_type: "framelink".to_string(),
-                    is_multi_bus: false,
-                    bus_count: 0,
-                    primary_info: None,
+                    is_multi_bus: iface_count > 1,
+                    bus_count: iface_count,
+                    primary_info: device_id.map(|s| s.to_string()),
                     secondary_info: None,
                     supports_fd: None,
                     error: Some(e.to_string()),

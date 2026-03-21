@@ -444,6 +444,70 @@ const scheduleSave = (save: () => Promise<void>) => {
   }, 1000);
 };
 
+/**
+ * Migrate old-style per-interface FrameLink profiles into grouped device profiles.
+ * Old format: one IOProfile per interface with connection.interface_index.
+ * New format: one IOProfile per device with connection.interfaces[].
+ * Returns { profiles, removedIds } where removedIds are IDs that were merged away.
+ */
+function migrateFrameLinkProfiles(profiles: IOProfile[]): { profiles: IOProfile[]; removedIds: Set<string> } {
+  const oldStyle = profiles.filter(
+    (p) => p.kind === "framelink" && p.connection?.interface_index != null && !Array.isArray(p.connection?.interfaces),
+  );
+  if (oldStyle.length === 0) return { profiles, removedIds: new Set() };
+
+  const rest = profiles.filter(
+    (p) => !(p.kind === "framelink" && p.connection?.interface_index != null && !Array.isArray(p.connection?.interfaces)),
+  );
+
+  // Group by (host, device_id) or (host, port) if no device_id
+  const groups = new Map<string, IOProfile[]>();
+  for (const p of oldStyle) {
+    const key = `${p.connection.host}:${p.connection.device_id ?? p.connection.port ?? "120"}`;
+    const group = groups.get(key);
+    if (group) group.push(p);
+    else groups.set(key, [p]);
+  }
+
+  const merged: IOProfile[] = [];
+  const removedIds = new Set<string>();
+  for (const group of groups.values()) {
+    const first = group[0];
+    // Derive device label: strip interface suffix from first profile name
+    const ifaceName = (first.connection.interface_name as string) ?? "";
+    const deviceLabel = ifaceName && first.name.endsWith(ifaceName)
+      ? first.name.slice(0, -ifaceName.length).trim() || (first.connection.device_id as string) || first.name
+      : (first.connection.device_id as string) ?? first.name;
+
+    merged.push({
+      id: first.id,
+      name: deviceLabel,
+      kind: "framelink",
+      connection: {
+        host: first.connection.host,
+        port: first.connection.port ?? "120",
+        timeout: first.connection.timeout,
+        device_id: first.connection.device_id,
+        interfaces: group
+          .map((p) => ({
+            index: p.connection.interface_index as number,
+            iface_type: p.connection.interface_type as number ?? 1,
+            name: (p.connection.interface_name as string) ?? `IF${p.connection.interface_index}`,
+          }))
+          .sort((a, b) => a.index - b.index),
+      },
+      preferred_catalog: first.preferred_catalog,
+    });
+
+    // Track removed IDs (all except the first which we kept)
+    for (let i = 1; i < group.length; i++) {
+      removedIds.add(group[i].id);
+    }
+  }
+
+  return { profiles: [...rest, ...merged], removedIds };
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   // Initial state
   locations: {
@@ -554,14 +618,26 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         validateDir(reportDir),
       ]);
 
+      // Migrate old per-interface FrameLink profiles to grouped device profiles
+      const migration = migrateFrameLinkProfiles(settings.io_profiles || []);
+      let defaultRead = settings.default_read_profile ?? null;
+      let defaultWrites = settings.default_write_profiles ?? [];
+      if (migration.removedIds.size > 0) {
+        // If default profiles were merged away, clear them (the surviving profile ID is kept)
+        if (defaultRead && migration.removedIds.has(defaultRead)) {
+          defaultRead = null;
+        }
+        defaultWrites = defaultWrites.filter((id: string) => !migration.removedIds.has(id));
+      }
+
       const normalized: AppSettings = {
         config_path: settings.config_path || '',
         decoder_dir: decoderDir,
         dump_dir: dumpDir,
         report_dir: reportDir,
-        io_profiles: settings.io_profiles || [],
-        default_read_profile: settings.default_read_profile ?? null,
-        default_write_profiles: settings.default_write_profiles ?? [],
+        io_profiles: migration.profiles,
+        default_read_profile: defaultRead,
+        default_write_profiles: defaultWrites,
         display_frame_id_format: settings.display_frame_id_format === 'decimal' ? 'decimal' : 'hex',
         save_frame_id_format: settings.save_frame_id_format === 'decimal' ? 'decimal' : 'hex',
         display_time_format: settings.display_time_format ?? 'human',
@@ -702,8 +778,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
           smpPort: normalized.smp_port ?? 1337,
         },
-        originalSettings: normalized,
+        // When migration occurred, use pre-migration profiles as original so hasUnsavedChanges() detects the diff
+        originalSettings: migration.removedIds.size > 0
+          ? { ...normalized, io_profiles: settings.io_profiles || [] }
+          : normalized,
       });
+
+      // Persist migrated settings so old profiles are not re-migrated next load
+      if (migration.removedIds.size > 0) {
+        scheduleSave(get().saveSettings);
+      }
 
       // Update backend wake settings cache (desktop)
       setWakeSettingsApi(

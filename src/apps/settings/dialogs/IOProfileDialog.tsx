@@ -14,6 +14,7 @@ import SecurePasswordField from "../components/SecurePasswordField";
 import IODeviceStatus, { type DeviceProbeState, type DeviceProbeResult } from "../components/IODeviceStatus";
 import FrameLinkSignalControl, { signalSortKey } from "../components/FrameLinkSignalControl";
 import {
+  framelinkProbeDevice,
   framelinkGetInterfaceSignals,
   framelinkWriteSignal,
   type SignalDescriptor,
@@ -120,16 +121,20 @@ export default function IOProfileDialog({
     const host = profileForm.connection.host;
     const port = Number(profileForm.connection.port) || 120;
     const timeout = Number(profileForm.connection.timeout) || 5;
-    const ifaceIndex = Number(profileForm.connection.interface_index);
-    if (!host || isNaN(ifaceIndex)) {
-      setFlError("Host and interface index are required");
+    const interfaces = profileForm.connection.interfaces as Array<{ index: number }> | undefined;
+    if (!host || !interfaces?.length) {
+      setFlError("Host and interfaces are required");
       return;
     }
     setFlLoading(true);
     setFlError(null);
     try {
-      const signals = await framelinkGetInterfaceSignals(host, port, ifaceIndex, timeout);
-      setFlSignals(signals);
+      const allSignals: SignalDescriptor[] = [];
+      for (const iface of interfaces) {
+        const signals = await framelinkGetInterfaceSignals(host, port, iface.index, timeout);
+        allSignals.push(...signals);
+      }
+      setFlSignals(allSignals);
       setFlFetched(true);
     } catch (e) {
       setFlError(e instanceof Error ? e.message : String(e));
@@ -138,7 +143,7 @@ export default function IOProfileDialog({
     } finally {
       setFlLoading(false);
     }
-  }, [profileForm.connection.host, profileForm.connection.port, profileForm.connection.timeout, profileForm.connection.interface_index]);
+  }, [profileForm.connection.host, profileForm.connection.port, profileForm.connection.timeout, profileForm.connection.interfaces]);
 
   // Auto-fetch signals when dialog opens for a framelink profile with valid connection
   useEffect(() => {
@@ -146,8 +151,8 @@ export default function IOProfileDialog({
       isOpen &&
       profileForm.kind === "framelink" &&
       profileForm.connection.host &&
-      profileForm.connection.interface_index != null &&
-      !isNaN(Number(profileForm.connection.interface_index))
+      Array.isArray(profileForm.connection.interfaces) &&
+      profileForm.connection.interfaces.length > 0
     ) {
       loadFlSignals();
     }
@@ -169,6 +174,30 @@ export default function IOProfileDialog({
     },
     [profileForm.connection.host, profileForm.connection.port, profileForm.connection.timeout, flPersist],
   );
+
+  // Re-probe FrameLink device to update interfaces list
+  const [flReprobing, setFlReprobing] = useState(false);
+  const handleFlReprobe = useCallback(async () => {
+    const host = profileForm.connection.host;
+    const port = Number(profileForm.connection.port) || 120;
+    if (!host) return;
+    setFlReprobing(true);
+    try {
+      const probe = await framelinkProbeDevice(host, port, 5);
+      onUpdateConnectionField("interfaces", probe.interfaces.map((i) => ({
+        index: i.index,
+        iface_type: i.iface_type,
+        name: i.name,
+      })) as any);
+      if (probe.device_id) onUpdateConnectionField("device_id", probe.device_id);
+      if (probe.board_name) onUpdateConnectionField("board_name", probe.board_name);
+      if (probe.board_revision) onUpdateConnectionField("board_revision", probe.board_revision);
+    } catch (e) {
+      setFlError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFlReprobing(false);
+    }
+  }, [profileForm.connection.host, profileForm.connection.port, onUpdateConnectionField]);
 
   // Reset GVRET probe state when dialog closes or profile type changes
   useEffect(() => {
@@ -1086,10 +1115,45 @@ export default function IOProfileDialog({
                 />
               </FormField>
 
-              {/* Interface Configuration */}
+              {/* Interfaces */}
+              {Array.isArray(profileForm.connection.interfaces) && profileForm.connection.interfaces.length > 0 && (
+                <div className={`border-t ${borderDefault} pt-4 mt-4`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className={h3}>Interfaces ({(profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string }>).length})</h3>
+                    <SecondaryButton
+                      onClick={handleFlReprobe}
+                      disabled={flReprobing}
+                    >
+                      {flReprobing ? (
+                        <>
+                          <RefreshCw className={`${iconXs} animate-spin`} />
+                          Probing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className={iconXs} />
+                          Re-probe
+                        </>
+                      )}
+                    </SecondaryButton>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {(profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string }>).map((iface) => (
+                      <div key={iface.index} className="flex items-center justify-between py-1.5 px-2 rounded bg-[var(--bg-primary)]">
+                        <span className={textMedium}>{iface.name}</span>
+                        <span className={caption}>
+                          {iface.iface_type === 1 ? "CAN" : iface.iface_type === 2 ? "CAN FD" : iface.iface_type === 3 ? "RS-485" : "Unknown"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Device Configuration (Signals) */}
               <div className={`border-t ${borderDefault} pt-4 mt-4`}>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className={h3}>Interface Configuration</h3>
+                  <h3 className={h3}>Device Configuration</h3>
                   <SecondaryButton
                     onClick={loadFlSignals}
                     disabled={flLoading}

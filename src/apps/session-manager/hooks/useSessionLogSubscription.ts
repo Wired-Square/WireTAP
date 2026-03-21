@@ -136,7 +136,7 @@ export function useSessionLogSubscription(): void {
         // Determine mode based on device type (realtime = Live, timeline = Playback)
         let modeLabel = "";
         if (p.device_type) {
-          const realtimeDevices = ["gvret_tcp", "gvret_usb", "slcan", "socketcan", "gs_usb", "mqtt", "modbus_tcp"];
+          const realtimeDevices = ["gvret_tcp", "gvret_usb", "slcan", "socketcan", "gs_usb", "mqtt", "modbus_tcp", "serial", "framelink", "virtual"];
           const isRealtime = realtimeDevices.some((d) => p.device_type?.includes(d));
           modeLabel = isRealtime ? " (Live)" : " (Playback)";
         }

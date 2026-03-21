@@ -31,6 +31,8 @@ export interface ProfileTraits {
   canTransmit: boolean;
   platforms: Platform[];
   multiSource: boolean;
+  /** Whether this kind can have multiple device-level buses/interfaces */
+  hasDeviceBuses: boolean;
 }
 
 /** Validation result when combining interfaces */
@@ -57,6 +59,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: true,
     platforms: ["windows", "macos", "linux", "ios"],
     multiSource: true,
+    hasDeviceBuses: true,
   },
   gvret_usb: {
     temporalMode: "realtime",
@@ -64,6 +67,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: true,
     platforms: ["windows", "macos", "linux"], // No iOS (requires serial port)
     multiSource: true,
+    hasDeviceBuses: true,
   },
   serial: {
     temporalMode: "realtime",
@@ -71,6 +75,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: false,
     platforms: ["windows", "macos", "linux"], // No iOS (requires serial port)
     multiSource: true,
+    hasDeviceBuses: false,
   },
   slcan: {
     temporalMode: "realtime",
@@ -78,6 +83,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: true,
     platforms: ["windows", "macos", "linux"], // No iOS (requires serial port)
     multiSource: true,
+    hasDeviceBuses: false,
   },
   gs_usb: {
     temporalMode: "realtime",
@@ -85,6 +91,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: true,
     platforms: ["windows", "macos"], // Linux uses SocketCAN kernel driver, no iOS
     multiSource: true,
+    hasDeviceBuses: false,
   },
   socketcan: {
     temporalMode: "realtime",
@@ -92,6 +99,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: true,
     platforms: ["linux"], // Linux kernel only
     multiSource: true,
+    hasDeviceBuses: false,
   },
   mqtt: {
     temporalMode: "realtime",
@@ -99,6 +107,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
     multiSource: true,
+    hasDeviceBuses: false,
   },
   postgres: {
     temporalMode: "timeline",
@@ -106,6 +115,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
     multiSource: false,
+    hasDeviceBuses: false,
   },
   csv_file: {
     temporalMode: "timeline",
@@ -113,6 +123,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
     multiSource: false,
+    hasDeviceBuses: false,
   },
   modbus_tcp: {
     temporalMode: "realtime",
@@ -120,6 +131,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
     multiSource: true,
+    hasDeviceBuses: false,
   },
   framelink: {
     temporalMode: "realtime",
@@ -127,6 +139,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: true,
     platforms: ["windows", "macos", "linux", "ios"],
     multiSource: true,
+    hasDeviceBuses: true,
   },
   virtual: {
     temporalMode: "realtime",
@@ -134,6 +147,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     canTransmit: true,
     platforms: ["windows", "macos", "linux", "ios"],
     multiSource: true,
+    hasDeviceBuses: true,
   },
 };
 
@@ -184,12 +198,22 @@ export function getProfileTraits(profile: IOProfile): ProfileTraits | undefined 
     }
 
     case "framelink": {
-      // interface_type: 1=CAN, 2=CANFD, 3=RS-485
-      const ifaceType = c?.interface_type as number | undefined;
-      if (ifaceType === 3) {
-        traits.protocols = ["serial"];
-      } else if (ifaceType === 2) {
-        traits.protocols = ["can", "canfd"];
+      const interfaces = c?.interfaces as Array<{ index: number; iface_type: number }> | undefined;
+      if (interfaces && interfaces.length > 0) {
+        // Grouped profile — derive protocols from all interfaces
+        const protocols: Protocol[] = [];
+        const hasCan = interfaces.some((i) => i.iface_type === 1 || i.iface_type === 2);
+        const hasCanFd = interfaces.some((i) => i.iface_type === 2);
+        const hasSerial = interfaces.some((i) => i.iface_type === 3);
+        if (hasCan) protocols.push("can");
+        if (hasCanFd) protocols.push("canfd");
+        if (hasSerial) protocols.push("serial");
+        if (protocols.length > 0) traits.protocols = protocols;
+      } else {
+        // Legacy single-interface fallback
+        const ifaceType = c?.interface_type as number | undefined;
+        if (ifaceType === 3) traits.protocols = ["serial"];
+        else if (ifaceType === 2) traits.protocols = ["can", "canfd"];
       }
       break;
     }
@@ -290,6 +314,29 @@ export function canTransmit(profile: IOProfile): boolean {
   return traits?.canTransmit ?? false;
 }
 
+/**
+ * Check if a profile has multiple device-level buses/interfaces.
+ * Uses the static hasDeviceBuses trait plus dynamic config (interface count).
+ */
+export function isMultiBusProfile(profile: IOProfile): boolean {
+  if (!profile.kind) return false;
+  const base = PROFILE_TRAIT_REGISTRY[profile.kind];
+  if (!base?.hasDeviceBuses) return false;
+
+  switch (profile.kind) {
+    case "gvret_tcp":
+    case "gvret_usb":
+      return true; // Always multi-bus (hardware interfaces)
+    case "framelink":
+    case "virtual": {
+      const interfaces = profile.connection?.interfaces;
+      return Array.isArray(interfaces) && interfaces.length > 1;
+    }
+    default:
+      return false;
+  }
+}
+
 // ============================================================================
 // Multi-Source Validation
 // ============================================================================
@@ -386,8 +433,31 @@ export function validateProfileSelection(
  * so that `generateMultiSessionId` can determine the correct session ID prefix.
  */
 export function buildDefaultBusMappings(profile: IOProfile): BusMapping[] {
+  // Grouped FrameLink profile — one mapping per interface
+  if (profile.kind === "framelink" && Array.isArray(profile.connection?.interfaces)) {
+    const interfaces = profile.connection.interfaces as Array<{ index: number; iface_type: number; name: string }>;
+    return interfaces.map((iface, idx) => {
+      const isSerial = iface.iface_type === 3;
+      const isFd = iface.iface_type === 2;
+      return {
+        deviceBus: iface.index,
+        enabled: true,
+        outputBus: idx,
+        interfaceId: isSerial ? `serial${iface.index}` : `can${iface.index}`,
+        traits: {
+          temporal_mode: "realtime" as TemporalMode,
+          protocols: (isSerial ? ["serial"] : isFd ? ["can", "canfd"] : ["can"]) as Protocol[],
+          tx_frames: !isSerial,
+          tx_bytes: isSerial,
+          multi_source: true,
+        },
+      };
+    });
+  }
+
   const traits = getProfileTraits(profile);
   const protocol = traits?.protocols[0] ?? "can";
+  // Legacy single-interface FrameLink fallback
   const deviceBus = profile.kind === "framelink"
     ? (profile.connection?.interface_index as number ?? 0)
     : 0;

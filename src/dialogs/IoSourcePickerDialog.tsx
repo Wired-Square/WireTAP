@@ -14,7 +14,7 @@ import {
   roundedDefault,
 } from "../styles";
 import { getReaderProtocols, type IOProfile } from "../hooks/useSettings";
-import { buildDefaultBusMappings } from "../utils/profileTraits";
+import { buildDefaultBusMappings, isMultiBusProfile } from "../utils/profileTraits";
 import { useSessionStore } from "../stores/sessionStore";
 import { pickCsvFilesToOpen } from "../api/dialogs";
 import {
@@ -671,26 +671,38 @@ export default function IoSourcePickerDialog({
       const session = getSessionForProfile(profileId);
       const isStopped = session?.ioState === "stopped";
       const profile = readProfiles.find((p) => p.id === profileId);
-      const isMultiBus = profile?.kind === "gvret_tcp" || profile?.kind === "gvret_usb";
+      const isMultiBus = profile ? isMultiBusProfile(profile) : false;
 
       // Calculate output bus offset based on position in selection list
       const outputBusOffset = profileIndex;
+
+      // Helper: build profile-aware bus mappings with output bus offset
+      const buildProfileBusMappings = (busCount: number) => {
+        if (profile && isMultiBus) {
+          // Use profile-aware mappings (correct deviceBus + per-interface protocols)
+          return buildDefaultBusMappings(profile).map((m, i) => ({
+            ...m,
+            outputBus: outputBusOffset + i,
+          }));
+        }
+        return createDefaultBusMappings(busCount, outputBusOffset);
+      };
 
       if (isLive && !isStopped) {
         // Use default config for live session
         probedProfilesRef.current.add(profileId);
         setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, {
           success: true,
-          deviceType: isMultiBus ? "gvret" : "single",
+          deviceType: isMultiBus ? "multi" : "single",
           isMultiBus,
-          busCount: isMultiBus ? 5 : 1,
+          busCount: isMultiBus ? (profile ? buildDefaultBusMappings(profile).length : 5) : 1,
           primaryInfo: "Session active",
           secondaryInfo: null,
           supports_fd: null,
           error: null,
         }));
         if (isMultiBus) {
-          setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(5, outputBusOffset)));
+          setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, buildProfileBusMappings(5)));
         } else {
           setSingleBusOverrideMap((prev) => new Map(prev).set(profileId, outputBusOffset));
         }
@@ -705,7 +717,7 @@ export default function IoSourcePickerDialog({
         .then((result) => {
           setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, result));
           if (result.isMultiBus) {
-            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(result.busCount, outputBusOffset)));
+            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, buildProfileBusMappings(result.busCount)));
           } else {
             setSingleBusOverrideMap((prev) => new Map(prev).set(profileId, outputBusOffset));
           }
@@ -714,7 +726,7 @@ export default function IoSourcePickerDialog({
           console.error(`[IoSourcePickerDialog] Probe failed for ${profileId}:`, err);
           setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, {
             success: false,
-            deviceType: isMultiBus ? "gvret" : "unknown",
+            deviceType: isMultiBus ? "multi" : "unknown",
             isMultiBus,
             busCount: 0,
             primaryInfo: null,
@@ -722,9 +734,8 @@ export default function IoSourcePickerDialog({
             supports_fd: null,
             error: String(err),
           }));
-          // For multi-bus devices, fall back to default 5 buses
           if (isMultiBus) {
-            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, createDefaultBusMappings(5, outputBusOffset)));
+            setDeviceBusConfigMap((prev) => new Map(prev).set(profileId, buildProfileBusMappings(5)));
           }
         })
         .finally(() => {
@@ -1182,34 +1193,27 @@ export default function IoSourcePickerDialog({
     // Build combined bus mappings from both GVRET and single-bus devices
     const combinedBusMappings = new Map<string, BusMapping[]>();
 
-    // Add GVRET multi-bus device mappings
+    // Add multi-bus device mappings (GVRET, FrameLink, virtual, etc.)
     for (const [profileId, mappings] of deviceBusConfigMap.entries()) {
       combinedBusMappings.set(profileId, mappings);
     }
 
     // Convert single-bus device overrides to BusMapping format
     for (const [profileId, outputBus] of singleBusOverrideMap.entries()) {
-      // Look up profile to determine protocol from driver type
       const profile = readProfiles.find(p => p.id === profileId);
       const readerProtocols = profile ? getReaderProtocols(profile.kind, profile.connection) : ['can'];
       const protocol = readerProtocols[0] || 'can';
 
-      // FrameLink profiles use interface_index as device bus (each profile handles one interface)
-      const deviceBus = profile?.kind === "framelink"
-        ? (typeof profile.connection?.interface_index === "number" ? profile.connection.interface_index : 0)
-        : 0;
-      const txBytes = profile?.kind === "framelink" && protocol === "serial";
-
       combinedBusMappings.set(profileId, [{
-        deviceBus,
+        deviceBus: 0,
         enabled: true,
         outputBus,
-        interfaceId: `${protocol}${deviceBus}`,
+        interfaceId: `${protocol}0`,
         traits: {
           temporal_mode: 'realtime',
           protocols: (protocol === 'can' ? ['can', 'canfd'] : [protocol]) as Protocol[],
-          tx_frames: !txBytes,
-          tx_bytes: txBytes,
+          tx_frames: true,
+          tx_bytes: false,
           multi_source: true,
         },
       }]);
@@ -1479,7 +1483,7 @@ export default function IoSourcePickerDialog({
 
               const probeResult = deviceProbeResultMap.get(profileId) || null;
               const isLoading = deviceProbeLoadingMap.get(profileId) || false;
-              const isGvret = profile.kind === "gvret_tcp" || profile.kind === "gvret_usb";
+              const isDeviceMultiBus = isMultiBusProfile(profile);
               // Check if config is locked for this profile (in use by 2+ sessions)
               const usageInfo = profileUsage.get(profileId);
               const configLocked = usageInfo?.configLocked ?? false;
@@ -1502,12 +1506,15 @@ export default function IoSourcePickerDialog({
               }
 
               // Multi-bus devices - show DeviceBusConfig
-              if (isGvret || probeResult?.isMultiBus) {
+              if (isDeviceMultiBus || probeResult?.isMultiBus) {
                 let busConfig = deviceBusConfigMap.get(profileId);
                 if (!busConfig && probeResult) {
                   const profileIndex = checkedSourceIds.indexOf(profileId);
                   const offset = profileIndex >= 0 ? profileIndex : 0;
-                  busConfig = createDefaultBusMappings(probeResult.busCount || 5, offset);
+                  // Use profile-aware mappings for devices with interfaces[]
+                  busConfig = isDeviceMultiBus
+                    ? buildDefaultBusMappings(profile).map((m, i) => ({ ...m, outputBus: offset + i }))
+                    : createDefaultBusMappings(probeResult.busCount || 5, offset);
                 }
                 busConfig = busConfig || [];
 
