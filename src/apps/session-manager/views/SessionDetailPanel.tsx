@@ -647,10 +647,10 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
       signal_generator: bs.enabled,
       frame_rate_hz: bs.frame_rate_hz,
     }));
-    const updated: IOProfile = {
+    const updated = {
       ...profile,
       connection: { ...profile.connection, interfaces },
-    };
+    } as IOProfile;
     updateProfile(profile.id, updated);
     setDirty(false);
     tlog.debug(`[session-manager] Saved signal generator settings to profile ${profile.id}`);

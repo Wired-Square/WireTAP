@@ -292,8 +292,9 @@ const renderConnectionSummary = (profile: IOProfile) => {
     );
   }
 
-  // Fallback (should be rare)
-  const raw = JSON.stringify(profile.connection ?? {}, null, 0);
+  // Fallback (should be rare — all known kinds handled above)
+  const _exhaustive: never = profile;
+  const raw = JSON.stringify((_exhaustive as IOProfile).connection ?? {}, null, 0);
   return (
     <div className="text-xs font-mono break-all" style={{ color: 'var(--text-secondary)' }}>
       {raw.length > 120 ? raw.slice(0, 120) + "…" : raw}

@@ -109,9 +109,9 @@ export default function SourceList({
 
   // Get bus number from profile connection config
   const getBusNumber = (profile: IOProfile): number | undefined => {
-    const busOverride = profile.connection?.bus_override;
+    const busOverride = (profile.connection as Record<string, unknown>)?.bus_override;
     if (busOverride !== undefined && busOverride !== null && busOverride !== "") {
-      return typeof busOverride === "number" ? busOverride : parseInt(busOverride, 10);
+      return typeof busOverride === "number" ? busOverride : parseInt(String(busOverride), 10);
     }
     return undefined;
   };

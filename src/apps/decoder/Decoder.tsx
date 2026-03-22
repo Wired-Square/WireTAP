@@ -838,7 +838,7 @@ export default function Decoder() {
       // Set default speed from the default read profile if it has one
       if (settings.default_read_profile && settings.io_profiles) {
         const profile = settings.io_profiles.find((p) => p.id === settings.default_read_profile);
-        if (profile?.connection?.default_speed) {
+        if (profile && (profile.kind === "postgres" || profile.kind === "csv_file") && profile.connection?.default_speed) {
           const defaultSpeed = parseFloat(profile.connection.default_speed) as PlaybackSpeed;
           setPlaybackSpeed(defaultSpeed);
         }

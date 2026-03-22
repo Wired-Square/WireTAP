@@ -5,7 +5,7 @@
 //
 // This is the single source of truth for all profile capabilities.
 
-import type { IOProfile, GvretInterfaceConfig } from "../hooks/useSettings";
+import type { IOProfile } from "../hooks/useSettings";
 import type { BusMapping } from "../api/io";
 
 // ============================================================================
@@ -176,21 +176,24 @@ export function getProfileTraits(profile: IOProfile): ProfileTraits | undefined 
   const base = PROFILE_TRAIT_REGISTRY[profile.kind];
   if (!base) return undefined;
   const traits = { ...base };
-  const c = profile.connection;
 
   switch (profile.kind) {
     case "virtual":
       return getVirtualProfileTraits(profile);
 
     case "slcan":
+      if (profile.connection?.enable_fd) traits.protocols = ["can", "canfd"];
+      break;
     case "gs_usb":
+      if (profile.connection?.enable_fd) traits.protocols = ["can", "canfd"];
+      break;
     case "socketcan":
-      if (c?.enable_fd) traits.protocols = ["can", "canfd"];
+      if (profile.connection?.enable_fd) traits.protocols = ["can", "canfd"];
       break;
 
     case "gvret_tcp":
     case "gvret_usb": {
-      const ifaces = c?.interfaces as GvretInterfaceConfig[] | undefined;
+      const ifaces = profile.connection?.interfaces;
       if (ifaces?.some((i) => i.protocol === "canfd")) {
         traits.protocols = ["can", "canfd"];
       }
@@ -198,7 +201,7 @@ export function getProfileTraits(profile: IOProfile): ProfileTraits | undefined 
     }
 
     case "framelink": {
-      const interfaces = c?.interfaces as Array<{ index: number; iface_type: number }> | undefined;
+      const interfaces = profile.connection?.interfaces;
       if (interfaces && interfaces.length > 0) {
         // Grouped profile — derive protocols from all interfaces
         const protocols: Protocol[] = [];
@@ -211,7 +214,7 @@ export function getProfileTraits(profile: IOProfile): ProfileTraits | undefined 
         if (protocols.length > 0) traits.protocols = protocols;
       } else {
         // Legacy single-interface fallback
-        const ifaceType = c?.interface_type as number | undefined;
+        const ifaceType = profile.connection?.interface_type;
         if (ifaceType === 3) traits.protocols = ["serial"];
         else if (ifaceType === 2) traits.protocols = ["can", "canfd"];
       }
@@ -219,7 +222,7 @@ export function getProfileTraits(profile: IOProfile): ProfileTraits | undefined 
     }
 
     case "postgres":
-      switch (c?.source_type) {
+      switch (profile.connection?.source_type) {
         case "modbus_frame":
           traits.protocols = ["modbus"];
           break;
@@ -238,9 +241,9 @@ export function getProfileTraits(profile: IOProfile): ProfileTraits | undefined 
  * Derive virtual adapter traits from profile connection config.
  * The traffic_type determines which protocols the virtual device uses.
  */
-function getVirtualProfileTraits(profile: IOProfile): ProfileTraits {
+function getVirtualProfileTraits(profile: Extract<IOProfile, { kind: "virtual" }>): ProfileTraits {
   const base = { ...PROFILE_TRAIT_REGISTRY.virtual };
-  switch (profile.connection?.traffic_type as string | undefined) {
+  switch (profile.connection?.traffic_type) {
     case "canfd":
       base.protocols = ["can", "canfd"];
       break;
@@ -327,7 +330,10 @@ export function isMultiBusProfile(profile: IOProfile): boolean {
     case "gvret_tcp":
     case "gvret_usb":
       return true; // Always multi-bus (hardware interfaces)
-    case "framelink":
+    case "framelink": {
+      const interfaces = profile.connection?.interfaces;
+      return Array.isArray(interfaces) && interfaces.length > 1;
+    }
     case "virtual": {
       const interfaces = profile.connection?.interfaces;
       return Array.isArray(interfaces) && interfaces.length > 1;
@@ -435,7 +441,7 @@ export function validateProfileSelection(
 export function buildDefaultBusMappings(profile: IOProfile): BusMapping[] {
   // Grouped FrameLink profile — one mapping per interface
   if (profile.kind === "framelink" && Array.isArray(profile.connection?.interfaces)) {
-    const interfaces = profile.connection.interfaces as Array<{ index: number; iface_type: number; name: string }>;
+    const interfaces = profile.connection.interfaces;
     return interfaces.map((iface, idx) => {
       const isSerial = iface.iface_type === 3;
       const isFd = iface.iface_type === 2;
@@ -459,7 +465,7 @@ export function buildDefaultBusMappings(profile: IOProfile): BusMapping[] {
   const protocol = traits?.protocols[0] ?? "can";
   // Legacy single-interface FrameLink fallback
   const deviceBus = profile.kind === "framelink"
-    ? (profile.connection?.interface_index as number ?? 0)
+    ? (profile.connection?.interface_index ?? 0)
     : 0;
   const txBytes = profile.kind === "framelink" && protocol === "serial";
   return [{
