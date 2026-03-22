@@ -25,6 +25,7 @@ export interface SignalDefDescriptor {
 export interface FrameDefDescriptor {
   frame_def_id: number;
   name: string;
+  description: string | null;
   interface_type: number;
   interface_type_name: string;
   can_id: number | null;
@@ -61,6 +62,8 @@ export interface SignalMappingDescriptor {
 
 export interface TransformerDescriptor {
   transformer_id: number;
+  name: string;
+  description: string | null;
   source_frame_def_id: number;
   source_frame_def_name: string;
   source_interface: number;
@@ -75,6 +78,8 @@ export interface TransformerDescriptor {
 
 export interface GeneratorDescriptor {
   generator_id: number;
+  name: string;
+  description: string | null;
   frame_def_id: number;
   frame_def_name: string;
   interface_index: number;
@@ -434,5 +439,39 @@ export function framelinkSignalsSelectable(
   deviceId: string,
 ): Promise<SelectableSignal[]> {
   return wsTransport.command("framelink.signals.selectable", { device_id: deviceId });
+}
+
+// ============================================================================
+// Label operations
+// ============================================================================
+
+export type LabelEntityType = "frame_def" | "generator" | "transformer";
+
+export function framelinkLabelSet(
+  deviceId: string,
+  entityType: LabelEntityType,
+  id: number,
+  name: string | null,
+  description: string | null,
+): Promise<void> {
+  return wsTransport.command("framelink.label.set", {
+    device_id: deviceId,
+    entity_type: entityType,
+    id,
+    name,
+    description,
+  });
+}
+
+export function framelinkLabelRemove(
+  deviceId: string,
+  entityType: LabelEntityType,
+  id: number,
+): Promise<void> {
+  return wsTransport.command("framelink.label.remove", {
+    device_id: deviceId,
+    entity_type: entityType,
+    id,
+  });
 }
 

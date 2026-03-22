@@ -26,7 +26,7 @@ interface MappingRow {
 interface TransformerDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (transformer: Record<string, unknown>) => void;
+  onSubmit: (transformer: Record<string, unknown> & { name?: string; description?: string }) => void;
   interfaces: { index: number; iface_type: number; name: string }[];
   frameDefs: FrameDefDescriptor[];
   usedIds: Set<number>;
@@ -44,9 +44,15 @@ export default function TransformerDialog({
 
   const [transformerId, setTransformerId] = useState(() => nextAvailableId(usedIds));
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
-    if (isOpen) setTransformerId(nextAvailableId(usedIds));
+    if (isOpen) {
+      setTransformerId(nextAvailableId(usedIds));
+      setName("");
+      setDescription("");
+    }
   }, [isOpen, usedIds]);
   const [sourceFrameDefId, setSourceFrameDefId] = useState(
     frameDefs[0]?.frame_def_id ?? 0,
@@ -107,6 +113,8 @@ export default function TransformerDialog({
         ...(m.transform_type === "scale" ? { scale: m.scale, offset: m.offset } : {}),
         ...(m.transform_type === "mask" ? { mask: m.mask } : {}),
       })),
+      name: name || undefined,
+      description: description || undefined,
     });
     onClose();
   };
@@ -121,6 +129,27 @@ export default function TransformerDialog({
         {validationError && (
           <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
         )}
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className={labelDefault}>Name</label>
+            <input
+              className={inputSimple}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+          <div>
+            <label className={labelDefault}>Description</label>
+            <input
+              className={inputSimple}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>

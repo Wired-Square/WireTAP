@@ -18,6 +18,8 @@ interface FrameDefDialogProps {
     interfaceType: number;
     header: FrameHeader;
     payloadBytes: number;
+    name?: string;
+    description?: string;
   }) => void;
   interfaces: { index: number; iface_type: number; name: string }[];
   usedIds: Set<number>;
@@ -32,10 +34,16 @@ export default function FrameDefDialog({
 }: FrameDefDialogProps) {
   const [frameDefId, setFrameDefId] = useState(() => nextAvailableId(usedIds));
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
 
-  // Re-compute next available ID when dialog opens
+  // Re-compute next available ID and reset fields when dialog opens
   useEffect(() => {
-    if (isOpen) setFrameDefId(nextAvailableId(usedIds));
+    if (isOpen) {
+      setFrameDefId(nextAvailableId(usedIds));
+      setName("");
+      setDescription("");
+    }
   }, [isOpen, usedIds]);
   const [interfaceType, setInterfaceType] = useState(
     interfaces[0]?.iface_type ?? 1,
@@ -64,6 +72,8 @@ export default function FrameDefDialog({
       interfaceType,
       header,
       payloadBytes: isCan ? dlc : payloadLength,
+      name: name || undefined,
+      description: description || undefined,
     });
     onClose();
   };
@@ -80,6 +90,27 @@ export default function FrameDefDialog({
         {validationError && (
           <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
         )}
+
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className={labelDefault}>Name</label>
+            <input
+              className={inputSimple}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+          <div>
+            <label className={labelDefault}>Description</label>
+            <input
+              className={inputSimple}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Optional"
+            />
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>

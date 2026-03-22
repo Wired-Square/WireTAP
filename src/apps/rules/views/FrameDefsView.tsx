@@ -5,17 +5,18 @@ import { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textSecondary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { FrameDefDescriptor, SignalDefDescriptor } from "../../../api/framelinkRules";
+import { InlineEdit } from "../components/InlineEdit";
 import FrameDefDialog from "../dialogs/FrameDefDialog";
 import FrameDefEditor from "./FrameDefEditor";
 import type { FrameHeader, FrameDefPayload } from "../utils/bitGrid";
 import { formatHexId } from "../utils/formatHex";
 
 export default function FrameDefsView() {
-  const { frameDefs, loading, temporaryRules, device, removeFrameDef, addFrameDef } =
+  const { frameDefs, loading, temporaryRules, device, removeFrameDef, addFrameDef, setLabel } =
     useRulesStore(
       useShallow((s) => ({
         frameDefs: s.frameDefs,
@@ -24,6 +25,7 @@ export default function FrameDefsView() {
         device: s.device,
         removeFrameDef: s.removeFrameDef,
         addFrameDef: s.addFrameDef,
+        setLabel: s.setLabel,
       })),
     );
 
@@ -35,6 +37,8 @@ export default function FrameDefsView() {
     payloadBytes: number;
     signals: SignalDefDescriptor[];
     isNew: boolean;
+    pendingName?: string;
+    pendingDescription?: string;
   } | null>(null);
 
   const usedIds = useMemo(() => new Set(frameDefs.map((fd) => fd.frame_def_id)), [frameDefs]);
@@ -45,11 +49,15 @@ export default function FrameDefsView() {
       interfaceType: number;
       header: FrameHeader;
       payloadBytes: number;
+      name?: string;
+      description?: string;
     }) => {
       setEditingFrameDef({
         ...headerInfo,
         signals: [],
         isNew: true,
+        pendingName: headerInfo.name,
+        pendingDescription: headerInfo.description,
       });
       setDialogOpen(false);
     },
@@ -82,9 +90,14 @@ export default function FrameDefsView() {
         await removeFrameDef(payload.frame_def_id);
       }
       await addFrameDef(payload as unknown as Record<string, unknown>);
+      // Apply pending label from the creation dialog
+      const pending = editingFrameDef;
+      if (pending && (pending.pendingName || pending.pendingDescription)) {
+        await setLabel("frame_def", payload.frame_def_id, pending.pendingName || null, pending.pendingDescription || null);
+      }
       setEditingFrameDef(null);
     },
-    [addFrameDef, removeFrameDef],
+    [addFrameDef, removeFrameDef, editingFrameDef, setLabel],
   );
 
   if (editingFrameDef) {
@@ -140,8 +153,13 @@ export default function FrameDefsView() {
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium ${textPrimary}`}>
-                  {fd.name}
+                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+                <span onClick={(e) => e.stopPropagation()}>
+                  <InlineEdit
+                    value={fd.name}
+                    variant="primary"
+                    onCommit={(newName) => setLabel("frame_def", fd.frame_def_id, newName || null, null)}
+                  />
                 </span>
                 <span className={`text-xs font-mono ${textTertiary}`}>
                   #{formatHexId(fd.frame_def_id)}
@@ -167,6 +185,15 @@ export default function FrameDefsView() {
                   {` | ${fd.signals.length} signal${fd.signals.length !== 1 ? "s" : ""}`}
                 </div>
               )}
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+              <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                <InlineEdit
+                  value={fd.description ?? ""}
+                  placeholder="Add description"
+                  variant="secondary"
+                  onCommit={(newDesc) => setLabel("frame_def", fd.frame_def_id, null, newDesc || null)}
+                />
+              </div>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); removeFrameDef(fd.frame_def_id); }}

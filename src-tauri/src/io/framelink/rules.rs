@@ -4,7 +4,7 @@
 // FrameLink rule operations dispatched via WS commands.
 // All operations route through the shared connection pool (one TCP connection per device).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -22,7 +22,7 @@ use framelink::board::{
     INDICATOR_XFORM_ID_BASE,
 };
 use framelink::board::display::{resolve_frame_def_display, resolve_iface_display, resolve_signal_name};
-use framelink::board::editable::EditableSignal;
+use framelink::board::editable::{ActiveRuleIds, EditableBoardDef, EditableSignal};
 
 use super::shared;
 
@@ -34,6 +34,7 @@ use super::shared;
 pub struct FrameDefDescriptor {
     pub frame_def_id: u16,
     pub name: String,
+    pub description: Option<String>,
     pub interface_type: u8,
     pub interface_type_name: String,
     pub can_id: Option<u32>,
@@ -76,6 +77,8 @@ pub struct BridgeFilterDescriptor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransformerDescriptor {
     pub transformer_id: u16,
+    pub name: String,
+    pub description: Option<String>,
     pub source_frame_def_id: u16,
     pub source_frame_def_name: String,
     pub source_interface: u8,
@@ -101,6 +104,8 @@ pub struct SignalMappingDescriptor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeneratorDescriptor {
     pub generator_id: u16,
+    pub name: String,
+    pub description: Option<String>,
     pub frame_def_id: u16,
     pub frame_def_name: String,
     pub interface_index: u8,
@@ -116,7 +121,34 @@ pub struct GeneratorDescriptor {
 // Conversion helpers
 // ============================================================================
 
-fn frame_def_to_descriptor(info: &FrameDefInfo, board_def: Option<&BoardDef>) -> FrameDefDescriptor {
+/// Resolve a frame def signal's display name.
+/// Checks EditableBoardDef first (has user-edited names), then falls back to BoardDef.
+fn resolve_signal_from_editable(
+    sig: &framelink::protocol::frame_def::FrameSignalDef,
+    frame_def_id: u16,
+    editable: Option<&EditableBoardDef>,
+    board_def: Option<&BoardDef>,
+) -> String {
+    if let Some(ed) = editable {
+        if let Some(fd) = ed.frame_defs.get(&frame_def_id) {
+            let slug = format!("0x{:04X}", sig.signal_id);
+            if let Some(es) = fd.signals.iter().find(|s| s.slug == slug) {
+                return es.name.clone();
+            }
+            // Fall back to position match for signals without matching slug
+            if let Some(es) = fd.signals.iter().find(|s| s.start_bit == sig.start_bit && s.bit_length == sig.bit_length) {
+                return es.name.clone();
+            }
+        }
+    }
+    resolve_signal_name(sig.signal_id, frame_def_id, sig.start_bit, sig.bit_length, board_def)
+}
+
+fn frame_def_to_descriptor(
+    info: &FrameDefInfo,
+    board_def: Option<&BoardDef>,
+    editable: Option<&EditableBoardDef>,
+) -> FrameDefDescriptor {
     let (can_id, dlc, extended) = match &info.header {
         framelink::protocol::frame_def::FrameHeader::Can { can_id, dlc, flags } => {
             (Some(*can_id), Some(*dlc), Some((*flags & 1) != 0))
@@ -124,9 +156,19 @@ fn frame_def_to_descriptor(info: &FrameDefInfo, board_def: Option<&BoardDef>) ->
         framelink::protocol::frame_def::FrameHeader::Rs485 { .. } => (None, None, None),
     };
 
+    let (name, description) = if let Some(ed) = editable {
+        (
+            ed.resolve_frame_def_name(info.frame_def_id),
+            ed.resolve_frame_def_description(info.frame_def_id),
+        )
+    } else {
+        (resolve_frame_def_display(info.frame_def_id, board_def), None)
+    };
+
     FrameDefDescriptor {
         frame_def_id: info.frame_def_id,
-        name: resolve_frame_def_display(info.frame_def_id, board_def),
+        name,
+        description,
         interface_type: info.interface_type,
         interface_type_name: interface_name(info.interface_type).to_string(),
         can_id,
@@ -137,12 +179,8 @@ fn frame_def_to_descriptor(info: &FrameDefInfo, board_def: Option<&BoardDef>) ->
             .iter()
             .map(|s| SignalDefDescriptor {
                 signal_id: s.signal_id,
-                name: resolve_signal_name(
-                    s.signal_id,
-                    info.frame_def_id,
-                    s.start_bit,
-                    s.bit_length,
-                    board_def,
+                name: resolve_signal_from_editable(
+                    s, info.frame_def_id, editable, board_def,
                 ),
                 start_bit: s.start_bit,
                 bit_length: s.bit_length,
@@ -195,15 +233,37 @@ fn mapping_to_descriptor(m: &SignalMapping) -> SignalMappingDescriptor {
     }
 }
 
-fn xform_to_descriptor(info: &TransformerInfo, board_def: Option<&BoardDef>) -> TransformerDescriptor {
+fn xform_to_descriptor(
+    info: &TransformerInfo,
+    board_def: Option<&BoardDef>,
+    editable: Option<&EditableBoardDef>,
+) -> TransformerDescriptor {
+    let (src_name, dst_name) = if let Some(ed) = editable {
+        (
+            ed.resolve_frame_def_name(info.source_frame_def_id),
+            ed.resolve_frame_def_name(info.dest_frame_def_id),
+        )
+    } else {
+        (
+            resolve_frame_def_display(info.source_frame_def_id, board_def),
+            resolve_frame_def_display(info.dest_frame_def_id, board_def),
+        )
+    };
+    let name = editable
+        .map(|ed| ed.resolve_transformer_name(info.transformer_id))
+        .unwrap_or_else(|| format!("Transformer 0x{:04X}", info.transformer_id));
+    let description = editable.and_then(|ed| ed.resolve_transformer_description(info.transformer_id));
+
     TransformerDescriptor {
         transformer_id: info.transformer_id,
+        name,
+        description,
         source_frame_def_id: info.source_frame_def_id,
-        source_frame_def_name: resolve_frame_def_display(info.source_frame_def_id, board_def),
+        source_frame_def_name: src_name,
         source_interface: info.source_interface,
         source_interface_name: resolve_iface_display(info.source_interface, board_def, None),
         dest_frame_def_id: info.dest_frame_def_id,
-        dest_frame_def_name: resolve_frame_def_display(info.dest_frame_def_id, board_def),
+        dest_frame_def_name: dst_name,
         dest_interface: info.dest_interface,
         dest_interface_name: resolve_iface_display(info.dest_interface, board_def, None),
         enabled: info.enabled,
@@ -211,15 +271,31 @@ fn xform_to_descriptor(info: &TransformerInfo, board_def: Option<&BoardDef>) -> 
     }
 }
 
-fn gen_to_descriptor(info: &GeneratorInfo, board_def: Option<&BoardDef>) -> GeneratorDescriptor {
+fn gen_to_descriptor(
+    info: &GeneratorInfo,
+    board_def: Option<&BoardDef>,
+    editable: Option<&EditableBoardDef>,
+) -> GeneratorDescriptor {
     let trigger_type_name = generator::trigger_type_name(info.trigger_type)
         .to_lowercase()
         .replace(' ', "_");
 
+    let frame_def_name = if let Some(ed) = editable {
+        ed.resolve_frame_def_name(info.frame_def_id)
+    } else {
+        resolve_frame_def_display(info.frame_def_id, board_def)
+    };
+    let name = editable
+        .map(|ed| ed.resolve_generator_name(info.generator_id))
+        .unwrap_or_else(|| format!("Generator 0x{:04X}", info.generator_id));
+    let description = editable.and_then(|ed| ed.resolve_generator_description(info.generator_id));
+
     GeneratorDescriptor {
         generator_id: info.generator_id,
+        name,
+        description,
         frame_def_id: info.frame_def_id,
-        frame_def_name: resolve_frame_def_display(info.frame_def_id, board_def),
+        frame_def_name,
         interface_index: info.interface_index,
         interface_name: resolve_iface_display(info.interface_index, board_def, None),
         period_ms: info.period_ms,
@@ -454,6 +530,10 @@ pub async fn dispatch_framelink_command(
         // Palettes (from board definition)
         "framelink.palettes.list" => cmd_palettes_list(params).await,
 
+        // Labels (pending name/description edits)
+        "framelink.label.set" => cmd_label_set(params).await,
+        "framelink.label.remove" => cmd_label_remove(params).await,
+
         // Selectable signals
         "framelink.signals.selectable" => cmd_signals_selectable(params).await,
 
@@ -485,6 +565,7 @@ async fn cmd_frame_def_list(params: Value) -> Result<Value, String> {
     let (host, port) = get_host_port(&params).await?;
     let timeout = get_timeout(&params);
     let board_def = shared::load_board_def(&host, port).await;
+    let editable = shared::clone_editable_board_def(&host, port).await;
     let payload = frame_def::build_frame_def_list();
     let frames =
         shared::request_multi(&host, port, MSG_FRAME_DEF_LIST, FLAG_ACK_REQ, &payload, timeout)
@@ -493,7 +574,7 @@ async fn cmd_frame_def_list(params: Value) -> Result<Value, String> {
     let descriptors: Vec<FrameDefDescriptor> = frames
         .iter()
         .filter_map(|f| frame_def::parse_frame_def_resp(&f.payload).ok())
-        .map(|info| frame_def_to_descriptor(&info, board_def.as_ref()))
+        .map(|info| frame_def_to_descriptor(&info, board_def.as_ref(), editable.as_ref()))
         .collect();
 
     serde_json::to_value(&descriptors).map_err(|e| e.to_string())
@@ -507,8 +588,50 @@ async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
     let payload = frame_def::build_frame_def_add(&info);
     shared::request(&host, port, MSG_FRAME_DEF_ADD, FLAG_ACK_REQ, &payload, timeout).await?;
 
-    // Upload the board definition so any pending editable changes are pushed
-    let _ = shared::upload_board_def(&host, port, timeout).await;
+    // Sync signal display names from the UI into the EditableBoardDef.
+    // The protocol doesn't carry signal names — they're TOML-only metadata.
+    let signal_names: Vec<(u16, String)> = fd["signals"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|s| {
+                    let id = s["signal_id"].as_u64()? as u16;
+                    let name = s["name"].as_str()?.to_string();
+                    Some((id, name))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if !signal_names.is_empty() {
+        use framelink::board::editable::EditableFrameSignal;
+
+        let frame_def_id = info.frame_def_id;
+        let signals_from_ui: Vec<EditableFrameSignal> = info.signals.iter().zip(signal_names.iter())
+            .map(|(proto_sig, (_sig_id, name))| {
+                let byte_order = if proto_sig.byte_order == 0 { "le" } else { "be" };
+                let value_type = if proto_sig.value_type == 0 { "unsigned" } else { "signed" };
+                EditableFrameSignal {
+                    slug: format!("0x{:04X}", proto_sig.signal_id),
+                    name: name.clone(),
+                    start_bit: proto_sig.start_bit,
+                    bit_length: proto_sig.bit_length,
+                    byte_order: byte_order.to_string(),
+                    value_type: value_type.to_string(),
+                    scale: proto_sig.scale,
+                    offset: proto_sig.offset,
+                    unit: String::new(),
+                }
+            })
+            .collect();
+
+        let _ = shared::with_editable_board_def(&host, port, timeout, |ed| {
+            if let Some(fd_entry) = ed.frame_defs.get_mut(&frame_def_id) {
+                fd_entry.signals = signals_from_ui;
+            }
+        })
+        .await;
+    }
 
     Ok(Value::Null)
 }
@@ -598,6 +721,7 @@ async fn cmd_xform_list(params: Value) -> Result<Value, String> {
     let (host, port) = get_host_port(&params).await?;
     let timeout = get_timeout(&params);
     let board_def = shared::load_board_def(&host, port).await;
+    let editable = shared::clone_editable_board_def(&host, port).await;
     let payload = xform::build_xform_list();
     let frames =
         shared::request_multi(&host, port, MSG_XFORM_LIST, FLAG_ACK_REQ, &payload, timeout)
@@ -606,7 +730,7 @@ async fn cmd_xform_list(params: Value) -> Result<Value, String> {
     let descriptors: Vec<TransformerDescriptor> = frames
         .iter()
         .filter_map(|f| xform::parse_xform_resp(&f.payload).ok())
-        .map(|info| xform_to_descriptor(&info, board_def.as_ref()))
+        .map(|info| xform_to_descriptor(&info, board_def.as_ref(), editable.as_ref()))
         .collect();
 
     serde_json::to_value(&descriptors).map_err(|e| e.to_string())
@@ -661,6 +785,7 @@ async fn cmd_gen_list(params: Value) -> Result<Value, String> {
     let (host, port) = get_host_port(&params).await?;
     let timeout = get_timeout(&params);
     let board_def = shared::load_board_def(&host, port).await;
+    let editable = shared::clone_editable_board_def(&host, port).await;
     let payload = generator::build_gen_list();
     let frames =
         shared::request_multi(&host, port, MSG_GEN_LIST, FLAG_ACK_REQ, &payload, timeout).await?;
@@ -668,7 +793,7 @@ async fn cmd_gen_list(params: Value) -> Result<Value, String> {
     let descriptors: Vec<GeneratorDescriptor> = frames
         .iter()
         .filter_map(|f| generator::parse_gen_resp(&f.payload).ok())
-        .map(|info| gen_to_descriptor(&info, board_def.as_ref()))
+        .map(|info| gen_to_descriptor(&info, board_def.as_ref(), editable.as_ref()))
         .collect();
 
     serde_json::to_value(&descriptors).map_err(|e| e.to_string())
@@ -722,9 +847,85 @@ async fn cmd_gen_enable(params: Value) -> Result<Value, String> {
 async fn cmd_persist_save(params: Value) -> Result<Value, String> {
     let (host, port) = get_host_port(&params).await?;
     let timeout = get_timeout(&params);
+
+    // Step 1: Send MSG_PERSIST_SAVE — if this fails, stop immediately
     let payload = persist::build_persist_save();
     shared::request(&host, port, MSG_PERSIST_SAVE, FLAG_ACK_REQ, &payload, timeout).await?;
+
+    // Step 2: Collect active rule IDs from the device
+    let active = collect_active_rule_ids(&host, port, timeout).await?;
+
+    // Step 3: Build merged TOML from a cloned EditableBoardDef
+    let merged_toml = {
+        let editable = shared::clone_editable_board_def(&host, port).await;
+        match editable {
+            Some(mut ed) => {
+                ed.merge_pending(&active);
+                Some(ed.to_toml())
+            }
+            None => None,
+        }
+    };
+
+    // Step 4: Upload merged TOML to device
+    if let Some(ref toml_str) = merged_toml {
+        let conn = shared::get_connection(&host, port, timeout).await?;
+        framelink::board::transfer::upload_board_def(&conn.session, toml_str).await?;
+    }
+
+    // Step 5: Merge pending on the real EditableBoardDef (clearing pending state)
+    let _ = shared::with_editable_board_def(&host, port, timeout, |ed| {
+        ed.merge_pending(&active);
+    })
+    .await;
+
     Ok(Value::Null)
+}
+
+/// Collect the IDs of all active rules from the device for merge_pending.
+async fn collect_active_rule_ids(
+    host: &str,
+    port: u16,
+    timeout: f64,
+) -> Result<ActiveRuleIds, String> {
+    // Frame defs
+    let fd_payload = frame_def::build_frame_def_list();
+    let fd_frames =
+        shared::request_multi(host, port, MSG_FRAME_DEF_LIST, FLAG_ACK_REQ, &fd_payload, timeout)
+            .await?;
+    let frame_defs: HashSet<u16> = fd_frames
+        .iter()
+        .filter_map(|f| frame_def::parse_frame_def_resp(&f.payload).ok())
+        .map(|info| info.frame_def_id)
+        .collect();
+
+    // Generators
+    let gen_payload = generator::build_gen_list();
+    let gen_frames =
+        shared::request_multi(host, port, MSG_GEN_LIST, FLAG_ACK_REQ, &gen_payload, timeout)
+            .await?;
+    let generators: HashSet<u16> = gen_frames
+        .iter()
+        .filter_map(|f| generator::parse_gen_resp(&f.payload).ok())
+        .map(|info| info.generator_id)
+        .collect();
+
+    // Transformers
+    let xform_payload = xform::build_xform_list();
+    let xform_frames =
+        shared::request_multi(host, port, MSG_XFORM_LIST, FLAG_ACK_REQ, &xform_payload, timeout)
+            .await?;
+    let transformers: HashSet<u16> = xform_frames
+        .iter()
+        .filter_map(|f| xform::parse_xform_resp(&f.payload).ok())
+        .map(|info| info.transformer_id)
+        .collect();
+
+    Ok(ActiveRuleIds {
+        frame_defs,
+        generators,
+        transformers,
+    })
 }
 
 async fn cmd_persist_load(params: Value) -> Result<Value, String> {
@@ -799,6 +1000,7 @@ async fn cmd_user_signal_add(params: Value) -> Result<Value, String> {
             unit,
             format: format_str,
             enum_values,
+            description: String::new(),
         });
         board_def.dirty = true;
     })
@@ -851,16 +1053,38 @@ struct DeviceSignalDescriptor {
     flags: u8,
 }
 
+/// Fetch the complete device signal list, handling chunked responses.
+pub(crate) async fn fetch_all_device_signals(
+    host: &str,
+    port: u16,
+    timeout: f64,
+) -> Result<Vec<dsig::SignalInfo>, String> {
+    let mut all_signals = Vec::new();
+    let mut offset: u16 = 0;
+
+    loop {
+        let frame = shared::request(
+            host, port, MSG_DSIG_LIST, FLAG_ACK_REQ,
+            &dsig::build_list_request(offset), timeout,
+        )
+        .await?;
+        let chunk = dsig::parse_list_response(&frame.payload)
+            .map_err(|e| format!("Failed to parse signal list: {e}"))?;
+        let complete = chunk.is_complete();
+        offset = chunk.next_offset();
+        all_signals.extend(chunk.signals);
+        if complete {
+            break;
+        }
+    }
+
+    Ok(all_signals)
+}
+
 async fn cmd_dsig_list(params: Value) -> Result<Value, String> {
     let (host, port) = get_host_port(&params).await?;
     let timeout = get_timeout(&params);
-    let payload = dsig::build_list_request();
-    let frame = shared::request(
-        &host, port, MSG_DSIG_LIST, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
-    let signals = dsig::parse_list_response(&frame.payload)
-        .map_err(|e| format!("Failed to parse signal list: {e}"))?;
+    let signals = fetch_all_device_signals(&host, port, timeout).await?;
     let descriptors: Vec<DeviceSignalDescriptor> = signals
         .iter()
         .map(|s| DeviceSignalDescriptor {
@@ -920,13 +1144,7 @@ async fn cmd_indicators_list(params: Value) -> Result<Value, String> {
     let timeout = get_timeout(&params);
 
     // List device signals
-    let list_payload = dsig::build_list_request();
-    let list_frame = shared::request(
-        &host, port, MSG_DSIG_LIST, FLAG_ACK_REQ, &list_payload, timeout,
-    )
-    .await?;
-    let all_signals = dsig::parse_list_response(&list_frame.payload)
-        .map_err(|e| format!("Failed to parse signal list: {e}"))?;
+    let all_signals = fetch_all_device_signals(&host, port, timeout).await?;
 
     // Load board def for label enrichment
     let board_def = shared::load_board_def(&host, port).await;
@@ -1163,6 +1381,52 @@ async fn cmd_indicator_remove(params: Value) -> Result<Value, String> {
     messages.push((MSG_DSIG_WRITE, FLAG_ACK_REQ, dsig::build_write_request(colour_signal_id, 0)));
 
     shared::request_batch(&host, port, messages, timeout).await?;
+    Ok(Value::Null)
+}
+
+// ============================================================================
+// Label operations (pending name/description edits)
+// ============================================================================
+
+async fn cmd_label_set(params: Value) -> Result<Value, String> {
+    let (host, port) = get_host_port(&params).await?;
+    let timeout = get_timeout(&params);
+    let entity_type = params["entity_type"].as_str().ok_or("Missing entity_type")?;
+    let id = params["id"].as_u64().ok_or("Missing id")? as u16;
+    let name = params["name"].as_str().map(String::from);
+    let description = params["description"].as_str().map(String::from);
+
+    shared::with_editable_board_def(&host, port, timeout, |ed| {
+        match entity_type {
+            "frame_def" => ed.set_pending_frame_def(id, name, description),
+            "generator" => ed.set_pending_generator(id, name, description),
+            "transformer" => ed.set_pending_transformer(id, name, description),
+            _ => return Err(format!("Unknown entity type: {entity_type}")),
+        }
+        Ok(())
+    })
+    .await??;
+
+    Ok(Value::Null)
+}
+
+async fn cmd_label_remove(params: Value) -> Result<Value, String> {
+    let (host, port) = get_host_port(&params).await?;
+    let timeout = get_timeout(&params);
+    let entity_type = params["entity_type"].as_str().ok_or("Missing entity_type")?;
+    let id = params["id"].as_u64().ok_or("Missing id")? as u16;
+
+    shared::with_editable_board_def(&host, port, timeout, |ed| {
+        match entity_type {
+            "frame_def" => ed.remove_pending_frame_def(id),
+            "generator" => ed.remove_pending_generator(id),
+            "transformer" => ed.remove_pending_transformer(id),
+            _ => return Err(format!("Unknown entity type: {entity_type}")),
+        }
+        Ok(())
+    })
+    .await??;
+
     Ok(Value::Null)
 }
 

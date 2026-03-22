@@ -168,6 +168,7 @@ export function serialiseFrameDef(
     interface_type: interfaceType,
     signals: signals.map((s) => ({
       signal_id: s.signalId,
+      name: s.name,
       start_bit: s.startBit,
       bit_length: s.bitLength,
       byte_order: s.byteOrder,

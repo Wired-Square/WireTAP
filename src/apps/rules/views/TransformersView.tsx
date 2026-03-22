@@ -5,10 +5,11 @@ import { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textSecondary, textTertiary } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { TransformerDescriptor } from "../../../api/framelinkRules";
+import { InlineEdit } from "../components/InlineEdit";
 import TransformerDialog from "../dialogs/TransformerDialog";
 import { formatHexId } from "../utils/formatHex";
 
@@ -22,6 +23,7 @@ export default function TransformersView() {
     removeTransformer,
     enableTransformer,
     addTransformer,
+    setLabel,
   } = useRulesStore(
     useShallow((s) => ({
       transformers: s.transformers,
@@ -32,6 +34,7 @@ export default function TransformersView() {
       removeTransformer: s.removeTransformer,
       enableTransformer: s.enableTransformer,
       addTransformer: s.addTransformer,
+      setLabel: s.setLabel,
     })),
   );
 
@@ -40,14 +43,18 @@ export default function TransformersView() {
   const usedIds = useMemo(() => new Set(transformers.map((t) => t.transformer_id)), [transformers]);
 
   const handleAdd = useCallback(
-    async (transformer: Record<string, unknown>) => {
+    async (transformer: Record<string, unknown> & { name?: string; description?: string }) => {
       try {
-        await addTransformer(transformer);
+        const { name, description, ...payload } = transformer;
+        await addTransformer(payload);
+        if (name || description) {
+          await setLabel("transformer", payload.transformer_id as number, name || null, description || null);
+        }
       } catch {
         // Error handled by store
       }
     },
-    [addTransformer],
+    [addTransformer, setLabel],
   );
 
   if (loading) {
@@ -86,7 +93,14 @@ export default function TransformersView() {
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-mono font-medium ${textPrimary}`}>
+                <span onClick={(e) => e.stopPropagation()}>
+                  <InlineEdit
+                    value={t.name}
+                    variant="primary"
+                    onCommit={(newName) => setLabel('transformer', t.transformer_id, newName || null, null)}
+                  />
+                </span>
+                <span className={`text-xs font-mono ${textTertiary}`}>
                   {formatHexId(t.transformer_id)}
                 </span>
                 <span
@@ -105,6 +119,14 @@ export default function TransformersView() {
                 {t.dest_frame_def_name}
                 {t.dest_frame_def_name !== "Device Signals" ? ` (${t.dest_interface_name})` : ""}
                 {` | ${t.mappings.length} mapping${t.mappings.length !== 1 ? "s" : ""}`}
+              </div>
+              <div className="mt-1">
+                <InlineEdit
+                  value={t.description ?? ""}
+                  placeholder="Add description"
+                  variant="secondary"
+                  onCommit={(newDesc) => setLabel("transformer", t.transformer_id, null, newDesc || null)}
+                />
               </div>
             </div>
             <div className="flex items-center gap-1">
