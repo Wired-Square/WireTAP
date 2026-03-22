@@ -5,7 +5,7 @@
 // framelink::board::discover_leds from the library) and provides controls
 // to change colour, state, and blink period.
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, RefreshCw, Palette } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
@@ -14,10 +14,7 @@ import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import IndicatorSprite, { IndicatorSpriteDefs } from "../components/IndicatorSprite";
 import { brgbToCss } from "../utils/brgbColour";
-import {
-  framelinkIndicatorsList,
-  type DiscoveredLed,
-} from "../../../api/framelinkRules";
+import type { DiscoveredLed } from "../../../api/framelinkRules";
 import PaletteEditorDialog from "../dialogs/PaletteEditorDialog";
 import IndicatorConfigDialog, { type LedUpdateValues } from "../dialogs/IndicatorConfigDialog";
 
@@ -28,37 +25,18 @@ const STATE_OPTIONS = [
 ] as const;
 
 export default function IndicatorsView() {
-  const { deviceId, deviceInterfaces, frameDefs } = useRulesStore(
+  const { deviceId, deviceInterfaces, indicators, loading, refreshIndicators } = useRulesStore(
     useShallow((s) => ({
       deviceId: s.device?.deviceId ?? null,
       deviceInterfaces: s.device?.interfaces ?? [],
-      frameDefs: s.frameDefs,
+      indicators: s.indicators,
+      loading: s.loading.indicators,
+      refreshIndicators: s.refreshIndicators,
     })),
   );
 
-  const [indicators, setIndicators] = useState<DiscoveredLed[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [configLed, setConfigLed] = useState<DiscoveredLed | null>(null);
-
-  const loadIndicators = useCallback(async () => {
-    if (!deviceId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await framelinkIndicatorsList(deviceId);
-      setIndicators(result);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [deviceId]);
-
-  useEffect(() => {
-    loadIndicators();
-  }, [loadIndicators]);
 
   if (loading) {
     return (
@@ -69,15 +47,7 @@ export default function IndicatorsView() {
     );
   }
 
-  if (error) {
-    return (
-      <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
-        <p className="text-sm text-red-400">{error}</p>
-      </div>
-    );
-  }
-
-  if (indicators.length === 0) {
+  if (indicators.length === 0 && !loading) {
     return (
       <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
         <p className="text-sm">No LED indicators found on device</p>
@@ -96,7 +66,7 @@ export default function IndicatorsView() {
           <Palette className={iconMd} /> Palette Editor
         </button>
         <button
-          onClick={loadIndicators}
+          onClick={refreshIndicators}
           className={`p-1 rounded hover:bg-white/10 ${textSecondary}`}
           title="Refresh indicators"
         >
@@ -151,19 +121,19 @@ export default function IndicatorsView() {
           isOpen={!!configLed}
           onClose={(updated?: LedUpdateValues) => {
             if (updated) {
-              setIndicators((prev) =>
-                prev.map((led) =>
+              // Optimistically update the store's indicator list
+              useRulesStore.setState((s) => ({
+                indicators: s.indicators.map((led) =>
                   led.index === configLed.index ? { ...led, ...updated } : led,
                 ),
-              );
+              }));
             }
             setConfigLed(null);
           }}
-          onConfigured={loadIndicators}
+          onConfigured={refreshIndicators}
           deviceId={deviceId}
           led={configLed}
           interfaces={deviceInterfaces}
-          frameDefs={frameDefs}
         />
       )}
     </div>

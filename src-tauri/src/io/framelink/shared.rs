@@ -25,6 +25,13 @@ use tokio::sync::Mutex;
 use super::{FrameLinkProbeResult, ProbeInterface};
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/// Maximum bytes per chunk when uploading a board definition to the device.
+const BOARD_DEF_UPLOAD_CHUNK_SIZE: usize = 400;
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -33,6 +40,7 @@ pub(crate) struct ManagedConnection {
     pub session: Arc<FrameLinkSession>,
     pub iface_types: HashMap<u8, u8>,
     pub probe_cache: FrameLinkProbeResult,
+    pub editable_board_def: std::sync::Mutex<Option<framelink::board::editable::EditableBoardDef>>,
     session_refs: AtomicUsize,
 }
 
@@ -86,13 +94,14 @@ async fn ensure_connection(
     .map_err(|_| format!("Connection to {} timed out", key))?
     .map_err(|e| format!("Connection to {} failed: {}", key, e))?;
 
-    let (iface_types, probe_cache) =
+    let (iface_types, probe_cache, editable_board_def) =
         fetch_capabilities(&session, &key, timeout_sec).await;
 
     let conn = Arc::new(ManagedConnection {
         session,
         iface_types,
         probe_cache,
+        editable_board_def: std::sync::Mutex::new(editable_board_def),
         session_refs: AtomicUsize::new(1),
     });
 
@@ -116,7 +125,11 @@ async fn fetch_capabilities(
     session: &Arc<FrameLinkSession>,
     key: &str,
     timeout_sec: f64,
-) -> (HashMap<u8, u8>, FrameLinkProbeResult) {
+) -> (
+    HashMap<u8, u8>,
+    FrameLinkProbeResult,
+    Option<framelink::board::editable::EditableBoardDef>,
+) {
     let empty_probe = || FrameLinkProbeResult {
         device_id: None,
         board_name: None,
@@ -133,11 +146,11 @@ async fn fetch_capabilities(
         Ok(Ok(f)) => f,
         Ok(Err(e)) => {
             tlog!("[framelink:{}] Capabilities request failed: {}", key, e);
-            return (HashMap::new(), empty_probe());
+            return (HashMap::new(), empty_probe(), None);
         }
         Err(_) => {
             tlog!("[framelink:{}] Capabilities request timed out", key);
-            return (HashMap::new(), empty_probe());
+            return (HashMap::new(), empty_probe(), None);
         }
     };
 
@@ -145,7 +158,7 @@ async fn fetch_capabilities(
         Ok(c) => c,
         Err(e) => {
             tlog!("[framelink:{}] Failed to decode capabilities: {}", key, e);
-            return (HashMap::new(), empty_probe());
+            return (HashMap::new(), empty_probe(), None);
         }
     };
 
@@ -198,6 +211,10 @@ async fn fetch_capabilities(
         })
         .collect();
 
+    let editable = board_def
+        .as_ref()
+        .map(framelink::board::editable::EditableBoardDef::from_board_def);
+
     let probe = FrameLinkProbeResult {
         device_id,
         board_name,
@@ -205,7 +222,7 @@ async fn fetch_capabilities(
         interfaces,
     };
 
-    (iface_types, probe)
+    (iface_types, probe, editable)
 }
 
 // ============================================================================
@@ -256,6 +273,16 @@ pub(crate) async fn session_release(host: &str, port: u16) {
 // ============================================================================
 // Public API — Request Tier
 // ============================================================================
+
+/// Get or create a managed connection without touching session_refs.
+/// Use this when a library function needs the `FrameLinkSession` directly.
+pub(crate) async fn get_connection(
+    host: &str,
+    port: u16,
+    timeout_sec: f64,
+) -> Result<Arc<ManagedConnection>, String> {
+    ensure_connection(host, port, timeout_sec).await
+}
 
 /// Send a request/response message through the managed connection.
 /// Creates the connection on demand if needed (without touching session_refs).
@@ -392,4 +419,90 @@ pub(crate) async fn resolve_device_id(device_id: &str) -> Option<(String, u16)> 
     }
 
     None
+}
+
+// ============================================================================
+// Public API — Editable Board Definition
+// ============================================================================
+
+/// Execute a closure with mutable access to the connection's EditableBoardDef.
+///
+/// Returns an error if no board definition is available for the device.
+pub(crate) async fn with_editable_board_def<F, R>(
+    host: &str,
+    port: u16,
+    timeout_sec: f64,
+    f: F,
+) -> Result<R, String>
+where
+    F: FnOnce(&mut framelink::board::editable::EditableBoardDef) -> R,
+{
+    let conn = ensure_connection(host, port, timeout_sec).await?;
+    let mut guard = conn
+        .editable_board_def
+        .lock()
+        .map_err(|e| format!("editable_board_def mutex poisoned: {}", e))?;
+    match guard.as_mut() {
+        Some(board_def) => Ok(f(board_def)),
+        None => Err("No board definition available for this device".to_string()),
+    }
+}
+
+/// Serialise the EditableBoardDef to TOML, compress, and upload to the device.
+pub(crate) async fn upload_board_def(
+    host: &str,
+    port: u16,
+    timeout_sec: f64,
+) -> Result<(), String> {
+    let conn = ensure_connection(host, port, timeout_sec).await?;
+
+    let toml_string = {
+        let guard = conn
+            .editable_board_def
+            .lock()
+            .map_err(|e| format!("editable_board_def mutex poisoned: {}", e))?;
+        match guard.as_ref() {
+            Some(board_def) => board_def.to_toml(),
+            None => return Err("No board definition available for this device".to_string()),
+        }
+    };
+
+    let compressed = framelink::board::compress::compress_board_toml(toml_string.as_bytes())
+        .map_err(|e| format!("Board def compression failed: {}", e))?;
+
+    let total = compressed.len() as u32;
+    let key = format!("{}:{}", host, port);
+
+    tlog!(
+        "[framelink:{}] Uploading board def ({} bytes, {} bytes compressed)",
+        key,
+        toml_string.len(),
+        compressed.len()
+    );
+
+    for (i, chunk) in compressed.chunks(BOARD_DEF_UPLOAD_CHUNK_SIZE).enumerate() {
+        let offset = (i * BOARD_DEF_UPLOAD_CHUNK_SIZE) as u32;
+        let payload =
+            framelink::protocol::board_def::build_board_def_upload(offset, total, chunk);
+
+        let frame = conn
+            .session
+            .request(
+                framelink::protocol::types::MSG_BOARD_DEF_UPLOAD,
+                0,
+                &payload,
+            )
+            .await
+            .map_err(|e| format!("Board def upload chunk {} failed: {}", i, e))?;
+
+        if frame.msg_type == framelink::protocol::types::MSG_NACK {
+            return Err(format!(
+                "Device rejected board def upload at chunk {} (offset {})",
+                i, offset
+            ));
+        }
+    }
+
+    tlog!("[framelink:{}] Board def upload complete", key);
+    Ok(())
 }

@@ -5,7 +5,7 @@
 /**
  * Base input styles - common to all input variants
  */
-export const inputBase = "w-full border transition-colors text-[color:var(--text-primary)]";
+export const inputBase = "w-full border box-border transition-colors text-[color:var(--text-primary)] h-10";
 
 /**
  * Default input style - full styling with focus ring

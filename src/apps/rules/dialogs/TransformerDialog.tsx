@@ -1,14 +1,18 @@
 // Copyright 2026 Wired Square Pty Ltd
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useCallback } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
-import { iconMd } from "../../../styles/spacing";
+import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { cardDefault, cardPadding, panelFooter } from "../../../styles/cardStyles";
+import { iconMd, iconSm } from "../../../styles/spacing";
 import type { FrameDefDescriptor } from "../../../api/framelinkRules";
+import SignalCombobox from "../components/SignalCombobox";
+import { useRulesStore } from "../stores/rulesStore";
+import { FRAME_DEF_ID_DEVICE, DEFAULT_SIGNAL_MASK, nextAvailableId } from "../utils/framelinkConstants";
+import { formatHexId } from "../utils/formatHex";
 
 interface MappingRow {
   source_signal_id: number;
@@ -25,10 +29,8 @@ interface TransformerDialogProps {
   onSubmit: (transformer: Record<string, unknown>) => void;
   interfaces: { index: number; iface_type: number; name: string }[];
   frameDefs: FrameDefDescriptor[];
-  nextId: number;
+  usedIds: Set<number>;
 }
-
-const DEVICE_SIGNALS_ID = 0xffff;
 
 export default function TransformerDialog({
   isOpen,
@@ -36,16 +38,23 @@ export default function TransformerDialog({
   onSubmit,
   interfaces,
   frameDefs,
-  nextId,
+  usedIds,
 }: TransformerDialogProps) {
-  const [transformerId, setTransformerId] = useState(nextId);
+  const selectableSignals = useRulesStore((s) => s.selectableSignals);
+
+  const [transformerId, setTransformerId] = useState(() => nextAvailableId(usedIds));
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) setTransformerId(nextAvailableId(usedIds));
+  }, [isOpen, usedIds]);
   const [sourceFrameDefId, setSourceFrameDefId] = useState(
     frameDefs[0]?.frame_def_id ?? 0,
   );
   const [sourceInterface, setSourceInterface] = useState(
     interfaces[0]?.index ?? 0,
   );
-  const [destFrameDefId, setDestFrameDefId] = useState(DEVICE_SIGNALS_ID);
+  const [destFrameDefId, setDestFrameDefId] = useState(FRAME_DEF_ID_DEVICE);
   const [destInterface, setDestInterface] = useState(
     interfaces[0]?.index ?? 0,
   );
@@ -60,7 +69,7 @@ export default function TransformerDialog({
         transform_type: "direct",
         scale: 1.0,
         offset: 0.0,
-        mask: 0xffffffff,
+        mask: DEFAULT_SIGNAL_MASK,
       },
     ]);
   }, []);
@@ -79,12 +88,17 @@ export default function TransformerDialog({
   );
 
   const handleSubmit = () => {
+    if (usedIds.has(transformerId)) {
+      setValidationError(`Transformer ID ${formatHexId(transformerId)} is already in use.`);
+      return;
+    }
+    setValidationError(null);
     onSubmit({
       transformer_id: transformerId,
       source_frame_def_id: sourceFrameDefId,
       source_interface: sourceInterface,
       dest_frame_def_id: destFrameDefId,
-      dest_interface: destFrameDefId === DEVICE_SIGNALS_ID ? 0xff : destInterface,
+      dest_interface: destFrameDefId === FRAME_DEF_ID_DEVICE ? 0xff : destInterface,
       enabled: true,
       mappings: mappings.map((m) => ({
         source_signal_id: m.source_signal_id,
@@ -103,6 +117,10 @@ export default function TransformerDialog({
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
           Add Transformer
         </h2>
+
+        {validationError && (
+          <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
@@ -155,7 +173,7 @@ export default function TransformerDialog({
               value={destFrameDefId}
               onChange={(e) => setDestFrameDefId(parseInt(e.target.value))}
             >
-              <option value={DEVICE_SIGNALS_ID}>Device Signals</option>
+              <option value={FRAME_DEF_ID_DEVICE}>Device Signals</option>
               {frameDefs.map((fd) => (
                 <option key={fd.frame_def_id} value={fd.frame_def_id}>
                   {fd.name}
@@ -163,7 +181,7 @@ export default function TransformerDialog({
               ))}
             </select>
           </div>
-          {destFrameDefId !== DEVICE_SIGNALS_ID && (
+          {destFrameDefId !== FRAME_DEF_ID_DEVICE && (
             <div>
               <label className={labelDefault}>Dest Interface</label>
               <select
@@ -192,105 +210,93 @@ export default function TransformerDialog({
               <Plus className={iconMd} /> Add Mapping
             </button>
           </div>
-          {mappings.length > 0 && (
-            <div className={`border ${borderDefault} rounded-lg overflow-hidden`}>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className={`${textTertiary} border-b ${borderDefault}`}>
-                    <th className="px-2 py-1 text-left">Src Signal</th>
-                    <th className="px-2 py-1 text-left">Dst Signal</th>
-                    <th className="px-2 py-1 text-left">Transform</th>
-                    <th className="px-2 py-1 text-left">Params</th>
-                    <th className="px-2 py-1"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mappings.map((m, idx) => (
-                    <tr key={idx} className={`border-b ${borderDefault} last:border-b-0`}>
-                      <td className="px-2 py-1">
+          <div className="space-y-2">
+            {mappings.map((m, idx) => {
+              const srcSignal = selectableSignals.find((s) => s.signal_id === m.source_signal_id);
+              return (
+              <div key={idx} className={`${cardDefault} ${cardPadding.sm}`}>
+                <div className="flex items-start gap-3">
+                  {/* Source → Dest vertical flow */}
+                  <div className="flex-1 space-y-1">
+                    <label className={`text-xs ${textTertiary}`}>Source Signal</label>
+                    <SignalCombobox
+                      signals={selectableSignals}
+                      value={m.source_signal_id || null}
+                      onChange={(id) => updateMapping(idx, "source_signal_id", id)}
+                      placeholder="Source signal"
+                    />
+                    <div className={`flex justify-center ${textTertiary}`}>
+                      <ArrowDown className={iconSm} />
+                    </div>
+                    <label className={`text-xs ${textTertiary}`}>Destination Signal</label>
+                    <SignalCombobox
+                      signals={selectableSignals}
+                      value={m.dest_signal_id || null}
+                      onChange={(id) => updateMapping(idx, "dest_signal_id", id)}
+                      placeholder="Dest signal"
+                      minBitLength={srcSignal?.bit_length}
+                    />
+                  </div>
+                  {/* Transform + params + delete */}
+                  <div className="flex flex-col items-end gap-2 pt-5">
+                    <select
+                      className={inputSimple}
+                      value={m.transform_type}
+                      onChange={(e) =>
+                        updateMapping(idx, "transform_type", e.target.value)
+                      }
+                    >
+                      <option value="direct">Direct</option>
+                      <option value="scale">Scale</option>
+                      <option value="invert">Invert</option>
+                      <option value="mask">Mask</option>
+                    </select>
+                    {m.transform_type === "scale" && (
+                      <div className="flex gap-2">
                         <input
                           type="number"
-                          className={`w-16 ${inputSimple} text-xs py-0.5 px-1`}
-                          value={m.source_signal_id}
+                          step="0.1"
+                          className={inputSimple}
+                          value={m.scale}
+                          placeholder="Scale"
                           onChange={(e) =>
-                            updateMapping(idx, "source_signal_id", parseInt(e.target.value) || 0)
+                            updateMapping(idx, "scale", parseFloat(e.target.value) || 1)
                           }
                         />
-                      </td>
-                      <td className="px-2 py-1">
                         <input
                           type="number"
-                          className={`w-16 ${inputSimple} text-xs py-0.5 px-1`}
-                          value={m.dest_signal_id}
+                          step="0.1"
+                          className={inputSimple}
+                          value={m.offset}
+                          placeholder="Offset"
                           onChange={(e) =>
-                            updateMapping(idx, "dest_signal_id", parseInt(e.target.value) || 0)
+                            updateMapping(idx, "offset", parseFloat(e.target.value) || 0)
                           }
                         />
-                      </td>
-                      <td className="px-2 py-1">
-                        <select
-                          className={`${inputSimple} text-xs py-0.5 px-1`}
-                          value={m.transform_type}
-                          onChange={(e) =>
-                            updateMapping(idx, "transform_type", e.target.value)
-                          }
-                        >
-                          <option value="direct">Direct</option>
-                          <option value="scale">Scale</option>
-                          <option value="invert">Invert</option>
-                          <option value="mask">Mask</option>
-                        </select>
-                      </td>
-                      <td className="px-2 py-1">
-                        {m.transform_type === "scale" && (
-                          <span className={`flex gap-1 ${textSecondary}`}>
-                            <input
-                              type="number"
-                              step="0.1"
-                              className={`w-14 ${inputSimple} text-xs py-0.5 px-1`}
-                              value={m.scale}
-                              placeholder="Scale"
-                              onChange={(e) =>
-                                updateMapping(idx, "scale", parseFloat(e.target.value) || 1)
-                              }
-                            />
-                            <input
-                              type="number"
-                              step="0.1"
-                              className={`w-14 ${inputSimple} text-xs py-0.5 px-1`}
-                              value={m.offset}
-                              placeholder="Offset"
-                              onChange={(e) =>
-                                updateMapping(idx, "offset", parseFloat(e.target.value) || 0)
-                              }
-                            />
-                          </span>
-                        )}
-                        {m.transform_type === "mask" && (
-                          <input
-                            type="text"
-                            className={`w-20 ${inputSimple} text-xs py-0.5 px-1 font-mono`}
-                            value={m.mask.toString(16).toUpperCase()}
-                            onChange={(e) =>
-                              updateMapping(idx, "mask", parseInt(e.target.value, 16) || 0)
-                            }
-                          />
-                        )}
-                      </td>
-                      <td className="px-2 py-1">
-                        <button
-                          onClick={() => removeMapping(idx)}
-                          className={`p-0.5 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                      </div>
+                    )}
+                    {m.transform_type === "mask" && (
+                      <input
+                        type="text"
+                        className={`${inputSimple} font-mono`}
+                        value={m.mask.toString(16).toUpperCase()}
+                        onChange={(e) =>
+                          updateMapping(idx, "mask", parseInt(e.target.value, 16) || 0)
+                        }
+                      />
+                    )}
+                    <button
+                      onClick={() => removeMapping(idx)}
+                      className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                      title="Remove mapping"
+                    >
+                      <Trash2 className={iconSm} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              ); })}
+          </div>
         </div>
       </div>
 

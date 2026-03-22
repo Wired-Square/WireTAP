@@ -1,12 +1,14 @@
 // Copyright 2026 Wired Square Pty Ltd
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
 import { textPrimary, textSecondary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import type { FrameHeader } from "../utils/bitGrid";
+import { nextAvailableId } from "../utils/framelinkConstants";
+import { formatHexId } from "../utils/formatHex";
 
 interface FrameDefDialogProps {
   isOpen: boolean;
@@ -18,7 +20,7 @@ interface FrameDefDialogProps {
     payloadBytes: number;
   }) => void;
   interfaces: { index: number; iface_type: number; name: string }[];
-  nextId: number;
+  usedIds: Set<number>;
 }
 
 export default function FrameDefDialog({
@@ -26,9 +28,15 @@ export default function FrameDefDialog({
   onClose,
   onSubmit,
   interfaces,
-  nextId,
+  usedIds,
 }: FrameDefDialogProps) {
-  const [frameDefId, setFrameDefId] = useState(nextId);
+  const [frameDefId, setFrameDefId] = useState(() => nextAvailableId(usedIds));
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Re-compute next available ID when dialog opens
+  useEffect(() => {
+    if (isOpen) setFrameDefId(nextAvailableId(usedIds));
+  }, [isOpen, usedIds]);
   const [interfaceType, setInterfaceType] = useState(
     interfaces[0]?.iface_type ?? 1,
   );
@@ -38,6 +46,11 @@ export default function FrameDefDialog({
   const [payloadLength, setPayloadLength] = useState(64);
 
   const handleSubmit = () => {
+    if (usedIds.has(frameDefId)) {
+      setValidationError(`Frame Def ID ${formatHexId(frameDefId)} is already in use.`);
+      return;
+    }
+    setValidationError(null);
     const isCan = interfaceType === 1 || interfaceType === 2;
     if (isCan) {
       const canIdNum = parseInt(canId, 16);
@@ -63,6 +76,10 @@ export default function FrameDefDialog({
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
           Add Frame Definition
         </h2>
+
+        {validationError && (
+          <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>

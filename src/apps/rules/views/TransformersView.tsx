@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
@@ -10,6 +10,7 @@ import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { TransformerDescriptor } from "../../../api/framelinkRules";
 import TransformerDialog from "../dialogs/TransformerDialog";
+import { formatHexId } from "../utils/formatHex";
 
 export default function TransformersView() {
   const {
@@ -36,10 +37,7 @@ export default function TransformersView() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const nextId =
-    transformers.length > 0
-      ? Math.max(...transformers.map((t) => t.transformer_id)) + 1
-      : 1;
+  const usedIds = useMemo(() => new Set(transformers.map((t) => t.transformer_id)), [transformers]);
 
   const handleAdd = useCallback(
     async (transformer: Record<string, unknown>) => {
@@ -89,7 +87,7 @@ export default function TransformersView() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className={`text-sm font-mono font-medium ${textPrimary}`}>
-                  #{t.transformer_id}
+                  {formatHexId(t.transformer_id)}
                 </span>
                 <span
                   className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
@@ -139,7 +137,7 @@ export default function TransformersView() {
         onSubmit={handleAdd}
         interfaces={device?.interfaces ?? []}
         frameDefs={frameDefs}
-        nextId={nextId}
+        usedIds={usedIds}
       />
     </div>
   );

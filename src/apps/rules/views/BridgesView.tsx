@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
@@ -10,6 +10,7 @@ import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { BridgeDescriptor } from "../../../api/framelinkRules";
 import BridgeDialog from "../dialogs/BridgeDialog";
+import { formatHexId } from "../utils/formatHex";
 
 export default function BridgesView() {
   const { bridges, loading, temporaryRules, device, removeBridge, enableBridge, addBridge } =
@@ -27,10 +28,7 @@ export default function BridgesView() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const nextId =
-    bridges.length > 0
-      ? Math.max(...bridges.map((b) => b.bridge_id)) + 1
-      : 1;
+  const usedIds = useMemo(() => new Set(bridges.map((b) => b.bridge_id)), [bridges]);
 
   const handleAdd = useCallback(
     async (bridgeDefs: Record<string, unknown>[]) => {
@@ -82,7 +80,7 @@ export default function BridgesView() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className={`text-sm font-mono font-medium ${textPrimary}`}>
-                  #{b.bridge_id}
+                  {formatHexId(b.bridge_id)}
                 </span>
                 <span
                   className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
@@ -131,7 +129,7 @@ export default function BridgesView() {
         onClose={() => setDialogOpen(false)}
         onSubmit={handleAdd}
         interfaces={device?.interfaces ?? []}
-        nextId={nextId}
+        usedIds={usedIds}
       />
     </div>
   );

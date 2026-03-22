@@ -19,8 +19,13 @@ import {
   framelinkPalettesList,
   type DiscoveredLed,
   type PaletteInfo,
-  type FrameDefDescriptor,
 } from "../../../api/framelinkRules";
+import SignalCombobox from "../components/SignalCombobox";
+import { useRulesStore } from "../stores/rulesStore";
+
+const COLOUR_WRITE_DEBOUNCE_MS = 150;
+const DEFAULT_CAN_ID_HEX = "100";
+const DEFAULT_DATA_MASK_HEX = "FF00000000000000";
 
 const STATE_OPTIONS = [
   { value: 0, label: "Off" },
@@ -41,7 +46,6 @@ interface IndicatorConfigDialogProps {
   deviceId: string;
   led: DiscoveredLed;
   interfaces: { index: number; iface_type: number; name: string }[];
-  frameDefs: FrameDefDescriptor[];
 }
 
 type SourceType = "activity" | "palette" | "threshold";
@@ -53,8 +57,8 @@ export default function IndicatorConfigDialog({
   deviceId,
   led,
   interfaces,
-  frameDefs,
 }: IndicatorConfigDialogProps) {
+  const selectableSignals = useRulesStore((s) => s.selectableSignals);
   const [source, setSource] = useState<SourceType>("activity");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -64,17 +68,17 @@ export default function IndicatorConfigDialog({
     led.interface_index ?? interfaces[0]?.index ?? 0,
   );
   const [triggerMode, setTriggerMode] = useState<"any" | "id" | "match">("any");
-  const [canId, setCanId] = useState("100");
-  const [dataMask, setDataMask] = useState("FF00000000000000");
+  const [canId, setCanId] = useState(DEFAULT_CAN_ID_HEX);
+  const [dataMask, setDataMask] = useState(DEFAULT_DATA_MASK_HEX);
   // Palette state
   const [palettes, setPalettes] = useState<PaletteInfo[]>([]);
   const [selectedPalette, setSelectedPalette] = useState(0);
-  const [palSourceSignal, setPalSourceSignal] = useState("");
+  const [palSourceSignal, setPalSourceSignal] = useState<number | null>(null);
   const [signalMax, setSignalMax] = useState(1000);
   const [gateSignalId, setGateSignalId] = useState("");
 
   // Threshold state
-  const [thrSourceSignal, setThrSourceSignal] = useState("");
+  const [thrSourceSignal, setThrSourceSignal] = useState<number | null>(null);
   const [threshold, setThreshold] = useState(500);
   const [valueAbove, setValueAbove] = useState(cssToBrgb(0, 255, 0, 255));
   const [valueBelow, setValueBelow] = useState(0);
@@ -101,7 +105,7 @@ export default function IndicatorConfigDialog({
     clearTimeout(colourDebounceRef.current);
     colourDebounceRef.current = setTimeout(async () => {
       try { await framelinkDsigWrite(deviceId, led.colour_signal_id, brgb); } catch (e) { setError(String(e)); }
-    }, 150);
+    }, COLOUR_WRITE_DEBOUNCE_MS);
   }, [deviceId, led.colour_signal_id]);
 
   const closeWithValues = useCallback(() => {
@@ -126,18 +130,6 @@ export default function IndicatorConfigDialog({
     if (!isOpen) return;
     framelinkPalettesList(deviceId).then(setPalettes).catch(() => {});
   }, [isOpen, deviceId]);
-
-  // Build signal options from frame defs (frame_def_id:signal_id format)
-  const signalOptions: { label: string; value: string }[] = [];
-  for (const fd of frameDefs) {
-    for (const sig of fd.signals) {
-      const fdLabel = fd.can_id != null ? `0x${fd.can_id.toString(16).toUpperCase()}` : `#${fd.frame_def_id}`;
-      signalOptions.push({
-        label: `Signal ${sig.signal_id} (${fdLabel})`,
-        value: `${fd.frame_def_id}:${sig.signal_id}`,
-      });
-    }
-  }
 
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
@@ -179,18 +171,18 @@ export default function IndicatorConfigDialog({
           params.trigger = { type: "FrameMatch", can_id: parseInt(canId, 16) || 0, mask };
         }
       } else if (source === "palette") {
-        if (!palSourceSignal) { setError("Select a source signal"); setSubmitting(false); return; }
-        const [fdId, sigId] = palSourceSignal.split(":").map(Number);
-        params.source_frame_def_id = fdId;
-        params.source_signal_id = sigId;
+        if (palSourceSignal == null) { setError("Select a source signal"); setSubmitting(false); return; }
+        const palSig = selectableSignals.find((s) => s.signal_id === palSourceSignal);
+        params.source_frame_def_id = palSig?.frame_def_id ?? null;
+        params.source_signal_id = palSourceSignal;
         params.palette_signal_start = palettes[selectedPalette]?.signal_start ?? 0;
         params.signal_max = signalMax;
         if (gateSignalId) params.gate_signal_id = parseInt(gateSignalId);
       } else if (source === "threshold") {
-        if (!thrSourceSignal) { setError("Select a source signal"); setSubmitting(false); return; }
-        const [fdId, sigId] = thrSourceSignal.split(":").map(Number);
-        params.source_frame_def_id = fdId;
-        params.source_signal_id = sigId;
+        if (thrSourceSignal == null) { setError("Select a source signal"); setSubmitting(false); return; }
+        const thrSig = selectableSignals.find((s) => s.signal_id === thrSourceSignal);
+        params.source_frame_def_id = thrSig?.frame_def_id ?? null;
+        params.source_signal_id = thrSourceSignal;
         params.threshold = threshold;
         params.value_above = valueAbove;
         params.value_below = valueBelow;
@@ -207,7 +199,8 @@ export default function IndicatorConfigDialog({
     }
   }, [source, led, deviceId, activityInterface, interfaces, triggerMode, canId, dataMask,
       activityColour, palSourceSignal, palettes, selectedPalette, signalMax, gateSignalId,
-      thrSourceSignal, threshold, valueAbove, valueBelow, thrGateSignalId, onConfigured, onClose]);
+      thrSourceSignal, threshold, valueAbove, valueBelow, thrGateSignalId,
+      selectableSignals, onConfigured, onClose]);
 
   // Note: activityColour is derived from led.colour, included in deps via led
 
@@ -352,12 +345,11 @@ export default function IndicatorConfigDialog({
           <div className="space-y-4">
             <div>
               <label className={labelDefault}>Source Signal</label>
-              <select className={inputSimple} value={palSourceSignal} onChange={(e) => setPalSourceSignal(e.target.value)}>
-                <option value="">Select signal...</option>
-                {signalOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <SignalCombobox
+                signals={selectableSignals}
+                value={palSourceSignal}
+                onChange={setPalSourceSignal}
+              />
             </div>
             <div>
               <label className={labelDefault}>Palette</label>
@@ -384,12 +376,11 @@ export default function IndicatorConfigDialog({
           <div className="space-y-4">
             <div>
               <label className={labelDefault}>Source Signal</label>
-              <select className={inputSimple} value={thrSourceSignal} onChange={(e) => setThrSourceSignal(e.target.value)}>
-                <option value="">Select signal...</option>
-                {signalOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <SignalCombobox
+                signals={selectableSignals}
+                value={thrSourceSignal}
+                onChange={setThrSourceSignal}
+              />
             </div>
             <div>
               <label className={labelDefault}>Threshold Value</label>

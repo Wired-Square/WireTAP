@@ -10,6 +10,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useRulesStore, type RulesTab } from "../stores/rulesStore";
 import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
+import { formatHexId } from "../utils/formatHex";
 
 export default function DeviceOverview() {
   const { frameDefs, bridges, transformers, generators, device, temporaryRules, setActiveTab, selectItem } =
@@ -99,7 +100,7 @@ export default function DeviceOverview() {
               return (
                 <FlowCard
                   key={`b-${b.bridge_id}`}
-                  label={`Bridge #${b.bridge_id}`}
+                  label={`Bridge ${formatHexId(b.bridge_id)}`}
                   sublabel={`${b.source_interface_name}→${b.dest_interface_name}`}
                   borderClass={
                     !b.enabled
@@ -117,7 +118,7 @@ export default function DeviceOverview() {
               return (
                 <FlowCard
                   key={`x-${t.transformer_id}`}
-                  label={`Xform #${t.transformer_id}`}
+                  label={`Xform ${formatHexId(t.transformer_id)}`}
                   sublabel={`${t.source_frame_def_name}→${t.dest_frame_def_name}`}
                   borderClass={
                     !t.enabled
@@ -135,7 +136,7 @@ export default function DeviceOverview() {
               return (
                 <FlowCard
                   key={`g-${g.generator_id}`}
-                  label={`Gen #${g.generator_id}`}
+                  label={`Gen ${formatHexId(g.generator_id)}`}
                   sublabel={`${g.frame_def_name}→${g.interface_name}`}
                   borderClass={
                     !g.enabled

@@ -30,6 +30,7 @@ import {
 import BitGrid from "../components/BitGrid";
 import SignalList from "../components/SignalList";
 import SignalProperties from "../components/SignalProperties";
+import { formatHexId } from "../utils/formatHex";
 
 // ============================================================================
 // Interface type name lookup
@@ -349,7 +350,7 @@ export default function FrameDefEditor({
           </button>
           <div>
             <div className={`text-sm font-medium ${textPrimary}`}>
-              Frame Def #{frameDefId}
+              Frame Def {formatHexId(frameDefId)}
             </div>
             <div className={`text-xs ${textSecondary}`}>
               {interfaceTypeName} | {headerInfo}
