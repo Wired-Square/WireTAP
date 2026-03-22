@@ -25,13 +25,6 @@ use tokio::sync::Mutex;
 use super::{FrameLinkProbeResult, ProbeInterface};
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-/// Maximum bytes per chunk when uploading a board definition to the device.
-const BOARD_DEF_UPLOAD_CHUNK_SIZE: usize = 400;
-
-// ============================================================================
 // Types
 // ============================================================================
 
@@ -183,11 +176,52 @@ async fn fetch_capabilities(
         }
     }
 
-    let board_def = board_name.as_deref().and_then(|name| {
-        board_revision
-            .as_deref()
-            .and_then(|rev| framelink::board::load_board_def(name, rev))
-    });
+    // Try downloading the device TOML first; fall back to embedded board def
+    let (board_def, editable) = match framelink::board::transfer::download_board_def(session)
+        .await
+    {
+        Ok(Some(toml_str)) => {
+            tlog!(
+                "[framelink:{}] Downloaded device TOML ({} bytes)",
+                key,
+                toml_str.len()
+            );
+            let ed = framelink::board::editable::EditableBoardDef::from_toml(&toml_str).ok();
+            let bd = framelink::board::parse_board_def(&toml_str).ok();
+            (bd, ed)
+        }
+        Ok(None) => {
+            tlog!(
+                "[framelink:{}] No device TOML stored, using embedded board def",
+                key
+            );
+            let bd = board_name.as_deref().and_then(|name| {
+                board_revision
+                    .as_deref()
+                    .and_then(|rev| framelink::board::load_board_def(name, rev))
+            });
+            let ed = bd
+                .as_ref()
+                .map(framelink::board::editable::EditableBoardDef::from_board_def);
+            (bd, ed)
+        }
+        Err(e) => {
+            tlog!(
+                "[framelink:{}] Board def download failed ({}), using embedded board def",
+                key,
+                e
+            );
+            let bd = board_name.as_deref().and_then(|name| {
+                board_revision
+                    .as_deref()
+                    .and_then(|rev| framelink::board::load_board_def(name, rev))
+            });
+            let ed = bd
+                .as_ref()
+                .map(framelink::board::editable::EditableBoardDef::from_board_def);
+            (bd, ed)
+        }
+    };
 
     let interfaces: Vec<ProbeInterface> = caps
         .interfaces
@@ -210,10 +244,6 @@ async fn fetch_capabilities(
             }
         })
         .collect();
-
-    let editable = board_def
-        .as_ref()
-        .map(framelink::board::editable::EditableBoardDef::from_board_def);
 
     let probe = FrameLinkProbeResult {
         device_id,
@@ -425,6 +455,20 @@ pub(crate) async fn resolve_device_id(device_id: &str) -> Option<(String, u16)> 
 // Public API — Editable Board Definition
 // ============================================================================
 
+/// Clone the EditableBoardDef from a managed connection, if one exists.
+///
+/// Returns `None` if no connection exists or no board definition is loaded.
+pub(crate) async fn clone_editable_board_def(
+    host: &str,
+    port: u16,
+) -> Option<framelink::board::editable::EditableBoardDef> {
+    let key = format!("{}:{}", host, port);
+    let pool = POOL.lock().await;
+    let conn = pool.get(&key).filter(|c| c.session.is_alive())?;
+    let guard = conn.editable_board_def.lock().ok()?;
+    guard.clone()
+}
+
 /// Execute a closure with mutable access to the connection's EditableBoardDef.
 ///
 /// Returns an error if no board definition is available for the device.
@@ -448,7 +492,7 @@ where
     }
 }
 
-/// Serialise the EditableBoardDef to TOML, compress, and upload to the device.
+/// Serialise the EditableBoardDef to TOML and upload to the device via the library.
 pub(crate) async fn upload_board_def(
     host: &str,
     port: u16,
@@ -467,41 +511,14 @@ pub(crate) async fn upload_board_def(
         }
     };
 
-    let compressed = framelink::board::compress::compress_board_toml(toml_string.as_bytes())
-        .map_err(|e| format!("Board def compression failed: {}", e))?;
-
-    let total = compressed.len() as u32;
     let key = format!("{}:{}", host, port);
-
     tlog!(
-        "[framelink:{}] Uploading board def ({} bytes, {} bytes compressed)",
+        "[framelink:{}] Uploading board def ({} bytes)",
         key,
-        toml_string.len(),
-        compressed.len()
+        toml_string.len()
     );
 
-    for (i, chunk) in compressed.chunks(BOARD_DEF_UPLOAD_CHUNK_SIZE).enumerate() {
-        let offset = (i * BOARD_DEF_UPLOAD_CHUNK_SIZE) as u32;
-        let payload =
-            framelink::protocol::board_def::build_board_def_upload(offset, total, chunk);
-
-        let frame = conn
-            .session
-            .request(
-                framelink::protocol::types::MSG_BOARD_DEF_UPLOAD,
-                0,
-                &payload,
-            )
-            .await
-            .map_err(|e| format!("Board def upload chunk {} failed: {}", i, e))?;
-
-        if frame.msg_type == framelink::protocol::types::MSG_NACK {
-            return Err(format!(
-                "Device rejected board def upload at chunk {} (offset {})",
-                i, offset
-            ));
-        }
-    }
+    framelink::board::transfer::upload_board_def(&conn.session, &toml_string).await?;
 
     tlog!("[framelink:{}] Board def upload complete", key);
     Ok(())

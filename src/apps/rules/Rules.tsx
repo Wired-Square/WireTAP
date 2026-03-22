@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useEffect, useMemo, useCallback } from "react";
-import { Workflow, Save, RefreshCw, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Workflow, Save, RefreshCw, Loader2, Trash2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
@@ -76,6 +77,7 @@ export default function Rules() {
     disconnectDevice,
     refreshTab,
     persistSave,
+    persistClear,
     clearError,
   } = useRulesStore(
     useShallow((s) => ({
@@ -89,6 +91,7 @@ export default function Rules() {
       disconnectDevice: s.disconnectDevice,
       refreshTab: s.refreshTab,
       persistSave: s.persistSave,
+      persistClear: s.persistClear,
       clearError: s.clearError,
     })),
   );
@@ -123,6 +126,21 @@ export default function Rules() {
     }
   }, [persistSave]);
 
+  const [confirmClear, setConfirmClear] = useState(false);
+  const handleClearConfig = useCallback(async () => {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 3000);
+      return;
+    }
+    setConfirmClear(false);
+    try {
+      await persistClear();
+    } catch (e) {
+      // Error is set in store
+    }
+  }, [confirmClear, persistClear]);
+
   const isAnyLoading = Object.values(loading).some(Boolean);
 
   const topBar = (
@@ -131,6 +149,7 @@ export default function Rules() {
       iconColour="text-indigo-400"
       title="Rules"
       actions={
+        <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">
           {/* Device selector */}
           {framelinkDevices.length > 1 && (
@@ -182,6 +201,22 @@ export default function Rules() {
             >
               <Save className={iconMd} />
               Make Permanent
+            </button>
+          )}
+        </div>
+
+          {device?.connected && (
+            <button
+              onClick={handleClearConfig}
+              className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded ${
+                confirmClear
+                  ? "bg-red-600 hover:bg-red-500 text-white"
+                  : "bg-red-500/10 hover:bg-red-500/20 text-red-400"
+              }`}
+              title="Clear all persisted configuration from device flash"
+            >
+              <Trash2 className={iconMd} />
+              {confirmClear ? "Confirm Clear" : "Clear Config"}
             </button>
           )}
         </div>

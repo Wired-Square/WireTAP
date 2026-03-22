@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use framelink::protocol::dsig;
 use framelink::protocol::stream::{build_frame_tx, FrameMetadata, StreamFrame};
 use framelink::protocol::types::{
-    FLAG_ACK_REQ, IFACE_CANFD, MSG_CAPABILITIES_REQ, MSG_DSIG_LIST, MSG_DSIG_READ,
+    FLAG_ACK_REQ, IFACE_CANFD, MSG_CAPABILITIES_REQ, MSG_DSIG_READ,
     MSG_DSIG_WRITE, MSG_PERSIST_SAVE,
 };
 use serde::Serialize;
@@ -205,14 +205,8 @@ pub async fn framelink_get_interface_signals(
 ) -> Result<Vec<SignalDescriptor>, String> {
     let timeout_sec = timeout.unwrap_or(5.0);
 
-    // 1. List all device signals
-    let list_payload = dsig::build_list_request();
-    let list_frame = shared::request(
-        &host, port, MSG_DSIG_LIST, FLAG_ACK_REQ, &list_payload, timeout_sec,
-    )
-    .await?;
-    let all_signals = dsig::parse_list_response(&list_frame.payload)
-        .map_err(|e| format!("Failed to parse signal list: {}", e))?;
+    // 1. List all device signals (chunked)
+    let all_signals = rules::fetch_all_device_signals(&host, port, timeout_sec).await?;
 
     // 2. Filter to signals targeting this interface
     let iface_signals = dsig::interface_signals(&all_signals, iface_index);

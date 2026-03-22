@@ -35,6 +35,8 @@ import {
   framelinkUserSignalAdd,
   framelinkUserSignalRemove,
   framelinkSignalsSelectable,
+  framelinkLabelSet,
+  type LabelEntityType,
 } from "../../../api/framelinkRules";
 
 // ============================================================================
@@ -121,6 +123,7 @@ interface RulesActions {
   loadSelectableSignals: () => Promise<void>;
   addUserSignal: (signalId: number, metadata?: { name: string; group: string; format: string; unit: string; enum_values?: Record<string, string> }) => Promise<void>;
   removeUserSignal: (signalId: number) => Promise<void>;
+  setLabel: (entityType: LabelEntityType, id: number, name: string | null, description: string | null) => Promise<void>;
   selectItem: (id: string | null) => void;
   clearError: () => void;
   setStatusBar: (entry: StatusBarEntry | null) => void;
@@ -427,7 +430,7 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
       set({ statusBar: statusInfo("Clearing persisted rules...") });
       try {
         await framelinkPersistClear(deviceId());
-        set({ statusBar: statusSuccess("Persisted rules cleared") });
+        set({ temporaryRules: new Set(), statusBar: statusSuccess("Persisted rules cleared") });
         await loadAllTabs();
         await get().loadSelectableSignals();
       } catch (e) {
@@ -469,6 +472,18 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
         return { temporaryRules: temp, statusBar: statusSuccess("User signal removed") };
       });
       await get().loadSelectableSignals();
+    },
+
+    setLabel: async (entityType, id, name, description) => {
+      const did = deviceId();
+      try {
+        await framelinkLabelSet(did, entityType, id, name, description);
+        // Refresh the relevant tab to pick up resolved names
+        const tabMap = { frame_def: "frame-defs", generator: "generators", transformer: "transformers" } as const;
+        await loadTab(tabMap[entityType]);
+      } catch (e) {
+        set({ error: `Failed to set label: ${e}` });
+      }
     },
 
     selectItem: (id) => set({ selectedItemId: id }),
