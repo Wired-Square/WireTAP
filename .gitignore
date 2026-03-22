@@ -28,6 +28,9 @@ dist-ssr
 *.sln
 *.sw?
 CLAUDE.md
+.superpowers
+.history
+.claude
 
 # Rust/Cargo
 src-tauri/target/
