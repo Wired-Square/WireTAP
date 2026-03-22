@@ -48,13 +48,10 @@ export interface DirectoryValidation {
   error?: string;
 }
 
-export interface IOProfile {
-  id: string;
-  name: string;
-  kind: 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'csv_file' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp' | 'virtual' | 'framelink';
-  connection: Record<string, any>;
-  preferred_catalog?: string;
-}
+// IOProfile is the canonical type defined in useSettings.ts — import and re-export
+import type { IOProfile, FrameLinkConnection } from '../../../hooks/useSettings';
+import { isProfileKind } from '../../../hooks/useSettings';
+export type { IOProfile } from '../../../hooks/useSettings';
 
 export interface CatalogFile {
   name: string;
@@ -208,7 +205,7 @@ const initialDialogs: Record<DialogName, boolean> = {
 
 const initialDialogPayload: DialogPayload = {
   editingProfileId: null,
-  profileForm: { id: '', name: '', kind: 'mqtt', connection: {} },
+  profileForm: { id: '', name: '', kind: 'mqtt', connection: {} } satisfies IOProfile,
   ioProfileToDelete: null,
   catalogToDelete: null,
   catalogToDuplicate: null,
@@ -451,19 +448,21 @@ const scheduleSave = (save: () => Promise<void>) => {
  * Returns { profiles, removedIds } where removedIds are IDs that were merged away.
  */
 function migrateFrameLinkProfiles(profiles: IOProfile[]): { profiles: IOProfile[]; removedIds: Set<string> } {
-  const oldStyle = profiles.filter(
-    (p) => p.kind === "framelink" && p.connection?.interface_index != null && !Array.isArray(p.connection?.interfaces),
-  );
+  type FrameLinkProfile = Extract<IOProfile, { kind: "framelink" }>;
+
+  const isOldStyleFrameLink = (p: IOProfile): p is FrameLinkProfile =>
+    isProfileKind(p, "framelink") && p.connection?.interface_index != null && !Array.isArray(p.connection?.interfaces);
+
+  const oldStyle = profiles.filter(isOldStyleFrameLink);
   if (oldStyle.length === 0) return { profiles, removedIds: new Set() };
 
-  const rest = profiles.filter(
-    (p) => !(p.kind === "framelink" && p.connection?.interface_index != null && !Array.isArray(p.connection?.interfaces)),
-  );
+  const rest = profiles.filter((p) => !isOldStyleFrameLink(p));
 
   // Group by (host, device_id) or (host, port) if no device_id
-  const groups = new Map<string, IOProfile[]>();
+  const groups = new Map<string, FrameLinkProfile[]>();
   for (const p of oldStyle) {
-    const key = `${p.connection.host}:${p.connection.device_id ?? p.connection.port ?? "120"}`;
+    const c = p.connection;
+    const key = `${c.host}:${c.device_id ?? c.port ?? "120"}`;
     const group = groups.get(key);
     if (group) group.push(p);
     else groups.set(key, [p]);
@@ -473,31 +472,34 @@ function migrateFrameLinkProfiles(profiles: IOProfile[]): { profiles: IOProfile[
   const removedIds = new Set<string>();
   for (const group of groups.values()) {
     const first = group[0];
+    const fc = first.connection;
     // Derive device label: strip interface suffix from first profile name
-    const ifaceName = (first.connection.interface_name as string) ?? "";
+    const ifaceName = fc.interface_name ?? "";
     const deviceLabel = ifaceName && first.name.endsWith(ifaceName)
-      ? first.name.slice(0, -ifaceName.length).trim() || (first.connection.device_id as string) || first.name
-      : (first.connection.device_id as string) ?? first.name;
+      ? first.name.slice(0, -ifaceName.length).trim() || fc.device_id || first.name
+      : fc.device_id ?? first.name;
+
+    const connection: FrameLinkConnection = {
+      host: fc.host,
+      port: fc.port ?? "120",
+      timeout: fc.timeout,
+      device_id: fc.device_id,
+      interfaces: group
+        .map((p) => ({
+          index: p.connection.interface_index as number,
+          iface_type: (p.connection.interface_type as number) ?? 1,
+          name: p.connection.interface_name ?? `IF${p.connection.interface_index}`,
+        }))
+        .sort((a, b) => a.index - b.index),
+    };
 
     merged.push({
       id: first.id,
       name: deviceLabel,
       kind: "framelink",
-      connection: {
-        host: first.connection.host,
-        port: first.connection.port ?? "120",
-        timeout: first.connection.timeout,
-        device_id: first.connection.device_id,
-        interfaces: group
-          .map((p) => ({
-            index: p.connection.interface_index as number,
-            iface_type: p.connection.interface_type as number ?? 1,
-            name: (p.connection.interface_name as string) ?? `IF${p.connection.interface_index}`,
-          }))
-          .sort((a, b) => a.index - b.index),
-      },
+      connection,
       preferred_catalog: first.preferred_catalog,
-    });
+    } satisfies IOProfile);
 
     // Track removed IDs (all except the first which we kept)
     for (let i = 1; i < group.length; i++) {

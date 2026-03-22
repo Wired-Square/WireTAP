@@ -5,7 +5,8 @@ import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
 import { iconButtonHover } from "../../../styles/buttonStyles";
 import { PROBE_DEBOUNCE_MS } from "../../../constants";
 import Dialog from "../../../components/Dialog";
-import type { IOProfile } from "../stores/settingsStore";
+import type { IOProfile, ConnectionFieldValue } from "../../../hooks/useSettings";
+import { isProfileKind } from "../../../hooks/useSettings";
 import { useSettingsStore } from "../stores/settingsStore";
 import SerialPortPicker from "../components/SerialPortPicker";
 import GsUsbDevicePicker from "../components/GsUsbDevicePicker";
@@ -57,7 +58,7 @@ type Props = {
   onMigratePassword?: () => void;
 
   onUpdateProfileField: (field: keyof IOProfile, value: any) => void;
-  onUpdateConnectionField: (key: string, value: string | boolean) => void;
+  onUpdateConnectionField: (key: string, value: ConnectionFieldValue) => void;
   onUpdateMqttFormat: (
     format: MqttFormatKind,
     field: MqttFormatField,
@@ -80,12 +81,15 @@ export default function IOProfileDialog({
   // Catalog list for preferred decoder picker
   const catalogs = useSettingsStore((s) => s.catalogs.list);
 
-  // Check password storage status
-  const isPasswordSecurelyStored = !!profileForm.connection._password_stored;
+  // Check password storage status (only mqtt and postgres have password fields)
+  const conn = profileForm.connection;
+  const isPasswordSecurelyStored = !!('_password_stored' in conn && conn._password_stored);
   // Legacy password exists if there's a password in the original profile that isn't marked as securely stored
+  const origConn = originalProfile?.connection;
   const hasLegacyPassword = !!(
-    originalProfile?.connection?.password &&
-    !originalProfile?.connection?._password_stored
+    origConn &&
+    'password' in origConn && origConn.password &&
+    !('_password_stored' in origConn && origConn._password_stored)
   );
 
   // slcan device probe state
@@ -118,10 +122,10 @@ export default function IOProfileDialog({
   }, [isOpen, profileForm.kind]);
 
   const loadFlSignals = useCallback(async () => {
-    const host = profileForm.connection.host;
-    const port = Number(profileForm.connection.port) || 120;
-    const timeout = Number(profileForm.connection.timeout) || 5;
-    const interfaces = profileForm.connection.interfaces as Array<{ index: number }> | undefined;
+    if (!isProfileKind(profileForm, "framelink")) return;
+    const { host, port: portStr, timeout: timeoutStr, interfaces } = profileForm.connection;
+    const port = Number(portStr) || 120;
+    const timeout = Number(timeoutStr) || 5;
     if (!host || !interfaces?.length) {
       setFlError("Host and interfaces are required");
       return;
@@ -143,26 +147,24 @@ export default function IOProfileDialog({
     } finally {
       setFlLoading(false);
     }
-  }, [profileForm.connection.host, profileForm.connection.port, profileForm.connection.timeout, profileForm.connection.interfaces]);
+  }, [profileForm]);
 
   // Auto-fetch signals when dialog opens for a framelink profile with valid connection
   useEffect(() => {
-    if (
-      isOpen &&
-      profileForm.kind === "framelink" &&
-      profileForm.connection.host &&
-      Array.isArray(profileForm.connection.interfaces) &&
-      profileForm.connection.interfaces.length > 0
-    ) {
-      loadFlSignals();
+    if (isOpen && isProfileKind(profileForm, "framelink")) {
+      const { host, interfaces } = profileForm.connection;
+      if (host && Array.isArray(interfaces) && interfaces.length > 0) {
+        loadFlSignals();
+      }
     }
   }, [isOpen, profileForm.kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFlWriteSignal = useCallback(
     async (signalId: number, value: number) => {
-      const host = profileForm.connection.host;
-      const port = Number(profileForm.connection.port) || 120;
-      const timeout = Number(profileForm.connection.timeout) || 5;
+      if (!isProfileKind(profileForm, "framelink")) return;
+      const { host, port: portStr, timeout: timeoutStr } = profileForm.connection;
+      const port = Number(portStr) || 120;
+      const timeout = Number(timeoutStr) || 5;
       if (!host) return;
       await framelinkWriteSignal(host, port, signalId, value, flPersist, timeout);
       // Update local state to reflect the written value
@@ -172,14 +174,15 @@ export default function IOProfileDialog({
         ),
       );
     },
-    [profileForm.connection.host, profileForm.connection.port, profileForm.connection.timeout, flPersist],
+    [profileForm, flPersist],
   );
 
   // Re-probe FrameLink device to update interfaces list
   const [flReprobing, setFlReprobing] = useState(false);
   const handleFlReprobe = useCallback(async () => {
-    const host = profileForm.connection.host;
-    const port = Number(profileForm.connection.port) || 120;
+    if (!isProfileKind(profileForm, "framelink")) return;
+    const { host, port: portStr } = profileForm.connection;
+    const port = Number(portStr) || 120;
     if (!host) return;
     setFlReprobing(true);
     try {
@@ -189,7 +192,7 @@ export default function IOProfileDialog({
         iface_type: i.iface_type,
         name: i.name,
         type_name: i.type_name,
-      })) as any);
+      })));
       if (probe.device_id) onUpdateConnectionField("device_id", probe.device_id);
       if (probe.board_name) onUpdateConnectionField("board_name", probe.board_name);
       if (probe.board_revision) onUpdateConnectionField("board_revision", probe.board_revision);
@@ -198,7 +201,7 @@ export default function IOProfileDialog({
     } finally {
       setFlReprobing(false);
     }
-  }, [profileForm.connection.host, profileForm.connection.port, onUpdateConnectionField]);
+  }, [profileForm, onUpdateConnectionField]);
 
   // Reset GVRET probe state when dialog closes or profile type changes
   useEffect(() => {
@@ -211,17 +214,18 @@ export default function IOProfileDialog({
 
   // Initialize GVRET device info from profile connection if available
   useEffect(() => {
-    if (isOpen && (profileForm.kind === "gvret_tcp" || profileForm.kind === "gvret_usb")) {
+    if (isOpen && (isProfileKind(profileForm, "gvret_tcp") || isProfileKind(profileForm, "gvret_usb"))) {
       const busCount = profileForm.connection._probed_bus_count;
       if (typeof busCount === "number" && busCount > 0) {
         setGvretDeviceInfo({ bus_count: busCount });
         setGvretProbeState("success");
       }
     }
-  }, [isOpen, profileForm.kind, profileForm.connection._probed_bus_count]);
+  }, [isOpen, profileForm]);
 
   // Probe GVRET device
   const probeGvret = useCallback(async () => {
+    if (profileForm.kind !== "gvret_tcp" && profileForm.kind !== "gvret_usb") return;
     if (!editingProfileId) {
       setGvretProbeError("Save profile first to probe device");
       setGvretProbeState("error");
@@ -237,7 +241,7 @@ export default function IOProfileDialog({
         setGvretDeviceInfo({ bus_count: result.busCount });
         setGvretProbeState("success");
 
-        const existingInterfaces = profileForm.connection.interfaces as GvretInterfaceConfig[] | undefined;
+        const existingInterfaces = profileForm.connection.interfaces;
         const configuredCount = existingInterfaces?.length || 0;
 
         if (configuredCount === 0) {
@@ -250,7 +254,7 @@ export default function IOProfileDialog({
               protocol: "can" as const,
             })
           );
-          onUpdateConnectionField("interfaces", defaultInterfaces as any);
+          onUpdateConnectionField("interfaces", defaultInterfaces);
         } else if (configuredCount !== result.busCount) {
           // Interface count mismatch - warn user but keep their config
           setGvretProbeError(
@@ -259,7 +263,7 @@ export default function IOProfileDialog({
           );
         }
         // Store probed bus count (always update to track device state)
-        onUpdateConnectionField("_probed_bus_count", result.busCount as any);
+        onUpdateConnectionField("_probed_bus_count", result.busCount);
       } else {
         setGvretProbeError(result.error || "Probe failed");
         setGvretProbeState("error");
@@ -268,11 +272,12 @@ export default function IOProfileDialog({
       setGvretProbeError(e instanceof Error ? e.message : String(e));
       setGvretProbeState("error");
     }
-  }, [editingProfileId, profileForm.connection.interfaces, onUpdateConnectionField]);
+  }, [editingProfileId, profileForm, onUpdateConnectionField]);
 
   // Convert GvretInterfaceConfig[] to BusMappingWithProtocol[] for the component
   const getDeviceBusConfig = useCallback((): BusMappingWithProtocol[] => {
-    const interfaces = profileForm.connection.interfaces as GvretInterfaceConfig[] | undefined;
+    if (profileForm.kind !== "gvret_tcp" && profileForm.kind !== "gvret_usb") return [];
+    const interfaces = profileForm.connection.interfaces;
     if (!interfaces || interfaces.length === 0) {
       // No interfaces configured - show empty state
       return [];
@@ -283,7 +288,7 @@ export default function IOProfileDialog({
       outputBus: iface.device_bus, // Not used in settings mode
       protocol: iface.protocol,
     }));
-  }, [profileForm.connection.interfaces]);
+  }, [profileForm]);
 
   // Handle bus config changes from DeviceBusConfig component
   const handleDeviceBusConfigChange = useCallback(
@@ -293,15 +298,16 @@ export default function IOProfileDialog({
         enabled: mapping.enabled,
         protocol: mapping.protocol || "can",
       }));
-      onUpdateConnectionField("interfaces", interfaces as any);
+      onUpdateConnectionField("interfaces", interfaces);
     },
     [onUpdateConnectionField]
   );
 
   // Probe slcan device
   const probeSlcan = useCallback(async () => {
-    const port = profileForm.connection.port;
-    const baudRate = parseInt(profileForm.connection.baud_rate || "115200", 10);
+    if (!isProfileKind(profileForm, "slcan")) return;
+    const { port, baud_rate, data_bits, stop_bits, parity } = profileForm.connection;
+    const baudRate = parseInt(baud_rate || "115200", 10);
 
     if (!port) {
       setSlcanProbeState("idle");
@@ -310,13 +316,13 @@ export default function IOProfileDialog({
     }
 
     // Get serial framing parameters (advanced options)
-    const dataBits = parseInt(profileForm.connection.data_bits || "8", 10);
-    const stopBits = parseInt(profileForm.connection.stop_bits || "1", 10);
-    const parity = profileForm.connection.parity || "none";
+    const dataBits = parseInt(data_bits || "8", 10);
+    const stopBits = parseInt(stop_bits || "1", 10);
+    const parityVal = parity || "none";
 
     setSlcanProbeState("probing");
     try {
-      const result = await probeSlcanDevice(port, baudRate, { dataBits, stopBits, parity });
+      const result = await probeSlcanDevice(port, baudRate, { dataBits, stopBits, parity: parityVal });
       setSlcanProbeResult({
         success: result.success,
         primaryInfo: result.version,
@@ -332,17 +338,11 @@ export default function IOProfileDialog({
       });
       setSlcanProbeState("error");
     }
-  }, [
-    profileForm.connection.port,
-    profileForm.connection.baud_rate,
-    profileForm.connection.data_bits,
-    profileForm.connection.stop_bits,
-    profileForm.connection.parity,
-  ]);
+  }, [profileForm]);
 
   // Auto-probe when slcan port, baud rate, or framing options change
   useEffect(() => {
-    if (profileForm.kind === "slcan" && profileForm.connection.port) {
+    if (isProfileKind(profileForm, "slcan") && profileForm.connection.port) {
       // Debounce to avoid probing while user is still changing settings
       const timer = setTimeout(() => {
         probeSlcan();
@@ -352,15 +352,7 @@ export default function IOProfileDialog({
       setSlcanProbeState("idle");
       setSlcanProbeResult(null);
     }
-  }, [
-    profileForm.kind,
-    profileForm.connection.port,
-    profileForm.connection.baud_rate,
-    profileForm.connection.data_bits,
-    profileForm.connection.stop_bits,
-    profileForm.connection.parity,
-    probeSlcan,
-  ]);
+  }, [profileForm, probeSlcan]);
 
   // Reset probe state when dialog closes or profile type changes
   useEffect(() => {
@@ -394,6 +386,7 @@ export default function IOProfileDialog({
   // Probe gs_usb device (Windows/macOS - uses nusb userspace driver)
   const probeGsUsb = useCallback(async () => {
     if (!platformIsWindows && !platformIsMacos) return;
+    if (!isProfileKind(profileForm, "gs_usb")) return;
 
     const bus = parseInt(profileForm.connection.bus || "0", 10);
     const address = parseInt(profileForm.connection.address || "0", 10);
@@ -423,11 +416,11 @@ export default function IOProfileDialog({
       });
       setGsUsbProbeState("error");
     }
-  }, [platformIsWindows, platformIsMacos, profileForm.connection.bus, profileForm.connection.address, profileForm.connection.serial]);
+  }, [platformIsWindows, platformIsMacos, profileForm]);
 
   // Auto-probe gs_usb device when bus/address changes (Windows/macOS)
   useEffect(() => {
-    if (profileForm.kind === "gs_usb" && (platformIsWindows || platformIsMacos) && (profileForm.connection.bus || profileForm.connection.address)) {
+    if (isProfileKind(profileForm, "gs_usb") && (platformIsWindows || platformIsMacos) && (profileForm.connection.bus || profileForm.connection.address)) {
       const timer = setTimeout(() => {
         probeGsUsb();
       }, PROBE_DEBOUNCE_MS);
@@ -436,7 +429,7 @@ export default function IOProfileDialog({
       setGsUsbProbeState("idle");
       setGsUsbProbeResult(null);
     }
-  }, [profileForm.kind, platformIsWindows, platformIsMacos, profileForm.connection.bus, profileForm.connection.address, probeGsUsb]);
+  }, [profileForm, platformIsWindows, platformIsMacos, probeGsUsb]);
 
   // Reset gs_usb probe state when dialog closes or profile type changes
   useEffect(() => {
@@ -814,7 +807,7 @@ export default function IOProfileDialog({
                   <label className="flex items-center gap-2 pt-6">
                     <input
                       type="checkbox"
-                      checked={profileForm.connection.loopback !== false && profileForm.connection.loopback !== "false"}
+                      checked={profileForm.connection.loopback !== false}
                       onChange={(e) => onUpdateConnectionField("loopback", e.target.checked)}
                     />
                     <span className={textMedium}>Loopback</span>
@@ -835,7 +828,7 @@ export default function IOProfileDialog({
                       signal_generator: true,
                       frame_rate_hz: 10,
                     });
-                    onUpdateConnectionField("interfaces", updated as any);
+                    onUpdateConnectionField("interfaces", updated);
                   }}
                 >
                   <option value="1">1 interface</option>
@@ -860,7 +853,7 @@ export default function IOProfileDialog({
                     onChange={(e) => {
                       const interfaces = [...((profileForm.connection.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: 10 }]) as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[])];
                       interfaces[idx] = { ...interfaces[idx], frame_rate_hz: parseFloat(e.target.value) || 0 };
-                      onUpdateConnectionField("interfaces", interfaces as any);
+                      onUpdateConnectionField("interfaces", interfaces);
                     }}
                     placeholder="10"
                     className="w-20"
@@ -873,7 +866,7 @@ export default function IOProfileDialog({
                       onChange={(e) => {
                         const interfaces = [...((profileForm.connection.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: 10 }]) as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[])];
                         interfaces[idx] = { ...interfaces[idx], signal_generator: e.target.checked };
-                        onUpdateConnectionField("interfaces", interfaces as any);
+                        onUpdateConnectionField("interfaces", interfaces);
                       }}
                     />
                     <span className={textMedium}>Signal Generator</span>

@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { loadSettings as loadSettingsApi, tlog } from '../api/settings';
 import { getOrCreateDefaultDirs } from '../utils/defaultPaths';
 import { WINDOW_EVENTS } from '../events/registry';
-import { getTraitsForKind, getProfileTraits } from '../utils/profileTraits';
+import { getTraitsForKind, getProfileTraits, type Protocol } from '../utils/profileTraits';
 import {
   DEFAULT_BUFFER_STORAGE,
   DEFAULT_CLEAR_BUFFERS_ON_START,
@@ -19,23 +19,226 @@ import {
   DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
 } from '../apps/settings/stores/settingsStore';
 
-export interface IOProfile {
+// ============================================================================
+// Profile Kind Type
+// ============================================================================
+
+export type ProfileKindId = 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'csv_file' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp' | 'virtual' | 'framelink';
+
+// ============================================================================
+// Connection Interfaces (per profile kind)
+// ============================================================================
+
+export interface MqttConnection {
+  host?: string;
+  port?: string;
+  username?: string;
+  password?: string;
+  _password_stored?: boolean;
+  formats?: {
+    json?: { enabled: boolean; topic: string };
+    savvycan?: { enabled: boolean; topic: string };
+    decode?: { enabled: boolean; topic: string };
+  };
+}
+
+export interface PostgresConnection {
+  host?: string;
+  port?: string;
+  database?: string;
+  username?: string;
+  password?: string;
+  _password_stored?: boolean;
+  sslmode?: string;
+  source_type?: 'can_frame' | 'modbus_frame' | 'serial_frame' | 'serial_raw';
+  default_speed?: string;
+  framing_mode?: string;
+}
+
+/** Interface configuration for GVRET devices */
+export interface GvretInterfaceConfig {
+  device_bus: number;
+  enabled: boolean;
+  protocol: 'can' | 'canfd';
+}
+
+export interface GvretTcpConnection {
+  host?: string;
+  port?: string;
+  timeout?: string;
+  tcp_keepalive?: boolean;
+  interfaces?: GvretInterfaceConfig[];
+  _probed_bus_count?: number;
+}
+
+export interface GvretUsbConnection {
+  port?: string;
+  baud_rate?: string;
+  interfaces?: GvretInterfaceConfig[];
+  _probed_bus_count?: number;
+}
+
+export interface CsvFileConnection {
+  file_path?: string;
+  default_speed?: string;
+}
+
+export interface SerialConnection {
+  port?: string;
+  baud_rate?: string;
+  data_bits?: string;
+  stop_bits?: string;
+  parity?: string;
+  framing_mode?: string;
+  framing_encoding?: string;
+  delimiter?: string[] | string;
+  max_frame_length?: number;
+  min_frame_length?: number;
+  emit_raw_bytes?: boolean;
+  frame_id_config?: { start_byte: number; num_bytes: number; big_endian: boolean };
+  source_address_config?: { start_byte: number; num_bytes: number; big_endian: boolean };
+}
+
+export interface SlcanConnection {
+  port?: string;
+  baud_rate?: string;
+  data_bits?: string;
+  stop_bits?: string;
+  parity?: string;
+  bitrate?: string;
+  silent_mode?: boolean;
+  enable_fd?: boolean;
+  data_bitrate?: string;
+}
+
+export interface SocketcanConnection {
+  interface?: string;
+  bitrate?: string;
+  enable_fd?: boolean;
+  data_bitrate?: string;
+}
+
+export interface GsUsbConnection {
+  device_id?: string;
+  bus?: string;
+  address?: string;
+  serial?: string;
+  interface?: string;
+  bitrate?: string;
+  sample_point?: string;
+  listen_only?: boolean;
+  channel?: string;
+  enable_fd?: boolean;
+  data_bitrate?: string;
+  data_sample_point?: string;
+}
+
+export interface ModbusTcpConnection {
+  host?: string;
+  port?: string;
+  unit_id?: string;
+}
+
+export interface FrameLinkInterfaceConfig {
+  index: number;
+  iface_type: number;
+  name: string;
+  type_name?: string;
+}
+
+export interface FrameLinkConnection {
+  host?: string;
+  port?: string;
+  timeout?: string;
+  device_id?: string;
+  board_name?: string;
+  board_revision?: string;
+  interfaces?: FrameLinkInterfaceConfig[];
+  // Legacy single-interface fields (pre-migration)
+  interface_index?: number;
+  interface_type?: number;
+  interface_name?: string;
+}
+
+export interface VirtualInterfaceConfig {
+  bus: number;
+  signal_generator: boolean;
+  frame_rate_hz: number | string;
+}
+
+export interface VirtualConnection {
+  traffic_type?: 'can' | 'canfd' | 'modbus' | 'serial';
+  loopback?: boolean;
+  interfaces?: VirtualInterfaceConfig[];
+  // Legacy fields
+  bus_count?: string;
+  frame_rate_hz?: number | string;
+  signal_generator?: boolean;
+}
+
+// ============================================================================
+// Connection type map (kind → connection interface)
+// ============================================================================
+
+export interface ConnectionTypeMap {
+  mqtt: MqttConnection;
+  postgres: PostgresConnection;
+  gvret_tcp: GvretTcpConnection;
+  gvret_usb: GvretUsbConnection;
+  csv_file: CsvFileConnection;
+  serial: SerialConnection;
+  slcan: SlcanConnection;
+  socketcan: SocketcanConnection;
+  gs_usb: GsUsbConnection;
+  modbus_tcp: ModbusTcpConnection;
+  virtual: VirtualConnection;
+  framelink: FrameLinkConnection;
+}
+
+// ============================================================================
+// IOProfile — discriminated union
+// ============================================================================
+
+/** Base fields shared by all profile kinds */
+interface IOProfileBase {
   id: string;
   name: string;
-  kind: 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'csv_file' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp' | 'virtual' | 'framelink';
-  connection: Record<string, any>;
   preferred_catalog?: string;
 }
 
-/** Protocol types that a reader can provide */
-export type ReaderProtocol = 'can' | 'canfd' | 'serial' | 'modbus';
+/** IOProfile discriminated union — connection type depends on kind */
+export type IOProfile = {
+  [K in ProfileKindId]: IOProfileBase & {
+    kind: K;
+    connection: ConnectionTypeMap[K];
+  };
+}[ProfileKindId];
 
-/** Interface configuration for GVRET devices (stored in profile connection.interfaces) */
-export interface GvretInterfaceConfig {
-  device_bus: number;  // Device-reported bus number (0-4)
-  enabled: boolean;    // Whether to capture frames from this interface
-  protocol: 'can' | 'canfd';  // Protocol type
+/**
+ * Narrow an IOProfile to a specific kind.
+ * Usage: `if (isProfileKind(profile, "framelink")) { profile.connection.interfaces }`
+ */
+export function isProfileKind<K extends ProfileKindId>(
+  profile: IOProfile,
+  kind: K,
+): profile is Extract<IOProfile, { kind: K }> {
+  return profile.kind === kind;
 }
+
+/** Union of all value types that can appear in connection fields */
+export type ConnectionFieldValue =
+  | string
+  | boolean
+  | number
+  | GvretInterfaceConfig[]
+  | FrameLinkInterfaceConfig[]
+  | VirtualInterfaceConfig[]
+  | string[]
+  | { start_byte: number; num_bytes: number; big_endian: boolean }
+  | MqttConnection['formats'];
+
+/** @deprecated Use Protocol from profileTraits.ts instead */
+export type ReaderProtocol = Protocol;
 
 /**
  * Get display-friendly protocol(s) for a reader kind.
@@ -43,8 +246,8 @@ export interface GvretInterfaceConfig {
  * then filters for display (e.g., shows only "CAN-FD" when FD is enabled,
  * since CAN is implied by CAN-FD).
  */
-export function getReaderProtocols(kind: IOProfile['kind'], connection?: Record<string, any>): ReaderProtocol[] {
-  const traits = getProfileTraits({ id: '', name: '', kind, connection: connection ?? {} });
+export function getReaderProtocols(kind: IOProfile['kind'], connection?: IOProfile['connection']): ReaderProtocol[] {
+  const traits = getProfileTraits({ id: '', name: '', kind, connection: connection ?? {} } as IOProfile);
   if (!traits) return ['can'];
 
   const protocols = traits.protocols.filter(

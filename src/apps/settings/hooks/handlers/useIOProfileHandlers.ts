@@ -6,7 +6,22 @@ import {
   deleteAllCredentials,
   SECURE_FIELDS,
 } from '../../../../api/credentials';
-import { useSettingsStore, type IOProfile } from '../../stores/settingsStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import type {
+  IOProfile,
+  ConnectionFieldValue,
+  MqttConnection,
+  PostgresConnection,
+  GvretTcpConnection,
+  SlcanConnection,
+  SocketcanConnection,
+  ModbusTcpConnection,
+  SerialConnection,
+  FrameLinkConnection,
+  ConnectionTypeMap,
+  ProfileKindId,
+} from '../../../../hooks/useSettings';
+import { isProfileKind } from '../../../../hooks/useSettings';
 import { useSessionStore } from '../../../../stores/sessionStore';
 import { withAppError } from '../../../../utils/appError';
 
@@ -30,15 +45,13 @@ export function useIOProfileHandlers() {
 
   // Open dialog for adding a new profile
   const handleAddIOProfile = () => {
-    setDialogPayload({
-      editingProfileId: null,
-      profileForm: {
-        id: '',
-        name: '',
-        kind: 'mqtt',
-        connection: {},
-      },
-    });
+    const profileForm: IOProfile = {
+      id: '',
+      name: '',
+      kind: 'mqtt',
+      connection: {} satisfies MqttConnection,
+    };
+    setDialogPayload({ editingProfileId: null, profileForm });
     openDialog('ioProfile');
   };
 
@@ -47,14 +60,15 @@ export function useIOProfileHandlers() {
     const profile = profiles.find((p) => p.id === id);
     if (!profile) return;
 
-    // Load secure fields from keyring
-    const connectionWithSecrets = { ...profile.connection };
+    // Load secure fields from keyring into a plain record, then merge back
+    const secretOverrides: Record<string, string> = {};
+    const conn = profile.connection as Record<string, unknown>;
     for (const field of SECURE_FIELDS) {
-      if (connectionWithSecrets[`_${field}_stored`]) {
+      if (conn[`_${field}_stored`]) {
         try {
           const value = await getCredential(id, field);
           if (value) {
-            connectionWithSecrets[field] = value;
+            secretOverrides[field] = value;
           }
         } catch (error) {
           console.error(`Failed to load ${field} from keyring:`, error);
@@ -62,9 +76,10 @@ export function useIOProfileHandlers() {
       }
     }
 
+    const connectionWithSecrets = { ...profile.connection, ...secretOverrides };
     setDialogPayload({
       editingProfileId: id,
-      profileForm: { ...profile, connection: connectionWithSecrets },
+      profileForm: { ...profile, connection: connectionWithSecrets } as IOProfile,
     });
     openDialog('ioProfile');
   };
@@ -153,24 +168,24 @@ export function useIOProfileHandlers() {
     const profileId = editingProfileId || `io_${Date.now()}`;
 
     // Store secure fields in keyring and remove from connection object
-    const connectionWithoutSecrets = { ...processedForm.connection };
+    const connRecord = { ...processedForm.connection } as Record<string, unknown>;
     for (const field of SECURE_FIELDS) {
-      const value = connectionWithoutSecrets[field];
+      const value = connRecord[field];
       if (value && typeof value === 'string' && value.trim()) {
         const ok = await withAppError('Credential Error', `Failed to securely store ${field}.`, () =>
           storeCredential(profileId, field, value)
         );
         if (!ok) return;
-        connectionWithoutSecrets[`_${field}_stored`] = true;
+        connRecord[`_${field}_stored`] = true;
       }
-      delete connectionWithoutSecrets[field];
+      delete connRecord[field];
     }
 
     const profileToSave: IOProfile = {
       ...processedForm,
       id: profileId,
-      connection: connectionWithoutSecrets,
-    };
+      connection: connRecord as ConnectionTypeMap[typeof processedForm.kind],
+    } as IOProfile;
 
     if (editingProfileId) {
       updateProfile(editingProfileId, profileToSave);
@@ -189,23 +204,24 @@ export function useIOProfileHandlers() {
   // Update a field on the profile form
   // NOTE: We use getState() instead of the dialogPayload from the closure to avoid
   // stale closure issues when multiple fields are updated in a single event handler.
-  const updateProfileField = (field: keyof IOProfile, value: any) => {
+  const updateProfileField = (field: keyof IOProfile, value: string | ProfileKindId) => {
     const currentPayload = useSettingsStore.getState().ui.dialogPayload;
     setDialogPayload({
-      profileForm: { ...currentPayload.profileForm, [field]: value },
+      profileForm: { ...currentPayload.profileForm, [field]: value } as IOProfile,
     });
   };
 
   // Update a connection field
   // NOTE: We use getState() instead of the dialogPayload from the closure to avoid
   // stale closure issues when multiple fields are updated in a single event handler.
-  const updateConnectionField = (key: string, value: string | boolean) => {
+  const updateConnectionField = (key: string, value: ConnectionFieldValue) => {
     const currentPayload = useSettingsStore.getState().ui.dialogPayload;
+    const prev = currentPayload.profileForm;
     setDialogPayload({
       profileForm: {
-        ...currentPayload.profileForm,
-        connection: { ...currentPayload.profileForm.connection, [key]: value },
-      },
+        ...prev,
+        connection: { ...prev.connection, [key]: value },
+      } as IOProfile,
     });
   };
 
@@ -218,7 +234,11 @@ export function useIOProfileHandlers() {
     value: string | boolean
   ) => {
     const currentPayload = useSettingsStore.getState().ui.dialogPayload;
-    const formats = currentPayload.profileForm.connection.formats || {
+    const { profileForm } = currentPayload;
+
+    if (!isProfileKind(profileForm, 'mqtt')) return;
+
+    const formats = profileForm.connection.formats || {
       json: { topic: '', enabled: false },
       savvycan: { topic: '', enabled: false },
       decode: { topic: '', enabled: false },
@@ -226,9 +246,9 @@ export function useIOProfileHandlers() {
 
     setDialogPayload({
       profileForm: {
-        ...currentPayload.profileForm,
+        ...profileForm,
         connection: {
-          ...currentPayload.profileForm.connection,
+          ...profileForm.connection,
           formats: {
             ...formats,
             [format]: {
@@ -266,49 +286,64 @@ export function useIOProfileHandlers() {
   };
 }
 
-// Helper: Apply default connection values based on profile kind
+// Helper: Apply default connection values based on profile kind.
+// Each case narrows the discriminated union so TypeScript knows the connection type.
 function applyConnectionDefaults(profile: IOProfile): IOProfile {
-  const processed = { ...profile, connection: { ...profile.connection } };
-
   switch (profile.kind) {
-    case 'mqtt':
-      if (!processed.connection.host) processed.connection.host = 'localhost';
-      if (!processed.connection.port) processed.connection.port = '1883';
-      break;
-    case 'postgres':
-      if (!processed.connection.host) processed.connection.host = 'localhost';
-      if (!processed.connection.port) processed.connection.port = '5432';
-      if (!processed.connection.database) processed.connection.database = 'wiretap';
-      break;
-    case 'gvret_tcp':
-      if (!processed.connection.host) processed.connection.host = '192.168.1.100';
-      if (!processed.connection.port) processed.connection.port = '23';
-      break;
-    case 'framelink':
-      if (!processed.connection.port) processed.connection.port = '120';
-      break;
-    case 'slcan':
-      if (!processed.connection.baud_rate) processed.connection.baud_rate = '115200';
-      if (!processed.connection.bitrate) processed.connection.bitrate = '500000';
-      if (processed.connection.silent_mode === undefined) processed.connection.silent_mode = true;
-      break;
-    case 'socketcan':
-      if (!processed.connection.interface) processed.connection.interface = 'can0';
-      break;
-    case 'modbus_tcp':
-      if (!processed.connection.host) processed.connection.host = '192.168.1.100';
-      if (!processed.connection.port) processed.connection.port = '502';
-      if (!processed.connection.unit_id) processed.connection.unit_id = '1';
-      break;
-    case 'serial':
-      if (!processed.connection.baud_rate) processed.connection.baud_rate = '115200';
-      if (!processed.connection.data_bits) processed.connection.data_bits = '8';
-      if (!processed.connection.stop_bits) processed.connection.stop_bits = '1';
-      if (!processed.connection.parity) processed.connection.parity = 'none';
-      break;
+    case 'mqtt': {
+      const conn: MqttConnection = { ...profile.connection };
+      if (!conn.host) conn.host = 'localhost';
+      if (!conn.port) conn.port = '1883';
+      return { ...profile, connection: conn };
+    }
+    case 'postgres': {
+      const conn: PostgresConnection = { ...profile.connection };
+      if (!conn.host) conn.host = 'localhost';
+      if (!conn.port) conn.port = '5432';
+      if (!conn.database) conn.database = 'wiretap';
+      return { ...profile, connection: conn };
+    }
+    case 'gvret_tcp': {
+      const conn: GvretTcpConnection = { ...profile.connection };
+      if (!conn.host) conn.host = '192.168.1.100';
+      if (!conn.port) conn.port = '23';
+      return { ...profile, connection: conn };
+    }
+    case 'framelink': {
+      const conn: FrameLinkConnection = { ...profile.connection };
+      if (!conn.port) conn.port = '120';
+      return { ...profile, connection: conn };
+    }
+    case 'slcan': {
+      const conn: SlcanConnection = { ...profile.connection };
+      if (!conn.baud_rate) conn.baud_rate = '115200';
+      if (!conn.bitrate) conn.bitrate = '500000';
+      if (conn.silent_mode === undefined) conn.silent_mode = true;
+      return { ...profile, connection: conn };
+    }
+    case 'socketcan': {
+      const conn: SocketcanConnection = { ...profile.connection };
+      if (!conn.interface) conn.interface = 'can0';
+      return { ...profile, connection: conn };
+    }
+    case 'modbus_tcp': {
+      const conn: ModbusTcpConnection = { ...profile.connection };
+      if (!conn.host) conn.host = '192.168.1.100';
+      if (!conn.port) conn.port = '502';
+      if (!conn.unit_id) conn.unit_id = '1';
+      return { ...profile, connection: conn };
+    }
+    case 'serial': {
+      const conn: SerialConnection = { ...profile.connection };
+      if (!conn.baud_rate) conn.baud_rate = '115200';
+      if (!conn.data_bits) conn.data_bits = '8';
+      if (!conn.stop_bits) conn.stop_bits = '1';
+      if (!conn.parity) conn.parity = 'none';
+      return { ...profile, connection: conn };
+    }
+    default:
+      return profile;
   }
-
-  return processed;
 }
 
 export type IOProfileHandlers = ReturnType<typeof useIOProfileHandlers>;
