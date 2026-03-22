@@ -7,6 +7,8 @@ import type {
   BridgeDescriptor,
   TransformerDescriptor,
   GeneratorDescriptor,
+  DiscoveredLed,
+  SelectableSignal,
 } from "../../../api/framelinkRules";
 import {
   framelinkProbe,
@@ -26,11 +28,13 @@ import {
   framelinkGenAdd,
   framelinkGenRemove,
   framelinkGenEnable,
+  framelinkIndicatorsList,
   framelinkPersistSave,
   framelinkPersistLoad,
   framelinkPersistClear,
   framelinkUserSignalAdd,
   framelinkUserSignalRemove,
+  framelinkSignalsSelectable,
 } from "../../../api/framelinkRules";
 
 // ============================================================================
@@ -73,7 +77,9 @@ interface LoadingState {
   bridges: boolean;
   transformers: boolean;
   generators: boolean;
+  indicators: boolean;
   userSignals: boolean;
+  selectableSignals: boolean;
 }
 
 interface RulesState {
@@ -83,6 +89,8 @@ interface RulesState {
   bridges: BridgeDescriptor[];
   transformers: TransformerDescriptor[];
   generators: GeneratorDescriptor[];
+  indicators: DiscoveredLed[];
+  selectableSignals: SelectableSignal[];
   loading: LoadingState;
   temporaryRules: Set<string>;
   selectedItemId: string | null;
@@ -109,7 +117,9 @@ interface RulesActions {
   persistSave: () => Promise<void>;
   persistLoad: () => Promise<void>;
   persistClear: () => Promise<void>;
-  addUserSignal: (signalId: number) => Promise<void>;
+  refreshIndicators: () => Promise<void>;
+  loadSelectableSignals: () => Promise<void>;
+  addUserSignal: (signalId: number, metadata?: { name: string; group: string; format: string; unit: string; enum_values?: Record<string, string> }) => Promise<void>;
   removeUserSignal: (signalId: number) => Promise<void>;
   selectItem: (id: string | null) => void;
   clearError: () => void;
@@ -124,12 +134,16 @@ const initialState: RulesState = {
   bridges: [],
   transformers: [],
   generators: [],
+  indicators: [],
+  selectableSignals: [],
   loading: {
     frameDefs: false,
     bridges: false,
     transformers: false,
     generators: false,
+    indicators: false,
     userSignals: false,
+    selectableSignals: false,
   },
   temporaryRules: new Set(),
   selectedItemId: null,
@@ -208,6 +222,25 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
         }
         break;
       }
+      case "indicators": {
+        set((s) => ({ loading: { ...s.loading, indicators: true } }));
+        try {
+          const indicators = await framelinkIndicatorsList(did);
+          set((s) => ({ indicators, loading: { ...s.loading, indicators: false } }));
+        } catch (e) {
+          set((s) => ({ loading: { ...s.loading, indicators: false }, error: `Failed to load indicators: ${e}` }));
+        }
+        break;
+      }
+    }
+  }
+
+  /** Load all rule types from the device. Called once on connect. */
+  async function loadAllTabs() {
+    // Run sequentially — single serialised connection, concurrent requests would just queue
+    const tabs: RulesTab[] = ["frame-defs", "bridges", "transformers", "generators", "indicators"];
+    for (const tab of tabs) {
+      await loadTab(tab);
     }
   }
 
@@ -228,8 +261,7 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
         // Probe device via WS command — the backend connection manager handles the TCP connection
         const probe = await framelinkProbe(host, port);
         const resolvedId = probe.device_id ?? `${host}:${port}`;
-        // Load initial data using the device_id (now resolvable in the pool)
-        const frameDefs = await framelinkFrameDefList(resolvedId);
+        // Mark connected first so loadAllTabs can use deviceId()
         set({
           device: {
             deviceId: resolvedId,
@@ -241,10 +273,12 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
             error: null,
             interfaces: probe.interfaces,
           },
-          frameDefs,
           temporaryRules: new Set(),
           statusBar: statusSuccess(`Connected to ${label || resolvedId}`),
         });
+        // Load all rule data from the device
+        await loadAllTabs();
+        await get().loadSelectableSignals();
       } catch (e) {
         set({
           device: { deviceId: "", label, host, port, connecting: false, connected: false, error: String(e), interfaces: [] },
@@ -257,11 +291,7 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
     disconnectDevice: () => set({ ...initialState, temporaryRules: new Set() }),
 
     setActiveTab: (tab) => {
-      const prev = get().activeTab;
       set({ activeTab: tab });
-      if (tab !== prev && get().device?.connected) {
-        loadTab(tab);
-      }
     },
 
     refreshTab: async (tab) => {
@@ -277,6 +307,7 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
         return { temporaryRules: temp, statusBar: statusSuccess("Frame definition added") };
       });
       await loadTab("frame-defs");
+      await get().loadSelectableSignals();
     },
 
     removeFrameDef: async (frameDefId) => {
@@ -287,6 +318,7 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
         return { temporaryRules: temp, statusBar: statusSuccess("Frame definition removed") };
       });
       await loadTab("frame-defs");
+      await get().loadSelectableSignals();
     },
 
     addBridge: async (bridge) => {
@@ -383,7 +415,8 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
       try {
         await framelinkPersistLoad(deviceId());
         set({ temporaryRules: new Set(), statusBar: statusSuccess("Persisted configuration loaded") });
-        await loadTab(get().activeTab);
+        await loadAllTabs();
+        await get().loadSelectableSignals();
       } catch (e) {
         set({ statusBar: statusError(`Load failed: ${e}`) });
         throw e;
@@ -395,20 +428,37 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
       try {
         await framelinkPersistClear(deviceId());
         set({ statusBar: statusSuccess("Persisted rules cleared") });
-        await loadTab(get().activeTab);
+        await loadAllTabs();
+        await get().loadSelectableSignals();
       } catch (e) {
         set({ statusBar: statusError(`Clear failed: ${e}`) });
         throw e;
       }
     },
 
-    addUserSignal: async (signalId) => {
-      await framelinkUserSignalAdd(deviceId(), signalId);
+    loadSelectableSignals: async () => {
+      if (!get().device?.connected) return;
+      set((s) => ({ loading: { ...s.loading, selectableSignals: true } }));
+      try {
+        const signals = await framelinkSignalsSelectable(deviceId());
+        set((s) => ({ selectableSignals: signals, loading: { ...s.loading, selectableSignals: false } }));
+      } catch (e) {
+        set((s) => ({ loading: { ...s.loading, selectableSignals: false }, error: `Failed to load selectable signals: ${e}` }));
+      }
+    },
+
+    refreshIndicators: async () => {
+      if (get().device?.connected) await loadTab("indicators");
+    },
+
+    addUserSignal: async (signalId, metadata) => {
+      await framelinkUserSignalAdd(deviceId(), signalId, metadata);
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.add(`usersig:${signalId}`);
         return { temporaryRules: temp, statusBar: statusSuccess("User signal added") };
       });
+      await get().loadSelectableSignals();
     },
 
     removeUserSignal: async (signalId) => {
@@ -418,6 +468,7 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
         temp.delete(`usersig:${signalId}`);
         return { temporaryRules: temp, statusBar: statusSuccess("User signal removed") };
       });
+      await get().loadSelectableSignals();
     },
 
     selectItem: (id) => set({ selectedItemId: id }),

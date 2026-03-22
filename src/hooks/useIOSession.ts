@@ -395,47 +395,66 @@ export function useIOSession(
     return () => useFocusStore.getState().removeListenerId(appName);
   }, [appName]);
 
-  // ---- Sync buffer name/persistent from sessionStore ----
-  // When renameSessionBuffer or setSessionBufferPersistent updates the global store,
-  // sync those fields into localState so the UI reflects the change immediately.
+  // ---- Sync session store → localState ----
+  // The session store receives WS push messages (SessionState, SessionLifecycle,
+  // StreamEnded, etc.) and updates sessions[id].ioState / capabilities / buffer.
+  // useIOSession manages its own localState — this subscription keeps it in sync
+  // so the UI reflects backend state changes (e.g., stop → "stopped").
   useEffect(() => {
     if (!effectiveSessionId) return;
     const unsub = useSessionStore.subscribe((state, prevState) => {
       const session = state.sessions[effectiveSessionId];
       const prevSession = prevState.sessions[effectiveSessionId];
       if (!session || !prevSession) return;
-      if (
-        session.buffer.name !== prevSession.buffer.name ||
-        session.buffer.persistent !== prevSession.buffer.persistent
-      ) {
-        // Also update expectedStateRef if it's active (e.g., buffer sessions that
-        // don't auto-start never receive streaming events to clear the ref, so
-        // effectiveState would read stale values from the ref instead of localState)
-        if (expectedStateRef.current?.sessionId === effectiveSessionId) {
-          expectedStateRef.current = {
-            ...expectedStateRef.current,
-            state: {
-              ...expectedStateRef.current.state,
-              buffer: {
-                ...expectedStateRef.current.state.buffer,
-                name: session.buffer.name,
-                persistent: session.buffer.persistent,
-              },
-            },
+
+      const ioStateChanged = session.ioState !== prevSession.ioState;
+      const capsChanged = session.capabilities !== prevSession.capabilities;
+      const bufferNameChanged = session.buffer.name !== prevSession.buffer.name;
+      const bufferPersistentChanged = session.buffer.persistent !== prevSession.buffer.persistent;
+
+      if (!ioStateChanged && !capsChanged && !bufferNameChanged && !bufferPersistentChanged) return;
+
+      // Build the partial update
+      const patch: Partial<LocalSessionState> = {};
+      if (ioStateChanged) {
+        patch.ioState = session.ioState;
+      }
+      if (capsChanged && session.capabilities) {
+        patch.capabilities = session.capabilities;
+      }
+      if (bufferNameChanged || bufferPersistentChanged) {
+        // Buffer fields are nested — built in setLocalState below
+      }
+
+      // Update expectedStateRef if it's active (e.g., buffer sessions that
+      // don't auto-start never receive streaming events to clear the ref, so
+      // effectiveState would read stale values from the ref instead of localState)
+      if (expectedStateRef.current?.sessionId === effectiveSessionId) {
+        const refState = { ...expectedStateRef.current.state };
+        if (ioStateChanged) refState.ioState = session.ioState;
+        if (capsChanged && session.capabilities) refState.capabilities = session.capabilities;
+        if (bufferNameChanged || bufferPersistentChanged) {
+          refState.buffer = {
+            ...refState.buffer,
+            name: session.buffer.name,
+            persistent: session.buffer.persistent,
           };
         }
-        setLocalState((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            buffer: {
-              ...prev.buffer,
-              name: session.buffer.name,
-              persistent: session.buffer.persistent,
-            },
-          };
-        });
+        expectedStateRef.current = { ...expectedStateRef.current, state: refState };
       }
+
+      setLocalState((prev) => {
+        if (!prev) return prev;
+        const updated = { ...prev, ...patch };
+        if (bufferNameChanged || bufferPersistentChanged) {
+          updated.buffer = {
+            ...prev.buffer,
+            name: session.buffer.name,
+            persistent: session.buffer.persistent,
+          };
+        }
+        return updated;
+      });
     });
     return unsub;
   }, [effectiveSessionId]);

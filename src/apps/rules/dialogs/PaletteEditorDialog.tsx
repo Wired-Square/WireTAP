@@ -14,6 +14,7 @@ import { iconMd } from "../../../styles/spacing";
 import ColourPicker from "../components/ColourPicker";
 import PalettePreview from "../components/PalettePreview";
 import { brgbToCss, cssToBrgb } from "../utils/brgbColour";
+import { formatHexId } from "../utils/formatHex";
 import {
   framelinkPalettesList,
   framelinkDsigWrite,
@@ -220,7 +221,7 @@ export default function PaletteEditorDialog({
 
             {selectedPalette && (
               <div className={`text-xs ${textTertiary}`}>
-                Signal start: 0x{selectedPalette.signal_start.toString(16).toUpperCase().padStart(4, "0")}
+                Signal start: {formatHexId(selectedPalette.signal_start)}
                 {` · ${entries.length} entries`}
               </div>
             )}

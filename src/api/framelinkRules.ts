@@ -284,10 +284,12 @@ export function framelinkPersistClear(deviceId: string): Promise<void> {
 export function framelinkUserSignalAdd(
   deviceId: string,
   signalId: number,
+  metadata?: { name: string; group: string; format: string; unit: string; enum_values?: Record<string, string> },
 ): Promise<void> {
   return wsTransport.command("framelink.user_signal.add", {
     device_id: deviceId,
     signal_id: signalId,
+    ...metadata,
   });
 }
 
@@ -412,5 +414,25 @@ export function framelinkPalettesList(
   deviceId: string,
 ): Promise<PaletteInfo[]> {
   return wsTransport.command("framelink.palettes.list", { device_id: deviceId });
+}
+
+// ============================================================================
+// Selectable signals
+// ============================================================================
+
+export interface SelectableSignal {
+  signal_id: number;
+  name: string;
+  group: string;
+  tier: "frame_def" | "device" | "user";
+  /** Bit width of the signal (1-64 for frame def signals, 64 for device/user registers) */
+  bit_length: number;
+  frame_def_id?: number;
+}
+
+export function framelinkSignalsSelectable(
+  deviceId: string,
+): Promise<SelectableSignal[]> {
+  return wsTransport.command("framelink.signals.selectable", { device_id: deviceId });
 }
 

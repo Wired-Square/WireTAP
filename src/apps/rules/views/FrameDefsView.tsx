@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
@@ -12,6 +12,7 @@ import type { FrameDefDescriptor, SignalDefDescriptor } from "../../../api/frame
 import FrameDefDialog from "../dialogs/FrameDefDialog";
 import FrameDefEditor from "./FrameDefEditor";
 import type { FrameHeader, FrameDefPayload } from "../utils/bitGrid";
+import { formatHexId } from "../utils/formatHex";
 
 export default function FrameDefsView() {
   const { frameDefs, loading, temporaryRules, device, removeFrameDef, addFrameDef } =
@@ -36,10 +37,7 @@ export default function FrameDefsView() {
     isNew: boolean;
   } | null>(null);
 
-  const nextId =
-    frameDefs.length > 0
-      ? Math.max(...frameDefs.map((fd) => fd.frame_def_id)) + 1
-      : 1;
+  const usedIds = useMemo(() => new Set(frameDefs.map((fd) => fd.frame_def_id)), [frameDefs]);
 
   const handleAdd = useCallback(
     (headerInfo: {
@@ -146,7 +144,7 @@ export default function FrameDefsView() {
                   {fd.name}
                 </span>
                 <span className={`text-xs font-mono ${textTertiary}`}>
-                  #{fd.frame_def_id}
+                  #{formatHexId(fd.frame_def_id)}
                 </span>
                 <span
                   className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
@@ -186,7 +184,7 @@ export default function FrameDefsView() {
         onClose={() => setDialogOpen(false)}
         onSubmit={handleAdd}
         interfaces={device?.interfaces ?? []}
-        nextId={nextId}
+        usedIds={usedIds}
       />
     </div>
   );

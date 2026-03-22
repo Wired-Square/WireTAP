@@ -1,13 +1,15 @@
 // Copyright 2026 Wired Square Pty Ltd
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
+import { nextAvailableId } from "../utils/framelinkConstants";
+import { formatHexId } from "../utils/formatHex";
 
 interface FilterRow {
   can_id: string;
@@ -19,7 +21,7 @@ interface BridgeDialogProps {
   onClose: () => void;
   onSubmit: (bridges: Record<string, unknown>[]) => void;
   interfaces: { index: number; iface_type: number; name: string }[];
-  nextId: number;
+  usedIds: Set<number>;
 }
 
 export default function BridgeDialog({
@@ -27,9 +29,14 @@ export default function BridgeDialog({
   onClose,
   onSubmit,
   interfaces,
-  nextId,
+  usedIds,
 }: BridgeDialogProps) {
-  const [bridgeId, setBridgeId] = useState(nextId);
+  const [bridgeId, setBridgeId] = useState(() => nextAvailableId(usedIds));
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) setBridgeId(nextAvailableId(usedIds));
+  }, [isOpen, usedIds]);
   const [sourceInterface, setSourceInterface] = useState(interfaces[0]?.index ?? 0);
   const [destInterface, setDestInterface] = useState(interfaces[1]?.index ?? interfaces[0]?.index ?? 0);
   const [bidirectional, setBidirectional] = useState(true);
@@ -57,6 +64,15 @@ export default function BridgeDialog({
   );
 
   const handleSubmit = () => {
+    if (usedIds.has(bridgeId)) {
+      setValidationError(`Bridge ID ${formatHexId(bridgeId)} is already in use.`);
+      return;
+    }
+    if (bidirectional && usedIds.has(bridgeId + 1)) {
+      setValidationError(`Bridge ID ${formatHexId(bridgeId + 1)} (reverse) is already in use.`);
+      return;
+    }
+    setValidationError(null);
     const parsedFilters = filters
       .map((f) => ({
         can_id: parseInt(f.can_id, 16) || 0,
@@ -95,6 +111,10 @@ export default function BridgeDialog({
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
           Add Bridge
         </h2>
+
+        {validationError && (
+          <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
+        )}
 
         <div className="space-y-4">
           <div>

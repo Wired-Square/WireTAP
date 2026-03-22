@@ -1,14 +1,18 @@
 // Copyright 2026 Wired Square Pty Ltd
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState, useCallback } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
-import { panelFooter } from "../../../styles/cardStyles";
-import { iconMd } from "../../../styles/spacing";
+import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { cardDefault, cardPadding, panelFooter } from "../../../styles/cardStyles";
+import { iconMd, iconSm } from "../../../styles/spacing";
 import type { FrameDefDescriptor } from "../../../api/framelinkRules";
+import SignalCombobox from "../components/SignalCombobox";
+import { useRulesStore } from "../stores/rulesStore";
+import { DEFAULT_SIGNAL_MASK, nextAvailableId } from "../utils/framelinkConstants";
+import { formatHexId } from "../utils/formatHex";
 
 interface MappingRow {
   source_signal_id: number;
@@ -25,7 +29,7 @@ interface GeneratorDialogProps {
   onSubmit: (generator: Record<string, unknown>) => void;
   interfaces: { index: number; iface_type: number; name: string }[];
   frameDefs: FrameDefDescriptor[];
-  nextId: number;
+  usedIds: Set<number>;
 }
 
 const TRIGGER_TYPES = [
@@ -40,9 +44,15 @@ export default function GeneratorDialog({
   onSubmit,
   interfaces,
   frameDefs,
-  nextId,
+  usedIds,
 }: GeneratorDialogProps) {
-  const [generatorId, setGeneratorId] = useState(nextId);
+  const selectableSignals = useRulesStore((s) => s.selectableSignals);
+  const [generatorId, setGeneratorId] = useState(() => nextAvailableId(usedIds));
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) setGeneratorId(nextAvailableId(usedIds));
+  }, [isOpen, usedIds]);
   const [frameDefId, setFrameDefId] = useState(
     frameDefs[0]?.frame_def_id ?? 0,
   );
@@ -62,7 +72,7 @@ export default function GeneratorDialog({
         transform_type: "direct",
         scale: 1.0,
         offset: 0.0,
-        mask: 0xffffffff,
+        mask: DEFAULT_SIGNAL_MASK,
       },
     ]);
   }, []);
@@ -81,6 +91,11 @@ export default function GeneratorDialog({
   );
 
   const handleSubmit = () => {
+    if (usedIds.has(generatorId)) {
+      setValidationError(`Generator ID ${formatHexId(generatorId)} is already in use.`);
+      return;
+    }
+    setValidationError(null);
     onSubmit({
       generator_id: generatorId,
       frame_def_id: frameDefId,
@@ -105,6 +120,10 @@ export default function GeneratorDialog({
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
           Add Generator
         </h2>
+
+        {validationError && (
+          <div className="mb-3 p-2 text-xs text-red-400 bg-red-500/10 rounded">{validationError}</div>
+        )}
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
@@ -184,68 +203,59 @@ export default function GeneratorDialog({
               <Plus className={iconMd} /> Add Mapping
             </button>
           </div>
-          {mappings.length > 0 && (
-            <div className={`border ${borderDefault} rounded-lg overflow-hidden`}>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className={`${textTertiary} border-b ${borderDefault}`}>
-                    <th className="px-2 py-1 text-left">Src Signal</th>
-                    <th className="px-2 py-1 text-left">Dst Signal</th>
-                    <th className="px-2 py-1 text-left">Transform</th>
-                    <th className="px-2 py-1"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mappings.map((m, idx) => (
-                    <tr key={idx} className={`border-b ${borderDefault} last:border-b-0`}>
-                      <td className="px-2 py-1">
-                        <input
-                          type="number"
-                          className={`w-16 ${inputSimple} text-xs py-0.5 px-1`}
-                          value={m.source_signal_id}
-                          onChange={(e) =>
-                            updateMapping(idx, "source_signal_id", parseInt(e.target.value) || 0)
-                          }
-                        />
-                      </td>
-                      <td className="px-2 py-1">
-                        <input
-                          type="number"
-                          className={`w-16 ${inputSimple} text-xs py-0.5 px-1`}
-                          value={m.dest_signal_id}
-                          onChange={(e) =>
-                            updateMapping(idx, "dest_signal_id", parseInt(e.target.value) || 0)
-                          }
-                        />
-                      </td>
-                      <td className="px-2 py-1">
-                        <select
-                          className={`${inputSimple} text-xs py-0.5 px-1`}
-                          value={m.transform_type}
-                          onChange={(e) =>
-                            updateMapping(idx, "transform_type", e.target.value)
-                          }
-                        >
-                          <option value="direct">Direct</option>
-                          <option value="scale">Scale</option>
-                          <option value="invert">Invert</option>
-                          <option value="mask">Mask</option>
-                        </select>
-                      </td>
-                      <td className="px-2 py-1">
-                        <button
-                          onClick={() => removeMapping(idx)}
-                          className={`p-0.5 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="space-y-2">
+            {mappings.map((m, idx) => {
+              const srcSignal = selectableSignals.find((s) => s.signal_id === m.source_signal_id);
+              return (
+              <div key={idx} className={`${cardDefault} ${cardPadding.sm}`}>
+                <div className="flex items-start gap-3">
+                  {/* Source → Dest vertical flow */}
+                  <div className="flex-1 space-y-1">
+                    <label className={`text-xs ${textTertiary}`}>Source Signal</label>
+                    <SignalCombobox
+                      signals={selectableSignals}
+                      value={m.source_signal_id || null}
+                      onChange={(id) => updateMapping(idx, "source_signal_id", id)}
+                      placeholder="Source signal"
+                    />
+                    <div className={`flex justify-center ${textTertiary}`}>
+                      <ArrowDown className={iconSm} />
+                    </div>
+                    <label className={`text-xs ${textTertiary}`}>Destination Signal</label>
+                    <SignalCombobox
+                      signals={selectableSignals}
+                      value={m.dest_signal_id || null}
+                      onChange={(id) => updateMapping(idx, "dest_signal_id", id)}
+                      placeholder="Dest signal"
+                      minBitLength={srcSignal?.bit_length}
+                    />
+                  </div>
+                  {/* Transform + delete */}
+                  <div className="flex flex-col items-end gap-2 pt-5">
+                    <select
+                      className={inputSimple}
+                      value={m.transform_type}
+                      onChange={(e) =>
+                        updateMapping(idx, "transform_type", e.target.value)
+                      }
+                    >
+                      <option value="direct">Direct</option>
+                      <option value="scale">Scale</option>
+                      <option value="invert">Invert</option>
+                      <option value="mask">Mask</option>
+                    </select>
+                    <button
+                      onClick={() => removeMapping(idx)}
+                      className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                      title="Remove mapping"
+                    >
+                      <Trash2 className={iconSm} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              ); })}
+          </div>
         </div>
       </div>
 

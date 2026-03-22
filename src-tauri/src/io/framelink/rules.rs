@@ -4,6 +4,8 @@
 // FrameLink rule operations dispatched via WS commands.
 // All operations route through the shared connection pool (one TCP connection per device).
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -20,6 +22,7 @@ use framelink::board::{
     INDICATOR_XFORM_ID_BASE,
 };
 use framelink::board::display::{resolve_frame_def_display, resolve_iface_display, resolve_signal_name};
+use framelink::board::editable::EditableSignal;
 
 use super::shared;
 
@@ -451,6 +454,9 @@ pub async fn dispatch_framelink_command(
         // Palettes (from board definition)
         "framelink.palettes.list" => cmd_palettes_list(params).await,
 
+        // Selectable signals
+        "framelink.signals.selectable" => cmd_signals_selectable(params).await,
+
         _ => Err(format!("Unknown framelink command: {op_name}")),
     }
 }
@@ -500,6 +506,10 @@ async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
     let info = parse_frame_def_info(fd)?;
     let payload = frame_def::build_frame_def_add(&info);
     shared::request(&host, port, MSG_FRAME_DEF_ADD, FLAG_ACK_REQ, &payload, timeout).await?;
+
+    // Upload the board definition so any pending editable changes are pushed
+    let _ = shared::upload_board_def(&host, port, timeout).await;
+
     Ok(Value::Null)
 }
 
@@ -751,6 +761,51 @@ async fn cmd_user_signal_add(params: Value) -> Result<Value, String> {
         &host, port, MSG_USER_SIGNAL_ADD, FLAG_ACK_REQ, &payload, timeout,
     )
     .await?;
+
+    // Insert signal metadata into the editable board definition
+    let name = params["name"]
+        .as_str()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("User Signal 0x{:04X}", signal_id));
+    let group = params["group"]
+        .as_str()
+        .unwrap_or("User")
+        .to_string();
+    let format_str = params["format"]
+        .as_str()
+        .unwrap_or("number")
+        .to_string();
+    let unit = params["unit"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let enum_values: BTreeMap<u32, String> = params["enum_values"]
+        .as_object()
+        .map(|obj| {
+            obj.iter()
+                .filter_map(|(k, v)| {
+                    let key = k.parse::<u32>().ok()?;
+                    let val = v.as_str()?.to_string();
+                    Some((key, val))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    shared::with_editable_board_def(&host, port, timeout, |board_def| {
+        board_def.signals.insert(signal_id, EditableSignal {
+            name,
+            group,
+            unit,
+            format: format_str,
+            enum_values,
+        });
+        board_def.dirty = true;
+    })
+    .await?;
+
+    shared::upload_board_def(&host, port, timeout).await?;
+
     Ok(Value::Null)
 }
 
@@ -765,6 +820,21 @@ async fn cmd_user_signal_remove(params: Value) -> Result<Value, String> {
         &host, port, MSG_USER_SIGNAL_REMOVE, FLAG_ACK_REQ, &payload, timeout,
     )
     .await?;
+
+    // Remove the signal metadata from the editable board definition
+    let removed = shared::with_editable_board_def(&host, port, timeout, |board_def| {
+        let existed = board_def.signals.remove(&signal_id).is_some();
+        if existed {
+            board_def.dirty = true;
+        }
+        existed
+    })
+    .await?;
+
+    if removed {
+        shared::upload_board_def(&host, port, timeout).await?;
+    }
+
     Ok(Value::Null)
 }
 
@@ -1094,4 +1164,20 @@ async fn cmd_indicator_remove(params: Value) -> Result<Value, String> {
 
     shared::request_batch(&host, port, messages, timeout).await?;
     Ok(Value::Null)
+}
+
+// ============================================================================
+// Selectable signals (all signals available for UI selection)
+// ============================================================================
+
+async fn cmd_signals_selectable(params: Value) -> Result<Value, String> {
+    let (host, port) = get_host_port(&params).await?;
+    let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&host, port, timeout).await?;
+    let board_def = shared::load_board_def(&host, port).await;
+    let signals =
+        framelink::board::selectable::list_selectable_signals(&conn.session, board_def.as_ref())
+            .await
+            .map_err(|e| format!("Failed to list selectable signals: {e}"))?;
+    serde_json::to_value(&signals).map_err(|e| e.to_string())
 }

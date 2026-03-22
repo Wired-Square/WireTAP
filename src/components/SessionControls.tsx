@@ -431,9 +431,10 @@ export function IOSessionControls({
   onClearBuffer,
   hasData = false,
 }: IOSessionControlsProps) {
-  // Auto-hide session controls when in buffer mode (playback controls are in the toolbar instead)
+  // Auto-hide session controls when in buffer mode (playback controls are in the toolbar instead),
+  // but always show when stopped so the Resume button remains accessible
   const isBufferMode = isBufferModeProp ?? isBufferProfileId(ioProfile);
-  const shouldHideControls = hideSessionControls || isBufferMode;
+  const shouldHideControls = (hideSessionControls || isBufferMode) && !isStopped;
   // Live session = we have an ioProfile that's not a buffer
   const isLiveSession = ioProfile !== null && !isBufferMode;
 
