@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use framelink::protocol::dsig;
 use framelink::protocol::stream::{build_frame_tx, FrameMetadata, StreamFrame};
 use framelink::protocol::types::{
-    FLAG_ACK_REQ, IFACE_CANFD, MSG_CAPABILITIES_REQ, MSG_DSIG_READ,
+    FLAG_ACK_REQ, IFACE_CANFD, MSG_DSIG_READ,
     MSG_DSIG_WRITE, MSG_PERSIST_SAVE,
 };
 use serde::Serialize;
@@ -40,17 +40,21 @@ pub struct FrameLinkProbeResult {
 
 /// Probe a FrameLink device to discover its capabilities.
 /// Returns cached data if a managed connection already exists (device accepts only 1 client).
-/// Otherwise triggers a connection via the manager, which populates the probe cache.
+/// Otherwise triggers a connection via connect_by_address, which populates the probe cache.
 pub async fn probe_framelink(
     host: &str,
     port: u16,
     timeout_sec: f64,
 ) -> Result<FrameLinkProbeResult, String> {
-    if let Some(cached) = shared::get_cached_probe(host, port).await {
+    // Check if this address already has a cached probe
+    let addr: std::net::SocketAddr = format!("{}:{}", host, port)
+        .parse()
+        .map_err(|e| format!("Invalid address {}:{}: {}", host, port, e))?;
+
+    if let Some(cached) = shared::find_probe_by_address(addr).await {
         tlog!(
             "[probe_framelink] Returning cached probe data for {}:{}",
-            host,
-            port
+            host, port
         );
         return Ok(cached);
     }
@@ -60,11 +64,9 @@ pub async fn probe_framelink(
         host, port, timeout_sec
     );
 
-    // Trigger connection creation via a capabilities request
-    shared::request(host, port, MSG_CAPABILITIES_REQ, FLAG_ACK_REQ, &[], timeout_sec).await?;
+    let device_id = shared::connect_by_address(host, port, timeout_sec).await?;
 
-    // Connection now exists with populated probe_cache
-    shared::get_cached_probe(host, port)
+    shared::get_cached_probe(&device_id)
         .await
         .ok_or_else(|| "Connection closed before probe data could be retrieved".to_string())
 }
@@ -198,15 +200,18 @@ pub struct SignalReadResult {
 /// Read all device signals for a given interface, enriched with board def metadata.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn framelink_get_interface_signals(
-    host: String,
-    port: u16,
+    device_id: String,
     iface_index: u8,
     timeout: Option<f64>,
 ) -> Result<Vec<SignalDescriptor>, String> {
     let timeout_sec = timeout.unwrap_or(5.0);
+    let conn = shared::get_connection(&device_id, timeout_sec).await?;
 
-    // 1. List all device signals (chunked)
-    let all_signals = rules::fetch_all_device_signals(&host, port, timeout_sec).await?;
+    // 1. List all device signals via session method
+    let all_signals = conn.session
+        .list_all_signals()
+        .await
+        .map_err(|e| e.to_string())?;
 
     // 2. Filter to signals targeting this interface
     let iface_signals = dsig::interface_signals(&all_signals, iface_index);
@@ -215,19 +220,18 @@ pub async fn framelink_get_interface_signals(
     }
 
     // 2b. Look up interface type for this index
-    let iface_type = shared::get_iface_type(&host, port, iface_index).await.unwrap_or(0);
+    let iface_type = shared::get_iface_type(&device_id, iface_index).await.unwrap_or(0);
 
     // 3. Load board def for metadata
-    let board_def = shared::load_board_def(&host, port).await;
+    let board_def = shared::load_board_def(&device_id).await;
 
     // 4. Read current value for each signal and build descriptors
     let mut descriptors = Vec::with_capacity(iface_signals.len());
     for sig in &iface_signals {
         let read_payload = dsig::build_read_request(sig.signal_id);
-        let value = match shared::request(
-            &host, port, MSG_DSIG_READ, FLAG_ACK_REQ, &read_payload, timeout_sec,
-        )
-        .await
+        let value = match conn.session
+            .request(MSG_DSIG_READ, FLAG_ACK_REQ, &read_payload)
+            .await
         {
             Ok(frame) => match dsig::parse_read_response(&frame.payload) {
                 Ok(sv) => sv.value,
@@ -281,25 +285,27 @@ pub async fn framelink_get_interface_signals(
 /// Write a device signal value, with optional persist.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn framelink_write_signal(
-    host: String,
-    port: u16,
+    device_id: String,
     signal_id: u16,
     value: u64,
     persist: bool,
     timeout: Option<f64>,
 ) -> Result<(), String> {
     let timeout_sec = timeout.unwrap_or(5.0);
+    let conn = shared::get_connection(&device_id, timeout_sec).await?;
 
     let write_payload = dsig::build_write_request(signal_id, value);
-    shared::request(&host, port, MSG_DSIG_WRITE, FLAG_ACK_REQ, &write_payload, timeout_sec)
-        .await?;
+    conn.session
+        .request(MSG_DSIG_WRITE, FLAG_ACK_REQ, &write_payload)
+        .await
+        .map_err(|e| e.to_string())?;
 
     if persist {
         let persist_payload = framelink::protocol::persist::build_persist_save();
-        shared::request(
-            &host, port, MSG_PERSIST_SAVE, FLAG_ACK_REQ, &persist_payload, timeout_sec,
-        )
-        .await?;
+        conn.session
+            .request(MSG_PERSIST_SAVE, FLAG_ACK_REQ, &persist_payload)
+            .await
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -308,17 +314,17 @@ pub async fn framelink_write_signal(
 /// Read a single device signal value.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn framelink_read_signal(
-    host: String,
-    port: u16,
+    device_id: String,
     signal_id: u16,
     timeout: Option<f64>,
 ) -> Result<SignalReadResult, String> {
     let timeout_sec = timeout.unwrap_or(5.0);
+    let conn = shared::get_connection(&device_id, timeout_sec).await?;
     let read_payload = dsig::build_read_request(signal_id);
-    let frame = shared::request(
-        &host, port, MSG_DSIG_READ, FLAG_ACK_REQ, &read_payload, timeout_sec,
-    )
-    .await?;
+    let frame = conn.session
+        .request(MSG_DSIG_READ, FLAG_ACK_REQ, &read_payload)
+        .await
+        .map_err(|e| e.to_string())?;
     let sv = dsig::parse_read_response(&frame.payload)
         .map_err(|e| format!("Failed to parse signal read: {}", e))?;
     Ok(SignalReadResult {

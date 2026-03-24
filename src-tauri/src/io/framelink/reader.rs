@@ -9,7 +9,6 @@ use std::sync::mpsc as std_mpsc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use framelink::protocol::stream::parse_frame_rx;
 use tokio::sync::mpsc;
 
 use super::convert_stream_frame;
@@ -31,7 +30,18 @@ pub async fn run_source(
     stop_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
-    let conn = match shared::session_acquire(&host, port, timeout_sec).await {
+    // Bootstrap: connect by address to get device_id
+    let device_id = match shared::connect_by_address(&host, port, timeout_sec).await {
+        Ok(id) => id,
+        Err(e) => {
+            let _ = tx
+                .send(SourceMessage::Error(source_idx, e))
+                .await;
+            return;
+        }
+    };
+
+    let conn = match shared::session_acquire(&device_id, timeout_sec).await {
         Ok(c) => c,
         Err(e) => {
             let _ = tx
@@ -77,53 +87,56 @@ pub async fn run_source(
         .map(|m| m.device_bus)
         .collect();
 
+    let mut poll_interval = tokio::time::interval(Duration::from_millis(1));
+
     loop {
-        if stop_flag.load(Ordering::SeqCst) {
-            break;
-        }
-
-        while let Ok(req) = transmit_rx.try_recv() {
-            let result = conn
-                .session
-                .transmit(&req.data)
-                .await
-                .map_err(|e| e.to_string());
-            let _ = req.result_tx.send(result);
-        }
-
-        match tokio::time::timeout(Duration::from_millis(1), frame_rx.recv()).await {
-            Ok(Ok(sf)) => {
-                if !my_interfaces.contains(&sf.iface_index) {
-                    continue;
-                }
-                if let Ok(parsed) = parse_frame_rx(&sf.payload) {
-                    if let Some(msg) =
-                        convert_stream_frame(&parsed, &bus_mappings, &conn.iface_types)
-                    {
+        tokio::select! {
+            result = frame_rx.recv() => {
+                match result {
+                    Ok(sf) => {
+                        if !my_interfaces.contains(&sf.iface_index) {
+                            continue;
+                        }
+                        if let Some(msg) =
+                            convert_stream_frame(&sf, &bus_mappings, &conn.iface_types)
+                        {
+                            let _ = tx
+                                .send(SourceMessage::Frames(source_idx, vec![msg]))
+                                .await;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tlog!("[framelink] Source {} lagged {} frames", source_idx, n);
+                    }
+                    Err(_) => {
                         let _ = tx
-                            .send(SourceMessage::Frames(source_idx, vec![msg]))
+                            .send(SourceMessage::Ended(
+                                source_idx,
+                                "disconnected".to_string(),
+                            ))
                             .await;
+                        shared::session_release(&device_id).await;
+                        return;
                     }
                 }
             }
-            Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(n))) => {
-                tlog!("[framelink] Source {} lagged {} frames", source_idx, n);
+            _ = poll_interval.tick() => {
+                if stop_flag.load(Ordering::SeqCst) {
+                    break;
+                }
+                while let Ok(req) = transmit_rx.try_recv() {
+                    let result = conn
+                        .session
+                        .transmit(&req.data)
+                        .await
+                        .map_err(|e| e.to_string());
+                    let _ = req.result_tx.send(result);
+                }
             }
-            Ok(Err(_)) => {
-                let _ = tx
-                    .send(SourceMessage::Ended(
-                        source_idx,
-                        "disconnected".to_string(),
-                    ))
-                    .await;
-                shared::session_release(&host, port).await;
-                return;
-            }
-            Err(_) => {}
         }
     }
 
-    shared::session_release(&host, port).await;
+    shared::session_release(&device_id).await;
     let _ = tx
         .send(SourceMessage::Ended(source_idx, "stopped".to_string()))
         .await;
