@@ -4,10 +4,22 @@
 // FrameLink rule operations dispatched via WS commands.
 // All operations route through the shared connection pool (one TCP connection per device).
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+/// Extension trait to convert any Display error to String for WS command results.
+trait IntoStringErr<T> {
+    fn str_err(self) -> Result<T, String>;
+}
+
+impl<T, E: fmt::Display> IntoStringErr<T> for Result<T, E> {
+    fn str_err(self) -> Result<T, String> {
+        self.map_err(|e| e.to_string())
+    }
+}
 
 use framelink::protocol::bridge::{self, BridgeInfo};
 use framelink::protocol::dsig;
@@ -22,7 +34,7 @@ use framelink::board::{
     INDICATOR_XFORM_ID_BASE,
 };
 use framelink::board::display::{resolve_frame_def_display, resolve_iface_display, resolve_signal_name};
-use framelink::board::editable::{ActiveRuleIds, EditableBoardDef, EditableSignal};
+use framelink::board::editable::{EditableBoardDef, EditableSignal};
 
 use super::shared;
 
@@ -310,23 +322,12 @@ fn gen_to_descriptor(
 // Params deserialization helpers
 // ============================================================================
 
-/// Resolve device connection from params.
-/// Accepts either `device_id` (resolved via the connection pool) or explicit `host`/`port`.
-async fn get_host_port(params: &Value) -> Result<(String, u16), String> {
-    if let Some(device_id) = params["device_id"].as_str() {
-        if let Some((host, port)) = shared::resolve_device_id(device_id).await {
-            return Ok((host, port));
-        }
-        return Err(format!("Device '{}' not found in connection pool", device_id));
-    }
-    let host = params["host"]
+/// Extract device_id from command params.
+fn get_device_id(params: &Value) -> Result<String, String> {
+    params["device_id"]
         .as_str()
-        .ok_or("Missing 'device_id' or 'host' parameter")?
-        .to_string();
-    let port = params["port"]
-        .as_u64()
-        .ok_or("Missing 'port' parameter")? as u16;
-    Ok((host, port))
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Missing 'device_id' parameter".to_string())
 }
 
 fn get_timeout(params: &Value) -> f64 {
@@ -562,14 +563,14 @@ async fn cmd_probe(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_frame_def_list(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
-    let board_def = shared::load_board_def(&host, port).await;
-    let editable = shared::clone_editable_board_def(&host, port).await;
+    let conn = shared::get_connection(&device_id, timeout).await?;
+    let board_def = shared::load_board_def(&device_id).await;
+    let editable = shared::clone_editable_board_def(&device_id).await;
     let payload = frame_def::build_frame_def_list();
     let frames =
-        shared::request_multi(&host, port, MSG_FRAME_DEF_LIST, FLAG_ACK_REQ, &payload, timeout)
-            .await?;
+        conn.session.request_multi(MSG_FRAME_DEF_LIST, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     let descriptors: Vec<FrameDefDescriptor> = frames
         .iter()
@@ -581,12 +582,13 @@ async fn cmd_frame_def_list(params: Value) -> Result<Value, String> {
 }
 
 async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let fd = &params["frame_def"];
     let info = parse_frame_def_info(fd)?;
     let payload = frame_def::build_frame_def_add(&info);
-    shared::request(&host, port, MSG_FRAME_DEF_ADD, FLAG_ACK_REQ, &payload, timeout).await?;
+    conn.session.request(MSG_FRAME_DEF_ADD, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     // Sync signal display names from the UI into the EditableBoardDef.
     // The protocol doesn't carry signal names — they're TOML-only metadata.
@@ -625,7 +627,7 @@ async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
             })
             .collect();
 
-        let _ = shared::with_editable_board_def(&host, port, timeout, |ed| {
+        let _ = shared::with_editable_board_def(&device_id, timeout, |ed| {
             if let Some(fd_entry) = ed.frame_defs.get_mut(&frame_def_id) {
                 fd_entry.signals = signals_from_ui;
             }
@@ -637,16 +639,14 @@ async fn cmd_frame_def_add(params: Value) -> Result<Value, String> {
 }
 
 async fn cmd_frame_def_remove(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let frame_def_id = params["frame_def_id"]
         .as_u64()
         .ok_or("Missing 'frame_def_id'")? as u16;
     let payload = frame_def::build_frame_def_remove(frame_def_id);
-    shared::request(
-        &host, port, MSG_FRAME_DEF_REMOVE, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_FRAME_DEF_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
@@ -655,13 +655,13 @@ async fn cmd_frame_def_remove(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_bridge_list(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
-    let board_def = shared::load_board_def(&host, port).await;
+    let conn = shared::get_connection(&device_id, timeout).await?;
+    let board_def = shared::load_board_def(&device_id).await;
     let payload = bridge::build_bridge_list();
     let frames =
-        shared::request_multi(&host, port, MSG_BRIDGE_LIST, FLAG_ACK_REQ, &payload, timeout)
-            .await?;
+        conn.session.request_multi(MSG_BRIDGE_LIST, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     let descriptors: Vec<BridgeDescriptor> = frames
         .iter()
@@ -673,32 +673,32 @@ async fn cmd_bridge_list(params: Value) -> Result<Value, String> {
 }
 
 async fn cmd_bridge_add(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let b = &params["bridge"];
     let info = parse_bridge_info(b)?;
     let payload = bridge::build_bridge_add(&info);
-    shared::request(&host, port, MSG_BRIDGE_ADD, FLAG_ACK_REQ, &payload, timeout).await?;
+    conn.session.request(MSG_BRIDGE_ADD, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
 async fn cmd_bridge_remove(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let bridge_id = params["bridge_id"]
         .as_u64()
         .ok_or("Missing 'bridge_id'")? as u16;
     let payload = bridge::build_bridge_remove(bridge_id);
-    shared::request(
-        &host, port, MSG_BRIDGE_REMOVE, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_BRIDGE_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
 async fn cmd_bridge_enable(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let bridge_id = params["bridge_id"]
         .as_u64()
         .ok_or("Missing 'bridge_id'")? as u16;
@@ -706,10 +706,7 @@ async fn cmd_bridge_enable(params: Value) -> Result<Value, String> {
         .as_bool()
         .ok_or("Missing 'enabled'")?;
     let payload = bridge::build_bridge_enable(bridge_id, enabled);
-    shared::request(
-        &host, port, MSG_BRIDGE_ENABLE, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_BRIDGE_ENABLE, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
@@ -718,14 +715,14 @@ async fn cmd_bridge_enable(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_xform_list(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
-    let board_def = shared::load_board_def(&host, port).await;
-    let editable = shared::clone_editable_board_def(&host, port).await;
+    let conn = shared::get_connection(&device_id, timeout).await?;
+    let board_def = shared::load_board_def(&device_id).await;
+    let editable = shared::clone_editable_board_def(&device_id).await;
     let payload = xform::build_xform_list();
     let frames =
-        shared::request_multi(&host, port, MSG_XFORM_LIST, FLAG_ACK_REQ, &payload, timeout)
-            .await?;
+        conn.session.request_multi(MSG_XFORM_LIST, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     let descriptors: Vec<TransformerDescriptor> = frames
         .iter()
@@ -737,32 +734,32 @@ async fn cmd_xform_list(params: Value) -> Result<Value, String> {
 }
 
 async fn cmd_xform_add(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let t = &params["transformer"];
     let info = parse_transformer_info(t)?;
     let payload = xform::build_xform_add(&info);
-    shared::request(&host, port, MSG_XFORM_ADD, FLAG_ACK_REQ, &payload, timeout).await?;
+    conn.session.request(MSG_XFORM_ADD, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
 async fn cmd_xform_remove(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let transformer_id = params["transformer_id"]
         .as_u64()
         .ok_or("Missing 'transformer_id'")? as u16;
     let payload = xform::build_xform_remove(transformer_id);
-    shared::request(
-        &host, port, MSG_XFORM_REMOVE, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_XFORM_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
 async fn cmd_xform_enable(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let transformer_id = params["transformer_id"]
         .as_u64()
         .ok_or("Missing 'transformer_id'")? as u16;
@@ -770,10 +767,7 @@ async fn cmd_xform_enable(params: Value) -> Result<Value, String> {
         .as_bool()
         .ok_or("Missing 'enabled'")?;
     let payload = xform::build_xform_enable(transformer_id, enabled);
-    shared::request(
-        &host, port, MSG_XFORM_ENABLE, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_XFORM_ENABLE, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
@@ -782,13 +776,14 @@ async fn cmd_xform_enable(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_gen_list(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
-    let board_def = shared::load_board_def(&host, port).await;
-    let editable = shared::clone_editable_board_def(&host, port).await;
+    let conn = shared::get_connection(&device_id, timeout).await?;
+    let board_def = shared::load_board_def(&device_id).await;
+    let editable = shared::clone_editable_board_def(&device_id).await;
     let payload = generator::build_gen_list();
     let frames =
-        shared::request_multi(&host, port, MSG_GEN_LIST, FLAG_ACK_REQ, &payload, timeout).await?;
+        conn.session.request_multi(MSG_GEN_LIST, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     let descriptors: Vec<GeneratorDescriptor> = frames
         .iter()
@@ -800,32 +795,32 @@ async fn cmd_gen_list(params: Value) -> Result<Value, String> {
 }
 
 async fn cmd_gen_add(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let g = &params["generator"];
     let info = parse_generator_info(g)?;
     let payload = generator::build_gen_add(&info);
-    shared::request(&host, port, MSG_GEN_ADD, FLAG_ACK_REQ, &payload, timeout).await?;
+    conn.session.request(MSG_GEN_ADD, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
 async fn cmd_gen_remove(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let generator_id = params["generator_id"]
         .as_u64()
         .ok_or("Missing 'generator_id'")? as u16;
     let payload = generator::build_gen_remove(generator_id);
-    shared::request(
-        &host, port, MSG_GEN_REMOVE, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_GEN_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
 async fn cmd_gen_enable(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let generator_id = params["generator_id"]
         .as_u64()
         .ok_or("Missing 'generator_id'")? as u16;
@@ -833,10 +828,7 @@ async fn cmd_gen_enable(params: Value) -> Result<Value, String> {
         .as_bool()
         .ok_or("Missing 'enabled'")?;
     let payload = generator::build_gen_enable(generator_id, enabled);
-    shared::request(
-        &host, port, MSG_GEN_ENABLE, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_GEN_ENABLE, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
@@ -845,19 +837,20 @@ async fn cmd_gen_enable(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_persist_save(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
 
     // Step 1: Send MSG_PERSIST_SAVE — if this fails, stop immediately
     let payload = persist::build_persist_save();
-    shared::request(&host, port, MSG_PERSIST_SAVE, FLAG_ACK_REQ, &payload, timeout).await?;
+    conn.session.request(MSG_PERSIST_SAVE, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     // Step 2: Collect active rule IDs from the device
-    let active = collect_active_rule_ids(&host, port, timeout).await?;
+    let active = conn.session.collect_active_rule_ids().await.str_err()?;
 
     // Step 3: Build merged TOML from a cloned EditableBoardDef
     let merged_toml = {
-        let editable = shared::clone_editable_board_def(&host, port).await;
+        let editable = shared::clone_editable_board_def(&device_id).await;
         match editable {
             Some(mut ed) => {
                 ed.merge_pending(&active);
@@ -869,12 +862,12 @@ async fn cmd_persist_save(params: Value) -> Result<Value, String> {
 
     // Step 4: Upload merged TOML to device
     if let Some(ref toml_str) = merged_toml {
-        let conn = shared::get_connection(&host, port, timeout).await?;
+        let conn = shared::get_connection(&device_id, timeout).await?;
         framelink::board::transfer::upload_board_def(&conn.session, toml_str).await?;
     }
 
     // Step 5: Merge pending on the real EditableBoardDef (clearing pending state)
-    let _ = shared::with_editable_board_def(&host, port, timeout, |ed| {
+    let _ = shared::with_editable_board_def(&device_id, timeout, |ed| {
         ed.merge_pending(&active);
     })
     .await;
@@ -882,68 +875,22 @@ async fn cmd_persist_save(params: Value) -> Result<Value, String> {
     Ok(Value::Null)
 }
 
-/// Collect the IDs of all active rules from the device for merge_pending.
-async fn collect_active_rule_ids(
-    host: &str,
-    port: u16,
-    timeout: f64,
-) -> Result<ActiveRuleIds, String> {
-    // Frame defs
-    let fd_payload = frame_def::build_frame_def_list();
-    let fd_frames =
-        shared::request_multi(host, port, MSG_FRAME_DEF_LIST, FLAG_ACK_REQ, &fd_payload, timeout)
-            .await?;
-    let frame_defs: HashSet<u16> = fd_frames
-        .iter()
-        .filter_map(|f| frame_def::parse_frame_def_resp(&f.payload).ok())
-        .map(|info| info.frame_def_id)
-        .collect();
-
-    // Generators
-    let gen_payload = generator::build_gen_list();
-    let gen_frames =
-        shared::request_multi(host, port, MSG_GEN_LIST, FLAG_ACK_REQ, &gen_payload, timeout)
-            .await?;
-    let generators: HashSet<u16> = gen_frames
-        .iter()
-        .filter_map(|f| generator::parse_gen_resp(&f.payload).ok())
-        .map(|info| info.generator_id)
-        .collect();
-
-    // Transformers
-    let xform_payload = xform::build_xform_list();
-    let xform_frames =
-        shared::request_multi(host, port, MSG_XFORM_LIST, FLAG_ACK_REQ, &xform_payload, timeout)
-            .await?;
-    let transformers: HashSet<u16> = xform_frames
-        .iter()
-        .filter_map(|f| xform::parse_xform_resp(&f.payload).ok())
-        .map(|info| info.transformer_id)
-        .collect();
-
-    Ok(ActiveRuleIds {
-        frame_defs,
-        generators,
-        transformers,
-    })
-}
 
 async fn cmd_persist_load(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let payload = persist::build_persist_load();
-    shared::request(&host, port, MSG_PERSIST_LOAD, FLAG_ACK_REQ, &payload, timeout).await?;
+    conn.session.request(MSG_PERSIST_LOAD, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
 async fn cmd_persist_clear(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let payload = persist::build_persist_clear();
-    shared::request(
-        &host, port, MSG_PERSIST_CLEAR, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_PERSIST_CLEAR, FLAG_ACK_REQ, &payload).await.str_err()?;
     Ok(Value::Null)
 }
 
@@ -952,16 +899,14 @@ async fn cmd_persist_clear(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_user_signal_add(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let signal_id = params["signal_id"]
         .as_u64()
         .ok_or("Missing 'signal_id'")? as u16;
     let payload = dsig::build_user_signal_add(signal_id);
-    shared::request(
-        &host, port, MSG_USER_SIGNAL_ADD, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_USER_SIGNAL_ADD, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     // Insert signal metadata into the editable board definition
     let name = params["name"]
@@ -993,7 +938,7 @@ async fn cmd_user_signal_add(params: Value) -> Result<Value, String> {
         })
         .unwrap_or_default();
 
-    shared::with_editable_board_def(&host, port, timeout, |board_def| {
+    shared::with_editable_board_def(&device_id, timeout, |board_def| {
         board_def.signals.insert(signal_id, EditableSignal {
             name,
             group,
@@ -1006,25 +951,23 @@ async fn cmd_user_signal_add(params: Value) -> Result<Value, String> {
     })
     .await?;
 
-    shared::upload_board_def(&host, port, timeout).await?;
+    shared::upload_board_def(&device_id, timeout).await?;
 
     Ok(Value::Null)
 }
 
 async fn cmd_user_signal_remove(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let signal_id = params["signal_id"]
         .as_u64()
         .ok_or("Missing 'signal_id'")? as u16;
     let payload = dsig::build_user_signal_remove(signal_id);
-    shared::request(
-        &host, port, MSG_USER_SIGNAL_REMOVE, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    conn.session.request(MSG_USER_SIGNAL_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
 
     // Remove the signal metadata from the editable board definition
-    let removed = shared::with_editable_board_def(&host, port, timeout, |board_def| {
+    let removed = shared::with_editable_board_def(&device_id, timeout, |board_def| {
         let existed = board_def.signals.remove(&signal_id).is_some();
         if existed {
             board_def.dirty = true;
@@ -1034,7 +977,7 @@ async fn cmd_user_signal_remove(params: Value) -> Result<Value, String> {
     .await?;
 
     if removed {
-        shared::upload_board_def(&host, port, timeout).await?;
+        shared::upload_board_def(&device_id, timeout).await?;
     }
 
     Ok(Value::Null)
@@ -1053,38 +996,12 @@ struct DeviceSignalDescriptor {
     flags: u8,
 }
 
-/// Fetch the complete device signal list, handling chunked responses.
-pub(crate) async fn fetch_all_device_signals(
-    host: &str,
-    port: u16,
-    timeout: f64,
-) -> Result<Vec<dsig::SignalInfo>, String> {
-    let mut all_signals = Vec::new();
-    let mut offset: u16 = 0;
-
-    loop {
-        let frame = shared::request(
-            host, port, MSG_DSIG_LIST, FLAG_ACK_REQ,
-            &dsig::build_list_request(offset), timeout,
-        )
-        .await?;
-        let chunk = dsig::parse_list_response(&frame.payload)
-            .map_err(|e| format!("Failed to parse signal list: {e}"))?;
-        let complete = chunk.is_complete();
-        offset = chunk.next_offset();
-        all_signals.extend(chunk.signals);
-        if complete {
-            break;
-        }
-    }
-
-    Ok(all_signals)
-}
 
 async fn cmd_dsig_list(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
-    let signals = fetch_all_device_signals(&host, port, timeout).await?;
+    let conn = shared::get_connection(&device_id, timeout).await?;
+    let signals = conn.session.list_all_signals().await.str_err()?;
     let descriptors: Vec<DeviceSignalDescriptor> = signals
         .iter()
         .map(|s| DeviceSignalDescriptor {
@@ -1099,16 +1016,14 @@ async fn cmd_dsig_list(params: Value) -> Result<Value, String> {
 }
 
 async fn cmd_dsig_read(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let signal_id = params["signal_id"]
         .as_u64()
         .ok_or("Missing 'signal_id'")? as u16;
     let payload = dsig::build_read_request(signal_id);
-    let frame = shared::request(
-        &host, port, MSG_DSIG_READ, FLAG_ACK_REQ, &payload, timeout,
-    )
-    .await?;
+    let frame = conn.session.request(MSG_DSIG_READ, FLAG_ACK_REQ, &payload).await.str_err()?;
     let sv = dsig::parse_read_response(&frame.payload)
         .map_err(|e| format!("Failed to parse signal read: {e}"))?;
     serde_json::to_value(&serde_json::json!({
@@ -1120,8 +1035,9 @@ async fn cmd_dsig_read(params: Value) -> Result<Value, String> {
 }
 
 async fn cmd_dsig_write(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let signal_id = params["signal_id"]
         .as_u64()
         .ok_or("Missing 'signal_id'")? as u16;
@@ -1131,7 +1047,7 @@ async fn cmd_dsig_write(params: Value) -> Result<Value, String> {
         .ok_or("Missing 'value'")?;
 
     let write_payload = dsig::build_write_request(signal_id, value);
-    shared::request(&host, port, MSG_DSIG_WRITE, FLAG_ACK_REQ, &write_payload, timeout).await?;
+    conn.session.request(MSG_DSIG_WRITE, FLAG_ACK_REQ, &write_payload).await.str_err()?;
     Ok(Value::Null)
 }
 
@@ -1140,14 +1056,15 @@ async fn cmd_dsig_write(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_indicators_list(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
 
     // List device signals
-    let all_signals = fetch_all_device_signals(&host, port, timeout).await?;
+    let all_signals = conn.session.list_all_signals().await.str_err()?;
 
     // Load board def for label enrichment
-    let board_def = shared::load_board_def(&host, port).await;
+    let board_def = shared::load_board_def(&device_id).await;
 
     // Discover LEDs using the library function
     let mut indicators = framelink::board::discover_leds(&all_signals, board_def.as_ref());
@@ -1175,7 +1092,7 @@ async fn cmd_indicators_list(params: Value) -> Result<Value, String> {
     }
 
     if !read_messages.is_empty() {
-        let responses = shared::request_batch(&host, port, read_messages, timeout).await?;
+        let responses = conn.session.send_batch(&read_messages).await.str_err()?;
         for (resp, (idx, field)) in responses.iter().zip(read_map.iter()) {
             if let Ok(sv) = dsig::parse_read_response(&resp.payload) {
                 match *field {
@@ -1198,9 +1115,9 @@ async fn cmd_indicators_list(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_palettes_list(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
 
-    let board_def = shared::load_board_def(&host, port)
+    let board_def = shared::load_board_def(&device_id)
         .await
         .ok_or("No board definition available")?;
 
@@ -1211,9 +1128,53 @@ async fn cmd_palettes_list(params: Value) -> Result<Value, String> {
 // Indicator configuration
 // ============================================================================
 
+/// Build the common messages for palette/threshold indicator setup:
+/// remove old trigger, add transformer with primary function + optional gate, turn LED on.
+fn build_indicator_xform_messages(
+    messages: &mut Vec<(u8, u8, Vec<u8>)>,
+    led: &DiscoveredLed,
+    source_frame_def_id: u16,
+    primary_function: xform::XformFunction,
+    gate_signal_id: Option<u16>,
+) {
+    // Remove old trigger
+    for (mt, pl) in board_mod::build_indicator_trigger_remove_messages(led.index) {
+        messages.push((mt, FLAG_ACK_REQ, pl));
+    }
+
+    let xform_id = INDICATOR_XFORM_ID_BASE + led.index as u16;
+    let mut functions = vec![primary_function];
+    if let Some(guard_id) = gate_signal_id {
+        functions.push(xform::XformFunction {
+            function_id: xform::FUNC_GATE,
+            source_signal_id: led.colour_signal_id,
+            dest_signal_id: led.colour_signal_id,
+            params: xform::FunctionParams::Gate {
+                guard_signal_id: guard_id,
+                compare_op: xform::GateOp::NotEqual,
+                compare_value: 0,
+                fail_value: 0,
+            },
+        });
+    }
+    let xform_info = xform::TransformerInfo {
+        transformer_id: xform_id,
+        source_frame_def_id,
+        source_interface: 0xFF,
+        dest_frame_def_id: FRAME_DEF_ID_DEVICE,
+        dest_interface: 0xFF,
+        enabled: true,
+        mappings: vec![],
+        functions,
+    };
+    messages.push((MSG_XFORM_ADD, FLAG_ACK_REQ, xform::build_xform_add(&xform_info)));
+    messages.push((MSG_DSIG_WRITE, FLAG_ACK_REQ, dsig::build_write_request(led.state_signal_id, 1)));
+}
+
 async fn cmd_indicator_configure(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
 
     let source = params["source"].as_str().ok_or("Missing 'source'")?;
 
@@ -1250,16 +1211,14 @@ async fn cmd_indicator_configure(params: Value) -> Result<Value, String> {
             let gate_signal_id = params["gate_signal_id"].as_u64().map(|v| v as u16);
 
             // Load palette entries from board def to register user signals and write values
-            let board_def = shared::load_board_def(&host, port).await;
+            let board_def = shared::load_board_def(&device_id).await;
 
             if let Some(ref bd) = board_def {
                 if let Some(pal) = bd.palettes.iter().find(|p| p.signal_start == palette_signal_start) {
-                    // Register palette user signals
                     messages.push((MSG_USER_SIGNAL_ADD, FLAG_ACK_REQ, dsig::build_user_signal_add(palette_signal_start)));
                     for i in 0..pal.entries.len() {
                         messages.push((MSG_USER_SIGNAL_ADD, FLAG_ACK_REQ, dsig::build_user_signal_add(palette_signal_start + 1 + i as u16)));
                     }
-                    // Write count + entries
                     messages.push((MSG_DSIG_WRITE, FLAG_ACK_REQ, dsig::build_write_request(palette_signal_start, pal.entries.len() as u64)));
                     for (i, &colour) in pal.entries.iter().enumerate() {
                         messages.push((MSG_DSIG_WRITE, FLAG_ACK_REQ, dsig::build_write_request(palette_signal_start + 1 + i as u16, colour as u64)));
@@ -1267,44 +1226,13 @@ async fn cmd_indicator_configure(params: Value) -> Result<Value, String> {
                 }
             }
 
-            // Remove old trigger
-            for (mt, pl) in board_mod::build_indicator_trigger_remove_messages(led.index) {
-                messages.push((mt, FLAG_ACK_REQ, pl));
-            }
-
-            // Build palette transformer
-            let xform_id = INDICATOR_XFORM_ID_BASE + led.index as u16;
-            let mut functions = vec![xform::XformFunction {
+            let primary_function = xform::XformFunction {
                 function_id: xform::FUNC_PALETTE,
                 source_signal_id,
                 dest_signal_id: led.colour_signal_id,
                 params: xform::FunctionParams::Palette { palette_signal_start, signal_max },
-            }];
-            if let Some(guard_id) = gate_signal_id {
-                functions.push(xform::XformFunction {
-                    function_id: xform::FUNC_GATE,
-                    source_signal_id: led.colour_signal_id,
-                    dest_signal_id: led.colour_signal_id,
-                    params: xform::FunctionParams::Gate {
-                        guard_signal_id: guard_id,
-                        compare_op: xform::GateOp::NotEqual,
-                        compare_value: 0,
-                        fail_value: 0,
-                    },
-                });
-            }
-            let xform_info = xform::TransformerInfo {
-                transformer_id: xform_id,
-                source_frame_def_id,
-                source_interface: 0xFF,
-                dest_frame_def_id: FRAME_DEF_ID_DEVICE,
-                dest_interface: 0xFF,
-                enabled: true,
-                mappings: vec![],
-                functions,
             };
-            messages.push((MSG_XFORM_ADD, FLAG_ACK_REQ, xform::build_xform_add(&xform_info)));
-            messages.push((MSG_DSIG_WRITE, FLAG_ACK_REQ, dsig::build_write_request(led.state_signal_id, 1)));
+            build_indicator_xform_messages(&mut messages, &led, source_frame_def_id, primary_function, gate_signal_id);
         }
 
         "threshold" => {
@@ -1315,56 +1243,27 @@ async fn cmd_indicator_configure(params: Value) -> Result<Value, String> {
             let value_below = params["value_below"].as_u64().unwrap_or(0) as u32;
             let gate_signal_id = params["gate_signal_id"].as_u64().map(|v| v as u16);
 
-            // Remove old trigger
-            for (mt, pl) in board_mod::build_indicator_trigger_remove_messages(led.index) {
-                messages.push((mt, FLAG_ACK_REQ, pl));
-            }
-
-            let xform_id = INDICATOR_XFORM_ID_BASE + led.index as u16;
-            let mut functions = vec![xform::XformFunction {
+            let primary_function = xform::XformFunction {
                 function_id: xform::FUNC_THRESHOLD,
                 source_signal_id,
                 dest_signal_id: led.colour_signal_id,
                 params: xform::FunctionParams::Threshold { threshold, value_above, value_below },
-            }];
-            if let Some(guard_id) = gate_signal_id {
-                functions.push(xform::XformFunction {
-                    function_id: xform::FUNC_GATE,
-                    source_signal_id: led.colour_signal_id,
-                    dest_signal_id: led.colour_signal_id,
-                    params: xform::FunctionParams::Gate {
-                        guard_signal_id: guard_id,
-                        compare_op: xform::GateOp::NotEqual,
-                        compare_value: 0,
-                        fail_value: 0,
-                    },
-                });
-            }
-            let xform_info = xform::TransformerInfo {
-                transformer_id: xform_id,
-                source_frame_def_id,
-                source_interface: 0xFF,
-                dest_frame_def_id: FRAME_DEF_ID_DEVICE,
-                dest_interface: 0xFF,
-                enabled: true,
-                mappings: vec![],
-                functions,
             };
-            messages.push((MSG_XFORM_ADD, FLAG_ACK_REQ, xform::build_xform_add(&xform_info)));
-            messages.push((MSG_DSIG_WRITE, FLAG_ACK_REQ, dsig::build_write_request(led.state_signal_id, 1)));
+            build_indicator_xform_messages(&mut messages, &led, source_frame_def_id, primary_function, gate_signal_id);
         }
 
         _ => return Err(format!("Unknown indicator source: {source}")),
     }
 
     // Send all messages as a batch
-    shared::request_batch(&host, port, messages, timeout).await?;
+    conn.session.send_batch(&messages).await.str_err()?;
     Ok(Value::Null)
 }
 
 async fn cmd_indicator_remove(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let conn = shared::get_connection(&device_id, timeout).await?;
     let led_index = params["led_index"].as_u64().ok_or("Missing 'led_index'")? as usize;
     let colour_signal_id = params["colour_signal_id"].as_u64().ok_or("Missing 'colour_signal_id'")? as u16;
     let state_signal_id = params["state_signal_id"].as_u64().ok_or("Missing 'state_signal_id'")? as u16;
@@ -1380,7 +1279,7 @@ async fn cmd_indicator_remove(params: Value) -> Result<Value, String> {
     messages.push((MSG_DSIG_WRITE, FLAG_ACK_REQ, dsig::build_write_request(state_signal_id, 0)));
     messages.push((MSG_DSIG_WRITE, FLAG_ACK_REQ, dsig::build_write_request(colour_signal_id, 0)));
 
-    shared::request_batch(&host, port, messages, timeout).await?;
+    conn.session.send_batch(&messages).await.str_err()?;
     Ok(Value::Null)
 }
 
@@ -1389,14 +1288,15 @@ async fn cmd_indicator_remove(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_label_set(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let _conn = shared::get_connection(&device_id, timeout).await?;
     let entity_type = params["entity_type"].as_str().ok_or("Missing entity_type")?;
     let id = params["id"].as_u64().ok_or("Missing id")? as u16;
     let name = params["name"].as_str().map(String::from);
     let description = params["description"].as_str().map(String::from);
 
-    shared::with_editable_board_def(&host, port, timeout, |ed| {
+    shared::with_editable_board_def(&device_id, timeout, |ed| {
         match entity_type {
             "frame_def" => ed.set_pending_frame_def(id, name, description),
             "generator" => ed.set_pending_generator(id, name, description),
@@ -1411,12 +1311,13 @@ async fn cmd_label_set(params: Value) -> Result<Value, String> {
 }
 
 async fn cmd_label_remove(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
+    let _conn = shared::get_connection(&device_id, timeout).await?;
     let entity_type = params["entity_type"].as_str().ok_or("Missing entity_type")?;
     let id = params["id"].as_u64().ok_or("Missing id")? as u16;
 
-    shared::with_editable_board_def(&host, port, timeout, |ed| {
+    shared::with_editable_board_def(&device_id, timeout, |ed| {
         match entity_type {
             "frame_def" => ed.remove_pending_frame_def(id),
             "generator" => ed.remove_pending_generator(id),
@@ -1435,10 +1336,11 @@ async fn cmd_label_remove(params: Value) -> Result<Value, String> {
 // ============================================================================
 
 async fn cmd_signals_selectable(params: Value) -> Result<Value, String> {
-    let (host, port) = get_host_port(&params).await?;
+    let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
-    let conn = shared::get_connection(&host, port, timeout).await?;
-    let board_def = shared::load_board_def(&host, port).await;
+    let _conn = shared::get_connection(&device_id, timeout).await?;
+    let conn = shared::get_connection(&device_id, timeout).await?;
+    let board_def = shared::load_board_def(&device_id).await;
     let signals =
         framelink::board::selectable::list_selectable_signals(&conn.session, board_def.as_ref())
             .await
