@@ -188,6 +188,17 @@ impl TransmitResult {
         }
     }
 
+    /// Create a "queued" result — frame was accepted into the transmit buffer
+    /// but the hardware write hasn't completed yet. Reports success to the caller
+    /// since the frame will be sent asynchronously.
+    pub fn queued() -> Self {
+        Self {
+            success: true,
+            timestamp_us: now_us(),
+            error: None,
+        }
+    }
+
     /// Create a failed transmit result with an error message
     pub fn error(message: String) -> Self {
         Self {
@@ -649,7 +660,8 @@ fn emit_state_change(session_id: &str, _previous: &IOState, current: &IOState) {
     crate::ws::dispatch::send_session_state(session_id, current);
 }
 
-/// Emit a joiner count change event for a session
+/// Emit a joiner count change event for a session.
+/// Sends speed = -1.0 as a sentinel meaning "no speed update".
 fn emit_joiner_count_change(
     session_id: &str,
     joiner_count: usize,
@@ -657,12 +669,13 @@ fn emit_joiner_count_change(
     _app_name: Option<&str>,
     _change: Option<&str>,
 ) {
-    crate::ws::dispatch::send_session_info(session_id, 0.0, joiner_count as u16);
+    crate::ws::dispatch::send_session_info(session_id, -1.0, joiner_count as u16);
 }
 
-/// Emit a speed change event for a session
+/// Emit a speed change event for a session.
+/// Sends listener_count = 0xFFFF as a sentinel meaning "no listener count update".
 fn emit_speed_change(session_id: &str, speed: f64) {
-    crate::ws::dispatch::send_session_info(session_id, speed, 0);
+    crate::ws::dispatch::send_session_info(session_id, speed, 0xFFFF);
 }
 
 /// Global session manager
@@ -2416,8 +2429,12 @@ pub async fn resume_to_live_session(
 
 /// Destroy a reader session
 pub async fn destroy_session(session_id: &str) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    if let Some(mut session) = sessions.remove(session_id) {
+    let removed = {
+        let mut sessions = IO_SESSIONS.lock().await;
+        sessions.remove(session_id)
+    };
+    // Lock released — perform slow operations outside the critical section
+    if let Some(mut session) = removed {
         // Stop the reader first
         let _ = session.device.stop().await;
         // Orphan buffers and store IDs in post-session cache before lifecycle event.
@@ -2704,60 +2721,68 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
 /// If this was the last listener, the session will be stopped and destroyed.
 /// Returns the remaining listener count.
 pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<usize, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
+    // Phase 1: Remove the listener under the lock, extract session if last listener left
+    let (remaining, session_to_destroy) = {
+        let mut sessions = IO_SESSIONS.lock().await;
 
-    if let Some(session) = sessions.get_mut(session_id) {
-        if let Some(removed) = session.listeners.remove(listener_id) {
-            let removed_app_name = removed.app_name;
-            session.joiner_count = session.listeners.len();
-            let remaining = session.listeners.len();
-            let app = session.app.clone();
+        let Some(session) = sessions.get_mut(session_id) else {
+            // Session doesn't exist - that's fine during cleanup
+            return Ok(0);
+        };
 
-            tlog!(
-                "[reader] Session '{}' unregistered listener '{}', remaining: {}",
-                session_id, listener_id, remaining
-            );
-
-            // Emit joiner count change
-            emit_joiner_count_change(session_id, remaining, Some(listener_id), Some(&removed_app_name), Some("left"));
-
-            // If no listeners left, stop and destroy the session
-            if remaining == 0 {
-                tlog!("[reader] Session '{}' has no listeners left, destroying", session_id);
-                let _ = session.device.stop().await;
-                // Orphan buffers and store IDs in post-session cache before lifecycle event.
-                let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
-                emit_buffer_orphaned_as_changed(session_id, orphaned);
-                // Now emit lifecycle event
-                let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
-                emit_session_lifecycle(&app, SessionLifecyclePayload {
-                    session_id: session_id.to_string(),
-                    event_type: "destroyed".to_string(),
-                    device_type: None,
-                    state: None,
-                    listener_count: 0,
-                    source_profile_ids,
-                    creator_listener_id: None,
-                });
-                // Remove from the session map (we already hold the lock)
-                sessions.remove(session_id);
-                // Clear any closing flag
-                clear_session_closing(session_id);
-                clear_playback_position(session_id);
-                // Clean up profile tracking (release single-handle device locks)
-                crate::sessions::cleanup_session_profiles(session_id);
-                tlog!("[reader] Session '{}' destroyed", session_id);
-            }
-
-            Ok(remaining)
-        } else {
+        let Some(removed) = session.listeners.remove(listener_id) else {
             // Listener wasn't registered - that's fine
-            Ok(session.listeners.len())
+            return Ok(session.listeners.len());
+        };
+
+        let removed_app_name = removed.app_name;
+        session.joiner_count = session.listeners.len();
+        let remaining = session.listeners.len();
+
+        tlog!(
+            "[reader] Session '{}' unregistered listener '{}', remaining: {}",
+            session_id, listener_id, remaining
+        );
+
+        // Emit joiner count change
+        emit_joiner_count_change(session_id, remaining, Some(listener_id), Some(&removed_app_name), Some("left"));
+
+        if remaining == 0 {
+            tlog!("[reader] Session '{}' has no listeners left, destroying", session_id);
+            // Remove from map so we can release the lock before slow operations
+            (remaining, sessions.remove(session_id))
+        } else {
+            (remaining, None)
         }
-    } else {
-        // Session doesn't exist - that's fine during cleanup
-        Ok(0)
+    };
+    // Lock released here
+
+    // Phase 2: Perform slow cleanup outside the critical section
+    if let Some(mut session) = session_to_destroy {
+        let _ = session.device.stop().await;
+        // Orphan buffers and store IDs in post-session cache before lifecycle event.
+        let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
+        emit_buffer_orphaned_as_changed(session_id, orphaned);
+        // Now emit lifecycle event
+        let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
+        emit_session_lifecycle(&session.app, SessionLifecyclePayload {
+            session_id: session_id.to_string(),
+            event_type: "destroyed".to_string(),
+            device_type: None,
+            state: None,
+            listener_count: 0,
+            source_profile_ids,
+            creator_listener_id: None,
+        });
+        // Clear any closing flag
+        clear_session_closing(session_id);
+        clear_playback_position(session_id);
+        // Clean up profile tracking (release single-handle device locks)
+        crate::sessions::cleanup_session_profiles(session_id);
+        tlog!("[reader] Session '{}' destroyed", session_id);
     }
+
+    Ok(remaining)
 }
 
 /// Evict a listener from a session, giving it a copy of the current buffer.

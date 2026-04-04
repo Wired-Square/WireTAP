@@ -76,12 +76,14 @@ import {
 // backend can resume the session before the grace period expires.
 // ============================================================================
 
-// HMR guard: remove previous handler before adding
-let _visibilityHandler: (() => void) | null = null;
-if (_visibilityHandler) {
-  document.removeEventListener("visibilitychange", _visibilityHandler);
+// HMR guard: remove previous handler before adding.
+// Use a property on `window` so the reference survives module re-evaluation.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const prevHandler = (window as any).__wiretap_visibilityHandler as (() => void) | undefined;
+if (prevHandler) {
+  document.removeEventListener("visibilitychange", prevHandler);
 }
-_visibilityHandler = () => {
+const _visibilityHandler = () => {
   tlog.info(`[visibility] ${document.visibilityState}`);
 
   if (document.visibilityState === "visible" && getEventListeners) {
@@ -101,6 +103,8 @@ _visibilityHandler = () => {
   }
 };
 document.addEventListener("visibilitychange", _visibilityHandler);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(window as any).__wiretap_visibilityHandler = _visibilityHandler;
 
 // ============================================================================
 // Session Logging Helper
@@ -563,11 +567,24 @@ async function setupSessionEventListeners(
       })
     );
 
-    // SessionInfo (0x09) — speed + listener count decoded from binary
+    // SessionInfo (0x09) — speed + listener count decoded from binary.
+    // Either field may be a sentinel meaning "no update":
+    //   speed = -1.0 → listener-count-only update
+    //   listener_count = 0xFFFF (65535) → speed-only update
     eventListeners.wsUnlistenFunctions.push(
       wsTransport.onSessionMessage(sessionId, MsgType.SessionInfo, (payload) => {
         const info = decodeSessionInfo(payload);
-        updateSession(sessionId, { listenerCount: info.listener_count });
+        const updates: Record<string, unknown> = {};
+        if (info.listener_count < 0xFFFF) {
+          updates.listenerCount = info.listener_count;
+        }
+        if (info.speed >= 0) {
+          updates.speed = info.speed;
+          invokeCallbacks(eventListeners, "onSpeedChange", info.speed);
+        }
+        if (Object.keys(updates).length > 0) {
+          updateSession(sessionId, updates);
+        }
       })
     );
 

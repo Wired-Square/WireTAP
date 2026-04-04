@@ -366,7 +366,7 @@ impl MultiSourceReader {
         let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
         tx.try_send(TransmitRequest { data, result_tx })
             .map_err(|e| format!("Transmit buffer full ({})", e))?;
-        Ok(TransmitResult::success())
+        Ok(TransmitResult::queued())
     }
 
     /// Route raw bytes to the first serial source
@@ -409,7 +409,7 @@ impl MultiSourceReader {
             result_tx,
         })
         .map_err(|e| format!("Serial transmit buffer full ({})", e))?;
-        Ok(TransmitResult::success())
+        Ok(TransmitResult::queued())
     }
 }
 
