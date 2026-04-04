@@ -3,6 +3,7 @@
 // Top toolbar for the Test Pattern app. Renders IO session controls via
 // AppTopBar, with role/mode/params and start/stop inline.
 
+import { useState, useCallback } from "react";
 import { FlaskConical } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
@@ -165,11 +166,10 @@ export default function TestPatternTopBar({
           {role === "initiator" && mode !== "throughput" && (
             <div className="flex items-center gap-1">
               <span className={`text-xs ${textSecondary}`}>Rate</span>
-              <input
-                type="number"
+              <NumericInput
                 className={inputClass}
                 value={rateHz}
-                onChange={(e) => onRateChange(Number(e.target.value))}
+                onChange={onRateChange}
                 disabled={isRunning}
                 min={1}
                 max={10000}
@@ -181,11 +181,10 @@ export default function TestPatternTopBar({
           {/* Duration */}
           <div className="flex items-center gap-1">
             <span className={`text-xs ${textSecondary}`}>Dur</span>
-            <input
-              type="number"
+            <NumericInput
               className={inputClass}
               value={durationSec}
-              onChange={(e) => onDurationChange(Number(e.target.value))}
+              onChange={onDurationChange}
               disabled={isRunning}
               min={1}
               max={86400}
@@ -196,11 +195,10 @@ export default function TestPatternTopBar({
           {/* Bus */}
           <div className="flex items-center gap-1">
             <span className={`text-xs ${textSecondary}`}>Bus</span>
-            <input
-              type="number"
+            <NumericInput
               className={`${inputClass} w-10`}
               value={bus}
-              onChange={(e) => onBusChange(Number(e.target.value))}
+              onChange={onBusChange}
               disabled={isRunning}
               min={0}
               max={7}
@@ -239,5 +237,61 @@ export default function TestPatternTopBar({
         </>
       )}
     </AppTopBar>
+  );
+}
+
+/** Number input that uses local state while focused, commits on blur.
+ *  Fixes Windows WebView issue where typing is interrupted by re-renders. */
+function NumericInput({
+  value,
+  onChange,
+  className,
+  disabled,
+  min,
+  max,
+  title,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  className?: string;
+  disabled?: boolean;
+  min?: number;
+  max?: number;
+  title?: string;
+}) {
+  const [localValue, setLocalValue] = useState<string | null>(null);
+
+  const handleFocus = useCallback(() => {
+    setLocalValue(String(value));
+  }, [value]);
+
+  const handleBlur = useCallback(() => {
+    if (localValue !== null) {
+      const n = Number(localValue);
+      if (!isNaN(n)) onChange(n);
+      setLocalValue(null);
+    }
+  }, [localValue, onChange]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      (e.target as HTMLInputElement).blur();
+    }
+  }, []);
+
+  return (
+    <input
+      type="number"
+      className={className}
+      value={localValue ?? value}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      disabled={disabled}
+      min={min}
+      max={max}
+      title={title}
+    />
   );
 }

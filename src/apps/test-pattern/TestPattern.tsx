@@ -52,16 +52,36 @@ export default function TestPattern() {
   const { settings } = useSettings();
   const ioProfiles = settings?.io_profiles ?? [];
 
-  // Filter to profiles that can transmit (same set as Transmit app)
-  const transmitProfiles = useMemo(
+  // All profiles that could potentially be used — including non-transmit ones
+  // which will be shown greyed out with a reason.
+  const testProfiles = useMemo(
     () =>
       ioProfiles.filter((p) => {
         const k = p.kind;
-        if (k === "slcan") return !p.connection?.silent_mode;
-        if (k === "gs_usb") return p.connection?.listen_only === false;
-        return ["gvret_tcp", "gvret_usb", "socketcan", "serial", "virtual", "framelink"].includes(k);
+        return ["slcan", "gvret_tcp", "gvret_usb", "gs_usb", "socketcan",
+                "serial", "virtual", "framelink"].includes(k);
       }),
     [ioProfiles],
+  );
+
+  // Map of profile ID → transmit status (greyed out with reason if can't transmit)
+  const transmitStatusMap = useMemo(
+    () => new Map(testProfiles.map((p) => {
+      const k = p.kind;
+      if (k === "slcan" && p.connection?.silent_mode) {
+        return [p.id, { canTransmit: false, reason: "Silent mode — cannot transmit" }];
+      }
+      if (k === "gs_usb" && p.connection?.listen_only !== false) {
+        return [p.id, { canTransmit: false, reason: "Listen-only mode — cannot transmit" }];
+      }
+      // Read-only sources
+      if (!["slcan", "gvret_tcp", "gvret_usb", "gs_usb", "socketcan",
+            "serial", "virtual", "framelink"].includes(k)) {
+        return [p.id, { canTransmit: false, reason: "Not a transmit interface" }];
+      }
+      return [p.id, { canTransmit: true }];
+    })),
+    [testProfiles],
   );
 
   // Store state
@@ -101,7 +121,7 @@ export default function TestPattern() {
 
   const manager = useIOSessionManager({
     appName: "test-pattern",
-    ioProfiles: transmitProfiles,
+    ioProfiles: testProfiles,
     onError: handleError,
   });
 
@@ -198,7 +218,7 @@ export default function TestPattern() {
     <AppLayout
       topBar={
         <TestPatternTopBar
-          ioProfiles={transmitProfiles}
+          ioProfiles={testProfiles}
           ioProfile={ioProfile}
           defaultReadProfileId={settings?.default_read_profile}
           sessionId={session.sessionId}
@@ -237,10 +257,11 @@ export default function TestPattern() {
         {...ioPickerProps}
         isOpen={dialogs.ioSessionPicker.isOpen}
         onClose={() => dialogs.ioSessionPicker.close()}
-        ioProfiles={transmitProfiles}
+        ioProfiles={testProfiles}
         selectedId={ioProfile ?? null}
         defaultId={settings?.default_read_profile}
         onSelect={() => {}}
+        disabledProfiles={transmitStatusMap}
       />
 
       {/* Main content */}
