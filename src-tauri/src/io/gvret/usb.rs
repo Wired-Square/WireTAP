@@ -165,7 +165,8 @@ pub async fn run_source(
 
     // Clear buffers and initialize (do all sync work without awaiting)
     let init_result: Result<(), String> = (|| {
-        let mut port = serial_port.lock().unwrap();
+        let mut port = serial_port.lock()
+            .map_err(|e| format!("Port lock poisoned: {}", e))?;
         let _ = port.clear(serialport::ClearBuffer::All);
 
         // Enable binary mode
@@ -183,10 +184,18 @@ pub async fn run_source(
     std::thread::sleep(Duration::from_millis(100));
 
     // Send device info probe
-    {
-        let mut port = serial_port.lock().unwrap();
-        let _ = port.write_all(&DEVICE_INFO_PROBE);
-        let _ = port.flush();
+    let probe_err = match serial_port.lock() {
+        Ok(mut port) => {
+            let _ = port.write_all(&DEVICE_INFO_PROBE);
+            let _ = port.flush();
+            None
+        }
+        Err(e) => Some(format!("Port lock poisoned: {}", e)),
+    };
+    // Guard is dropped here — safe to await
+    if let Some(msg) = probe_err {
+        let _ = tx.send(SourceMessage::Error(source_idx, msg)).await;
+        return;
     }
 
     // Create transmit channel and send it to the merge task
@@ -218,19 +227,25 @@ pub async fn run_source(
         while !stop_flag_clone.load(Ordering::SeqCst) {
             // Check for transmit requests (non-blocking)
             while let Ok(req) = transmit_rx.try_recv() {
-                let result = {
-                    let mut port = serial_port_clone.lock().unwrap();
-                    port.write_all(&req.data)
+                let result = match serial_port_clone.lock() {
+                    Ok(mut port) => port.write_all(&req.data)
                         .and_then(|_| port.flush())
-                        .map_err(|e| format!("Write error: {}", e))
+                        .map_err(|e| format!("Write error: {}", e)),
+                    Err(e) => Err(format!("Port lock poisoned: {}", e)),
                 };
                 let _ = req.result_tx.send(result);
             }
 
             // Read data
-            let read_result = {
-                let mut port = serial_port_clone.lock().unwrap();
-                port.read(&mut read_buf)
+            let read_result = match serial_port_clone.lock() {
+                Ok(mut port) => port.read(&mut read_buf),
+                Err(_) => {
+                    let _ = tx_clone.blocking_send(SourceMessage::Error(
+                        source_idx,
+                        "Port lock poisoned during read".to_string(),
+                    ));
+                    return;
+                }
             };
 
             match read_result {

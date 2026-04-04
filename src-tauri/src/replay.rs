@@ -275,11 +275,12 @@ pub async fn io_start_replay(
         store_replay_state(&replay_id_for_task, final_state.clone());
         crate::ws::dispatch::send_replay_state(&final_state);
 
-        // Remove from active tasks map, then clear state
+        // Remove from active tasks map.
+        // Keep final replay state in REPLAY_STATES so the frontend can fetch it
+        // after receiving the WS notification. State is cleared on next replay start
+        // or when io_stop_replay is called.
         let mut tasks = IO_REPLAY_TASKS.lock().await;
         tasks.remove(&replay_id_for_task);
-        drop(tasks);
-        clear_replay_state(&replay_id_for_task);
     });
 
     let mut tasks = IO_REPLAY_TASKS.lock().await;

@@ -424,7 +424,7 @@ export function useIOSessionManager(
   // Flag to suppress handleReconfigure when the reconfigure was self-initiated
   // (e.g., our own jumpToBookmark). The backend fires session-reconfigured for ALL
   // listeners, including the one that initiated the reconfigure.
-  const selfReconfigureRef = useRef(false);
+  const selfReconfigureRef = useRef(0);
 
   // ---- Derived Values ----
   // Effective session ID: multiSessionId takes priority (all realtime sources now use it),
@@ -476,10 +476,10 @@ export function useIOSessionManager(
       setLoadFrameCount((prev) => prev + frames.length);
       return; // Don't call onFramesProp
     }
-    if (selfReconfigureRef.current) {
+    if (selfReconfigureRef.current > 0) {
       // During self-initiated reconfigure: suppress stale in-flight frames from the old stream.
-      // The flag is cleared by handleReconfigure when the session-reconfigured event arrives,
-      // so new-stream frames flow normally after that.
+      // The counter is decremented by handleReconfigure when the session-reconfigured event
+      // arrives, so new-stream frames flow normally after the matching event.
       return;
     }
     if (isWatchingRef.current) {
@@ -510,8 +510,8 @@ export function useIOSessionManager(
   // This resets frame counts and calls cleanup so the UI clears its state.
   // Skipped for self-initiated reconfigures (jumpToBookmark already handled cleanup).
   const handleReconfigure = useCallback(() => {
-    if (selfReconfigureRef.current) {
-      selfReconfigureRef.current = false;
+    if (selfReconfigureRef.current > 0) {
+      selfReconfigureRef.current--;
       // Self-initiated reconfigure: the backend emits this event AFTER the old stream has
       // stopped and BEFORE the new one starts. Any stale in-flight frames from the old stream
       // were suppressed by the flag check in handleFrames. Clear the flag so new-stream
@@ -1203,7 +1203,7 @@ export function useIOSessionManager(
         // This stops the stream, orphans old buffer, creates new buffer, and restarts
         // Other apps joined to this session stay connected
         // Suppress the session-reconfigured event handler since we already ran cleanup
-        selfReconfigureRef.current = true;
+        selfReconfigureRef.current++;
         tlog.debug("[IOSessionManager:jumpToBookmark] Using reconfigure (same profile, session stays alive)");
         await reconfigureReaderSession(sessionId, startUtc, endUtc || undefined);
       } else {
