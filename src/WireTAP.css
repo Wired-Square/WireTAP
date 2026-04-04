@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@import "@fontsource/ubuntu/400.css";
+@import "@fontsource/ubuntu/500.css";
+@import "@fontsource/ubuntu/700.css";
+@import "@fontsource/ubuntu-mono/400.css";
+@import "@fontsource/ubuntu-mono/700.css";
+@import "@fontsource/dseg7/classic-400.css";
 
 /* Use default cursor everywhere; inputs and textareas still show text cursor via browser UA styles */
 * {
@@ -17,16 +23,6 @@ html, body {
 
 #root {
   height: 100%;
-}
-
-/* DSEG7 Classic - 7-segment LED display font */
-@font-face {
-  font-family: 'DSEG7';
-  src: url('https://cdn.jsdelivr.net/npm/dseg@0.46.0/fonts/DSEG7-Classic/DSEG7Classic-Regular.woff2') format('woff2'),
-       url('https://cdn.jsdelivr.net/npm/dseg@0.46.0/fonts/DSEG7-Classic/DSEG7Classic-Regular.woff') format('woff');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
 }
 
 .font-ubuntu {
