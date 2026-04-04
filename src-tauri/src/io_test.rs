@@ -635,12 +635,19 @@ async fn run_initiator(
                     }
                 }
                 Err(e) => {
+                    // Buffer full = backpressure from the device channel.
+                    // In throughput mode, yield briefly and retry instead of
+                    // counting as a fatal error.
+                    if matches!(config.mode, TestMode::Throughput) && e.contains("buffer full") {
+                        tokio::time::sleep(std::time::Duration::from_micros(100)).await;
+                        continue; // Retry same seq
+                    }
                     consecutive_tx_failures += 1;
                     errors.push(format!("seq {}: {}", seq, e));
                 }
             }
 
-            // Abort if transmit is persistently failing
+            // Abort if transmit is persistently failing (not buffer-full)
             if consecutive_tx_failures >= MAX_CONSECUTIVE_FAILURES {
                 tlog!("[io_test] '{}' aborting: {} consecutive transmit failures",
                       test_id, consecutive_tx_failures);
