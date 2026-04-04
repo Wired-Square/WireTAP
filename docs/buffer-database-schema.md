@@ -201,20 +201,20 @@ SQLite database used to record every frame transmitted via the Transmit panel â€
 
 One row per transmitted frame or serial payload.
 
-| Column | Type | Nullable | Default | Description |
-|--------|------|----------|---------|-------------|
-| `id` | INTEGER | NO | AUTOINCREMENT | Primary key. Insertion (chronological) order. |
-| `session_id` | TEXT | NO | | Session that transmitted this frame. |
-| `timestamp_us` | INTEGER | NO | | Wall-clock timestamp in microseconds at time of transmission. |
-| `kind` | TEXT | NO | | `"can"` or `"serial"`. |
-| `frame_id` | INTEGER | YES | NULL | CAN arbitration ID. NULL for serial payloads. |
-| `dlc` | INTEGER | YES | NULL | Data length code. NULL for serial payloads. |
-| `bytes` | BLOB | NO | | Transmitted payload bytes. |
-| `bus` | INTEGER | NO | 0 | CAN bus number. `0` for serial. |
-| `is_extended` | INTEGER | NO | 0 | Boolean (0/1). `1` if 29-bit extended CAN ID. |
-| `is_fd` | INTEGER | NO | 0 | Boolean (0/1). `1` if CAN FD frame. |
-| `success` | INTEGER | NO | 1 | Boolean (0/1). `1` if the device accepted the frame. |
-| `error_msg` | TEXT | YES | NULL | Error string from the device if `success = 0`. |
+| Column         | Type    | Nullable | Default       | Description                                                   |
+| -------------- | ------- | -------- | ------------- | ------------------------------------------------------------- |
+| `id`           | INTEGER | NO       | AUTOINCREMENT | Primary key. Insertion (chronological) order.                 |
+| `session_id`   | TEXT    | NO       |               | Session that transmitted this frame.                          |
+| `timestamp_us` | INTEGER | NO       |               | Wall-clock timestamp in microseconds at time of transmission. |
+| `kind`         | TEXT    | NO       |               | `"can"` or `"serial"`.                                        |
+| `frame_id`     | INTEGER | YES      | NULL          | CAN arbitration ID. NULL for serial payloads.                 |
+| `dlc`          | INTEGER | YES      | NULL          | Data length code. NULL for serial payloads.                   |
+| `bytes`        | BLOB    | NO       |               | Transmitted payload bytes.                                    |
+| `bus`          | INTEGER | NO       | 0             | CAN bus number. `0` for serial.                               |
+| `is_extended`  | INTEGER | NO       | 0             | Boolean (0/1). `1` if 29-bit extended CAN ID.                 |
+| `is_fd`        | INTEGER | NO       | 0             | Boolean (0/1). `1` if CAN FD frame.                           |
+| `success`      | INTEGER | NO       | 1             | Boolean (0/1). `1` if the device accepted the frame.          |
+| `error_msg`    | TEXT    | YES      | NULL          | Error string from the device if `success = 0`.                |
 
 ## Indexes
 
