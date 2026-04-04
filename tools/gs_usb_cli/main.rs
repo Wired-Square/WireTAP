@@ -2,12 +2,18 @@
 //
 // Bypasses the Tauri/UI stack to give direct control over USB transfers
 // for diagnosing frame loss and protocol issues.
+//
+// Linux uses SocketCAN for gs_usb devices, so this CLI is not applicable.
 
+#[cfg(not(target_os = "linux"))]
 mod commands;
+#[cfg(not(target_os = "linux"))]
 mod usb_diag;
 
+#[cfg(not(target_os = "linux"))]
 use clap::{Parser, Subcommand};
 
+#[cfg(not(target_os = "linux"))]
 #[derive(Parser)]
 #[command(name = "gs_usb_cli", about = "Diagnostic CLI for gs_usb CAN adapters")]
 struct Cli {
@@ -15,6 +21,7 @@ struct Cli {
     command: Commands,
 }
 
+#[cfg(not(target_os = "linux"))]
 #[derive(Subcommand)]
 enum Commands {
     /// List all connected gs_usb devices
@@ -91,6 +98,7 @@ enum Commands {
     },
 }
 
+#[cfg(not(target_os = "linux"))]
 fn parse_bus_addr(s: &str) -> Result<(u8, u8), String> {
     let parts: Vec<&str> = s.split(':').collect();
     if parts.len() != 2 {
@@ -105,6 +113,13 @@ fn parse_bus_addr(s: &str) -> Result<(u8, u8), String> {
     Ok((bus, addr))
 }
 
+#[cfg(target_os = "linux")]
+fn main() {
+    eprintln!("gs_usb_cli is not supported on Linux — use SocketCAN tools instead.");
+    std::process::exit(1);
+}
+
+#[cfg(not(target_os = "linux"))]
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();

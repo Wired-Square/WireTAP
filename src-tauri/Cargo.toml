@@ -1,6 +1,6 @@
 [package]
 name = "wiretap"
-version = "0.5.9"
+version = "0.6.0"
 description = "Desktop UI for WireTAP. CAN bus analysis and decoding toolkit."
 authors = ["Alex Ferrara"]
 edition = "2021"
@@ -11,6 +11,11 @@ default-run = "WireTAP"
 [[bin]]
 name = "WireTAP"
 path = "src/main.rs"
+
+[[bin]]
+name = "gs_usb_cli"
+path = "../tools/gs_usb_cli/main.rs"
+required-features = ["cli"]
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
@@ -76,19 +81,15 @@ nusb = { version = "0.2", features = ["tokio"] }
 windows-sys = { version = "0.59", features = ["Win32_UI_HiDpi"] }
 
 [features]
+cli = ["clap"]
 
 [dependencies.clap]
 version = "4"
 features = ["derive"]
+optional = true
 
 # Linux
 [target.'cfg(target_os = "linux")'.dependencies]
 socketcan = "3.3"
 # sync-secret-service uses DBus Secret Service (GNOME Keyring, KWallet)
 keyring = { version = "3", features = ["sync-secret-service"] }
-
-# Local path override for development — Cargo uses this when the path exists,
-# falls back to the git dependency above when it doesn't (CI, other machines).
-# The path is relative to this Cargo.toml (src-tauri/).
-[patch."ssh://git@github.com/Wired-Square/framelink-rs.git"]
-framelink = { path = "../../framelink-rs" }

@@ -57,6 +57,14 @@ To use gs_usb, flash your CANable with [candleLight firmware](https://github.com
 
 ## Tools
 
+### [gs_usb_cli](tools/gs_usb_cli/)
+
+A diagnostic CLI for gs_usb/candleLight CAN adapters. Bypasses the WireTAP UI to give direct USB-level control for diagnosing frame loss and protocol issues. Supports device discovery, capability probing, USB topology inspection, frame receive with per-transfer diagnostics, and frame transmission.
+
+Available on macOS and Windows. On Linux, use SocketCAN tools (`candump`, `cansend`) instead.
+
+See [tools/gs_usb_cli/README.md](tools/gs_usb_cli/README.md) for build and usage instructions.
+
 ### [WireTAP Server](tools/wiretap-server/)
 
 A GVRET-compatible TCP server for Linux that bridges SocketCAN interfaces to TCP clients. Deploy on a Raspberry Pi or any Linux system with CAN hardware to:
@@ -87,6 +95,9 @@ npm run tauri dev
 
 # Build for production
 npm run tauri build
+
+# Build for production with dev tools (CSP enforced, console accessible)
+npm run tauri:build:debug
 
 # Clean build artifacts
 rm -rf node_modules/.vite dist src-tauri/target

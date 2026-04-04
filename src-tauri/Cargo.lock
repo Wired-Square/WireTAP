@@ -1693,6 +1693,7 @@ dependencies = [
 [[package]]
 name = "framelink"
 version = "0.1.0"
+source = "git+ssh://git@github.com/Wired-Square/framelink-rs.git?branch=main#ddebed12e8b0e6e4a45f9eab2a8c8fc691c8edfd"
 dependencies = [
  "flate2",
  "serde",
@@ -7627,7 +7628,7 @@ dependencies = [
 
 [[package]]
 name = "wiretap"
-version = "0.5.9"
+version = "0.6.0"
 dependencies = [
  "async-trait",
  "btleplug",

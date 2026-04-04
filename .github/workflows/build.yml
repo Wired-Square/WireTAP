@@ -21,9 +21,10 @@ jobs:
             target: aarch64-apple-darwin
           - platform: macos-latest
             target: x86_64-apple-darwin
-          - platform: ubuntu-22.04
+          - platform: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-          # Note: arm64 Linux removed - cross-compiling webkit/GTK is not feasible on GitHub runners
+          - platform: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
 
@@ -31,12 +32,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure private dependency access
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "ssh://git@github.com/"
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.FRAMELINK_DEPLOY_KEY }}
+
+      - name: Force Cargo to use git CLI
+        if: matrix.platform == 'windows-latest'
+        run: echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $GITHUB_ENV
+        shell: bash
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -44,13 +50,13 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libudev-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libudev-dev xdg-utils
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -59,7 +65,7 @@ jobs:
         run: npm ci
 
       - name: Import Apple certificate
-        if: matrix.platform == 'macos-latest'
+        if: runner.os == 'macOS'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -75,7 +81,7 @@ jobs:
           security list-keychains -d user -s $KEYCHAIN_PATH login.keychain-db
 
       - name: Set notarisation credentials
-        if: matrix.platform == 'macos-latest' && vars.APPLE_NOTARISE == 'true'
+        if: runner.os == 'macOS' && vars.APPLE_NOTARISE == 'true'
         run: |
           echo "APPLE_ID=${{ secrets.APPLE_ID }}" >> $GITHUB_ENV
           echo "APPLE_PASSWORD=${{ secrets.APPLE_NOTARY_PASSWORD }}" >> $GITHUB_ENV
@@ -115,7 +121,7 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wiretap-${{ matrix.target }}
           path: |
