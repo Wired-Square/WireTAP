@@ -355,13 +355,17 @@ impl MultiSourceReader {
             }
         };
 
-        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
+        // Fire-and-forget: queue the frame into the device's transmit channel
+        // (capacity 32) and return immediately. The device write task handles
+        // the actual hardware write asynchronously. If the channel is full,
+        // that's backpressure — report it as an error.
+        //
+        // We still create a result channel so the device task can report errors,
+        // but we don't block waiting for it. Device write errors are logged by
+        // the device task.
+        let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
         tx.try_send(TransmitRequest { data, result_tx })
-            .map_err(|e| format!("Failed to queue transmit request: {}", e))?;
-        let result = result_rx
-            .recv_timeout(std::time::Duration::from_millis(500))
-            .map_err(|e| format!("Transmit timeout or channel closed: {}", e))?;
-        result?;
+            .map_err(|e| format!("Transmit buffer full ({})", e))?;
         Ok(TransmitResult::success())
     }
 
@@ -399,16 +403,12 @@ impl MultiSourceReader {
             bytes.to_vec()
         };
 
-        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
+        let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
         tx.try_send(TransmitRequest {
             data,
             result_tx,
         })
-        .map_err(|e| format!("Failed to queue serial transmit request: {}", e))?;
-        let result = result_rx
-            .recv_timeout(std::time::Duration::from_millis(500))
-            .map_err(|e| format!("Serial transmit timeout or channel closed: {}", e))?;
-        result?;
+        .map_err(|e| format!("Serial transmit buffer full ({})", e))?;
         Ok(TransmitResult::success())
     }
 }
