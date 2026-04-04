@@ -59,8 +59,8 @@ html, body {
 .dockview-theme-abyss .dv-tabs-and-actions-container button[title="Open app menu"] {
   width: 32px;
   height: 32px;
-  padding: 3px;
-  background-color: white;
+  padding: 1px;
+  background-color: transparent;
   border-radius: 6px;
   box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
 }
