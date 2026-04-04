@@ -3,16 +3,39 @@
 // Register data table showing live Modbus register values with decoded signals.
 // Filtered by selectedFrames (from FramePicker).
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { formatFrameId } from "../../../utils/frameIds";
 import { parseFrameKey } from "../../../utils/frameKey";
-import { formatIsoUs } from "../../../utils/timeFormat";
 import { bgDataView, textPrimary, textMuted, textSecondary, borderDefault } from "../../../styles";
-import { emptyStateText } from "../../../styles/typography";
-import { monoBody } from "../../../styles/typography";
+import { emptyStateText, monoBody } from "../../../styles/typography";
+import { badgeSmallNeutral, badgeSmallInfo, badgeSmallSuccess, badgeSmallPurple, badgeSmallWarning } from "../../../styles/badgeStyles";
 import { getRegisterValues, type RegisterValue } from "../stores/modbusStore";
 import type { FrameDetail } from "../../../types/decoder";
 import type { ModbusPollGroup } from "../../../utils/modbusPollBuilder";
+
+export type ModbusTimeFormat = "seconds" | "human";
+
+/** Format milliseconds as seconds ("5.0s") or human ("5m 9s") */
+function formatDuration(ms: number, fmt: ModbusTimeFormat): string {
+  const totalSeconds = Math.round(ms / 1000);
+  if (fmt === "seconds") {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+}
+
+/** Format a microsecond timestamp as relative time from now */
+function formatElapsed(timestampUs: number, nowMs: number, fmt: ModbusTimeFormat): string {
+  const elapsedMs = nowMs - timestampUs / 1000;
+  if (elapsedMs < 500) return 'now';
+  return formatDuration(elapsedMs, fmt);
+}
 
 interface Props {
   frames: Map<string, FrameDetail>;
@@ -20,6 +43,7 @@ interface Props {
   pollGroups: ModbusPollGroup[];
   registerVersion: number;
   displayFrameIdFormat: "hex" | "decimal";
+  timeFormat: ModbusTimeFormat;
 }
 
 type RegisterRow = {
@@ -30,13 +54,28 @@ type RegisterRow = {
   pollGroup: ModbusPollGroup | undefined;
 };
 
+const TYPE_BADGE: Record<string, string> = {
+  holding: badgeSmallInfo,
+  input: badgeSmallSuccess,
+  coil: badgeSmallWarning,
+  discrete: badgeSmallPurple,
+};
+
 export default function ModbusRegistersView({
   frames,
   selectedFrames,
   pollGroups,
   registerVersion,
   displayFrameIdFormat,
+  timeFormat,
 }: Props) {
+  // Tick every second to update relative timestamps
+  const [nowMs, setNowMs] = useState(Date.now);
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // Force re-render when registerVersion changes
   void registerVersion;
   const registerValues = getRegisterValues();
@@ -120,9 +159,15 @@ export default function ModbusRegistersView({
                 )}
               </td>
 
-              {/* Register type */}
-              <td className={`px-3 py-1.5 ${textSecondary}`}>
-                {row.pollGroup?.register_type ?? '—'}
+              {/* Register type badge */}
+              <td className="px-3 py-1.5">
+                {row.pollGroup ? (
+                  <span className={TYPE_BADGE[row.pollGroup.register_type] ?? badgeSmallNeutral}>
+                    {row.pollGroup.register_type}
+                  </span>
+                ) : (
+                  <span className={textMuted}>—</span>
+                )}
               </td>
 
               {/* Raw bytes */}
@@ -151,16 +196,16 @@ export default function ModbusRegistersView({
               </td>
 
               {/* Poll interval */}
-              <td className={`px-3 py-1.5 text-right ${textMuted}`}>
+              <td className={`px-3 py-1.5 text-right whitespace-nowrap ${textMuted}`}>
                 {row.pollGroup?.interval_ms
-                  ? `${(row.pollGroup.interval_ms / 1000).toFixed(1)}s`
+                  ? formatDuration(row.pollGroup.interval_ms, timeFormat)
                   : '—'}
               </td>
 
               {/* Last update */}
-              <td className={`px-3 py-1.5 text-right ${monoBody} ${textMuted}`}>
+              <td className={`px-3 py-1.5 text-right whitespace-nowrap ${textMuted}`}>
                 {row.registerValue
-                  ? formatIsoUs(row.registerValue.timestamp)
+                  ? formatElapsed(row.registerValue.timestamp, nowMs, timeFormat)
                   : '—'}
               </td>
             </tr>
