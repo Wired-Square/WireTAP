@@ -5,7 +5,7 @@
 // Shares session with decoder so both apps can work on the same data.
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { Server, Settings as SettingsIcon, Play, Square } from "lucide-react";
+import { Server, Settings as SettingsIcon, Play, Square, Clock, Timer } from "lucide-react";
 import { dataViewContainer } from "../../styles";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
@@ -36,6 +36,7 @@ export default function Modbus() {
   const [framePickerOpen, setFramePickerOpen] = useState(false);
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
   const [isPolling, setIsPolling] = useState(true);
+  const [timeFormat, setTimeFormat] = useState<"seconds" | "human">("human");
 
   // Modbus store
   const catalogPath = useModbusStore((s) => s.catalogPath);
@@ -88,6 +89,9 @@ export default function Modbus() {
     watchSource,
     sourceProfileId,
     multiBusProfiles,
+    isDetached,
+    handleLeave,
+    handleClearBuffer,
   } = manager;
 
 
@@ -234,13 +238,18 @@ export default function Modbus() {
         <ModbusTopBar
           ioProfiles={settings?.io_profiles ?? []}
           ioProfile={ioProfile}
+          defaultReadProfileId={settings?.default_read_profile}
           sessionId={sessionId}
+          multiBusProfiles={multiBusProfiles}
           isStreaming={isStreaming}
           isStopped={isStopped}
           ioState={session.state}
           onOpenIoPicker={() => setIoPickerOpen(true)}
           onStop={stopWatch}
           onResume={reconnectWithPolls}
+          onLeave={!isDetached ? handleLeave : undefined}
+          onClearBuffer={async () => { clearState(); await handleClearBuffer(); }}
+          hasData={registerVersion > 0}
           transportMode={transportMode}
           catalogs={catalogs}
           catalogPath={catalogPath}
@@ -317,6 +326,15 @@ export default function Modbus() {
                 Poll
               </button>
             ) : null}
+
+            {/* Time format toggle */}
+            <button
+              onClick={() => setTimeFormat(f => f === "human" ? "seconds" : "human")}
+              className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+              title={timeFormat === "human" ? "Switch to seconds" : "Switch to human-readable"}
+            >
+              {timeFormat === "human" ? <Timer size={14} /> : <Clock size={14} />}
+            </button>
           </div>
         </div>
 
@@ -328,6 +346,7 @@ export default function Modbus() {
             pollGroups={pollGroups}
             registerVersion={registerVersion}
             displayFrameIdFormat={displayFrameIdFormat}
+            timeFormat={timeFormat}
           />
         )}
         {activeTab === 'config' && (

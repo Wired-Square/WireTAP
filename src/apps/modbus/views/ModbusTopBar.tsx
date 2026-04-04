@@ -10,7 +10,9 @@ import type { ModbusTransportMode } from "../stores/modbusStore";
 interface Props {
   ioProfiles: IOProfile[];
   ioProfile: string | null;
+  defaultReadProfileId?: string | null;
   sessionId?: string | null;
+  multiBusProfiles?: string[];
   isStreaming: boolean;
   isStopped?: boolean;
   ioState?: string | null;
@@ -27,6 +29,10 @@ interface Props {
   catalogPath: string | null;
   onOpenCatalogPicker: () => void;
 
+  // Clear
+  onClearBuffer?: () => void;
+  hasData?: boolean;
+
   // Poll info
   pollGroupCount: number;
   registerCount: number;
@@ -40,7 +46,9 @@ interface Props {
 export default function ModbusTopBar({
   ioProfiles,
   ioProfile,
+  defaultReadProfileId,
   sessionId,
+  multiBusProfiles = [],
   isStreaming,
   isStopped = false,
   ioState,
@@ -48,6 +56,8 @@ export default function ModbusTopBar({
   onStop,
   onResume,
   onLeave,
+  onClearBuffer,
+  hasData = false,
   transportMode,
   catalogs,
   catalogPath,
@@ -65,7 +75,9 @@ export default function ModbusTopBar({
       ioSession={{
         ioProfile,
         ioProfiles,
+        defaultReadProfileId,
         sessionId,
+        multiBusProfiles,
         ioState,
         onOpenIoSessionPicker: onOpenIoPicker,
         isStreaming,
@@ -73,6 +85,8 @@ export default function ModbusTopBar({
         onStop,
         onResume,
         onLeave,
+        onClearBuffer,
+        hasData,
       }}
       framePicker={{
         frameCount,
