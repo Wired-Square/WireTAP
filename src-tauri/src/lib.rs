@@ -23,6 +23,7 @@ mod store_manager;
 mod transmit;
 mod transmit_history;
 mod replay;
+mod io_test;
 pub mod ws;
 
 use std::sync::Mutex;
@@ -1149,6 +1150,10 @@ pub fn run() {
             replay::io_stop_replay,
             replay::io_stop_all_replays,
             replay::get_replay_state,
+            // Test Pattern protocol
+            io_test::io_test_start,
+            io_test::io_test_stop,
+            io_test::get_io_test_state,
             // Transmit history (SQLite-backed)
             transmit_history::transmit_history_query,
             transmit_history::transmit_history_count,

@@ -555,6 +555,8 @@ pub fn get_session_frame_buffer_id(session_id: &str) -> Option<String> {
 /// buffer_type == Frames. No-op if session has no frame buffer.
 pub fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>) {
     if new_frames.is_empty() { return; }
+    // Tap test pattern frames for active io_test runners
+    crate::io_test::tap_test_frames(session_id, &new_frames);
     let buffer_id = {
         let registry = BUFFER_REGISTRY.read().unwrap();
         registry.buffers.values()

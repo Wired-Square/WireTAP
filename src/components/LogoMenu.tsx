@@ -1,7 +1,7 @@
 // ui/src/components/LogoMenu.tsx
 
 import { useState, useRef, useEffect } from "react";
-import { Search, Activity, FileText, Calculator, Settings, Send, ArrowUpCircle, DatabaseZap, Network, BarChart3, Workflow } from "lucide-react";
+import { Search, Activity, FileText, Calculator, Settings, Send, ArrowUpCircle, DatabaseZap, Network, BarChart3, Workflow, FlaskConical } from "lucide-react";
 import { iconMd, marginAppContent } from "../styles/spacing";
 import { bgSurface, borderDefault, textPrimary } from "../styles";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -9,7 +9,7 @@ const logo = "/logo.png";
 import { useUpdateStore } from "../stores/updateStore";
 import { openSettingsPanel } from "../api";
 
-export type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "transmit" | "query" | "session-manager" | "graph" | "rules" | "settings";
+export type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "transmit" | "query" | "session-manager" | "graph" | "rules" | "test-pattern" | "settings";
 
 interface LogoMenuProps {
   onPanelClick: (panelId: PanelId) => void;
@@ -81,6 +81,13 @@ const menuItems: MenuItem[] = [
     label: "Calculator",
     color: "text-teal-400",
     bgColor: "hover:bg-teal-500/10",
+  },
+  {
+    id: "test-pattern",
+    icon: FlaskConical,
+    label: "Test Pattern",
+    color: "text-emerald-400",
+    bgColor: "hover:bg-emerald-500/10",
   },
   {
     id: "session-manager",

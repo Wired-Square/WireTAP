@@ -309,6 +309,24 @@ pub fn send_replay_state(state: &crate::replay::ReplayState) {
     server.send_global(msg);
 }
 
+/// Send Test Pattern state update (global, channel 0).
+pub fn send_io_test_state(test_id: &str) {
+    let server = match ws_server() {
+        Some(s) => s,
+        None => return,
+    };
+    let state = match crate::io_test::get_io_test_state(test_id.to_string()) {
+        Some(s) => s,
+        None => return,
+    };
+    let payload = match serde_json::to_vec(&state) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let msg = protocol::encode_message(MsgType::TestPatternState, 0, &payload);
+    server.send_global(msg);
+}
+
 /// Send session lifecycle event (global, channel 0).
 pub fn send_session_lifecycle(payload: &crate::io::SessionLifecyclePayload) {
     let server = match ws_server() {
