@@ -65,6 +65,10 @@ pub enum MergeCommand {
     AddSource(SourceConfig),
     /// Remove a source reader by profile ID
     RemoveSource(String),
+    /// Pause polling for a source (by profile ID) — source stays connected but stops emitting
+    PauseSource(String),
+    /// Resume polling for a paused source (by profile ID)
+    ResumeSource(String),
 }
 
 /// Command sent to a virtual reader task for dynamic bus management
@@ -92,6 +96,7 @@ pub struct MultiSourceReader {
     sources: Vec<SourceConfig>,
     state: IOState,
     stop_flag: Arc<AtomicBool>,
+    pause_flag: Arc<AtomicBool>,
     /// Handles to sub-reader tasks
     task_handles: Vec<tokio::task::JoinHandle<()>>,
     /// Channel to receive messages from sub-readers
@@ -115,6 +120,29 @@ pub struct MultiSourceReader {
 }
 
 impl MultiSourceReader {
+    /// Pause polling for a specific source (by profile ID).
+    /// The source stays connected but stops emitting frames.
+    pub fn pause_source(&self, profile_id: &str) -> Result<(), String> {
+        let cmd_tx = self.merge_cmd_tx.lock()
+            .map_err(|e| format!("Failed to lock merge command channel: {}", e))?;
+        let tx = cmd_tx.as_ref()
+            .ok_or_else(|| "Session not running — cannot pause source".to_string())?;
+        tx.send(MergeCommand::PauseSource(profile_id.to_string()))
+            .map_err(|e| format!("Failed to send pause-source command: {}", e))?;
+        Ok(())
+    }
+
+    /// Resume polling for a paused source (by profile ID).
+    pub fn resume_source(&self, profile_id: &str) -> Result<(), String> {
+        let cmd_tx = self.merge_cmd_tx.lock()
+            .map_err(|e| format!("Failed to lock merge command channel: {}", e))?;
+        let tx = cmd_tx.as_ref()
+            .ok_or_else(|| "Session not running — cannot resume source".to_string())?;
+        tx.send(MergeCommand::ResumeSource(profile_id.to_string()))
+            .map_err(|e| format!("Failed to send resume-source command: {}", e))?;
+        Ok(())
+    }
+
     /// Create a multi-source reader with exactly one source.
     /// This is the preferred way to create sessions for real-time devices,
     /// as it uses the same code path as multi-device sessions.
@@ -207,6 +235,7 @@ impl MultiSourceReader {
             sources,
             state: IOState::Stopped,
             stop_flag: Arc::new(AtomicBool::new(false)),
+            pause_flag: Arc::new(AtomicBool::new(false)),
             task_handles: Vec::new(),
             rx: Some(rx),
             tx,
@@ -494,6 +523,7 @@ impl IODevice for MultiSourceReader {
         let session_id = self.session_id.clone();
         let sources = self.sources.clone();
         let stop_flag = self.stop_flag.clone();
+        let pause_flag = self.pause_flag.clone();
         let tx = self.tx.clone();
         let transmit_channels = self.transmit_channels.clone();
         let emits_raw_bytes = self.emits_raw_bytes;
@@ -529,6 +559,7 @@ impl IODevice for MultiSourceReader {
                 emits_raw_bytes,
                 bytes_buffer_id,
                 stop_flag,
+                pause_flag,
                 rx,
                 tx,
                 transmit_channels,
@@ -575,11 +606,11 @@ impl IODevice for MultiSourceReader {
     }
 
     async fn pause(&mut self) -> Result<(), String> {
-        Err("Multi-source sessions do not support pause".to_string())
+        Err("Multi-source sessions do not support session-level pause. Use per-source pause instead.".to_string())
     }
 
     async fn resume(&mut self) -> Result<(), String> {
-        Err("Multi-source sessions do not support resume".to_string())
+        Err("Multi-source sessions do not support session-level resume. Use per-source resume instead.".to_string())
     }
 
     fn set_speed(&mut self, _speed: f64) -> Result<(), String> {
@@ -757,5 +788,13 @@ impl IODevice for MultiSourceReader {
 
     fn multi_source_configs(&self) -> Option<Vec<SourceConfig>> {
         Some(self.sources.clone())
+    }
+
+    fn pause_source_polling(&self, profile_id: &str) -> Result<(), String> {
+        self.pause_source(profile_id)
+    }
+
+    fn resume_source_polling(&self, profile_id: &str) -> Result<(), String> {
+        self.resume_source(profile_id)
     }
 }

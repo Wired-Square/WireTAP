@@ -14,6 +14,7 @@ import { useDiscoveryUIStore, type FrameMetadata, type PlaybackSpeed } from './d
 import { useDiscoverySerialStore } from './discoverySerialStore';
 import { useDiscoveryToolboxStore } from './discoveryToolboxStore';
 import type { FrameMessage } from '../types/frame';
+import { keyOf, parseFrameKey } from '../utils/frameKey';
 import type { SelectionSet } from '../utils/selectionSets';
 import { tlog } from '../api/settings';
 
@@ -62,13 +63,14 @@ export type TimestampedByte = {
 };
 
 // Combined state type for backward compatibility
+// All Map/Set keys are composite frame keys (e.g. "can:256", "modbus:5013").
 type CombinedDiscoveryState = {
   // Frame store (frames is from mutable buffer, use frameVersion for reactivity)
   frames: FrameMessage[];
   frameVersion: number;
-  frameInfoMap: Map<number, FrameInfo>;
-  selectedFrames: Set<number>;
-  seenIds: Set<number>;
+  frameInfoMap: Map<string, FrameInfo>;
+  selectedFrames: Set<string>;
+  seenIds: Set<string>;
   streamStartTimeUs: number | null;
   bufferMode: { enabled: boolean; totalFrames: number };
   renderFrozen: boolean;
@@ -116,7 +118,7 @@ type CombinedDiscoveryState = {
   clearBuffer: () => void;
   clearFramePicker: () => void;
   clearAll: () => void;
-  toggleFrameSelection: (id: number) => void;
+  toggleFrameSelection: (id: string) => void;
   bulkSelectBus: (bus: number | null, select: boolean) => void;
   setMaxBuffer: (value: number) => void;
   setRenderBuffer: (value: number) => void;
@@ -280,9 +282,16 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
       frameStore.deselectAllFrames(uiStore.activeSelectionSetId, uiStore.setSelectionSetDirty);
     },
     applySelectionSet: (selectionSet) => {
-      frameStore.applySelectionSet(selectionSet, uiStore.setActiveSelectionSet, uiStore.setSelectionSetDirty);
+      // Detect protocol from current frameInfoMap, default to 'can'
+      let protocol = 'can';
+      for (const info of frameStore.frameInfoMap.values()) {
+        if (info.protocol) { protocol = info.protocol; break; }
+      }
+      frameStore.applySelectionSet(selectionSet, protocol, uiStore.setActiveSelectionSet, uiStore.setSelectionSetDirty);
+      // Convert numeric selection set IDs to composite keys
+      const numericIds = selectionSet.selectedIds ?? selectionSet.frameIds;
       uiStore.setActiveSelectionSetSelectedIds(
-        new Set(selectionSet.selectedIds ?? selectionSet.frameIds)
+        new Set(numericIds.map(id => `${protocol}:${id}`))
       );
     },
     setRenderFrozen: frameStore.setRenderFrozen,
@@ -541,15 +550,15 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
       // When the Filtered tab is active, analyse filtered-out IDs instead of selected ones
       const { framesViewActiveTab } = useDiscoveryUIStore.getState();
       const isFilteredTab = framesViewActiveTab === 'filtered';
-      let targetIds: Set<number>;
+      let targetKeys: Set<string>;
       if (isFilteredTab) {
         const { seenIds } = frameStore;
-        targetIds = new Set<number>();
-        for (const id of seenIds) {
-          if (!selectedFrames.has(id)) targetIds.add(id);
+        targetKeys = new Set<string>();
+        for (const fk of seenIds) {
+          if (!selectedFrames.has(fk)) targetKeys.add(fk);
         }
       } else {
-        targetIds = selectedFrames;
+        targetKeys = selectedFrames;
       }
 
       let selectedFrameData: FrameMessage[];
@@ -562,8 +571,9 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         const { useSessionStore } = await import('./sessionStore');
         const sessionId = uiStore.ioProfile ?? '';
         const bufferId = useSessionStore.getState().sessions[sessionId]?.buffer?.id ?? '';
-        const selectedIds = Array.from(targetIds);
-        if (selectedIds.length === 0 || !bufferId) return;
+        // Buffer DB still uses numeric IDs — extract from composite keys
+        const selectedNumericIds = Array.from(targetKeys).map(fk => parseFrameKey(fk).frameId);
+        if (selectedNumericIds.length === 0 || !bufferId) return;
 
         toolboxStore.setIsRunning(true);
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -573,13 +583,13 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         let offset = 0;
 
         try {
-          const firstResponse = await getBufferFramesPaginatedFiltered(bufferId, 0, BATCH_SIZE, selectedIds);
+          const firstResponse = await getBufferFramesPaginatedFiltered(bufferId, 0, BATCH_SIZE, selectedNumericIds);
           const totalCount = firstResponse.total_count;
           selectedFrameData.push(...(firstResponse.frames as FrameMessage[]));
           offset = firstResponse.frames.length;
 
           while (offset < totalCount) {
-            const response = await getBufferFramesPaginatedFiltered(bufferId, offset, BATCH_SIZE, selectedIds);
+            const response = await getBufferFramesPaginatedFiltered(bufferId, offset, BATCH_SIZE, selectedNumericIds);
             selectedFrameData.push(...(response.frames as FrameMessage[]));
             offset += response.frames.length;
           }
@@ -589,7 +599,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           return;
         }
       } else {
-        selectedFrameData = frames.filter((f) => targetIds.has(f.frame_id));
+        selectedFrameData = frames.filter((f) => targetKeys.has(keyOf(f)));
         if (selectedFrameData.length === 0) return;
       }
 

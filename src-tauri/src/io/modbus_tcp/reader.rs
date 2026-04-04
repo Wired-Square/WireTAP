@@ -86,6 +86,7 @@ pub struct ModbusTcpReader {
     config: ModbusTcpConfig,
     state: IOState,
     cancel_flag: Arc<AtomicBool>,
+    pause_flag: Arc<AtomicBool>,
     task_handles: Vec<tauri::async_runtime::JoinHandle<()>>,
 }
 
@@ -97,6 +98,7 @@ impl ModbusTcpReader {
             config,
             state: IOState::Stopped,
             cancel_flag: Arc::new(AtomicBool::new(false)),
+            pause_flag: Arc::new(AtomicBool::new(false)),
             task_handles: Vec::new(),
         }
     }
@@ -108,6 +110,7 @@ impl IODevice for ModbusTcpReader {
         let mut caps = IOCapabilities::realtime_can()
             .with_buses(vec![])
             .with_protocols(vec![Protocol::Modbus]);
+        caps.can_pause = true;
         caps.supports_extended_id = false;
         caps.supports_rtr = false;
         caps
@@ -172,6 +175,7 @@ impl IODevice for ModbusTcpReader {
                 poll.clone(),
                 ctx.clone(),
                 self.cancel_flag.clone(),
+                self.pause_flag.clone(),
                 self.config.max_register_errors,
             );
             self.task_handles.push(handle);
@@ -198,11 +202,23 @@ impl IODevice for ModbusTcpReader {
     }
 
     async fn pause(&mut self) -> Result<(), String> {
-        Err("Modbus TCP is a live polling session and cannot be paused.".to_string())
+        if self.state != IOState::Running {
+            return Err("Reader is not running".to_string());
+        }
+        self.pause_flag.store(true, Ordering::Relaxed);
+        self.state = IOState::Paused;
+        tlog!("[ModbusTCP:{}] Polling paused", self.session_id);
+        Ok(())
     }
 
     async fn resume(&mut self) -> Result<(), String> {
-        Err("Modbus TCP does not support pause/resume.".to_string())
+        if self.state != IOState::Paused {
+            return Err("Reader is not paused".to_string());
+        }
+        self.pause_flag.store(false, Ordering::Relaxed);
+        self.state = IOState::Running;
+        tlog!("[ModbusTCP:{}] Polling resumed", self.session_id);
+        Ok(())
     }
 
     fn set_speed(&mut self, _speed: f64) -> Result<(), String> {
@@ -241,6 +257,7 @@ fn spawn_poll_task(
     poll: PollGroup,
     ctx: Arc<Mutex<client::Context>>,
     cancel_flag: Arc<AtomicBool>,
+    pause_flag: Arc<AtomicBool>,
     max_register_errors: u32,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
@@ -265,6 +282,11 @@ fn spawn_poll_task(
 
             if cancel_flag.load(Ordering::Relaxed) {
                 break;
+            }
+
+            // Skip reads while paused (poll task stays alive, timer keeps ticking)
+            if pause_flag.load(Ordering::Relaxed) {
+                continue;
             }
 
             let mut ctx = ctx.lock().await;

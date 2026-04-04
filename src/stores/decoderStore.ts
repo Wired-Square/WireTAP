@@ -52,7 +52,7 @@ import type { SelectionSet } from '../utils/selectionSets';
 import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
 import { loadCatalog as loadCatalogFromPath, parseCanId } from '../utils/catalogParser';
-import { buildPollsFromCatalog } from '../utils/modbusPollBuilder';
+import { frameKey } from '../utils/frameKey';
 
 
 // Re-export for consumers that import from decoderStore
@@ -233,19 +233,17 @@ export type MirrorValidationEntry = {
 };
 
 interface DecoderState {
-  // Catalog and frames
+  // Catalog and frames (Map/Set keys are composite frame keys, e.g. "can:256")
   catalogPath: string | null;
-  frames: Map<number, FrameDetail>;
-  selectedFrames: Set<number>;
-  seenIds: Set<number>;
+  frames: Map<string, FrameDetail>;
+  selectedFrames: Set<string>;
+  seenIds: Set<string>;
   /** Protocol type from catalog meta (default_frame) */
   protocol: 'can' | 'serial' | 'modbus';
   /** CAN config from [frame.can.config] - used for frame ID masking and source address extraction */
   canConfig: CanConfig | null;
   /** Serial config from [frame.serial.config] - used for frame ID/source address extraction */
   serialConfig: SerialFrameConfig | null;
-  /** Pre-built Modbus poll groups JSON (from catalog load, for session creation) */
-  modbusPollsJson: string | null;
   /** Map of mirror frame ID to source frame ID for mirror validation */
   mirrorSourceMap: Map<number, number>;
   /** Mirror validation results - keyed by mirror frame ID */
@@ -303,7 +301,7 @@ interface DecoderState {
   initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
 
   // Actions - Frame management
-  toggleFrameSelection: (id: number) => void;
+  toggleFrameSelection: (id: string) => void;
   bulkSelectBus: (bus: number | null, select: boolean) => void;
   selectAllFrames: () => void;
   deselectAllFrames: () => void;
@@ -369,7 +367,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   protocol: 'can',
   canConfig: null,
   serialConfig: null,
-  modbusPollsJson: null,
   mirrorSourceMap: new Map(),
   mirrorValidation: new Map(),
   mirrorFuzzWindowMs: 1000, // 1 second - generous to handle batching and varying frame rates
@@ -408,11 +405,14 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       const catalog = await loadCatalogFromPath(path);
 
       // Convert ParsedCatalog to decoder's FrameDetail format
-      const frameMap = new Map<number, FrameDetail>();
-      const seenIds = new Set<number>();
+      // Use composite keys (e.g. "can:256", "modbus:5013")
+      const proto = catalog.protocol;
+      const frameMap = new Map<string, FrameDetail>();
+      const seenIds = new Set<string>();
 
       for (const [id, frame] of catalog.frames) {
-        frameMap.set(id, {
+        const fk = frameKey(proto, id);
+        frameMap.set(fk, {
           id,
           len: frame.length,
           isExtended: frame.isExtended,
@@ -424,7 +424,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
           mirrorOf: frame.mirrorOf,
           copyFrom: frame.copyFrom,
         });
-        seenIds.add(id);
+        seenIds.add(fk);
       }
 
       // Convert CanProtocolConfig to CanConfig (compatible structure)
@@ -483,21 +483,21 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       const { selectedFrames: currentSelected, catalogPath: currentPath } = get();
       const isReload = currentPath === path;
 
-      let newSelected: Set<number>;
+      let newSelected: Set<string>;
       if (isReload && currentSelected.size > 0) {
         // Reloading same catalog: preserve selection, add new frames as selected
-        const existingFrameIds = new Set(frameMap.keys());
-        newSelected = new Set<number>();
+        const existingFrameKeys = new Set(frameMap.keys());
+        newSelected = new Set<string>();
 
-        for (const id of currentSelected) {
-          if (existingFrameIds.has(id)) {
-            newSelected.add(id);
+        for (const fk of currentSelected) {
+          if (existingFrameKeys.has(fk)) {
+            newSelected.add(fk);
           }
         }
 
-        for (const id of existingFrameIds) {
-          if (!currentSelected.has(id) && !get().frames.has(id)) {
-            newSelected.add(id);
+        for (const fk of existingFrameKeys) {
+          if (!currentSelected.has(fk) && !get().frames.has(fk)) {
+            newSelected.add(fk);
           }
         }
       } else {
@@ -532,10 +532,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         }
       }
 
-      // Pre-build Modbus poll groups from catalog (before converting to FrameDetail)
-      const modbusPolls = buildPollsFromCatalog(catalog.frames, catalog.modbusConfig ?? null);
-      const modbusPollsJson = modbusPolls.length > 0 ? JSON.stringify(modbusPolls) : null;
-
       set({
         frames: frameMap,
         selectedFrames: newSelected,
@@ -544,7 +540,6 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         protocol: catalog.protocol,
         canConfig,
         serialConfig,
-        modbusPollsJson,
         mirrorSourceMap,
       });
     } catch (e) {
@@ -577,18 +572,18 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   bulkSelectBus: (bus, select) => {
     const { frames, selectedFrames, activeSelectionSetId } = get();
-    const ids = Array.from(frames.values())
-      .filter((f) => bus === null ? f.bus === undefined : f.bus === bus)
-      .map((f) => f.id);
+    const keys = Array.from(frames.entries())
+      .filter(([, f]) => bus === null ? f.bus === undefined : f.bus === bus)
+      .map(([fk]) => fk);
 
-    if (ids.length === 0) return;
+    if (keys.length === 0) return;
 
     const next = new Set(selectedFrames);
-    ids.forEach((id) => {
+    keys.forEach((fk) => {
       if (select) {
-        next.add(id);
+        next.add(fk);
       } else {
-        next.delete(id);
+        next.delete(fk);
       }
     });
     set({
@@ -730,7 +725,8 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       }
     }
 
-    const frame = frames.get(maskedFrameId);
+    const frameLookupKey = frameKey(protocol, maskedFrameId);
+    const frame = frames.get(frameLookupKey);
     if (!frame) return;
 
     // Determine default byte order from catalog config
@@ -850,7 +846,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     // Helper to update a validation entry
     const updateValidationEntry = (validationKey: number, sourceFrameId: number, mirrorFrameId: number, isMirrorFrame: boolean) => {
       // Calculate fuzz window based on frame interval
-      const sourceFrame = frames.get(sourceFrameId);
+      const sourceFrame = frames.get(frameKey(protocol, sourceFrameId));
       const frameInterval = sourceFrame?.interval ?? canConfig?.default_interval ?? mirrorFuzzWindowMs;
       const effectiveFuzzWindow = frameInterval * 2;
 
@@ -858,7 +854,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       let entry = nextMirrorValidation.get(validationKey);
       if (!entry) {
         // Compute inherited byte indices from mirror frame definition
-        const mirrorFrame = frames.get(mirrorFrameId);
+        const mirrorFrame = frames.get(frameKey(protocol, mirrorFrameId));
         const inheritedByteIndices = new Set<number>();
         if (mirrorFrame) {
           for (const signal of mirrorFrame.signals) {
@@ -1051,7 +1047,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         }
       }
 
-      const frame = frames.get(maskedFrameId);
+      const frame = frames.get(frameKey(protocol, maskedFrameId));
       if (!frame) continue;
 
       // Decode plain signals
@@ -1121,13 +1117,13 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
       if (mirrorSourceId !== undefined || mirrorsOfThisSource.length > 0) {
         const updateValidationEntry = (validationKey: number, sourceFrameId: number, mirrorFrameId: number, isMirrorFrame: boolean) => {
-          const sourceFrame = frames.get(sourceFrameId);
+          const sourceFrame = frames.get(frameKey(protocol, sourceFrameId));
           const frameInterval = sourceFrame?.interval ?? canConfig?.default_interval ?? mirrorFuzzWindowMs;
           const effectiveFuzzWindow = frameInterval * 2;
 
           let entry = nextMirrorValidation.get(validationKey);
           if (!entry) {
-            const mirrorFrame = frames.get(mirrorFrameId);
+            const mirrorFrame = frames.get(frameKey(protocol, mirrorFrameId));
             const inheritedByteIndices = new Set<number>();
             if (mirrorFrame) {
               for (const signal of mirrorFrame.signals) {
@@ -1385,8 +1381,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     const baseDir = decoderDir.replace(/[\\/]+$/, '');
     const path = `${baseDir}/${filename}`;
 
-    const selectedFramesList = Array.from(frames.values())
-      .filter((f) => selectedFrames.has(f.id))
+    const selectedFramesList = Array.from(frames.entries())
+      .filter(([fk]) => selectedFrames.has(fk))
+      .map(([, f]) => f)
       .sort((a, b) => a.id - b.id);
 
     const content = buildFramesToml(
@@ -1414,11 +1411,13 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     // Decoder behavior: only select IDs from selectedIds
     // (including IDs that don't exist in current catalog)
     // Fall back to frameIds for backwards compatibility with old selection sets
+    // Convert numeric IDs to composite keys using the catalog's protocol
+    const { protocol } = get();
     const idsToSelect = selectionSet.selectedIds ?? selectionSet.frameIds;
-    const newSelectedFrames = new Set<number>();
+    const newSelectedFrames = new Set<string>();
 
-    for (const frameId of idsToSelect) {
-      newSelectedFrames.add(frameId);
+    for (const numericId of idsToSelect) {
+      newSelectedFrames.add(frameKey(protocol, numericId));
     }
 
     set({

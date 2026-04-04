@@ -34,6 +34,7 @@ pub(super) async fn run_merge_task(
     _emits_raw_bytes: bool,
     _bytes_buffer_id: Option<String>,
     stop_flag: Arc<AtomicBool>,
+    _pause_flag: Arc<AtomicBool>,
     mut rx: mpsc::Receiver<SourceMessage>,
     tx: mpsc::Sender<SourceMessage>,
     transmit_channels: TransmitChannels,
@@ -56,6 +57,8 @@ pub(super) async fn run_merge_task(
     let mut next_source_idx = sources.len();
     // Per-source stop flags for hot-remove
     let mut source_stop_flags: HashMap<String, Arc<AtomicBool>> = HashMap::new();
+    // Per-source pause flags for pause/resume polling
+    let mut source_pause_flags: HashMap<String, Arc<AtomicBool>> = HashMap::new();
     for (index, source_config) in sources.iter().enumerate() {
         let profile = match settings.io_profiles.iter().find(|p| p.id == source_config.profile_id) {
             Some(p) => p.clone(),
@@ -70,12 +73,15 @@ pub(super) async fn run_merge_task(
 
         let source_stop = Arc::new(AtomicBool::new(false));
         source_stop_flags.insert(source_config.profile_id.clone(), source_stop.clone());
+        let source_pause = Arc::new(AtomicBool::new(false));
+        source_pause_flags.insert(source_config.profile_id.clone(), source_pause.clone());
 
         let handle = spawn_source(
             index,
             source_config,
             &profile,
             source_stop,
+            source_pause,
             &app,
             &session_id,
             &stop_flag,
@@ -172,11 +178,14 @@ pub(super) async fn run_merge_task(
                         };
                         let source_stop = Arc::new(AtomicBool::new(false));
                         source_stop_flags.insert(source_config.profile_id.clone(), source_stop.clone());
+                        let source_pause = Arc::new(AtomicBool::new(false));
+                        source_pause_flags.insert(source_config.profile_id.clone(), source_pause.clone());
                         let handle = spawn_source(
                             idx,
                             &source_config,
                             &profile,
                             source_stop,
+                            source_pause,
                             &app,
                             &session_id,
                             &stop_flag,
@@ -196,6 +205,18 @@ pub(super) async fn run_merge_task(
                             tlog!("[MultiSourceReader] Hot-remove: profile '{}' not found in stop flags", profile_id);
                         }
                         // The source reader will send Ended, which decrements active_sources
+                    }
+                    Some(MergeCommand::PauseSource(profile_id)) => {
+                        if let Some(flag) = source_pause_flags.get(&profile_id) {
+                            flag.store(true, Ordering::Relaxed);
+                            tlog!("[MultiSourceReader] Paused source polling (profile '{}')", profile_id);
+                        }
+                    }
+                    Some(MergeCommand::ResumeSource(profile_id)) => {
+                        if let Some(flag) = source_pause_flags.get(&profile_id) {
+                            flag.store(false, Ordering::Relaxed);
+                            tlog!("[MultiSourceReader] Resumed source polling (profile '{}')", profile_id);
+                        }
                     }
                     None => {
                         // Command channel closed — session ending
@@ -290,6 +311,7 @@ fn spawn_source(
     source_config: &SourceConfig,
     profile: &crate::settings::IOProfile,
     source_stop: Arc<AtomicBool>,
+    source_pause: Arc<AtomicBool>,
     app: &AppHandle,
     session_id: &str,
     stop_flag: &Arc<AtomicBool>,
@@ -301,6 +323,7 @@ fn spawn_source(
     let session_id_clone = session_id.to_string();
     let stop_flag_clone = stop_flag.clone();
     let source_stop_clone = source_stop;
+    let source_pause_clone = source_pause;
     let tx_clone = tx.clone();
     let bus_mappings = source_config.bus_mappings.clone();
     let display_name = source_config.display_name.clone();
@@ -371,6 +394,7 @@ fn spawn_source(
             modbus_role,
             max_register_errors,
             combined_stop,
+            source_pause_clone,
             tx_clone,
             virtual_bus_controls_clone,
             virtual_cmd_rx,

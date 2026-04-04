@@ -20,6 +20,7 @@ import ModbusScanResultView from "./tools/ModbusScanResultView";
 import FilteredTabContent from "./FilteredTabContent";
 import { bgDataView, bgSurface, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
+import { keyOf, parseFrameKey } from "../../../utils/frameKey";
 import type { IOCapabilities } from "../../../api/io";
 import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
 import { useBufferFrameView } from "../hooks/useBufferFrameView";
@@ -166,7 +167,7 @@ function DiscoveryFramesView({
   const toolboxResults = useDiscoveryToolboxStore((s) => s.toolbox);
 
   // ── Coordinated actions (cross-store wrappers) ──
-  const toggleFrameSelection = useCallback((id: number) => {
+  const toggleFrameSelection = useCallback((id: string) => {
     const { activeSelectionSetId, setSelectionSetDirty } = useDiscoveryUIStore.getState();
     useDiscoveryFrameStore.getState().toggleFrameSelection(id, activeSelectionSetId, setSelectionSetDirty);
   }, []);
@@ -303,7 +304,7 @@ function DiscoveryFramesView({
     for (let i = 0; i < allFrames.length; i++) {
       const frame = allFrames[i];
       // Only count frames that match the selection
-      if (selectedIds.has(frame.frame_id)) {
+      if (selectedIds.has(keyOf(frame))) {
         if (frame.timestamp_us >= targetTimeUs) {
           break;
         }
@@ -371,7 +372,7 @@ function DiscoveryFramesView({
 
     for (let i = frames.length - 1; i >= 0 && result.length < limit; i--) {
       const frame = frames[i];
-      if (selectedFrames.has(frame.frame_id)) {
+      if (selectedFrames.has(keyOf(frame))) {
         result.push(frame);
         indices.push(i + 1); // 1-based position in the in-memory buffer
       }
@@ -420,7 +421,7 @@ function DiscoveryFramesView({
 
         for (let i = currentIndex; i < endIndex; i++) {
           const frame = frames[i];
-          if (selectedFrames.has(frame.frame_id)) {
+          if (selectedFrames.has(keyOf(frame))) {
             filtered.push(frame);
           }
         }
@@ -597,12 +598,12 @@ function DiscoveryFramesView({
       {
         label: 'Filter',
         icon: <Filter className={iconXs} />,
-        onClick: () => toggleFrameSelection(frame.frame_id),
+        onClick: () => toggleFrameSelection(keyOf(frame as FrameMessage)),
       },
       {
         label: 'Solo',
         icon: <Target className={iconXs} />,
-        onClick: () => { deselectAllFrames(); toggleFrameSelection(frame.frame_id); },
+        onClick: () => { deselectAllFrames(); toggleFrameSelection(keyOf(frame as FrameMessage)); },
       },
       { separator: true, label: '', onClick: () => {} },
       {
@@ -871,7 +872,7 @@ function DiscoveryFramesView({
             q,
             findMode !== 'data',
             findMode !== 'id',
-            Array.from(selectedFrames),
+            Array.from(selectedFrames).map(fk => parseFrameKey(fk).frameId),
           );
           setFindResults(results);
           setFindCurrentIndex(results.length > 0 ? 0 : -1);
@@ -888,7 +889,7 @@ function DiscoveryFramesView({
       let filteredOffset = 0;
       const matches: number[] = [];
       for (const frame of buffer) {
-        if (selectedFrames.has(frame.frame_id)) {
+        if (selectedFrames.has(keyOf(frame))) {
           const idStr = formatFrameId(frame.frame_id, displayFrameIdFormat, frame.is_extended)
             .replace(/\s/g, '').toLowerCase();
           const hexStr = frame.bytes.map(b => b.toString(16).padStart(2, '0')).join('').toLowerCase();

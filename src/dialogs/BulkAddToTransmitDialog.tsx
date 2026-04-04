@@ -13,6 +13,7 @@ import {
   getDiscoveryFrameBuffer,
   useDiscoveryFrameStore,
 } from "../stores/discoveryFrameStore";
+import { parseFrameKey } from "../utils/frameKey";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
 
@@ -62,12 +63,13 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
     return isNaN(n) ? null : n;
   }, [maxIdRaw]);
 
-  // IDs in range, sorted ascending
+  // Composite keys whose numeric frame ID falls within the range, sorted ascending
   const matchingIds = useMemo(() => {
     if (minId === null || maxId === null) return [];
     return Array.from(frameInfoMap.keys())
-      .filter((id) => id >= minId && id <= maxId)
-      .sort((a, b) => a - b);
+      .map((fk) => ({ fk, numId: parseFrameKey(fk).frameId }))
+      .filter(({ numId }) => numId >= minId && numId <= maxId)
+      .sort((a, b) => a.numId - b.numId);
   }, [frameInfoMap, minId, maxId]);
 
   const rangeError =
@@ -82,14 +84,14 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
   const handleConfirm = () => {
     if (!transmitSession || matchingIds.length === 0) return;
 
-    // Build last-seen bytes for each matching ID by scanning the buffer once (O(n))
-    const matchingSet = new Set(matchingIds);
+    // Build last-seen bytes for each matching numeric ID by scanning the buffer once (O(n))
+    const matchingNumericSet = new Set(matchingIds.map(m => m.numId));
     const lastSeenMap = new Map<
       number,
       { bytes: number[]; is_extended: boolean; dlc: number }
     >();
     for (const f of getDiscoveryFrameBuffer()) {
-      if (matchingSet.has(f.frame_id)) {
+      if (matchingNumericSet.has(f.frame_id)) {
         lastSeenMap.set(f.frame_id, {
           bytes: f.bytes,
           is_extended: f.is_extended ?? false,
@@ -98,15 +100,15 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
       }
     }
 
-    const frames = matchingIds.map((id) => {
-      const seen = lastSeenMap.get(id);
-      const info = frameInfoMap.get(id);
+    const frames = matchingIds.map(({ fk, numId }) => {
+      const seen = lastSeenMap.get(numId);
+      const info = frameInfoMap.get(fk);
       const dlc = seen?.dlc ?? info?.len ?? 8;
       return {
-        frame_id: id,
+        frame_id: numId,
         bytes: seen ? [...seen.bytes] : new Array(dlc).fill(0),
         bus,
-        is_extended: seen?.is_extended ?? info?.isExtended ?? id > 0x7ff,
+        is_extended: seen?.is_extended ?? info?.isExtended ?? numId > 0x7ff,
         dlc,
       };
     });

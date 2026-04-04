@@ -17,6 +17,7 @@ import { wsTransport } from "../../../services/wsTransport";
 import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../../stores/discoveryFrameStore";
 import { trackAlloc } from "../../../services/memoryDiag";
 import type { FrameMessage } from "../../../types/frame";
+import { parseFrameKey } from "../../../utils/frameKey";
 
 /** Frame with pre-computed hex bytes for display */
 export type FrameWithHex = FrameMessage & { hexBytes: string[] };
@@ -26,8 +27,8 @@ export interface UseBufferFrameViewOptions {
   bufferId: string | null;
   /** Whether currently streaming (determines tail vs pagination mode) */
   isStreaming: boolean;
-  /** Selected frame IDs filter (empty = all) */
-  selectedFrames: Set<number>;
+  /** Selected composite frame keys filter (empty = all) */
+  selectedFrames: Set<string>;
   /** Page size for pagination (when stopped) */
   pageSize: number;
   /** Tail size for streaming mode (default: 50) */
@@ -110,12 +111,13 @@ export function useBufferFrameView(
   } | null>(null);
 
   // Refs to avoid stale closures in intervals
-  const selectedIdsRef = useRef<number[]>(Array.from(selectedFrames));
+  // Buffer API uses numeric IDs — extract from composite keys
+  const selectedIdsRef = useRef<number[]>(Array.from(selectedFrames).map(fk => parseFrameKey(fk).frameId));
   const pageSizeRef = useRef(pageSize);
 
   // Update refs when values change
   useEffect(() => {
-    selectedIdsRef.current = Array.from(selectedFrames);
+    selectedIdsRef.current = Array.from(selectedFrames).map(fk => parseFrameKey(fk).frameId);
   }, [selectedFrames]);
 
   useEffect(() => {
@@ -345,14 +347,14 @@ export function useBufferFrameView(
   }, [followTimeUs, bufferId, isBufferPlayback, doFollowNavigate]);
 
   // Track previous selection to detect actual changes
-  const prevSelectedFramesRef = useRef<Set<number>>(selectedFrames);
+  const prevSelectedFramesRef = useRef<Set<string>>(selectedFrames);
 
   // Reset to page 0 when selection actually changes (not when streaming state changes)
   useEffect(() => {
     const prevSet = prevSelectedFramesRef.current;
     const changed =
       prevSet.size !== selectedFrames.size ||
-      [...selectedFrames].some((id) => !prevSet.has(id));
+      [...selectedFrames].some((fk) => !prevSet.has(fk));
 
     if (changed && bufferId) {
       setCurrentPage(0);

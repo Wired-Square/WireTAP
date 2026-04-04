@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Filter, Calculator, Copy, ClipboardCopy } from "lucide-react";
 import { useDiscoveryStore } from "../../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
+import { keyOf, parseFrameKey } from "../../../utils/frameKey";
 import { getBufferFramesPaginatedFiltered } from "../../../api/buffer";
 import { FrameDataTable, FRAME_PAGE_SIZE_OPTIONS } from "../components";
 import { PaginationToolbar } from "../components";
@@ -91,11 +92,12 @@ export default function FilteredTabContent({
   }, []);
 
   // Compute filtered-out IDs: in seenIds but NOT in selectedFrames
+  // Extract numeric IDs for the buffer API
   const filteredOutIds = useMemo(() => {
     const ids: number[] = [];
-    for (const id of seenIds) {
-      if (!selectedFrames.has(id)) {
-        ids.push(id);
+    for (const fk of seenIds) {
+      if (!selectedFrames.has(fk)) {
+        ids.push(parseFrameKey(fk).frameId);
       }
     }
     return ids;
@@ -258,7 +260,7 @@ export default function FilteredTabContent({
       {
         label: 'Unfilter',
         icon: <Filter className={iconXs} />,
-        onClick: () => toggleFrameSelection(frame.frame_id),
+        onClick: () => toggleFrameSelection(keyOf(frame)),
       },
       { separator: true, label: '', onClick: () => {} },
       {

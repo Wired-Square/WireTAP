@@ -13,6 +13,7 @@ import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
 import { getFavoritesForProfile } from "../../utils/favorites";
 import { mergeSerialConfigForWatch } from "../../utils/sessionConfigMerge";
+import { frameKey } from "../../utils/frameKey";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { tlog } from "../../api/settings";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
@@ -270,9 +271,10 @@ export default function Decoder() {
     // Build a set of source frame IDs that need to be processed for mirror validation
     // (sources of selected mirror frames)
     const mirrorSourceMap = storeState.mirrorSourceMap;
+    const catalogProtocol = storeState.protocol;
     const sourceIdsForValidation = new Set<number>();
     for (const [mirrorId, sourceId] of mirrorSourceMap) {
-      if (currentSelectedFrames.has(mirrorId)) {
+      if (currentSelectedFrames.has(frameKey(catalogProtocol, mirrorId))) {
         sourceIdsForValidation.add(sourceId);
       }
     }
@@ -324,11 +326,13 @@ export default function Decoder() {
       // Apply frame_id_mask before catalog lookup (same as decodeSignals does)
       const maskedFrameId = frameIdMask !== undefined ? (frameId & frameIdMask) : frameId;
 
-      // Check if frame exists in catalog (using masked ID)
-      if (catalogFrames.has(maskedFrameId)) {
+      // Check if frame exists in catalog (using composite key with masked ID)
+      const maskedKey = frameKey(catalogProtocol, maskedFrameId);
+      if (catalogFrames.has(maskedKey)) {
         // Frame exists in catalog - decode if selected (check both raw and masked IDs)
         // Also process source frames for mirror validation even if not selected
-        const isSelected = currentSelectedFrames.has(maskedFrameId) || currentSelectedFrames.has(frameId);
+        const rawKey = frameKey(catalogProtocol, frameId);
+        const isSelected = currentSelectedFrames.has(maskedKey) || currentSelectedFrames.has(rawKey);
         const isSourceForSelectedMirror = sourceIdsForValidation.has(maskedFrameId);
         if (isSelected || isSourceForSelectedMirror) {
           pendingFramesRef.current.push({ frameId, bytes: f.bytes, sourceAddress: f.source_address, timestamp });
@@ -606,20 +610,7 @@ export default function Decoder() {
         tlog.debug(`[Decoder] preferred decoder already loaded → ${path}`);
       } else {
         tlog.debug(`[Decoder] auto-loading preferred decoder → ${path}`);
-        loadCatalog(path).then(() => {
-          // If the catalog produced Modbus poll groups, reinitialize the session
-          // so the backend gets the poll configuration (polls aren't available
-          // at initial session creation because the catalog loads after)
-          const { modbusPollsJson } = useDecoderStore.getState();
-          if (modbusPollsJson) {
-            tlog.debug(`[Decoder] Modbus catalog loaded — reinitializing session with poll groups`);
-            if (ioProfiles.length > 0) {
-              watchSource(ioProfiles, { modbusPollsJson });
-            } else if (sourceProfileId) {
-              watchSource([sourceProfileId], { modbusPollsJson });
-            }
-          }
-        }).catch((err) => {
+        loadCatalog(path).catch((err) => {
           console.warn("[Decoder] Failed to auto-load preferred decoder:", err);
         });
       }
@@ -729,10 +720,7 @@ export default function Decoder() {
     closeDialog: () => dialogs.ioSessionPicker.close(),
     mergeOptions: (options) => {
       const state = useDecoderStore.getState();
-      const merged = mergeSerialConfigForWatch(state.serialConfig, options);
-      // Inject Modbus poll groups if a Modbus catalog is loaded
-      if (state.modbusPollsJson) merged.modbusPollsJson = state.modbusPollsJson;
-      return merged;
+      return mergeSerialConfigForWatch(state.serialConfig, options);
     },
   });
 
@@ -957,6 +945,19 @@ export default function Decoder() {
     [frames]
   );
 
+  // For FramePickerDialog: convert FrameDetail[] to FrameInfo[] with composite string keys
+  const pickerFrameList = useMemo(
+    () => frameList.map((f) => ({
+      id: frameKey(protocol, f.id),
+      len: f.len,
+      isExtended: f.isExtended,
+      bus: f.bus,
+      lenMismatch: f.lenMismatch,
+      protocol,
+    })),
+    [frameList, protocol]
+  );
+
   // Convert reader state to TimeController state
   const getPlaybackState = (): PlaybackState => {
     if (readerState === "running") return "playing";
@@ -1101,7 +1102,7 @@ export default function Decoder() {
       <FramePickerDialog
         isOpen={dialogs.framePicker.isOpen}
         onClose={() => dialogs.framePicker.close()}
-        frames={frameList}
+        frames={pickerFrameList}
         selectedFrames={selectedFrames}
         onToggleFrame={toggleFrameSelection}
         onBulkSelect={bulkSelectBus}

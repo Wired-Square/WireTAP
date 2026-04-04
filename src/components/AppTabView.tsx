@@ -11,7 +11,7 @@ import DataViewController, {
   type PageSizeOption,
   FRAME_PAGE_SIZE_OPTIONS,
 } from "./DataViewController";
-import { bgDataView, borderDataView } from "../styles";
+import { bgDataView, dataViewContainer } from "../styles";
 
 /**
  * Toolbar configuration for AppTabView.
@@ -182,7 +182,7 @@ export default function AppTabView({
 
   return (
     <div
-      className={`flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border ${borderDataView}`}
+      className={`flex flex-col flex-1 min-h-0 ${dataViewContainer}`}
     >
       {/* View Controller: Tab Bar + Toolbar + Timeline */}
       <DataViewController

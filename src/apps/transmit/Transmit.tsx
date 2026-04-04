@@ -17,6 +17,7 @@ import { useTransmitHistorySubscription } from "./hooks/useTransmitHistorySubscr
 import {
   bgDataToolbar,
   borderDataView,
+  dataViewContainer,
   textDataSecondary,
 } from "../../styles/colourTokens";
 import { dataViewTabClass, tabCountColorClass } from "../../styles/buttonStyles";
@@ -297,7 +298,7 @@ export default function Transmit() {
       }
     >
       {/* Bubble container */}
-      <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
+      <div className={`flex-1 flex flex-col min-h-0 ${dataViewContainer}`}>
         {/* Error Banner */}
         {transmitError && (
           <div

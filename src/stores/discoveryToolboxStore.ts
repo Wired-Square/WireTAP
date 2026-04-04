@@ -20,6 +20,7 @@ import {
   updateKnowledgeFromPayloadAnalysis,
 } from '../utils/decoderKnowledge';
 import type { FrameInfo } from './discoveryStore';
+import { parseFrameKey } from '../utils/frameKey';
 import { useDiscoveryUIStore } from './discoveryUIStore';
 import { ANALYSIS_YIELD_MS } from '../constants';
 
@@ -123,7 +124,7 @@ interface DiscoveryToolboxState {
   clearToolResult: (toolTabId: string) => void;
 
   // Actions - Knowledge
-  openInfoView: (frameInfoMap: Map<number, FrameInfo>) => void;
+  openInfoView: (frameInfoMap: Map<string, FrameInfo>) => void;
   closeInfoView: () => void;
   resetKnowledge: () => void;
   updateKnowledge: (knowledge: DecoderKnowledge) => void;
@@ -131,12 +132,12 @@ interface DiscoveryToolboxState {
   // Analysis runners - these need frame data passed in
   runMessageOrderAnalysis: (
     frames: FrameMessage[],
-    frameInfoMap: Map<number, FrameInfo>
+    frameInfoMap: Map<string, FrameInfo>
   ) => Promise<MessageOrderResult>;
 
   runChangesAnalysis: (
     frames: FrameMessage[],
-    frameInfoMap: Map<number, FrameInfo>
+    frameInfoMap: Map<string, FrameInfo>
   ) => Promise<ChangesResult>;
 
   runSerialFramingAnalysis: (
@@ -389,7 +390,8 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
       const detectedProtocol: 'can' | 'serial' = serialCount > canCount ? 'serial' : 'can';
 
       const newKnowledge = createEmptyKnowledge(detectedProtocol);
-      for (const [frameId, info] of frameInfoMap) {
+      for (const [fk, info] of frameInfoMap) {
+        const { frameId } = parseFrameKey(fk);
         newKnowledge.frames.set(
           frameId,
           initializeFrameKnowledge(frameId, info.len, info.isExtended, info.bus)
@@ -423,7 +425,8 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     // Update knowledge with message order analysis results
     let updatedKnowledge = knowledge;
     if (updatedKnowledge.frames.size === 0) {
-      for (const [frameId, info] of frameInfoMap) {
+      for (const [fk, info] of frameInfoMap) {
+        const { frameId } = parseFrameKey(fk);
         updatedKnowledge.frames.set(
           frameId,
           initializeFrameKnowledge(frameId, info.len, info.isExtended, info.bus)
@@ -500,7 +503,8 @@ export const useDiscoveryToolboxStore = create<DiscoveryToolboxState>((set, get)
     // Update knowledge
     let updatedKnowledge = knowledge;
     if (updatedKnowledge.frames.size === 0) {
-      for (const [frameId, info] of frameInfoMap) {
+      for (const [fk, info] of frameInfoMap) {
+        const { frameId } = parseFrameKey(fk);
         updatedKnowledge.frames.set(
           frameId,
           initializeFrameKnowledge(frameId, info.len, info.isExtended, info.bus)

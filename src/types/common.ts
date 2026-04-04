@@ -3,14 +3,16 @@
 
 /**
  * Frame information used in frame pickers and sidebars.
- * Represents metadata about a CAN frame for selection/display purposes.
+ * Represents metadata about a frame for selection/display purposes.
+ * The `id` is a composite frame key (e.g. "can:256", "modbus:5013").
  */
 export type FrameInfo = {
-  id: number;
+  id: string;
   len: number;
   isExtended?: boolean;
   bus?: number;
   lenMismatch?: boolean;
+  protocol?: string;
 };
 
 /**

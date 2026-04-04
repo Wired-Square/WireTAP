@@ -3,16 +3,17 @@
 
 import { useState, useEffect } from "react";
 import { type IDockviewPanelHeaderProps } from "dockview-react";
-import { Search, Activity, FileText, Calculator, GitCompare, ListOrdered, Scan, Send, Settings, DatabaseZap, Network, BarChart3, Workflow, FlaskConical, X } from "lucide-react";
+import { Search, Activity, FileText, Calculator, GitCompare, ListOrdered, Scan, Send, Server, Settings, DatabaseZap, Network, BarChart3, Workflow, FlaskConical, X } from "lucide-react";
 import { iconMd, iconXs } from "../styles/spacing";
 
-type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "serial-frame-analysis" | "transmit" | "query" | "session-manager" | "graph" | "rules" | "test-pattern" | "settings";
+type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "serial-frame-analysis" | "transmit" | "modbus" | "query" | "session-manager" | "graph" | "rules" | "test-pattern" | "settings";
 
 // Icon and color config for each panel
 const panelConfig: Record<PanelId, { icon: typeof Search; color: string }> = {
   discovery: { icon: Search, color: "text-purple-400" },
   decoder: { icon: Activity, color: "text-green-400" },
   transmit: { icon: Send, color: "text-red-400" },
+  modbus: { icon: Server, color: "text-amber-400" },
   "catalog-editor": { icon: FileText, color: "text-blue-400" },
   "frame-calculator": { icon: Calculator, color: "text-teal-400" },
   "payload-analysis": { icon: GitCompare, color: "text-pink-400" },

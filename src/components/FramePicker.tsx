@@ -6,6 +6,7 @@ import { iconSm } from "../styles/spacing";
 import { labelSmall, captionMuted, emptyStateText } from "../styles/typography";
 import { hoverLight } from "../styles";
 import { formatFrameId } from "../utils/frameIds";
+import { parseFrameKey } from "../utils/frameKey";
 import type { FrameInfo } from "../types/common";
 import type { SelectionSet } from "../utils/selectionSets";
 
@@ -17,8 +18,8 @@ type FrameWarning = {
 
 type Props = {
   frames: FrameInfo[];
-  selected: Set<number>;
-  onToggle: (id: number) => void;
+  selected: Set<string>;
+  onToggle: (id: string) => void;
   onBulkSelect: (bus: number | null, select: boolean) => void;
   displayFrameIdFormat: "hex" | "decimal";
   actions?: React.ReactNode;
@@ -62,11 +63,15 @@ function FramePicker({
   noInnerScroll = false,
 }: Props) {
   const sortedFrames = useMemo(
-    () => [...frames].sort((a, b) => a.id - b.id),
+    () => [...frames].sort((a, b) => {
+      const aId = parseFrameKey(a.id).frameId;
+      const bId = parseFrameKey(b.id).frameId;
+      return aId - bId;
+    }),
     [frames]
   );
 
-  const formatId = (f: FrameInfo) => formatFrameId(f.id, displayFrameIdFormat, f.isExtended);
+  const formatId = (f: FrameInfo) => formatFrameId(parseFrameKey(f.id).frameId, displayFrameIdFormat, f.isExtended);
 
   const anyFrames = sortedFrames.length > 0;
   const buses = useMemo(() => {
@@ -76,6 +81,16 @@ function FramePicker({
     });
     return Array.from(set).sort((a, b) => a - b);
   }, [frames]);
+
+  // Show protocol badges when multiple protocols are present
+  const protocols = useMemo(() => {
+    const set = new Set<string>();
+    frames.forEach((f) => {
+      if (f.protocol) set.add(f.protocol);
+    });
+    return set;
+  }, [frames]);
+  const isMultiProtocol = protocols.size > 1;
 
   const hasBuslessFrames = useMemo(
     () => frames.some((f) => typeof f.bus !== "number"),
@@ -321,9 +336,20 @@ function FramePicker({
                   <span className="text-[10px] text-[color:var(--text-muted)]">
                     [{f.len}]
                   </span>
-                  <span className="text-[10px] text-[color:var(--text-muted)]">
-                    {typeof f.bus === "number" ? `bus ${f.bus}` : ""}
-                  </span>
+                  {typeof f.bus === "number" && (
+                    <span className="text-[10px] text-[color:var(--text-muted)]">
+                      bus {f.bus}
+                    </span>
+                  )}
+                  {isMultiProtocol && f.protocol && (
+                    <span className={`text-[9px] px-1 py-0.5 rounded font-medium ${
+                      f.protocol === 'modbus' ? 'bg-amber-500/15 text-[color:var(--text-amber)]' :
+                      f.protocol === 'serial' ? 'bg-purple-500/15 text-[color:var(--text-purple)]' :
+                      'bg-blue-500/15 text-[color:var(--text-blue)]'
+                    }`}>
+                      {f.protocol.toUpperCase()}
+                    </span>
+                  )}
                 </label>
               ))}
               {!anyFrames && (

@@ -595,7 +595,11 @@ pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
             };
             (FrameType::Can, cf.encode())
         } else if frame.protocol == "modbus" {
-            (FrameType::Modbus, frame.bytes.clone())
+            // Encode frame_id as 4-byte LE prefix (register number), followed by raw bytes
+            let mut data = Vec::with_capacity(4 + frame.bytes.len());
+            data.extend_from_slice(&frame.frame_id.to_le_bytes());
+            data.extend_from_slice(&frame.bytes);
+            (FrameType::Modbus, data)
         } else {
             // serial and anything else — raw bytes
             (FrameType::Serial, frame.bytes.clone())

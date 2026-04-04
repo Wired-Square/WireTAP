@@ -31,7 +31,7 @@ export interface UseDiscoveryPlaybackHandlersParams {
   currentTimestampUs?: number | null;
 
   // Selected frame IDs for filtering step operations
-  selectedFrameIds?: Set<number>;
+  selectedFrameIds?: Set<string>;
 
   // Speed change state
   pendingSpeed: PlaybackSpeed | null;

@@ -14,7 +14,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { storeGet, storeSet } from "../api/store";
-import { Settings as SettingsIcon, Search, Activity, FileText, Calculator, Send, DatabaseZap, Network, BarChart3, FlaskConical } from "lucide-react";
+import { Settings as SettingsIcon, Search, Activity, FileText, Calculator, Send, Server, DatabaseZap, Network, BarChart3, FlaskConical } from "lucide-react";
 import { icon2xl } from "../styles/spacing";
 import { bgPrimary, textPrimary, textSecondary, textTertiary } from "../styles/colourTokens";
 import { launcherButton, launcherButtonLabel, launcherGrid } from "../styles/buttonStyles";
@@ -50,6 +50,7 @@ const Query = lazy(() => import("../apps/query/Query"));
 const SessionManager = lazy(() => import("../apps/session-manager/SessionManager"));
 const Graph = lazy(() => import("../apps/graph/Graph"));
 const Rules = lazy(() => import("../apps/rules/Rules"));
+const Modbus = lazy(() => import("../apps/modbus/Modbus"));
 const TestPattern = lazy(() => import("../apps/test-pattern/TestPattern"));
 const Settings = lazy(() => import("../apps/settings/Settings"));
 
@@ -164,6 +165,10 @@ function RulesPanel(_props: IDockviewPanelProps) {
   return <PanelWrapper><Rules /></PanelWrapper>;
 }
 
+function ModbusPanel(_props: IDockviewPanelProps) {
+  return <PanelWrapper><Modbus /></PanelWrapper>;
+}
+
 function TestPatternPanel(_props: IDockviewPanelProps) {
   return <PanelWrapper><TestPattern /></PanelWrapper>;
 }
@@ -177,6 +182,7 @@ const components = {
   discovery: DiscoveryPanel,
   decoder: DecoderPanel,
   transmit: TransmitPanel,
+  modbus: ModbusPanel,
   "catalog-editor": CatalogEditorPanel,
   "frame-calculator": FrameCalculatorPanel,
   "payload-analysis": PayloadAnalysisPanel,
@@ -246,6 +252,13 @@ function Watermark(_props: IWatermarkPanelProps) {
             color="text-red-400"
             bgColor="bg-red-500/10 hover:bg-red-500/20"
             onClick={() => openPanel("transmit")}
+          />
+          <WatermarkAppButton
+            icon={Server}
+            label="Modbus"
+            color="text-amber-400"
+            bgColor="bg-amber-500/10 hover:bg-amber-500/20"
+            onClick={() => openPanel("modbus")}
           />
           <WatermarkAppButton
             icon={FileText}
@@ -328,6 +341,7 @@ const panelTitles: Record<PanelId, string> = {
   discovery: "Discovery",
   decoder: "Decoder",
   transmit: "Transmit",
+  modbus: "Modbus",
   "catalog-editor": "Catalog Editor",
   "frame-calculator": "Calculator",
   "payload-analysis": "Payload Analysis",
@@ -589,7 +603,7 @@ export default function MainLayout() {
 
   // Disable all session + bookmark menu items when a non-session panel is focused.
   // Session-aware panels manage their own state via useMenuSessionControl.
-  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "graph"]));
+  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "modbus", "query", "graph"]));
   const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
 
   useEffect(() => {
