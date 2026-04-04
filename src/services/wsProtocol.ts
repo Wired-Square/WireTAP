@@ -309,8 +309,8 @@ export function decodeSessionInfo(payload: DataView): {
   speed: number;
   listener_count: number;
 } {
-  const speed = payload.getFloat32(0, true);
-  const listener_count = payload.getUint16(4, true);
+  const speed = payload.getFloat64(0, true);
+  const listener_count = payload.getUint16(8, true);
   return { speed, listener_count };
 }
 
