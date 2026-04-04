@@ -2552,10 +2552,9 @@ pub async fn session_transmit(session_id: &str, payload: &TransmitPayload) -> Re
         _ => {}
     }
 
-    // Call device transmit - this is sync and may block waiting for result
-    // For MultiSourceReader, this blocks on recv_timeout(500ms)
-    // We call it while holding the lock, but the actual I/O happens in the
-    // source reader tasks which don't need the IO_SESSIONS lock
+    // Call device transmit — fire-and-forget for most devices.
+    // Queues the frame into the device's transmit channel and returns
+    // immediately. The lock is held only briefly for the channel send.
     session.device.transmit(payload)
 }
 
