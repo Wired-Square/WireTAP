@@ -1,0 +1,243 @@
+// src/apps/test-pattern/views/TestPatternTopBar.tsx
+//
+// Top toolbar for the Test Pattern app. Renders IO session controls via
+// AppTopBar, with role/mode/params and start/stop inline.
+
+import { FlaskConical } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { iconSm } from "../../../styles/spacing";
+import { bgSurface, borderDefault, textPrimary, textSecondary } from "../../../styles";
+import type { IOProfile } from "../../../types/common";
+import type { TestMode, TestRole } from "../../../api/testPattern";
+import AppTopBar from "../../../components/AppTopBar";
+
+const TEST_MODES: { value: TestMode; label: string }[] = [
+  { value: "echo", label: "Echo" },
+  { value: "throughput", label: "Throughput" },
+  { value: "latency", label: "Latency" },
+  { value: "reliability", label: "Reliability" },
+];
+
+const ROLES: { value: TestRole; label: string }[] = [
+  { value: "initiator", label: "Initiator" },
+  { value: "responder", label: "Responder" },
+];
+
+interface Props {
+  // IO session
+  ioProfiles: IOProfile[];
+  ioProfile: string | null;
+  defaultReadProfileId?: string | null;
+  sessionId?: string | null;
+  multiBusProfiles?: string[];
+  isStreaming: boolean;
+  isStopped?: boolean;
+  ioState?: string | null;
+  frameCount?: number;
+  totalFrameCount?: number;
+  onOpenIoPicker: () => void;
+  onStop?: () => void;
+  onResume?: () => void;
+  onLeave?: () => void;
+
+  // Test config
+  role: TestRole;
+  mode: TestMode;
+  rateHz: number;
+  durationSec: number;
+  bus: number;
+  useFd: boolean;
+  useExtended: boolean;
+  isRunning: boolean;
+  isConnected: boolean;
+
+  // Setters
+  onRoleChange: (role: TestRole) => void;
+  onModeChange: (mode: TestMode) => void;
+  onRateChange: (hz: number) => void;
+  onDurationChange: (sec: number) => void;
+  onBusChange: (bus: number) => void;
+  onFdChange: (fd: boolean) => void;
+  onExtendedChange: (ext: boolean) => void;
+
+  // Error
+  error?: string | null;
+}
+
+export default function TestPatternTopBar({
+  ioProfiles,
+  ioProfile,
+  defaultReadProfileId,
+  sessionId,
+  multiBusProfiles = [],
+  isStreaming,
+  isStopped = false,
+  ioState,
+  frameCount,
+  totalFrameCount,
+  onOpenIoPicker,
+  onStop,
+  onResume,
+  onLeave,
+  role,
+  mode,
+  rateHz,
+  durationSec,
+  bus,
+  useFd,
+  useExtended,
+  isRunning,
+  isConnected,
+  onRoleChange,
+  onModeChange,
+  onRateChange,
+  onDurationChange,
+  onBusChange,
+  onFdChange,
+  onExtendedChange,
+  error = null,
+}: Props) {
+  const selectClass = `h-7 rounded border px-1.5 text-xs ${bgSurface} ${textPrimary} ${borderDefault}`;
+  const inputClass = `h-7 w-16 rounded border px-1.5 text-xs ${bgSurface} ${textPrimary} ${borderDefault}`;
+
+  return (
+    <AppTopBar
+      icon={FlaskConical}
+      iconColour="text-emerald-500"
+      ioSession={{
+        ioProfile,
+        ioProfiles,
+        multiBusProfiles,
+        defaultReadProfileId,
+        sessionId,
+        ioState,
+        frameCount,
+        totalFrameCount,
+        onOpenIoSessionPicker: onOpenIoPicker,
+        isStreaming,
+        isStopped,
+        onStop,
+        onResume,
+        onLeave,
+      }}
+      actions={
+        <>
+          {error && (
+            <span className="text-xs text-red-400 max-w-[300px] truncate">
+              {error}
+            </span>
+          )}
+        </>
+      }
+    >
+      {/* Test controls — shown after IO session, before actions */}
+      {isConnected && (
+        <>
+          <ChevronRight className={`${iconSm} text-[color:var(--text-muted)] shrink-0`} />
+
+          {/* Role */}
+          <select
+            className={selectClass}
+            value={role}
+            onChange={(e) => onRoleChange(e.target.value as TestRole)}
+            disabled={isRunning}
+            title="Role"
+          >
+            {ROLES.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+
+          {/* Mode */}
+          <select
+            className={selectClass}
+            value={mode}
+            onChange={(e) => onModeChange(e.target.value as TestMode)}
+            disabled={isRunning}
+            title="Test mode"
+          >
+            {TEST_MODES.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+
+          {/* Rate (only for non-throughput initiator) */}
+          {role === "initiator" && mode !== "throughput" && (
+            <div className="flex items-center gap-1">
+              <span className={`text-xs ${textSecondary}`}>Rate</span>
+              <input
+                type="number"
+                className={inputClass}
+                value={rateHz}
+                onChange={(e) => onRateChange(Number(e.target.value))}
+                disabled={isRunning}
+                min={1}
+                max={10000}
+                title="Frames per second"
+              />
+            </div>
+          )}
+
+          {/* Duration */}
+          <div className="flex items-center gap-1">
+            <span className={`text-xs ${textSecondary}`}>Dur</span>
+            <input
+              type="number"
+              className={inputClass}
+              value={durationSec}
+              onChange={(e) => onDurationChange(Number(e.target.value))}
+              disabled={isRunning}
+              min={1}
+              max={86400}
+              title="Duration in seconds"
+            />
+          </div>
+
+          {/* Bus */}
+          <div className="flex items-center gap-1">
+            <span className={`text-xs ${textSecondary}`}>Bus</span>
+            <input
+              type="number"
+              className={`${inputClass} w-10`}
+              value={bus}
+              onChange={(e) => onBusChange(Number(e.target.value))}
+              disabled={isRunning}
+              min={0}
+              max={7}
+              title="Bus number"
+            />
+          </div>
+
+          {/* FD badge toggle */}
+          <button
+            className={`text-xs px-2 py-0.5 rounded ${
+              useFd
+                ? "bg-green-600/30 text-green-400"
+                : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-[color:var(--border-default)]"
+            }`}
+            onClick={() => onFdChange(!useFd)}
+            disabled={isRunning}
+            title="CAN FD mode"
+          >
+            FD
+          </button>
+
+          {/* Extended badge toggle */}
+          <button
+            className={`text-xs px-2 py-0.5 rounded ${
+              useExtended
+                ? "bg-amber-600/30 text-amber-400"
+                : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-[color:var(--border-default)]"
+            }`}
+            onClick={() => onExtendedChange(!useExtended)}
+            disabled={isRunning}
+            title="Extended (29-bit) IDs"
+          >
+            Ext
+          </button>
+
+        </>
+      )}
+    </AppTopBar>
+  );
+}

@@ -14,7 +14,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { storeGet, storeSet } from "../api/store";
-import { Settings as SettingsIcon, Search, Activity, FileText, Calculator, Send, DatabaseZap, Network, BarChart3 } from "lucide-react";
+import { Settings as SettingsIcon, Search, Activity, FileText, Calculator, Send, DatabaseZap, Network, BarChart3, FlaskConical } from "lucide-react";
 import { icon2xl } from "../styles/spacing";
 import { bgPrimary, textPrimary, textSecondary, textTertiary } from "../styles/colourTokens";
 import { launcherButton, launcherButtonLabel, launcherGrid } from "../styles/buttonStyles";
@@ -50,6 +50,7 @@ const Query = lazy(() => import("../apps/query/Query"));
 const SessionManager = lazy(() => import("../apps/session-manager/SessionManager"));
 const Graph = lazy(() => import("../apps/graph/Graph"));
 const Rules = lazy(() => import("../apps/rules/Rules"));
+const TestPattern = lazy(() => import("../apps/test-pattern/TestPattern"));
 const Settings = lazy(() => import("../apps/settings/Settings"));
 
 // Get layout key for a specific window (per-window persistence)
@@ -163,6 +164,10 @@ function RulesPanel(_props: IDockviewPanelProps) {
   return <PanelWrapper><Rules /></PanelWrapper>;
 }
 
+function TestPatternPanel(_props: IDockviewPanelProps) {
+  return <PanelWrapper><TestPattern /></PanelWrapper>;
+}
+
 function SettingsPanel(_props: IDockviewPanelProps) {
   return <PanelWrapper><Settings /></PanelWrapper>;
 }
@@ -180,6 +185,7 @@ const components = {
   "session-manager": SessionManagerPanel,
   graph: GraphPanel,
   rules: RulesPanel,
+  "test-pattern": TestPatternPanel,
   settings: SettingsPanel,
 };
 
@@ -277,6 +283,13 @@ function Watermark(_props: IWatermarkPanelProps) {
             onClick={() => openPanel("graph")}
           />
           <WatermarkAppButton
+            icon={FlaskConical}
+            label="Test Pattern"
+            color="text-emerald-400"
+            bgColor="bg-emerald-500/10 hover:bg-emerald-500/20"
+            onClick={() => openPanel("test-pattern")}
+          />
+          <WatermarkAppButton
             icon={SettingsIcon}
             label="Settings"
             color="text-orange-400"
@@ -323,6 +336,7 @@ const panelTitles: Record<PanelId, string> = {
   "session-manager": "Sessions",
   graph: "Graph",
   rules: "Rules",
+  "test-pattern": "Test Pattern",
   settings: "Settings",
 };
 

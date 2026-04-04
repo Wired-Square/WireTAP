@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
+    Arc,
 };
 use std::time::Duration;
 
@@ -603,7 +603,7 @@ pub async fn run_source(
 
     // Open serial port
     let serial_port = match serialport::new(&port_path, baud_rate)
-        .timeout(Duration::from_millis(50))
+        .timeout(Duration::from_millis(2))
         .open()
     {
         Ok(p) => p,
@@ -618,13 +618,20 @@ pub async fn run_source(
         }
     };
 
-    // Wrap in Arc<Mutex> for shared access between read and transmit
-    let serial_port = Arc::new(Mutex::new(serial_port));
+    // Clone the serial port handle so read and write can run concurrently
+    // without mutex contention. try_clone() duplicates the OS file descriptor.
+    let write_port = match serial_port.try_clone() {
+        Ok(p) => Some(p),
+        Err(e) => {
+            tlog!("[slcan] Failed to clone serial port for write thread: {} — falling back to shared mutex", e);
+            None
+        }
+    };
 
-    // Initialize slcan
+    // Initialize slcan (serial_port is exclusively ours before spawning threads)
+    let mut serial_port = serial_port;
     let init_result: Result<(), String> = (|| {
-        let mut port = serial_port.lock()
-            .map_err(|e| format!("Failed to lock serial port during init: {}", e))?;
+        let port = &mut serial_port;
         let _ = port.clear(serialport::ClearBuffer::All);
 
         // Wait for device to be ready
@@ -690,45 +697,47 @@ pub async fn run_source(
         .send(SourceMessage::Connected(source_idx, "slcan".to_string(), port_path.clone(), None))
         .await;
 
-    // Read loop (blocking)
+    // Spawn dedicated write thread if we have a cloned port handle.
+    // This runs independently of the read loop — no mutex contention.
+    let stop_flag_write = stop_flag.clone();
+    if let Some(mut w_port) = write_port {
+        if !silent_mode {
+            std::thread::Builder::new()
+                .name(format!("slcan-tx-{}", source_idx))
+                .spawn(move || {
+                    while !stop_flag_write.load(Ordering::SeqCst) {
+                        match transmit_rx.recv_timeout(Duration::from_millis(50)) {
+                            Ok(req) => {
+                                let result = w_port
+                                    .write_all(&req.data)
+                                    .and_then(|_| w_port.flush())
+                                    .map_err(|e| format!("Write error: {}", e));
+                                let _ = req.result_tx.send(result);
+                            }
+                            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                        }
+                    }
+                })
+                .ok();
+        }
+    } else {
+        // Fallback: no clone available — transmit handled inline in read loop (old path)
+        // This shouldn't happen on supported platforms but keeps things working.
+        tlog!("[slcan] Write thread not available, transmit will be handled in read loop");
+    }
+
+    // Read loop (blocking) — owns the original serial port handle directly
     let tx_clone = tx.clone();
     let stop_flag_clone = stop_flag.clone();
-    let serial_port_clone = serial_port.clone();
 
     let blocking_handle = tokio::task::spawn_blocking(move || {
         let mut line_buf = String::with_capacity(256);
         let mut read_buf = [0u8; 256];
 
         while !stop_flag_clone.load(Ordering::SeqCst) {
-            // Check for transmit requests (non-blocking)
-            if !silent_mode {
-                while let Ok(req) = transmit_rx.try_recv() {
-                    let result = match serial_port_clone.lock() {
-                        Ok(mut port) => port
-                            .write_all(&req.data)
-                            .and_then(|_| port.flush())
-                            .map_err(|e| format!("Write error: {}", e)),
-                        Err(e) => {
-                            tlog!("[slcan] Mutex poisoned in transmit: {}", e);
-                            Err(format!("Port mutex poisoned: {}", e))
-                        }
-                    };
-                    let _ = req.result_tx.send(result);
-                }
-            }
-
-            // Read data
-            let read_result = match serial_port_clone.lock() {
-                Ok(mut port) => port.read(&mut read_buf),
-                Err(e) => {
-                    tlog!("[slcan] Mutex poisoned in read loop: {}", e);
-                    let _ = tx_clone.blocking_send(SourceMessage::Error(
-                        source_idx,
-                        format!("Port mutex poisoned: {}", e),
-                    ));
-                    return;
-                }
-            };
+            // Read data — no mutex, we own this handle
+            let read_result = serial_port.read(&mut read_buf);
 
             match read_result {
                 Ok(n) if n > 0 => {
@@ -750,8 +759,6 @@ pub async fn run_source(
                             line_buf.clear();
                         } else if byte.is_ascii() && !byte.is_ascii_control() {
                             line_buf.push(byte as char);
-                            // CAN FD frames can be up to ~139 chars; Elmue extended
-                            // V responses ~200 chars. 512 is generous headroom.
                             if line_buf.len() > 512 {
                                 tlog!("[slcan] Line buffer exceeded 512 bytes, discarding");
                                 line_buf.clear();
@@ -765,11 +772,11 @@ pub async fn run_source(
                     }
                 }
                 Ok(0) => {
-                    std::thread::sleep(Duration::from_millis(10));
+                    std::thread::sleep(Duration::from_millis(1));
                 }
                 Ok(_) => {}
                 Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
-                    // Timeout - continue
+                    // Timeout — continue
                 }
                 Err(e) => {
                     let _ = tx_clone.blocking_send(SourceMessage::Error(
@@ -782,10 +789,8 @@ pub async fn run_source(
         }
 
         // Close channel
-        if let Ok(mut port) = serial_port_clone.lock() {
-            let _ = port.write_all(b"C\r");
-            let _ = port.flush();
-        }
+        let _ = serial_port.write_all(b"C\r");
+        let _ = serial_port.flush();
 
         let _ = tx_clone.blocking_send(SourceMessage::Ended(source_idx, "stopped".to_string()));
     });
