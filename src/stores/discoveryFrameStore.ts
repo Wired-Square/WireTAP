@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { tlog } from '../api/settings';
 import { trackAlloc } from '../services/memoryDiag';
 import type { FrameMessage } from '../types/frame';
+import { keyOf } from '../utils/frameKey';
 import type { SelectionSet } from '../utils/selectionSets';
 
 // Frame buffer for throttling UI updates
@@ -40,10 +41,11 @@ export type LastFrameData = {
 
 // Last observed frame data per frame ID — updated on every flush (last-writer-wins).
 // Used by bulk-add to Transmit queue so we don't need to scan the full buffer at click time.
-let _lastFrameDataMap: Map<number, LastFrameData> = new Map();
+// Keyed by composite frame key (e.g. "can:256", "modbus:5013").
+let _lastFrameDataMap: Map<string, LastFrameData> = new Map();
 
-/** Direct access to the last-seen frame data map. Read-only. */
-export function getLastFrameDataMap(): Map<number, LastFrameData> {
+/** Direct access to the last-seen frame data map (keyed by composite frame key). Read-only. */
+export function getLastFrameDataMap(): Map<string, LastFrameData> {
   return _lastFrameDataMap;
 }
 
@@ -52,15 +54,17 @@ export type FrameInfo = {
   isExtended?: boolean;
   bus?: number;
   lenMismatch?: boolean;
-  protocol?: string;
+  /** Protocol that produced this frame (e.g. "can", "modbus", "serial"). */
+  protocol: string;
 };
 
 interface DiscoveryFrameState {
   // Frame data (actual frames live in _frameBuffer, not in state — see module comment)
+  // All Map/Set keys are composite frame keys (e.g. "can:256", "modbus:5013").
   frameVersion: number;
-  frameInfoMap: Map<number, FrameInfo>;
-  selectedFrames: Set<number>;
-  seenIds: Set<number>;
+  frameInfoMap: Map<string, FrameInfo>;
+  selectedFrames: Set<string>;
+  seenIds: Set<string>;
 
   // Stream timing
   streamStartTimeUs: number | null;
@@ -75,19 +79,19 @@ interface DiscoveryFrameState {
   setStreamStartTimeUs: (timeUs: number | null) => void;
 
   // Actions - Data management
-  addFrames: (newFrames: FrameMessage[], maxBuffer: number, skipFramePicker?: boolean, activeSelectionSetSelectedIds?: Set<number> | null) => void;
+  addFrames: (newFrames: FrameMessage[], maxBuffer: number, skipFramePicker?: boolean, activeSelectionSetSelectedIds?: Set<string> | null) => void;
   clearBuffer: () => void;
   clearFramePicker: () => void;
   clearAll: () => void;
   setFrames: (frames: FrameMessage[]) => void;
-  rebuildFramePickerFromBuffer: (activeSelectionSetSelectedIds?: Set<number> | null) => void;
+  rebuildFramePickerFromBuffer: (activeSelectionSetSelectedIds?: Set<string> | null) => void;
 
   // Actions - Frame selection
-  toggleFrameSelection: (id: number, activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
+  toggleFrameSelection: (id: string, activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
   bulkSelectBus: (bus: number | null, select: boolean, activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
   selectAllFrames: (activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
   deselectAllFrames: (activeSelectionSetId: string | null, setDirty: (dirty: boolean) => void) => void;
-  applySelectionSet: (selectionSet: SelectionSet, setActiveId: (id: string | null) => void, setDirty: (dirty: boolean) => void) => void;
+  applySelectionSet: (selectionSet: SelectionSet, protocol: string, setActiveId: (id: string | null) => void, setDirty: (dirty: boolean) => void) => void;
 
   // Actions - Render freeze (pause UI updates while capture continues)
   renderFrozen: boolean;
@@ -103,7 +107,7 @@ interface DiscoveryFrameState {
     bus: number;
     is_extended: boolean;
     has_dlc_mismatch: boolean;
-  }>, protocol?: string, activeSelectionSetSelectedIds?: Set<number> | null) => void;
+  }>, protocol?: string, activeSelectionSetSelectedIds?: Set<string> | null) => void;
 }
 
 export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => ({
@@ -158,7 +162,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
 
         // Keep last-seen data per frame ID (last-writer-wins, no allocation overhead)
         for (const f of framesToProcess) {
-          _lastFrameDataMap.set(f.frame_id, {
+          _lastFrameDataMap.set(keyOf(f), {
             bytes: f.bytes,
             bus: f.bus ?? 0,
             is_extended: f.is_extended ?? false,
@@ -172,25 +176,26 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
 
         // Skip frame picker updates if requested (e.g., serial mode before framing is accepted)
         if (!skipFramePicker) {
-          const newlyDiscovered: number[] = [];
+          const newlyDiscovered: string[] = [];
           for (const f of framesToProcess) {
-            if (!seenIds.has(f.frame_id)) {
-              newlyDiscovered.push(f.frame_id);
+            const fk = keyOf(f);
+            if (!seenIds.has(fk)) {
+              newlyDiscovered.push(fk);
             }
           }
 
           if (newlyDiscovered.length > 0) {
             const nextSeenIds = new Set(seenIds);
             const nextSelectedFrames = new Set(selectedFrames);
-            newlyDiscovered.forEach((id) => {
-              nextSeenIds.add(id);
+            newlyDiscovered.forEach((fk) => {
+              nextSeenIds.add(fk);
               // When a selection set is active, only auto-select frames that are in the set
               if (activeSelectionSetSelectedIds) {
-                if (activeSelectionSetSelectedIds.has(id)) {
-                  nextSelectedFrames.add(id);
+                if (activeSelectionSetSelectedIds.has(fk)) {
+                  nextSelectedFrames.add(fk);
                 }
               } else {
-                nextSelectedFrames.add(id);
+                nextSelectedFrames.add(fk);
               }
             });
             trackAlloc("frameStore.newSet", nextSeenIds.size * 60);
@@ -203,7 +208,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
 
           if (!frameInfoChanged) {
             for (const f of framesToProcess) {
-              const current = frameInfoMap.get(f.frame_id);
+              const current = frameInfoMap.get(keyOf(f));
               if (current) {
                 const newLen = Math.max(current.len, f.dlc);
                 const lenMismatch = current.lenMismatch || current.len !== f.dlc;
@@ -219,12 +224,13 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
             const nextFrameInfoMap = new Map(frameInfoMap);
 
             for (const f of framesToProcess) {
-              const current = nextFrameInfoMap.get(f.frame_id);
+              const fk = keyOf(f);
+              const current = nextFrameInfoMap.get(fk);
               const newLen = current ? Math.max(current.len, f.dlc) : f.dlc;
               const newBus = current?.bus ?? f.bus;
               const newExtended = current?.isExtended ?? f.is_extended;
               const lenMismatch = current ? current.lenMismatch || current.len !== f.dlc : false;
-              const protocol = current?.protocol ?? f.protocol;
+              const protocol = current?.protocol ?? f.protocol ?? 'can';
 
               if (
                 !current ||
@@ -234,7 +240,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
                 current.lenMismatch !== lenMismatch ||
                 current.protocol !== protocol
               ) {
-                nextFrameInfoMap.set(f.frame_id, { len: newLen, isExtended: newExtended, bus: newBus, lenMismatch, protocol });
+                nextFrameInfoMap.set(fk, { len: newLen, isExtended: newExtended, bus: newBus, lenMismatch, protocol });
               }
             }
 
@@ -299,36 +305,37 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
 
     tlog.debug(`[discoveryFrameStore] Building frame picker from ${frames.length} frames`);
 
-    const nextSeenIds = new Set<number>();
-    const nextFrameInfoMap = new Map<number, FrameInfo>();
-    const nextSelectedFrames = new Set<number>();
+    const nextSeenIds = new Set<string>();
+    const nextFrameInfoMap = new Map<string, FrameInfo>();
+    const nextSelectedFrames = new Set<string>();
     _lastFrameDataMap = new Map();
 
     for (const f of frames) {
+      const fk = keyOf(f);
       // Rebuild last-seen data map (last-writer-wins as we iterate forward)
-      _lastFrameDataMap.set(f.frame_id, {
+      _lastFrameDataMap.set(fk, {
         bytes: f.bytes,
         bus: f.bus ?? 0,
         is_extended: f.is_extended ?? false,
         dlc: f.dlc,
       });
-      if (!nextSeenIds.has(f.frame_id)) {
-        nextSeenIds.add(f.frame_id);
+      if (!nextSeenIds.has(fk)) {
+        nextSeenIds.add(fk);
         if (activeSelectionSetSelectedIds) {
-          if (activeSelectionSetSelectedIds.has(f.frame_id)) {
-            nextSelectedFrames.add(f.frame_id);
+          if (activeSelectionSetSelectedIds.has(fk)) {
+            nextSelectedFrames.add(fk);
           }
         } else {
-          nextSelectedFrames.add(f.frame_id);
+          nextSelectedFrames.add(fk);
         }
       }
 
-      const current = nextFrameInfoMap.get(f.frame_id);
+      const current = nextFrameInfoMap.get(fk);
       const newLen = current ? Math.max(current.len, f.dlc) : f.dlc;
       const newBus = current?.bus ?? f.bus;
       const newExtended = current?.isExtended ?? f.is_extended;
       const lenMismatch = current ? current.lenMismatch || current.len !== f.dlc : false;
-      const protocol = current?.protocol ?? f.protocol;
+      const protocol = current?.protocol ?? f.protocol ?? 'can';
 
       if (
         !current ||
@@ -338,7 +345,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
         current.lenMismatch !== lenMismatch ||
         current.protocol !== protocol
       ) {
-        nextFrameInfoMap.set(f.frame_id, { len: newLen, isExtended: newExtended, bus: newBus, lenMismatch, protocol });
+        nextFrameInfoMap.set(fk, { len: newLen, isExtended: newExtended, bus: newBus, lenMismatch, protocol });
       }
     }
 
@@ -404,28 +411,32 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
     }
   },
 
-  applySelectionSet: (selectionSet, setActiveId, setDirty) => {
+  applySelectionSet: (selectionSet, protocol, setActiveId, setDirty) => {
     const { frameInfoMap, seenIds } = get();
 
     const newFrameInfoMap = new Map(frameInfoMap);
     const newSeenIds = new Set(seenIds);
-    const newSelectedFrames = new Set<number>();
+    const newSelectedFrames = new Set<string>();
 
-    for (const frameId of selectionSet.frameIds) {
-      if (!newFrameInfoMap.has(frameId)) {
-        newFrameInfoMap.set(frameId, {
+    // Selection sets store numeric IDs — convert to composite keys using the session's protocol
+    const proto = protocol || 'can';
+    for (const numericId of selectionSet.frameIds) {
+      const fk = `${proto}:${numericId}`;
+      if (!newFrameInfoMap.has(fk)) {
+        newFrameInfoMap.set(fk, {
           len: 8,
-          isExtended: frameId > 0x7ff,
+          isExtended: numericId > 0x7ff,
           bus: undefined,
           lenMismatch: false,
+          protocol: proto,
         });
-        newSeenIds.add(frameId);
+        newSeenIds.add(fk);
       }
     }
 
     const idsToSelect = selectionSet.selectedIds ?? selectionSet.frameIds;
-    for (const frameId of idsToSelect) {
-      newSelectedFrames.add(frameId);
+    for (const numericId of idsToSelect) {
+      newSelectedFrames.add(`${proto}:${numericId}`);
     }
 
     set({
@@ -470,27 +481,29 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   },
 
   setFrameInfoFromBuffer: (frameInfoList, protocol, activeSelectionSetSelectedIds = null) => {
-    tlog.debug(`[discoveryFrameStore] Setting frame info from buffer: ${frameInfoList.length} unique frames, protocol: ${protocol || 'can'}`);
+    const proto = protocol || 'can';
+    tlog.debug(`[discoveryFrameStore] Setting frame info from buffer: ${frameInfoList.length} unique frames, protocol: ${proto}`);
 
-    const nextSeenIds = new Set<number>();
-    const nextFrameInfoMap = new Map<number, FrameInfo>();
-    const nextSelectedFrames = new Set<number>();
+    const nextSeenIds = new Set<string>();
+    const nextFrameInfoMap = new Map<string, FrameInfo>();
+    const nextSelectedFrames = new Set<string>();
 
     for (const info of frameInfoList) {
-      nextSeenIds.add(info.frame_id);
+      const fk = `${proto}:${info.frame_id}`;
+      nextSeenIds.add(fk);
       if (activeSelectionSetSelectedIds) {
-        if (activeSelectionSetSelectedIds.has(info.frame_id)) {
-          nextSelectedFrames.add(info.frame_id);
+        if (activeSelectionSetSelectedIds.has(fk)) {
+          nextSelectedFrames.add(fk);
         }
       } else {
-        nextSelectedFrames.add(info.frame_id);
+        nextSelectedFrames.add(fk);
       }
-      nextFrameInfoMap.set(info.frame_id, {
+      nextFrameInfoMap.set(fk, {
         len: info.max_dlc,
         isExtended: info.is_extended,
         bus: info.bus,
         lenMismatch: info.has_dlc_mismatch,
-        protocol,
+        protocol: proto,
       });
     }
 

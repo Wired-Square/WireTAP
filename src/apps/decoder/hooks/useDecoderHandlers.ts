@@ -65,9 +65,9 @@ export interface UseDecoderHandlersParams {
   setSelectionSetDirty: (dirty: boolean) => void;
   applySelectionSet: (selectionSet: SelectionSet) => void;
 
-  // Store state (decoder)
-  frames: Map<number, FrameDetail>;
-  selectedFrames: Set<number>;
+  // Store state (decoder) — keyed by composite frame keys (e.g. "can:256")
+  frames: Map<string, FrameDetail>;
+  selectedFrames: Set<string>;
   activeSelectionSetId: string | null;
   selectionSetDirty: boolean;
   startTime: string;

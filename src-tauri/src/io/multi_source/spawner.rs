@@ -62,6 +62,7 @@ pub(super) async fn run_source_reader(
     _modbus_role: Option<ModbusRole>,
     _max_register_errors: Option<u32>,
     stop_flag: Arc<AtomicBool>,
+    pause_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
     virtual_bus_controls: VirtualBusControls,
     virtual_cmd_rx: Option<mpsc::UnboundedReceiver<VirtualBusCommand>>,
@@ -125,6 +126,7 @@ pub(super) async fn run_source_reader(
                         _modbus_polls.unwrap_or_default(),
                         _max_register_errors.unwrap_or(0),
                         stop_flag,
+                        pause_flag,
                         tx,
                     )
                     .await;
@@ -944,6 +946,7 @@ async fn run_modbus_tcp_client(
     polls: Vec<PollGroup>,
     max_register_errors: u32,
     stop_flag: Arc<AtomicBool>,
+    pause_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let host = profile
@@ -1043,6 +1046,7 @@ async fn run_modbus_tcp_client(
         let tx_clone = tx.clone();
         let ctx_clone = ctx.clone();
         let stop_clone = stop_flag.clone();
+        let pause_clone = pause_flag.clone();
         let poll = poll.clone();
 
         let handle = tokio::spawn(async move {
@@ -1053,6 +1057,7 @@ async fn run_modbus_tcp_client(
                 ctx_clone,
                 max_register_errors,
                 stop_clone,
+                pause_clone,
                 tx_clone,
             )
             .await;
@@ -1078,6 +1083,7 @@ async fn run_modbus_poll_task(
     ctx: Arc<Mutex<client::Context>>,
     max_register_errors: u32,
     stop_flag: Arc<AtomicBool>,
+    pause_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
     let mut timer = interval(Duration::from_millis(poll.interval_ms));
@@ -1100,6 +1106,11 @@ async fn run_modbus_poll_task(
 
         if stop_flag.load(Ordering::Relaxed) {
             break;
+        }
+
+        // Skip reads while paused (task stays alive, timer keeps ticking)
+        if pause_flag.load(Ordering::Relaxed) {
+            continue;
         }
 
         let mut ctx = ctx.lock().await;

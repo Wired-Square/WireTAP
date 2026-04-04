@@ -7,6 +7,7 @@ import { PlaybackControls } from "../../../components/PlaybackControls";
 import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
 import { badgeDarkPanelInfo, badgeDarkPanelSuccess, badgeDarkPanelDanger, badgeDarkPanelPurple, badgeDarkPanelCyan } from "../../../styles/badgeStyles";
 import { parseCanId } from "../../../utils/catalogParser";
+import { frameKey } from "../../../utils/frameKey";
 import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault, hoverBg, textSecondary } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
@@ -52,7 +53,7 @@ function getSignalByteIndices(signal: SignalDef): Set<number> {
 
 type Props = {
   frames: FrameDetail[];
-  selectedIds: Set<number>;
+  selectedIds: Set<string>;
   decoded: Map<number, DecodedFrame>;
   /** Decoded frames keyed by "frameId:sourceAddress" for per-source view mode */
   decodedPerSource: Map<string, DecodedFrame>;
@@ -888,8 +889,9 @@ export default function DecoderFramesView({
 }: Props) {
   void _onToggleRawBytes; // Silence unused variable warning
   void _frameIdFilter; // Frame ID filtering is done at processing level in Decoder.tsx
-  const selectedFrames = frames.filter((f) => selectedIds.has(f.id));
-  const deselectedFrames = frames.filter((f) => !selectedIds.has(f.id));
+  const proto = protocol ?? 'can';
+  const selectedFrames = frames.filter((f) => selectedIds.has(frameKey(proto, f.id)));
+  const deselectedFrames = frames.filter((f) => !selectedIds.has(frameKey(proto, f.id)));
 
   // Use stream start time for delta-start calculation (passed from store)
   const startTimeSeconds = streamStartTimeSeconds ?? undefined;
@@ -1093,7 +1095,7 @@ export default function DecoderFramesView({
       {
         label: 'Filter',
         icon: <Filter className={iconXs} />,
-        onClick: () => { useDecoderStore.getState().toggleFrameSelection(frame.id); },
+        onClick: () => { useDecoderStore.getState().toggleFrameSelection(frameKey(proto, frame.id)); },
       },
       {
         label: 'Solo',
@@ -1101,7 +1103,7 @@ export default function DecoderFramesView({
         onClick: () => {
           const store = useDecoderStore.getState();
           store.deselectAllFrames();
-          store.toggleFrameSelection(frame.id);
+          store.toggleFrameSelection(frameKey(proto, frame.id));
         },
       },
       { separator: true, label: '', onClick: () => {} },

@@ -32,6 +32,8 @@ import { tableIconButtonDark } from '../../../styles/buttonStyles';
 export interface FrameRow {
   timestamp_us: number;
   frame_id: number;
+  /** Protocol that produced this frame (e.g. "can", "modbus", "serial"). Defaults to "can". */
+  protocol: string;
   is_extended?: boolean;
   source_address?: number;
   dlc: number;

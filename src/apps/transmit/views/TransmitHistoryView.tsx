@@ -36,6 +36,7 @@ function historyRowToFrameRow(row: TransmitHistoryRow): FrameRow {
   return {
     timestamp_us: row.timestamp_us,
     frame_id: row.frame_id ?? 0,
+    protocol: 'can',
     is_extended: row.is_extended,
     dlc: row.dlc ?? 0,
     bytes: row.bytes,

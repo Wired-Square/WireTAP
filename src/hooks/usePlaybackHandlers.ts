@@ -6,6 +6,7 @@
 import { useCallback } from "react";
 import type { PlaybackSpeed } from "../components/TimeController";
 import { stepBufferFrame, updateReaderDirection } from "../api/io";
+import { parseFrameKey } from "../utils/frameKey";
 import { tlog } from "../api/settings";
 
 export interface UsePlaybackHandlersParams {
@@ -32,8 +33,8 @@ export interface UsePlaybackHandlersParams {
   currentFrameIndex?: number | null;
   currentTimestampUs?: number | null;
 
-  // Selected frame IDs for filtering step operations
-  selectedFrameIds?: Set<number>;
+  // Selected composite frame keys for filtering step operations (e.g. "can:256")
+  selectedFrameIds?: Set<string>;
 
   // Store actions
   setPlaybackSpeed: (speed: PlaybackSpeed) => void;
@@ -135,9 +136,9 @@ export function usePlaybackHandlers({
       return;
     }
     try {
-      // Convert Set to array for the API call, only if we have a selection
+      // Convert composite keys to numeric IDs for the buffer API call
       const filter = selectedFrameIds && selectedFrameIds.size > 0
-        ? Array.from(selectedFrameIds)
+        ? Array.from(selectedFrameIds).map(fk => parseFrameKey(fk).frameId)
         : undefined;
       const result = await stepBufferFrame(sessionId, bufferId, currentFrameIndex ?? null, currentTimestampUs ?? null, true, filter);
       // Update the store immediately with the new frame index and timestamp
@@ -161,9 +162,9 @@ export function usePlaybackHandlers({
       return;
     }
     try {
-      // Convert Set to array for the API call, only if we have a selection
+      // Convert composite keys to numeric IDs for the buffer API call
       const filter = selectedFrameIds && selectedFrameIds.size > 0
-        ? Array.from(selectedFrameIds)
+        ? Array.from(selectedFrameIds).map(fk => parseFrameKey(fk).frameId)
         : undefined;
       const result = await stepBufferFrame(sessionId, bufferId, currentFrameIndex ?? null, currentTimestampUs ?? null, false, filter);
       // Update the store immediately with the new frame index and timestamp

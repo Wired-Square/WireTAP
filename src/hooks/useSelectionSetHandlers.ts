@@ -4,6 +4,7 @@
 // Used by Decoder and Discovery directly.
 
 import { useCallback } from "react";
+import { parseFrameKey } from "../utils/frameKey";
 import {
   addSelectionSet,
   updateSelectionSet,
@@ -12,9 +13,9 @@ import {
 } from "../utils/selectionSets";
 
 export interface UseSelectionSetHandlersParams {
-  /** Map whose keys() yield all known frame IDs */
-  frameMap: Map<number, unknown>;
-  selectedFrames: Set<number>;
+  /** Map whose keys() yield all known composite frame keys (e.g. "can:256") */
+  frameMap: Map<string, unknown>;
+  selectedFrames: Set<string>;
   activeSelectionSetId: string | null;
   selectionSetDirty: boolean;
 
@@ -42,10 +43,11 @@ export function useSelectionSetHandlers({
   onAfterMutate,
 }: UseSelectionSetHandlersParams) {
   // Save selection set: update existing if dirty, otherwise open dialog
+  // SelectionSet persistence uses numeric IDs — extract from composite keys
   const handleSaveSelectionSet = useCallback(async () => {
     if (activeSelectionSetId && selectionSetDirty) {
-      const allFrameIds = Array.from(frameMap.keys());
-      const selectedIds = Array.from(selectedFrames);
+      const allFrameIds = Array.from(frameMap.keys()).map(fk => parseFrameKey(fk).frameId);
+      const selectedIds = Array.from(selectedFrames).map(fk => parseFrameKey(fk).frameId);
       await updateSelectionSet(activeSelectionSetId, {
         frameIds: allFrameIds,
         selectedIds: selectedIds,
@@ -68,8 +70,8 @@ export function useSelectionSetHandlers({
   // Save new selection set with a name
   const handleSaveNewSelectionSet = useCallback(
     async (name: string) => {
-      const allFrameIds = Array.from(frameMap.keys());
-      const selectedIds = Array.from(selectedFrames);
+      const allFrameIds = Array.from(frameMap.keys()).map(fk => parseFrameKey(fk).frameId);
+      const selectedIds = Array.from(selectedFrames).map(fk => parseFrameKey(fk).frameId);
       const newSet = await addSelectionSet(name, allFrameIds, selectedIds);
       setActiveSelectionSet(newSet.id);
       setSelectionSetDirty(false);
@@ -84,10 +86,11 @@ export function useSelectionSetHandlers({
       applySelectionSet(selectionSet);
       await markSelectionSetUsed(selectionSet.id);
 
-      // If the current frame map has IDs not tracked by the selection set,
+      // If the current frame map has numeric IDs not tracked by the selection set,
       // mark dirty so the user can save those new frames into the set
       const setFrameIds = new Set(selectionSet.frameIds);
-      for (const frameId of frameMap.keys()) {
+      for (const fk of frameMap.keys()) {
+        const { frameId } = parseFrameKey(fk);
         if (!setFrameIds.has(frameId)) {
           setSelectionSetDirty(true);
           break;

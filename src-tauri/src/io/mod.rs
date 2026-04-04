@@ -20,6 +20,7 @@ mod timeline;
 pub mod gs_usb; // pub for Tauri command access
 pub mod gvret; // GVRET TCP/USB driver
 pub mod modbus_tcp; // pub for scanner command access
+pub mod modbus_rtu; // Modbus RTU master over serial
 mod mqtt;
 mod multi_source;
 mod virtual_device;
@@ -559,6 +560,17 @@ pub trait IODevice: Send + Sync {
     /// Hot-swaps the source by removing and re-adding it with updated mappings.
     fn update_source_bus_mappings(&mut self, _profile_id: &str, _bus_mappings: Vec<gvret::BusMapping>) -> Result<(), String> {
         Err("This device does not support bus mapping updates".to_string())
+    }
+
+    /// Pause polling for a specific source within a multi-source session.
+    /// The source stays connected but stops emitting frames.
+    fn pause_source_polling(&self, _profile_id: &str) -> Result<(), String> {
+        Err("This device does not support per-source pause".to_string())
+    }
+
+    /// Resume polling for a paused source within a multi-source session.
+    fn resume_source_polling(&self, _profile_id: &str) -> Result<(), String> {
+        Err("This device does not support per-source resume".to_string())
     }
 
     /// Add a virtual bus generator to a running session.
@@ -2966,6 +2978,33 @@ pub async fn remove_source_from_session(
     );
 
     Ok(capabilities)
+}
+
+/// Pause polling for a specific source within a running session.
+/// The session stays active and other sources continue normally.
+pub async fn pause_source_in_session(
+    session_id: &str,
+    profile_id: &str,
+) -> Result<(), String> {
+    let sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    session.device.pause_source_polling(profile_id)
+}
+
+/// Resume polling for a paused source within a running session.
+pub async fn resume_source_in_session(
+    session_id: &str,
+    profile_id: &str,
+) -> Result<(), String> {
+    let sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+    session.device.resume_source_polling(profile_id)
 }
 
 /// Update bus mappings for a source in a multi-source session.

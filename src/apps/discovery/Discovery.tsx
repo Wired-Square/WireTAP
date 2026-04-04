@@ -8,6 +8,7 @@ import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
 import { useSessionStore } from '../../stores/sessionStore';
 import { type FrameMessage, type PlaybackSpeed } from "../../stores/discoveryStore";
+import { keyOf, parseFrameKey } from "../../utils/frameKey";
 import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../stores/discoveryUIStore";
 import { useDiscoverySerialStore } from "../../stores/discoverySerialStore";
@@ -141,7 +142,7 @@ export default function Discovery() {
     useDiscoveryFrameStore.getState().addFrames(newFrames, mb, skipFramePicker, activeSelectionSetSelectedIds);
   }, []);
 
-  const toggleFrameSelection = useCallback((id: number) => {
+  const toggleFrameSelection = useCallback((id: string) => {
     const { activeSelectionSetId: asid, setSelectionSetDirty: ssd } = useDiscoveryUIStore.getState();
     useDiscoveryFrameStore.getState().toggleFrameSelection(id, asid, ssd);
   }, []);
@@ -163,11 +164,18 @@ export default function Discovery() {
 
   const applySelectionSet = useCallback((selectionSet: import('../../utils/selectionSets').SelectionSet) => {
     const uiState = useDiscoveryUIStore.getState();
+    // Detect protocol from current frameInfoMap, default to 'can'
+    let protocol = 'can';
+    for (const info of useDiscoveryFrameStore.getState().frameInfoMap.values()) {
+      if (info.protocol) { protocol = info.protocol; break; }
+    }
     useDiscoveryFrameStore.getState().applySelectionSet(
-      selectionSet, uiState.setActiveSelectionSet, uiState.setSelectionSetDirty
+      selectionSet, protocol, uiState.setActiveSelectionSet, uiState.setSelectionSetDirty
     );
+    // Convert numeric selection set IDs to composite keys
+    const numericIds = selectionSet.selectedIds ?? selectionSet.frameIds;
     uiState.setActiveSelectionSetSelectedIds(
-      new Set(selectionSet.selectedIds ?? selectionSet.frameIds)
+      new Set(numericIds.map(id => `${protocol}:${id}`))
     );
   }, []);
 
@@ -709,12 +717,13 @@ export default function Discovery() {
 
   const frameList = useMemo(
     () =>
-      Array.from(frameInfoMap.entries()).map(([id, info]) => ({
-        id,
+      Array.from(frameInfoMap.entries()).map(([fk, info]) => ({
+        id: fk,
         len: info.len,
         isExtended: info.isExtended,
         bus: info.bus,
         lenMismatch: info.lenMismatch,
+        protocol: info.protocol,
       })),
     [frameInfoMap]
   );
@@ -960,10 +969,11 @@ export default function Discovery() {
       await seekByFrame(frameIndex);
     } else {
       // Buffer-only mode: look up timestamp from buffer
-      const selectedIds = Array.from(selectedFrames);
+      // Buffer API uses numeric IDs — extract from composite keys
+      const selectedNumericIds = Array.from(selectedFrames).map(fk => parseFrameKey(fk).frameId);
       const frameBufferId = bufferMetadata?.id ?? sessionBufferId;
       try {
-        const response = await getBufferFramesPaginatedFiltered(frameBufferId!, frameIndex, 1, selectedIds);
+        const response = await getBufferFramesPaginatedFiltered(frameBufferId!, frameIndex, 1, selectedNumericIds);
         if (response.frames.length > 0) {
           updateCurrentTime(response.frames[0].timestamp_us / 1_000_000);
         }
@@ -1152,7 +1162,7 @@ export default function Discovery() {
 
       <AnalysisProgressDialog
         isOpen={toolboxIsRunning}
-        frameCount={selectedFrames.size > 0 ? frames.filter(f => selectedFrames.has(f.frame_id)).length : 0}
+        frameCount={selectedFrames.size > 0 ? frames.filter(f => selectedFrames.has(keyOf(f))).length : 0}
         toolName={toolboxActiveView === 'changes' ? 'Payload Changes' : toolboxActiveView === 'message-order' ? 'Frame Order' : 'Analysis'}
       />
 

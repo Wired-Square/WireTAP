@@ -341,6 +341,21 @@ export async function resumeReaderSession(sessionId: string): Promise<IOState> {
 }
 
 /**
+ * Pause polling for a specific source within a running multi-source session.
+ * The session stays active and other sources continue normally.
+ */
+export async function pauseSourcePolling(sessionId: string, profileId: string): Promise<void> {
+  return invoke("pause_source_polling", { session_id: sessionId, profile_id: profileId });
+}
+
+/**
+ * Resume polling for a paused source within a running multi-source session.
+ */
+export async function resumeSourcePolling(sessionId: string, profileId: string): Promise<void> {
+  return invoke("resume_source_polling", { session_id: sessionId, profile_id: profileId });
+}
+
+/**
  * Suspend a reader session - stops streaming, finalizes buffer, session stays alive.
  * The buffer remains owned by the session and all joined apps can view it.
  * Use `resumeReaderSessionFresh` to start streaming again with a new buffer.

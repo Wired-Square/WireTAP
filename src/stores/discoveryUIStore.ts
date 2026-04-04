@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { saveCatalog } from '../api';
 import { buildFramesTomlWithKnowledge, buildModbusDiscoveryToml, type ExportFrameWithKnowledge, type SerialFrameConfig, type ModbusExportConfig } from '../utils/frameExport';
 import { formatFrameId } from '../utils/frameIds';
+import { parseFrameKey } from '../utils/frameKey';
 import { normalizeMeta } from '../utils/catalogMeta';
 import type { FrameInfo } from './discoveryFrameStore';
 import { useDiscoveryToolboxStore } from './discoveryToolboxStore';
@@ -49,8 +50,9 @@ interface DiscoveryUIState {
   // Selection set state
   activeSelectionSetId: string | null;
   selectionSetDirty: boolean;
-  /** Cached selectedIds from the active selection set — used to gate auto-selection during ingestion */
-  activeSelectionSetSelectedIds: Set<number> | null;
+  /** Cached selectedIds from the active selection set — used to gate auto-selection during ingestion.
+   *  Keys are composite frame keys (e.g. "can:256"). */
+  activeSelectionSetSelectedIds: Set<string> | null;
 
   // Frame view tab state
   framesViewActiveTab: string;
@@ -83,14 +85,14 @@ interface DiscoveryUIState {
   saveFrames: (
     decoderDir: string,
     saveFrameIdFormat: 'hex' | 'decimal',
-    selectedFrames: Set<number>,
-    frameInfoMap: Map<number, FrameInfo>
+    selectedFrames: Set<string>,
+    frameInfoMap: Map<string, FrameInfo>
   ) => Promise<void>;
 
   // Actions - Selection sets
   setActiveSelectionSet: (id: string | null) => void;
   setSelectionSetDirty: (dirty: boolean) => void;
-  setActiveSelectionSetSelectedIds: (ids: Set<number> | null) => void;
+  setActiveSelectionSetSelectedIds: (ids: Set<string> | null) => void;
 
   // Actions - Frame view tabs
   setFramesViewActiveTab: (tab: string) => void;
@@ -189,14 +191,17 @@ export const useDiscoveryUIStore = create<DiscoveryUIState>((set, get) => ({
     const path = `${baseDir}/${filename}`;
 
     const selectedFramesList: ExportFrameWithKnowledge[] = Array.from(frameInfoMap.entries())
-      .filter(([id]) => selectedFrames.has(id))
-      .map(([id, info]) => ({
-        id,
-        len: info.len,
-        isExtended: info.isExtended,
-        protocol: info.protocol,
-        knowledge: knowledge.frames.get(id),
-      }))
+      .filter(([fk]) => selectedFrames.has(fk))
+      .map(([fk, info]) => {
+        const { frameId } = parseFrameKey(fk);
+        return {
+          id: frameId,
+          len: info.len,
+          isExtended: info.isExtended,
+          protocol: info.protocol,
+          knowledge: knowledge.frames.get(frameId),
+        };
+      })
       .sort((a, b) => a.id - b.id);
 
     const detectedProtocol = selectedFramesList.find(f => f.protocol)?.protocol ?? 'can';

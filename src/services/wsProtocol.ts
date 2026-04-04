@@ -173,9 +173,25 @@ export function decodeFrameBatch(
         is_fd: frameType === FrameType.CanFd,
         direction: directionTx ? "tx" : undefined,
       };
-    } else {
+    } else if (frameType === FrameType.Modbus) {
+      // Modbus: first 4 bytes are frame_id (register number) in LE, rest is payload
+      if (len < 4) continue;
+      const modbusId = view.getUint32(dataStart, true);
+      const payloadLen = len - 4;
       frame = {
-        protocol: frameType === FrameType.Serial ? "serial" : "modbus",
+        protocol: "modbus",
+        timestamp_us,
+        frame_id: modbusId,
+        bus,
+        dlc: payloadLen,
+        bytes: Array.from(new Uint8Array(buf, dataStart + 4, payloadLen)),
+        is_extended: false,
+        is_fd: false,
+      };
+    } else {
+      // Serial and anything else — raw bytes, no frame_id
+      frame = {
+        protocol: "serial",
         timestamp_us,
         frame_id: 0,
         bus,

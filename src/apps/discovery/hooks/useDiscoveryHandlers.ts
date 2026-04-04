@@ -50,8 +50,8 @@ export interface UseDiscoveryHandlersParams {
   frames: FrameMessage[];
   framedData: FrameMessage[];
   framedBufferId: string | null;
-  frameInfoMap: Map<number, any>;
-  selectedFrames: Set<number>;
+  frameInfoMap: Map<string, any>;
+  selectedFrames: Set<string>;
 
   // Serial state
   isSerialMode: boolean;

@@ -1,7 +1,7 @@
 // ui/src/components/LogoMenu.tsx
 
 import { useState, useRef, useEffect } from "react";
-import { Search, Activity, FileText, Calculator, Settings, Send, ArrowUpCircle, DatabaseZap, Network, BarChart3, Workflow, FlaskConical } from "lucide-react";
+import { Search, Activity, FileText, Calculator, Settings, Send, Server, ArrowUpCircle, DatabaseZap, Network, BarChart3, Workflow, FlaskConical } from "lucide-react";
 import { iconMd, marginAppContent } from "../styles/spacing";
 import { bgSurface, borderDefault, textPrimary } from "../styles";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -9,7 +9,7 @@ const logo = "/logo.svg";
 import { useUpdateStore } from "../stores/updateStore";
 import { openSettingsPanel } from "../api";
 
-export type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "transmit" | "query" | "session-manager" | "graph" | "rules" | "test-pattern" | "settings";
+export type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "transmit" | "modbus" | "query" | "session-manager" | "graph" | "rules" | "test-pattern" | "settings";
 
 interface LogoMenuProps {
   onPanelClick: (panelId: PanelId) => void;
@@ -48,11 +48,18 @@ const menuItems: MenuItem[] = [
     bgColor: "hover:bg-red-500/10",
   },
   {
+    id: "modbus",
+    icon: Server,
+    label: "Modbus",
+    color: "text-amber-400",
+    bgColor: "hover:bg-amber-500/10",
+  },
+  {
     id: "query",
     icon: DatabaseZap,
     label: "Query",
-    color: "text-amber-400",
-    bgColor: "hover:bg-amber-500/10",
+    color: "text-yellow-400",
+    bgColor: "hover:bg-yellow-500/10",
   },
   {
     id: "graph",

@@ -148,6 +148,9 @@ export const bgDataToolbar = "bg-[var(--bg-surface)]";
 /** Data view border - uses CSS variable */
 export const borderDataView = "border-[color:var(--border-default)]";
 
+/** Data view outer container - rounded with border (the standard "bubble" look) */
+export const dataViewContainer = "rounded-lg border border-[color:var(--border-default)] overflow-hidden";
+
 /** Data view input background - uses CSS variable */
 export const bgDataInput = "bg-[var(--bg-primary)]";
 
