@@ -411,7 +411,6 @@ function Gauge({
             stroke={colour}
             strokeWidth={sw}
             strokeLinecap="round"
-            style={{ transition: "d 0.2s ease-out" }}
           />
         )}
         {/* Value text */}
