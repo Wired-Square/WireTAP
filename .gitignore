@@ -32,6 +32,9 @@ CLAUDE.md
 .history
 .claude
 
+# Python
+__pycache__/
+
 # Rust/Cargo
 src-tauri/target/
 
