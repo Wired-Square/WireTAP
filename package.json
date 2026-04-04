@@ -30,6 +30,9 @@
     "notarise:info": "xcrun notarytool info --apple-id \"$APPLE_ID\" --team-id \"$APPLE_TEAM_ID\" --password \"$APPLE_NOTARY_PASSWORD\""
   },
   "dependencies": {
+    "@fontsource/dseg7": "^4.5.4",
+    "@fontsource/ubuntu": "^5.2.8",
+    "@fontsource/ubuntu-mono": "^5.2.8",
     "@saurl/tauri-plugin-safe-area-insets-css-api": "^0.1.0",
     "@sentry/react": "^10.39.0",
     "@tauri-apps/api": "^2",

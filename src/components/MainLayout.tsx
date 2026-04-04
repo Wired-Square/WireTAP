@@ -36,7 +36,7 @@ import {
 import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuState } from "../api";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
-const logo = "/logo.png";
+const logo = "/logo.svg";
 
 // Lazy load app components for better initial load
 const Discovery = lazy(() => import("../apps/discovery/Discovery"));
