@@ -499,20 +499,11 @@ impl IODevice for GsUsbReader {
             guard.clone().ok_or("Not connected (no transmit channel)")?
         };
 
-        // Create a sync channel to receive the result
-        let (result_tx, result_rx) = std_mpsc::sync_channel(1);
-
-        // Send the transmit request
+        // Fire-and-forget: queue into the device's 32-slot channel and return
+        // immediately. Channel full = backpressure from the USB write task.
+        let (result_tx, _result_rx) = std_mpsc::sync_channel(1);
         tx.try_send(TransmitRequest { data, result_tx })
-            .map_err(|e| format!("Failed to queue transmit request: {}", e))?;
-
-        // Wait for the result with a timeout
-        let result = result_rx
-            .recv_timeout(std::time::Duration::from_millis(500))
-            .map_err(|e| format!("Transmit timeout or channel closed: {}", e))?;
-
-        result?;
-
+            .map_err(|e| format!("Transmit buffer full ({})", e))?;
         Ok(TransmitResult::success())
     }
 }
