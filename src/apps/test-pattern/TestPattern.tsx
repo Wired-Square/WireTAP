@@ -31,7 +31,7 @@ import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useSettings } from "../../hooks/useSettings";
 import { ioTestStart, ioTestStop } from "../../api/testPattern";
-import type { TestConfig, IOTestState } from "../../api/testPattern";
+import type { TestConfig, IOTestState, AutoPhaseResult } from "../../api/testPattern";
 import { wsTransport } from "../../services/wsTransport";
 import { MsgType, HEADER_SIZE } from "../../services/wsProtocol";
 import AppLayout from "../../components/AppLayout";
@@ -449,6 +449,11 @@ function Gauge({
 // ============================================================================
 
 function TestResults({ state }: { state: IOTestState }) {
+  // Auto mode has its own display
+  if (state.mode === "auto") {
+    return <AutoResults state={state} />;
+  }
+
   const expectedTxCount = useTestPatternStore((s) => s.expectedTxCount);
 
   const isThroughput = state.mode === "throughput";
@@ -672,6 +677,150 @@ function TestResults({ state }: { state: IOTestState }) {
       )}
     </div>
   );
+}
+
+// ============================================================================
+// Auto mode results
+// ============================================================================
+
+function AutoResults({ state }: { state: IOTestState }) {
+  const results = state.auto_results ?? [];
+  const allPassed = results.length > 0 && results.every((r) => r.passed);
+  const isRunning = state.status === "running";
+
+  const statusColour = isRunning
+    ? textPrimary
+    : allPassed
+      ? textDataGreen
+      : textDanger;
+
+  return (
+    <div className="flex flex-col gap-3 flex-1">
+      {/* Status */}
+      <div className="flex items-center gap-3">
+        <span className={`text-sm font-semibold uppercase ${statusColour}`}>
+          {state.status}
+        </span>
+        {state.auto_phase && (
+          <span className={`text-xs ${textSecondary}`}>
+            {state.auto_phase}
+          </span>
+        )}
+        {!isRunning && (
+          <span className={`text-xs font-semibold ${allPassed ? textDataGreen : textDanger}`}>
+            {allPassed ? "ALL PASS" : "FAIL"}
+          </span>
+        )}
+        <span className={`text-xs ${textSecondary}`}>
+          {state.elapsed_sec.toFixed(1)}s
+        </span>
+      </div>
+
+      {/* Phase results table */}
+      {results.length > 0 && (
+        <div className="border border-[color:var(--border-default)] rounded overflow-hidden">
+          <table className={`w-full text-xs ${monoBody}`}>
+            <thead>
+              <tr className="bg-[var(--bg-primary)]">
+                <th className="text-left px-3 py-1.5 font-medium">Phase</th>
+                <th className="text-left px-3 py-1.5 font-medium">Result</th>
+                <th className="text-right px-3 py-1.5 font-medium">TX</th>
+                <th className="text-right px-3 py-1.5 font-medium">RX</th>
+                <th className="text-right px-3 py-1.5 font-medium">Drops</th>
+                <th className="text-right px-3 py-1.5 font-medium">Rate</th>
+                <th className="text-right px-3 py-1.5 font-medium">Latency</th>
+                <th className="text-right px-3 py-1.5 font-medium">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r, i) => (
+                <tr key={i} className="border-t border-[color:var(--border-default)]">
+                  <td className="px-3 py-1.5">{r.phase}</td>
+                  <td className={`px-3 py-1.5 font-semibold ${r.passed ? textDataGreen : textDanger}`}>
+                    {r.passed ? "PASS" : "FAIL"}
+                  </td>
+                  <td className="text-right px-3 py-1.5">{r.tx_count.toLocaleString()}</td>
+                  <td className="text-right px-3 py-1.5">{r.rx_count.toLocaleString()}</td>
+                  <td className={`text-right px-3 py-1.5 ${r.drops > 0 ? textDanger : ""}`}>
+                    {r.phase === "Throughput" ? "—" : r.drops.toLocaleString()}
+                  </td>
+                  <td className="text-right px-3 py-1.5">{r.frames_per_sec.toFixed(0)} fps</td>
+                  <td className="text-right px-3 py-1.5">
+                    {r.latency_us ? `${r.latency_us.mean_us.toLocaleString()} μs` : "—"}
+                  </td>
+                  <td className="text-right px-3 py-1.5">{r.elapsed_sec.toFixed(1)}s</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Remote stats from last phase that has them */}
+      {(() => {
+        const remotePhase = [...results].reverse().find((r) => r.remote);
+        if (!remotePhase?.remote) return null;
+        return (
+          <div>
+            <div className={`text-xs mb-1 ${textSecondary}`}>
+              Remote Endpoint (from {remotePhase.phase})
+            </div>
+            <div className={`grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1 ${monoBody}`}>
+              <Stat label="RX" value={remotePhase.remote.rx_count} />
+              <Stat label="TX" value={remotePhase.remote.tx_count} />
+              <Stat label="Rate" value={`${remotePhase.remote.fps} fps`} />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Plain English summary */}
+      {!isRunning && results.length > 0 && (
+        <div className={`text-sm ${textSecondary} border-t border-[color:var(--border-default)] pt-2 mt-1`}>
+          <AutoSummary results={results} elapsed={state.elapsed_sec} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AutoSummary({ results, elapsed }: { results: AutoPhaseResult[]; elapsed: number }) {
+  const allPassed = results.every((r) => r.passed);
+  const echoResult = results.find((r) => r.phase === "Echo");
+  const latResult = results.find((r) => r.phase === "Latency");
+  const tpResult = results.find((r) => r.phase === "Throughput");
+  const relResult = results.find((r) => r.phase === "Reliability");
+
+  const parts: string[] = [];
+
+  parts.push(`Full test suite completed in ${elapsed.toFixed(0)}s — ${allPassed ? "ALL PASS" : "FAILURES DETECTED"}.`);
+
+  if (echoResult) {
+    parts.push(echoResult.passed
+      ? `Echo: ${echoResult.frames_per_sec.toFixed(0)} fps, zero drops.`
+      : `Echo: FAILED (${echoResult.drops} drops, ${echoResult.errors.length} errors).`);
+  }
+
+  if (latResult?.latency_us) {
+    parts.push(`Latency: ${latResult.latency_us.mean_us.toLocaleString()} μs mean, ${latResult.latency_us.p95_us.toLocaleString()} μs p95.`);
+  }
+
+  if (tpResult) {
+    const remote = tpResult.remote;
+    if (remote && remote.rx_count > 0) {
+      parts.push(`Throughput: ${tpResult.frames_per_sec.toFixed(0)} fps queue rate, ${remote.fps} fps bus rate.`);
+    } else {
+      parts.push(`Throughput: ${tpResult.frames_per_sec.toFixed(0)} fps.`);
+    }
+  }
+
+  if (relResult) {
+    parts.push(relResult.passed
+      ? `Reliability: ${relResult.tx_count.toLocaleString()} frames over ${relResult.elapsed_sec.toFixed(0)}s, zero drops.`
+      : `Reliability: FAILED — ${relResult.drops} drops in ${relResult.elapsed_sec.toFixed(0)}s.`);
+  }
+
+  return <p>{parts.join(" ")}</p>;
 }
 
 function TestSummary({ state, passed }: { state: IOTestState; passed: boolean }) {
