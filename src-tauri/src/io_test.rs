@@ -74,6 +74,7 @@ pub enum TestMode {
     Latency,
     Reliability,
     Loopback,
+    Auto,
 }
 
 impl std::fmt::Display for TestMode {
@@ -84,6 +85,7 @@ impl std::fmt::Display for TestMode {
             TestMode::Latency => write!(f, "latency"),
             TestMode::Reliability => write!(f, "reliability"),
             TestMode::Loopback => write!(f, "loopback"),
+            TestMode::Auto => write!(f, "auto"),
         }
     }
 }
@@ -126,6 +128,21 @@ pub struct LatencyStats {
     pub count: u64,
 }
 
+/// Result of a single phase in an Auto test.
+#[derive(Clone, Debug, Serialize)]
+pub struct AutoPhaseResult {
+    pub phase: String,
+    pub passed: bool,
+    pub tx_count: u64,
+    pub rx_count: u64,
+    pub drops: u64,
+    pub frames_per_sec: f64,
+    pub elapsed_sec: f64,
+    pub latency_us: Option<LatencyStats>,
+    pub remote: Option<RemoteStats>,
+    pub errors: Vec<String>,
+}
+
 /// Remote endpoint stats received via status report frames.
 #[derive(Clone, Debug, Serialize, Default)]
 pub struct RemoteStats {
@@ -152,6 +169,10 @@ pub struct IOTestState {
     pub frames_per_sec: f64,
     pub errors: Vec<String>,
     pub remote: Option<RemoteStats>,
+    /// Phase results for Auto mode.
+    pub auto_results: Option<Vec<AutoPhaseResult>>,
+    /// Current phase label for Auto mode (e.g. "Echo (1/4)").
+    pub auto_phase: Option<String>,
 }
 
 // ============================================================================
@@ -481,12 +502,16 @@ pub async fn io_test_start(
     let session_id_clone = session_id.clone();
 
     let handle = tauri::async_runtime::spawn(async move {
-        match config.role {
-            TestRole::Initiator => {
-                run_initiator(&session_id_clone, &test_id_clone, &config, &cancel_clone).await;
-            }
-            TestRole::Responder => {
-                run_responder(&session_id_clone, &test_id_clone, &config, &cancel_clone).await;
+        if matches!(config.mode, TestMode::Auto) {
+            run_auto(&session_id_clone, &test_id_clone, &config, &cancel_clone).await;
+        } else {
+            match config.role {
+                TestRole::Initiator => {
+                    run_initiator(&session_id_clone, &test_id_clone, &config, &cancel_clone).await;
+                }
+                TestRole::Responder => {
+                    run_responder(&session_id_clone, &test_id_clone, &config, &cancel_clone).await;
+                }
             }
         }
     });
@@ -562,6 +587,10 @@ async fn run_initiator(
         TestMode::Latency => {
             (TP_ID_LATENCY_PROBE, TP_TAG_LATENCY_PROBE, TP_TAG_LATENCY_REPLY)
         }
+        TestMode::Auto => {
+            // Auto mode is dispatched via run_auto, not run_initiator
+            unreachable!("Auto mode should not reach run_initiator directly")
+        }
     };
 
     // Store initial state
@@ -583,6 +612,8 @@ async fn run_initiator(
         frames_per_sec: 0.0,
         errors: Vec::new(),
             remote: None,
+            auto_results: None,
+            auto_phase: None,
         });
     crate::ws::dispatch::send_io_test_state(test_id);
 
@@ -708,6 +739,8 @@ async fn run_initiator(
                 frames_per_sec: fps,
                 errors: errors.clone(),
             remote: None,
+            auto_results: None,
+            auto_phase: None,
         });
             crate::ws::dispatch::send_io_test_state(test_id);
             last_progress = std::time::Instant::now();
@@ -775,11 +808,181 @@ async fn run_initiator(
         frames_per_sec: fps,
         errors,
         remote,
+        auto_results: None,
+        auto_phase: None,
     });
     crate::ws::dispatch::send_io_test_state(test_id);
 
     // Cleanup
     unregister_frame_taps(session_id);
+    let mut tasks = IO_TEST_TASKS.lock().await;
+    tasks.remove(test_id);
+}
+
+// ============================================================================
+// Auto test orchestrator
+// ============================================================================
+
+async fn run_auto(
+    session_id: &str,
+    test_id: &str,
+    config: &TestConfig,
+    cancel: &AtomicBool,
+) {
+    let mut results: Vec<AutoPhaseResult> = Vec::new();
+
+    let phases: Vec<(&str, TestMode, f64, f64)> = vec![
+        // (label, mode, rate_hz, duration_sec)
+        ("Echo", TestMode::Echo, 100.0, 10.0),
+        ("Latency", TestMode::Latency, 10.0, 10.0),
+        ("Throughput", TestMode::Throughput, 0.0, 10.0),
+        ("Reliability", TestMode::Reliability, 100.0, 60.0), // rate updated after echo
+    ];
+
+    let total_phases = phases.len();
+    let mut achieved_echo_fps: f64 = 100.0;
+
+    for (i, (label, mode, mut rate_hz, duration_sec)) in phases.into_iter().enumerate() {
+        if cancel.load(Ordering::SeqCst) {
+            break;
+        }
+
+        // For reliability, use the echo's achieved rate (capped at 80% to avoid overload)
+        if matches!(mode, TestMode::Reliability) {
+            rate_hz = (achieved_echo_fps * 0.8).max(10.0);
+        }
+
+        let phase_label = format!("{} ({}/{})", label, i + 1, total_phases);
+        tlog!("[io_test] '{}' auto phase: {} (rate={:.0} Hz, dur={:.0}s)",
+              test_id, phase_label, rate_hz, duration_sec);
+
+        // Update state to show current phase
+        store_test_state(test_id, IOTestState {
+            test_id: test_id.to_string(),
+            status: "running".to_string(),
+            mode: "auto".to_string(),
+            role: "initiator".to_string(),
+            tx_count: 0,
+            rx_count: 0,
+            drops: 0,
+            duplicates: 0,
+            out_of_order: 0,
+            sequence_gaps: Vec::new(),
+            latency_us: None,
+            elapsed_sec: 0.0,
+            frames_per_sec: 0.0,
+            errors: Vec::new(),
+            remote: None,
+            auto_results: Some(results.clone()),
+            auto_phase: Some(phase_label.clone()),
+        });
+        crate::ws::dispatch::send_io_test_state(test_id);
+
+        // Create a sub-config for this phase
+        let sub_config = TestConfig {
+            mode: mode.clone(),
+            role: TestRole::Initiator,
+            duration_sec,
+            rate_hz,
+            bus: config.bus,
+            use_fd: config.use_fd,
+            use_extended: config.use_extended,
+        };
+
+        // Run the sub-test using a temporary test ID
+        let sub_test_id = format!("{}_phase_{}", test_id, i);
+        run_initiator(session_id, &sub_test_id, &sub_config, cancel).await;
+
+        // Read the sub-test result
+        let sub_state = IO_TEST_STATES.lock().ok()
+            .and_then(|s| s.get(&sub_test_id).cloned());
+
+        // Clean up sub-test state
+        if let Ok(mut states) = IO_TEST_STATES.lock() {
+            states.remove(&sub_test_id);
+        }
+
+        if let Some(state) = sub_state {
+            let is_throughput = matches!(sub_config.mode, TestMode::Throughput);
+            let passed = state.status == "completed"
+                && state.tx_count > 0
+                && state.errors.is_empty()
+                && (is_throughput || (state.drops == 0 && state.duplicates == 0));
+
+            // Capture echo achieved rate for reliability phase
+            if matches!(sub_config.mode, TestMode::Echo) {
+                achieved_echo_fps = state.frames_per_sec;
+            }
+
+            results.push(AutoPhaseResult {
+                phase: label.to_string(),
+                passed,
+                tx_count: state.tx_count,
+                rx_count: state.rx_count,
+                drops: state.drops,
+                frames_per_sec: state.frames_per_sec,
+                elapsed_sec: state.elapsed_sec,
+                latency_us: state.latency_us,
+                remote: state.remote,
+                errors: if state.errors.len() > 3 {
+                    let mut e = state.errors[..3].to_vec();
+                    e.push(format!("... and {} more", state.errors.len() - 3));
+                    e
+                } else {
+                    state.errors
+                },
+            });
+
+            // If echo fails, skip remaining phases (connectivity issue)
+            if matches!(sub_config.mode, TestMode::Echo) && !passed {
+                tlog!("[io_test] '{}' auto: echo failed, skipping remaining phases", test_id);
+                break;
+            }
+        } else {
+            results.push(AutoPhaseResult {
+                phase: label.to_string(),
+                passed: false,
+                tx_count: 0,
+                rx_count: 0,
+                drops: 0,
+                frames_per_sec: 0.0,
+                elapsed_sec: 0.0,
+                latency_us: None,
+                remote: None,
+                errors: vec!["Phase did not produce results".to_string()],
+            });
+        }
+    }
+
+    let all_passed = results.iter().all(|r| r.passed);
+    let total_elapsed: f64 = results.iter().map(|r| r.elapsed_sec).sum();
+    let status = if cancel.load(Ordering::SeqCst) { "stopped" } else if all_passed { "completed" } else { "completed" };
+
+    tlog!("[io_test] '{}' auto complete: {} phases, all_passed={}, elapsed={:.1}s",
+          test_id, results.len(), all_passed, total_elapsed);
+
+    store_test_state(test_id, IOTestState {
+        test_id: test_id.to_string(),
+        status: status.to_string(),
+        mode: "auto".to_string(),
+        role: "initiator".to_string(),
+        tx_count: results.iter().map(|r| r.tx_count).sum(),
+        rx_count: results.iter().map(|r| r.rx_count).sum(),
+        drops: results.iter().map(|r| r.drops).sum(),
+        duplicates: 0,
+        out_of_order: 0,
+        sequence_gaps: Vec::new(),
+        latency_us: results.iter().find_map(|r| r.latency_us.clone()),
+        elapsed_sec: total_elapsed,
+        frames_per_sec: 0.0,
+        errors: Vec::new(),
+        remote: None,
+        auto_results: Some(results),
+        auto_phase: None,
+    });
+    crate::ws::dispatch::send_io_test_state(test_id);
+
+    // Cleanup
     let mut tasks = IO_TEST_TASKS.lock().await;
     tasks.remove(test_id);
 }
@@ -823,6 +1026,8 @@ async fn run_responder(
         frames_per_sec: 0.0,
         errors: Vec::new(),
             remote: None,
+            auto_results: None,
+            auto_phase: None,
         });
     crate::ws::dispatch::send_io_test_state(test_id);
 
@@ -916,6 +1121,8 @@ async fn run_responder(
                 frames_per_sec: fps,
                 errors: errors.clone(),
             remote: None,
+            auto_results: None,
+            auto_phase: None,
         });
             crate::ws::dispatch::send_io_test_state(test_id);
             last_progress = std::time::Instant::now();
@@ -947,6 +1154,8 @@ async fn run_responder(
         frames_per_sec: fps,
         errors,
             remote: None,
+            auto_results: None,
+            auto_phase: None,
         });
     crate::ws::dispatch::send_io_test_state(test_id);
 

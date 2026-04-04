@@ -13,6 +13,7 @@ import type { TestMode, TestRole } from "../../../api/testPattern";
 import AppTopBar from "../../../components/AppTopBar";
 
 const TEST_MODES: { value: TestMode; label: string }[] = [
+  { value: "auto", label: "Auto (Full Suite)" },
   { value: "echo", label: "Echo" },
   { value: "throughput", label: "Throughput" },
   { value: "latency", label: "Latency" },
@@ -136,18 +137,20 @@ export default function TestPatternTopBar({
         <>
           <ChevronRight className={`${iconSm} text-[color:var(--text-muted)] shrink-0`} />
 
-          {/* Role */}
-          <select
-            className={selectClass}
-            value={role}
-            onChange={(e) => onRoleChange(e.target.value as TestRole)}
-            disabled={isRunning}
-            title="Role"
-          >
-            {ROLES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </select>
+          {/* Role (hidden for Auto — always initiator) */}
+          {mode !== "auto" && (
+            <select
+              className={selectClass}
+              value={role}
+              onChange={(e) => onRoleChange(e.target.value as TestRole)}
+              disabled={isRunning}
+              title="Role"
+            >
+              {ROLES.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          )}
 
           {/* Mode */}
           <select
@@ -162,8 +165,8 @@ export default function TestPatternTopBar({
             ))}
           </select>
 
-          {/* Rate (only for non-throughput initiator) */}
-          {role === "initiator" && mode !== "throughput" && (
+          {/* Rate (only for non-throughput initiator, hidden for auto) */}
+          {role === "initiator" && mode !== "throughput" && mode !== "auto" && (
             <div className="flex items-center gap-1">
               <span className={`text-xs ${textSecondary}`}>Rate</span>
               <NumericInput
@@ -178,61 +181,59 @@ export default function TestPatternTopBar({
             </div>
           )}
 
-          {/* Duration */}
-          <div className="flex items-center gap-1">
-            <span className={`text-xs ${textSecondary}`}>Dur</span>
-            <NumericInput
-              className={inputClass}
-              value={durationSec}
-              onChange={onDurationChange}
-              disabled={isRunning}
-              min={1}
-              max={86400}
-              title="Duration in seconds"
-            />
-          </div>
-
-          {/* Bus */}
-          <div className="flex items-center gap-1">
-            <span className={`text-xs ${textSecondary}`}>Bus</span>
-            <NumericInput
-              className={`${inputClass} w-10`}
-              value={bus}
-              onChange={onBusChange}
-              disabled={isRunning}
-              min={0}
-              max={7}
-              title="Bus number"
-            />
-          </div>
-
-          {/* FD badge toggle */}
-          <button
-            className={`text-xs px-2 py-0.5 rounded ${
-              useFd
-                ? "bg-green-600/30 text-green-400"
-                : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-[color:var(--border-default)]"
-            }`}
-            onClick={() => onFdChange(!useFd)}
-            disabled={isRunning}
-            title="CAN FD mode"
-          >
-            FD
-          </button>
-
-          {/* Extended badge toggle */}
-          <button
-            className={`text-xs px-2 py-0.5 rounded ${
-              useExtended
-                ? "bg-amber-600/30 text-amber-400"
-                : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-[color:var(--border-default)]"
-            }`}
-            onClick={() => onExtendedChange(!useExtended)}
-            disabled={isRunning}
-            title="Extended (29-bit) IDs"
-          >
-            Ext
-          </button>
+          {/* Duration, Bus, FD, Ext — hidden for Auto (uses fixed params) */}
+          {mode !== "auto" && (
+            <>
+              <div className="flex items-center gap-1">
+                <span className={`text-xs ${textSecondary}`}>Dur</span>
+                <NumericInput
+                  className={inputClass}
+                  value={durationSec}
+                  onChange={onDurationChange}
+                  disabled={isRunning}
+                  min={1}
+                  max={86400}
+                  title="Duration in seconds"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className={`text-xs ${textSecondary}`}>Bus</span>
+                <NumericInput
+                  className={`${inputClass} w-10`}
+                  value={bus}
+                  onChange={onBusChange}
+                  disabled={isRunning}
+                  min={0}
+                  max={7}
+                  title="Bus number"
+                />
+              </div>
+              <button
+                className={`text-xs px-2 py-0.5 rounded ${
+                  useFd
+                    ? "bg-green-600/30 text-green-400"
+                    : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-[color:var(--border-default)]"
+                }`}
+                onClick={() => onFdChange(!useFd)}
+                disabled={isRunning}
+                title="CAN FD mode"
+              >
+                FD
+              </button>
+              <button
+                className={`text-xs px-2 py-0.5 rounded ${
+                  useExtended
+                    ? "bg-amber-600/30 text-amber-400"
+                    : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-[color:var(--border-default)]"
+                }`}
+                onClick={() => onExtendedChange(!useExtended)}
+                disabled={isRunning}
+                title="Extended (29-bit) IDs"
+              >
+                Ext
+              </button>
+            </>
+          )}
 
         </>
       )}

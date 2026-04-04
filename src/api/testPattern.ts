@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 // Types
 // ============================================================================
 
-export type TestMode = "echo" | "throughput" | "latency" | "reliability" | "loopback";
+export type TestMode = "echo" | "throughput" | "latency" | "reliability" | "loopback" | "auto";
 export type TestRole = "initiator" | "responder";
 
 export interface TestConfig {
@@ -38,6 +38,19 @@ export interface RemoteStats {
   fps: number;
 }
 
+export interface AutoPhaseResult {
+  phase: string;
+  passed: boolean;
+  tx_count: number;
+  rx_count: number;
+  drops: number;
+  frames_per_sec: number;
+  elapsed_sec: number;
+  latency_us: LatencyStats | null;
+  remote: RemoteStats | null;
+  errors: string[];
+}
+
 export interface IOTestState {
   test_id: string;
   status: "running" | "completed" | "stopped" | "failed";
@@ -54,6 +67,8 @@ export interface IOTestState {
   frames_per_sec: number;
   errors: string[];
   remote: RemoteStats | null;
+  auto_results: AutoPhaseResult[] | null;
+  auto_phase: string | null;
 }
 
 // ============================================================================
