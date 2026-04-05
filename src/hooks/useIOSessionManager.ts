@@ -32,6 +32,7 @@ import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
 import { isMultiSourceCapable, buildDefaultBusMappings } from "../utils/profileTraits";
+import { WINDOW_EVENTS } from "../events/registry";
 
 /**
  * Generate a unique session ID for recorded/timeline sources.
@@ -726,7 +727,6 @@ export function useIOSessionManager(
         await deleteCapture(bid);
         useSessionStore.getState().removeKnownCaptureId(bid);
         const { emit } = await import("@tauri-apps/api/event");
-        const { WINDOW_EVENTS } = await import("../events/registry");
         emit(WINDOW_EVENTS.BUFFER_CHANGED, { metadata: null, deletedBufferIds: [bid], timestamp: Date.now() });
       }
       await session.leave();

@@ -8,6 +8,7 @@ import * as Sentry from "@sentry/react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { listen, emit, type UnlistenFn } from "@tauri-apps/api/event";
+import { WINDOW_EVENTS } from "../events/registry";
 import {
   createIOSession,
   getIOSessionState,
@@ -1631,7 +1632,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       set((s) => ({ sessions: { ...s.sessions, ...updated } }));
     }
     // Notify other windows
-    const { WINDOW_EVENTS } = await import("../events/registry");
     emit(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, { captureId, name: newName });
   },
 
@@ -1650,7 +1650,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       set((s) => ({ sessions: { ...s.sessions, ...updated } }));
     }
     // Notify other windows
-    const { WINDOW_EVENTS } = await import("../events/registry");
     emit(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, { captureId, persistent });
   },
 
@@ -1811,7 +1810,7 @@ getGlobalShowAppError = () => useSessionStore.getState().showAppError;
 let _unlistenBufferMeta: (() => void) | null = null;
 let _unlistenBufferChanged: (() => void) | null = null;
 
-import("../events/registry").then(({ WINDOW_EVENTS }) => {
+{
   // Clean up previous registrations (HMR guard)
   _unlistenBufferMeta?.();
   _unlistenBufferChanged?.();
@@ -1871,7 +1870,7 @@ import("../events/registry").then(({ WINDOW_EVENTS }) => {
       }
     }
   ).then(fn => { _unlistenBufferChanged = fn; });
-});
+}
 
 // ============================================================================
 // Convenience Hooks

@@ -24,6 +24,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Capture follow-navigate used stale `captureId`**: `doFollowNavigate` in `useBufferFrameView` had an empty `useCallback` dep array, so it closed over the initial `null` captureId and passed `''` to `findCaptureOffsetForTimestamp` on every follow-mode jump. Added `captureId` to the deps, an early return when it's null, and dropped the `?? ''` fallback.
 
+- **Vite mixed-import warning for `events/registry`**: `src/events/registry.ts` was statically imported by several apps/hooks and also dynamically imported from `sessionStore.ts` and `useIOSessionManager.ts`, so Vite couldn't move it into a separate chunk and logged a warning on every build. Converted the dynamic imports to static imports (the module is tiny — just `WINDOW_EVENTS` constants and payload types) and replaced the top-level `import("../events/registry").then(...)` IIFE in `sessionStore.ts` with a plain block.
+
 - **Removed auto-load-check debug log spam**: The `[Decoder] auto-load check` and `[Graph] auto-load check` `tlog.debug` lines fired on every render of the auto-load effect — hundreds of lines per second during capture playback. The surrounding effect already has targeted debug logs for the actual decisions (`auto-loading preferred decoder`, `preferred decoder already loaded`, etc.), so the entry log was pure noise.
 
 ## [0.6.0] - 2026-04-04
