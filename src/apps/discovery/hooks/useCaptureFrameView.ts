@@ -303,10 +303,13 @@ export function useBufferFrameView(
   const framesRef = useRef(frames);
   useEffect(() => { framesRef.current = frames; }, [frames]);
 
-  // Shared follow-navigate helper used by both the effect and the catchup path
+  // Shared follow-navigate helper used by both the effect and the catchup path.
+  // `captureId` must be in the dep array — with an empty array the callback
+  // would close over the initial `null` captureId and pass '' to the backend.
   const doFollowNavigate = useCallback((timeUs: number) => {
+    if (!captureId) return;
     const timeUsInt = Math.round(timeUs);
-    findCaptureOffsetForTimestamp(captureId ?? '', timeUsInt, selectedIdsRef.current)
+    findCaptureOffsetForTimestamp(captureId, timeUsInt, selectedIdsRef.current)
       .then((offset) => {
         const targetPage = Math.floor(offset / pageSizeRef.current);
         setCurrentPage(targetPage);
@@ -322,7 +325,7 @@ export function useBufferFrameView(
           doFollowNavigate(skipped);
         }
       });
-  }, []);
+  }, [captureId]);
 
   useEffect(() => {
     if (followTimeUs == null || !captureId || !isCapturePlayback) return;

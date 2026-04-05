@@ -22,6 +22,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **`decodeSessionState` RangeError on every session state change**: The TypeScript decoder read a length-prefixed string at offset 0, but the Rust encoder writes `[u8 state_type][length-prefixed error message iff state_type == 4]`. On a 1-byte `Running` payload (`[0x02]`), the decoder tried to read a u16 length and went out of bounds, throwing `RangeError: Out of bounds access` on every session state transition. Rewrote `decodeSessionState` to match the Rust wire format — read u8 state type, map to state name, only decode the error message when `stateType === 4`.
 
+- **Capture follow-navigate used stale `captureId`**: `doFollowNavigate` in `useBufferFrameView` had an empty `useCallback` dep array, so it closed over the initial `null` captureId and passed `''` to `findCaptureOffsetForTimestamp` on every follow-mode jump. Added `captureId` to the deps, an early return when it's null, and dropped the `?? ''` fallback.
+
 - **Removed auto-load-check debug log spam**: The `[Decoder] auto-load check` and `[Graph] auto-load check` `tlog.debug` lines fired on every render of the auto-load effect — hundreds of lines per second during capture playback. The surrounding effect already has targeted debug logs for the actual decisions (`auto-loading preferred decoder`, `preferred decoder already loaded`, etc.), so the entry log was pure noise.
 
 ## [0.6.0] - 2026-04-04
