@@ -455,6 +455,24 @@ export default function Decoder() {
     }
   }, []);
 
+  // Handle session destroyed externally (e.g., user clicked "Leave" on a live
+  // session). The manager has already set ioProfile=captureId for the orphaned
+  // capture; we fetch its metadata here so the SessionButton label shows the
+  // capture id instead of the generic "Capture" fallback, and the tooltip/
+  // timeline surfaces the correct time range. Mirrors Discovery's handler.
+  const handleSessionDestroyed = useCallback(async (orphanedBufferIds: string[]) => {
+    if (orphanedBufferIds.length === 0) return;
+    const captureId = orphanedBufferIds[0];
+    try {
+      const meta = await getCaptureMetadata(captureId);
+      if (meta) {
+        setCaptureMetadata(meta);
+      }
+    } catch (err) {
+      console.warn('[Decoder] Failed to load capture after session destroyed:', err);
+    }
+  }, []);
+
   // Use the IO session manager hook - manages session lifecycle, ingest, multi-bus, and derived state
   const manager = useIOSessionManager({
     appName: "decoder",
@@ -476,6 +494,7 @@ export default function Decoder() {
     onBeforeMultiWatch: clearFrames,
     streamCompletedRef,
     onSessionReconfigured: handleSessionReconfigured,
+    onSessionDestroyed: handleSessionDestroyed,
   });
 
   // Destructure everything from the manager
