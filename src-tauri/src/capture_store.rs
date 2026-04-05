@@ -402,6 +402,12 @@ pub fn hydrate_from_db() {
             continue;
         }
 
+        // Auto-orphan captures whose owning session no longer exists.
+        // On app restart, sessions are gone from memory but the DB still
+        // records them as owners — without this, the capture is stranded
+        // (not in any session's list, not in list_orphaned_captures).
+        let had_stale_owner = meta.owning_session_id.is_some();
+
         // Backfill buses from DB if not already populated
         let mut buses = meta.buses.clone();
         if buses.is_empty() {
@@ -414,31 +420,39 @@ pub fn hydrate_from_db() {
             }
         }
 
+        if had_stale_owner {
+            tlog!(
+                "[CaptureStore] Auto-orphaning capture '{}' (stale owning_session_id={:?} from previous run)",
+                meta.id, meta.owning_session_id
+            );
+        }
+
         tlog!(
-            "[BufferStore] Hydrating buffer '{}' ({:?}, '{}', {} items, buses: {:?})",
+            "[CaptureStore] Hydrating capture '{}' ({:?}, '{}', {} items, buses: {:?})",
             meta.id, meta.kind, meta.name, meta.count, buses
         );
 
         let seen_buses: HashSet<u8> = buses.iter().copied().collect();
-        let buffer = NamedCapture {
+        let capture = NamedCapture {
             metadata: CaptureMetadata {
                 is_streaming: false,
+                owning_session_id: None, // always orphan on startup
                 buses: buses.clone(),
                 ..meta
             },
             seen_buses,
         };
 
-        // Persist backfilled buses so we don't scan again next startup
-        if !buses.is_empty() {
-            let _ = capture_db::save_capture_metadata(&buffer.metadata);
+        // Persist if we changed anything (backfilled buses or orphaned)
+        if !buses.is_empty() || had_stale_owner {
+            let _ = capture_db::save_capture_metadata(&capture.metadata);
         }
 
-        registry.buffers.insert(buffer.metadata.id.clone(), buffer);
+        registry.buffers.insert(capture.metadata.id.clone(), capture);
         hydrated += 1;
     }
 
-    tlog!("[BufferStore] Hydrated {} buffer(s) from SQLite", hydrated);
+    tlog!("[CaptureStore] Hydrated {} capture(s) from SQLite", hydrated);
 }
 
 // ============================================================================
