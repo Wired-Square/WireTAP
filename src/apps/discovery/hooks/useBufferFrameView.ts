@@ -211,10 +211,10 @@ export function useBufferFrameView(
         );
         if (!isMounted) return;
         setFrames(addHexBytes(response.frames));
-        setBufferIndices(response.buffer_indices);
+        setBufferIndices(response.capture_indices);
         setTotalCount(response.total_filtered_count);
-        if (response.buffer_end_time_us != null) {
-          setTimeRange((prev) => prev ? { ...prev, endUs: response.buffer_end_time_us! } : null);
+        if (response.capture_end_time_us != null) {
+          setTimeRange((prev) => prev ? { ...prev, endUs: response.capture_end_time_us! } : null);
         }
       } catch (e) {
         console.error("[useBufferFrameView] tail fetch error:", e);
@@ -249,7 +249,7 @@ export function useBufferFrameView(
 
         const withHex = addHexBytes(response.frames);
         setFrames(withHex);
-        setBufferIndices(response.buffer_indices);
+        setBufferIndices(response.capture_indices);
         setTotalCount(response.total_count);
       } catch (e) {
         console.error("[useBufferFrameView] page fetch error:", e);

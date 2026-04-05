@@ -379,8 +379,8 @@ export default function Decoder() {
   // Handle stream ended - update buffer metadata and trigger transition if needed
   const handleStreamEnded = useCallback(async (payload: StreamEndedInfo) => {
     // Update buffer metadata
-    if (payload.buffer_available && payload.buffer_id) {
-      const meta = await getBufferMetadata(payload.buffer_id);
+    if (payload.capture_available && payload.capture_id) {
+      const meta = await getBufferMetadata(payload.capture_id);
       setBufferMetadata(meta);
 
       // Notify other windows about the buffer change
@@ -418,9 +418,9 @@ export default function Decoder() {
 
   // Ingest complete handler - passed to useIOSessionManager
   const handleIngestComplete = useCallback(async (payload: StreamEndedInfo) => {
-    if (payload.buffer_available && payload.count > 0 && payload.buffer_id) {
+    if (payload.capture_available && payload.count > 0 && payload.capture_id) {
       // Get the updated buffer metadata
-      const meta = await getBufferMetadata(payload.buffer_id);
+      const meta = await getBufferMetadata(payload.capture_id);
       if (meta) {
         setBufferMetadata(meta);
 

@@ -146,7 +146,7 @@ export default function BufferList({
               ) : (
                 <FileText
                   className={`${iconMd} flex-shrink-0 ${
-                    buffer.buffer_type === "bytes"
+                    buffer.kind === "bytes"
                       ? "text-[color:var(--text-purple)]"
                       : "text-[color:var(--status-info-text)]"
                   }`}
@@ -178,7 +178,7 @@ export default function BufferList({
                     {buffer.id}
                   </span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
-                    {buffer.count.toLocaleString()} {buffer.buffer_type}
+                    {buffer.count.toLocaleString()} {buffer.kind}
                   </span>
                   {isInSession && (
                     <span className={badgeSmallInfo}>{sessionId}</span>

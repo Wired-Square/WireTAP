@@ -210,12 +210,12 @@ impl IODevice for VirtualDeviceReader {
             None
         };
 
-        // Create buffer for this session (type depends on traffic mode)
-        let buffer_type = match self.config.traffic_type {
+        // Create capture for this session (kind depends on traffic mode)
+        let kind = match self.config.traffic_type {
             VirtualTrafficType::Serial => CaptureKind::Bytes,
             _ => CaptureKind::Frames,
         };
-        let buffer_id = capture_store::create_capture(buffer_type, self.session_id.clone());
+        let buffer_id = capture_store::create_capture(kind, self.session_id.clone());
         let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
 
         let traffic_type_name = match self.config.traffic_type {

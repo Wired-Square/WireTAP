@@ -71,7 +71,7 @@ export default function Query() {
       try {
         const all = await listBuffers();
         // Only show frame buffers with data
-        setBuffers(all.filter((b) => b.buffer_type === "frames" && b.count > 0));
+        setBuffers(all.filter((b) => b.kind === "frames" && b.count > 0));
       } catch (e) {
         console.error("Failed to load buffers:", e);
       }

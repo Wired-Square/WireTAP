@@ -560,7 +560,7 @@ export function useIOSession(
 
       // Listener evicted (from Session Manager "Remove" action).
       // This is a global event - we filter by our session ID and listener ID.
-      const unlistenEvicted = await listen<{ session_id: string; listener_id: string; buffer_ids: string[] }>(
+      const unlistenEvicted = await listen<{ session_id: string; listener_id: string; capture_ids: string[] }>(
         "listener-evicted",
         (event) => {
           if (cancelled) return;
@@ -569,7 +569,7 @@ export function useIOSession(
             event.payload.listener_id === listenerIdRef.current
           ) {
             tlog.info(
-              `[useIOSession:${appName}] Evicted from session '${effectiveSessionId}', buffer copies: ${event.payload.buffer_ids}`
+              `[useIOSession:${appName}] Evicted from session '${effectiveSessionId}', capture copies: ${event.payload.capture_ids}`
             );
             // Prevent the cleanup timeout from trying to leave
             setupCompleteRef.current = false;
@@ -578,8 +578,8 @@ export function useIOSession(
             useSessionStore.getState().cleanupEvictedListener(effectiveSessionId, listenerIdRef.current);
             // Clear local state
             setLocalState(null);
-            // Notify higher-level hooks with copied buffer IDs (same path as destroy)
-            callbacksRef.current.onDestroyed?.(event.payload.buffer_ids);
+            // Notify higher-level hooks with copied capture IDs (same path as destroy)
+            callbacksRef.current.onDestroyed?.(event.payload.capture_ids);
           }
         }
       );

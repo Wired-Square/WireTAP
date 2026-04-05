@@ -781,14 +781,14 @@ export default function IoSourcePickerDialog({
         internalLoadSessionIdRef.current = null;
       }
 
-      if (payload.buffer_available && payload.count > 0) {
+      if (payload.capture_available && payload.count > 0) {
         // Refresh the buffer list
         const allBuffers = await listOrphanedBuffers();
         setBuffers(allBuffers);
 
         // Get the specific buffer that was created (if we have its ID)
-        if (payload.buffer_id) {
-          const meta = allBuffers.find((b) => b.id === payload.buffer_id);
+        if (payload.capture_id) {
+          const meta = allBuffers.find((b) => b.id === payload.capture_id);
           if (meta) {
             onImport?.(meta);
 
@@ -1418,7 +1418,7 @@ export default function IoSourcePickerDialog({
 
   // Check if a bytes buffer is selected (for framing options)
   const selectedBuffer = selectedBufferId ? buffers.find((b) => b.id === selectedBufferId) : null;
-  const isBytesBufferSelected = selectedBuffer?.buffer_type === "bytes" && !checkedSourceId;
+  const isBytesBufferSelected = selectedBuffer?.kind === "bytes" && !checkedSourceId;
 
   // Handle OK button click for buffer selection - pass framing config if configured
   const handleBufferOkClick = () => {

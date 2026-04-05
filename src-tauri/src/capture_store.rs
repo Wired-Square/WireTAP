@@ -43,10 +43,10 @@ pub struct TimestampedByte {
 /// Metadata about a buffer
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CaptureMetadata {
-    /// Unique buffer ID (e.g., "xk9m2p", "r7f3kw")
+    /// Unique capture ID (e.g., "xk9m2p", "r7f3kw")
     pub id: String,
-    /// Buffer type (frames or bytes)
-    pub buffer_type: CaptureKind,
+    /// Capture kind (frames or bytes)
+    pub kind: CaptureKind,
     /// Display name (e.g., "GVRET 10:30am", "Serial dump")
     pub name: String,
     /// Number of items (frames or bytes depending on type)
@@ -135,21 +135,21 @@ pub fn list_capture_ids() -> Vec<String> {
 // Public API - Buffer Creation & Management
 // ============================================================================
 
-/// Create a new buffer and set it as active for streaming.
-/// Returns the buffer ID.
-pub fn create_capture(buffer_type: CaptureKind, name: String) -> String {
-    create_capture_internal(buffer_type, name, true)
+/// Create a new capture and set it as active for streaming.
+/// Returns the capture ID.
+pub fn create_capture(kind: CaptureKind, name: String) -> String {
+    create_capture_internal(kind, name, true)
 }
 
-/// Create a new buffer WITHOUT setting it as active.
-/// Use this when creating derived buffers (e.g., framing results) that shouldn't
-/// disrupt the current streaming buffer.
-/// Returns the buffer ID.
-pub fn create_capture_inactive(buffer_type: CaptureKind, name: String) -> String {
-    create_capture_internal(buffer_type, name, false)
+/// Create a new capture WITHOUT setting it as active.
+/// Use this when creating derived captures (e.g., framing results) that shouldn't
+/// disrupt the current streaming capture.
+/// Returns the capture ID.
+pub fn create_capture_inactive(kind: CaptureKind, name: String) -> String {
+    create_capture_internal(kind, name, false)
 }
 
-/// Generate a random 6-character lowercase alphanumeric buffer ID.
+/// Generate a random 6-character lowercase alphanumeric capture ID.
 /// Retries on collision (astronomically unlikely with 36^6 ≈ 2.2 billion possibilities).
 fn generate_capture_id(registry: &CaptureRegistry) -> String {
     const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
@@ -173,8 +173,8 @@ fn generate_capture_id(registry: &CaptureRegistry) -> String {
     }
 }
 
-/// Internal helper to create a buffer with optional streaming activation.
-fn create_capture_internal(buffer_type: CaptureKind, name: String, set_streaming: bool) -> String {
+/// Internal helper to create a capture with optional streaming activation.
+fn create_capture_internal(kind: CaptureKind, name: String, set_streaming: bool) -> String {
     let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
     let id = generate_capture_id(&registry);
@@ -186,7 +186,7 @@ fn create_capture_internal(buffer_type: CaptureKind, name: String, set_streaming
 
     let metadata = CaptureMetadata {
         id: id.clone(),
-        buffer_type: buffer_type.clone(),
+        kind: kind.clone(),
         name: name.clone(),
         count: 0,
         start_time_us: None,
@@ -198,8 +198,8 @@ fn create_capture_internal(buffer_type: CaptureKind, name: String, set_streaming
         buses: Vec::new(),
     };
 
-    let buffer = NamedCapture { metadata: metadata.clone(), seen_buses: HashSet::new() };
-    registry.buffers.insert(id.clone(), buffer);
+    let capture = NamedCapture { metadata: metadata.clone(), seen_buses: HashSet::new() };
+    registry.buffers.insert(id.clone(), capture);
 
     if set_streaming {
         registry.streaming_ids.insert(id.clone());
@@ -210,12 +210,12 @@ fn create_capture_internal(buffer_type: CaptureKind, name: String, set_streaming
 
     // Persist initial metadata to SQLite
     if let Err(e) = capture_db::save_capture_metadata(&metadata) {
-        tlog!("[BufferStore] Failed to persist buffer metadata: {}", e);
+        tlog!("[CaptureStore] Failed to persist capture metadata: {}", e);
     }
 
     tlog!(
-        "[BufferStore] Created buffer '{}' ({:?}) - '{}' [streaming={}]",
-        id, buffer_type, name, set_streaming
+        "[CaptureStore] Created capture '{}' ({:?}) - '{}' [streaming={}]",
+        id, kind, name, set_streaming
     );
 
     id
@@ -383,7 +383,7 @@ pub fn hydrate_from_db() {
 
     for meta in metadata_rows {
         // Verify data actually exists in SQLite (skip orphaned metadata)
-        let has_data = match meta.buffer_type {
+        let has_data = match meta.kind {
             CaptureKind::Frames => {
                 capture_db::get_frame_count(&meta.id).unwrap_or(0) > 0
             }
@@ -405,7 +405,7 @@ pub fn hydrate_from_db() {
         // Backfill buses from DB if not already populated
         let mut buses = meta.buses.clone();
         if buses.is_empty() {
-            let table = match meta.buffer_type {
+            let table = match meta.kind {
                 CaptureKind::Frames => "frames",
                 CaptureKind::Bytes => "bytes",
             };
@@ -416,7 +416,7 @@ pub fn hydrate_from_db() {
 
         tlog!(
             "[BufferStore] Hydrating buffer '{}' ({:?}, '{}', {} items, buses: {:?})",
-            meta.id, meta.buffer_type, meta.name, meta.count, buses
+            meta.id, meta.kind, meta.name, meta.count, buses
         );
 
         let seen_buses: HashSet<u8> = buses.iter().copied().collect();
@@ -473,12 +473,12 @@ pub fn set_capture_owner(buffer_id: &str, session_id: &str) -> Result<(), String
     }
 }
 
-/// Info about an orphaned buffer for event emission
+/// Info about an orphaned capture for event emission
 #[derive(Clone, Debug, Serialize)]
 pub struct OrphanedCaptureInfo {
-    pub buffer_id: String,
-    pub buffer_name: String,
-    pub buffer_type: CaptureKind,
+    pub capture_id: String,
+    pub name: String,
+    pub kind: CaptureKind,
     pub count: usize,
 }
 
@@ -495,9 +495,9 @@ pub fn orphan_captures_for_session(session_id: &str) -> Vec<OrphanedCaptureInfo>
             if buffer.metadata.owning_session_id.as_deref() == Some(session_id) {
                 buffer.metadata.owning_session_id = None;
                 orphaned.push(OrphanedCaptureInfo {
-                    buffer_id: buffer.metadata.id.clone(),
-                    buffer_name: buffer.metadata.name.clone(),
-                    buffer_type: buffer.metadata.buffer_type.clone(),
+                    capture_id: buffer.metadata.id.clone(),
+                    name: buffer.metadata.name.clone(),
+                    kind: buffer.metadata.kind.clone(),
                     count: buffer.metadata.count,
                 });
                 metas.push(buffer.metadata.clone());
@@ -516,10 +516,10 @@ pub fn orphan_captures_for_session(session_id: &str) -> Vec<OrphanedCaptureInfo>
 
     if !orphaned.is_empty() {
         tlog!(
-            "[BufferStore] Orphaned {} buffer(s) for session '{}': {:?}",
+            "[CaptureStore] Orphaned {} capture(s) for session '{}': {:?}",
             orphaned.len(),
             session_id,
-            orphaned.iter().map(|o| &o.buffer_id).collect::<Vec<_>>()
+            orphaned.iter().map(|o| &o.capture_id).collect::<Vec<_>>()
         );
     }
 
@@ -545,7 +545,7 @@ pub fn get_session_frame_capture_id(session_id: &str) -> Option<String> {
         .values()
         .find(|b| {
             b.metadata.owning_session_id.as_deref() == Some(session_id)
-                && b.metadata.buffer_type == CaptureKind::Frames
+                && b.metadata.kind == CaptureKind::Frames
         })
         .map(|b| b.metadata.id.clone())
 }
@@ -561,7 +561,7 @@ pub fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>)
         let registry = CAPTURE_REGISTRY.read().unwrap();
         registry.buffers.values()
             .find(|b| b.metadata.owning_session_id.as_deref() == Some(session_id)
-                    && b.metadata.buffer_type == CaptureKind::Frames)
+                    && b.metadata.kind == CaptureKind::Frames)
             .map(|b| b.metadata.id.clone())
     };
     if let Some(id) = buffer_id {
@@ -580,7 +580,7 @@ pub fn append_raw_bytes_to_session(session_id: &str, new_bytes: Vec<TimestampedB
         let registry = CAPTURE_REGISTRY.read().unwrap();
         registry.buffers.values()
             .find(|b| b.metadata.owning_session_id.as_deref() == Some(session_id)
-                    && b.metadata.buffer_type == CaptureKind::Bytes)
+                    && b.metadata.kind == CaptureKind::Bytes)
             .map(|b| b.metadata.id.clone())
     };
     if let Some(id) = buffer_id {
@@ -678,7 +678,7 @@ pub fn copy_capture(source_buffer_id: &str, new_name: String) -> Result<String, 
 
         let metadata = CaptureMetadata {
             id: id.clone(),
-            buffer_type: source_metadata.buffer_type.clone(),
+            kind: source_metadata.kind.clone(),
             name: new_name.clone(),
             count: source_metadata.count,
             start_time_us: source_metadata.start_time_us,
@@ -729,7 +729,7 @@ pub fn append_frames_to_capture(buffer_id: &str, new_frames: Vec<FrameMessage>) 
         let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
         if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
-            if buffer.metadata.buffer_type != CaptureKind::Frames {
+            if buffer.metadata.kind != CaptureKind::Frames {
                 return;
             }
             if buffer.metadata.start_time_us.is_none() {
@@ -769,7 +769,7 @@ pub fn clear_and_refill_capture(buffer_id: &str, new_frames: Vec<FrameMessage>) 
         let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
         if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
-            if buffer.metadata.buffer_type != CaptureKind::Frames {
+            if buffer.metadata.kind != CaptureKind::Frames {
                 return;
             }
             buffer.metadata.start_time_us = new_frames.first().map(|f| f.timestamp_us);
@@ -804,7 +804,7 @@ pub fn clear_and_refill_capture(buffer_id: &str, new_frames: Vec<FrameMessage>) 
 pub fn get_capture_frames(id: &str) -> Option<Vec<FrameMessage>> {
     let registry = CAPTURE_REGISTRY.read().unwrap();
     let buffer = registry.buffers.get(id)?;
-    if buffer.metadata.buffer_type != CaptureKind::Frames {
+    if buffer.metadata.kind != CaptureKind::Frames {
         return None;
     }
     drop(registry);
@@ -818,7 +818,7 @@ pub fn get_capture_frames_paginated(id: &str, offset: usize, limit: usize) -> (V
     let total = {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => b.metadata.count,
+            Some(b) if b.metadata.kind == CaptureKind::Frames => b.metadata.count,
             _ => return (Vec::new(), Vec::new(), 0),
         }
     };
@@ -850,7 +850,7 @@ pub fn get_capture_frames_paginated_filtered(
     {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => {},
+            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
             _ => return (Vec::new(), Vec::new(), 0),
         }
     }
@@ -876,10 +876,10 @@ pub fn get_capture_frames_paginated_filtered(
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct TailResponse {
     pub frames: Vec<FrameMessage>,
-    /// 1-based original buffer position (rowid) for each frame, parallel to `frames`.
-    pub buffer_indices: Vec<usize>,
+    /// 1-based original capture position (rowid) for each frame, parallel to `frames`.
+    pub capture_indices: Vec<usize>,
     pub total_filtered_count: usize,
-    pub buffer_end_time_us: Option<u64>,
+    pub capture_end_time_us: Option<u64>,
 }
 
 /// Get the most recent N frames from a buffer, optionally filtered by frame IDs.
@@ -892,12 +892,12 @@ pub fn get_capture_frames_tail(
     {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => {},
+            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
             _ => return TailResponse {
                 frames: Vec::new(),
-                buffer_indices: Vec::new(),
+                capture_indices: Vec::new(),
                 total_filtered_count: 0,
-                buffer_end_time_us: None,
+                capture_end_time_us: None,
             },
         }
     }
@@ -908,18 +908,18 @@ pub fn get_capture_frames_tail(
             let indices = rowids.into_iter().map(|r| r as usize).collect();
             TailResponse {
                 frames,
-                buffer_indices: indices,
+                capture_indices: indices,
                 total_filtered_count: total,
-                buffer_end_time_us: end_time_us,
+                capture_end_time_us: end_time_us,
             }
         }
         Err(e) => {
             tlog!("[BufferStore] Failed to get tail frames: {}", e);
             TailResponse {
                 frames: Vec::new(),
-                buffer_indices: Vec::new(),
+                capture_indices: Vec::new(),
                 total_filtered_count: 0,
-                buffer_end_time_us: None,
+                capture_end_time_us: None,
             }
         }
     }
@@ -940,7 +940,7 @@ pub fn get_capture_frame_info(id: &str) -> Vec<CaptureFrameInfo> {
     {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => {},
+            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
             _ => return Vec::new(),
         }
     }
@@ -963,7 +963,7 @@ pub fn find_capture_offset_for_timestamp(
     {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => {},
+            Some(b) if b.metadata.kind == CaptureKind::Frames => {},
             _ => return 0,
         }
     }
@@ -993,7 +993,7 @@ pub fn append_raw_bytes_to_capture(buffer_id: &str, new_bytes: Vec<TimestampedBy
         let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
         if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
-            if buffer.metadata.buffer_type != CaptureKind::Bytes {
+            if buffer.metadata.kind != CaptureKind::Bytes {
                 return;
             }
             if buffer.metadata.start_time_us.is_none() {
@@ -1027,7 +1027,7 @@ pub fn append_raw_bytes_to_capture(buffer_id: &str, new_bytes: Vec<TimestampedBy
 pub fn get_capture_bytes(id: &str) -> Option<Vec<TimestampedByte>> {
     let registry = CAPTURE_REGISTRY.read().unwrap();
     let buffer = registry.buffers.get(id)?;
-    if buffer.metadata.buffer_type != CaptureKind::Bytes {
+    if buffer.metadata.kind != CaptureKind::Bytes {
         return None;
     }
     drop(registry);
@@ -1041,7 +1041,7 @@ pub fn get_capture_bytes_paginated(id: &str, offset: usize, limit: usize) -> (Ve
     {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == CaptureKind::Bytes => {},
+            Some(b) if b.metadata.kind == CaptureKind::Bytes => {},
             _ => return (Vec::new(), 0),
         }
     }
@@ -1060,7 +1060,7 @@ pub fn find_capture_bytes_offset_for_timestamp_by_id(buffer_id: &str, target_tim
     {
         let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(buffer_id) {
-            Some(b) if b.metadata.buffer_type == CaptureKind::Bytes => {},
+            Some(b) if b.metadata.kind == CaptureKind::Bytes => {},
             _ => return 0,
         }
     }
@@ -1093,7 +1093,7 @@ pub fn get_capture_count(id: &str) -> usize {
 /// Get the type of a specific buffer.
 pub fn get_capture_kind(id: &str) -> Option<CaptureKind> {
     let registry = CAPTURE_REGISTRY.read().unwrap();
-    registry.buffers.get(id).map(|b| b.metadata.buffer_type.clone())
+    registry.buffers.get(id).map(|b| b.metadata.kind.clone())
 }
 
 

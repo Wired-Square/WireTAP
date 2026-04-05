@@ -275,9 +275,9 @@ export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
 
   return {
     reason,
-    buffer_available: bufferAvailable,
-    buffer_id: bufferId.length > 0 ? bufferId : null,
-    buffer_type: bufferType.length > 0 ? bufferType : null,
+    capture_available: bufferAvailable,
+    capture_id: bufferId.length > 0 ? bufferId : null,
+    capture_kind: bufferType.length > 0 ? bufferType : null,
     count,
     time_range,
   };

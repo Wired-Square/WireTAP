@@ -17,9 +17,9 @@ const TTL: Duration = Duration::from_secs(10);
 #[derive(Clone, Debug, Serialize)]
 pub struct StreamEndedInfo {
     pub reason: String,
-    pub buffer_available: bool,
-    pub buffer_id: Option<String>,
-    pub buffer_type: Option<String>,
+    pub capture_available: bool,
+    pub capture_id: Option<String>,
+    pub capture_kind: Option<String>,
     pub count: usize,
     pub time_range: Option<(u64, u64)>,
 }
@@ -116,7 +116,7 @@ pub fn get_sources(session_id: &str) -> Vec<SourceInfo> {
         .unwrap_or_default()
 }
 
-pub fn store_orphaned_buffer_ids(session_id: &str, ids: Vec<String>) {
+pub fn store_orphaned_capture_ids(session_id: &str, ids: Vec<String>) {
     if let Ok(mut cache) = CACHE.write() {
         let entry = get_or_create_entry(&mut cache, session_id);
         entry.orphaned_buffer_ids = ids;
@@ -124,7 +124,7 @@ pub fn store_orphaned_buffer_ids(session_id: &str, ids: Vec<String>) {
     }
 }
 
-pub fn get_orphaned_buffer_ids(session_id: &str) -> Vec<String> {
+pub fn get_orphaned_capture_ids(session_id: &str) -> Vec<String> {
     CACHE
         .read()
         .ok()
@@ -154,9 +154,9 @@ mod tests {
             sid,
             StreamEndedInfo {
                 reason: "complete".into(),
-                buffer_available: true,
-                buffer_id: Some("buf1".into()),
-                buffer_type: Some("frames".into()),
+                capture_available: true,
+                capture_id: Some("buf1".into()),
+                capture_kind: Some("frames".into()),
                 count: 42,
                 time_range: Some((1000, 2000)),
             },

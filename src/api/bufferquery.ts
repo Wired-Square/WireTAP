@@ -30,8 +30,8 @@ export async function queryByteChangesBuffer(
   endTimeUs?: number,
   limit?: number,
 ): Promise<ByteChangeQueryResult> {
-  return invoke("buffer_query_byte_changes", {
-    bufferId,
+  return invoke("capture_query_byte_changes", {
+    captureId: bufferId,
     frameId,
     byteIndex,
     isExtended,
@@ -54,8 +54,8 @@ export async function queryFrameChangesBuffer(
   endTimeUs?: number,
   limit?: number,
 ): Promise<FrameChangeQueryResult> {
-  return invoke("buffer_query_frame_changes", {
-    bufferId,
+  return invoke("capture_query_frame_changes", {
+    captureId: bufferId,
     frameId,
     isExtended,
     startTimeUs,
@@ -79,8 +79,8 @@ export async function queryMirrorValidationBuffer(
   endTimeUs?: number,
   limit?: number,
 ): Promise<MirrorValidationQueryResult> {
-  return invoke("buffer_query_mirror_validation", {
-    bufferId,
+  return invoke("capture_query_mirror_validation", {
+    captureId: bufferId,
     mirrorFrameId,
     sourceFrameId,
     isExtended,
@@ -108,8 +108,8 @@ export async function queryMuxStatisticsBuffer(
   endTimeUs?: number,
   limit?: number,
 ): Promise<MuxStatisticsQueryResult> {
-  return invoke("buffer_query_mux_statistics", {
-    bufferId,
+  return invoke("capture_query_mux_statistics", {
+    captureId: bufferId,
     frameId,
     muxSelectorByte,
     isExtended,
@@ -131,8 +131,8 @@ export async function queryFirstLastBuffer(
   startTimeUs?: number,
   endTimeUs?: number,
 ): Promise<FirstLastQueryResult> {
-  return invoke("buffer_query_first_last", {
-    bufferId,
+  return invoke("capture_query_first_last", {
+    captureId: bufferId,
     frameId,
     isExtended,
     startTimeUs,
@@ -152,8 +152,8 @@ export async function queryFrequencyBuffer(
   endTimeUs?: number,
   limit?: number,
 ): Promise<FrequencyQueryResult> {
-  return invoke("buffer_query_frequency", {
-    bufferId,
+  return invoke("capture_query_frequency", {
+    captureId: bufferId,
     frameId,
     isExtended,
     bucketSizeMs,
@@ -174,8 +174,8 @@ export async function queryDistributionBuffer(
   startTimeUs?: number,
   endTimeUs?: number,
 ): Promise<DistributionQueryResult> {
-  return invoke("buffer_query_distribution", {
-    bufferId,
+  return invoke("capture_query_distribution", {
+    captureId: bufferId,
     frameId,
     byteIndex,
     isExtended,
@@ -196,8 +196,8 @@ export async function queryGapAnalysisBuffer(
   endTimeUs?: number,
   limit?: number,
 ): Promise<GapAnalysisQueryResult> {
-  return invoke("buffer_query_gap_analysis", {
-    bufferId,
+  return invoke("capture_query_gap_analysis", {
+    captureId: bufferId,
     frameId,
     isExtended,
     gapThresholdMs,
@@ -218,8 +218,8 @@ export async function queryPatternSearchBuffer(
   endTimeUs?: number,
   limit?: number,
 ): Promise<PatternSearchQueryResult> {
-  return invoke("buffer_query_pattern_search", {
-    bufferId,
+  return invoke("capture_query_pattern_search", {
+    captureId: bufferId,
     pattern,
     patternMask,
     startTimeUs,

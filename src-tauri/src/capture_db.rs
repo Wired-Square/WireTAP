@@ -1205,7 +1205,7 @@ pub fn save_capture_metadata(meta: &CaptureMetadata) -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
-    let kind_str = match &meta.buffer_type {
+    let kind_str = match &meta.kind {
         CaptureKind::Frames => "frames",
         CaptureKind::Bytes => "bytes",
     };
@@ -1245,7 +1245,7 @@ pub fn load_all_capture_metadata() -> Result<Vec<CaptureMetadata>, String> {
     let rows = stmt
         .query_map([], |row| {
             let kind_str: String = row.get("capture_kind")?;
-            let buffer_type = if kind_str == "bytes" {
+            let kind = if kind_str == "bytes" {
                 CaptureKind::Bytes
             } else {
                 CaptureKind::Frames
@@ -1256,7 +1256,7 @@ pub fn load_all_capture_metadata() -> Result<Vec<CaptureMetadata>, String> {
 
             Ok(CaptureMetadata {
                 id: row.get("capture_id")?,
-                buffer_type,
+                kind,
                 name: row.get("name")?,
                 count: row.get::<_, i64>("count")? as usize,
                 start_time_us: row.get::<_, Option<i64>>("start_time_us")?.map(|v| v as u64),

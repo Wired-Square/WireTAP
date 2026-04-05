@@ -312,10 +312,10 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
       // Note: We don't fetch the frames here - FramedDataView will use pagination
       // Increment framedDataTrigger to force refetch even if buffer ID/count unchanged
       set((state) => ({
-        framedBufferId: result.buffer_id,
+        framedBufferId: result.capture_id,
         backendFrameCount: result.frame_count,
         filteredFrameCount: result.filtered_count,
-        filteredBufferId: result.filtered_buffer_id,
+        filteredBufferId: result.filtered_capture_id,
         framedDataTrigger: state.framedDataTrigger + 1,
         // Clear local framedData since frames are now in backend
         framedData: [],

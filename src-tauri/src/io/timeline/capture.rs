@@ -791,9 +791,9 @@ async fn run_buffer_stream(
     let frame_count = capture_store::get_capture_count(&buf_id);
     let stream_ended_info = post_session::StreamEndedInfo {
         reason: "paused".to_string(),
-        buffer_available: true,
-        buffer_id: Some(buf_id.clone()),
-        buffer_type: Some("frames".to_string()),
+        capture_available: true,
+        capture_id: Some(buf_id.clone()),
+        capture_kind: Some("frames".to_string()),
         count: frame_count,
         time_range: None,
     };
@@ -854,9 +854,9 @@ async fn run_buffer_stream(
             let frame_count = capture_store::get_capture_count(&buf_id);
             let stream_ended_info = post_session::StreamEndedInfo {
                 reason: "paused".to_string(),
-                buffer_available: true,
-                buffer_id: Some(buf_id.clone()),
-                buffer_type: Some("frames".to_string()),
+                capture_available: true,
+                capture_id: Some(buf_id.clone()),
+                capture_kind: Some("frames".to_string()),
                 count: frame_count,
                 time_range: None,
             };

@@ -49,7 +49,7 @@ export function useEffectiveBufferMetadata(
     // Merge session values with local metadata, preferring session for sync
     return {
       id,
-      buffer_type: localMetadata?.buffer_type ?? "frames",
+      kind: localMetadata?.kind ?? "frames",
       name: sessionBuffer.bufferName ?? localMetadata?.name ?? "",
       // Prefer session values for cross-app timeline sync
       start_time_us: sessionBuffer.bufferStartTimeUs ?? localMetadata?.start_time_us,
@@ -59,6 +59,7 @@ export function useEffectiveBufferMetadata(
       is_streaming: localMetadata?.is_streaming ?? false,
       owning_session_id: localMetadata?.owning_session_id ?? null,
       persistent: sessionBuffer.bufferPersistent ?? localMetadata?.persistent ?? false,
+      buses: localMetadata?.buses ?? [],
     } as BufferMetadata;
   }, [
     sessionBuffer.bufferStartTimeUs,

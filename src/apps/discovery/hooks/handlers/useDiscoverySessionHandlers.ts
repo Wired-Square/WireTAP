@@ -74,8 +74,8 @@ export function useDiscoverySessionHandlers({
     onAfterSwitch: async (meta) => {
       if (!meta || meta.count === 0) return;
 
-      const isFramesMode = meta.buffer_type === "frames";
-      const isBytesMode = meta.buffer_type === "bytes";
+      const isFramesMode = meta.kind === "frames";
+      const isBytesMode = meta.kind === "bytes";
 
       if (isBytesMode) {
         // Bytes mode is handled elsewhere for Discovery

@@ -15,10 +15,10 @@ export type BufferType = "frames" | "bytes";
  * Metadata about a buffer in the registry
  */
 export interface BufferMetadata {
-  /** Unique buffer ID (e.g., "xk9m2p", "r7f3kw") */
+  /** Unique capture ID (e.g., "xk9m2p", "r7f3kw") */
   id: string;
-  /** Type of data stored: "frames" (CAN, framed serial) or "bytes" (raw serial) */
-  buffer_type: BufferType;
+  /** Kind of data stored: "frames" (CAN, framed serial) or "bytes" (raw serial) */
+  kind: BufferType;
   /** Display name (e.g., "GVRET 10:30am", "Serial dump") */
   name: string;
   /** Number of items (frames for frame buffers, bytes for byte buffers) */
@@ -51,7 +51,7 @@ export interface BufferMetadata {
  * @returns Metadata about the imported data
  */
 export async function importCsvToBuffer(sessionId: string, filePath: string): Promise<BufferMetadata> {
-  return invoke("import_csv_to_buffer", { session_id: sessionId, file_path: filePath });
+  return invoke("import_csv_to_capture", { session_id: sessionId, file_path: filePath });
 }
 
 // ============================================================================
@@ -230,7 +230,7 @@ export async function importCsvBatchWithMapping(
  * @param bufferId - The buffer ID to look up
  */
 export async function getBufferMetadata(bufferId: string): Promise<BufferMetadata | null> {
-  return invoke("get_buffer_metadata", { buffer_id: bufferId });
+  return invoke("get_capture_metadata", { capture_id: bufferId });
 }
 
 /**
@@ -255,7 +255,7 @@ export interface BufferFrame {
  * WARNING: For large buffers (>100k frames), use getBufferFramesPaginated instead.
  */
 export async function getBufferFrames(bufferId: string): Promise<BufferFrame[]> {
-  return invoke("get_buffer_frames", { buffer_id: bufferId });
+  return invoke("get_capture_frames", { capture_id: bufferId });
 }
 
 /**
@@ -266,8 +266,8 @@ export interface PaginatedFramesResponse {
   total_count: number;
   offset: number;
   limit: number;
-  /** 1-based original buffer position (rowid) for each frame, parallel to `frames`. */
-  buffer_indices: number[];
+  /** 1-based original capture position (rowid) for each frame, parallel to `frames`. */
+  capture_indices: number[];
 }
 
 /**
@@ -282,7 +282,7 @@ export async function getBufferFramesPaginated(
   offset: number,
   limit: number
 ): Promise<PaginatedFramesResponse> {
-  return invoke("get_buffer_frames_paginated", { buffer_id: bufferId, offset, limit });
+  return invoke("get_capture_frames_paginated", { capture_id: bufferId, offset, limit });
 }
 
 /**
@@ -299,8 +299,8 @@ export async function getBufferFramesPaginatedFiltered(
   limit: number,
   selectedIds: number[]
 ): Promise<PaginatedFramesResponse> {
-  return invoke("get_buffer_frames_paginated_filtered", {
-    buffer_id: bufferId,
+  return invoke("get_capture_frames_paginated_filtered", {
+    capture_id: bufferId,
     offset,
     limit,
     selected_ids: selectedIds,
@@ -312,10 +312,10 @@ export async function getBufferFramesPaginatedFiltered(
  */
 export interface TailResponse {
   frames: BufferFrame[];
-  /** 1-based original buffer position (rowid) for each frame, parallel to `frames`. */
-  buffer_indices: number[];
+  /** 1-based original capture position (rowid) for each frame, parallel to `frames`. */
+  capture_indices: number[];
   total_filtered_count: number;
-  buffer_end_time_us: number | null;
+  capture_end_time_us: number | null;
 }
 
 /**
@@ -330,8 +330,8 @@ export async function getBufferFramesTail(
   limit: number,
   selectedIds: number[]
 ): Promise<TailResponse> {
-  return invoke("get_buffer_frames_tail", {
-    buffer_id: bufferId,
+  return invoke("get_capture_frames_tail", {
+    capture_id: bufferId,
     limit,
     selected_ids: selectedIds,
   });
@@ -350,8 +350,8 @@ export async function getBufferFramesPaginatedById(
   offset: number,
   limit: number
 ): Promise<PaginatedFramesResponse> {
-  return invoke("get_buffer_frames_paginated_by_id", {
-    buffer_id: bufferId,
+  return invoke("get_capture_frames_paginated_by_id", {
+    capture_id: bufferId,
     offset,
     limit,
   });
@@ -373,7 +373,7 @@ export interface BufferFrameInfo {
  * Used to build the frame picker after a large ingest.
  */
 export async function getBufferFrameInfo(bufferId: string): Promise<BufferFrameInfo[]> {
-  return invoke("get_buffer_frame_info", { buffer_id: bufferId });
+  return invoke("get_capture_frame_info", { capture_id: bufferId });
 }
 
 /**
@@ -389,8 +389,8 @@ export async function findBufferOffsetForTimestamp(
   timestampUs: number,
   selectedIds: number[]
 ): Promise<number> {
-  return invoke("find_buffer_offset_for_timestamp", {
-    buffer_id: bufferId,
+  return invoke("find_capture_offset_for_timestamp", {
+    capture_id: bufferId,
     timestamp_us: timestampUs,
     selected_ids: selectedIds,
   });
@@ -409,9 +409,9 @@ export async function createBufferReaderSession(
   bufferId: string,
   speed?: number
 ): Promise<IOCapabilities> {
-  return invoke("create_buffer_reader_session", {
+  return invoke("create_capture_source_session", {
     session_id: sessionId,
-    buffer_id: bufferId,
+    capture_id: bufferId,
     speed,
   });
 }
@@ -425,7 +425,7 @@ export async function createBufferReaderSession(
  * Returns metadata for all buffers (frame and byte types).
  */
 export async function listBuffers(): Promise<BufferMetadata[]> {
-  return invoke("list_buffers");
+  return invoke("list_captures");
 }
 
 /**
@@ -433,7 +433,7 @@ export async function listBuffers(): Promise<BufferMetadata[]> {
  * Used to populate the known buffer ID set for `isBufferProfileId()` lookups.
  */
 export async function listBufferIds(): Promise<string[]> {
-  return invoke("list_buffer_ids");
+  return invoke("list_capture_ids");
 }
 
 /**
@@ -442,7 +442,7 @@ export async function listBufferIds(): Promise<string[]> {
  * Includes CSV imports and buffers from destroyed sessions.
  */
 export async function listOrphanedBuffers(): Promise<BufferMetadata[]> {
-  return invoke("list_orphaned_buffers");
+  return invoke("list_orphaned_captures");
 }
 
 /**
@@ -451,7 +451,7 @@ export async function listOrphanedBuffers(): Promise<BufferMetadata[]> {
  * @param bufferId - The buffer ID to delete
  */
 export async function deleteBuffer(bufferId: string): Promise<void> {
-  await invoke("delete_buffer", { buffer_id: bufferId });
+  await invoke("delete_capture", { capture_id: bufferId });
   // Remove from known buffer ID cache
   const { useSessionStore } = await import("../stores/sessionStore");
   useSessionStore.getState().removeKnownBufferId(bufferId);
@@ -464,7 +464,7 @@ export async function deleteBuffer(bufferId: string): Promise<void> {
  * @param bufferId - The buffer ID to clear
  */
 export async function clearBufferData(bufferId: string): Promise<void> {
-  return invoke("clear_buffer", { buffer_id: bufferId });
+  return invoke("clear_capture", { capture_id: bufferId });
 }
 
 /**
@@ -475,7 +475,7 @@ export async function clearBufferData(bufferId: string): Promise<void> {
  * @returns Updated buffer metadata
  */
 export async function renameBuffer(bufferId: string, newName: string): Promise<BufferMetadata> {
-  return invoke("rename_buffer", { buffer_id: bufferId, new_name: newName });
+  return invoke("rename_capture", { capture_id: bufferId, new_name: newName });
 }
 
 /**
@@ -487,7 +487,7 @@ export async function renameBuffer(bufferId: string, newName: string): Promise<B
  * @returns Updated buffer metadata
  */
 export async function setBufferPersistent(bufferId: string, persistent: boolean): Promise<BufferMetadata> {
-  return invoke("set_buffer_persistent", { buffer_id: bufferId, persistent });
+  return invoke("set_capture_persistent", { capture_id: bufferId, persistent });
 }
 
 /**
@@ -497,7 +497,7 @@ export async function setBufferPersistent(bufferId: string, persistent: boolean)
  * @returns Buffer metadata, or null if not found
  */
 export async function getBufferMetadataById(bufferId: string): Promise<BufferMetadata | null> {
-  return invoke("get_buffer_metadata_by_id", { buffer_id: bufferId });
+  return invoke("get_capture_metadata_by_id", { capture_id: bufferId });
 }
 
 /**
@@ -508,7 +508,7 @@ export async function getBufferMetadataById(bufferId: string): Promise<BufferMet
  * @returns Array of frames
  */
 export async function getBufferFramesById(bufferId: string): Promise<BufferFrame[]> {
-  return invoke("get_buffer_frames_by_id", { buffer_id: bufferId });
+  return invoke("get_capture_frames_by_id", { capture_id: bufferId });
 }
 
 /**
@@ -529,7 +529,7 @@ export interface TimestampedByte {
  * @returns Array of timestamped bytes
  */
 export async function getBufferBytesById(bufferId: string): Promise<TimestampedByte[]> {
-  return invoke("get_buffer_bytes_by_id", { buffer_id: bufferId });
+  return invoke("get_capture_bytes_by_id", { capture_id: bufferId });
 }
 
 /**
@@ -539,7 +539,7 @@ export async function getBufferBytesById(bufferId: string): Promise<TimestampedB
  * @param bufferId - The buffer ID to set as active
  */
 export async function setActiveBuffer(bufferId: string): Promise<void> {
-  return invoke("set_active_buffer", { buffer_id: bufferId });
+  return invoke("set_active_capture", { capture_id: bufferId });
 }
 
 /**
@@ -555,7 +555,7 @@ export async function createFrameBufferFromFrames(
   name: string,
   frames: BufferFrame[]
 ): Promise<BufferMetadata> {
-  return invoke("create_frame_buffer_from_frames", { session_id: sessionId, name, frames });
+  return invoke("create_frame_capture_from_frames", { session_id: sessionId, name, frames });
 }
 
 // ============================================================================
@@ -584,14 +584,14 @@ export async function getBufferBytesPaginated(
   offset: number,
   limit: number
 ): Promise<PaginatedBytesResponse> {
-  return invoke("get_buffer_bytes_paginated", { buffer_id: bufferId, offset, limit });
+  return invoke("get_capture_bytes_paginated", { capture_id: bufferId, offset, limit });
 }
 
 /**
  * Get the total byte count from the active buffer.
  */
 export async function getBufferBytesCount(bufferId: string): Promise<number> {
-  return invoke("get_buffer_bytes_count", { buffer_id: bufferId });
+  return invoke("get_capture_bytes_count", { capture_id: bufferId });
 }
 
 /**
@@ -606,7 +606,7 @@ export async function getBufferBytesPaginatedById(
   offset: number,
   limit: number
 ): Promise<PaginatedBytesResponse> {
-  return invoke("get_buffer_bytes_paginated_by_id", { buffer_id: bufferId, offset, limit });
+  return invoke("get_capture_bytes_paginated_by_id", { capture_id: bufferId, offset, limit });
 }
 
 // ============================================================================
@@ -667,12 +667,12 @@ export interface BackendFramingConfig {
 export interface FramingResult {
   /** Number of frames extracted */
   frame_count: number;
-  /** ID of the new frame buffer */
-  buffer_id: string;
+  /** ID of the new frame capture */
+  capture_id: string;
   /** Number of frames excluded by min_length filter */
   filtered_count: number;
-  /** ID of the filtered frames buffer (frames that were too short) */
-  filtered_buffer_id: string | null;
+  /** ID of the filtered frames capture (frames that were too short) */
+  filtered_capture_id: string | null;
 }
 
 /**
@@ -690,10 +690,10 @@ export async function applyFramingToBuffer(
   config: BackendFramingConfig,
   reuseBufferId?: string | null
 ): Promise<FramingResult> {
-  return invoke("apply_framing_to_buffer", {
+  return invoke("apply_framing_to_capture", {
     session_id: sessionId,
     config,
-    reuse_buffer_id: reuseBufferId ?? null,
+    reuse_capture_id: reuseBufferId ?? null,
   });
 }
 
@@ -708,7 +708,7 @@ export async function findBufferBytesOffsetForTimestamp(
   bufferId: string,
   targetTimeUs: number
 ): Promise<number> {
-  return invoke("find_buffer_bytes_offset_for_timestamp", { buffer_id: bufferId, target_time_us: targetTimeUs });
+  return invoke("find_capture_bytes_offset_for_timestamp", { capture_id: bufferId, target_time_us: targetTimeUs });
 }
 
 /**
@@ -728,8 +728,8 @@ export async function searchBufferFrames(
   searchData: boolean,
   selectedIds: number[]
 ): Promise<number[]> {
-  return invoke("search_buffer_frames", {
-    buffer_id: bufferId,
+  return invoke("search_capture_frames", {
+    capture_id: bufferId,
     query,
     search_id: searchId,
     search_data: searchData,

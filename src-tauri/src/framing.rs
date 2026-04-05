@@ -14,9 +14,9 @@ mod ios_stub {
     #[derive(Clone, serde::Serialize)]
     pub struct FramingResult {
         pub frame_count: usize,
-        pub buffer_id: String,
+        pub capture_id: String,
         pub filtered_count: usize,
-        pub filtered_buffer_id: Option<String>,
+        pub filtered_capture_id: Option<String>,
     }
 
     /// Configuration for backend framing (iOS stub)
@@ -42,9 +42,9 @@ mod ios_stub {
     }
 
     #[tauri::command(rename_all = "snake_case")]
-    pub async fn apply_framing_to_buffer(
+    pub async fn apply_framing_to_capture(
         _config: BackendFramingConfig,
-        _reuse_buffer_id: Option<String>,
+        _reuse_capture_id: Option<String>,
     ) -> Result<FramingResult, String> {
         Err("Framing is not available on iOS".to_string())
     }
@@ -104,12 +104,12 @@ mod desktop {
     pub struct FramingResult {
         /// Number of frames extracted
         pub frame_count: usize,
-        /// ID of the new frame buffer
-        pub buffer_id: String,
+        /// ID of the new frame capture
+        pub capture_id: String,
         /// Number of frames excluded by min_length filter
         pub filtered_count: usize,
-        /// ID of the filtered frames buffer (frames that were too short)
-        pub filtered_buffer_id: Option<String>,
+        /// ID of the filtered frames capture (frames that were too short)
+        pub filtered_capture_id: Option<String>,
     }
 
     /// Parse hex string to bytes (e.g., "0D0A" -> [0x0D, 0x0A])
@@ -157,27 +157,27 @@ mod desktop {
     }
 
     /// Apply framing to the active byte buffer.
-    /// If `reuse_buffer_id` is provided and valid, that buffer will be cleared and reused.
+    /// If `reuse_capture_id` is provided and valid, that buffer will be cleared and reused.
     /// Otherwise, a new frame buffer is created.
     /// This avoids buffer proliferation during live framing.
     #[tauri::command(rename_all = "snake_case")]
-    pub async fn apply_framing_to_buffer(
+    pub async fn apply_framing_to_capture(
         session_id: String,
         config: BackendFramingConfig,
-        reuse_buffer_id: Option<String>,
+        reuse_capture_id: Option<String>,
     ) -> Result<FramingResult, String> {
-        tlog!("[framing] apply_framing_to_buffer called with min_length={:?}", config.min_length);
+        tlog!("[framing] apply_framing_to_capture called with min_length={:?}", config.min_length);
 
         // Get session's byte buffer
-        let buffer_id = capture_store::get_session_capture_ids(&session_id)
+        let capture_id = capture_store::get_session_capture_ids(&session_id)
             .into_iter()
             .find(|id| capture_store::get_capture_metadata(id)
-                .map(|m| m.buffer_type == capture_store::CaptureKind::Bytes)
+                .map(|m| m.kind == capture_store::CaptureKind::Bytes)
                 .unwrap_or(false))
             .ok_or_else(|| "No byte buffer found for session".to_string())?;
 
-        let bytes = capture_store::get_capture_bytes(&buffer_id)
-            .ok_or_else(|| format!("Buffer '{}' not found or is not a byte buffer", buffer_id))?;
+        let bytes = capture_store::get_capture_bytes(&capture_id)
+            .ok_or_else(|| format!("Buffer '{}' not found or is not a byte buffer", capture_id))?;
 
         if bytes.is_empty() {
             return Err("No bytes in buffer".to_string());
@@ -335,16 +335,16 @@ mod desktop {
             return Err("No frames extracted".to_string());
         }
 
-        // Reuse existing buffer if provided and valid, otherwise create a new one.
-        // This avoids buffer proliferation during live streaming.
-        let target_buffer_id = if let Some(ref existing_id) = reuse_buffer_id {
+        // Reuse existing capture if provided and valid, otherwise create a new one.
+        // This avoids capture proliferation during live streaming.
+        let target_capture_id = if let Some(ref existing_id) = reuse_capture_id {
             if capture_store::get_capture_kind(existing_id) == Some(capture_store::CaptureKind::Frames) {
                 capture_store::clear_and_refill_capture(existing_id, frame_messages);
                 existing_id.clone()
             } else {
                 let new_id = capture_store::create_capture_inactive(
                     capture_store::CaptureKind::Frames,
-                    format!("Framed from {}", buffer_id),
+                    format!("Framed from {}", capture_id),
                 );
                 let _ = capture_store::set_capture_owner(&new_id, &session_id);
                 capture_store::append_frames_to_capture(&new_id, frame_messages);
@@ -353,17 +353,17 @@ mod desktop {
         } else {
             let new_id = capture_store::create_capture_inactive(
                 capture_store::CaptureKind::Frames,
-                format!("Framed from {}", buffer_id),
+                format!("Framed from {}", capture_id),
             );
             let _ = capture_store::set_capture_owner(&new_id, &session_id);
             capture_store::append_frames_to_capture(&new_id, frame_messages);
             new_id
         };
 
-        let filtered_buffer_id = if !filtered_messages.is_empty() {
+        let filtered_capture_id = if !filtered_messages.is_empty() {
             let filtered_id = capture_store::create_capture_inactive(
                 capture_store::CaptureKind::Frames,
-                format!("Filtered from {}", buffer_id),
+                format!("Filtered from {}", capture_id),
             );
             let _ = capture_store::set_capture_owner(&filtered_id, &session_id);
             capture_store::append_frames_to_capture(&filtered_id, filtered_messages);
@@ -372,14 +372,14 @@ mod desktop {
             None
         };
 
-        // Note: We don't finalize here - the bytes buffer stays active for HexDump,
-        // and the frames buffer is just a derived view that FramedDataView fetches by ID.
+        // Note: We don't finalize here - the bytes capture stays active for HexDump,
+        // and the frames capture is just a derived view that FramedDataView fetches by ID.
 
         Ok(FramingResult {
             frame_count,
-            buffer_id: target_buffer_id,
+            capture_id: target_capture_id,
             filtered_count,
-            filtered_buffer_id,
+            filtered_capture_id,
         })
     }
 }

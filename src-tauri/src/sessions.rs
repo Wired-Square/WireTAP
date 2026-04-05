@@ -985,7 +985,7 @@ pub async fn suspend_reader_session(session_id: String) -> Result<IOState, Strin
 /// Stop a realtime session and switch all listeners to buffer replay.
 /// Emits `session-lifecycle` signal so all apps on the session refresh state.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn io_stop_and_switch_to_buffer(
+pub async fn io_stop_and_switch_to_capture(
     app: tauri::AppHandle,
     session_id: String,
     speed: Option<f64>,
@@ -1002,11 +1002,11 @@ pub async fn resume_reader_session_fresh(session_id: String) -> Result<IOState, 
 }
 
 /// Copy a buffer for an app that is detaching from a session.
-/// Creates an orphaned copy of the buffer that can be used standalone.
-/// Returns the new buffer ID.
+/// Creates an orphaned copy of the capture that can be used standalone.
+/// Returns the new capture ID.
 #[tauri::command(rename_all = "snake_case")]
-pub fn copy_buffer_for_detach(buffer_id: String, new_name: String) -> Result<String, String> {
-    capture_store::copy_capture(&buffer_id, new_name)
+pub fn copy_capture_for_detach(capture_id: String, new_name: String) -> Result<String, String> {
+    capture_store::copy_capture(&capture_id, new_name)
 }
 
 /// Update playback speed for a reader session
@@ -1138,22 +1138,22 @@ pub async fn destroy_reader_session(session_id: String) -> Result<(), String> {
 /// The buffer is registered as a source profile so it appears in
 /// `sourceProfileIds` and the session manager graph.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn create_buffer_reader_session(
+pub async fn create_capture_source_session(
     app: tauri::AppHandle,
     session_id: String,
-    buffer_id: String,
+    capture_id: String,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
     if !capture_store::has_any_data() {
-        return Err("No data in buffer. Please import a CSV file first.".to_string());
+        return Err("No data in capture. Please import a CSV file first.".to_string());
     }
 
-    register_session_profile(&session_id, &buffer_id);
+    register_session_profile(&session_id, &capture_id);
 
     let reader = CaptureSource::new(
         app.clone(),
         session_id.clone(),
-        buffer_id,
+        capture_id,
         speed.unwrap_or(0.0), // 0 = no limit by default
     );
 
@@ -1161,14 +1161,14 @@ pub async fn create_buffer_reader_session(
     Ok(result.capabilities)
 }
 
-/// Transition an existing session to use a buffer for replay.
+/// Transition an existing session to use a capture for replay.
 /// This is used when a streaming source (GVRET, PostgreSQL) ends and
 /// the user wants to replay the captured frames.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn transition_to_buffer_reader(
+pub async fn transition_to_capture_source(
     app: tauri::AppHandle,
     session_id: String,
-    buffer_id: String,
+    capture_id: String,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
     // Stop and destroy current session
@@ -1176,15 +1176,15 @@ pub async fn transition_to_buffer_reader(
     let _ = destroy_session(&session_id).await;
 
     if !capture_store::has_any_data() {
-        return Err("No data in buffer for replay".to_string());
+        return Err("No data in capture for replay".to_string());
     }
 
-    register_session_profile(&session_id, &buffer_id);
+    register_session_profile(&session_id, &capture_id);
 
     let reader = CaptureSource::new(
         app.clone(),
         session_id.clone(),
-        buffer_id,
+        capture_id,
         speed.unwrap_or(1.0),
     );
 
@@ -1197,7 +1197,7 @@ pub async fn transition_to_buffer_reader(
 /// owned buffer. All listeners stay connected and can replay the captured data.
 /// Use this after ingest completes to enable playback controls.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn switch_session_to_buffer_replay(
+pub async fn switch_session_to_capture_replay(
     app: tauri::AppHandle,
     session_id: String,
     speed: Option<f64>,
@@ -1291,16 +1291,16 @@ pub async fn resume_session_to_live(
 /// Requires either current_frame_index or current_timestamp_us to determine position.
 /// If filter_frame_ids is provided, skips frames that don't match the filter.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn step_buffer_frame(
+pub async fn step_capture_frame(
     app: tauri::AppHandle,
     session_id: String,
-    buffer_id: String,
+    capture_id: String,
     current_frame_index: Option<usize>,
     current_timestamp_us: Option<i64>,
     backward: bool,
     filter_frame_ids: Option<Vec<u32>>,
 ) -> Result<Option<StepResult>, String> {
-    step_frame(&app, &session_id, &buffer_id, current_frame_index, current_timestamp_us, backward, filter_frame_ids.as_deref())
+    step_frame(&app, &session_id, &capture_id, current_frame_index, current_timestamp_us, backward, filter_frame_ids.as_deref())
 }
 
 // Legacy heartbeat commands removed - use register_session_listener/unregister_session_listener instead
@@ -2494,8 +2494,8 @@ pub fn get_session_sources(session_id: String) -> Vec<io::post_session::SourceIn
 }
 
 #[tauri::command(rename_all = "snake_case")]
-pub fn get_orphaned_buffer_ids(session_id: String) -> Vec<String> {
-    io::post_session::get_orphaned_buffer_ids(&session_id)
+pub fn get_orphaned_capture_ids(session_id: String) -> Vec<String> {
+    io::post_session::get_orphaned_capture_ids(&session_id)
 }
 
 #[tauri::command(rename_all = "snake_case")]

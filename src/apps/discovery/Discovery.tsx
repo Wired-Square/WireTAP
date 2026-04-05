@@ -339,8 +339,8 @@ export default function Discovery() {
 
   // Ingest complete handler - passed to useIOSessionManager
   const handleIngestComplete = useCallback(async (payload: StreamEndedInfo) => {
-    if (payload.buffer_available && payload.count > 0 && payload.buffer_id) {
-      const meta = await getBufferMetadata(payload.buffer_id);
+    if (payload.capture_available && payload.count > 0 && payload.capture_id) {
+      const meta = await getBufferMetadata(payload.capture_id);
       if (meta) {
         setBufferMetadata(meta);
 
@@ -352,7 +352,7 @@ export default function Discovery() {
 
       dialogs.ioSessionPicker.close();
 
-      if (payload.buffer_type === "bytes" && meta) {
+      if (payload.capture_kind === "bytes" && meta) {
         console.log(`[Discovery] Loading ${payload.count} bytes from buffer into serial view`);
         try {
           const bytes = await getBufferBytesById(meta.id);
@@ -379,7 +379,7 @@ export default function Discovery() {
 
         // Load frame info for the frame picker
         try {
-          const frameInfoList = await getBufferFrameInfo(payload.buffer_id);
+          const frameInfoList = await getBufferFrameInfo(payload.capture_id);
           console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from buffer`);
           setFrameInfoFromBuffer(frameInfoList);
         } catch (e) {
@@ -698,7 +698,7 @@ export default function Discovery() {
       newIsSerialMode = false;
     } else if (isBufferMode) {
       // Buffer mode: check buffer metadata for bytes type
-      newIsSerialMode = bufferMetadata?.buffer_type === "bytes" || bufferType === "bytes" || framedBufferId !== null;
+      newIsSerialMode = bufferMetadata?.kind === "bytes" || bufferType === "bytes" || framedBufferId !== null;
     } else {
       // Live session: check session traits from capabilities
       newIsSerialMode = capabilities?.traits?.protocols?.includes("serial") ?? false;

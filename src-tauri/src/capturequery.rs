@@ -20,8 +20,8 @@ use crate::dbquery::{
 /// Returns timestamps where the specified byte changed value.
 /// Time bounds are in microseconds (matching buffer timestamp_us).
 #[tauri::command]
-pub fn buffer_query_byte_changes(
-    buffer_id: String,
+pub fn capture_query_byte_changes(
+    capture_id: String,
     frame_id: u32,
     byte_index: u8,
     is_extended: Option<bool>,
@@ -33,8 +33,8 @@ pub fn buffer_query_byte_changes(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] byte_changes: buffer_id='{}', frame_id={}, byte_index={}, is_extended={:?}, limit={}",
-        buffer_id, frame_id, byte_index, is_extended, result_limit
+        "[bufferquery] byte_changes: capture_id='{}', frame_id={}, byte_index={}, is_extended={:?}, limit={}",
+        capture_id, frame_id, byte_index, is_extended, result_limit
     );
 
     // Build the SQL dynamically based on optional filters
@@ -48,7 +48,7 @@ pub fn buffer_query_byte_changes(
 
     let mut param_idx = 3;
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(capture_id.clone()));
     params.push(Box::new(frame_id as i64));
 
     if let Some(ext) = is_extended {
@@ -134,8 +134,8 @@ pub fn buffer_query_byte_changes(
 ///
 /// Returns timestamps where any byte in the frame payload changed.
 #[tauri::command]
-pub fn buffer_query_frame_changes(
-    buffer_id: String,
+pub fn capture_query_frame_changes(
+    capture_id: String,
     frame_id: u32,
     is_extended: Option<bool>,
     start_time_us: Option<i64>,
@@ -146,8 +146,8 @@ pub fn buffer_query_frame_changes(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] frame_changes: buffer_id='{}', frame_id={}, is_extended={:?}, limit={}",
-        buffer_id, frame_id, is_extended, result_limit
+        "[bufferquery] frame_changes: capture_id='{}', frame_id={}, is_extended={:?}, limit={}",
+        capture_id, frame_id, is_extended, result_limit
     );
 
     let mut sql = String::from(
@@ -160,7 +160,7 @@ pub fn buffer_query_frame_changes(
 
     let mut param_idx = 3;
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(capture_id.clone()));
     params.push(Box::new(frame_id as i64));
 
     if let Some(ext) = is_extended {
@@ -247,8 +247,8 @@ pub fn buffer_query_frame_changes(
 /// Finds timestamps where a mirror frame's payload doesn't match its source frame
 /// within the given tolerance window (in microseconds).
 #[tauri::command]
-pub fn buffer_query_mirror_validation(
-    buffer_id: String,
+pub fn capture_query_mirror_validation(
+    capture_id: String,
     mirror_frame_id: u32,
     source_frame_id: u32,
     is_extended: Option<bool>,
@@ -261,8 +261,8 @@ pub fn buffer_query_mirror_validation(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] mirror_validation: buffer_id='{}', mirror={}, source={}, tolerance_us={}, limit={}",
-        buffer_id, mirror_frame_id, source_frame_id, tolerance_us, result_limit
+        "[bufferquery] mirror_validation: capture_id='{}', mirror={}, source={}, tolerance_us={}, limit={}",
+        capture_id, mirror_frame_id, source_frame_id, tolerance_us, result_limit
     );
 
     // Strategy: load mirror frames, then for each mirror frame find the closest
@@ -275,11 +275,11 @@ pub fn buffer_query_mirror_validation(
     );
 
     let mut mirror_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    mirror_params.push(Box::new(buffer_id.clone()));
+    mirror_params.push(Box::new(capture_id.clone()));
     mirror_params.push(Box::new(mirror_frame_id as i64));
 
     let mut source_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    source_params.push(Box::new(buffer_id.clone()));
+    source_params.push(Box::new(capture_id.clone()));
     source_params.push(Box::new(source_frame_id as i64));
 
     let mut param_idx = 3;
@@ -402,8 +402,8 @@ pub fn buffer_query_mirror_validation(
 /// Fetches payloads from the SQLite buffer, groups by mux selector byte, and
 /// computes per-byte and optional 16-bit word statistics for each mux case.
 #[tauri::command]
-pub fn buffer_query_mux_statistics(
-    buffer_id: String,
+pub fn capture_query_mux_statistics(
+    capture_id: String,
     frame_id: u32,
     mux_selector_byte: u8,
     is_extended: Option<bool>,
@@ -417,8 +417,8 @@ pub fn buffer_query_mux_statistics(
     let result_limit = limit.unwrap_or(500_000);
 
     tlog!(
-        "[bufferquery] mux_statistics: buffer_id='{}', frame_id={}, mux_byte={}, limit={}",
-        buffer_id, frame_id, mux_selector_byte, result_limit
+        "[bufferquery] mux_statistics: capture_id='{}', frame_id={}, mux_byte={}, limit={}",
+        capture_id, frame_id, mux_selector_byte, result_limit
     );
 
     // Build SQL to fetch payloads
@@ -428,7 +428,7 @@ pub fn buffer_query_mux_statistics(
 
     let mut param_idx = 3;
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(capture_id.clone()));
     params.push(Box::new(frame_id as i64));
 
     if let Some(ext) = is_extended {
@@ -490,8 +490,8 @@ pub fn buffer_query_mux_statistics(
 /// Returns the first timestamp/payload, last timestamp/payload, and total count.
 /// Time bounds are in microseconds (matching buffer timestamp_us).
 #[tauri::command]
-pub fn buffer_query_first_last(
-    buffer_id: String,
+pub fn capture_query_first_last(
+    capture_id: String,
     frame_id: u32,
     is_extended: Option<bool>,
     start_time_us: Option<i64>,
@@ -500,14 +500,14 @@ pub fn buffer_query_first_last(
     let query_start = std::time::Instant::now();
 
     tlog!(
-        "[bufferquery] first_last: buffer_id='{}', frame_id={}, is_extended={:?}",
-        buffer_id, frame_id, is_extended
+        "[bufferquery] first_last: capture_id='{}', frame_id={}, is_extended={:?}",
+        capture_id, frame_id, is_extended
     );
 
     // Build the shared WHERE clause for all three queries
     let mut where_clause = String::from("WHERE capture_id = ?1 AND frame_id = ?2");
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(capture_id.clone()));
     params.push(Box::new(frame_id as i64));
 
     let mut param_idx = 3;
@@ -590,8 +590,8 @@ pub fn buffer_query_first_last(
 /// Groups frames into time buckets and computes min/max/avg inter-frame intervals
 /// within each bucket. Useful for detecting jitter, dropouts, and timing drift.
 #[tauri::command]
-pub fn buffer_query_frequency(
-    buffer_id: String,
+pub fn capture_query_frequency(
+    capture_id: String,
     frame_id: u32,
     is_extended: Option<bool>,
     bucket_size_ms: u32,
@@ -603,8 +603,8 @@ pub fn buffer_query_frequency(
     let result_limit = limit.unwrap_or(100_000);
 
     tlog!(
-        "[bufferquery] frequency: buffer_id='{}', frame_id={}, bucket_size_ms={}, is_extended={:?}, limit={}",
-        buffer_id, frame_id, bucket_size_ms, is_extended, result_limit
+        "[bufferquery] frequency: capture_id='{}', frame_id={}, bucket_size_ms={}, is_extended={:?}, limit={}",
+        capture_id, frame_id, bucket_size_ms, is_extended, result_limit
     );
 
     // Build SQL to fetch timestamps (use query_raw_two_col, ignore payload)
@@ -614,7 +614,7 @@ pub fn buffer_query_frequency(
 
     let mut param_idx = 3;
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(capture_id.clone()));
     params.push(Box::new(frame_id as i64));
 
     if let Some(ext) = is_extended {
@@ -695,8 +695,8 @@ pub fn buffer_query_frequency(
 /// Counts how often each byte value (0-255) appears at the given byte index,
 /// returning value, count, and percentage.
 #[tauri::command]
-pub fn buffer_query_distribution(
-    buffer_id: String,
+pub fn capture_query_distribution(
+    capture_id: String,
     frame_id: u32,
     byte_index: u8,
     is_extended: Option<bool>,
@@ -706,8 +706,8 @@ pub fn buffer_query_distribution(
     let query_start = std::time::Instant::now();
 
     tlog!(
-        "[bufferquery] distribution: buffer_id='{}', frame_id={}, byte_index={}, is_extended={:?}",
-        buffer_id, frame_id, byte_index, is_extended
+        "[bufferquery] distribution: capture_id='{}', frame_id={}, byte_index={}, is_extended={:?}",
+        capture_id, frame_id, byte_index, is_extended
     );
 
     // Build SQL to fetch payloads
@@ -717,7 +717,7 @@ pub fn buffer_query_distribution(
 
     let mut param_idx = 3;
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(capture_id.clone()));
     params.push(Box::new(frame_id as i64));
 
     if let Some(ext) = is_extended {
@@ -795,8 +795,8 @@ pub fn buffer_query_distribution(
 /// Finds inter-frame intervals that exceed the specified threshold, returning
 /// them sorted by duration (longest first). Useful for detecting dropouts.
 #[tauri::command]
-pub fn buffer_query_gap_analysis(
-    buffer_id: String,
+pub fn capture_query_gap_analysis(
+    capture_id: String,
     frame_id: u32,
     is_extended: Option<bool>,
     gap_threshold_ms: f64,
@@ -808,8 +808,8 @@ pub fn buffer_query_gap_analysis(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] gap_analysis: buffer_id='{}', frame_id={}, threshold_ms={}, is_extended={:?}, limit={}",
-        buffer_id, frame_id, gap_threshold_ms, is_extended, result_limit
+        "[bufferquery] gap_analysis: capture_id='{}', frame_id={}, threshold_ms={}, is_extended={:?}, limit={}",
+        capture_id, frame_id, gap_threshold_ms, is_extended, result_limit
     );
 
     // Build SQL to fetch timestamps (use query_raw_two_col, ignore payload)
@@ -819,7 +819,7 @@ pub fn buffer_query_gap_analysis(
 
     let mut param_idx = 3;
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(capture_id.clone()));
     params.push(Box::new(frame_id as i64));
 
     if let Some(ext) = is_extended {
@@ -895,8 +895,8 @@ pub fn buffer_query_gap_analysis(
 /// `(payload[p+i] & mask[i]) == (pattern[i] & mask[i])`.
 /// No frame_id filter — searches across ALL frame IDs.
 #[tauri::command]
-pub fn buffer_query_pattern_search(
-    buffer_id: String,
+pub fn capture_query_pattern_search(
+    capture_id: String,
     pattern: Vec<u8>,
     pattern_mask: Vec<u8>,
     start_time_us: Option<i64>,
@@ -907,8 +907,8 @@ pub fn buffer_query_pattern_search(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] pattern_search: buffer_id='{}', pattern_len={}, mask_len={}, limit={}",
-        buffer_id, pattern.len(), pattern_mask.len(), result_limit
+        "[bufferquery] pattern_search: capture_id='{}', pattern_len={}, mask_len={}, limit={}",
+        capture_id, pattern.len(), pattern_mask.len(), result_limit
     );
 
     if pattern.len() != pattern_mask.len() {
@@ -925,7 +925,7 @@ pub fn buffer_query_pattern_search(
 
     let mut param_idx = 2;
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-    params.push(Box::new(buffer_id.clone()));
+    params.push(Box::new(capture_id.clone()));
 
     if let Some(start) = start_time_us {
         sql.push_str(&format!(" AND timestamp_us >= ?{}", param_idx));

@@ -552,7 +552,7 @@ export function useIOSessionManager(
   const handleStreamEndedWithIngest = useCallback(async (payload: StreamEndedInfo) => {
     tlog.debug(`[IOSessionManager:${appName}] Stream ended, isLoading=${isLoadingRef.current}, payload: ${JSON.stringify(payload)}`);
 
-    if (isLoadingRef.current && payload.buffer_available) {
+    if (isLoadingRef.current && payload.capture_available) {
       // Ingest completed with buffer available - switch to buffer replay mode
       tlog.debug(`[IOSessionManager:${appName}] Ingest complete - switching to buffer replay mode`);
 

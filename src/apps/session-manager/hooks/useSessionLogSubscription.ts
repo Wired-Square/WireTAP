@@ -349,7 +349,7 @@ async function setupPerSessionListeners(
           const eventType = info.reason === "paused" ? "stream-complete" : "stream-ended";
           const details = info.reason === "paused"
             ? "Stream completed"
-            : `Reason: ${info.reason}, buffer: ${info.buffer_available ? `${info.count} items` : "none"}`;
+            : `Reason: ${info.reason}, capture: ${info.capture_available ? `${info.count} items` : "none"}`;
           addEntry({ eventType, sessionId, profileId, profileName, appName: null, details });
         }
       })

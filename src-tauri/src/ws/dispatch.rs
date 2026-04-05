@@ -150,9 +150,9 @@ pub fn send_stream_ended(session_id: &str, info: &StreamEndedInfo) {
     };
     let payload = protocol::encode_stream_ended(
         reason,
-        info.buffer_available,
-        info.buffer_id.as_deref(),
-        info.buffer_type.as_deref(),
+        info.capture_available,
+        info.capture_id.as_deref(),
+        info.capture_kind.as_deref(),
         info.count as u32,
         info.time_range,
     );

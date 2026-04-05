@@ -74,7 +74,7 @@ export default function SessionCanvas({
             name: b.name,
             persistent: b.persistent,
             count: b.count,
-            bufferType: b.buffer_type,
+            bufferType: b.kind,
           });
         }
         setBufferInfoMap(map);

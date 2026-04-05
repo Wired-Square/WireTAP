@@ -4,7 +4,7 @@
 // Handles CSV import, capture CRUD, pagination, and multi-capture registry.
 //
 // NOTE: Tauri command names and their snake_case parameter names (e.g.
-// `list_buffers`, `buffer_id`) are preserved in Stage 1 of the Buffer →
+// `list_captures`, `capture_id`) are preserved in Stage 1 of the Buffer →
 // Capture rename — they are the IPC contract and change atomically in Stage 2.
 
 use tauri::{AppHandle, Emitter};
@@ -25,16 +25,16 @@ pub struct CsvImportResult {
     pub wrap_points: Vec<u64>,
 }
 
-/// Response for paginated buffer frames
+/// Response for paginated capture frames
 #[derive(Clone, serde::Serialize)]
 pub struct PaginatedFramesResponse {
     pub frames: Vec<FrameMessage>,
     pub total_count: usize,
     pub offset: usize,
     pub limit: usize,
-    /// 1-based original buffer position (rowid) for each frame.
-    /// Parallel to `frames` — `buffer_indices[i]` is the position of `frames[i]`.
-    pub buffer_indices: Vec<usize>,
+    /// 1-based original capture position (rowid) for each frame.
+    /// Parallel to `frames` — `capture_indices[i]` is the position of `frames[i]`.
+    pub capture_indices: Vec<usize>,
 }
 
 /// Response for paginated buffer bytes
@@ -52,7 +52,7 @@ pub struct PaginatedBytesResponse {
 
 /// Import a CSV file into a session-owned buffer
 #[tauri::command(rename_all = "snake_case")]
-pub async fn import_csv_to_buffer(session_id: String, file_path: String) -> Result<CaptureMetadata, String> {
+pub async fn import_csv_to_capture(session_id: String, file_path: String) -> Result<CaptureMetadata, String> {
     let filename = std::path::Path::new(&file_path)
         .file_name()
         .and_then(|n| n.to_str())
@@ -65,8 +65,8 @@ pub async fn import_csv_to_buffer(session_id: String, file_path: String) -> Resu
         return Err("CSV file contains no valid frames".to_string());
     }
 
-    let buffer_id = capture_store::create_capture(capture_store::CaptureKind::Frames, filename);
-    let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
+    let capture_id = capture_store::create_capture(capture_store::CaptureKind::Frames, filename);
+    let _ = capture_store::set_capture_owner(&capture_id, &session_id);
     capture_store::append_frames_to_session(&session_id, frames);
     let finalized = capture_store::finalize_session_captures(&session_id);
     finalized.into_iter().next()
@@ -111,8 +111,8 @@ pub async fn import_csv_with_mapping(
     let total_dropped = sequence_gaps.iter().map(|g| g.dropped).sum();
     let wrap_points = detect_wrap_points(&sequence_gaps);
 
-    let buffer_id = capture_store::create_capture(capture_store::CaptureKind::Frames, filename);
-    let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
+    let capture_id = capture_store::create_capture(capture_store::CaptureKind::Frames, filename);
+    let _ = capture_store::set_capture_owner(&capture_id, &session_id);
     capture_store::append_frames_to_session(&session_id, result.frames);
     let finalized = capture_store::finalize_session_captures(&session_id);
     let metadata = finalized.into_iter().next()
@@ -151,8 +151,8 @@ pub async fn import_csv_batch_with_mapping(
     };
 
     // Create a single buffer for all files, owned by the session
-    let buffer_id = capture_store::create_capture(capture_store::CaptureKind::Frames, name);
-    let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
+    let capture_id = capture_store::create_capture(capture_store::CaptureKind::Frames, name);
+    let _ = capture_store::set_capture_owner(&capture_id, &session_id);
 
     let total_files = file_paths.len();
     let mut total_frames: usize = 0;
@@ -222,13 +222,13 @@ pub async fn import_csv_batch_with_mapping(
     }
 
     if total_frames == 0 {
-        let _ = capture_store::delete_capture(&buffer_id);
+        let _ = capture_store::delete_capture(&capture_id);
         return Err("No valid frames found in any of the selected files".to_string());
     }
 
     tlog!(
         "[Buffers] Batch imported {} files ({} frames) into buffer '{}'",
-        total_files, total_frames, buffer_id
+        total_files, total_frames, capture_id
     );
 
     let total_dropped = all_sequence_gaps.iter().map(|g| g.dropped).sum();
@@ -301,80 +301,80 @@ fn build_batch_name(paths: &[String]) -> String {
 
 /// Get the current buffer metadata (if any data is loaded)
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_metadata(buffer_id: String) -> Result<Option<CaptureMetadata>, String> {
-    Ok(capture_store::get_capture_metadata(&buffer_id))
+pub async fn get_capture_metadata(capture_id: String) -> Result<Option<CaptureMetadata>, String> {
+    Ok(capture_store::get_capture_metadata(&capture_id))
 }
 
 /// Get all frames from a buffer
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_frames(buffer_id: String) -> Result<Vec<FrameMessage>, String> {
-    capture_store::get_capture_frames(&buffer_id)
-        .ok_or_else(|| format!("Buffer '{}' not found or is not a frame buffer", buffer_id))
+pub async fn get_capture_frames(capture_id: String) -> Result<Vec<FrameMessage>, String> {
+    capture_store::get_capture_frames(&capture_id)
+        .ok_or_else(|| format!("Buffer '{}' not found or is not a frame buffer", capture_id))
 }
 
 /// Get a page of frames from a buffer (for large datasets)
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_frames_paginated(
-    buffer_id: String,
+pub async fn get_capture_frames_paginated(
+    capture_id: String,
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedFramesResponse, String> {
-    let (frames, buffer_indices, total_count) = capture_store::get_capture_frames_paginated(&buffer_id, offset, limit);
+    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated(&capture_id, offset, limit);
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
         offset,
         limit,
-        buffer_indices,
+        capture_indices,
     })
 }
 
 /// Get a page of frames from a buffer, filtered by selected frame IDs
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_frames_paginated_filtered(
-    buffer_id: String,
+pub async fn get_capture_frames_paginated_filtered(
+    capture_id: String,
     offset: usize,
     limit: usize,
     selected_ids: Vec<u32>,
 ) -> Result<PaginatedFramesResponse, String> {
     let selected_set: std::collections::HashSet<u32> = selected_ids.into_iter().collect();
-    let (frames, buffer_indices, total_count) = capture_store::get_capture_frames_paginated_filtered(&buffer_id, offset, limit, &selected_set);
+    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated_filtered(&capture_id, offset, limit, &selected_set);
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
         offset,
         limit,
-        buffer_indices,
+        capture_indices,
     })
 }
 
 /// Get the most recent N frames from a buffer, optionally filtered by frame IDs.
 /// Used for "tail mode" during streaming.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_frames_tail(
-    buffer_id: String,
+pub async fn get_capture_frames_tail(
+    capture_id: String,
     limit: usize,
     selected_ids: Vec<u32>,
 ) -> Result<TailResponse, String> {
     let selected_set: std::collections::HashSet<u32> = selected_ids.into_iter().collect();
-    Ok(capture_store::get_capture_frames_tail(&buffer_id, limit, &selected_set))
+    Ok(capture_store::get_capture_frames_tail(&capture_id, limit, &selected_set))
 }
 
 /// Get unique frame IDs and their metadata from a buffer
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_frame_info(buffer_id: String) -> Result<Vec<CaptureFrameInfo>, String> {
-    Ok(capture_store::get_capture_frame_info(&buffer_id))
+pub async fn get_capture_frame_info(capture_id: String) -> Result<Vec<CaptureFrameInfo>, String> {
+    Ok(capture_store::get_capture_frame_info(&capture_id))
 }
 
 /// Find the offset in the filtered buffer for a given timestamp
 #[tauri::command(rename_all = "snake_case")]
-pub async fn find_buffer_offset_for_timestamp(
-    buffer_id: String,
+pub async fn find_capture_offset_for_timestamp(
+    capture_id: String,
     timestamp_us: u64,
     selected_ids: Vec<u32>,
 ) -> Result<usize, String> {
     let selected_set: std::collections::HashSet<u32> = selected_ids.into_iter().collect();
-    Ok(capture_store::find_capture_offset_for_timestamp(&buffer_id, timestamp_us, &selected_set))
+    Ok(capture_store::find_capture_offset_for_timestamp(&capture_id, timestamp_us, &selected_set))
 }
 
 // ============================================================================
@@ -383,59 +383,59 @@ pub async fn find_buffer_offset_for_timestamp(
 
 /// List all buffers in the registry
 #[tauri::command(rename_all = "snake_case")]
-pub async fn list_buffers() -> Result<Vec<CaptureMetadata>, String> {
+pub async fn list_captures() -> Result<Vec<CaptureMetadata>, String> {
     Ok(capture_store::list_captures())
 }
 
 /// List all buffer IDs (lightweight — no metadata)
 #[tauri::command(rename_all = "snake_case")]
-pub async fn list_buffer_ids() -> Vec<String> {
+pub async fn list_capture_ids() -> Vec<String> {
     capture_store::list_capture_ids()
 }
 
 /// Delete a specific buffer by ID
 #[tauri::command(rename_all = "snake_case")]
-pub async fn delete_buffer(buffer_id: String) -> Result<(), String> {
-    capture_store::delete_capture(&buffer_id)
+pub async fn delete_capture(capture_id: String) -> Result<(), String> {
+    capture_store::delete_capture(&capture_id)
 }
 
 /// Clear a buffer's data without deleting the buffer.
 /// The session keeps its reference and can continue writing new frames.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn clear_buffer(buffer_id: String) -> Result<(), String> {
-    capture_store::clear_capture(&buffer_id)
+pub async fn clear_capture(capture_id: String) -> Result<(), String> {
+    capture_store::clear_capture(&capture_id)
 }
 
 /// Get metadata for a specific buffer by ID
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_metadata_by_id(buffer_id: String) -> Result<Option<CaptureMetadata>, String> {
-    Ok(capture_store::get_capture_metadata(&buffer_id))
+pub async fn get_capture_metadata_by_id(capture_id: String) -> Result<Option<CaptureMetadata>, String> {
+    Ok(capture_store::get_capture_metadata(&capture_id))
 }
 
 /// Get frames from a specific buffer by ID
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_frames_by_id(buffer_id: String) -> Result<Vec<FrameMessage>, String> {
-    capture_store::get_capture_frames(&buffer_id)
-        .ok_or_else(|| format!("Buffer '{}' not found or is not a frame buffer", buffer_id))
+pub async fn get_capture_frames_by_id(capture_id: String) -> Result<Vec<FrameMessage>, String> {
+    capture_store::get_capture_frames(&capture_id)
+        .ok_or_else(|| format!("Buffer '{}' not found or is not a frame buffer", capture_id))
 }
 
 /// Get raw bytes from a specific buffer by ID
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_bytes_by_id(buffer_id: String) -> Result<Vec<TimestampedByte>, String> {
-    capture_store::get_capture_bytes(&buffer_id)
-        .ok_or_else(|| format!("Buffer '{}' not found or is not a byte buffer", buffer_id))
+pub async fn get_capture_bytes_by_id(capture_id: String) -> Result<Vec<TimestampedByte>, String> {
+    capture_store::get_capture_bytes(&capture_id)
+        .ok_or_else(|| format!("Buffer '{}' not found or is not a byte buffer", capture_id))
 }
 
 /// Mark a buffer as active (being rendered by a UI panel)
 #[tauri::command(rename_all = "snake_case")]
-pub async fn set_active_buffer(buffer_id: String) -> Result<(), String> {
-    capture_store::mark_capture_active(&buffer_id)
+pub async fn set_active_capture(capture_id: String) -> Result<(), String> {
+    capture_store::mark_capture_active(&capture_id)
 }
 
 /// Create a new frame buffer from frames passed from the frontend.
 /// Used when accepting client-side framing to persist the framed data.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn create_frame_buffer_from_frames(
+pub async fn create_frame_capture_from_frames(
     session_id: String,
     name: String,
     frames: Vec<FrameMessage>,
@@ -444,28 +444,28 @@ pub async fn create_frame_buffer_from_frames(
         return Err("No frames to create buffer from".to_string());
     }
 
-    let buffer_id = capture_store::create_capture(capture_store::CaptureKind::Frames, name);
-    let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
+    let capture_id = capture_store::create_capture(capture_store::CaptureKind::Frames, name);
+    let _ = capture_store::set_capture_owner(&capture_id, &session_id);
     capture_store::append_frames_to_session(&session_id, frames);
     let finalized = capture_store::finalize_session_captures(&session_id);
     finalized.into_iter().next()
-        .ok_or_else(|| format!("Failed to finalize buffer '{}'", buffer_id))
+        .ok_or_else(|| format!("Failed to finalize buffer '{}'", capture_id))
 }
 
 /// Get a page of frames from a specific buffer by ID
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_frames_paginated_by_id(
-    buffer_id: String,
+pub async fn get_capture_frames_paginated_by_id(
+    capture_id: String,
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedFramesResponse, String> {
-    let (frames, buffer_indices, total_count) = capture_store::get_capture_frames_paginated(&buffer_id, offset, limit);
+    let (frames, capture_indices, total_count) = capture_store::get_capture_frames_paginated(&capture_id, offset, limit);
     Ok(PaginatedFramesResponse {
         frames,
         total_count,
         offset,
         limit,
-        buffer_indices,
+        capture_indices,
     })
 }
 
@@ -475,12 +475,12 @@ pub async fn get_buffer_frames_paginated_by_id(
 
 /// Get a page of bytes from a buffer (for serial discovery)
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_bytes_paginated(
-    buffer_id: String,
+pub async fn get_capture_bytes_paginated(
+    capture_id: String,
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedBytesResponse, String> {
-    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(&buffer_id, offset, limit);
+    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(&capture_id, offset, limit);
     Ok(PaginatedBytesResponse {
         bytes,
         total_count,
@@ -491,18 +491,18 @@ pub async fn get_buffer_bytes_paginated(
 
 /// Get the total byte count from a buffer
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_bytes_count(buffer_id: String) -> Result<usize, String> {
-    Ok(capture_store::get_capture_count(&buffer_id))
+pub async fn get_capture_bytes_count(capture_id: String) -> Result<usize, String> {
+    Ok(capture_store::get_capture_count(&capture_id))
 }
 
 /// Get bytes from a specific buffer by ID with pagination
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_buffer_bytes_paginated_by_id(
-    buffer_id: String,
+pub async fn get_capture_bytes_paginated_by_id(
+    capture_id: String,
     offset: usize,
     limit: usize,
 ) -> Result<PaginatedBytesResponse, String> {
-    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(&buffer_id, offset, limit);
+    let (bytes, total_count) = capture_store::get_capture_bytes_paginated(&capture_id, offset, limit);
     Ok(PaginatedBytesResponse {
         bytes,
         total_count,
@@ -514,25 +514,25 @@ pub async fn get_buffer_bytes_paginated_by_id(
 /// Find the byte offset at or after the given timestamp in a byte buffer.
 /// Uses binary search for O(log n) performance.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn find_buffer_bytes_offset_for_timestamp(
-    buffer_id: String,
+pub async fn find_capture_bytes_offset_for_timestamp(
+    capture_id: String,
     target_time_us: u64,
 ) -> Result<usize, String> {
-    Ok(capture_store::find_capture_bytes_offset_for_timestamp_by_id(&buffer_id, target_time_us))
+    Ok(capture_store::find_capture_bytes_offset_for_timestamp_by_id(&capture_id, target_time_us))
 }
 
 /// Search a specific buffer for frames matching a query string.
 /// Returns 0-based offsets in the selected-ID-filtered result set.
 /// `query` should have whitespace stripped before calling.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn search_buffer_frames(
-    buffer_id: String,
+pub async fn search_capture_frames(
+    capture_id: String,
     query: String,
     search_id: bool,
     search_data: bool,
     selected_ids: Vec<u32>,
 ) -> Result<Vec<usize>, String> {
-    crate::capture_db::search_frames(&buffer_id, &query, search_id, search_data, &selected_ids)
+    crate::capture_db::search_frames(&capture_id, &query, search_id, search_data, &selected_ids)
 }
 
 /// Response for tail-mode byte buffer queries
@@ -544,11 +544,11 @@ pub struct BytesTailResponse {
 
 /// Get the most recent bytes from a buffer (tail view for serial discovery).
 #[tauri::command(rename_all = "snake_case")]
-pub fn get_buffer_bytes_tail(buffer_id: String, tail_size: usize) -> BytesTailResponse {
-    let total_count = capture_store::get_capture_count(&buffer_id);
+pub fn get_capture_bytes_tail(capture_id: String, tail_size: usize) -> BytesTailResponse {
+    let total_count = capture_store::get_capture_count(&capture_id);
     let offset = total_count.saturating_sub(tail_size);
     let limit = tail_size.min(total_count);
-    let (bytes, _) = capture_store::get_capture_bytes_paginated(&buffer_id, offset, limit);
+    let (bytes, _) = capture_store::get_capture_bytes_paginated(&capture_id, offset, limit);
     BytesTailResponse { bytes, total_count }
 }
 
@@ -558,21 +558,21 @@ pub fn get_buffer_bytes_tail(buffer_id: String, tail_size: usize) -> BytesTailRe
 
 /// Rename a buffer.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn rename_buffer(buffer_id: String, new_name: String) -> Result<CaptureMetadata, String> {
-    capture_store::rename_capture(&buffer_id, &new_name)
+pub async fn rename_capture(capture_id: String, new_name: String) -> Result<CaptureMetadata, String> {
+    capture_store::rename_capture(&capture_id, &new_name)
 }
 
 /// Set a buffer's persistent flag.
 /// Persistent buffers survive app restart when 'clear buffers on start' is enabled.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn set_buffer_persistent(buffer_id: String, persistent: bool) -> Result<CaptureMetadata, String> {
-    capture_store::set_capture_persistent(&buffer_id, persistent)
+pub async fn set_capture_persistent(capture_id: String, persistent: bool) -> Result<CaptureMetadata, String> {
+    capture_store::set_capture_persistent(&capture_id, persistent)
 }
 
 /// List only orphaned buffers (no owning session).
 /// These are buffers available for standalone selection in the IO picker.
 /// Includes CSV imports and buffers from destroyed sessions.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn list_orphaned_buffers() -> Vec<CaptureMetadata> {
+pub async fn list_orphaned_captures() -> Vec<CaptureMetadata> {
     capture_store::list_orphaned_captures()
 }

@@ -65,7 +65,7 @@ export function useBufferSession({
       const meta = await getBufferMetadataById(profileId);
 
       tlog.debug(
-        `[BufferSession] Got metadata: id=${meta?.id}, count=${meta?.count}, type=${meta?.buffer_type}`
+        `[BufferSession] Got metadata: id=${meta?.id}, count=${meta?.count}, kind=${meta?.kind}`
       );
 
       // Update buffer metadata

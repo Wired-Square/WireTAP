@@ -203,9 +203,9 @@ export async function createIOSession(
 ): Promise<IOCapabilities> {
   // Use buffer reader if requested
   if (options.useBuffer) {
-    return invoke("create_buffer_reader_session", {
+    return invoke("create_capture_source_session", {
       session_id: options.sessionId,
-      buffer_id: options.bufferId,
+      capture_id: options.bufferId,
       speed: options.speed,
     });
   }
@@ -270,9 +270,9 @@ export async function getIOSessionCapabilities(
 export interface JoinSessionResult {
   capabilities: IOCapabilities;
   state: IOState;
-  buffer_id: string | null;
-  /** Type of the active buffer ("frames" or "bytes"), if any */
-  buffer_type: "frames" | "bytes" | null;
+  capture_id: string | null;
+  /** Kind of the active capture ("frames" or "bytes"), if any */
+  capture_kind: "frames" | "bytes" | null;
   /** Number of apps connected to this session (including this one) */
   joiner_count: number;
 }
@@ -384,7 +384,7 @@ export async function copyBufferForDetach(
   bufferId: string,
   newName: string
 ): Promise<string> {
-  return invoke("copy_buffer_for_detach", { buffer_id: bufferId, new_name: newName });
+  return invoke("copy_capture_for_detach", { capture_id: bufferId, new_name: newName });
 }
 
 /**
@@ -616,9 +616,9 @@ export async function stepBufferFrame(
   backward: boolean,
   filterFrameIds?: number[]
 ): Promise<StepResult | null> {
-  return invoke("step_buffer_frame", {
+  return invoke("step_capture_frame", {
     session_id: sessionId,
-    buffer_id: bufferId,
+    capture_id: bufferId,
     current_frame_index: currentFrameIndex,
     current_timestamp_us: currentTimestampUs,
     backward,
@@ -727,7 +727,7 @@ export async function transitionToBufferReader(
   bufferId: string,
   speed?: number,
 ): Promise<IOCapabilities> {
-  return invoke("transition_to_buffer_reader", { session_id: sessionId, buffer_id: bufferId, speed });
+  return invoke("transition_to_capture_source", { session_id: sessionId, capture_id: bufferId, speed });
 }
 
 /**
@@ -742,7 +742,7 @@ export async function switchSessionToBufferReplay(
   sessionId: string,
   speed?: number
 ): Promise<IOCapabilities> {
-  return invoke("switch_session_to_buffer_replay", { session_id: sessionId, speed });
+  return invoke("switch_session_to_capture_replay", { session_id: sessionId, speed });
 }
 
 /**
@@ -756,7 +756,7 @@ export async function stopAndSwitchToBuffer(
   sessionId: string,
   speed?: number
 ): Promise<IOCapabilities> {
-  return invoke("io_stop_and_switch_to_buffer", { session_id: sessionId, speed });
+  return invoke("io_stop_and_switch_to_capture", { session_id: sessionId, speed });
 }
 
 /**
@@ -852,10 +852,10 @@ export interface RegisterListenerResult {
   capabilities: IOCapabilities;
   /** Current session state */
   state: IOState;
-  /** Active buffer ID (if any) */
-  buffer_id: string | null;
-  /** Buffer type ("frames" or "bytes") */
-  buffer_type: "frames" | "bytes" | null;
+  /** Active capture ID (if any) */
+  capture_id: string | null;
+  /** Capture kind ("frames" or "bytes") */
+  capture_kind: "frames" | "bytes" | null;
   /** Total number of listeners */
   listener_count: number;
   /** Error that occurred before this listener registered (one-shot, cleared after return) */
@@ -1366,8 +1366,8 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
       }>;
     }> | null;
     source_profile_ids: string[];
-    buffer_id: string | null;
-    buffer_frame_count: number | null;
+    capture_id: string | null;
+    capture_frame_count: number | null;
     is_streaming: boolean;
   }> = await invoke("list_active_sessions");
 
@@ -1390,8 +1390,8 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
       })),
     })) ?? null,
     sourceProfileIds: s.source_profile_ids ?? [],
-    bufferId: s.buffer_id ?? null,
-    bufferFrameCount: s.buffer_frame_count ?? null,
+    bufferId: s.capture_id ?? null,
+    bufferFrameCount: s.capture_frame_count ?? null,
     isStreaming: s.is_streaming ?? false,
   }));
 }
@@ -1547,9 +1547,9 @@ export async function getStreamEndedInfo(
 
 export interface StreamEndedInfo {
   reason: string;
-  buffer_available: boolean;
-  buffer_id: string | null;
-  buffer_type: string | null;
+  capture_available: boolean;
+  capture_id: string | null;
+  capture_kind: string | null;
   count: number;
   time_range: [number, number] | null;
 }
@@ -1578,7 +1578,7 @@ export interface SourceInfo {
 export async function getOrphanedBufferIds(
   sessionId: string
 ): Promise<string[]> {
-  return invoke("get_orphaned_buffer_ids", { session_id: sessionId });
+  return invoke("get_orphaned_capture_ids", { session_id: sessionId });
 }
 
 /** Fetch current replay state. */
@@ -1624,8 +1624,8 @@ export async function getBufferBytesTail(
   bufferId: string,
   tailSize: number
 ): Promise<BytesTailResponse> {
-  return invoke("get_buffer_bytes_tail", {
-    buffer_id: bufferId,
+  return invoke("get_capture_bytes_tail", {
+    capture_id: bufferId,
     tail_size: tailSize,
   });
 }

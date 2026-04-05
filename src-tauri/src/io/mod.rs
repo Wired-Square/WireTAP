@@ -1165,20 +1165,20 @@ pub fn emit_stream_ended(
     use crate::capture_store::{self, CaptureKind};
 
     let finalized = capture_store::finalize_session_captures(session_id);
-    // Use the frame buffer metadata (primary), fall back to first finalized
+    // Use the frame capture metadata (primary), fall back to first finalized
     let metadata = finalized.iter()
-        .find(|m| m.buffer_type == CaptureKind::Frames)
+        .find(|m| m.kind == CaptureKind::Frames)
         .or(finalized.first());
 
-    let (buffer_id, buffer_type, count, time_range, buffer_available) = match metadata {
+    let (capture_id, capture_kind, count, time_range, capture_available) = match metadata {
         Some(m) => {
-            let type_str = match m.buffer_type {
+            let kind_str = match m.kind {
                 CaptureKind::Frames => "frames",
                 CaptureKind::Bytes => "bytes",
             };
             (
                 Some(m.id.clone()),
-                Some(type_str.to_string()),
+                Some(kind_str.to_string()),
                 m.count,
                 match (m.start_time_us, m.end_time_us) {
                     (Some(start), Some(end)) => Some((start, end)),
@@ -1193,9 +1193,9 @@ pub fn emit_stream_ended(
     // Store in post-session cache for late-arriving fetches
     let stream_ended_info = post_session::StreamEndedInfo {
         reason: reason.to_string(),
-        buffer_available,
-        buffer_id: buffer_id.clone(),
-        buffer_type: buffer_type.clone(),
+        capture_available,
+        capture_id: capture_id.clone(),
+        capture_kind: capture_kind.clone(),
         count,
         time_range,
     };
@@ -1219,8 +1219,8 @@ pub fn emit_buffer_changed(session_id: &str) {
 /// can fetch them (e.g., for the onDestroyed callback).
 pub fn emit_buffer_orphaned_as_changed(session_id: &str, orphaned: Vec<crate::capture_store::OrphanedCaptureInfo>) {
     if !orphaned.is_empty() {
-        let ids: Vec<String> = orphaned.iter().map(|o| o.buffer_id.clone()).collect();
-        post_session::store_orphaned_buffer_ids(session_id, ids);
+        let ids: Vec<String> = orphaned.iter().map(|o| o.capture_id.clone()).collect();
+        post_session::store_orphaned_capture_ids(session_id, ids);
         emit_buffer_changed(session_id);
     }
 }
@@ -1451,9 +1451,9 @@ pub async fn get_session_source_configs(session_id: &str) -> Vec<SourceConfig> {
 pub struct JoinSessionResult {
     pub capabilities: IOCapabilities,
     pub state: IOState,
-    pub buffer_id: Option<String>,
-    /// Type of the active buffer ("frames" or "bytes"), if any
-    pub buffer_type: Option<String>,
+    pub capture_id: Option<String>,
+    /// Kind of the active capture ("frames" or "bytes"), if any
+    pub capture_kind: Option<String>,
     /// Number of apps connected to this session (including this one)
     pub joiner_count: usize,
 }
@@ -1474,19 +1474,19 @@ pub async fn join_session(session_id: &str) -> Result<JoinSessionResult, String>
     // Emit joiner count change event to all listeners (legacy join - no listener ID)
     emit_joiner_count_change(session_id, joiner_count, None, None, Some("joined"));
 
-    // Get session's frame buffer
-    let buffer_ids = crate::capture_store::get_session_capture_ids(session_id);
-    let (buffer_id, buffer_type) = buffer_ids.iter()
+    // Get session's frame capture
+    let capture_ids = crate::capture_store::get_session_capture_ids(session_id);
+    let (capture_id, capture_kind) = capture_ids.iter()
         .filter_map(|id| crate::capture_store::get_capture_metadata(id))
-        .find(|m| m.buffer_type == crate::capture_store::CaptureKind::Frames)
+        .find(|m| m.kind == crate::capture_store::CaptureKind::Frames)
         .map(|m| (Some(m.id), Some("frames".to_string())))
         .unwrap_or((None, None));
 
     Ok(JoinSessionResult {
         capabilities: session.device.capabilities(),
         state: session.device.state(),
-        buffer_id,
-        buffer_type,
+        capture_id,
+        capture_kind,
         joiner_count,
     })
 }
@@ -2014,7 +2014,7 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
     let buffer_ids = capture_store::get_session_capture_ids(session_id);
     let buffer_id = buffer_ids.iter()
         .filter_map(|id| capture_store::get_capture_metadata(id))
-        .find(|m| m.buffer_type == capture_store::CaptureKind::Frames)
+        .find(|m| m.kind == capture_store::CaptureKind::Frames)
         .map(|m| m.id.clone());
 
     // Try to switch to buffer replay
@@ -2353,7 +2353,7 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
     let buffer_ids = crate::capture_store::get_session_capture_ids(session_id);
     let buffer_id = buffer_ids.iter()
         .filter_map(|id| crate::capture_store::get_capture_metadata(id).map(|m| (id.clone(), m)))
-        .find(|(_id, m)| m.buffer_type == crate::capture_store::CaptureKind::Frames)
+        .find(|(_id, m)| m.kind == crate::capture_store::CaptureKind::Frames)
         .map(|(id, _m)| id)
         .ok_or_else(|| {
             let buffers = crate::capture_store::list_captures();
@@ -2502,12 +2502,12 @@ pub struct ActiveSessionInfo {
     /// Profile IDs feeding this session (populated from SESSION_PROFILES in sessions.rs)
     #[serde(default)]
     pub source_profile_ids: Vec<String>,
-    /// Buffer ID owned by this session (if any)
+    /// Capture ID owned by this session (if any)
     #[serde(default)]
-    pub buffer_id: Option<String>,
-    /// Frame count in the owned buffer
+    pub capture_id: Option<String>,
+    /// Frame count in the owned capture
     #[serde(default)]
-    pub buffer_frame_count: Option<usize>,
+    pub capture_frame_count: Option<usize>,
     /// Whether the session is actively streaming data
     #[serde(default)]
     pub is_streaming: bool,
@@ -2522,9 +2522,9 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
             // Get source profile IDs from the session tracking
             let source_profile_ids = sessions::get_session_profile_ids(session_id);
 
-            // Get buffer info if this session owns a buffer
-            let buffer_id = capture_store::get_session_capture_ids(session_id).into_iter().next();
-            let buffer_frame_count = buffer_id
+            // Get capture info if this session owns a capture
+            let capture_id = capture_store::get_session_capture_ids(session_id).into_iter().next();
+            let capture_frame_count = capture_id
                 .as_ref()
                 .map(|id| capture_store::get_capture_count(id));
 
@@ -2553,8 +2553,8 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
                 listeners,
                 multi_source_configs: session.device.multi_source_configs(),
                 source_profile_ids,
-                buffer_id,
-                buffer_frame_count,
+                capture_id,
+                capture_frame_count,
                 is_streaming,
             }
         })
@@ -2620,10 +2620,10 @@ pub struct RegisterListenerResult {
     pub capabilities: IOCapabilities,
     /// Current session state
     pub state: IOState,
-    /// Active buffer ID (if any)
-    pub buffer_id: Option<String>,
-    /// Buffer type ("frames" or "bytes")
-    pub buffer_type: Option<String>,
+    /// Active capture ID (if any)
+    pub capture_id: Option<String>,
+    /// Capture kind ("frames" or "bytes")
+    pub capture_kind: Option<String>,
     /// Total number of listeners
     pub listener_count: usize,
     /// Error that occurred before this listener registered (one-shot, cleared after return)
@@ -2688,11 +2688,11 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
         emit_joiner_count_change(session_id, session.listeners.len(), Some(listener_id), Some(&resolved_app_name), Some("joined"));
     }
 
-    // Get session's frame buffer
-    let buffer_ids = crate::capture_store::get_session_capture_ids(session_id);
-    let (buffer_id, buffer_type) = buffer_ids.iter()
+    // Get session's frame capture
+    let capture_ids = crate::capture_store::get_session_capture_ids(session_id);
+    let (capture_id, capture_kind) = capture_ids.iter()
         .filter_map(|id| crate::capture_store::get_capture_metadata(id))
-        .find(|m| m.buffer_type == crate::capture_store::CaptureKind::Frames)
+        .find(|m| m.kind == crate::capture_store::CaptureKind::Frames)
         .map(|m| (Some(m.id), Some("frames".to_string())))
         .unwrap_or((None, None));
 
@@ -2722,8 +2722,8 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
     Ok(RegisterListenerResult {
         capabilities: session.device.capabilities(),
         state: session.device.state(),
-        buffer_id,
-        buffer_type,
+        capture_id,
+        capture_kind,
         listener_count: session.listeners.len(),
         startup_error,
     })
@@ -2831,13 +2831,13 @@ pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_
     struct ListenerEvictedPayload {
         session_id: String,
         listener_id: String,
-        buffer_ids: Vec<String>,
+        capture_ids: Vec<String>,
     }
 
     let payload = ListenerEvictedPayload {
         session_id: session_id.to_string(),
         listener_id: listener_id.to_string(),
-        buffer_ids: copied_buffer_ids.clone(),
+        capture_ids: copied_buffer_ids.clone(),
     };
     let _ = app.emit("listener-evicted", payload);
 

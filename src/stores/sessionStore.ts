@@ -494,9 +494,9 @@ async function setupSessionEventListeners(
           ioState: ioState as IOStateType,
           streamEndedReason: info.reason as Session["streamEndedReason"],
           buffer: {
-            available: info.buffer_available,
-            id: info.buffer_id,
-            type: info.buffer_type as "frames" | "bytes" | null,
+            available: info.capture_available,
+            id: info.capture_id,
+            type: info.capture_kind as "frames" | "bytes" | null,
             count: info.count,
             owningSessionId: sessionId,
             startTimeUs: info.time_range?.[0] ?? null,
@@ -505,12 +505,12 @@ async function setupSessionEventListeners(
             persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
           },
         });
-        if (info.buffer_id) {
-          useSessionStore.getState().addKnownBufferId(info.buffer_id);
+        if (info.capture_id) {
+          useSessionStore.getState().addKnownBufferId(info.capture_id);
         }
-        if (info.buffer_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
+        if (info.capture_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
           import("../api/buffer").then(({ getBufferMetadataById }) =>
-            getBufferMetadataById(info.buffer_id!).then((meta) => {
+            getBufferMetadataById(info.capture_id!).then((meta) => {
               if (meta) {
                 updateSession(sessionId, {
                   buffer: {
@@ -783,8 +783,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       capabilities = regResult.capabilities;
       ioState = getStateType(regResult.state);
       listenerCount = regResult.listener_count;
-      bufferId = regResult.buffer_id;
-      bufferType = regResult.buffer_type;
+      bufferId = regResult.capture_id;
+      bufferType = regResult.capture_kind;
 
       // Handle startup error (error that occurred before listener registered)
       if (regResult.startup_error) {
@@ -851,8 +851,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           const regResult = await registerSessionListener(sessionId, listenerId, appName);
           listenerCount = regResult.listener_count;
           // Pick up buffer info from the registration result (more accurate than our guess)
-          if (regResult.buffer_id) bufferId = regResult.buffer_id;
-          if (regResult.buffer_type) bufferType = regResult.buffer_type;
+          if (regResult.capture_id) bufferId = regResult.capture_id;
+          if (regResult.capture_kind) bufferType = regResult.capture_kind;
           // Handle startup error (error that occurred before listener registered)
           if (regResult.startup_error) {
             get().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
@@ -869,8 +869,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           capabilities = regResult.capabilities;
           ioState = getStateType(regResult.state);
           listenerCount = regResult.listener_count;
-          bufferId = regResult.buffer_id;
-          bufferType = regResult.buffer_type;
+          bufferId = regResult.capture_id;
+          bufferType = regResult.capture_kind;
 
           // Handle startup error (error that occurred before listener registered)
           if (regResult.startup_error) {
