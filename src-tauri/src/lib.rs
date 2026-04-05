@@ -2,10 +2,10 @@
 pub(crate) mod logging;
 mod ble_common;
 mod ble_provision;
-mod buffer_db;
-mod bufferquery;
-mod buffer_store;
-mod buffers;
+mod capture_db;
+mod capturequery;
+mod capture_store;
+mod captures;
 mod catalog;
 mod checksums;
 mod credentials;
@@ -892,7 +892,7 @@ pub fn run() {
                 let clear_on_start = settings::load_settings_sync(app.handle())
                     .map(|s| s.clear_buffers_on_start)
                     .unwrap_or(true);
-                if let Err(e) = buffer_db::initialise(&data_dir, clear_on_start) {
+                if let Err(e) = capture_db::initialise(&data_dir, clear_on_start) {
                     tlog!("[setup] Failed to initialise buffer database: {}", e);
                 }
 
@@ -902,7 +902,7 @@ pub fn run() {
 
                 // Hydrate the buffer registry from SQLite.
                 // Always called — persistent (pinned) buffers may survive clear_on_start.
-                buffer_store::hydrate_from_db();
+                capture_store::hydrate_from_db();
             }
 
             // Restore dashboard window geometry from persisted state (desktop only).
@@ -1084,39 +1084,39 @@ pub fn run() {
             io::webview_health_pong,
             io::check_recovery_occurred,
             // Buffer / CSV Import API
-            buffers::import_csv_to_buffer,
-            buffers::preview_csv,
-            buffers::import_csv_with_mapping,
-            buffers::import_csv_batch_with_mapping,
-            buffers::get_buffer_metadata,
-            buffers::get_buffer_frames,
-            buffers::get_buffer_frames_paginated,
-            buffers::get_buffer_frames_paginated_filtered,
-            buffers::get_buffer_frames_paginated_by_id,
-            buffers::get_buffer_frames_tail,
-            buffers::get_buffer_frame_info,
-            buffers::find_buffer_offset_for_timestamp,
-            buffers::search_buffer_frames,
+            captures::import_csv_to_buffer,
+            captures::preview_csv,
+            captures::import_csv_with_mapping,
+            captures::import_csv_batch_with_mapping,
+            captures::get_buffer_metadata,
+            captures::get_buffer_frames,
+            captures::get_buffer_frames_paginated,
+            captures::get_buffer_frames_paginated_filtered,
+            captures::get_buffer_frames_paginated_by_id,
+            captures::get_buffer_frames_tail,
+            captures::get_buffer_frame_info,
+            captures::find_buffer_offset_for_timestamp,
+            captures::search_buffer_frames,
             // Multi-buffer registry API
-            buffers::list_buffers,
-            buffers::list_buffer_ids,
-            buffers::delete_buffer,
-            buffers::clear_buffer,
-            buffers::get_buffer_metadata_by_id,
-            buffers::get_buffer_frames_by_id,
-            buffers::get_buffer_bytes_by_id,
-            buffers::set_active_buffer,
-            buffers::create_frame_buffer_from_frames,
+            captures::list_buffers,
+            captures::list_buffer_ids,
+            captures::delete_buffer,
+            captures::clear_buffer,
+            captures::get_buffer_metadata_by_id,
+            captures::get_buffer_frames_by_id,
+            captures::get_buffer_bytes_by_id,
+            captures::set_active_buffer,
+            captures::create_frame_buffer_from_frames,
             // Byte buffer API (Serial Discovery)
-            buffers::get_buffer_bytes_tail,
-            buffers::get_buffer_bytes_paginated,
-            buffers::get_buffer_bytes_count,
-            buffers::get_buffer_bytes_paginated_by_id,
-            buffers::find_buffer_bytes_offset_for_timestamp,
-            buffers::rename_buffer,
-            buffers::set_buffer_persistent,
+            captures::get_buffer_bytes_tail,
+            captures::get_buffer_bytes_paginated,
+            captures::get_buffer_bytes_count,
+            captures::get_buffer_bytes_paginated_by_id,
+            captures::find_buffer_bytes_offset_for_timestamp,
+            captures::rename_buffer,
+            captures::set_buffer_persistent,
             // Session-aware buffer API
-            buffers::list_orphaned_buffers,
+            captures::list_orphaned_buffers,
             // Backend framing
             framing::apply_framing_to_buffer,
             // Serial port API (platform-aware: real on desktop, stub on iOS)
@@ -1190,15 +1190,15 @@ pub fn run() {
             dbquery::db_query_activity,
             dbquery::db_cancel_backend,
             dbquery::db_terminate_backend,
-            bufferquery::buffer_query_byte_changes,
-            bufferquery::buffer_query_frame_changes,
-            bufferquery::buffer_query_mirror_validation,
-            bufferquery::buffer_query_mux_statistics,
-            bufferquery::buffer_query_first_last,
-            bufferquery::buffer_query_frequency,
-            bufferquery::buffer_query_distribution,
-            bufferquery::buffer_query_gap_analysis,
-            bufferquery::buffer_query_pattern_search,
+            capturequery::buffer_query_byte_changes,
+            capturequery::buffer_query_frame_changes,
+            capturequery::buffer_query_mirror_validation,
+            capturequery::buffer_query_mux_statistics,
+            capturequery::buffer_query_first_last,
+            capturequery::buffer_query_frequency,
+            capturequery::buffer_query_distribution,
+            capturequery::buffer_query_gap_analysis,
+            capturequery::buffer_query_pattern_search,
                         // Unified Device Scan API
                         device_scan::device_scan_start,
                         device_scan::device_scan_stop,

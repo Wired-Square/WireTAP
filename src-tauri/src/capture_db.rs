@@ -1,10 +1,10 @@
-// ui/src-tauri/src/buffer_db.rs
+// ui/src-tauri/src/capture_db.rs
 //
-// SQLite-backed storage for buffer frame and byte data.
+// SQLite-backed storage for capture frame and byte data.
 // Replaces the in-memory Vec<FrameMessage> / Vec<TimestampedByte> storage
 // to prevent OOM crashes during long captures.
 //
-// The public API of buffer_store.rs is unchanged — this module provides
+// The public API of capture_store.rs is unchanged — this module provides
 // the underlying storage layer only.
 
 use once_cell::sync::Lazy;
@@ -12,7 +12,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::buffer_store::{BufferFrameInfo, BufferMetadata, BufferType, TimestampedByte};
+use crate::capture_store::{CaptureFrameInfo, CaptureMetadata, CaptureKind, TimestampedByte};
 use crate::io::FrameMessage;
 
 /// Global database connection, protected by a Mutex.
@@ -22,7 +22,7 @@ static DB: Lazy<Mutex<Option<Connection>>> = Lazy::new(|| Mutex::new(None));
 const SCHEMA_SQL: &str = "
 CREATE TABLE IF NOT EXISTS frames (
     rowid INTEGER PRIMARY KEY,
-    buffer_id TEXT NOT NULL,
+    capture_id TEXT NOT NULL,
     protocol TEXT NOT NULL,
     timestamp_us INTEGER NOT NULL,
     frame_id INTEGER NOT NULL,
@@ -38,15 +38,15 @@ CREATE TABLE IF NOT EXISTS frames (
 
 CREATE TABLE IF NOT EXISTS bytes (
     rowid INTEGER PRIMARY KEY,
-    buffer_id TEXT NOT NULL,
+    capture_id TEXT NOT NULL,
     byte_val INTEGER NOT NULL,
     timestamp_us INTEGER NOT NULL,
     bus INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS buffer_metadata (
-    buffer_id TEXT PRIMARY KEY,
-    buffer_type TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS capture_metadata (
+    capture_id TEXT PRIMARY KEY,
+    capture_kind TEXT NOT NULL,
     name TEXT NOT NULL,
     count INTEGER NOT NULL DEFAULT 0,
     start_time_us INTEGER,
@@ -55,10 +55,60 @@ CREATE TABLE IF NOT EXISTS buffer_metadata (
     owning_session_id TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_frames_buffer_ts ON frames (buffer_id, timestamp_us);
-CREATE INDEX IF NOT EXISTS idx_frames_buffer_fid ON frames (buffer_id, frame_id);
-CREATE INDEX IF NOT EXISTS idx_bytes_buffer_ts ON bytes (buffer_id, timestamp_us);
+CREATE INDEX IF NOT EXISTS idx_frames_capture_ts ON frames (capture_id, timestamp_us);
+CREATE INDEX IF NOT EXISTS idx_frames_capture_fid ON frames (capture_id, frame_id);
+CREATE INDEX IF NOT EXISTS idx_bytes_capture_ts ON bytes (capture_id, timestamp_us);
 ";
+
+/// Migration: rename legacy `buffer_*` tables/columns to `capture_*`.
+/// Detects pre-rename schema and migrates in a single transaction.
+/// Idempotent — safely no-ops on fresh installs and already-migrated DBs.
+fn migrate_buffer_to_capture(conn: &mut Connection) -> Result<(), String> {
+    // Detect whether legacy `buffer_metadata` table exists
+    let has_legacy: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='buffer_metadata'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|n| n > 0)
+        .unwrap_or(false);
+
+    if !has_legacy {
+        return Ok(());
+    }
+
+    tlog!("[capture_db] Legacy buffer_* schema detected — migrating to capture_* names");
+
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to begin migration transaction: {}", e))?;
+
+    // The CREATE TABLE IF NOT EXISTS above will have already created an EMPTY
+    // `capture_metadata` table on this run. Drop it so we can rename the
+    // legacy table into place (with all its data).
+    tx.execute_batch(
+        "DROP TABLE IF EXISTS capture_metadata;
+         ALTER TABLE buffer_metadata RENAME TO capture_metadata;
+         ALTER TABLE capture_metadata RENAME COLUMN buffer_id TO capture_id;
+         ALTER TABLE capture_metadata RENAME COLUMN buffer_type TO capture_kind;
+         ALTER TABLE frames RENAME COLUMN buffer_id TO capture_id;
+         ALTER TABLE bytes RENAME COLUMN buffer_id TO capture_id;
+         DROP INDEX IF EXISTS idx_frames_buffer_ts;
+         DROP INDEX IF EXISTS idx_frames_buffer_fid;
+         DROP INDEX IF EXISTS idx_bytes_buffer_ts;
+         CREATE INDEX IF NOT EXISTS idx_frames_capture_ts ON frames (capture_id, timestamp_us);
+         CREATE INDEX IF NOT EXISTS idx_frames_capture_fid ON frames (capture_id, frame_id);
+         CREATE INDEX IF NOT EXISTS idx_bytes_capture_ts ON bytes (capture_id, timestamp_us);",
+    )
+    .map_err(|e| format!("Failed to execute buffer→capture migration: {}", e))?;
+
+    tx.commit()
+        .map_err(|e| format!("Failed to commit migration: {}", e))?;
+
+    tlog!("[capture_db] Buffer → Capture schema migration complete");
+    Ok(())
+}
 
 // ============================================================================
 // Initialisation
@@ -71,22 +121,27 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
         .map_err(|e| format!("Failed to create app data dir: {}", e))?;
 
     let db_path = app_data_dir.join("buffers.db");
-    let conn = Connection::open(&db_path)
-        .map_err(|e| format!("Failed to open buffer database: {}", e))?;
+    let mut conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open capture database: {}", e))?;
 
     // Create tables and indexes first (idempotent — IF NOT EXISTS)
     conn.execute_batch(SCHEMA_SQL)
         .map_err(|e| format!("Failed to create schema: {}", e))?;
 
+    // Migrate legacy buffer_* schema to capture_* if present.
+    // Must run BEFORE the ADD COLUMN migrations below so we're targeting the
+    // correct table name.
+    migrate_buffer_to_capture(&mut conn)?;
+
     // Schema migration: add persistent column (idempotent — ignores duplicate column error)
     let _ = conn.execute(
-        "ALTER TABLE buffer_metadata ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE capture_metadata ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0",
         [],
     );
 
     // Schema migration: add buses column (idempotent — ignores duplicate column error)
     let _ = conn.execute(
-        "ALTER TABLE buffer_metadata ADD COLUMN buses TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE capture_metadata ADD COLUMN buses TEXT NOT NULL DEFAULT '[]'",
         [],
     );
 
@@ -97,35 +152,35 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
         // VACUUM cannot shrink a WAL-mode database, so switch to DELETE mode first.
         conn.execute_batch("PRAGMA journal_mode=DELETE;")
             .map_err(|e| format!("Failed to switch to DELETE journal mode: {}", e))?;
-        // Delete frames/bytes belonging to non-persistent buffers
+        // Delete frames/bytes belonging to non-persistent captures
         conn.execute(
-            "DELETE FROM frames WHERE buffer_id IN (SELECT buffer_id FROM buffer_metadata WHERE persistent = 0)",
+            "DELETE FROM frames WHERE capture_id IN (SELECT capture_id FROM capture_metadata WHERE persistent = 0)",
             [],
         )
         .map_err(|e| format!("Failed to clear non-persistent frames: {}", e))?;
         conn.execute(
-            "DELETE FROM bytes WHERE buffer_id IN (SELECT buffer_id FROM buffer_metadata WHERE persistent = 0)",
+            "DELETE FROM bytes WHERE capture_id IN (SELECT capture_id FROM capture_metadata WHERE persistent = 0)",
             [],
         )
         .map_err(|e| format!("Failed to clear non-persistent bytes: {}", e))?;
-        conn.execute("DELETE FROM buffer_metadata WHERE persistent = 0", [])
-            .map_err(|e| format!("Failed to clear non-persistent buffer metadata: {}", e))?;
+        conn.execute("DELETE FROM capture_metadata WHERE persistent = 0", [])
+            .map_err(|e| format!("Failed to clear non-persistent capture metadata: {}", e))?;
         // Also delete orphaned data (frames/bytes with no metadata row at all)
         conn.execute(
-            "DELETE FROM frames WHERE buffer_id NOT IN (SELECT buffer_id FROM buffer_metadata)",
+            "DELETE FROM frames WHERE capture_id NOT IN (SELECT capture_id FROM capture_metadata)",
             [],
         )
         .map_err(|e| format!("Failed to clear orphaned frames: {}", e))?;
         conn.execute(
-            "DELETE FROM bytes WHERE buffer_id NOT IN (SELECT buffer_id FROM buffer_metadata)",
+            "DELETE FROM bytes WHERE capture_id NOT IN (SELECT capture_id FROM capture_metadata)",
             [],
         )
         .map_err(|e| format!("Failed to clear orphaned bytes: {}", e))?;
         conn.execute_batch("VACUUM;")
             .map_err(|e| format!("Failed to vacuum database: {}", e))?;
-        tlog!("[buffer_db] Initialised at {:?} (cleared non-persistent and vacuumed)", db_path);
+        tlog!("[capture_db] Initialised at {:?} (cleared non-persistent and vacuumed)", db_path);
     } else {
-        tlog!("[buffer_db] Initialised at {:?} (preserving previous data)", db_path);
+        tlog!("[capture_db] Initialised at {:?} (preserving previous data)", db_path);
     }
 
     // Set WAL mode and performance pragmas after vacuum (VACUUM resets journal mode)
@@ -195,7 +250,7 @@ pub fn insert_frames(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), Str
     {
         let mut stmt = tx
             .prepare_cached(
-                "INSERT INTO frames (buffer_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
+                "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             )
             .map_err(|e| format!("Failed to prepare statement: {}", e))?;
@@ -241,7 +296,7 @@ pub fn insert_bytes(buffer_id: &str, bytes: &[TimestampedByte]) -> Result<(), St
     {
         let mut stmt = tx
             .prepare_cached(
-                "INSERT INTO bytes (buffer_id, byte_val, timestamp_us, bus)
+                "INSERT INTO bytes (capture_id, byte_val, timestamp_us, bus)
                  VALUES (?1, ?2, ?3, ?4)",
             )
             .map_err(|e| format!("Failed to prepare statement: {}", e))?;
@@ -279,7 +334,7 @@ pub fn get_frames_paginated(
     let mut stmt = conn
         .prepare_cached(
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 ORDER BY rowid LIMIT ?2 OFFSET ?3",
+             FROM frames WHERE capture_id = ?1 ORDER BY rowid LIMIT ?2 OFFSET ?3",
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -325,7 +380,7 @@ pub fn get_frames_paginated_filtered(
     let total: usize = conn
         .query_row(
             &format!(
-                "SELECT COUNT(*) FROM frames WHERE buffer_id = ?1 AND frame_id IN ({})",
+                "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND frame_id IN ({})",
                 placeholders
             ),
             params![buffer_id],
@@ -336,7 +391,7 @@ pub fn get_frames_paginated_filtered(
     // Get page
     let sql = format!(
         "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-         FROM frames WHERE buffer_id = ?1 AND frame_id IN ({}) ORDER BY rowid LIMIT ?2 OFFSET ?3",
+         FROM frames WHERE capture_id = ?1 AND frame_id IN ({}) ORDER BY rowid LIMIT ?2 OFFSET ?3",
         placeholders
     );
 
@@ -374,10 +429,10 @@ pub fn get_frames_tail(
     let (sql_data, sql_count, sql_end_time) = if frame_ids.is_empty() {
         (
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 ORDER BY rowid DESC LIMIT ?2"
+             FROM frames WHERE capture_id = ?1 ORDER BY rowid DESC LIMIT ?2"
                 .to_string(),
-            "SELECT COUNT(*) FROM frames WHERE buffer_id = ?1".to_string(),
-            "SELECT MAX(timestamp_us) FROM frames WHERE buffer_id = ?1".to_string(),
+            "SELECT COUNT(*) FROM frames WHERE capture_id = ?1".to_string(),
+            "SELECT MAX(timestamp_us) FROM frames WHERE capture_id = ?1".to_string(),
         )
     } else {
         let placeholders = frame_ids
@@ -388,15 +443,15 @@ pub fn get_frames_tail(
         (
             format!(
                 "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-                 FROM frames WHERE buffer_id = ?1 AND frame_id IN ({}) ORDER BY rowid DESC LIMIT ?2",
+                 FROM frames WHERE capture_id = ?1 AND frame_id IN ({}) ORDER BY rowid DESC LIMIT ?2",
                 placeholders
             ),
             format!(
-                "SELECT COUNT(*) FROM frames WHERE buffer_id = ?1 AND frame_id IN ({})",
+                "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND frame_id IN ({})",
                 placeholders
             ),
             format!(
-                "SELECT MAX(timestamp_us) FROM frames WHERE buffer_id = ?1 AND frame_id IN ({})",
+                "SELECT MAX(timestamp_us) FROM frames WHERE capture_id = ?1 AND frame_id IN ({})",
                 placeholders
             ),
         )
@@ -443,7 +498,7 @@ pub fn get_frame_count(buffer_id: &str) -> Result<usize, String> {
 
     let count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM frames WHERE buffer_id = ?1",
+            "SELECT COUNT(*) FROM frames WHERE capture_id = ?1",
             params![buffer_id],
             |row| row.get(0),
         )
@@ -453,7 +508,7 @@ pub fn get_frame_count(buffer_id: &str) -> Result<usize, String> {
 }
 
 /// Get unique frame info via aggregation query.
-pub fn get_frame_info(buffer_id: &str) -> Result<Vec<BufferFrameInfo>, String> {
+pub fn get_frame_info(buffer_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
@@ -461,13 +516,13 @@ pub fn get_frame_info(buffer_id: &str) -> Result<Vec<BufferFrameInfo>, String> {
         .prepare_cached(
             "SELECT frame_id, MAX(dlc) as max_dlc, MIN(bus) as bus, MAX(is_extended) as is_extended,
                     (MIN(dlc) != MAX(dlc)) as has_dlc_mismatch
-             FROM frames WHERE buffer_id = ?1 GROUP BY frame_id",
+             FROM frames WHERE capture_id = ?1 GROUP BY frame_id",
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
         .query_map(params![buffer_id], |row| {
-            Ok(BufferFrameInfo {
+            Ok(CaptureFrameInfo {
                 frame_id: row.get::<_, i64>("frame_id")? as u32,
                 max_dlc: row.get::<_, i64>("max_dlc")? as u8,
                 bus: row.get::<_, i64>("bus")? as u8,
@@ -495,7 +550,7 @@ pub fn find_offset_for_timestamp(
 
     let count: i64 = if frame_ids.is_empty() {
         conn.query_row(
-            "SELECT COUNT(*) FROM frames WHERE buffer_id = ?1 AND timestamp_us < ?2",
+            "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND timestamp_us < ?2",
             params![buffer_id, target_us as i64],
             |row| row.get(0),
         )
@@ -508,7 +563,7 @@ pub fn find_offset_for_timestamp(
             .join(",");
         conn.query_row(
             &format!(
-                "SELECT COUNT(*) FROM frames WHERE buffer_id = ?1 AND timestamp_us < ?2 AND frame_id IN ({})",
+                "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND timestamp_us < ?2 AND frame_id IN ({})",
                 placeholders
             ),
             params![buffer_id, target_us as i64],
@@ -589,7 +644,7 @@ pub fn search_frames(
             SELECT frame_id, payload,
                    CAST(ROW_NUMBER() OVER (ORDER BY rowid) AS INTEGER) - 1 AS offset
             FROM frames
-            WHERE buffer_id = ?1{}
+            WHERE capture_id = ?1{}
         )
         SELECT offset FROM numbered WHERE {}",
         id_filter, where_clause
@@ -612,7 +667,7 @@ pub fn search_frames(
 }
 
 /// Copy all frame and byte data from one buffer to another using INSERT SELECT.
-pub fn copy_buffer_data(source_id: &str, dest_id: &str) -> Result<usize, String> {
+pub fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String> {
     let mut guard = DB.lock().unwrap();
     let conn = guard.as_mut().ok_or("Database not initialised")?;
 
@@ -622,18 +677,18 @@ pub fn copy_buffer_data(source_id: &str, dest_id: &str) -> Result<usize, String>
 
     let frame_count = tx
         .execute(
-            "INSERT INTO frames (buffer_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
+            "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
              SELECT ?2, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 ORDER BY rowid",
+             FROM frames WHERE capture_id = ?1 ORDER BY rowid",
             params![source_id, dest_id],
         )
         .map_err(|e| format!("Failed to copy frames: {}", e))?;
 
     let byte_count = tx
         .execute(
-            "INSERT INTO bytes (buffer_id, byte_val, timestamp_us, bus)
+            "INSERT INTO bytes (capture_id, byte_val, timestamp_us, bus)
              SELECT ?2, byte_val, timestamp_us, bus
-             FROM bytes WHERE buffer_id = ?1 ORDER BY rowid",
+             FROM bytes WHERE capture_id = ?1 ORDER BY rowid",
             params![source_id, dest_id],
         )
         .map_err(|e| format!("Failed to copy bytes: {}", e))?;
@@ -645,13 +700,13 @@ pub fn copy_buffer_data(source_id: &str, dest_id: &str) -> Result<usize, String>
 }
 
 /// Delete all data for a specific buffer.
-pub fn delete_buffer_data(buffer_id: &str) -> Result<(), String> {
+pub fn delete_capture_data(buffer_id: &str) -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
-    conn.execute("DELETE FROM frames WHERE buffer_id = ?1", params![buffer_id])
+    conn.execute("DELETE FROM frames WHERE capture_id = ?1", params![buffer_id])
         .map_err(|e| format!("Failed to delete frames: {}", e))?;
-    conn.execute("DELETE FROM bytes WHERE buffer_id = ?1", params![buffer_id])
+    conn.execute("DELETE FROM bytes WHERE capture_id = ?1", params![buffer_id])
         .map_err(|e| format!("Failed to delete bytes: {}", e))?;
 
     Ok(())
@@ -666,13 +721,13 @@ pub fn clear_and_refill(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), 
         .transaction()
         .map_err(|e| format!("Failed to begin transaction: {}", e))?;
 
-    tx.execute("DELETE FROM frames WHERE buffer_id = ?1", params![buffer_id])
+    tx.execute("DELETE FROM frames WHERE capture_id = ?1", params![buffer_id])
         .map_err(|e| format!("Failed to clear frames: {}", e))?;
 
     {
         let mut stmt = tx
             .prepare_cached(
-                "INSERT INTO frames (buffer_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
+                "INSERT INTO frames (capture_id, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             )
             .map_err(|e| format!("Failed to prepare: {}", e))?;
@@ -710,7 +765,7 @@ pub fn get_all_frames(buffer_id: &str) -> Result<Vec<FrameMessage>, String> {
     let mut stmt = conn
         .prepare_cached(
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 ORDER BY rowid",
+             FROM frames WHERE capture_id = ?1 ORDER BY rowid",
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -742,7 +797,7 @@ pub fn read_frame_chunk(
     let mut stmt = conn
         .prepare_cached(
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 AND rowid > ?2 ORDER BY rowid ASC LIMIT ?3",
+             FROM frames WHERE capture_id = ?1 AND rowid > ?2 ORDER BY rowid ASC LIMIT ?3",
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -772,7 +827,7 @@ pub fn read_frame_chunk_reverse(
     let mut stmt = conn
         .prepare_cached(
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 AND rowid < ?2 ORDER BY rowid DESC LIMIT ?3",
+             FROM frames WHERE capture_id = ?1 AND rowid < ?2 ORDER BY rowid DESC LIMIT ?3",
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -796,7 +851,7 @@ pub fn get_rowid_range(buffer_id: &str) -> Result<Option<(i64, i64)>, String> {
 
     let result: Option<(i64, i64)> = conn
         .query_row(
-            "SELECT MIN(rowid), MAX(rowid) FROM frames WHERE buffer_id = ?1",
+            "SELECT MIN(rowid), MAX(rowid) FROM frames WHERE capture_id = ?1",
             params![buffer_id],
             |row| {
                 let min: Option<i64> = row.get(0)?;
@@ -819,7 +874,7 @@ pub fn find_rowid_for_timestamp(
 
     let result: Option<i64> = conn
         .query_row(
-            "SELECT rowid FROM frames WHERE buffer_id = ?1 AND timestamp_us >= ?2 ORDER BY timestamp_us ASC, rowid ASC LIMIT 1",
+            "SELECT rowid FROM frames WHERE capture_id = ?1 AND timestamp_us >= ?2 ORDER BY timestamp_us ASC, rowid ASC LIMIT 1",
             params![buffer_id, timestamp_us as i64],
             |row| row.get(0),
         )
@@ -842,7 +897,7 @@ pub fn get_frame_at_index(
     let result = conn
         .query_row(
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 ORDER BY rowid LIMIT 1 OFFSET ?2",
+             FROM frames WHERE capture_id = ?1 ORDER BY rowid LIMIT 1 OFFSET ?2",
             params![buffer_id, index as i64],
             |row| row_to_frame_with_rowid(row),
         )
@@ -872,7 +927,7 @@ pub fn get_next_filtered_frame(
     let sql = if frame_ids.is_empty() {
         format!(
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 AND rowid {} ?2 ORDER BY rowid {} LIMIT 1",
+             FROM frames WHERE capture_id = ?1 AND rowid {} ?2 ORDER BY rowid {} LIMIT 1",
             op, order
         )
     } else {
@@ -883,7 +938,7 @@ pub fn get_next_filtered_frame(
             .join(",");
         format!(
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
-             FROM frames WHERE buffer_id = ?1 AND rowid {} ?2 AND frame_id IN ({}) ORDER BY rowid {} LIMIT 1",
+             FROM frames WHERE capture_id = ?1 AND rowid {} ?2 AND frame_id IN ({}) ORDER BY rowid {} LIMIT 1",
             op, placeholders, order
         )
     };
@@ -899,7 +954,7 @@ pub fn get_next_filtered_frame(
         // Compute the frame_index (0-based position within the buffer)
         let frame_index: usize = conn
             .query_row(
-                "SELECT COUNT(*) FROM frames WHERE buffer_id = ?1 AND rowid < ?2",
+                "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND rowid < ?2",
                 params![buffer_id, rowid],
                 |row| row.get::<_, i64>(0),
             )
@@ -918,7 +973,7 @@ pub fn count_frames_before_rowid(buffer_id: &str, rowid: i64) -> Result<usize, S
 
     let count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM frames WHERE buffer_id = ?1 AND rowid < ?2",
+            "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND rowid < ?2",
             params![buffer_id, rowid],
             |row| row.get(0),
         )
@@ -942,7 +997,7 @@ pub fn get_bytes_paginated(
 
     let total: usize = conn
         .query_row(
-            "SELECT COUNT(*) FROM bytes WHERE buffer_id = ?1",
+            "SELECT COUNT(*) FROM bytes WHERE capture_id = ?1",
             params![buffer_id],
             |row| row.get::<_, i64>(0),
         )
@@ -950,7 +1005,7 @@ pub fn get_bytes_paginated(
 
     let mut stmt = conn
         .prepare_cached(
-            "SELECT byte_val, timestamp_us, bus FROM bytes WHERE buffer_id = ?1 ORDER BY rowid LIMIT ?2 OFFSET ?3",
+            "SELECT byte_val, timestamp_us, bus FROM bytes WHERE capture_id = ?1 ORDER BY rowid LIMIT ?2 OFFSET ?3",
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -979,7 +1034,7 @@ pub fn get_all_bytes(buffer_id: &str) -> Result<Vec<TimestampedByte>, String> {
 
     let mut stmt = conn
         .prepare_cached(
-            "SELECT byte_val, timestamp_us, bus FROM bytes WHERE buffer_id = ?1 ORDER BY rowid",
+            "SELECT byte_val, timestamp_us, bus FROM bytes WHERE capture_id = ?1 ORDER BY rowid",
         )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
@@ -1132,7 +1187,7 @@ pub fn find_bytes_offset_for_timestamp(
 
     let count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM bytes WHERE buffer_id = ?1 AND timestamp_us < ?2",
+            "SELECT COUNT(*) FROM bytes WHERE capture_id = ?1 AND timestamp_us < ?2",
             params![buffer_id, target_us as i64],
             |row| row.get(0),
         )
@@ -1145,24 +1200,24 @@ pub fn find_bytes_offset_for_timestamp(
 // Buffer Metadata Persistence
 // ============================================================================
 
-/// Upsert buffer metadata into SQLite.
-pub fn save_buffer_metadata(meta: &BufferMetadata) -> Result<(), String> {
+/// Upsert capture metadata into SQLite.
+pub fn save_capture_metadata(meta: &CaptureMetadata) -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
-    let type_str = match &meta.buffer_type {
-        BufferType::Frames => "frames",
-        BufferType::Bytes => "bytes",
+    let kind_str = match &meta.buffer_type {
+        CaptureKind::Frames => "frames",
+        CaptureKind::Bytes => "bytes",
     };
 
     let buses_json = serde_json::to_string(&meta.buses).unwrap_or_else(|_| "[]".to_string());
 
     conn.execute(
-        "INSERT OR REPLACE INTO buffer_metadata (buffer_id, buffer_type, name, count, start_time_us, end_time_us, created_at, owning_session_id, persistent, buses)
+        "INSERT OR REPLACE INTO capture_metadata (capture_id, capture_kind, name, count, start_time_us, end_time_us, created_at, owning_session_id, persistent, buses)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             &meta.id,
-            type_str,
+            kind_str,
             &meta.name,
             meta.count as i64,
             meta.start_time_us.map(|v| v as i64),
@@ -1173,34 +1228,34 @@ pub fn save_buffer_metadata(meta: &BufferMetadata) -> Result<(), String> {
             buses_json,
         ],
     )
-    .map_err(|e| format!("Failed to save buffer metadata: {}", e))?;
+    .map_err(|e| format!("Failed to save capture metadata: {}", e))?;
 
     Ok(())
 }
 
-/// Load all buffer metadata from SQLite.
-pub fn load_all_buffer_metadata() -> Result<Vec<BufferMetadata>, String> {
+/// Load all capture metadata from SQLite.
+pub fn load_all_capture_metadata() -> Result<Vec<CaptureMetadata>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     let mut stmt = conn
-        .prepare("SELECT buffer_id, buffer_type, name, count, start_time_us, end_time_us, created_at, owning_session_id, persistent, buses FROM buffer_metadata")
+        .prepare("SELECT capture_id, capture_kind, name, count, start_time_us, end_time_us, created_at, owning_session_id, persistent, buses FROM capture_metadata")
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
         .query_map([], |row| {
-            let type_str: String = row.get("buffer_type")?;
-            let buffer_type = if type_str == "bytes" {
-                BufferType::Bytes
+            let kind_str: String = row.get("capture_kind")?;
+            let buffer_type = if kind_str == "bytes" {
+                CaptureKind::Bytes
             } else {
-                BufferType::Frames
+                CaptureKind::Frames
             };
 
             let buses_json: String = row.get::<_, String>("buses").unwrap_or_else(|_| "[]".to_string());
             let buses: Vec<u8> = serde_json::from_str(&buses_json).unwrap_or_default();
 
-            Ok(BufferMetadata {
-                id: row.get("buffer_id")?,
+            Ok(CaptureMetadata {
+                id: row.get("capture_id")?,
                 buffer_type,
                 name: row.get("name")?,
                 count: row.get::<_, i64>("count")? as usize,
@@ -1222,30 +1277,30 @@ pub fn load_all_buffer_metadata() -> Result<Vec<BufferMetadata>, String> {
     Ok(result)
 }
 
-/// Update the name of a buffer in SQLite.
-pub fn update_buffer_name(buffer_id: &str, new_name: &str) -> Result<(), String> {
+/// Update the name of a capture in SQLite.
+pub fn update_capture_name(capture_id: &str, new_name: &str) -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     conn.execute(
-        "UPDATE buffer_metadata SET name = ?2 WHERE buffer_id = ?1",
-        params![buffer_id, new_name],
+        "UPDATE capture_metadata SET name = ?2 WHERE capture_id = ?1",
+        params![capture_id, new_name],
     )
-    .map_err(|e| format!("Failed to update buffer name: {}", e))?;
+    .map_err(|e| format!("Failed to update capture name: {}", e))?;
 
     Ok(())
 }
 
-/// Update the persistent flag of a buffer in SQLite.
-pub fn update_buffer_persistent(buffer_id: &str, persistent: bool) -> Result<(), String> {
+/// Update the persistent flag of a capture in SQLite.
+pub fn update_capture_persistent(capture_id: &str, persistent: bool) -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     conn.execute(
-        "UPDATE buffer_metadata SET persistent = ?2 WHERE buffer_id = ?1",
-        params![buffer_id, persistent as i64],
+        "UPDATE capture_metadata SET persistent = ?2 WHERE capture_id = ?1",
+        params![capture_id, persistent as i64],
     )
-    .map_err(|e| format!("Failed to update buffer persistent flag: {}", e))?;
+    .map_err(|e| format!("Failed to update capture persistent flag: {}", e))?;
 
     Ok(())
 }
@@ -1259,7 +1314,7 @@ pub fn get_distinct_buses(buffer_id: &str, table: &str) -> Result<Vec<u8>, Strin
 
     // table is an internal constant ("frames" or "bytes"), not user input
     let sql = format!(
-        "SELECT DISTINCT bus FROM {} WHERE buffer_id = ?1 ORDER BY bus",
+        "SELECT DISTINCT bus FROM {} WHERE capture_id = ?1 ORDER BY bus",
         table
     );
     let mut stmt = conn
@@ -1277,16 +1332,16 @@ pub fn get_distinct_buses(buffer_id: &str, table: &str) -> Result<Vec<u8>, Strin
     Ok(buses)
 }
 
-/// Delete metadata for a specific buffer.
-pub fn delete_buffer_metadata(buffer_id: &str) -> Result<(), String> {
+/// Delete metadata for a specific capture.
+pub fn delete_capture_metadata(capture_id: &str) -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     conn.execute(
-        "DELETE FROM buffer_metadata WHERE buffer_id = ?1",
-        params![buffer_id],
+        "DELETE FROM capture_metadata WHERE capture_id = ?1",
+        params![capture_id],
     )
-    .map_err(|e| format!("Failed to delete buffer metadata: {}", e))?;
+    .map_err(|e| format!("Failed to delete capture metadata: {}", e))?;
 
     Ok(())
 }

@@ -1,8 +1,8 @@
-// ui/src-tauri/src/buffer_store.rs
+// ui/src-tauri/src/capture_store.rs
 //
-// Multi-buffer registry for storing captured data.
-// Metadata lives in RAM; bulk frame/byte data lives in SQLite (buffer_db).
-// Supports multiple named buffers, each typed as either Frames or Bytes.
+// Multi-capture registry for storing captured data.
+// Metadata lives in RAM; bulk frame/byte data lives in SQLite (capture_db).
+// Supports multiple named captures, each typed as either Frames or Bytes.
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
 use std::sync::RwLock;
 
-use crate::buffer_db;
+use crate::capture_db;
 use crate::io::FrameMessage;
 
 // ============================================================================
@@ -21,7 +21,7 @@ use crate::io::FrameMessage;
 /// Buffer type - determines what kind of data the buffer contains
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum BufferType {
+pub enum CaptureKind {
     /// CAN frames, framed serial messages
     Frames,
     /// Raw serial bytes (unframed)
@@ -42,11 +42,11 @@ pub struct TimestampedByte {
 
 /// Metadata about a buffer
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BufferMetadata {
+pub struct CaptureMetadata {
     /// Unique buffer ID (e.g., "xk9m2p", "r7f3kw")
     pub id: String,
     /// Buffer type (frames or bytes)
-    pub buffer_type: BufferType,
+    pub buffer_type: CaptureKind,
     /// Display name (e.g., "GVRET 10:30am", "Serial dump")
     pub name: String,
     /// Number of items (frames or bytes depending on type)
@@ -79,27 +79,27 @@ pub struct BufferMetadata {
 // ============================================================================
 
 /// A named buffer — metadata only, data lives in SQLite.
-struct NamedBuffer {
-    metadata: BufferMetadata,
+struct NamedCapture {
+    metadata: CaptureMetadata,
     /// In-memory set for efficient bus tracking during streaming
     seen_buses: HashSet<u8>,
 }
 
 /// Buffer registry holding multiple named buffers
-struct BufferRegistry {
+struct CaptureRegistry {
     /// All buffers indexed by ID
-    buffers: HashMap<String, NamedBuffer>,
+    buffers: HashMap<String, NamedCapture>,
     /// Buffer IDs currently receiving streaming data
     streaming_ids: HashSet<String>,
     /// Buffer IDs currently being rendered by UI panels
     active_ids: HashSet<String>,
-    /// Last logged streaming state for list_buffers (reduces log spam)
+    /// Last logged streaming state for list_captures (reduces log spam)
     last_logged_streaming_ids: Option<HashSet<String>>,
-    /// Last logged buffer count for list_buffers
+    /// Last logged buffer count for list_captures
     last_logged_buffer_count: usize,
 }
 
-impl Default for BufferRegistry {
+impl Default for CaptureRegistry {
     fn default() -> Self {
         Self {
             buffers: HashMap::new(),
@@ -112,22 +112,22 @@ impl Default for BufferRegistry {
 }
 
 /// Global buffer registry
-static BUFFER_REGISTRY: Lazy<RwLock<BufferRegistry>> =
-    Lazy::new(|| RwLock::new(BufferRegistry::default()));
+static CAPTURE_REGISTRY: Lazy<RwLock<CaptureRegistry>> =
+    Lazy::new(|| RwLock::new(CaptureRegistry::default()));
 
 // ============================================================================
 // Public API - Buffer ID Queries
 // ============================================================================
 
 /// Check if a given ID corresponds to a known buffer.
-pub fn is_known_buffer(id: &str) -> bool {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn is_known_capture(id: &str) -> bool {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     registry.buffers.contains_key(id)
 }
 
 /// Return all known buffer IDs.
-pub fn list_buffer_ids() -> Vec<String> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn list_capture_ids() -> Vec<String> {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     registry.buffers.keys().cloned().collect()
 }
 
@@ -137,21 +137,21 @@ pub fn list_buffer_ids() -> Vec<String> {
 
 /// Create a new buffer and set it as active for streaming.
 /// Returns the buffer ID.
-pub fn create_buffer(buffer_type: BufferType, name: String) -> String {
-    create_buffer_internal(buffer_type, name, true)
+pub fn create_capture(buffer_type: CaptureKind, name: String) -> String {
+    create_capture_internal(buffer_type, name, true)
 }
 
 /// Create a new buffer WITHOUT setting it as active.
 /// Use this when creating derived buffers (e.g., framing results) that shouldn't
 /// disrupt the current streaming buffer.
 /// Returns the buffer ID.
-pub fn create_buffer_inactive(buffer_type: BufferType, name: String) -> String {
-    create_buffer_internal(buffer_type, name, false)
+pub fn create_capture_inactive(buffer_type: CaptureKind, name: String) -> String {
+    create_capture_internal(buffer_type, name, false)
 }
 
 /// Generate a random 6-character lowercase alphanumeric buffer ID.
 /// Retries on collision (astronomically unlikely with 36^6 ≈ 2.2 billion possibilities).
-fn generate_buffer_id(registry: &BufferRegistry) -> String {
+fn generate_capture_id(registry: &CaptureRegistry) -> String {
     const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
     loop {
         let random_state = RandomState::new();
@@ -174,17 +174,17 @@ fn generate_buffer_id(registry: &BufferRegistry) -> String {
 }
 
 /// Internal helper to create a buffer with optional streaming activation.
-fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: bool) -> String {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
+fn create_capture_internal(buffer_type: CaptureKind, name: String, set_streaming: bool) -> String {
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
-    let id = generate_buffer_id(&registry);
+    let id = generate_capture_id(&registry);
 
     let created_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    let metadata = BufferMetadata {
+    let metadata = CaptureMetadata {
         id: id.clone(),
         buffer_type: buffer_type.clone(),
         name: name.clone(),
@@ -198,7 +198,7 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
         buses: Vec::new(),
     };
 
-    let buffer = NamedBuffer { metadata: metadata.clone(), seen_buses: HashSet::new() };
+    let buffer = NamedCapture { metadata: metadata.clone(), seen_buses: HashSet::new() };
     registry.buffers.insert(id.clone(), buffer);
 
     if set_streaming {
@@ -209,7 +209,7 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
     drop(registry);
 
     // Persist initial metadata to SQLite
-    if let Err(e) = buffer_db::save_buffer_metadata(&metadata) {
+    if let Err(e) = capture_db::save_capture_metadata(&metadata) {
         tlog!("[BufferStore] Failed to persist buffer metadata: {}", e);
     }
 
@@ -223,8 +223,8 @@ fn create_buffer_internal(buffer_type: BufferType, name: String, set_streaming: 
 
 /// List all buffers (returns metadata only, not data).
 /// Sets is_streaming=true for the buffer currently being streamed to.
-pub fn list_buffers() -> Vec<BufferMetadata> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
+pub fn list_captures() -> Vec<CaptureMetadata> {
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
     let current_streaming = registry.streaming_ids.clone();
     let buffer_count = registry.buffers.len();
@@ -233,7 +233,7 @@ pub fn list_buffers() -> Vec<BufferMetadata> {
 
     if should_log {
         tlog!(
-            "[BufferStore] list_buffers - streaming: {:?}, buffers: {}",
+            "[BufferStore] list_captures - streaming: {:?}, buffers: {}",
             current_streaming,
             buffer_count
         );
@@ -248,7 +248,7 @@ pub fn list_buffers() -> Vec<BufferMetadata> {
         registry.last_logged_buffer_count = buffer_count;
     }
 
-    let result: Vec<BufferMetadata> = registry
+    let result: Vec<CaptureMetadata> = registry
         .buffers
         .values()
         .map(|b| {
@@ -262,8 +262,8 @@ pub fn list_buffers() -> Vec<BufferMetadata> {
 
 /// Get metadata for a specific buffer.
 /// Sets is_streaming=true if this buffer is being streamed to.
-pub fn get_buffer_metadata(id: &str) -> Option<BufferMetadata> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn get_capture_metadata(id: &str) -> Option<CaptureMetadata> {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     registry.buffers.get(id).map(|b| {
         let mut meta = b.metadata.clone();
         meta.is_streaming = registry.streaming_ids.contains(&meta.id);
@@ -273,8 +273,8 @@ pub fn get_buffer_metadata(id: &str) -> Option<BufferMetadata> {
 
 /// Delete a specific buffer.
 /// If deleting the active/streaming buffer, clears those IDs.
-pub fn delete_buffer(id: &str) -> Result<(), String> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
+pub fn delete_capture(id: &str) -> Result<(), String> {
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
     registry.active_ids.remove(id);
     registry.streaming_ids.remove(id);
@@ -282,10 +282,10 @@ pub fn delete_buffer(id: &str) -> Result<(), String> {
     if registry.buffers.remove(id).is_some() {
         // Drop the registry lock before touching SQLite
         drop(registry);
-        if let Err(e) = buffer_db::delete_buffer_data(id) {
+        if let Err(e) = capture_db::delete_capture_data(id) {
             tlog!("[BufferStore] Failed to delete buffer data from SQLite: {}", e);
         }
-        if let Err(e) = buffer_db::delete_buffer_metadata(id) {
+        if let Err(e) = capture_db::delete_capture_metadata(id) {
             tlog!("[BufferStore] Failed to delete buffer metadata from SQLite: {}", e);
         }
         tlog!("[BufferStore] Deleted buffer '{}'", id);
@@ -298,9 +298,9 @@ pub fn delete_buffer(id: &str) -> Result<(), String> {
 /// Clear a buffer's data without deleting the buffer itself.
 /// Resets metadata (count, times, buses) so the session can continue
 /// writing new frames into the same buffer.
-pub fn clear_buffer(id: &str) -> Result<(), String> {
+pub fn clear_capture(id: &str) -> Result<(), String> {
     {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        let mut registry = CAPTURE_REGISTRY.write().unwrap();
         if let Some(buffer) = registry.buffers.get_mut(id) {
             buffer.metadata.count = 0;
             buffer.metadata.start_time_us = None;
@@ -312,7 +312,7 @@ pub fn clear_buffer(id: &str) -> Result<(), String> {
         }
     }
 
-    if let Err(e) = buffer_db::delete_buffer_data(id) {
+    if let Err(e) = capture_db::delete_capture_data(id) {
         tlog!("[BufferStore] Failed to clear buffer data from SQLite: {}", e);
     }
     tlog!("[BufferStore] Cleared buffer '{}'", id);
@@ -321,8 +321,8 @@ pub fn clear_buffer(id: &str) -> Result<(), String> {
 
 /// Rename a buffer.
 /// Updates both the in-memory registry and SQLite metadata.
-pub fn rename_buffer(id: &str, new_name: &str) -> Result<BufferMetadata, String> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
+pub fn rename_capture(id: &str, new_name: &str) -> Result<CaptureMetadata, String> {
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
     let buffer = registry.buffers.get_mut(id)
         .ok_or_else(|| format!("Buffer '{}' not found", id))?;
 
@@ -332,7 +332,7 @@ pub fn rename_buffer(id: &str, new_name: &str) -> Result<BufferMetadata, String>
     // Drop registry lock before touching SQLite
     drop(registry);
 
-    if let Err(e) = buffer_db::update_buffer_name(id, new_name) {
+    if let Err(e) = capture_db::update_capture_name(id, new_name) {
         tlog!("[BufferStore] Failed to persist buffer rename: {}", e);
     }
 
@@ -342,8 +342,8 @@ pub fn rename_buffer(id: &str, new_name: &str) -> Result<BufferMetadata, String>
 
 /// Set a buffer's persistent flag.
 /// Persistent buffers survive app restart when 'clear buffers on start' is enabled.
-pub fn set_buffer_persistent(id: &str, persistent: bool) -> Result<BufferMetadata, String> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
+pub fn set_capture_persistent(id: &str, persistent: bool) -> Result<CaptureMetadata, String> {
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
     let buffer = registry.buffers.get_mut(id)
         .ok_or_else(|| format!("Buffer '{}' not found", id))?;
 
@@ -353,7 +353,7 @@ pub fn set_buffer_persistent(id: &str, persistent: bool) -> Result<BufferMetadat
     // Drop registry lock before touching SQLite
     drop(registry);
 
-    if let Err(e) = buffer_db::update_buffer_persistent(id, persistent) {
+    if let Err(e) = capture_db::update_capture_persistent(id, persistent) {
         tlog!("[BufferStore] Failed to persist buffer persistent flag: {}", e);
     }
 
@@ -362,10 +362,10 @@ pub fn set_buffer_persistent(id: &str, persistent: bool) -> Result<BufferMetadat
 }
 
 /// Hydrate the in-memory buffer registry from persisted SQLite metadata.
-/// Called on startup when `clear_buffers_on_start` is false.
+/// Called on startup when `clear_captures_on_start` is false.
 /// Verifies that data actually exists in SQLite for each metadata entry.
 pub fn hydrate_from_db() {
-    let metadata_rows = match buffer_db::load_all_buffer_metadata() {
+    let metadata_rows = match capture_db::load_all_capture_metadata() {
         Ok(rows) => rows,
         Err(e) => {
             tlog!("[BufferStore] Failed to load buffer metadata from DB: {}", e);
@@ -378,18 +378,18 @@ pub fn hydrate_from_db() {
         return;
     }
 
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
     let mut hydrated = 0u32;
 
     for meta in metadata_rows {
         // Verify data actually exists in SQLite (skip orphaned metadata)
         let has_data = match meta.buffer_type {
-            BufferType::Frames => {
-                buffer_db::get_frame_count(&meta.id).unwrap_or(0) > 0
+            CaptureKind::Frames => {
+                capture_db::get_frame_count(&meta.id).unwrap_or(0) > 0
             }
-            BufferType::Bytes => {
+            CaptureKind::Bytes => {
                 // Check byte count via paginated query (limit 1 is enough to verify existence)
-                buffer_db::get_bytes_paginated(&meta.id, 0, 1)
+                capture_db::get_bytes_paginated(&meta.id, 0, 1)
                     .map(|(_, total)| total > 0)
                     .unwrap_or(false)
             }
@@ -398,7 +398,7 @@ pub fn hydrate_from_db() {
         if !has_data {
             tlog!("[BufferStore] Skipping metadata for '{}' — no data in SQLite", meta.id);
             // Clean up the orphaned metadata row
-            let _ = buffer_db::delete_buffer_metadata(&meta.id);
+            let _ = capture_db::delete_capture_metadata(&meta.id);
             continue;
         }
 
@@ -406,10 +406,10 @@ pub fn hydrate_from_db() {
         let mut buses = meta.buses.clone();
         if buses.is_empty() {
             let table = match meta.buffer_type {
-                BufferType::Frames => "frames",
-                BufferType::Bytes => "bytes",
+                CaptureKind::Frames => "frames",
+                CaptureKind::Bytes => "bytes",
             };
-            if let Ok(db_buses) = buffer_db::get_distinct_buses(&meta.id, table) {
+            if let Ok(db_buses) = capture_db::get_distinct_buses(&meta.id, table) {
                 buses = db_buses;
             }
         }
@@ -420,8 +420,8 @@ pub fn hydrate_from_db() {
         );
 
         let seen_buses: HashSet<u8> = buses.iter().copied().collect();
-        let buffer = NamedBuffer {
-            metadata: BufferMetadata {
+        let buffer = NamedCapture {
+            metadata: CaptureMetadata {
                 is_streaming: false,
                 buses: buses.clone(),
                 ..meta
@@ -431,7 +431,7 @@ pub fn hydrate_from_db() {
 
         // Persist backfilled buses so we don't scan again next startup
         if !buses.is_empty() {
-            let _ = buffer_db::save_buffer_metadata(&buffer.metadata);
+            let _ = capture_db::save_capture_metadata(&buffer.metadata);
         }
 
         registry.buffers.insert(buffer.metadata.id.clone(), buffer);
@@ -447,9 +447,9 @@ pub fn hydrate_from_db() {
 
 /// Assign a buffer to a session.
 /// The buffer will only be accessible through this session until orphaned.
-pub fn set_buffer_owner(buffer_id: &str, session_id: &str) -> Result<(), String> {
+pub fn set_capture_owner(buffer_id: &str, session_id: &str) -> Result<(), String> {
     let meta = {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        let mut registry = CAPTURE_REGISTRY.write().unwrap();
         if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
             buffer.metadata.owning_session_id = Some(session_id.to_string());
             tlog!(
@@ -464,7 +464,7 @@ pub fn set_buffer_owner(buffer_id: &str, session_id: &str) -> Result<(), String>
 
     match meta {
         Some(m) => {
-            if let Err(e) = buffer_db::save_buffer_metadata(&m) {
+            if let Err(e) = capture_db::save_capture_metadata(&m) {
                 tlog!("[BufferStore] Failed to persist buffer owner: {}", e);
             }
             Ok(())
@@ -475,26 +475,26 @@ pub fn set_buffer_owner(buffer_id: &str, session_id: &str) -> Result<(), String>
 
 /// Info about an orphaned buffer for event emission
 #[derive(Clone, Debug, Serialize)]
-pub struct OrphanedBufferInfo {
+pub struct OrphanedCaptureInfo {
     pub buffer_id: String,
     pub buffer_name: String,
-    pub buffer_type: BufferType,
+    pub buffer_type: CaptureKind,
     pub count: usize,
 }
 
 /// Orphan all buffers owned by a specific session.
 /// Called when a session is destroyed or restarted.
 /// Returns list of orphaned buffer info for event emission.
-pub fn orphan_buffers_for_session(session_id: &str) -> Vec<OrphanedBufferInfo> {
+pub fn orphan_captures_for_session(session_id: &str) -> Vec<OrphanedCaptureInfo> {
     let (orphaned, metas_to_persist) = {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        let mut registry = CAPTURE_REGISTRY.write().unwrap();
         let mut orphaned = Vec::new();
         let mut metas = Vec::new();
 
         for buffer in registry.buffers.values_mut() {
             if buffer.metadata.owning_session_id.as_deref() == Some(session_id) {
                 buffer.metadata.owning_session_id = None;
-                orphaned.push(OrphanedBufferInfo {
+                orphaned.push(OrphanedCaptureInfo {
                     buffer_id: buffer.metadata.id.clone(),
                     buffer_name: buffer.metadata.name.clone(),
                     buffer_type: buffer.metadata.buffer_type.clone(),
@@ -509,7 +509,7 @@ pub fn orphan_buffers_for_session(session_id: &str) -> Vec<OrphanedBufferInfo> {
 
     // Persist ownership changes outside the registry lock
     for meta in &metas_to_persist {
-        if let Err(e) = buffer_db::save_buffer_metadata(meta) {
+        if let Err(e) = capture_db::save_capture_metadata(meta) {
             tlog!("[BufferStore] Failed to persist orphan for '{}': {}", meta.id, e);
         }
     }
@@ -527,8 +527,8 @@ pub fn orphan_buffers_for_session(session_id: &str) -> Vec<OrphanedBufferInfo> {
 }
 
 /// Get all buffer IDs owned by a session (frames + bytes).
-pub fn get_session_buffer_ids(session_id: &str) -> Vec<String> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn get_session_capture_ids(session_id: &str) -> Vec<String> {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     registry
         .buffers
         .values()
@@ -538,14 +538,14 @@ pub fn get_session_buffer_ids(session_id: &str) -> Vec<String> {
 }
 
 /// Get the frame buffer ID for a session, if one exists.
-pub fn get_session_frame_buffer_id(session_id: &str) -> Option<String> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn get_session_frame_capture_id(session_id: &str) -> Option<String> {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     registry
         .buffers
         .values()
         .find(|b| {
             b.metadata.owning_session_id.as_deref() == Some(session_id)
-                && b.metadata.buffer_type == BufferType::Frames
+                && b.metadata.buffer_type == CaptureKind::Frames
         })
         .map(|b| b.metadata.id.clone())
 }
@@ -558,14 +558,14 @@ pub fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>)
     // Tap test pattern frames for active io_test runners
     crate::io_test::tap_test_frames(session_id, &new_frames);
     let buffer_id = {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         registry.buffers.values()
             .find(|b| b.metadata.owning_session_id.as_deref() == Some(session_id)
-                    && b.metadata.buffer_type == BufferType::Frames)
+                    && b.metadata.buffer_type == CaptureKind::Frames)
             .map(|b| b.metadata.id.clone())
     };
     if let Some(id) = buffer_id {
-        append_frames_to_buffer(&id, new_frames);
+        append_frames_to_capture(&id, new_frames);
     } else {
         tlog!("[BufferStore] WARN: append_frames_to_session('{}') — no frame buffer found for session (dropped {} frames)", session_id, new_frames.len());
     }
@@ -577,21 +577,21 @@ pub fn append_frames_to_session(session_id: &str, new_frames: Vec<FrameMessage>)
 pub fn append_raw_bytes_to_session(session_id: &str, new_bytes: Vec<TimestampedByte>) {
     if new_bytes.is_empty() { return; }
     let buffer_id = {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         registry.buffers.values()
             .find(|b| b.metadata.owning_session_id.as_deref() == Some(session_id)
-                    && b.metadata.buffer_type == BufferType::Bytes)
+                    && b.metadata.buffer_type == CaptureKind::Bytes)
             .map(|b| b.metadata.id.clone())
     };
     if let Some(id) = buffer_id {
-        append_raw_bytes_to_buffer(&id, new_bytes);
+        append_raw_bytes_to_capture(&id, new_bytes);
     }
 }
 
 /// Finalize all streaming buffers owned by this session.
 /// Removes them from streaming_ids, persists final metadata.
-pub fn finalize_session_buffers(session_id: &str) -> Vec<BufferMetadata> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
+pub fn finalize_session_captures(session_id: &str) -> Vec<CaptureMetadata> {
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
     let owned: Vec<String> = {
         let streaming = &registry.streaming_ids;
@@ -615,7 +615,7 @@ pub fn finalize_session_buffers(session_id: &str) -> Vec<BufferMetadata> {
     drop(registry);
 
     for meta in &finalized {
-        if let Err(e) = buffer_db::save_buffer_metadata(meta) {
+        if let Err(e) = capture_db::save_capture_metadata(meta) {
             tlog!("[BufferStore] Failed to persist finalized buffer metadata: {}", e);
         }
     }
@@ -624,8 +624,8 @@ pub fn finalize_session_buffers(session_id: &str) -> Vec<BufferMetadata> {
 }
 
 /// Mark a buffer as being rendered by a UI panel.
-pub fn mark_buffer_active(buffer_id: &str) -> Result<(), String> {
-    let mut registry = BUFFER_REGISTRY.write().unwrap();
+pub fn mark_capture_active(buffer_id: &str) -> Result<(), String> {
+    let mut registry = CAPTURE_REGISTRY.write().unwrap();
     if registry.buffers.contains_key(buffer_id) {
         registry.active_ids.insert(buffer_id.to_string());
         tlog!("[BufferStore] Marked buffer active: {}", buffer_id);
@@ -637,8 +637,8 @@ pub fn mark_buffer_active(buffer_id: &str) -> Result<(), String> {
 
 /// List only orphaned buffers (no owning session).
 /// These are available for standalone selection.
-pub fn list_orphaned_buffers() -> Vec<BufferMetadata> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn list_orphaned_captures() -> Vec<CaptureMetadata> {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
 
     registry
         .buffers
@@ -655,9 +655,9 @@ pub fn list_orphaned_buffers() -> Vec<BufferMetadata> {
 /// Create a copy of a buffer for an app that is detaching.
 /// The copy is orphaned (no owning session) and available for standalone use.
 /// Returns the new buffer ID.
-pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, String> {
+pub fn copy_capture(source_buffer_id: &str, new_name: String) -> Result<String, String> {
     let source_metadata = {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         let source = registry
             .buffers
             .get(source_buffer_id)
@@ -667,16 +667,16 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
 
     // Create new buffer entry in registry
     let (id, metadata) = {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
-        let id = generate_buffer_id(&registry);
+        let id = generate_capture_id(&registry);
 
         let created_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        let metadata = BufferMetadata {
+        let metadata = CaptureMetadata {
             id: id.clone(),
             buffer_type: source_metadata.buffer_type.clone(),
             name: new_name.clone(),
@@ -691,16 +691,16 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
         };
 
         let seen_buses: HashSet<u8> = source_metadata.buses.iter().copied().collect();
-        let buffer = NamedBuffer { metadata: metadata.clone(), seen_buses };
+        let buffer = NamedCapture { metadata: metadata.clone(), seen_buses };
         registry.buffers.insert(id.clone(), buffer);
         (id, metadata)
     };
 
     // Copy data in SQLite (INSERT INTO ... SELECT — no memory spike)
-    let count = buffer_db::copy_buffer_data(source_buffer_id, &id)?;
+    let count = capture_db::copy_capture_data(source_buffer_id, &id)?;
 
     // Persist metadata for the new buffer
-    if let Err(e) = buffer_db::save_buffer_metadata(&metadata) {
+    if let Err(e) = capture_db::save_capture_metadata(&metadata) {
         tlog!("[BufferStore] Failed to persist copied buffer metadata: {}", e);
     }
 
@@ -720,16 +720,16 @@ pub fn copy_buffer(source_buffer_id: &str, new_name: String) -> Result<String, S
 /// Silently returns if buffer doesn't exist or is not a frame buffer.
 /// Only used by framing.rs which is desktop-only.
 #[cfg(not(target_os = "ios"))]
-pub fn append_frames_to_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
+pub fn append_frames_to_capture(buffer_id: &str, new_frames: Vec<FrameMessage>) {
     if new_frames.is_empty() {
         return;
     }
 
     {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
         if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
-            if buffer.metadata.buffer_type != BufferType::Frames {
+            if buffer.metadata.buffer_type != CaptureKind::Frames {
                 return;
             }
             if buffer.metadata.start_time_us.is_none() {
@@ -754,7 +754,7 @@ pub fn append_frames_to_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
         // Registry lock dropped here
     }
 
-    if let Err(e) = buffer_db::insert_frames(buffer_id, &new_frames) {
+    if let Err(e) = capture_db::insert_frames(buffer_id, &new_frames) {
         tlog!("[BufferStore] Failed to insert frames to buffer '{}': {}", buffer_id, e);
     }
 }
@@ -764,12 +764,12 @@ pub fn append_frames_to_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
 /// Silently returns if buffer doesn't exist or is not a frame buffer.
 /// Only used by framing.rs which is desktop-only.
 #[cfg(not(target_os = "ios"))]
-pub fn clear_and_refill_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
+pub fn clear_and_refill_capture(buffer_id: &str, new_frames: Vec<FrameMessage>) {
     {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
         if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
-            if buffer.metadata.buffer_type != BufferType::Frames {
+            if buffer.metadata.buffer_type != CaptureKind::Frames {
                 return;
             }
             buffer.metadata.start_time_us = new_frames.first().map(|f| f.timestamp_us);
@@ -789,7 +789,7 @@ pub fn clear_and_refill_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
         }
     }
 
-    if let Err(e) = buffer_db::clear_and_refill(buffer_id, &new_frames) {
+    if let Err(e) = capture_db::clear_and_refill(buffer_id, &new_frames) {
         tlog!("[BufferStore] Failed to clear and refill buffer '{}': {}", buffer_id, e);
     } else {
         tlog!(
@@ -801,24 +801,24 @@ pub fn clear_and_refill_buffer(buffer_id: &str, new_frames: Vec<FrameMessage>) {
 
 /// Get frames from a specific buffer.
 /// Returns None if buffer doesn't exist or is not a frame buffer.
-pub fn get_buffer_frames(id: &str) -> Option<Vec<FrameMessage>> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn get_capture_frames(id: &str) -> Option<Vec<FrameMessage>> {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     let buffer = registry.buffers.get(id)?;
-    if buffer.metadata.buffer_type != BufferType::Frames {
+    if buffer.metadata.buffer_type != CaptureKind::Frames {
         return None;
     }
     drop(registry);
 
-    buffer_db::get_all_frames(id).ok()
+    capture_db::get_all_frames(id).ok()
 }
 
 /// Get a page of frames from a specific buffer.
 /// Returns (frames, buffer_indices, total_count).
-pub fn get_buffer_frames_paginated(id: &str, offset: usize, limit: usize) -> (Vec<FrameMessage>, Vec<usize>, usize) {
+pub fn get_capture_frames_paginated(id: &str, offset: usize, limit: usize) -> (Vec<FrameMessage>, Vec<usize>, usize) {
     let total = {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == BufferType::Frames => b.metadata.count,
+            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => b.metadata.count,
             _ => return (Vec::new(), Vec::new(), 0),
         }
     };
@@ -827,7 +827,7 @@ pub fn get_buffer_frames_paginated(id: &str, offset: usize, limit: usize) -> (Ve
         return (Vec::new(), Vec::new(), total);
     }
 
-    match buffer_db::get_frames_paginated(id, offset, limit) {
+    match capture_db::get_frames_paginated(id, offset, limit) {
         Ok((frames, rowids)) => {
             let indices = rowids.into_iter().map(|r| r as usize).collect();
             (frames, indices, total)
@@ -841,26 +841,26 @@ pub fn get_buffer_frames_paginated(id: &str, offset: usize, limit: usize) -> (Ve
 
 /// Get a page of frames filtered by selected IDs.
 /// Returns (frames, buffer_indices, total_filtered_count).
-pub fn get_buffer_frames_paginated_filtered(
+pub fn get_capture_frames_paginated_filtered(
     id: &str,
     offset: usize,
     limit: usize,
     selected_ids: &std::collections::HashSet<u32>,
 ) -> (Vec<FrameMessage>, Vec<usize>, usize) {
     {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == BufferType::Frames => {},
+            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => {},
             _ => return (Vec::new(), Vec::new(), 0),
         }
     }
 
     if selected_ids.is_empty() {
-        return get_buffer_frames_paginated(id, offset, limit);
+        return get_capture_frames_paginated(id, offset, limit);
     }
 
     let frame_ids: Vec<u32> = selected_ids.iter().copied().collect();
-    match buffer_db::get_frames_paginated_filtered(id, offset, limit, &frame_ids) {
+    match capture_db::get_frames_paginated_filtered(id, offset, limit, &frame_ids) {
         Ok((frames, rowids, total)) => {
             let indices = rowids.into_iter().map(|r| r as usize).collect();
             (frames, indices, total)
@@ -884,15 +884,15 @@ pub struct TailResponse {
 
 /// Get the most recent N frames from a buffer, optionally filtered by frame IDs.
 /// Returns the frames in chronological order (oldest first) for display.
-pub fn get_buffer_frames_tail(
+pub fn get_capture_frames_tail(
     id: &str,
     limit: usize,
     selected_ids: &std::collections::HashSet<u32>,
 ) -> TailResponse {
     {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == BufferType::Frames => {},
+            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => {},
             _ => return TailResponse {
                 frames: Vec::new(),
                 buffer_indices: Vec::new(),
@@ -903,7 +903,7 @@ pub fn get_buffer_frames_tail(
     }
 
     let frame_ids: Vec<u32> = selected_ids.iter().copied().collect();
-    match buffer_db::get_frames_tail(id, limit, &frame_ids) {
+    match capture_db::get_frames_tail(id, limit, &frame_ids) {
         Ok((frames, rowids, total, end_time_us)) => {
             let indices = rowids.into_iter().map(|r| r as usize).collect();
             TailResponse {
@@ -927,7 +927,7 @@ pub fn get_buffer_frames_tail(
 
 /// Frame info extracted from a buffer
 #[derive(Clone, Debug, serde::Serialize)]
-pub struct BufferFrameInfo {
+pub struct CaptureFrameInfo {
     pub frame_id: u32,
     pub max_dlc: u8,
     pub bus: u8,
@@ -936,16 +936,16 @@ pub struct BufferFrameInfo {
 }
 
 /// Get unique frame IDs and their metadata from a buffer.
-pub fn get_buffer_frame_info(id: &str) -> Vec<BufferFrameInfo> {
+pub fn get_capture_frame_info(id: &str) -> Vec<CaptureFrameInfo> {
     {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == BufferType::Frames => {},
+            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => {},
             _ => return Vec::new(),
         }
     }
 
-    match buffer_db::get_frame_info(id) {
+    match capture_db::get_frame_info(id) {
         Ok(info) => info,
         Err(e) => {
             tlog!("[BufferStore] Failed to get frame info: {}", e);
@@ -955,21 +955,21 @@ pub fn get_buffer_frame_info(id: &str) -> Vec<BufferFrameInfo> {
 }
 
 /// Find the offset for a given timestamp in a buffer.
-pub fn find_buffer_offset_for_timestamp(
+pub fn find_capture_offset_for_timestamp(
     id: &str,
     target_time_us: u64,
     selected_ids: &std::collections::HashSet<u32>,
 ) -> usize {
     {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == BufferType::Frames => {},
+            Some(b) if b.metadata.buffer_type == CaptureKind::Frames => {},
             _ => return 0,
         }
     }
 
     let frame_ids: Vec<u32> = selected_ids.iter().copied().collect();
-    match buffer_db::find_offset_for_timestamp(id, target_time_us, &frame_ids) {
+    match capture_db::find_offset_for_timestamp(id, target_time_us, &frame_ids) {
         Ok(offset) => offset,
         Err(e) => {
             tlog!("[BufferStore] Failed to find offset for timestamp: {}", e);
@@ -984,16 +984,16 @@ pub fn find_buffer_offset_for_timestamp(
 
 /// Append raw bytes to a specific buffer by ID.
 /// Silently returns if buffer doesn't exist or is not a byte buffer.
-pub fn append_raw_bytes_to_buffer(buffer_id: &str, new_bytes: Vec<TimestampedByte>) {
+pub fn append_raw_bytes_to_capture(buffer_id: &str, new_bytes: Vec<TimestampedByte>) {
     if new_bytes.is_empty() {
         return;
     }
 
     {
-        let mut registry = BUFFER_REGISTRY.write().unwrap();
+        let mut registry = CAPTURE_REGISTRY.write().unwrap();
 
         if let Some(buffer) = registry.buffers.get_mut(buffer_id) {
-            if buffer.metadata.buffer_type != BufferType::Bytes {
+            if buffer.metadata.buffer_type != CaptureKind::Bytes {
                 return;
             }
             if buffer.metadata.start_time_us.is_none() {
@@ -1017,36 +1017,36 @@ pub fn append_raw_bytes_to_buffer(buffer_id: &str, new_bytes: Vec<TimestampedByt
         }
     }
 
-    if let Err(e) = buffer_db::insert_bytes(buffer_id, &new_bytes) {
+    if let Err(e) = capture_db::insert_bytes(buffer_id, &new_bytes) {
         tlog!("[BufferStore] Failed to insert bytes to buffer '{}': {}", buffer_id, e);
     }
 }
 
 /// Get raw bytes from a specific buffer.
 /// Returns None if buffer doesn't exist or is not a byte buffer.
-pub fn get_buffer_bytes(id: &str) -> Option<Vec<TimestampedByte>> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn get_capture_bytes(id: &str) -> Option<Vec<TimestampedByte>> {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     let buffer = registry.buffers.get(id)?;
-    if buffer.metadata.buffer_type != BufferType::Bytes {
+    if buffer.metadata.buffer_type != CaptureKind::Bytes {
         return None;
     }
     drop(registry);
 
-    buffer_db::get_all_bytes(id).ok()
+    capture_db::get_all_bytes(id).ok()
 }
 
 /// Get a page of bytes from a specific buffer.
 /// Returns (bytes, total_count).
-pub fn get_buffer_bytes_paginated(id: &str, offset: usize, limit: usize) -> (Vec<TimestampedByte>, usize) {
+pub fn get_capture_bytes_paginated(id: &str, offset: usize, limit: usize) -> (Vec<TimestampedByte>, usize) {
     {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(id) {
-            Some(b) if b.metadata.buffer_type == BufferType::Bytes => {},
+            Some(b) if b.metadata.buffer_type == CaptureKind::Bytes => {},
             _ => return (Vec::new(), 0),
         }
     }
 
-    match buffer_db::get_bytes_paginated(id, offset, limit) {
+    match capture_db::get_bytes_paginated(id, offset, limit) {
         Ok((bytes, total)) => (bytes, total),
         Err(e) => {
             tlog!("[BufferStore] Failed to get paginated bytes: {}", e);
@@ -1056,16 +1056,16 @@ pub fn get_buffer_bytes_paginated(id: &str, offset: usize, limit: usize) -> (Vec
 }
 
 /// Find the byte offset for a given timestamp in a specific byte buffer.
-pub fn find_buffer_bytes_offset_for_timestamp_by_id(buffer_id: &str, target_time_us: u64) -> usize {
+pub fn find_capture_bytes_offset_for_timestamp_by_id(buffer_id: &str, target_time_us: u64) -> usize {
     {
-        let registry = BUFFER_REGISTRY.read().unwrap();
+        let registry = CAPTURE_REGISTRY.read().unwrap();
         match registry.buffers.get(buffer_id) {
-            Some(b) if b.metadata.buffer_type == BufferType::Bytes => {},
+            Some(b) if b.metadata.buffer_type == CaptureKind::Bytes => {},
             _ => return 0,
         }
     }
 
-    match buffer_db::find_bytes_offset_for_timestamp(buffer_id, target_time_us) {
+    match capture_db::find_bytes_offset_for_timestamp(buffer_id, target_time_us) {
         Ok(offset) => offset,
         Err(e) => {
             tlog!("[BufferStore] Failed to find bytes offset for timestamp: {}", e);
@@ -1080,19 +1080,19 @@ pub fn find_buffer_bytes_offset_for_timestamp_by_id(buffer_id: &str, target_time
 
 /// Check if any buffer has data.
 pub fn has_any_data() -> bool {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     registry.buffers.values().any(|b| b.metadata.count > 0)
 }
 
 /// Get the count for a specific buffer.
-pub fn get_buffer_count(id: &str) -> usize {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn get_capture_count(id: &str) -> usize {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     registry.buffers.get(id).map(|b| b.metadata.count).unwrap_or(0)
 }
 
 /// Get the type of a specific buffer.
-pub fn get_buffer_type(id: &str) -> Option<BufferType> {
-    let registry = BUFFER_REGISTRY.read().unwrap();
+pub fn get_capture_kind(id: &str) -> Option<CaptureKind> {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
     registry.buffers.get(id).map(|b| b.metadata.buffer_type.clone())
 }
 

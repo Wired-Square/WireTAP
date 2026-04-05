@@ -29,7 +29,7 @@ use super::{
     CanTransmitFrame, IOCapabilities, IODevice, IOState, InterfaceTraits, SessionDataStreams,
     TransmitPayload, TransmitResult, VirtualBusState, emit_buffer_changed,
 };
-use crate::buffer_store::{self, BufferType};
+use crate::capture_store::{self, CaptureKind};
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 use super::gs_usb::encode_frame as encode_gs_usb_frame;
@@ -479,7 +479,7 @@ impl IODevice for MultiSourceReader {
 
         // Orphan any existing buffer owned by this session (e.g., from a previous bookmark jump)
         // This makes the old buffer selectable in "Orphaned Buffers" while creating a fresh one
-        let _orphaned = buffer_store::orphan_buffers_for_session(&self.session_id);
+        let _orphaned = capture_store::orphan_captures_for_session(&self.session_id);
 
         // Create appropriate buffer(s) for this multi-source session
         // We may need both a Frames buffer (for CAN, framed serial) and a Bytes buffer (for raw serial)
@@ -488,26 +488,26 @@ impl IODevice for MultiSourceReader {
 
         if has_framing {
             // Create a frames buffer as active (for frame operations)
-            let buffer_id = buffer_store::create_buffer(BufferType::Frames, self.session_id.clone());
+            let buffer_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
             // Assign buffer ownership to this session
-            let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
+            let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
         }
 
         if self.emits_raw_bytes {
             if has_framing {
                 // Create a bytes buffer in addition to frames buffer (not as active)
-                let bytes_id = buffer_store::create_buffer_inactive(
-                    BufferType::Bytes,
+                let bytes_id = capture_store::create_capture_inactive(
+                    CaptureKind::Bytes,
                     self.session_id.clone(),
                 );
                 // Assign buffer ownership to this session
-                let _ = buffer_store::set_buffer_owner(&bytes_id, &self.session_id);
+                let _ = capture_store::set_capture_owner(&bytes_id, &self.session_id);
                 bytes_buffer_id = Some(bytes_id);
             } else {
                 // Only raw bytes - create a bytes buffer as active
-                let buffer_id = buffer_store::create_buffer(BufferType::Bytes, self.session_id.clone());
+                let buffer_id = capture_store::create_capture(CaptureKind::Bytes, self.session_id.clone());
                 // Assign buffer ownership to this session
-                let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
+                let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
             }
         }
 

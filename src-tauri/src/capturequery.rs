@@ -1,12 +1,12 @@
-// ui/src-tauri/src/bufferquery.rs
+// ui/src-tauri/src/capturequery.rs
 //
-// Query commands for running analytical queries against buffer SQLite data.
+// Query commands for running analytical queries against capture SQLite data.
 // Mirrors the PostgreSQL query commands in dbquery.rs but operates on the
-// local buffer_db instead.
+// local capture_db instead.
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::buffer_db;
+use crate::capture_db;
 use crate::dbquery::{
     ByteChangeQueryResult, ByteChangeResult, DistributionQueryResult, DistributionResult,
     FirstLastQueryResult, FirstLastResult, FrameChangeQueryResult, FrameChangeResult,
@@ -43,7 +43,7 @@ pub fn buffer_query_byte_changes(
             SELECT timestamp_us, payload,
                    LAG(payload) OVER (ORDER BY rowid) as prev_payload
             FROM frames
-            WHERE buffer_id = ?1 AND frame_id = ?2",
+            WHERE capture_id = ?1 AND frame_id = ?2",
     );
 
     let mut param_idx = 3;
@@ -84,7 +84,7 @@ pub fn buffer_query_byte_changes(
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
-    let rows = buffer_db::query_raw(&sql, &param_refs)?;
+    let rows = capture_db::query_raw(&sql, &param_refs)?;
 
     let byte_idx = byte_index as usize;
     let mut results = Vec::new();
@@ -155,7 +155,7 @@ pub fn buffer_query_frame_changes(
             SELECT timestamp_us, payload,
                    LAG(payload) OVER (ORDER BY rowid) as prev_payload
             FROM frames
-            WHERE buffer_id = ?1 AND frame_id = ?2",
+            WHERE capture_id = ?1 AND frame_id = ?2",
     );
 
     let mut param_idx = 3;
@@ -193,7 +193,7 @@ pub fn buffer_query_frame_changes(
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
-    let rows = buffer_db::query_raw(&sql, &param_refs)?;
+    let rows = capture_db::query_raw(&sql, &param_refs)?;
 
     let mut results = Vec::new();
     let rows_scanned = rows.len();
@@ -268,10 +268,10 @@ pub fn buffer_query_mirror_validation(
     // Strategy: load mirror frames, then for each mirror frame find the closest
     // source frame within tolerance. This avoids a potentially expensive cross-join.
     let mut mirror_sql = String::from(
-        "SELECT timestamp_us, payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = ?1 AND frame_id = ?2",
     );
     let mut source_sql = String::from(
-        "SELECT timestamp_us, payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = ?1 AND frame_id = ?2",
     );
 
     let mut mirror_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -318,8 +318,8 @@ pub fn buffer_query_mirror_validation(
     let source_param_refs: Vec<&dyn rusqlite::types::ToSql> =
         source_params.iter().map(|p| p.as_ref()).collect();
 
-    let mirror_rows = buffer_db::query_raw_two_col(&mirror_sql, &mirror_param_refs)?;
-    let source_rows = buffer_db::query_raw_two_col(&source_sql, &source_param_refs)?;
+    let mirror_rows = capture_db::query_raw_two_col(&mirror_sql, &mirror_param_refs)?;
+    let source_rows = capture_db::query_raw_two_col(&source_sql, &source_param_refs)?;
 
     let rows_scanned = mirror_rows.len() + source_rows.len();
 
@@ -423,7 +423,7 @@ pub fn buffer_query_mux_statistics(
 
     // Build SQL to fetch payloads
     let mut sql = String::from(
-        "SELECT payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+        "SELECT payload FROM frames WHERE capture_id = ?1 AND frame_id = ?2",
     );
 
     let mut param_idx = 3;
@@ -452,7 +452,7 @@ pub fn buffer_query_mux_statistics(
 
     // Execute query and collect payloads
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-    let rows: Vec<Vec<u8>> = buffer_db::query_payloads(&sql, &param_refs)?;
+    let rows: Vec<Vec<u8>> = capture_db::query_payloads(&sql, &param_refs)?;
 
     let rows_scanned = rows.len();
     tlog!("[bufferquery] mux_statistics: fetched {} payloads", rows_scanned);
@@ -505,7 +505,7 @@ pub fn buffer_query_first_last(
     );
 
     // Build the shared WHERE clause for all three queries
-    let mut where_clause = String::from("WHERE buffer_id = ?1 AND frame_id = ?2");
+    let mut where_clause = String::from("WHERE capture_id = ?1 AND frame_id = ?2");
     let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
     params.push(Box::new(buffer_id.clone()));
     params.push(Box::new(frame_id as i64));
@@ -536,18 +536,18 @@ pub fn buffer_query_first_last(
         "SELECT timestamp_us, payload FROM frames {} ORDER BY rowid ASC LIMIT 1",
         where_clause
     );
-    let first_rows = buffer_db::query_raw_two_col(&first_sql, &param_refs)?;
+    let first_rows = capture_db::query_raw_two_col(&first_sql, &param_refs)?;
 
     // Query 2: last frame (DESC)
     let last_sql = format!(
         "SELECT timestamp_us, payload FROM frames {} ORDER BY rowid DESC LIMIT 1",
         where_clause
     );
-    let last_rows = buffer_db::query_raw_two_col(&last_sql, &param_refs)?;
+    let last_rows = capture_db::query_raw_two_col(&last_sql, &param_refs)?;
 
     // Query 3: total count
     let count_sql = format!("SELECT COUNT(*), x'00' FROM frames {}", where_clause);
-    let count_rows = buffer_db::query_raw_two_col(&count_sql, &param_refs)?;
+    let count_rows = capture_db::query_raw_two_col(&count_sql, &param_refs)?;
     let total_count = count_rows.first().map(|(c, _)| *c).unwrap_or(0);
 
     let rows_scanned = 2 + 1; // 2 LIMIT-1 queries + 1 count query (logical)
@@ -609,7 +609,7 @@ pub fn buffer_query_frequency(
 
     // Build SQL to fetch timestamps (use query_raw_two_col, ignore payload)
     let mut sql = String::from(
-        "SELECT timestamp_us, payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = ?1 AND frame_id = ?2",
     );
 
     let mut param_idx = 3;
@@ -638,7 +638,7 @@ pub fn buffer_query_frequency(
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
-    let rows = buffer_db::query_raw_two_col(&sql, &param_refs)?;
+    let rows = capture_db::query_raw_two_col(&sql, &param_refs)?;
     let rows_scanned = rows.len();
 
     // Extract just timestamps
@@ -712,7 +712,7 @@ pub fn buffer_query_distribution(
 
     // Build SQL to fetch payloads
     let mut sql = String::from(
-        "SELECT payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+        "SELECT payload FROM frames WHERE capture_id = ?1 AND frame_id = ?2",
     );
 
     let mut param_idx = 3;
@@ -740,7 +740,7 @@ pub fn buffer_query_distribution(
     sql.push_str(" ORDER BY rowid");
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-    let payloads = buffer_db::query_payloads(&sql, &param_refs)?;
+    let payloads = capture_db::query_payloads(&sql, &param_refs)?;
 
     let rows_scanned = payloads.len();
     let byte_idx = byte_index as usize;
@@ -814,7 +814,7 @@ pub fn buffer_query_gap_analysis(
 
     // Build SQL to fetch timestamps (use query_raw_two_col, ignore payload)
     let mut sql = String::from(
-        "SELECT timestamp_us, payload FROM frames WHERE buffer_id = ?1 AND frame_id = ?2",
+        "SELECT timestamp_us, payload FROM frames WHERE capture_id = ?1 AND frame_id = ?2",
     );
 
     let mut param_idx = 3;
@@ -843,7 +843,7 @@ pub fn buffer_query_gap_analysis(
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
-    let rows = buffer_db::query_raw_two_col(&sql, &param_refs)?;
+    let rows = capture_db::query_raw_two_col(&sql, &param_refs)?;
     let rows_scanned = rows.len();
 
     // Extract timestamps and find gaps exceeding threshold
@@ -920,7 +920,7 @@ pub fn buffer_query_pattern_search(
 
     // Build SQL — no frame_id filter, search across all frames
     let mut sql = String::from(
-        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE buffer_id = ?1",
+        "SELECT timestamp_us, frame_id, is_extended, payload FROM frames WHERE capture_id = ?1",
     );
 
     let mut param_idx = 2;
@@ -943,7 +943,7 @@ pub fn buffer_query_pattern_search(
 
     let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
 
-    let rows = buffer_db::query_raw_four_col(&sql, &param_refs)?;
+    let rows = capture_db::query_raw_four_col(&sql, &param_refs)?;
     let rows_scanned = rows.len();
 
     // Pre-compute masked pattern for comparison

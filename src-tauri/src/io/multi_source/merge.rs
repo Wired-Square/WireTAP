@@ -13,7 +13,7 @@ use super::spawner::run_source_reader;
 use super::types::{SourceConfig, TransmitChannels};
 use super::{MergeCommand, VirtualBusCommand, VirtualBusControls, VirtualCmdTx};
 use crate::settings;
-use crate::buffer_store::{self, TimestampedByte};
+use crate::capture_store::{self, TimestampedByte};
 use crate::io::types::SourceMessage;
 use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, signal_bytes_ready, signal_frames_ready, FrameMessage, SignalThrottle};
 
@@ -254,7 +254,7 @@ pub(super) async fn run_merge_task(
         if should_emit {
             if !pending_frames.is_empty() {
                 pending_frames.sort_by_key(|f| f.timestamp_us);
-                buffer_store::append_frames_to_session(&session_id, pending_frames);
+                capture_store::append_frames_to_session(&session_id, pending_frames);
                 pending_frames = Vec::new();
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
@@ -263,7 +263,7 @@ pub(super) async fn run_merge_task(
 
             if !pending_bytes.is_empty() {
                 pending_bytes.sort_by_key(|b| b.timestamp_us);
-                buffer_store::append_raw_bytes_to_session(&session_id, pending_bytes);
+                capture_store::append_raw_bytes_to_session(&session_id, pending_bytes);
                 pending_bytes = Vec::new();
                 if throttle.should_signal("bytes-ready") {
                     signal_bytes_ready(&session_id);
@@ -277,7 +277,7 @@ pub(super) async fn run_merge_task(
     // Store and signal any remaining frames
     if !pending_frames.is_empty() {
         pending_frames.sort_by_key(|f| f.timestamp_us);
-        buffer_store::append_frames_to_session(&session_id, pending_frames);
+        capture_store::append_frames_to_session(&session_id, pending_frames);
         throttle.flush();
         signal_frames_ready(&session_id);
     }
@@ -285,7 +285,7 @@ pub(super) async fn run_merge_task(
     // Store and signal any remaining bytes
     if !pending_bytes.is_empty() {
         pending_bytes.sort_by_key(|b| b.timestamp_us);
-        buffer_store::append_raw_bytes_to_session(&session_id, pending_bytes);
+        capture_store::append_raw_bytes_to_session(&session_id, pending_bytes);
         throttle.flush();
         signal_bytes_ready(&session_id);
     }

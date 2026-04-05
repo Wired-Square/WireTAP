@@ -4,7 +4,7 @@
 // Handles session creation, control (start/stop/pause/resume), and destruction.
 
 use crate::{
-    buffer_store,
+    capture_store,
     credentials,
     io::{
         self,
@@ -15,7 +15,7 @@ use crate::{
         stop_and_switch_to_buffer, suspend_session, switch_to_buffer_replay, resume_to_live_session, transmit_frame, unregister_listener,
         evict_session_listener, add_source_to_session, remove_source_from_session, update_source_bus_mappings, pause_source_in_session, resume_source_in_session, get_session_source_count,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IODevice, IOState,
-        JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, BufferReader, step_frame, StepResult,
+        JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
         CsvReader, CsvReaderOptions,
         GvretDeviceInfo, probe_gvret_tcp,
@@ -1006,7 +1006,7 @@ pub async fn resume_reader_session_fresh(session_id: String) -> Result<IOState, 
 /// Returns the new buffer ID.
 #[tauri::command(rename_all = "snake_case")]
 pub fn copy_buffer_for_detach(buffer_id: String, new_name: String) -> Result<String, String> {
-    buffer_store::copy_buffer(&buffer_id, new_name)
+    capture_store::copy_capture(&buffer_id, new_name)
 }
 
 /// Update playback speed for a reader session
@@ -1144,13 +1144,13 @@ pub async fn create_buffer_reader_session(
     buffer_id: String,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
-    if !buffer_store::has_any_data() {
+    if !capture_store::has_any_data() {
         return Err("No data in buffer. Please import a CSV file first.".to_string());
     }
 
     register_session_profile(&session_id, &buffer_id);
 
-    let reader = BufferReader::new(
+    let reader = CaptureSource::new(
         app.clone(),
         session_id.clone(),
         buffer_id,
@@ -1175,13 +1175,13 @@ pub async fn transition_to_buffer_reader(
     let _ = stop_session(&session_id).await;
     let _ = destroy_session(&session_id).await;
 
-    if !buffer_store::has_any_data() {
+    if !capture_store::has_any_data() {
         return Err("No data in buffer for replay".to_string());
     }
 
     register_session_profile(&session_id, &buffer_id);
 
-    let reader = BufferReader::new(
+    let reader = CaptureSource::new(
         app.clone(),
         session_id.clone(),
         buffer_id,
@@ -1193,7 +1193,7 @@ pub async fn transition_to_buffer_reader(
 }
 
 /// Switch a session to buffer replay mode without destroying it.
-/// This swaps the session's reader to a BufferReader that reads from the session's
+/// This swaps the session's reader to a CaptureSource that reads from the session's
 /// owned buffer. All listeners stay connected and can replay the captured data.
 /// Use this after ingest completes to enable playback controls.
 #[tauri::command(rename_all = "snake_case")]
@@ -1613,8 +1613,8 @@ pub async fn probe_device(
     use crate::io::slcan::reader::probe_slcan_device;
 
     // Buffer IDs — metadata already in memory, no profile lookup needed
-    if buffer_store::is_known_buffer(&profile_id) {
-        if let Some(meta) = buffer_store::get_buffer_metadata(&profile_id) {
+    if capture_store::is_known_capture(&profile_id) {
+        if let Some(meta) = capture_store::get_capture_metadata(&profile_id) {
             let bus_count = if meta.buses.is_empty() { 1 } else { meta.buses.len() as u8 };
             let is_multi_bus = meta.buses.len() > 1;
             let result = DeviceProbeResult {

@@ -24,7 +24,7 @@ use tauri::AppHandle;
 use tokio::time::Duration;
 
 use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready, FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle};
-use crate::buffer_store::{self, BufferType};
+use crate::capture_store::{self, CaptureKind};
 
 // ============================================================================
 // Configuration
@@ -231,9 +231,9 @@ fn spawn_mqtt_stream(
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         // Create a frame buffer for this MQTT session (named after session ID)
-        let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
+        let buffer_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
         // Assign buffer ownership to this session
-        let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
+        let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
 
         let mut throttle = SignalThrottle::new();
 
@@ -310,7 +310,7 @@ fn spawn_mqtt_stream(
                                 };
 
                                 // Buffer frame for replay
-                                buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                                capture_store::append_frames_to_session(&session_id, vec![frame]);
 
                                 if throttle.should_signal("frames-ready") {
                                     signal_frames_ready(&session_id);

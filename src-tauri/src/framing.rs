@@ -60,7 +60,7 @@ pub use ios_stub::*;
 #[cfg(not(target_os = "ios"))]
 mod desktop {
     use crate::{
-        buffer_store,
+        capture_store,
         io::FrameMessage,
         io::serial::{extract_frame_id, FrameIdConfig, FramingEncoding, SerialFramer},
     };
@@ -169,14 +169,14 @@ mod desktop {
         tlog!("[framing] apply_framing_to_buffer called with min_length={:?}", config.min_length);
 
         // Get session's byte buffer
-        let buffer_id = buffer_store::get_session_buffer_ids(&session_id)
+        let buffer_id = capture_store::get_session_capture_ids(&session_id)
             .into_iter()
-            .find(|id| buffer_store::get_buffer_metadata(id)
-                .map(|m| m.buffer_type == buffer_store::BufferType::Bytes)
+            .find(|id| capture_store::get_capture_metadata(id)
+                .map(|m| m.buffer_type == capture_store::CaptureKind::Bytes)
                 .unwrap_or(false))
             .ok_or_else(|| "No byte buffer found for session".to_string())?;
 
-        let bytes = buffer_store::get_buffer_bytes(&buffer_id)
+        let bytes = capture_store::get_capture_bytes(&buffer_id)
             .ok_or_else(|| format!("Buffer '{}' not found or is not a byte buffer", buffer_id))?;
 
         if bytes.is_empty() {
@@ -194,7 +194,7 @@ mod desktop {
         // Group bytes by bus/interface for per-interface framing
         // This prevents bytes from different interfaces from being mixed during framing
         use std::collections::HashMap;
-        let mut bytes_by_bus: HashMap<u8, Vec<(usize, &buffer_store::TimestampedByte)>> = HashMap::new();
+        let mut bytes_by_bus: HashMap<u8, Vec<(usize, &capture_store::TimestampedByte)>> = HashMap::new();
         for (i, byte) in bytes.iter().enumerate() {
             bytes_by_bus
                 .entry(byte.bus)
@@ -338,35 +338,35 @@ mod desktop {
         // Reuse existing buffer if provided and valid, otherwise create a new one.
         // This avoids buffer proliferation during live streaming.
         let target_buffer_id = if let Some(ref existing_id) = reuse_buffer_id {
-            if buffer_store::get_buffer_type(existing_id) == Some(buffer_store::BufferType::Frames) {
-                buffer_store::clear_and_refill_buffer(existing_id, frame_messages);
+            if capture_store::get_capture_kind(existing_id) == Some(capture_store::CaptureKind::Frames) {
+                capture_store::clear_and_refill_capture(existing_id, frame_messages);
                 existing_id.clone()
             } else {
-                let new_id = buffer_store::create_buffer_inactive(
-                    buffer_store::BufferType::Frames,
+                let new_id = capture_store::create_capture_inactive(
+                    capture_store::CaptureKind::Frames,
                     format!("Framed from {}", buffer_id),
                 );
-                let _ = buffer_store::set_buffer_owner(&new_id, &session_id);
-                buffer_store::append_frames_to_buffer(&new_id, frame_messages);
+                let _ = capture_store::set_capture_owner(&new_id, &session_id);
+                capture_store::append_frames_to_capture(&new_id, frame_messages);
                 new_id
             }
         } else {
-            let new_id = buffer_store::create_buffer_inactive(
-                buffer_store::BufferType::Frames,
+            let new_id = capture_store::create_capture_inactive(
+                capture_store::CaptureKind::Frames,
                 format!("Framed from {}", buffer_id),
             );
-            let _ = buffer_store::set_buffer_owner(&new_id, &session_id);
-            buffer_store::append_frames_to_buffer(&new_id, frame_messages);
+            let _ = capture_store::set_capture_owner(&new_id, &session_id);
+            capture_store::append_frames_to_capture(&new_id, frame_messages);
             new_id
         };
 
         let filtered_buffer_id = if !filtered_messages.is_empty() {
-            let filtered_id = buffer_store::create_buffer_inactive(
-                buffer_store::BufferType::Frames,
+            let filtered_id = capture_store::create_capture_inactive(
+                capture_store::CaptureKind::Frames,
                 format!("Filtered from {}", buffer_id),
             );
-            let _ = buffer_store::set_buffer_owner(&filtered_id, &session_id);
-            buffer_store::append_frames_to_buffer(&filtered_id, filtered_messages);
+            let _ = capture_store::set_capture_owner(&filtered_id, &session_id);
+            capture_store::append_frames_to_capture(&filtered_id, filtered_messages);
             Some(filtered_id)
         } else {
             None

@@ -11,7 +11,7 @@ use std::sync::{
 use crate::io::IOState;
 
 /// Shared control state for timeline playback.
-/// Used by BufferReader, CsvReader, and PostgresReader.
+/// Used by CaptureSource, CsvReader, and PostgresReader.
 #[derive(Clone)]
 pub struct TimelineControl {
     /// Set to true to cancel the stream
@@ -122,7 +122,7 @@ impl Default for TimelineControl {
 
 /// Reader state management for timeline readers.
 /// Encapsulates the common state machine (Stopped -> Running <-> Paused -> Stopped)
-/// and reduces boilerplate in BufferReader, CsvReader, and PostgresReader.
+/// and reduces boilerplate in CaptureSource, CsvReader, and PostgresReader.
 pub struct TimelineReaderState {
     pub control: TimelineControl,
     pub state: IOState,

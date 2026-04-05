@@ -19,7 +19,7 @@ use crate::ws::server::ws_server;
 static FRAME_OFFSETS: Lazy<RwLock<HashMap<String, usize>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-/// Read new frames from buffer_store since the last send, encode as binary, and send via WS.
+/// Read new frames from capture_store since the last send, encode as binary, and send via WS.
 /// Called from signal_frames_ready at the 2Hz throttle cadence.
 pub fn send_new_frames(session_id: &str) {
     let server = match ws_server() {
@@ -31,7 +31,7 @@ pub fn send_new_frames(session_id: &str) {
         None => return,
     };
 
-    let buffer_id = match crate::buffer_store::get_session_frame_buffer_id(session_id) {
+    let buffer_id = match crate::capture_store::get_session_frame_capture_id(session_id) {
         Some(id) => id,
         None => return,
     };
@@ -43,14 +43,14 @@ pub fn send_new_frames(session_id: &str) {
         .unwrap_or(0);
 
     // Check how many new frames exist before reading — avoids unbounded allocation
-    let total = crate::buffer_store::get_buffer_count(&buffer_id);
+    let total = crate::capture_store::get_capture_count(&buffer_id);
     let new_count = total.saturating_sub(offset);
     if new_count == 0 {
         return;
     }
 
     let (frames, _indices, _total) =
-        crate::buffer_store::get_buffer_frames_paginated(&buffer_id, offset, new_count);
+        crate::capture_store::get_capture_frames_paginated(&buffer_id, offset, new_count);
 
     if frames.is_empty() {
         return;
@@ -72,8 +72,8 @@ pub fn send_new_frames(session_id: &str) {
 /// Reset frame offset for a session to the current buffer length.
 /// Called on subscribe so that only frames arriving after subscription are sent.
 pub fn reset_frame_offset(session_id: &str) {
-    let count = crate::buffer_store::get_session_frame_buffer_id(session_id)
-        .map(|id| crate::buffer_store::get_buffer_count(&id))
+    let count = crate::capture_store::get_session_frame_capture_id(session_id)
+        .map(|id| crate::capture_store::get_capture_count(&id))
         .unwrap_or(0);
 
     if let Ok(mut offsets) = FRAME_OFFSETS.write() {

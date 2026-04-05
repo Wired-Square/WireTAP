@@ -216,7 +216,7 @@ fn unregister_frame_taps(session_id: &str) {
     }
 }
 
-/// Called from buffer_store::append_frames_to_session to forward test frames.
+/// Called from capture_store::append_frames_to_session to forward test frames.
 /// Returns true if any frames were tapped (for logging).
 pub fn tap_test_frames(session_id: &str, frames: &[FrameMessage]) {
     let taps = match FRAME_TAPS.lock() {

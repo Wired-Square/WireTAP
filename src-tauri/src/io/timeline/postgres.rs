@@ -15,7 +15,7 @@ use crate::io::{
     signal_frames_ready, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition,
     SignalThrottle,
 };
-use crate::buffer_store::{self, BufferType};
+use crate::capture_store::{self, CaptureKind};
 
 /// PostgreSQL connection configuration
 #[derive(Clone, Debug)]
@@ -137,10 +137,10 @@ impl IODevice for PostgresReader {
         // Create buffer synchronously BEFORE spawning task (matches MultiSource pattern)
         // This prevents double buffer creation when resume_session_fresh() is called,
         // and ensures buffer exists before any frames are emitted.
-        let _orphaned = buffer_store::orphan_buffers_for_session(&session_id);
+        let _orphaned = capture_store::orphan_captures_for_session(&session_id);
 
-        let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
-        let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
+        let buffer_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
+        let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
         emit_buffer_changed(&session_id);
 
         let config = self.config.clone();
@@ -506,7 +506,7 @@ async fn run_postgres_stream(
             last_frame_time_secs = Some(frame_time_secs);
 
             if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
-                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
+                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
 
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
@@ -560,7 +560,7 @@ async fn run_postgres_stream(
 
                 last_pacing_check = std::time::Instant::now();
 
-                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
+                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
 
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
@@ -584,7 +584,7 @@ async fn run_postgres_stream(
         } else {
             // Normal speed: store any pending batch first
             if !batch_buffer.is_empty() {
-                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
+                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
                 }
@@ -603,7 +603,7 @@ async fn run_postgres_stream(
             }
 
             // Store single frame
-            buffer_store::append_frames_to_session(&session_id, vec![frame]);
+            capture_store::append_frames_to_session(&session_id, vec![frame]);
             total_emitted += 1;
 
             if throttle.should_signal("frames-ready") {
@@ -623,7 +623,7 @@ async fn run_postgres_stream(
 
     // Store and signal any remaining frames
     if !batch_buffer.is_empty() {
-        buffer_store::append_frames_to_session(&session_id, batch_buffer);
+        capture_store::append_frames_to_session(&session_id, batch_buffer);
         throttle.flush();
         signal_frames_ready(&session_id);
     }

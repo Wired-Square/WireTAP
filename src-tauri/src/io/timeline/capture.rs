@@ -14,7 +14,7 @@ use tauri::AppHandle;
 
 use super::base::{TimelineControl, TimelineReaderState};
 use crate::io::{emit_session_error, post_session, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition, SignalThrottle, TemporalMode};
-use crate::{buffer_db, buffer_store};
+use crate::{capture_db, capture_store};
 
 /// Sentinel value meaning "no seek requested"
 const NO_SEEK: i64 = i64::MIN;
@@ -22,7 +22,7 @@ const NO_SEEK: i64 = i64::MIN;
 const NO_SEEK_FRAME: i64 = -1;
 
 /// Buffer Reader - streams frames from the SQLite-backed buffer store
-pub struct BufferReader {
+pub struct CaptureSource {
     app: AppHandle,
     /// Common timeline reader state (control, state, session_id, task_handle)
     reader_state: TimelineReaderState,
@@ -39,9 +39,9 @@ pub struct BufferReader {
     buses: Vec<u8>,
 }
 
-impl BufferReader {
+impl CaptureSource {
     pub fn new(app: AppHandle, session_id: String, buffer_id: String, speed: f64) -> Self {
-        let buses = buffer_store::get_buffer_metadata(&buffer_id)
+        let buses = capture_store::get_capture_metadata(&buffer_id)
             .map(|m| m.buses)
             .unwrap_or_default();
 
@@ -58,7 +58,7 @@ impl BufferReader {
 }
 
 #[async_trait]
-impl IODevice for BufferReader {
+impl IODevice for CaptureSource {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::timeline_can()
             .with_temporal_mode(TemporalMode::Buffer)
@@ -76,7 +76,7 @@ impl IODevice for BufferReader {
         self.reader_state.check_can_start()?;
 
         // Check if buffer has data
-        if !buffer_store::has_any_data() {
+        if !capture_store::has_any_data() {
             return Err("No data in buffer. Please import a CSV file first.".to_string());
         }
 
@@ -194,7 +194,7 @@ pub fn step_frame(
 ) -> Result<Option<StepResult>, String> {
     let buf_id = buffer_id;
 
-    let total_frames = buffer_store::get_buffer_count(&buf_id);
+    let total_frames = capture_store::get_capture_count(&buf_id);
     if total_frames == 0 {
         return Err("Buffer is empty".to_string());
     }
@@ -202,17 +202,17 @@ pub fn step_frame(
     // Determine current rowid from frame index or timestamp
     let current_rowid = if let Some(idx) = current_frame_index {
         let clamped = idx.min(total_frames.saturating_sub(1));
-        match buffer_db::get_frame_at_index(&buf_id, clamped)? {
+        match capture_db::get_frame_at_index(&buf_id, clamped)? {
             Some((rowid, _)) => rowid,
             None => return Err("Frame index out of bounds".to_string()),
         }
     } else if let Some(ts) = current_timestamp_us {
-        match buffer_db::find_rowid_for_timestamp(&buf_id, ts as u64)? {
+        match capture_db::find_rowid_for_timestamp(&buf_id, ts as u64)? {
             Some(rowid) => rowid,
             None => {
                 // Fallback to start or end
                 let idx = if backward { total_frames.saturating_sub(1) } else { 0 };
-                match buffer_db::get_frame_at_index(&buf_id, idx)? {
+                match capture_db::get_frame_at_index(&buf_id, idx)? {
                     Some((rowid, _)) => rowid,
                     None => return Err("Buffer empty".to_string()),
                 }
@@ -221,7 +221,7 @@ pub fn step_frame(
     } else {
         // No position info - start from beginning or end depending on direction
         let idx = if backward { total_frames.saturating_sub(1) } else { 0 };
-        match buffer_db::get_frame_at_index(&buf_id, idx)? {
+        match capture_db::get_frame_at_index(&buf_id, idx)? {
             Some((rowid, _)) => rowid,
             None => return Err("Buffer empty".to_string()),
         }
@@ -229,7 +229,7 @@ pub fn step_frame(
 
     // Find next/prev frame using targeted SQLite query
     let filter = filter_frame_ids.unwrap_or(&[]);
-    match buffer_db::get_next_filtered_frame(&buf_id, current_rowid, filter, backward)? {
+    match capture_db::get_next_filtered_frame(&buf_id, current_rowid, filter, backward)? {
         Some((_, new_idx, frame)) => {
             let new_timestamp_us = frame.timestamp_us as i64;
 
@@ -292,9 +292,9 @@ fn load_chunk(
     reverse: bool,
 ) -> Vec<(i64, FrameMessage)> {
     let result = if reverse {
-        buffer_db::read_frame_chunk_reverse(buf_id, boundary_rowid, chunk_size)
+        capture_db::read_frame_chunk_reverse(buf_id, boundary_rowid, chunk_size)
     } else {
-        buffer_db::read_frame_chunk(buf_id, boundary_rowid, chunk_size)
+        capture_db::read_frame_chunk(buf_id, boundary_rowid, chunk_size)
     };
     result.unwrap_or_default()
 }
@@ -330,7 +330,7 @@ fn handle_seek(
             session_id, target_idx, is_paused
         );
 
-        if let Ok(Some((rowid, frame))) = buffer_db::get_frame_at_index(buf_id, target_idx) {
+        if let Ok(Some((rowid, frame))) = capture_db::get_frame_at_index(buf_id, target_idx) {
             let is_reverse = control.is_reverse();
             // In reverse mode, the main loop pre-decrements before capturing actual_index,
             // so set frame_index one higher so pre-decrement yields target_idx.
@@ -372,9 +372,9 @@ fn handle_seek(
         seek_target_us.store(NO_SEEK, Ordering::Relaxed);
         let is_paused = control.is_paused();
 
-        if let Ok(Some(rowid)) = buffer_db::find_rowid_for_timestamp(buf_id, seek_target as u64) {
+        if let Ok(Some(rowid)) = capture_db::find_rowid_for_timestamp(buf_id, seek_target as u64) {
             // Compute 0-based frame index for this rowid
-            let target_idx = buffer_db::count_frames_before_rowid(buf_id, rowid).unwrap_or(0);
+            let target_idx = capture_db::count_frames_before_rowid(buf_id, rowid).unwrap_or(0);
 
             tlog!(
                 "[Buffer:{}] Seeking to frame {} (timestamp {}us, paused={})",
@@ -439,13 +439,13 @@ async fn run_buffer_stream(
         }
     };
 
-    let total_frames = buffer_store::get_buffer_count(&buf_id);
+    let total_frames = capture_store::get_capture_count(&buf_id);
     if total_frames == 0 {
         emit_session_error(&session_id, "Buffer is empty".to_string());
         return;
     }
 
-    let (min_rowid, max_rowid) = match buffer_db::get_rowid_range(&buf_id) {
+    let (min_rowid, max_rowid) = match capture_db::get_rowid_range(&buf_id) {
         Ok(Some(range)) => range,
         _ => {
             emit_session_error(&session_id, "Buffer has no data".to_string());
@@ -453,7 +453,7 @@ async fn run_buffer_stream(
         }
     };
 
-    let metadata = buffer_store::get_buffer_metadata(&buf_id);
+    let metadata = capture_store::get_capture_metadata(&buf_id);
     let initial_speed = control.read_speed();
     let initial_pacing = control.is_pacing_enabled();
     tlog!(
@@ -788,7 +788,7 @@ async fn run_buffer_stream(
     // This keeps the stream task alive so step/seek/resume work after playback ends.
     completed_flag.store(true, Ordering::Relaxed);
     control.pause();
-    let frame_count = buffer_store::get_buffer_count(&buf_id);
+    let frame_count = capture_store::get_capture_count(&buf_id);
     let stream_ended_info = post_session::StreamEndedInfo {
         reason: "paused".to_string(),
         buffer_available: true,
@@ -851,7 +851,7 @@ async fn run_buffer_stream(
             // Still at boundary in this direction, re-pause and notify frontend
             control.pause();
             completed_flag.store(true, Ordering::Relaxed);
-            let frame_count = buffer_store::get_buffer_count(&buf_id);
+            let frame_count = capture_store::get_capture_count(&buf_id);
             let stream_ended_info = post_session::StreamEndedInfo {
                 reason: "paused".to_string(),
                 buffer_available: true,

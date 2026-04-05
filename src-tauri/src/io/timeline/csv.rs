@@ -12,7 +12,7 @@ use tauri::AppHandle;
 
 use super::base::{TimelineControl, TimelineReaderState};
 use crate::io::{emit_session_error, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition, SignalThrottle};
-use crate::buffer_store;
+use crate::capture_store;
 
 /// CSV reader options for playback control
 #[derive(Clone, Debug)]
@@ -1607,7 +1607,7 @@ async fn run_csv_stream(
             last_frame_time_secs = Some(frame_time_secs);
 
             if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
-                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
+                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
 
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
@@ -1660,7 +1660,7 @@ async fn run_csv_stream(
 
                 last_pacing_check = std::time::Instant::now();
 
-                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
+                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
 
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
@@ -1680,7 +1680,7 @@ async fn run_csv_stream(
         } else {
             // Normal speed: store any pending batch first
             if !batch_buffer.is_empty() {
-                buffer_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
+                capture_store::append_frames_to_session(&session_id, std::mem::take(&mut batch_buffer));
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
                 }
@@ -1699,7 +1699,7 @@ async fn run_csv_stream(
             }
 
             // Store single frame
-            buffer_store::append_frames_to_session(&session_id, vec![frame]);
+            capture_store::append_frames_to_session(&session_id, vec![frame]);
             total_emitted += 1;
 
             if throttle.should_signal("frames-ready") {
@@ -1719,7 +1719,7 @@ async fn run_csv_stream(
 
     // Store and signal any remaining frames
     if !batch_buffer.is_empty() {
-        buffer_store::append_frames_to_session(&session_id, batch_buffer);
+        capture_store::append_frames_to_session(&session_id, batch_buffer);
         throttle.flush();
         signal_frames_ready(&session_id);
     }

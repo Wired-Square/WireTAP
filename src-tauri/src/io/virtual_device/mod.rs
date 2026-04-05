@@ -20,7 +20,7 @@ use tauri::AppHandle;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::time::{interval, Duration};
 
-use crate::buffer_store::{self, BufferType, TimestampedByte};
+use crate::capture_store::{self, CaptureKind, TimestampedByte};
 use crate::io::{
     emit_device_connected, emit_stream_ended, now_us, signal_bytes_ready, signal_frames_ready,
     CanTransmitFrame, FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle,
@@ -212,11 +212,11 @@ impl IODevice for VirtualDeviceReader {
 
         // Create buffer for this session (type depends on traffic mode)
         let buffer_type = match self.config.traffic_type {
-            VirtualTrafficType::Serial => BufferType::Bytes,
-            _ => BufferType::Frames,
+            VirtualTrafficType::Serial => CaptureKind::Bytes,
+            _ => CaptureKind::Frames,
         };
-        let buffer_id = buffer_store::create_buffer(buffer_type, self.session_id.clone());
-        let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
+        let buffer_id = capture_store::create_capture(buffer_type, self.session_id.clone());
+        let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
 
         let traffic_type_name = match self.config.traffic_type {
             VirtualTrafficType::Can => "CAN",
@@ -517,7 +517,7 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    capture_store::append_frames_to_session(&session_id, vec![frame]);
                     if throttle.should_signal("frames-ready") {
                         signal_frames_ready(&session_id);
                     }
@@ -548,7 +548,7 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    capture_store::append_frames_to_session(&session_id, vec![frame]);
                     if throttle.should_signal("frames-ready") {
                         signal_frames_ready(&session_id);
                     }
@@ -573,7 +573,7 @@ fn spawn_bus_generator(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    capture_store::append_frames_to_session(&session_id, vec![frame]);
                     if throttle.should_signal("frames-ready") {
                         signal_frames_ready(&session_id);
                     }
@@ -588,7 +588,7 @@ fn spawn_bus_generator(
                         })
                         .collect();
 
-                    buffer_store::append_raw_bytes_to_session(&session_id, entries);
+                    capture_store::append_raw_bytes_to_session(&session_id, entries);
                     if throttle.should_signal("bytes-ready") {
                         signal_bytes_ready(&session_id);
                     }
@@ -636,7 +636,7 @@ fn spawn_loopback_handler(
                         incomplete: None,
                         direction: Some("rx".to_string()),
                     };
-                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    capture_store::append_frames_to_session(&session_id, vec![frame]);
                     if throttle.should_signal("frames-ready") {
                         signal_frames_ready(&session_id);
                     }
@@ -652,7 +652,7 @@ fn spawn_loopback_handler(
                             bus: 0,
                         })
                         .collect();
-                    buffer_store::append_raw_bytes_to_session(&session_id, entries);
+                    capture_store::append_raw_bytes_to_session(&session_id, entries);
                     if throttle.should_signal("bytes-ready") {
                         signal_bytes_ready(&session_id);
                     }

@@ -21,7 +21,7 @@ use std::sync::{
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
-use crate::buffer_store::{self, BufferType};
+use crate::capture_store::{self, CaptureKind};
 use crate::checksums::crc16_modbus_checksum;
 use crate::io::modbus_tcp::{PollGroup, RegisterType};
 use crate::io::serial::utils::{to_serialport_data_bits, to_serialport_parity, to_serialport_stop_bits, Parity};
@@ -127,8 +127,8 @@ impl IODevice for ModbusRtuReader {
         let port = Arc::new(Mutex::new(port));
 
         // Create frame buffer
-        let buffer_id = buffer_store::create_buffer(BufferType::Frames, self.session_id.clone());
-        let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
+        let buffer_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
+        let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
 
         // Emit connected event
         emit_device_connected(
@@ -299,7 +299,7 @@ async fn run_poll_loop(
                     direction: Some("rx".to_string()),
                 };
 
-                buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                capture_store::append_frames_to_session(&session_id, vec![frame]);
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
                 }

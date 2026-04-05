@@ -32,7 +32,7 @@ pub mod framelink;
 mod socketcan;
 
 // Re-export timeline readers
-pub use timeline::{step_frame, BufferReader, StepResult};
+pub use timeline::{step_frame, CaptureSource, StepResult};
 pub use timeline::{
     parse_csv_file, parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
     CsvReader, CsvReaderOptions, Delimiter, SequenceGap, TimestampUnit,
@@ -91,7 +91,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Mutex;
 
-use crate::{buffer_store, sessions};
+use crate::{capture_store, sessions};
 
 // ============================================================================
 // Shared Types (used by multiple readers)
@@ -1162,19 +1162,19 @@ pub fn emit_stream_ended(
     reason: &str,
     log_prefix: &str,
 ) {
-    use crate::buffer_store::{self, BufferType};
+    use crate::capture_store::{self, CaptureKind};
 
-    let finalized = buffer_store::finalize_session_buffers(session_id);
+    let finalized = capture_store::finalize_session_captures(session_id);
     // Use the frame buffer metadata (primary), fall back to first finalized
     let metadata = finalized.iter()
-        .find(|m| m.buffer_type == BufferType::Frames)
+        .find(|m| m.buffer_type == CaptureKind::Frames)
         .or(finalized.first());
 
     let (buffer_id, buffer_type, count, time_range, buffer_available) = match metadata {
         Some(m) => {
             let type_str = match m.buffer_type {
-                BufferType::Frames => "frames",
-                BufferType::Bytes => "bytes",
+                CaptureKind::Frames => "frames",
+                CaptureKind::Bytes => "bytes",
             };
             (
                 Some(m.id.clone()),
@@ -1217,7 +1217,7 @@ pub fn emit_buffer_changed(session_id: &str) {
 /// Orphan buffers for a session and emit buffer-changed.
 /// Stores orphaned buffer IDs in the post-session cache so the frontend
 /// can fetch them (e.g., for the onDestroyed callback).
-pub fn emit_buffer_orphaned_as_changed(session_id: &str, orphaned: Vec<crate::buffer_store::OrphanedBufferInfo>) {
+pub fn emit_buffer_orphaned_as_changed(session_id: &str, orphaned: Vec<crate::capture_store::OrphanedCaptureInfo>) {
     if !orphaned.is_empty() {
         let ids: Vec<String> = orphaned.iter().map(|o| o.buffer_id.clone()).collect();
         post_session::store_orphaned_buffer_ids(session_id, ids);
@@ -1475,10 +1475,10 @@ pub async fn join_session(session_id: &str) -> Result<JoinSessionResult, String>
     emit_joiner_count_change(session_id, joiner_count, None, None, Some("joined"));
 
     // Get session's frame buffer
-    let buffer_ids = crate::buffer_store::get_session_buffer_ids(session_id);
+    let buffer_ids = crate::capture_store::get_session_capture_ids(session_id);
     let (buffer_id, buffer_type) = buffer_ids.iter()
-        .filter_map(|id| crate::buffer_store::get_buffer_metadata(id))
-        .find(|m| m.buffer_type == crate::buffer_store::BufferType::Frames)
+        .filter_map(|id| crate::capture_store::get_capture_metadata(id))
+        .find(|m| m.buffer_type == crate::capture_store::CaptureKind::Frames)
         .map(|m| (Some(m.id), Some("frames".to_string())))
         .unwrap_or((None, None));
 
@@ -2011,25 +2011,25 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
     }
 
     // Look up the buffer by session ownership (finalized during stop())
-    let buffer_ids = buffer_store::get_session_buffer_ids(session_id);
+    let buffer_ids = capture_store::get_session_capture_ids(session_id);
     let buffer_id = buffer_ids.iter()
-        .filter_map(|id| buffer_store::get_buffer_metadata(id))
-        .find(|m| m.buffer_type == buffer_store::BufferType::Frames)
+        .filter_map(|id| capture_store::get_capture_metadata(id))
+        .find(|m| m.buffer_type == capture_store::CaptureKind::Frames)
         .map(|m| m.id.clone());
 
     // Try to switch to buffer replay
     if let Some(ref bid) = buffer_id {
-        let _ = crate::buffer_store::mark_buffer_active(bid);
+        let _ = crate::capture_store::mark_capture_active(bid);
 
         // Domain-specific housekeeping before the swap
-        buffer_store::orphan_buffers_for_session(session_id);
+        capture_store::orphan_captures_for_session(session_id);
         let profile_ids = sessions::get_session_profile_ids(session_id);
         for profile_id in &profile_ids {
             crate::profile_tracker::unregister_usage_by_session(profile_id, session_id);
         }
         sessions::replace_session_profiles(session_id, &[bid.clone()]);
 
-        let new_reader = BufferReader::new(
+        let new_reader = CaptureSource::new(
             app.clone(),
             session_id.to_string(),
             bid.clone(),
@@ -2345,18 +2345,18 @@ pub async fn update_session_direction(session_id: &str, reverse: bool) -> Result
 }
 
 /// Switch a session to buffer replay mode.
-/// This replaces the session's reader with a BufferReader that reads from the session's
+/// This replaces the session's reader with a CaptureSource that reads from the session's
 /// owned buffer. The session stays alive and all listeners remain connected.
 /// Use this after ingest completes to enable playback without destroying the session.
 pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
     // Get the session's owned frame buffer
-    let buffer_ids = crate::buffer_store::get_session_buffer_ids(session_id);
+    let buffer_ids = crate::capture_store::get_session_capture_ids(session_id);
     let buffer_id = buffer_ids.iter()
-        .filter_map(|id| crate::buffer_store::get_buffer_metadata(id).map(|m| (id.clone(), m)))
-        .find(|(_id, m)| m.buffer_type == crate::buffer_store::BufferType::Frames)
+        .filter_map(|id| crate::capture_store::get_capture_metadata(id).map(|m| (id.clone(), m)))
+        .find(|(_id, m)| m.buffer_type == crate::capture_store::CaptureKind::Frames)
         .map(|(id, _m)| id)
         .ok_or_else(|| {
-            let buffers = crate::buffer_store::list_buffers();
+            let buffers = crate::capture_store::list_captures();
             tlog!(
                 "[io] switch_to_buffer_replay: No buffer found for session '{}'. Available buffers:",
                 session_id
@@ -2373,16 +2373,16 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
         })?;
 
     // Log buffer details
-    let buffer_count = crate::buffer_store::get_buffer_count(&buffer_id);
+    let buffer_count = crate::capture_store::get_capture_count(&buffer_id);
     tlog!(
         "[io] switch_to_buffer_replay: session='{}', buffer='{}', frames={}, speed={}",
         session_id, buffer_id, buffer_count, speed
     );
 
-    let _ = crate::buffer_store::mark_buffer_active(&buffer_id);
+    let _ = crate::capture_store::mark_capture_active(&buffer_id);
 
-    // Create a new BufferReader that reads from the session's buffer
-    let new_reader = BufferReader::new(
+    // Create a new CaptureSource that reads from the session's buffer
+    let new_reader = CaptureSource::new(
         app.clone(),
         session_id.to_string(),
         buffer_id,
@@ -2406,7 +2406,7 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
 }
 
 /// Resume a session from buffer playback back to live streaming.
-/// This replaces the BufferReader with a new live reader (passed in from the caller
+/// This replaces the CaptureSource with a new live reader (passed in from the caller
 /// who creates it from profile config). The session stays alive and all listeners
 /// remain connected.
 ///
@@ -2451,7 +2451,7 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
         let _ = session.device.stop().await;
         // Orphan buffers and store IDs in post-session cache before lifecycle event.
         // The frontend fetches orphaned buffer IDs via command when it handles "destroyed".
-        let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
+        let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
         emit_buffer_orphaned_as_changed(session_id, orphaned);
         // Now emit lifecycle event
         let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
@@ -2523,10 +2523,10 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
             let source_profile_ids = sessions::get_session_profile_ids(session_id);
 
             // Get buffer info if this session owns a buffer
-            let buffer_id = buffer_store::get_session_buffer_ids(session_id).into_iter().next();
+            let buffer_id = capture_store::get_session_capture_ids(session_id).into_iter().next();
             let buffer_frame_count = buffer_id
                 .as_ref()
-                .map(|id| buffer_store::get_buffer_count(id));
+                .map(|id| capture_store::get_capture_count(id));
 
             // Check if session is actively streaming (running state)
             let is_streaming = matches!(session.device.state(), IOState::Running);
@@ -2689,10 +2689,10 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
     }
 
     // Get session's frame buffer
-    let buffer_ids = crate::buffer_store::get_session_buffer_ids(session_id);
+    let buffer_ids = crate::capture_store::get_session_capture_ids(session_id);
     let (buffer_id, buffer_type) = buffer_ids.iter()
-        .filter_map(|id| crate::buffer_store::get_buffer_metadata(id))
-        .find(|m| m.buffer_type == crate::buffer_store::BufferType::Frames)
+        .filter_map(|id| crate::capture_store::get_capture_metadata(id))
+        .find(|m| m.buffer_type == crate::capture_store::CaptureKind::Frames)
         .map(|m| (Some(m.id), Some("frames".to_string())))
         .unwrap_or((None, None));
 
@@ -2773,7 +2773,7 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
     if let Some(mut session) = session_to_destroy {
         let _ = session.device.stop().await;
         // Orphan buffers and store IDs in post-session cache before lifecycle event.
-        let orphaned = crate::buffer_store::orphan_buffers_for_session(session_id);
+        let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
         emit_buffer_orphaned_as_changed(session_id, orphaned);
         // Now emit lifecycle event
         let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
@@ -2804,9 +2804,9 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
 pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_id: &str) -> Result<Vec<String>, String> {
     // Copy the buffer before unregistering (so the evicted listener gets a snapshot)
     let mut copied_buffer_ids = Vec::new();
-    if let Some(buffer_id) = crate::buffer_store::get_session_buffer_ids(session_id).into_iter().next() {
+    if let Some(buffer_id) = crate::capture_store::get_session_capture_ids(session_id).into_iter().next() {
         let copy_name = format!("{} (evicted)", listener_id);
-        match crate::buffer_store::copy_buffer(&buffer_id, copy_name) {
+        match crate::capture_store::copy_capture(&buffer_id, copy_name) {
             Ok(copied_id) => {
                 tlog!(
                     "[reader] Copied buffer '{}' -> '{}' for evicted listener '{}'",

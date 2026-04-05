@@ -27,7 +27,7 @@ use super::{
 };
 use tokio::sync::mpsc;
 
-use crate::buffer_store::{self, BufferType};
+use crate::capture_store::{self, CaptureKind};
 use crate::io::error::IoError;
 use crate::io::gvret::{apply_bus_mapping, BusMapping};
 use crate::io::types::{SourceMessage, TransmitRequest, TransmitSender};
@@ -532,9 +532,9 @@ async fn run_gs_usb_stream(
     transmit_rx: Option<std_mpsc::Receiver<TransmitRequest>>,
 ) {
     // Buffer named after session ID (UI prefixes with "Frames:")
-    let buffer_id = buffer_store::create_buffer(BufferType::Frames, session_id.clone());
+    let buffer_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
     // Assign buffer ownership to this session
-    let _ = buffer_store::set_buffer_owner(&buffer_id, &session_id);
+    let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
     let device_name = format!("gs_usb({}:{})", config.bus, config.address);
 
     #[allow(unused_assignments)]
@@ -771,7 +771,7 @@ async fn run_gs_usb_stream(
         // Store batched frames periodically
         if last_emit_time.elapsed() >= emit_interval && !pending_frames.is_empty() {
             let frames = std::mem::take(&mut pending_frames);
-            buffer_store::append_frames_to_session(&session_id, frames);
+            capture_store::append_frames_to_session(&session_id, frames);
             if throttle.should_signal("frames-ready") {
                 signal_frames_ready(&session_id);
             }
@@ -800,7 +800,7 @@ async fn run_gs_usb_stream(
 
     // Store and signal remaining frames
     if !pending_frames.is_empty() {
-        buffer_store::append_frames_to_session(&session_id, pending_frames);
+        capture_store::append_frames_to_session(&session_id, pending_frames);
         throttle.flush();
         signal_frames_ready(&session_id);
     }

@@ -25,7 +25,7 @@ use tokio::time::{Duration, interval};
 use tokio_modbus::client::{self, tcp};
 use tokio_modbus::prelude::*;
 
-use crate::buffer_store::{self, BufferType};
+use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready,
     FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle,
@@ -146,8 +146,8 @@ impl IODevice for ModbusTcpReader {
         let ctx: Arc<Mutex<client::Context>> = Arc::new(Mutex::new(ctx));
 
         // Create frame buffer
-        let buffer_id = buffer_store::create_buffer(BufferType::Frames, self.session_id.clone());
-        let _ = buffer_store::set_buffer_owner(&buffer_id, &self.session_id);
+        let buffer_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
+        let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
 
         // Emit connected event
         let address = format!("{}:{}", self.config.host, self.config.port);
@@ -365,7 +365,7 @@ fn spawn_poll_task(
                         direction: Some("rx".to_string()),
                     };
 
-                    buffer_store::append_frames_to_session(&session_id, vec![frame]);
+                    capture_store::append_frames_to_session(&session_id, vec![frame]);
                     if throttle.should_signal("frames-ready") {
                         signal_frames_ready(&session_id);
                     }
