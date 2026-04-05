@@ -109,7 +109,7 @@ export default function CaptureList({
         <div className="flex items-center gap-1.5">
           <Archive className={`${iconXs} text-[color:var(--text-muted)]`} />
           <span className={sectionHeader}>
-            Buffers
+            Captures
           </span>
           <span className={captionMuted}>({buffers.length})</span>
         </div>
