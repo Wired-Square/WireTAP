@@ -215,8 +215,8 @@ impl IODevice for VirtualDeviceReader {
             VirtualTrafficType::Serial => CaptureKind::Bytes,
             _ => CaptureKind::Frames,
         };
-        let buffer_id = capture_store::create_capture(kind, self.session_id.clone());
-        let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
+        let capture_id = capture_store::create_capture(kind, self.session_id.clone());
+        let _ = capture_store::set_capture_owner(&capture_id, &self.session_id);
 
         let traffic_type_name = match self.config.traffic_type {
             VirtualTrafficType::Can => "CAN",

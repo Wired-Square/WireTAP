@@ -13,7 +13,7 @@ pub enum MsgType {
     SessionError     = 0x04,
     PlaybackPosition = 0x05,
     DeviceConnected  = 0x06,
-    BufferChanged    = 0x07,
+    CaptureChanged   = 0x07,
     SessionLifecycle = 0x08,
     SessionInfo      = 0x09,
     Reconfigured     = 0x0A,
@@ -41,7 +41,7 @@ impl TryFrom<u8> for MsgType {
             0x04 => Ok(MsgType::SessionError),
             0x05 => Ok(MsgType::PlaybackPosition),
             0x06 => Ok(MsgType::DeviceConnected),
-            0x07 => Ok(MsgType::BufferChanged),
+            0x07 => Ok(MsgType::CaptureChanged),
             0x08 => Ok(MsgType::SessionLifecycle),
             0x09 => Ok(MsgType::SessionInfo),
             0x0A => Ok(MsgType::Reconfigured),
@@ -371,31 +371,31 @@ pub fn decode_session_state(payload: &[u8]) -> Result<SessionStateMsg, ProtocolE
 /// Encode a StreamEnded payload.
 ///
 /// `reason`: 0=complete, 1=disconnected, 2=error, 3=stopped, 4=paused.
-/// Flags byte (bit 0 = buffer_available, bit 1 = has_buffer_id,
-///             bit 2 = has_buffer_type, bit 3 = has_time_range).
+/// Flags byte (bit 0 = capture_available, bit 1 = has_capture_id,
+///             bit 2 = has_capture_kind, bit 3 = has_time_range).
 pub fn encode_stream_ended(
     reason: u8,
-    buffer_available: bool,
-    buffer_id: Option<&str>,
-    buffer_type: Option<&str>,
+    capture_available: bool,
+    capture_id: Option<&str>,
+    capture_kind: Option<&str>,
     count: u32,
     time_range: Option<(u64, u64)>,
 ) -> Vec<u8> {
     let mut flags: u8 = 0;
-    if buffer_available    { flags |= 1 << 0; }
-    if buffer_id.is_some() { flags |= 1 << 1; }
-    if buffer_type.is_some() { flags |= 1 << 2; }
+    if capture_available    { flags |= 1 << 0; }
+    if capture_id.is_some() { flags |= 1 << 1; }
+    if capture_kind.is_some() { flags |= 1 << 2; }
     if time_range.is_some()  { flags |= 1 << 3; }
 
     let mut out = Vec::new();
     out.push(reason);
     out.push(flags);
     out.extend_from_slice(&count.to_le_bytes());
-    if let Some(id) = buffer_id {
+    if let Some(id) = capture_id {
         out.extend_from_slice(&encode_length_prefixed_str(id));
     }
-    if let Some(bt) = buffer_type {
-        out.extend_from_slice(&encode_length_prefixed_str(bt));
+    if let Some(ck) = capture_kind {
+        out.extend_from_slice(&encode_length_prefixed_str(ck));
     }
     if let Some((start, end)) = time_range {
         out.extend_from_slice(&start.to_le_bytes());
@@ -463,12 +463,12 @@ pub fn encode_device_connected(device_type: &str, address: &str, bus: Option<u8>
 }
 
 // ----------------------------------------------------------------------------
-// 0x07 — Buffer Changed
+// 0x07 — Capture Changed
 // ----------------------------------------------------------------------------
 
-/// Encode a BufferChanged payload — entire payload is the raw UTF-8 buffer ID.
-pub fn encode_buffer_changed(buffer_id: &str) -> Vec<u8> {
-    buffer_id.as_bytes().to_vec()
+/// Encode a CaptureChanged payload — entire payload is the raw UTF-8 capture ID.
+pub fn encode_capture_changed(capture_id: &str) -> Vec<u8> {
+    capture_id.as_bytes().to_vec()
 }
 
 // ----------------------------------------------------------------------------
@@ -710,7 +710,7 @@ mod tests {
             MsgType::SessionError,
             MsgType::PlaybackPosition,
             MsgType::DeviceConnected,
-            MsgType::BufferChanged,
+            MsgType::CaptureChanged,
             MsgType::SessionLifecycle,
             MsgType::SessionInfo,
             MsgType::Reconfigured,
@@ -1069,7 +1069,7 @@ mod tests {
 
     #[test]
     fn stream_ended_minimal_round_trip() {
-        // reason=0, no buffer, no time range
+        // reason=0, no capture, no time range
         let payload = encode_stream_ended(0, false, None, None, 42, None);
         // Manual decode to verify layout
         assert_eq!(payload[0], 0);    // reason
@@ -1090,9 +1090,9 @@ mod tests {
         );
         assert_eq!(payload[0], 2); // reason
         let flags = payload[1];
-        assert!(flags & (1 << 0) != 0, "buffer_available");
-        assert!(flags & (1 << 1) != 0, "has_buffer_id");
-        assert!(flags & (1 << 2) != 0, "has_buffer_type");
+        assert!(flags & (1 << 0) != 0, "capture_available");
+        assert!(flags & (1 << 1) != 0, "has_capture_id");
+        assert!(flags & (1 << 2) != 0, "has_capture_kind");
         assert!(flags & (1 << 3) != 0, "has_time_range");
 
         let count = u32::from_le_bytes(payload[2..6].try_into().unwrap());
@@ -1111,9 +1111,9 @@ mod tests {
     }
 
     #[test]
-    fn stream_ended_buffer_available_flag_only() {
+    fn stream_ended_capture_available_flag_only() {
         let payload = encode_stream_ended(3, true, None, None, 0, None);
-        assert_eq!(payload[1] & (1 << 0), 1);  // buffer_available set
+        assert_eq!(payload[1] & (1 << 0), 1);  // capture_available set
         assert_eq!(payload[1] & !(1u8),   0);  // no other flags
     }
 
@@ -1208,18 +1208,18 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // 0x07 Buffer Changed
+    // 0x07 Capture Changed
     // -----------------------------------------------------------------------
 
     #[test]
-    fn buffer_changed_encodes_raw_bytes() {
-        let payload = encode_buffer_changed("live-session-42");
+    fn capture_changed_encodes_raw_bytes() {
+        let payload = encode_capture_changed("live-session-42");
         assert_eq!(payload, b"live-session-42");
     }
 
     #[test]
-    fn buffer_changed_empty_id() {
-        assert!(encode_buffer_changed("").is_empty());
+    fn capture_changed_empty_id() {
+        assert!(encode_capture_changed("").is_empty());
     }
 
     // -----------------------------------------------------------------------

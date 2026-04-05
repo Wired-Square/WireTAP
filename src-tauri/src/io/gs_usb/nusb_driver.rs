@@ -531,10 +531,10 @@ async fn run_gs_usb_stream(
     cancel_flag: Arc<AtomicBool>,
     transmit_rx: Option<std_mpsc::Receiver<TransmitRequest>>,
 ) {
-    // Buffer named after session ID (UI prefixes with "Frames:")
-    let buffer_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
-    // Assign buffer ownership to this session
-    let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
+    // Capture named after session ID (UI prefixes with "Frames:")
+    let capture_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
+    // Assign capture ownership to this session
+    let _ = capture_store::set_capture_owner(&capture_id, &session_id);
     let device_name = format!("gs_usb({}:{})", config.bus, config.address);
 
     #[allow(unused_assignments)]

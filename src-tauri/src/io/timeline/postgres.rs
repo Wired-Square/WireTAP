@@ -11,7 +11,7 @@ use tokio_postgres::{NoTls, Row};
 
 use super::base::{TimelineControl, TimelineReaderState};
 use crate::io::{
-    emit_session_error, emit_stream_ended, emit_buffer_changed, signal_playback_position,
+    emit_session_error, emit_stream_ended, emit_capture_changed, signal_playback_position,
     signal_frames_ready, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition,
     SignalThrottle,
 };
@@ -134,14 +134,14 @@ impl IODevice for PostgresReader {
         let app = self.app.clone();
         let session_id = self.reader_state.session_id.clone();
 
-        // Create buffer synchronously BEFORE spawning task (matches MultiSource pattern)
-        // This prevents double buffer creation when resume_session_fresh() is called,
-        // and ensures buffer exists before any frames are emitted.
+        // Create capture synchronously BEFORE spawning task (matches MultiSource pattern)
+        // This prevents double capture creation when resume_session_fresh() is called,
+        // and ensures capture exists before any frames are emitted.
         let _orphaned = capture_store::orphan_captures_for_session(&session_id);
 
-        let buffer_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
-        let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
-        emit_buffer_changed(&session_id);
+        let capture_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
+        let _ = capture_store::set_capture_owner(&capture_id, &session_id);
+        emit_capture_changed(&session_id);
 
         let config = self.config.clone();
         let options = self.options.clone();
@@ -212,7 +212,7 @@ impl IODevice for PostgresReader {
     }
 
     async fn complete_reconfigure(&mut self) -> Result<(), String> {
-        // Start a new stream (this will orphan old buffer and create new one)
+        // Start a new stream (this will orphan old capture and create new one)
         self.start().await
     }
 }
@@ -247,8 +247,8 @@ async fn run_postgres_stream(
     options: PostgresReaderOptions,
     control: TimelineControl,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Buffer is created synchronously in start() before this task is spawned.
-    // This prevents double buffer creation when resume_session_fresh() is called.
+    // Capture is created synchronously in start() before this task is spawned.
+    // This prevents double capture creation when resume_session_fresh() is called.
 
     // Track stream end reason
     let mut stream_reason = "complete";
@@ -308,7 +308,7 @@ async fn run_postgres_stream(
         }
     };
 
-    // Buffer settings
+    // Streaming window settings
     const BUFFER_SIZE: usize = 2000; // Keep 2000 frames in buffer
     const REFILL_THRESHOLD: usize = 200; // Refill when buffer drops below this
     const HIGH_SPEED_BATCH_SIZE: usize = 50; // Max batch size for high-speed emission

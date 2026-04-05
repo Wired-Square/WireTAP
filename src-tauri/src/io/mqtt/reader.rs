@@ -230,10 +230,10 @@ fn spawn_mqtt_stream(
     cancel_flag: Arc<AtomicBool>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
-        // Create a frame buffer for this MQTT session (named after session ID)
-        let buffer_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
-        // Assign buffer ownership to this session
-        let _ = capture_store::set_capture_owner(&buffer_id, &session_id);
+        // Create a frame capture for this MQTT session (named after session ID)
+        let capture_id = capture_store::create_capture(CaptureKind::Frames, session_id.clone());
+        // Assign capture ownership to this session
+        let _ = capture_store::set_capture_owner(&capture_id, &session_id);
 
         let mut throttle = SignalThrottle::new();
 

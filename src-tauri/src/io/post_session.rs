@@ -36,7 +36,7 @@ struct Entry {
     stream_ended: Option<StreamEndedInfo>,
     error: Option<String>,
     sources: Vec<SourceInfo>,
-    orphaned_buffer_ids: Vec<String>,
+    orphaned_capture_ids: Vec<String>,
     stored_at: Instant,
 }
 
@@ -53,7 +53,7 @@ fn get_or_create_entry<'a>(
             stream_ended: None,
             error: None,
             sources: Vec::new(),
-            orphaned_buffer_ids: Vec::new(),
+            orphaned_capture_ids: Vec::new(),
             stored_at: Instant::now(),
         })
 }
@@ -119,7 +119,7 @@ pub fn get_sources(session_id: &str) -> Vec<SourceInfo> {
 pub fn store_orphaned_capture_ids(session_id: &str, ids: Vec<String>) {
     if let Ok(mut cache) = CACHE.write() {
         let entry = get_or_create_entry(&mut cache, session_id);
-        entry.orphaned_buffer_ids = ids;
+        entry.orphaned_capture_ids = ids;
         entry.stored_at = Instant::now();
     }
 }
@@ -131,7 +131,7 @@ pub fn get_orphaned_capture_ids(session_id: &str) -> Vec<String> {
         .and_then(|c| {
             c.get(session_id)
                 .filter(|e| e.stored_at.elapsed() < TTL)
-                .map(|e| e.orphaned_buffer_ids.clone())
+                .map(|e| e.orphaned_capture_ids.clone())
         })
         .unwrap_or_default()
 }

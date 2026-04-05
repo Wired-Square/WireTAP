@@ -145,9 +145,9 @@ impl IODevice for ModbusTcpReader {
         // Wrap the context in an Arc<Mutex> so poll tasks can share it
         let ctx: Arc<Mutex<client::Context>> = Arc::new(Mutex::new(ctx));
 
-        // Create frame buffer
-        let buffer_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
-        let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
+        // Create frame capture
+        let capture_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
+        let _ = capture_store::set_capture_owner(&capture_id, &self.session_id);
 
         // Emit connected event
         let address = format!("{}:{}", self.config.host, self.config.port);

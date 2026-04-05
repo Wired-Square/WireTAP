@@ -121,7 +121,7 @@ fn migrate_buffer_to_capture(conn: &mut Connection) -> Result<(), String> {
 // Initialisation
 // ============================================================================
 
-/// Initialise the buffer database. Must be called once at app startup.
+/// Initialise the capture database. Must be called once at app startup.
 /// When `clear_on_start` is true, leftover data from previous sessions is deleted.
 pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), String> {
     std::fs::create_dir_all(app_data_dir)
@@ -160,7 +160,7 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
     );
 
     // Conditionally clear leftover data and reclaim disk space
-    // Persistent (pinned) buffers survive the clear.
+    // Persistent (pinned) captures survive the clear.
     if clear_on_start {
         // The database file persists WAL mode from the previous session.
         // VACUUM cannot shrink a WAL-mode database, so switch to DELETE mode first.
@@ -248,8 +248,8 @@ fn row_to_frame_with_rowid(row: &rusqlite::Row) -> rusqlite::Result<(i64, FrameM
 // Hot-Path Writes (called per batch during streaming)
 // ============================================================================
 
-/// Insert a batch of frames for a buffer. Uses a single transaction.
-pub fn insert_frames(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
+/// Insert a batch of frames for a capture. Uses a single transaction.
+pub fn insert_frames(capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
     if frames.is_empty() {
         return Ok(());
     }
@@ -271,7 +271,7 @@ pub fn insert_frames(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), Str
 
         for frame in frames {
             stmt.execute(params![
-                buffer_id,
+                capture_id,
                 &frame.protocol,
                 frame.timestamp_us as i64,
                 frame.frame_id as i64,
@@ -294,8 +294,8 @@ pub fn insert_frames(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), Str
     Ok(())
 }
 
-/// Insert a batch of timestamped bytes for a buffer. Uses a single transaction.
-pub fn insert_bytes(buffer_id: &str, bytes: &[TimestampedByte]) -> Result<(), String> {
+/// Insert a batch of timestamped bytes for a capture. Uses a single transaction.
+pub fn insert_bytes(capture_id: &str, bytes: &[TimestampedByte]) -> Result<(), String> {
     if bytes.is_empty() {
         return Ok(());
     }
@@ -317,7 +317,7 @@ pub fn insert_bytes(buffer_id: &str, bytes: &[TimestampedByte]) -> Result<(), St
 
         for b in bytes {
             stmt.execute(params![
-                buffer_id,
+                capture_id,
                 b.byte as i64,
                 b.timestamp_us as i64,
                 b.bus as i64,
@@ -336,9 +336,9 @@ pub fn insert_bytes(buffer_id: &str, bytes: &[TimestampedByte]) -> Result<(), St
 // Cold-Path Reads (on-demand, frontend-initiated)
 // ============================================================================
 
-/// Get paginated frames for a buffer. Returns (frames, rowids).
+/// Get paginated frames for a capture. Returns (frames, rowids).
 pub fn get_frames_paginated(
-    buffer_id: &str,
+    capture_id: &str,
     offset: usize,
     limit: usize,
 ) -> Result<(Vec<FrameMessage>, Vec<i64>), String> {
@@ -353,7 +353,7 @@ pub fn get_frames_paginated(
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id, limit as i64, offset as i64], |row| {
+        .query_map(params![capture_id, limit as i64, offset as i64], |row| {
             row_to_frame_with_rowid(row)
         })
         .map_err(|e| format!("Failed to query: {}", e))?;
@@ -370,14 +370,14 @@ pub fn get_frames_paginated(
 
 /// Get paginated frames filtered by frame ID set. Returns (frames, rowids, total_filtered_count).
 pub fn get_frames_paginated_filtered(
-    buffer_id: &str,
+    capture_id: &str,
     offset: usize,
     limit: usize,
     frame_ids: &[u32],
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize), String> {
     if frame_ids.is_empty() {
-        let (frames, rowids) = get_frames_paginated(buffer_id, offset, limit)?;
-        let total = get_frame_count(buffer_id)?;
+        let (frames, rowids) = get_frames_paginated(capture_id, offset, limit)?;
+        let total = get_frame_count(capture_id)?;
         return Ok((frames, rowids, total));
     }
 
@@ -397,7 +397,7 @@ pub fn get_frames_paginated_filtered(
                 "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND frame_id IN ({})",
                 placeholders
             ),
-            params![buffer_id],
+            params![capture_id],
             |row| row.get::<_, i64>(0),
         )
         .map_err(|e| format!("Failed to count: {}", e))? as usize;
@@ -414,7 +414,7 @@ pub fn get_frames_paginated_filtered(
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id, limit as i64, offset as i64], |row| {
+        .query_map(params![capture_id, limit as i64, offset as i64], |row| {
             row_to_frame_with_rowid(row)
         })
         .map_err(|e| format!("Failed to query: {}", e))?;
@@ -430,10 +430,10 @@ pub fn get_frames_paginated_filtered(
     Ok((frames, rowids, total))
 }
 
-/// Get the last N frames for a buffer, optionally filtered. Returns (frames, rowids, total_filtered_count, end_time).
+/// Get the last N frames for a capture, optionally filtered. Returns (frames, rowids, total_filtered_count, end_time).
 /// Frames are returned in chronological order (oldest first).
 pub fn get_frames_tail(
-    buffer_id: &str,
+    capture_id: &str,
     limit: usize,
     frame_ids: &[u32],
 ) -> Result<(Vec<FrameMessage>, Vec<i64>, usize, Option<u64>), String> {
@@ -472,11 +472,11 @@ pub fn get_frames_tail(
     };
 
     let total: usize = conn
-        .query_row(&sql_count, params![buffer_id], |row| row.get::<_, i64>(0))
+        .query_row(&sql_count, params![capture_id], |row| row.get::<_, i64>(0))
         .map_err(|e| format!("Failed to count: {}", e))? as usize;
 
     let end_time_us: Option<u64> = conn
-        .query_row(&sql_end_time, params![buffer_id], |row| {
+        .query_row(&sql_end_time, params![capture_id], |row| {
             row.get::<_, Option<i64>>(0)
         })
         .map_err(|e| format!("Failed to get end time: {}", e))?
@@ -487,7 +487,7 @@ pub fn get_frames_tail(
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id, limit as i64], |row| row_to_frame_with_rowid(row))
+        .query_map(params![capture_id, limit as i64], |row| row_to_frame_with_rowid(row))
         .map_err(|e| format!("Failed to query: {}", e))?;
 
     let mut frames = Vec::with_capacity(limit);
@@ -505,15 +505,15 @@ pub fn get_frames_tail(
     Ok((frames, rowids, total, end_time_us))
 }
 
-/// Get total frame count for a buffer.
-pub fn get_frame_count(buffer_id: &str) -> Result<usize, String> {
+/// Get total frame count for a capture.
+pub fn get_frame_count(capture_id: &str) -> Result<usize, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM frames WHERE capture_id = ?1",
-            params![buffer_id],
+            params![capture_id],
             |row| row.get(0),
         )
         .map_err(|e| format!("Failed to count: {}", e))?;
@@ -522,7 +522,7 @@ pub fn get_frame_count(buffer_id: &str) -> Result<usize, String> {
 }
 
 /// Get unique frame info via aggregation query.
-pub fn get_frame_info(buffer_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
+pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
@@ -535,7 +535,7 @@ pub fn get_frame_info(buffer_id: &str) -> Result<Vec<CaptureFrameInfo>, String> 
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id], |row| {
+        .query_map(params![capture_id], |row| {
             Ok(CaptureFrameInfo {
                 frame_id: row.get::<_, i64>("frame_id")? as u32,
                 max_dlc: row.get::<_, i64>("max_dlc")? as u8,
@@ -555,7 +555,7 @@ pub fn get_frame_info(buffer_id: &str) -> Result<Vec<CaptureFrameInfo>, String> 
 
 /// Find the offset (row count) for a given timestamp, optionally filtered by frame IDs.
 pub fn find_offset_for_timestamp(
-    buffer_id: &str,
+    capture_id: &str,
     target_us: u64,
     frame_ids: &[u32],
 ) -> Result<usize, String> {
@@ -565,7 +565,7 @@ pub fn find_offset_for_timestamp(
     let count: i64 = if frame_ids.is_empty() {
         conn.query_row(
             "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND timestamp_us < ?2",
-            params![buffer_id, target_us as i64],
+            params![capture_id, target_us as i64],
             |row| row.get(0),
         )
         .map_err(|e| format!("Failed to count: {}", e))?
@@ -580,7 +580,7 @@ pub fn find_offset_for_timestamp(
                 "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND timestamp_us < ?2 AND frame_id IN ({})",
                 placeholders
             ),
-            params![buffer_id, target_us as i64],
+            params![capture_id, target_us as i64],
             |row| row.get(0),
         )
         .map_err(|e| format!("Failed to count: {}", e))?
@@ -589,7 +589,7 @@ pub fn find_offset_for_timestamp(
     Ok(count as usize)
 }
 
-/// Search frames in a buffer for a text query, returning 0-based offsets in the
+/// Search frames in a capture for a text query, returning 0-based offsets in the
 /// selected-ID-filtered result set.
 ///
 /// `query` must have whitespace stripped by the caller.
@@ -597,7 +597,7 @@ pub fn find_offset_for_timestamp(
 /// `search_data` matches against the hex representation of the payload BLOB.
 /// `frame_ids` filters which frames are included (empty = all frames).
 pub fn search_frames(
-    buffer_id: &str,
+    capture_id: &str,
     query: &str,
     search_id: bool,
     search_data: bool,
@@ -669,7 +669,7 @@ pub fn search_frames(
         .map_err(|e| format!("Failed to prepare search: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id], |row| row.get::<_, i64>(0))
+        .query_map(params![capture_id], |row| row.get::<_, i64>(0))
         .map_err(|e| format!("Failed to execute search: {}", e))?;
 
     let mut offsets = Vec::new();
@@ -680,7 +680,7 @@ pub fn search_frames(
     Ok(offsets)
 }
 
-/// Copy all frame and byte data from one buffer to another using INSERT SELECT.
+/// Copy all frame and byte data from one capture to another using INSERT SELECT.
 pub fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String> {
     let mut guard = DB.lock().unwrap();
     let conn = guard.as_mut().ok_or("Database not initialised")?;
@@ -713,21 +713,21 @@ pub fn copy_capture_data(source_id: &str, dest_id: &str) -> Result<usize, String
     Ok(frame_count + byte_count)
 }
 
-/// Delete all data for a specific buffer.
-pub fn delete_capture_data(buffer_id: &str) -> Result<(), String> {
+/// Delete all data for a specific capture.
+pub fn delete_capture_data(capture_id: &str) -> Result<(), String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
-    conn.execute("DELETE FROM frames WHERE capture_id = ?1", params![buffer_id])
+    conn.execute("DELETE FROM frames WHERE capture_id = ?1", params![capture_id])
         .map_err(|e| format!("Failed to delete frames: {}", e))?;
-    conn.execute("DELETE FROM bytes WHERE capture_id = ?1", params![buffer_id])
+    conn.execute("DELETE FROM bytes WHERE capture_id = ?1", params![capture_id])
         .map_err(|e| format!("Failed to delete bytes: {}", e))?;
 
     Ok(())
 }
 
-/// Clear and refill a buffer with new frames (used by framing to reuse buffer IDs).
-pub fn clear_and_refill(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
+/// Clear and refill a capture with new frames (used by framing to reuse capture IDs).
+pub fn clear_and_refill(capture_id: &str, frames: &[FrameMessage]) -> Result<(), String> {
     let mut guard = DB.lock().unwrap();
     let conn = guard.as_mut().ok_or("Database not initialised")?;
 
@@ -735,7 +735,7 @@ pub fn clear_and_refill(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), 
         .transaction()
         .map_err(|e| format!("Failed to begin transaction: {}", e))?;
 
-    tx.execute("DELETE FROM frames WHERE capture_id = ?1", params![buffer_id])
+    tx.execute("DELETE FROM frames WHERE capture_id = ?1", params![capture_id])
         .map_err(|e| format!("Failed to clear frames: {}", e))?;
 
     {
@@ -748,7 +748,7 @@ pub fn clear_and_refill(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), 
 
         for frame in frames {
             stmt.execute(params![
-                buffer_id,
+                capture_id,
                 &frame.protocol,
                 frame.timestamp_us as i64,
                 frame.frame_id as i64,
@@ -771,8 +771,8 @@ pub fn clear_and_refill(buffer_id: &str, frames: &[FrameMessage]) -> Result<(), 
     Ok(())
 }
 
-/// Get all frames for a buffer (loads everything — use sparingly).
-pub fn get_all_frames(buffer_id: &str) -> Result<Vec<FrameMessage>, String> {
+/// Get all frames for a capture (loads everything — use sparingly).
+pub fn get_all_frames(capture_id: &str) -> Result<Vec<FrameMessage>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
@@ -784,7 +784,7 @@ pub fn get_all_frames(buffer_id: &str) -> Result<Vec<FrameMessage>, String> {
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id], |row| row_to_frame(row))
+        .query_map(params![capture_id], |row| row_to_frame(row))
         .map_err(|e| format!("Failed to query: {}", e))?;
 
     let mut frames = Vec::new();
@@ -795,13 +795,13 @@ pub fn get_all_frames(buffer_id: &str) -> Result<Vec<FrameMessage>, String> {
 }
 
 // ============================================================================
-// Buffer Reader Streaming (chunked reads for playback)
+// Capture Reader Streaming (chunked reads for playback)
 // ============================================================================
 
 /// Read a chunk of frames starting after the given rowid (forward).
 /// Returns Vec of (rowid, FrameMessage) for position tracking.
 pub fn read_frame_chunk(
-    buffer_id: &str,
+    capture_id: &str,
     after_rowid: i64,
     limit: usize,
 ) -> Result<Vec<(i64, FrameMessage)>, String> {
@@ -816,7 +816,7 @@ pub fn read_frame_chunk(
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id, after_rowid, limit as i64], |row| {
+        .query_map(params![capture_id, after_rowid, limit as i64], |row| {
             row_to_frame_with_rowid(row)
         })
         .map_err(|e| format!("Failed to query: {}", e))?;
@@ -831,7 +831,7 @@ pub fn read_frame_chunk(
 /// Read a chunk of frames before the given rowid (reverse).
 /// Returns in reverse chronological order (most recent first).
 pub fn read_frame_chunk_reverse(
-    buffer_id: &str,
+    capture_id: &str,
     before_rowid: i64,
     limit: usize,
 ) -> Result<Vec<(i64, FrameMessage)>, String> {
@@ -846,7 +846,7 @@ pub fn read_frame_chunk_reverse(
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id, before_rowid, limit as i64], |row| {
+        .query_map(params![capture_id, before_rowid, limit as i64], |row| {
             row_to_frame_with_rowid(row)
         })
         .map_err(|e| format!("Failed to query: {}", e))?;
@@ -858,15 +858,15 @@ pub fn read_frame_chunk_reverse(
     Ok(result)
 }
 
-/// Get min and max rowid for a buffer (for determining bounds).
-pub fn get_rowid_range(buffer_id: &str) -> Result<Option<(i64, i64)>, String> {
+/// Get min and max rowid for a capture (for determining bounds).
+pub fn get_rowid_range(capture_id: &str) -> Result<Option<(i64, i64)>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     let result: Option<(i64, i64)> = conn
         .query_row(
             "SELECT MIN(rowid), MAX(rowid) FROM frames WHERE capture_id = ?1",
-            params![buffer_id],
+            params![capture_id],
             |row| {
                 let min: Option<i64> = row.get(0)?;
                 let max: Option<i64> = row.get(1)?;
@@ -880,7 +880,7 @@ pub fn get_rowid_range(buffer_id: &str) -> Result<Option<(i64, i64)>, String> {
 
 /// Find the rowid nearest to (at or after) a given timestamp.
 pub fn find_rowid_for_timestamp(
-    buffer_id: &str,
+    capture_id: &str,
     timestamp_us: u64,
 ) -> Result<Option<i64>, String> {
     let guard = DB.lock().unwrap();
@@ -889,7 +889,7 @@ pub fn find_rowid_for_timestamp(
     let result: Option<i64> = conn
         .query_row(
             "SELECT rowid FROM frames WHERE capture_id = ?1 AND timestamp_us >= ?2 ORDER BY timestamp_us ASC, rowid ASC LIMIT 1",
-            params![buffer_id, timestamp_us as i64],
+            params![capture_id, timestamp_us as i64],
             |row| row.get(0),
         )
         .optional()
@@ -899,10 +899,10 @@ pub fn find_rowid_for_timestamp(
 }
 
 
-/// Get the frame at a specific index (0-based) within a buffer.
+/// Get the frame at a specific index (0-based) within a capture.
 /// Returns (rowid, FrameMessage) or None if index out of bounds.
 pub fn get_frame_at_index(
-    buffer_id: &str,
+    capture_id: &str,
     index: usize,
 ) -> Result<Option<(i64, FrameMessage)>, String> {
     let guard = DB.lock().unwrap();
@@ -912,7 +912,7 @@ pub fn get_frame_at_index(
         .query_row(
             "SELECT rowid, protocol, timestamp_us, frame_id, bus, dlc, payload, is_extended, is_fd, source_address, incomplete, direction
              FROM frames WHERE capture_id = ?1 ORDER BY rowid LIMIT 1 OFFSET ?2",
-            params![buffer_id, index as i64],
+            params![capture_id, index as i64],
             |row| row_to_frame_with_rowid(row),
         )
         .optional()
@@ -924,7 +924,7 @@ pub fn get_frame_at_index(
 /// Get the next (or previous) frame matching an optional filter, starting after (or before) a given rowid.
 /// Returns (rowid, frame_index, FrameMessage) where frame_index is the 0-based position.
 pub fn get_next_filtered_frame(
-    buffer_id: &str,
+    capture_id: &str,
     current_rowid: i64,
     frame_ids: &[u32],
     backward: bool,
@@ -958,18 +958,18 @@ pub fn get_next_filtered_frame(
     };
 
     let row_result = conn
-        .query_row(&sql, params![buffer_id, current_rowid], |row| {
+        .query_row(&sql, params![capture_id, current_rowid], |row| {
             row_to_frame_with_rowid(row)
         })
         .optional()
         .map_err(|e| format!("Failed to query: {}", e))?;
 
     if let Some((rowid, frame)) = row_result {
-        // Compute the frame_index (0-based position within the buffer)
+        // Compute the frame_index (0-based position within the capture)
         let frame_index: usize = conn
             .query_row(
                 "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND rowid < ?2",
-                params![buffer_id, rowid],
+                params![capture_id, rowid],
                 |row| row.get::<_, i64>(0),
             )
             .map_err(|e| format!("Failed to count: {}", e))? as usize;
@@ -980,15 +980,15 @@ pub fn get_next_filtered_frame(
     }
 }
 
-/// Count the number of frames before a given rowid in a buffer (for computing 0-based frame index).
-pub fn count_frames_before_rowid(buffer_id: &str, rowid: i64) -> Result<usize, String> {
+/// Count the number of frames before a given rowid in a capture (for computing 0-based frame index).
+pub fn count_frames_before_rowid(capture_id: &str, rowid: i64) -> Result<usize, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM frames WHERE capture_id = ?1 AND rowid < ?2",
-            params![buffer_id, rowid],
+            params![capture_id, rowid],
             |row| row.get(0),
         )
         .map_err(|e| format!("Failed to count: {}", e))?;
@@ -997,12 +997,12 @@ pub fn count_frames_before_rowid(buffer_id: &str, rowid: i64) -> Result<usize, S
 }
 
 // ============================================================================
-// Byte Buffer Operations
+// Byte Capture Operations
 // ============================================================================
 
-/// Get paginated bytes for a buffer. Returns (bytes, total_count).
+/// Get paginated bytes for a capture. Returns (bytes, total_count).
 pub fn get_bytes_paginated(
-    buffer_id: &str,
+    capture_id: &str,
     offset: usize,
     limit: usize,
 ) -> Result<(Vec<TimestampedByte>, usize), String> {
@@ -1012,7 +1012,7 @@ pub fn get_bytes_paginated(
     let total: usize = conn
         .query_row(
             "SELECT COUNT(*) FROM bytes WHERE capture_id = ?1",
-            params![buffer_id],
+            params![capture_id],
             |row| row.get::<_, i64>(0),
         )
         .map_err(|e| format!("Failed to count: {}", e))? as usize;
@@ -1024,7 +1024,7 @@ pub fn get_bytes_paginated(
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id, limit as i64, offset as i64], |row| {
+        .query_map(params![capture_id, limit as i64, offset as i64], |row| {
             Ok(TimestampedByte {
                 byte: row.get::<_, i64>(0)? as u8,
                 timestamp_us: row.get::<_, i64>(1)? as u64,
@@ -1041,8 +1041,8 @@ pub fn get_bytes_paginated(
     Ok((bytes, total))
 }
 
-/// Get all bytes for a buffer (used by framing which needs the full stream).
-pub fn get_all_bytes(buffer_id: &str) -> Result<Vec<TimestampedByte>, String> {
+/// Get all bytes for a capture (used by framing which needs the full stream).
+pub fn get_all_bytes(capture_id: &str) -> Result<Vec<TimestampedByte>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
@@ -1053,7 +1053,7 @@ pub fn get_all_bytes(buffer_id: &str) -> Result<Vec<TimestampedByte>, String> {
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id], |row| {
+        .query_map(params![capture_id], |row| {
             Ok(TimestampedByte {
                 byte: row.get::<_, i64>(0)? as u8,
                 timestamp_us: row.get::<_, i64>(1)? as u64,
@@ -1071,11 +1071,11 @@ pub fn get_all_bytes(buffer_id: &str) -> Result<Vec<TimestampedByte>, String> {
 
 
 // ============================================================================
-// Raw query helpers (for bufferquery.rs)
+// Raw query helpers (for capturequery.rs)
 // ============================================================================
 
 /// Execute a raw SQL query returning (timestamp_us, prev_payload, payload) tuples.
-/// Used by buffer_query_byte_changes and buffer_query_frame_changes.
+/// Used by capture_query_byte_changes and capture_query_frame_changes.
 pub fn query_raw(
     sql: &str,
     params: &[&dyn rusqlite::types::ToSql],
@@ -1106,7 +1106,7 @@ pub fn query_raw(
 }
 
 /// Execute a raw SQL query returning (timestamp_us, payload) tuples.
-/// Used by buffer_query_mirror_validation.
+/// Used by capture_query_mirror_validation.
 pub fn query_raw_two_col(
     sql: &str,
     params: &[&dyn rusqlite::types::ToSql],
@@ -1132,7 +1132,7 @@ pub fn query_raw_two_col(
     Ok(results)
 }
 
-/// Query payloads only (single BLOB column) from the buffer database.
+/// Query payloads only (single BLOB column) from the capture database.
 pub fn query_payloads(
     sql: &str,
     params: &[&dyn rusqlite::types::ToSql],
@@ -1159,7 +1159,7 @@ pub fn query_payloads(
 }
 
 /// Execute a raw SQL query returning (timestamp_us, frame_id, is_extended, payload) tuples.
-/// Used by buffer_query_pattern_search.
+/// Used by capture_query_pattern_search.
 pub fn query_raw_four_col(
     sql: &str,
     params: &[&dyn rusqlite::types::ToSql],
@@ -1191,9 +1191,9 @@ pub fn query_raw_four_col(
     Ok(results)
 }
 
-/// Find the byte offset for a given timestamp in a buffer.
+/// Find the byte offset for a given timestamp in a capture.
 pub fn find_bytes_offset_for_timestamp(
-    buffer_id: &str,
+    capture_id: &str,
     target_us: u64,
 ) -> Result<usize, String> {
     let guard = DB.lock().unwrap();
@@ -1202,7 +1202,7 @@ pub fn find_bytes_offset_for_timestamp(
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM bytes WHERE capture_id = ?1 AND timestamp_us < ?2",
-            params![buffer_id, target_us as i64],
+            params![capture_id, target_us as i64],
             |row| row.get(0),
         )
         .map_err(|e| format!("Failed to count: {}", e))?;
@@ -1211,7 +1211,7 @@ pub fn find_bytes_offset_for_timestamp(
 }
 
 // ============================================================================
-// Buffer Metadata Persistence
+// Capture Metadata Persistence
 // ============================================================================
 
 /// Upsert capture metadata into SQLite.
@@ -1319,10 +1319,10 @@ pub fn update_capture_persistent(capture_id: &str, persistent: bool) -> Result<(
     Ok(())
 }
 
-/// Get distinct bus numbers from a buffer's data.
-/// Used to backfill bus metadata for buffers created before bus tracking was added.
+/// Get distinct bus numbers from a capture's data.
+/// Used to backfill bus metadata for captures created before bus tracking was added.
 /// `table` should be "frames" or "bytes".
-pub fn get_distinct_buses(buffer_id: &str, table: &str) -> Result<Vec<u8>, String> {
+pub fn get_distinct_buses(capture_id: &str, table: &str) -> Result<Vec<u8>, String> {
     let guard = DB.lock().unwrap();
     let conn = guard.as_ref().ok_or("Database not initialised")?;
 
@@ -1336,7 +1336,7 @@ pub fn get_distinct_buses(buffer_id: &str, table: &str) -> Result<Vec<u8>, Strin
         .map_err(|e| format!("Failed to prepare: {}", e))?;
 
     let rows = stmt
-        .query_map(params![buffer_id], |row| row.get::<_, u8>(0))
+        .query_map(params![capture_id], |row| row.get::<_, u8>(0))
         .map_err(|e| format!("Failed to query: {}", e))?;
 
     let mut buses = Vec::new();

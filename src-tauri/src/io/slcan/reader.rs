@@ -71,7 +71,7 @@ pub struct SlcanConfig {
     pub silent_mode: bool,
     /// Maximum number of frames to read (None = unlimited)
     pub limit: Option<i64>,
-    /// Display name for the reader (used in buffer names)
+    /// Display name for the reader (used in capture names)
     pub display_name: Option<String>,
     /// Data bits (5, 6, 7, 8) - defaults to 8
     #[serde(default = "default_data_bits")]

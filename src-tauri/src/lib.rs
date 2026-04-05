@@ -887,21 +887,21 @@ pub fn run() {
                 tlog!("[setup] Failed to initialise store manager: {}", e);
             }
 
-            // Initialise the SQLite-backed buffer database
+            // Initialise the SQLite-backed capture database
             if let Ok(data_dir) = app.path().app_data_dir() {
                 let clear_on_start = settings::load_settings_sync(app.handle())
-                    .map(|s| s.clear_buffers_on_start)
+                    .map(|s| s.clear_captures_on_start)
                     .unwrap_or(true);
                 if let Err(e) = capture_db::initialise(&data_dir, clear_on_start) {
-                    tlog!("[setup] Failed to initialise buffer database: {}", e);
+                    tlog!("[setup] Failed to initialise capture database: {}", e);
                 }
 
                 if let Err(e) = transmit_history::initialise(&data_dir) {
                     tlog!("[setup] Failed to initialise transmit history database: {}", e);
                 }
 
-                // Hydrate the buffer registry from SQLite.
-                // Always called — persistent (pinned) buffers may survive clear_on_start.
+                // Hydrate the capture registry from SQLite.
+                // Always called — persistent (pinned) captures may survive clear_on_start.
                 capture_store::hydrate_from_db();
             }
 

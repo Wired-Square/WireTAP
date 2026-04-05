@@ -156,10 +156,10 @@ mod desktop {
         }
     }
 
-    /// Apply framing to the active byte buffer.
-    /// If `reuse_capture_id` is provided and valid, that buffer will be cleared and reused.
-    /// Otherwise, a new frame buffer is created.
-    /// This avoids buffer proliferation during live framing.
+    /// Apply framing to the active byte capture.
+    /// If `reuse_capture_id` is provided and valid, that capture will be cleared and reused.
+    /// Otherwise, a new frame capture is created.
+    /// This avoids capture proliferation during live framing.
     #[tauri::command(rename_all = "snake_case")]
     pub async fn apply_framing_to_capture(
         session_id: String,
@@ -168,19 +168,19 @@ mod desktop {
     ) -> Result<FramingResult, String> {
         tlog!("[framing] apply_framing_to_capture called with min_length={:?}", config.min_length);
 
-        // Get session's byte buffer
+        // Get session's byte capture
         let capture_id = capture_store::get_session_capture_ids(&session_id)
             .into_iter()
             .find(|id| capture_store::get_capture_metadata(id)
                 .map(|m| m.kind == capture_store::CaptureKind::Bytes)
                 .unwrap_or(false))
-            .ok_or_else(|| "No byte buffer found for session".to_string())?;
+            .ok_or_else(|| "No byte capture found for session".to_string())?;
 
         let bytes = capture_store::get_capture_bytes(&capture_id)
-            .ok_or_else(|| format!("Buffer '{}' not found or is not a byte buffer", capture_id))?;
+            .ok_or_else(|| format!("Capture '{}' not found or is not a byte capture", capture_id))?;
 
         if bytes.is_empty() {
-            return Err("No bytes in buffer".to_string());
+            return Err("No bytes in capture".to_string());
         }
 
         // Build default framing encoding from config

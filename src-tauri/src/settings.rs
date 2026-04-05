@@ -117,13 +117,13 @@ pub struct AppSettings {
     #[serde(default = "default_telemetry_consent_given")]
     pub telemetry_consent_given: bool,
 
-    // Buffer persistence
-    #[serde(default = "default_clear_buffers_on_start")]
-    pub clear_buffers_on_start: bool,
+    // Capture persistence
+    #[serde(default = "default_clear_captures_on_start", alias = "clear_buffers_on_start")]
+    pub clear_captures_on_start: bool,
 
-    /// Buffer storage backend ("sqlite" is the only option for now)
-    #[serde(default = "default_buffer_storage")]
-    pub buffer_storage: String,
+    /// Capture storage backend ("sqlite" is the only option for now)
+    #[serde(default = "default_capture_storage", alias = "buffer_storage")]
+    pub capture_storage: String,
 
     // Decoder buffer limits
     #[serde(default = "default_decoder_max_unmatched_frames")]
@@ -284,11 +284,11 @@ fn default_telemetry_consent_given() -> bool {
     false
 }
 
-// Buffer persistence defaults
-fn default_clear_buffers_on_start() -> bool {
+// Capture persistence defaults
+fn default_clear_captures_on_start() -> bool {
     true
 }
-fn default_buffer_storage() -> String {
+fn default_capture_storage() -> String {
     "sqlite".to_string()
 }
 fn default_smp_port() -> u16 {
@@ -380,9 +380,9 @@ impl Default for AppSettings {
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
             telemetry_consent_given: default_telemetry_consent_given(),
-            // Buffer persistence
-            clear_buffers_on_start: default_clear_buffers_on_start(),
-            buffer_storage: default_buffer_storage(),
+            // Capture persistence
+            clear_captures_on_start: default_clear_captures_on_start(),
+            capture_storage: default_capture_storage(),
             // Decoder buffer limits
             decoder_max_unmatched_frames: default_decoder_max_unmatched_frames(),
             decoder_max_filtered_frames: default_decoder_max_filtered_frames(),
@@ -461,9 +461,9 @@ impl AppSettings {
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
             telemetry_consent_given: default_telemetry_consent_given(),
-            // Buffer persistence
-            clear_buffers_on_start: default_clear_buffers_on_start(),
-            buffer_storage: default_buffer_storage(),
+            // Capture persistence
+            clear_captures_on_start: default_clear_captures_on_start(),
+            capture_storage: default_capture_storage(),
             // Decoder buffer limits
             decoder_max_unmatched_frames: default_decoder_max_unmatched_frames(),
             decoder_max_filtered_frames: default_decoder_max_filtered_frames(),

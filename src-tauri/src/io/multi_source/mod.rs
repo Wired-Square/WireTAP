@@ -27,7 +27,7 @@ use super::traits::{get_traits_for_profile_kind, validate_session_traits};
 use super::types::{SourceMessage, TransmitRequest};
 use super::{
     CanTransmitFrame, IOCapabilities, IODevice, IOState, InterfaceTraits, SessionDataStreams,
-    TransmitPayload, TransmitResult, VirtualBusState, emit_buffer_changed,
+    TransmitPayload, TransmitResult, VirtualBusState, emit_capture_changed,
 };
 use crate::capture_store::{self, CaptureKind};
 
@@ -477,42 +477,42 @@ impl IODevice for MultiSourceReader {
             framing != "raw" // Serial sources with non-raw framing produce frames
         });
 
-        // Orphan any existing buffer owned by this session (e.g., from a previous bookmark jump)
-        // This makes the old buffer selectable in "Orphaned Buffers" while creating a fresh one
+        // Orphan any existing capture owned by this session (e.g., from a previous bookmark jump)
+        // This makes the old capture selectable in "Orphaned Captures" while creating a fresh one
         let _orphaned = capture_store::orphan_captures_for_session(&self.session_id);
 
-        // Create appropriate buffer(s) for this multi-source session
-        // We may need both a Frames buffer (for CAN, framed serial) and a Bytes buffer (for raw serial)
-        // Buffer names use session ID (UI prefixes with "Frames:" or "Bytes:" based on type)
-        let mut bytes_buffer_id: Option<String> = None;
+        // Create appropriate capture(s) for this multi-source session
+        // We may need both a Frames capture (for CAN, framed serial) and a Bytes capture (for raw serial)
+        // Capture names use session ID (UI prefixes with "Frames:" or "Bytes:" based on type)
+        let mut bytes_capture_id: Option<String> = None;
 
         if has_framing {
-            // Create a frames buffer as active (for frame operations)
-            let buffer_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
-            // Assign buffer ownership to this session
-            let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
+            // Create a frames capture as active (for frame operations)
+            let capture_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
+            // Assign capture ownership to this session
+            let _ = capture_store::set_capture_owner(&capture_id, &self.session_id);
         }
 
         if self.emits_raw_bytes {
             if has_framing {
-                // Create a bytes buffer in addition to frames buffer (not as active)
+                // Create a bytes capture in addition to frames capture (not as active)
                 let bytes_id = capture_store::create_capture_inactive(
                     CaptureKind::Bytes,
                     self.session_id.clone(),
                 );
-                // Assign buffer ownership to this session
+                // Assign capture ownership to this session
                 let _ = capture_store::set_capture_owner(&bytes_id, &self.session_id);
-                bytes_buffer_id = Some(bytes_id);
+                bytes_capture_id = Some(bytes_id);
             } else {
-                // Only raw bytes - create a bytes buffer as active
-                let buffer_id = capture_store::create_capture(CaptureKind::Bytes, self.session_id.clone());
-                // Assign buffer ownership to this session
-                let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
+                // Only raw bytes - create a bytes capture as active
+                let capture_id = capture_store::create_capture(CaptureKind::Bytes, self.session_id.clone());
+                // Assign capture ownership to this session
+                let _ = capture_store::set_capture_owner(&capture_id, &self.session_id);
             }
         }
 
-        // Emit buffer-changed after all buffer operations are complete
-        emit_buffer_changed(&self.session_id);
+        // Emit capture-changed after all capture operations are complete
+        emit_capture_changed(&self.session_id);
 
         // Clear any stale transmit channels from previous run
         if let Ok(mut channels) = self.transmit_channels.lock() {
@@ -557,7 +557,7 @@ impl IODevice for MultiSourceReader {
                 session_id,
                 sources,
                 emits_raw_bytes,
-                bytes_buffer_id,
+                bytes_capture_id,
                 stop_flag,
                 pause_flag,
                 rx,

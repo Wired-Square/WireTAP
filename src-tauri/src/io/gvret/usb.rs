@@ -33,7 +33,7 @@ pub struct GvretUsbConfig {
     pub baud_rate: u32,
     /// Maximum number of frames to read (None = unlimited)
     pub limit: Option<i64>,
-    /// Display name for the reader (used in buffer names)
+    /// Display name for the reader (used in capture names)
     pub display_name: Option<String>,
     /// Bus number override - if set, all frames will use this bus number
     /// instead of the device-reported bus number

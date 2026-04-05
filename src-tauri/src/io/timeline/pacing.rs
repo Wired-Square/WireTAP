@@ -1,4 +1,4 @@
-// Shared playback pacing constants for timeline readers (buffer, CSV, PostgreSQL).
+// Shared playback pacing constants for timeline readers (capture, CSV, PostgreSQL).
 //
 // These values control how frames are batched and emitted during playback.
 // Extracted here to ensure consistent behaviour across all timeline reader

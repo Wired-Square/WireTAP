@@ -121,14 +121,14 @@ pub struct FrameMessage {
     pub direction: Option<String>,
 }
 
-/// Playback position - stored and signalled via playback-position events during buffer streaming
+/// Playback position - stored and signalled via playback-position events during capture streaming
 #[derive(Clone, Serialize)]
 pub struct PlaybackPosition {
     /// Current timestamp in microseconds
     pub timestamp_us: i64,
     /// Current frame index (0-based)
     pub frame_index: usize,
-    /// Total frame count in buffer (optional, for timeline sources)
+    /// Total frame count in capture (optional, for timeline sources)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frame_count: Option<usize>,
 }
@@ -402,7 +402,7 @@ impl IOCapabilities {
         self
     }
 
-    /// Set temporal mode (e.g., buffer replay overrides timeline_can's default)
+    /// Set temporal mode (e.g., capture replay overrides timeline_can's default)
     pub fn with_temporal_mode(mut self, mode: TemporalMode) -> Self {
         self.traits.temporal_mode = mode;
         self
@@ -493,7 +493,7 @@ pub trait IODevice: Send + Sync {
     }
 
     /// Seek to a specific frame index (if supported).
-    /// This is the preferred method for buffer playback as it avoids floating-point issues.
+    /// This is the preferred method for capture playback as it avoids floating-point issues.
     /// Default implementation returns an error.
     fn seek_by_frame(&mut self, _frame_index: i64) -> Result<(), String> {
         Err("This device does not support frame-based seeking".to_string())
@@ -694,7 +694,7 @@ fn emit_speed_change(session_id: &str, speed: f64) {
 static IO_SESSIONS: Lazy<Mutex<HashMap<String, IOSession>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-/// Playback position cache — updated during buffer/timeline streaming, polled by frontend
+/// Playback position cache — updated during capture/timeline streaming, polled by frontend
 static PLAYBACK_POSITIONS: Lazy<RwLock<HashMap<String, PlaybackPosition>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
@@ -1142,20 +1142,20 @@ pub fn signal_playback_position(session_id: &str) {
 }
 
 /// Signal the frontend that new frames are available for a session.
-/// The frontend fetches frames via get_buffer_frames_tail.
+/// The frontend fetches frames via get_capture_frames_tail.
 pub fn signal_frames_ready(session_id: &str) {
     crate::ws::dispatch::send_new_frames(session_id);
 }
 
 /// Signal the frontend that new bytes are available for a session.
-/// The frontend fetches bytes via get_buffer_bytes_tail.
+/// The frontend fetches bytes via get_capture_bytes_tail.
 pub fn signal_bytes_ready(session_id: &str) {
-    crate::ws::dispatch::send_buffer_changed(session_id);
+    crate::ws::dispatch::send_capture_changed(session_id);
 }
 
-/// Emit stream-ended signal with buffer info.
+/// Emit stream-ended signal with capture info.
 ///
-/// Finalises the buffer, stores info in the post-session cache for late-arriving
+/// Finalises the capture, stores info in the post-session cache for late-arriving
 /// fetches, then emits an empty signal for the frontend to fetch via command.
 pub fn emit_stream_ended(
     session_id: &str,
@@ -1208,20 +1208,20 @@ pub fn emit_stream_ended(
     );
 }
 
-/// Emit buffer-changed signal when session buffers are created or orphaned.
-/// Frontend fetches current buffer state via commands.
-pub fn emit_buffer_changed(session_id: &str) {
-    crate::ws::dispatch::send_buffer_changed(session_id);
+/// Emit capture-changed signal when session captures are created or orphaned.
+/// Frontend fetches current capture state via commands.
+pub fn emit_capture_changed(session_id: &str) {
+    crate::ws::dispatch::send_capture_changed(session_id);
 }
 
-/// Orphan buffers for a session and emit buffer-changed.
-/// Stores orphaned buffer IDs in the post-session cache so the frontend
+/// Orphan captures for a session and emit capture-changed.
+/// Stores orphaned capture IDs in the post-session cache so the frontend
 /// can fetch them (e.g., for the onDestroyed callback).
-pub fn emit_buffer_orphaned_as_changed(session_id: &str, orphaned: Vec<crate::capture_store::OrphanedCaptureInfo>) {
+pub fn emit_capture_orphaned_as_changed(session_id: &str, orphaned: Vec<crate::capture_store::OrphanedCaptureInfo>) {
     if !orphaned.is_empty() {
         let ids: Vec<String> = orphaned.iter().map(|o| o.capture_id.clone()).collect();
         post_session::store_orphaned_capture_ids(session_id, ids);
-        emit_buffer_changed(session_id);
+        emit_capture_changed(session_id);
     }
 }
 
@@ -1870,9 +1870,9 @@ pub async fn stop_session(session_id: &str) -> Result<IOState, String> {
     Ok(current)
 }
 
-/// Suspend a reader session - stops streaming, finalizes buffer, session stays alive.
-/// The buffer remains owned by the session and all joined apps can view it.
-/// Use `resume_session_fresh` to start streaming again with a new buffer.
+/// Suspend a reader session - stops streaming, finalizes capture, session stays alive.
+/// The capture remains owned by the session and all joined apps can view it.
+/// Use `resume_session_fresh` to start streaming again with a new capture.
 /// Returns the confirmed state after the operation.
 pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
     let mut sessions = IO_SESSIONS.lock().await;
@@ -1887,7 +1887,7 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
         return Ok(previous);
     }
 
-    // Stop the device (triggers emit_stream_ended which finalises the buffer)
+    // Stop the device (triggers emit_stream_ended which finalises the capture)
     session.device.stop().await?;
 
     // Emit session-lifecycle signal with inline state + capabilities
@@ -1900,7 +1900,7 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
     }
 
     tlog!(
-        "[reader] suspend_session('{}') - buffer finalized, session stays alive",
+        "[reader] suspend_session('{}') - capture finalized, session stays alive",
         session_id
     );
 
@@ -1910,7 +1910,7 @@ pub async fn suspend_session(session_id: &str) -> Result<IOState, String> {
 /// Replace a session's device in-place, keeping the session ID and all listeners.
 ///
 /// This is the low-level primitive for device swaps. Callers handle domain-specific
-/// logic (buffer orchestration, profile tracking) before/after calling this.
+/// logic (capture orchestration, profile tracking) before/after calling this.
 ///
 /// Steps: stop old device → swap device → optionally update metadata → optionally
 /// auto-start → emit `session-lifecycle` signal → emit state change.
@@ -1987,19 +1987,19 @@ pub async fn replace_session_device(
     Ok(payload)
 }
 
-/// Stop a realtime session and switch to buffer replay atomically.
+/// Stop a realtime session and switch to capture replay atomically.
 ///
-/// This combines suspend + switch_to_buffer_replay in a single lock acquisition
+/// This combines suspend + switch_to_capture_replay in a single lock acquisition
 /// and emits a `session-lifecycle:{sessionId}` signal so ALL listeners
 /// on the session refresh their state.
 ///
-/// If no buffer exists (e.g. stopped before any frames), falls back to a normal
+/// If no capture exists (e.g. stopped before any frames), falls back to a normal
 /// suspend.
-pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
+pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
     let mut sessions = IO_SESSIONS.lock().await;
 
     // Stop the device first — stop() triggers emit_stream_ended which calls
-    // finalize_buffer(), so we must stop before looking up the buffer.
+    // finalize_capture(), so we must stop before looking up the capture.
     // Scoped to release the mutable borrow before calling replace_session_device.
     {
         let session = sessions
@@ -2010,15 +2010,15 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
         }
     }
 
-    // Look up the buffer by session ownership (finalized during stop())
-    let buffer_ids = capture_store::get_session_capture_ids(session_id);
-    let buffer_id = buffer_ids.iter()
+    // Look up the capture by session ownership (finalized during stop())
+    let capture_ids = capture_store::get_session_capture_ids(session_id);
+    let capture_id = capture_ids.iter()
         .filter_map(|id| capture_store::get_capture_metadata(id))
         .find(|m| m.kind == capture_store::CaptureKind::Frames)
         .map(|m| m.id.clone());
 
-    // Try to switch to buffer replay
-    if let Some(ref bid) = buffer_id {
+    // Try to switch to capture replay
+    if let Some(ref bid) = capture_id {
         let _ = crate::capture_store::mark_capture_active(bid);
 
         // Domain-specific housekeeping before the swap
@@ -2051,13 +2051,13 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
         ).await?;
 
         tlog!(
-            "[reader] stop_and_switch_to_buffer('{}') - switched to buffer '{}'",
+            "[reader] stop_and_switch_to_capture('{}') - switched to capture '{}'",
             session_id, bid
         );
 
         Ok(result.capabilities)
     } else {
-        // No buffer — fall back to normal suspend
+        // No capture — fall back to normal suspend
         let session = sessions
             .get(session_id)
             .ok_or_else(|| format!("Session '{}' not found", session_id))?;
@@ -2067,7 +2067,7 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
         crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &state, &caps);
 
         tlog!(
-            "[reader] stop_and_switch_to_buffer('{}') - no buffer, fell back to suspend",
+            "[reader] stop_and_switch_to_capture('{}') - no capture, fell back to suspend",
             session_id
         );
 
@@ -2075,9 +2075,9 @@ pub async fn stop_and_switch_to_buffer(app: &AppHandle, session_id: &str, speed:
     }
 }
 
-/// Resume a suspended session with a fresh buffer.
-/// The old buffer is orphaned (becomes available for standalone viewing).
-/// A new buffer is created by the device's start() method.
+/// Resume a suspended session with a fresh capture.
+/// The old capture is orphaned (becomes available for standalone viewing).
+/// A new capture is created by the device's start() method.
 /// Returns the confirmed state after the operation.
 pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
     let mut sessions = IO_SESSIONS.lock().await;
@@ -2087,10 +2087,10 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
 
     let previous = session.device.state();
 
-    // Must be stopped to resume with new buffer
+    // Must be stopped to resume with new capture
     if !matches!(previous, IOState::Stopped) {
         return Err(format!(
-            "Session must be stopped to resume with new buffer (current: {:?})",
+            "Session must be stopped to resume with new capture (current: {:?})",
             previous
         ));
     }
@@ -2099,8 +2099,8 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
     let caps = session.device.capabilities();
     crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &previous, &caps);
 
-    // Start the device - this will orphan old buffer and create new one
-    // Timeline readers (PostgreSQL, CSV, Buffer) handle buffer creation in start()
+    // Start the device - this will orphan old capture and create new one
+    // Timeline readers (PostgreSQL, CSV, Buffer) handle capture creation in start()
     session.device.start().await?;
 
     let current = session.device.state();
@@ -2109,7 +2109,7 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
     }
 
     tlog!(
-        "[reader] resume_session_fresh('{}') - device started with fresh buffer",
+        "[reader] resume_session_fresh('{}') - device started with fresh capture",
         session_id
     );
 
@@ -2269,7 +2269,7 @@ pub async fn update_session_time_range(
 }
 
 /// Reconfigure a running session with new time range.
-/// This stops the current stream, orphans the old buffer, creates a new buffer,
+/// This stops the current stream, orphans the old capture, creates a new capture,
 /// and starts streaming with the new time range - all while keeping the session alive.
 /// Other apps joined to this session remain connected.
 pub async fn reconfigure_session(
@@ -2298,7 +2298,7 @@ pub async fn reconfigure_session(
     // The frontend clears stale frames when it receives this event.
     crate::ws::dispatch::send_reconfigured(session_id);
 
-    // Phase 2: Start the new stream (orphans old buffer, creates new one)
+    // Phase 2: Start the new stream (orphans old capture, creates new one)
     let result = session.device.complete_reconfigure().await;
     if let Err(ref e) = result {
         tlog!("[io] reconfigure_session failed on restart: {}", e);
@@ -2324,7 +2324,7 @@ pub async fn seek_session(session_id: &str, timestamp_us: i64) -> Result<(), Str
     session.device.seek(timestamp_us)
 }
 
-/// Seek to a specific frame index (preferred for buffer playback)
+/// Seek to a specific frame index (preferred for capture playback)
 pub async fn seek_session_by_frame(session_id: &str, frame_index: i64) -> Result<(), String> {
     let mut sessions = IO_SESSIONS.lock().await;
     let session = sessions
@@ -2344,48 +2344,48 @@ pub async fn update_session_direction(session_id: &str, reverse: bool) -> Result
     session.device.set_direction(reverse)
 }
 
-/// Switch a session to buffer replay mode.
+/// Switch a session to capture replay mode.
 /// This replaces the session's reader with a CaptureSource that reads from the session's
-/// owned buffer. The session stays alive and all listeners remain connected.
+/// owned capture. The session stays alive and all listeners remain connected.
 /// Use this after ingest completes to enable playback without destroying the session.
-pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
-    // Get the session's owned frame buffer
-    let buffer_ids = crate::capture_store::get_session_capture_ids(session_id);
-    let buffer_id = buffer_ids.iter()
+pub async fn switch_to_capture_replay(app: &AppHandle, session_id: &str, speed: f64) -> Result<IOCapabilities, String> {
+    // Get the session's owned frame capture
+    let capture_ids = crate::capture_store::get_session_capture_ids(session_id);
+    let capture_id = capture_ids.iter()
         .filter_map(|id| crate::capture_store::get_capture_metadata(id).map(|m| (id.clone(), m)))
         .find(|(_id, m)| m.kind == crate::capture_store::CaptureKind::Frames)
         .map(|(id, _m)| id)
         .ok_or_else(|| {
-            let buffers = crate::capture_store::list_captures();
+            let captures = crate::capture_store::list_captures();
             tlog!(
-                "[io] switch_to_buffer_replay: No buffer found for session '{}'. Available buffers:",
+                "[io] switch_to_capture_replay: No capture found for session '{}'. Available captures:",
                 session_id
             );
-            for buf in &buffers {
+            for cap in &captures {
                 tlog!(
                     "  - {} (owner: {:?}, count: {})",
-                    buf.id,
-                    buf.owning_session_id,
-                    buf.count
+                    cap.id,
+                    cap.owning_session_id,
+                    cap.count
                 );
             }
-            format!("No buffer found for session '{}'", session_id)
+            format!("No capture found for session '{}'", session_id)
         })?;
 
-    // Log buffer details
-    let buffer_count = crate::capture_store::get_capture_count(&buffer_id);
+    // Log capture details
+    let capture_count = crate::capture_store::get_capture_count(&capture_id);
     tlog!(
-        "[io] switch_to_buffer_replay: session='{}', buffer='{}', frames={}, speed={}",
-        session_id, buffer_id, buffer_count, speed
+        "[io] switch_to_capture_replay: session='{}', capture='{}', frames={}, speed={}",
+        session_id, capture_id, capture_count, speed
     );
 
-    let _ = crate::capture_store::mark_capture_active(&buffer_id);
+    let _ = crate::capture_store::mark_capture_active(&capture_id);
 
-    // Create a new CaptureSource that reads from the session's buffer
+    // Create a new CaptureSource that reads from the session's capture
     let new_reader = CaptureSource::new(
         app.clone(),
         session_id.to_string(),
-        buffer_id,
+        capture_id,
         speed,
     );
 
@@ -2405,7 +2405,7 @@ pub async fn switch_to_buffer_replay(app: &AppHandle, session_id: &str, speed: f
     Ok(result.capabilities)
 }
 
-/// Resume a session from buffer playback back to live streaming.
+/// Resume a session from capture playback back to live streaming.
 /// This replaces the CaptureSource with a new live reader (passed in from the caller
 /// who creates it from profile config). The session stays alive and all listeners
 /// remain connected.
@@ -2418,7 +2418,7 @@ pub async fn resume_to_live_session(
     new_reader: Box<dyn IODevice>,
 ) -> Result<IOCapabilities, String> {
     tlog!(
-        "[io] resume_to_live_session: session='{}' switching from buffer to live",
+        "[io] resume_to_live_session: session='{}' switching from capture to live",
         session_id
     );
 
@@ -2449,10 +2449,10 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
     if let Some(mut session) = removed {
         // Stop the reader first
         let _ = session.device.stop().await;
-        // Orphan buffers and store IDs in post-session cache before lifecycle event.
-        // The frontend fetches orphaned buffer IDs via command when it handles "destroyed".
+        // Orphan captures and store IDs in post-session cache before lifecycle event.
+        // The frontend fetches orphaned capture IDs via command when it handles "destroyed".
         let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
-        emit_buffer_orphaned_as_changed(session_id, orphaned);
+        emit_capture_orphaned_as_changed(session_id, orphaned);
         // Now emit lifecycle event
         let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
         emit_session_lifecycle(&session.app, SessionLifecyclePayload {
@@ -2470,7 +2470,7 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
     // Clear any stored startup error
     clear_startup_error(session_id);
     clear_playback_position(session_id);
-    // Don't sweep_expired here — the orphaned buffer IDs were just stored
+    // Don't sweep_expired here — the orphaned capture IDs were just stored
     // and need to survive long enough for the frontend to fetch them.
     Ok(())
 }
@@ -2772,9 +2772,9 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
     // Phase 2: Perform slow cleanup outside the critical section
     if let Some(mut session) = session_to_destroy {
         let _ = session.device.stop().await;
-        // Orphan buffers and store IDs in post-session cache before lifecycle event.
+        // Orphan captures and store IDs in post-session cache before lifecycle event.
         let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
-        emit_buffer_orphaned_as_changed(session_id, orphaned);
+        emit_capture_orphaned_as_changed(session_id, orphaned);
         // Now emit lifecycle event
         let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
         emit_session_lifecycle(&session.app, SessionLifecyclePayload {
@@ -2797,26 +2797,26 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
     Ok(remaining)
 }
 
-/// Evict a listener from a session, giving it a copy of the current buffer.
+/// Evict a listener from a session, giving it a copy of the current capture.
 /// This is used by the Session Manager to remove a listener without destroying the session.
-/// The evicted listener receives a buffer copy so it can continue viewing data standalone.
-/// Returns the list of copied buffer IDs.
+/// The evicted listener receives a capture copy so it can continue viewing data standalone.
+/// Returns the list of copied capture IDs.
 pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_id: &str) -> Result<Vec<String>, String> {
-    // Copy the buffer before unregistering (so the evicted listener gets a snapshot)
-    let mut copied_buffer_ids = Vec::new();
-    if let Some(buffer_id) = crate::capture_store::get_session_capture_ids(session_id).into_iter().next() {
+    // Copy the capture before unregistering (so the evicted listener gets a snapshot)
+    let mut copied_capture_ids = Vec::new();
+    if let Some(capture_id) = crate::capture_store::get_session_capture_ids(session_id).into_iter().next() {
         let copy_name = format!("{} (evicted)", listener_id);
-        match crate::capture_store::copy_capture(&buffer_id, copy_name) {
+        match crate::capture_store::copy_capture(&capture_id, copy_name) {
             Ok(copied_id) => {
                 tlog!(
-                    "[reader] Copied buffer '{}' -> '{}' for evicted listener '{}'",
-                    buffer_id, copied_id, listener_id
+                    "[reader] Copied capture '{}' -> '{}' for evicted listener '{}'",
+                    capture_id, copied_id, listener_id
                 );
-                copied_buffer_ids.push(copied_id);
+                copied_capture_ids.push(copied_id);
             }
             Err(e) => {
                 tlog!(
-                    "[reader] Failed to copy buffer for evicted listener '{}': {}",
+                    "[reader] Failed to copy capture for evicted listener '{}': {}",
                     listener_id, e
                 );
             }
@@ -2837,16 +2837,16 @@ pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_
     let payload = ListenerEvictedPayload {
         session_id: session_id.to_string(),
         listener_id: listener_id.to_string(),
-        capture_ids: copied_buffer_ids.clone(),
+        capture_ids: copied_capture_ids.clone(),
     };
     let _ = app.emit("listener-evicted", payload);
 
     tlog!(
-        "[reader] Evicted listener '{}' from session '{}' (remaining: {}, buffer copies: {:?})",
-        listener_id, session_id, remaining, copied_buffer_ids
+        "[reader] Evicted listener '{}' from session '{}' (remaining: {}, capture copies: {:?})",
+        listener_id, session_id, remaining, copied_capture_ids
     );
 
-    Ok(copied_buffer_ids)
+    Ok(copied_capture_ids)
 }
 
 /// Add a new source to an existing multi-source session.

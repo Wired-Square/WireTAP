@@ -31,7 +31,7 @@ pub fn send_new_frames(session_id: &str) {
         None => return,
     };
 
-    let buffer_id = match crate::capture_store::get_session_frame_capture_id(session_id) {
+    let capture_id = match crate::capture_store::get_session_frame_capture_id(session_id) {
         Some(id) => id,
         None => return,
     };
@@ -43,14 +43,14 @@ pub fn send_new_frames(session_id: &str) {
         .unwrap_or(0);
 
     // Check how many new frames exist before reading — avoids unbounded allocation
-    let total = crate::capture_store::get_capture_count(&buffer_id);
+    let total = crate::capture_store::get_capture_count(&capture_id);
     let new_count = total.saturating_sub(offset);
     if new_count == 0 {
         return;
     }
 
     let (frames, _indices, _total) =
-        crate::capture_store::get_capture_frames_paginated(&buffer_id, offset, new_count);
+        crate::capture_store::get_capture_frames_paginated(&capture_id, offset, new_count);
 
     if frames.is_empty() {
         return;
@@ -62,14 +62,14 @@ pub fn send_new_frames(session_id: &str) {
     let msg = protocol::encode_message(MsgType::FrameData, channel, &payload);
     server.send_to_channel(channel, msg);
 
-    // Update offset — use total as a ceiling so we never fall behind a cleared buffer.
+    // Update offset — use total as a ceiling so we never fall behind a cleared capture.
     let next = new_offset.max(total);
     if let Ok(mut offsets) = FRAME_OFFSETS.write() {
         offsets.insert(session_id.to_string(), next);
     }
 }
 
-/// Reset frame offset for a session to the current buffer length.
+/// Reset frame offset for a session to the current capture length.
 /// Called on subscribe so that only frames arriving after subscription are sent.
 pub fn reset_frame_offset(session_id: &str) {
     let count = crate::capture_store::get_session_frame_capture_id(session_id)
@@ -214,8 +214,8 @@ pub fn send_device_connected(
     server.send_to_channel(channel, msg);
 }
 
-/// Send buffer-changed signal.
-pub fn send_buffer_changed(session_id: &str) {
+/// Send capture-changed signal.
+pub fn send_capture_changed(session_id: &str) {
     let server = match ws_server() {
         Some(s) => s,
         None => return,
@@ -224,8 +224,8 @@ pub fn send_buffer_changed(session_id: &str) {
         Some(c) => c,
         None => return,
     };
-    // Empty payload — the frontend fetches buffer state via command
-    let msg = protocol::encode_message(MsgType::BufferChanged, channel, &[]);
+    // Empty payload — the frontend fetches capture state via command
+    let msg = protocol::encode_message(MsgType::CaptureChanged, channel, &[]);
     server.send_to_channel(channel, msg);
 }
 
@@ -358,7 +358,7 @@ pub fn send_session_lifecycle(payload: &crate::io::SessionLifecyclePayload) {
 }
 
 /// Send scoped session-lifecycle signal with inline state + capabilities.
-/// Used for suspend, resume, switch-to-buffer, and device-replaced transitions.
+/// Used for suspend, resume, switch-to-capture, and device-replaced transitions.
 pub fn send_session_lifecycle_scoped(
     session_id: &str,
     state: &crate::io::IOState,

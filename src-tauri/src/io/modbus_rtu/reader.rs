@@ -126,9 +126,9 @@ impl IODevice for ModbusRtuReader {
 
         let port = Arc::new(Mutex::new(port));
 
-        // Create frame buffer
-        let buffer_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
-        let _ = capture_store::set_capture_owner(&buffer_id, &self.session_id);
+        // Create frame capture
+        let capture_id = capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
+        let _ = capture_store::set_capture_owner(&capture_id, &self.session_id);
 
         // Emit connected event
         emit_device_connected(

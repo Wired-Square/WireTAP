@@ -5,7 +5,7 @@
 // single-shot transmits so the frontend can display a scrollable, paginated
 // history without unbounded Zustand array growth.
 //
-// Pattern mirrors buffer_db.rs: one global Mutex<Connection>.
+// Pattern mirrors capture_db.rs: one global Mutex<Connection>.
 
 use once_cell::sync::Lazy;
 use rusqlite::{params, Connection};

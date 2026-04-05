@@ -809,7 +809,7 @@ pub fn parse_csv_with_mapping(
             }
         }
 
-        // Sort frames to ensure correct order in the buffer.
+        // Sort frames to ensure correct order in the capture.
         // When a sequence column is mapped, use unwrapped sequence as the primary sort key
         // (handles counter wraparound, e.g. 16-bit: 65534, 65535, 0, 1, 2) with timestamp
         // as a tiebreaker. Otherwise, sort by timestamp alone.
@@ -1518,7 +1518,7 @@ async fn run_csv_stream(
         frames.len()
     );
 
-    // Buffer settings (shared with buffer and PostgreSQL readers)
+    // Pacing settings (shared with capture and PostgreSQL readers)
     use super::pacing::*;
 
     let mut throttle = SignalThrottle::new();

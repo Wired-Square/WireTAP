@@ -15,10 +15,10 @@ use crate::dbquery::{
     PatternSearchQueryResult, PatternSearchResult, QueryStats, compute_mux_statistics,
 };
 
-/// Query for byte changes in a specific frame within a buffer.
+/// Query for byte changes in a specific frame within a capture.
 ///
 /// Returns timestamps where the specified byte changed value.
-/// Time bounds are in microseconds (matching buffer timestamp_us).
+/// Time bounds are in microseconds (matching capture timestamp_us).
 #[tauri::command]
 pub fn capture_query_byte_changes(
     capture_id: String,
@@ -33,7 +33,7 @@ pub fn capture_query_byte_changes(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] byte_changes: capture_id='{}', frame_id={}, byte_index={}, is_extended={:?}, limit={}",
+        "[capturequery] byte_changes: capture_id='{}', frame_id={}, byte_index={}, is_extended={:?}, limit={}",
         capture_id, frame_id, byte_index, is_extended, result_limit
     );
 
@@ -114,7 +114,7 @@ pub fn capture_query_byte_changes(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] byte_changes: {} results from {} rows in {}ms",
+        "[capturequery] byte_changes: {} results from {} rows in {}ms",
         results.len(),
         rows_scanned,
         elapsed.as_millis()
@@ -130,7 +130,7 @@ pub fn capture_query_byte_changes(
     })
 }
 
-/// Query for frame payload changes in a buffer.
+/// Query for frame payload changes in a capture.
 ///
 /// Returns timestamps where any byte in the frame payload changed.
 #[tauri::command]
@@ -146,7 +146,7 @@ pub fn capture_query_frame_changes(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] frame_changes: capture_id='{}', frame_id={}, is_extended={:?}, limit={}",
+        "[capturequery] frame_changes: capture_id='{}', frame_id={}, is_extended={:?}, limit={}",
         capture_id, frame_id, is_extended, result_limit
     );
 
@@ -226,7 +226,7 @@ pub fn capture_query_frame_changes(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] frame_changes: {} results from {} rows in {}ms",
+        "[capturequery] frame_changes: {} results from {} rows in {}ms",
         results.len(),
         rows_scanned,
         elapsed.as_millis()
@@ -242,7 +242,7 @@ pub fn capture_query_frame_changes(
     })
 }
 
-/// Query for mirror validation mismatches in a buffer.
+/// Query for mirror validation mismatches in a capture.
 ///
 /// Finds timestamps where a mirror frame's payload doesn't match its source frame
 /// within the given tolerance window (in microseconds).
@@ -261,7 +261,7 @@ pub fn capture_query_mirror_validation(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] mirror_validation: capture_id='{}', mirror={}, source={}, tolerance_us={}, limit={}",
+        "[capturequery] mirror_validation: capture_id='{}', mirror={}, source={}, tolerance_us={}, limit={}",
         capture_id, mirror_frame_id, source_frame_id, tolerance_us, result_limit
     );
 
@@ -381,7 +381,7 @@ pub fn capture_query_mirror_validation(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] mirror_validation: {} results from {} rows in {}ms",
+        "[capturequery] mirror_validation: {} results from {} rows in {}ms",
         results.len(),
         rows_scanned,
         elapsed.as_millis()
@@ -397,9 +397,9 @@ pub fn capture_query_mirror_validation(
     })
 }
 
-/// Query mux statistics for a multiplexed frame within a buffer.
+/// Query mux statistics for a multiplexed frame within a capture.
 ///
-/// Fetches payloads from the SQLite buffer, groups by mux selector byte, and
+/// Fetches payloads from the SQLite capture, groups by mux selector byte, and
 /// computes per-byte and optional 16-bit word statistics for each mux case.
 #[tauri::command]
 pub fn capture_query_mux_statistics(
@@ -417,7 +417,7 @@ pub fn capture_query_mux_statistics(
     let result_limit = limit.unwrap_or(500_000);
 
     tlog!(
-        "[bufferquery] mux_statistics: capture_id='{}', frame_id={}, mux_byte={}, limit={}",
+        "[capturequery] mux_statistics: capture_id='{}', frame_id={}, mux_byte={}, limit={}",
         capture_id, frame_id, mux_selector_byte, result_limit
     );
 
@@ -455,7 +455,7 @@ pub fn capture_query_mux_statistics(
     let rows: Vec<Vec<u8>> = capture_db::query_payloads(&sql, &param_refs)?;
 
     let rows_scanned = rows.len();
-    tlog!("[bufferquery] mux_statistics: fetched {} payloads", rows_scanned);
+    tlog!("[capturequery] mux_statistics: fetched {} payloads", rows_scanned);
 
     // Group by mux selector byte
     let mux_idx = mux_selector_byte as usize;
@@ -471,7 +471,7 @@ pub fn capture_query_mux_statistics(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] mux_statistics: {} cases, {} total frames in {}ms",
+        "[capturequery] mux_statistics: {} cases, {} total frames in {}ms",
         result.cases.len(), result.total_frames, elapsed.as_millis()
     );
 
@@ -485,10 +485,10 @@ pub fn capture_query_mux_statistics(
     })
 }
 
-/// Query the first and last frames for a given frame ID within a buffer.
+/// Query the first and last frames for a given frame ID within a capture.
 ///
 /// Returns the first timestamp/payload, last timestamp/payload, and total count.
-/// Time bounds are in microseconds (matching buffer timestamp_us).
+/// Time bounds are in microseconds (matching capture timestamp_us).
 #[tauri::command]
 pub fn capture_query_first_last(
     capture_id: String,
@@ -500,7 +500,7 @@ pub fn capture_query_first_last(
     let query_start = std::time::Instant::now();
 
     tlog!(
-        "[bufferquery] first_last: capture_id='{}', frame_id={}, is_extended={:?}",
+        "[capturequery] first_last: capture_id='{}', frame_id={}, is_extended={:?}",
         capture_id, frame_id, is_extended
     );
 
@@ -565,7 +565,7 @@ pub fn capture_query_first_last(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] first_last: count={}, first_ts={}, last_ts={} in {}ms",
+        "[capturequery] first_last: count={}, first_ts={}, last_ts={} in {}ms",
         total_count, first_timestamp_us, last_timestamp_us, elapsed.as_millis()
     );
 
@@ -603,7 +603,7 @@ pub fn capture_query_frequency(
     let result_limit = limit.unwrap_or(100_000);
 
     tlog!(
-        "[bufferquery] frequency: capture_id='{}', frame_id={}, bucket_size_ms={}, is_extended={:?}, limit={}",
+        "[capturequery] frequency: capture_id='{}', frame_id={}, bucket_size_ms={}, is_extended={:?}, limit={}",
         capture_id, frame_id, bucket_size_ms, is_extended, result_limit
     );
 
@@ -674,7 +674,7 @@ pub fn capture_query_frequency(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] frequency: {} buckets from {} rows in {}ms",
+        "[capturequery] frequency: {} buckets from {} rows in {}ms",
         results.len(),
         rows_scanned,
         elapsed.as_millis()
@@ -706,7 +706,7 @@ pub fn capture_query_distribution(
     let query_start = std::time::Instant::now();
 
     tlog!(
-        "[bufferquery] distribution: capture_id='{}', frame_id={}, byte_index={}, is_extended={:?}",
+        "[capturequery] distribution: capture_id='{}', frame_id={}, byte_index={}, is_extended={:?}",
         capture_id, frame_id, byte_index, is_extended
     );
 
@@ -774,7 +774,7 @@ pub fn capture_query_distribution(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] distribution: {} distinct values from {} rows in {}ms",
+        "[capturequery] distribution: {} distinct values from {} rows in {}ms",
         results.len(),
         rows_scanned,
         elapsed.as_millis()
@@ -808,7 +808,7 @@ pub fn capture_query_gap_analysis(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] gap_analysis: capture_id='{}', frame_id={}, threshold_ms={}, is_extended={:?}, limit={}",
+        "[capturequery] gap_analysis: capture_id='{}', frame_id={}, threshold_ms={}, is_extended={:?}, limit={}",
         capture_id, frame_id, gap_threshold_ms, is_extended, result_limit
     );
 
@@ -872,7 +872,7 @@ pub fn capture_query_gap_analysis(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] gap_analysis: {} gaps from {} rows in {}ms",
+        "[capturequery] gap_analysis: {} gaps from {} rows in {}ms",
         results.len(),
         rows_scanned,
         elapsed.as_millis()
@@ -888,7 +888,7 @@ pub fn capture_query_gap_analysis(
     })
 }
 
-/// Search for a byte pattern across all frames in a buffer using a mask.
+/// Search for a byte pattern across all frames in a capture using a mask.
 ///
 /// For each frame, checks if the pattern matches anywhere in the payload.
 /// A position `p` matches if for all `i` in `0..pattern.len()`,
@@ -907,7 +907,7 @@ pub fn capture_query_pattern_search(
     let result_limit = limit.unwrap_or(10000);
 
     tlog!(
-        "[bufferquery] pattern_search: capture_id='{}', pattern_len={}, mask_len={}, limit={}",
+        "[capturequery] pattern_search: capture_id='{}', pattern_len={}, mask_len={}, limit={}",
         capture_id, pattern.len(), pattern_mask.len(), result_limit
     );
 
@@ -994,7 +994,7 @@ pub fn capture_query_pattern_search(
     let elapsed = query_start.elapsed();
 
     tlog!(
-        "[bufferquery] pattern_search: {} matches from {} rows in {}ms",
+        "[capturequery] pattern_search: {} matches from {} rows in {}ms",
         results.len(),
         rows_scanned,
         elapsed.as_millis()

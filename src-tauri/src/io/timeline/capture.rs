@@ -1,6 +1,6 @@
-// ui/src-tauri/src/io/timeline/buffer.rs
+// ui/src-tauri/src/io/timeline/capture.rs
 //
-// Buffer Reader - streams CAN data from the SQLite-backed buffer store.
+// Capture Source - streams CAN data from the SQLite-backed capture store.
 // Used for replaying imported CSV files across all apps.
 // Reads frames in chunks from SQLite instead of loading everything into memory.
 
@@ -21,7 +21,7 @@ const NO_SEEK: i64 = i64::MIN;
 /// Sentinel value meaning "no frame seek requested"
 const NO_SEEK_FRAME: i64 = -1;
 
-/// Buffer Reader - streams frames from the SQLite-backed buffer store
+/// Capture Source - streams frames from the SQLite-backed capture store
 pub struct CaptureSource {
     app: AppHandle,
     /// Common timeline reader state (control, state, session_id, task_handle)
@@ -33,15 +33,15 @@ pub struct CaptureSource {
     seek_target_frame: Arc<AtomicI64>,
     /// Set to true when the stream completes naturally (not cancelled)
     completed_flag: Arc<AtomicBool>,
-    /// Buffer ID to read from (extracted from session_id for buffer_N patterns)
-    buffer_id: Option<String>,
-    /// Available buses in this buffer (from metadata)
+    /// Capture ID to read from
+    capture_id: Option<String>,
+    /// Available buses in this capture (from metadata)
     buses: Vec<u8>,
 }
 
 impl CaptureSource {
-    pub fn new(app: AppHandle, session_id: String, buffer_id: String, speed: f64) -> Self {
-        let buses = capture_store::get_capture_metadata(&buffer_id)
+    pub fn new(app: AppHandle, session_id: String, capture_id: String, speed: f64) -> Self {
+        let buses = capture_store::get_capture_metadata(&capture_id)
             .map(|m| m.buses)
             .unwrap_or_default();
 
@@ -50,10 +50,10 @@ impl CaptureSource {
         // Without this, no FrameData is broadcast and apps that rely on the
         // onFrames callback (Decoder, etc.) see nothing while playback runs.
         // Ownership is released by orphan_captures_for_session on session destroy.
-        if let Err(e) = capture_store::set_capture_owner(&buffer_id, &session_id) {
+        if let Err(e) = capture_store::set_capture_owner(&capture_id, &session_id) {
             tlog!(
                 "[CaptureSource] Failed to set capture owner for '{}' on session '{}': {}",
-                buffer_id, session_id, e
+                capture_id, session_id, e
             );
         }
 
@@ -63,7 +63,7 @@ impl CaptureSource {
             seek_target_us: Arc::new(AtomicI64::new(NO_SEEK)),
             seek_target_frame: Arc::new(AtomicI64::new(NO_SEEK_FRAME)),
             completed_flag: Arc::new(AtomicBool::new(false)),
-            buffer_id: Some(buffer_id),
+            capture_id: Some(capture_id),
             buses,
         }
     }
@@ -87,9 +87,9 @@ impl IODevice for CaptureSource {
 
         self.reader_state.check_can_start()?;
 
-        // Check if buffer has data
+        // Check if capture has data
         if !capture_store::has_any_data() {
-            return Err("No data in buffer. Please import a CSV file first.".to_string());
+            return Err("No data in capture. Please import a CSV file first.".to_string());
         }
 
         self.reader_state.prepare_start();
@@ -100,9 +100,9 @@ impl IODevice for CaptureSource {
         let seek_target_us = self.seek_target_us.clone();
         let seek_target_frame = self.seek_target_frame.clone();
         let completed_flag = self.completed_flag.clone();
-        let buffer_id = self.buffer_id.clone();
+        let capture_id = self.capture_id.clone();
 
-        let handle = spawn_buffer_stream(app, session_id, control, seek_target_us, seek_target_frame, completed_flag, buffer_id);
+        let handle = spawn_capture_stream(app, session_id, control, seek_target_us, seek_target_frame, completed_flag, capture_id);
         self.reader_state.mark_running(handle);
 
         Ok(())
@@ -129,7 +129,7 @@ impl IODevice for CaptureSource {
     }
 
     fn set_speed(&mut self, speed: f64) -> Result<(), String> {
-        self.reader_state.set_speed(speed, "Buffer")
+        self.reader_state.set_speed(speed, "Capture")
     }
 
     fn set_time_range(
@@ -137,12 +137,12 @@ impl IODevice for CaptureSource {
         _start: Option<String>,
         _end: Option<String>,
     ) -> Result<(), String> {
-        Err("Buffer reader does not support time range filtering".to_string())
+        Err("Capture source does not support time range filtering".to_string())
     }
 
     fn seek(&mut self, timestamp_us: i64) -> Result<(), String> {
         tlog!(
-            "[Buffer:{}] Seek requested to {}us",
+            "[Capture:{}] Seek requested to {}us",
             self.reader_state.session_id, timestamp_us
         );
         self.seek_target_us.store(timestamp_us, Ordering::Relaxed);
@@ -151,7 +151,7 @@ impl IODevice for CaptureSource {
 
     fn seek_by_frame(&mut self, frame_index: i64) -> Result<(), String> {
         tlog!(
-            "[Buffer:{}] Seek by frame requested to index {}",
+            "[Capture:{}] Seek by frame requested to index {}",
             self.reader_state.session_id, frame_index
         );
         self.seek_target_frame.store(frame_index, Ordering::Relaxed);
@@ -160,7 +160,7 @@ impl IODevice for CaptureSource {
 
     fn set_direction(&mut self, reverse: bool) -> Result<(), String> {
         tlog!(
-            "[Buffer:{}] Direction set to {}",
+            "[Capture:{}] Direction set to {}",
             self.reader_state.session_id,
             if reverse { "reverse" } else { "forward" }
         );
@@ -198,17 +198,17 @@ pub struct StepResult {
 pub fn step_frame(
     _app: &AppHandle,
     session_id: &str,
-    buffer_id: &str,
+    capture_id: &str,
     current_frame_index: Option<usize>,
     current_timestamp_us: Option<i64>,
     backward: bool,
     filter_frame_ids: Option<&[u32]>,
 ) -> Result<Option<StepResult>, String> {
-    let buf_id = buffer_id;
+    let buf_id = capture_id;
 
     let total_frames = capture_store::get_capture_count(&buf_id);
     if total_frames == 0 {
-        return Err("Buffer is empty".to_string());
+        return Err("Capture is empty".to_string());
     }
 
     // Determine current rowid from frame index or timestamp
@@ -226,7 +226,7 @@ pub fn step_frame(
                 let idx = if backward { total_frames.saturating_sub(1) } else { 0 };
                 match capture_db::get_frame_at_index(&buf_id, idx)? {
                     Some((rowid, _)) => rowid,
-                    None => return Err("Buffer empty".to_string()),
+                    None => return Err("Capture empty".to_string()),
                 }
             }
         }
@@ -235,7 +235,7 @@ pub fn step_frame(
         let idx = if backward { total_frames.saturating_sub(1) } else { 0 };
         match capture_db::get_frame_at_index(&buf_id, idx)? {
             Some((rowid, _)) => rowid,
-            None => return Err("Buffer empty".to_string()),
+            None => return Err("Capture empty".to_string()),
         }
     };
 
@@ -246,7 +246,7 @@ pub fn step_frame(
             let new_timestamp_us = frame.timestamp_us as i64;
 
             tlog!(
-                "[Buffer:{}] Step {} from rowid {} to frame {} (timestamp {}us, frame_id=0x{:X})",
+                "[Capture:{}] Step {} from rowid {} to frame {} (timestamp {}us, frame_id=0x{:X})",
                 session_id,
                 if backward { "backward" } else { "forward" },
                 current_rowid,
@@ -276,24 +276,24 @@ pub fn step_frame(
     }
 }
 
-/// Spawn a buffer reader task
-fn spawn_buffer_stream(
+/// Spawn a capture stream task
+fn spawn_capture_stream(
     app_handle: AppHandle,
     session_id: String,
     control: TimelineControl,
     seek_target_us: Arc<AtomicI64>,
     seek_target_frame: Arc<AtomicI64>,
     completed_flag: Arc<AtomicBool>,
-    buffer_id: Option<String>,
+    capture_id: Option<String>,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
-        run_buffer_stream(app_handle, session_id, control, seek_target_us, seek_target_frame, completed_flag, buffer_id).await;
+        run_capture_stream(app_handle, session_id, control, seek_target_us, seek_target_frame, completed_flag, capture_id).await;
     })
 }
 
-/// Resolve the buffer ID to use for streaming.
-fn resolve_buffer_id(buffer_id: &Option<String>) -> Option<String> {
-    buffer_id.clone()
+/// Resolve the capture ID to use for streaming.
+fn resolve_capture_id(capture_id: &Option<String>) -> Option<String> {
+    capture_id.clone()
 }
 
 /// Load a chunk of frames from SQLite for the current playback direction.
@@ -338,7 +338,7 @@ fn handle_seek(
         let is_paused = control.is_paused();
 
         tlog!(
-            "[Buffer:{}] Seeking to frame {} (by index, paused={})",
+            "[Capture:{}] Seeking to frame {} (by index, paused={})",
             session_id, target_idx, is_paused
         );
 
@@ -353,7 +353,7 @@ fn handle_seek(
             *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, 2000, is_reverse);
             *chunk_idx = 0;
 
-            // Discard pending batch (data is already in buffer)
+            // Discard pending batch
             batch_buffer.clear();
 
             // Reset timing baselines
@@ -371,7 +371,7 @@ fn handle_seek(
             crate::io::store_playback_position(session_id, position);
             signal_playback_position(session_id);
 
-            // Signal frontend to fetch current state from buffer
+            // Signal frontend to fetch current state from capture
             signal_frames_ready(session_id);
         }
 
@@ -389,7 +389,7 @@ fn handle_seek(
             let target_idx = capture_db::count_frames_before_rowid(buf_id, rowid).unwrap_or(0);
 
             tlog!(
-                "[Buffer:{}] Seeking to frame {} (timestamp {}us, paused={})",
+                "[Capture:{}] Seeking to frame {} (timestamp {}us, paused={})",
                 session_id, target_idx, seek_target, is_paused
             );
 
@@ -403,7 +403,7 @@ fn handle_seek(
             *chunk = load_chunk(buf_id, if is_reverse { rowid + 1 } else { rowid - 1 }, 2000, is_reverse);
             *chunk_idx = 0;
 
-            // Discard pending batch (data is already in buffer)
+            // Discard pending batch
             batch_buffer.clear();
 
             // Get frame at this rowid for timing info
@@ -423,7 +423,7 @@ fn handle_seek(
                 signal_playback_position(session_id);
             }
 
-            // Signal frontend to fetch current state from buffer
+            // Signal frontend to fetch current state from capture
             signal_frames_ready(session_id);
         }
 
@@ -433,34 +433,34 @@ fn handle_seek(
     false
 }
 
-async fn run_buffer_stream(
+async fn run_capture_stream(
     app_handle: AppHandle,
     session_id: String,
     control: TimelineControl,
     seek_target_us: Arc<AtomicI64>,
     seek_target_frame: Arc<AtomicI64>,
     completed_flag: Arc<AtomicBool>,
-    buffer_id: Option<String>,
+    capture_id: Option<String>,
 ) {
-    // Resolve which buffer to read from
-    let buf_id = match resolve_buffer_id(&buffer_id) {
+    // Resolve which capture to read from
+    let buf_id = match resolve_capture_id(&capture_id) {
         Some(id) => id,
         None => {
-            emit_session_error(&session_id, "No frame buffer found".to_string());
+            emit_session_error(&session_id, "No frame capture found".to_string());
             return;
         }
     };
 
     let total_frames = capture_store::get_capture_count(&buf_id);
     if total_frames == 0 {
-        emit_session_error(&session_id, "Buffer is empty".to_string());
+        emit_session_error(&session_id, "Capture is empty".to_string());
         return;
     }
 
     let (min_rowid, max_rowid) = match capture_db::get_rowid_range(&buf_id) {
         Ok(Some(range)) => range,
         _ => {
-            emit_session_error(&session_id, "Buffer has no data".to_string());
+            emit_session_error(&session_id, "Capture has no data".to_string());
             return;
         }
     };
@@ -469,7 +469,7 @@ async fn run_buffer_stream(
     let initial_speed = control.read_speed();
     let initial_pacing = control.is_pacing_enabled();
     tlog!(
-        "[Buffer:{}] Starting stream (frames: {}, speed: {}x, pacing: {}, source: '{}')",
+        "[Capture:{}] Starting stream (frames: {}, speed: {}x, pacing: {}, source: '{}')",
         session_id,
         total_frames,
         initial_speed,
@@ -491,7 +491,7 @@ async fn run_buffer_stream(
     let mut chunk_idx: usize = 0;
     let mut last_consumed_rowid: i64 = min_rowid - 1;
     if chunk.is_empty() {
-        emit_session_error(&session_id, "Buffer is empty".to_string());
+        emit_session_error(&session_id, "Capture is empty".to_string());
         return;
     }
 
@@ -510,7 +510,7 @@ async fn run_buffer_stream(
     let mut last_reverse = control.is_reverse();
 
     tlog!(
-        "[Buffer:{}] Starting frame-by-frame loop (stream_start: {:.3}s, reverse: {})",
+        "[Capture:{}] Starting frame-by-frame loop (stream_start: {:.3}s, reverse: {})",
         session_id, stream_start_secs, last_reverse
     );
 
@@ -519,7 +519,7 @@ async fn run_buffer_stream(
         // Check if cancelled
         if control.is_cancelled() {
             tlog!(
-                "[Buffer:{}] Stream cancelled, stopping immediately",
+                "[Capture:{}] Stream cancelled, stopping immediately",
                 session_id
             );
             break 'outer;
@@ -547,7 +547,7 @@ async fn run_buffer_stream(
         // Handle direction change: reload chunk from current position
         if is_reverse != last_reverse {
             tlog!(
-                "[Buffer:{}] Direction changed to {}",
+                "[Capture:{}] Direction changed to {}",
                 session_id,
                 if is_reverse { "reverse" } else { "forward" }
             );
@@ -592,7 +592,7 @@ async fn run_buffer_stream(
             chunk_idx = 0;
 
             if chunk.is_empty() {
-                break; // End of buffer
+                break; // End of capture
             }
         }
 
@@ -601,7 +601,7 @@ async fn run_buffer_stream(
         chunk_idx += 1;
         last_consumed_rowid = rowid;
 
-        // Pre-decrement for reverse so actual_index reflects the correct buffer position.
+        // Pre-decrement for reverse so actual_index reflects the correct capture position.
         // Forward: actual_index = frame_index (then post-increment for next frame).
         // Reverse: decrement first (backing up to this frame's position), then capture.
         if is_reverse {
@@ -802,7 +802,7 @@ async fn run_buffer_stream(
     crate::ws::dispatch::send_stream_ended(&session_id, &stream_ended_info);
     let final_pos = if control.is_reverse() { frame_index } else { frame_index.saturating_sub(1) };
     tlog!(
-        "[Buffer:{}] Stream reached end of data, pausing at final position (frame_index: {})",
+        "[Capture:{}] Stream reached end of data, pausing at final position (frame_index: {})",
         session_id, final_pos
     );
 
@@ -873,7 +873,7 @@ async fn run_buffer_stream(
         }
         last_reverse = is_reverse;
         last_speed = control.read_speed();
-        tlog!("[Buffer:{}] Resuming playback from post-completion pause", session_id);
+        tlog!("[Capture:{}] Resuming playback from post-completion pause", session_id);
         break; // Break post-completion loop → re-enter main streaming via 'outer
     }
     } // end 'outer
@@ -882,7 +882,7 @@ async fn run_buffer_stream(
     let total_wall_time_ms = wall_clock_baseline.elapsed().as_millis();
     let data_duration_secs = last_frame_time_secs.unwrap_or(stream_start_secs) - stream_start_secs;
     tlog!(
-        "[Buffer:{}] Stream ended (reason: stopped, count: {}, wall_time: {}ms, data_duration: {:.1}s, waits: {} totaling {}ms)",
+        "[Capture:{}] Stream ended (reason: stopped, count: {}, wall_time: {}ms, data_duration: {:.1}s, waits: {} totaling {}ms)",
         session_id, total_emitted, total_wall_time_ms, data_duration_secs, wait_count, total_wait_ms
     );
 }

@@ -12,7 +12,7 @@ use crate::{
         get_session_listeners, get_session_source_configs, join_session, leave_session, list_sessions, pause_session,
         reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_listener_active, start_session, stop_session,
-        stop_and_switch_to_buffer, suspend_session, switch_to_buffer_replay, resume_to_live_session, transmit_frame, unregister_listener,
+        stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_listener,
         evict_session_listener, add_source_to_session, remove_source_from_session, update_source_bus_mappings, pause_source_in_session, resume_source_in_session, get_session_source_count,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IODevice, IOState,
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
@@ -147,7 +147,7 @@ fn take_session_profiles(session_id: &str) -> Vec<String> {
     profile_ids
 }
 
-/// Replace all profile IDs for a session (e.g., swap device profiles for buffer ID).
+/// Replace all profile IDs for a session (e.g., swap device profiles for capture ID).
 /// Cleans up old reverse mappings and sets new ones.
 pub fn replace_session_profiles(session_id: &str, new_profile_ids: &[String]) {
     // Remove old reverse mappings
@@ -974,15 +974,15 @@ pub async fn resume_reader_session(session_id: String) -> Result<IOState, String
     resume_session(&session_id).await
 }
 
-/// Suspend a reader session - stops streaming, finalizes buffer, session stays alive.
-/// The buffer remains owned by the session and all joined apps can view it.
-/// Use `resume_reader_session_fresh` to start streaming again with a new buffer.
+/// Suspend a reader session - stops streaming, finalizes capture, session stays alive.
+/// The capture remains owned by the session and all joined apps can view it.
+/// Use `resume_reader_session_fresh` to start streaming again with a new capture.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn suspend_reader_session(session_id: String) -> Result<IOState, String> {
     suspend_session(&session_id).await
 }
 
-/// Stop a realtime session and switch all listeners to buffer replay.
+/// Stop a realtime session and switch all listeners to capture replay.
 /// Emits `session-lifecycle` signal so all apps on the session refresh state.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn io_stop_and_switch_to_capture(
@@ -990,18 +990,18 @@ pub async fn io_stop_and_switch_to_capture(
     session_id: String,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
-    stop_and_switch_to_buffer(&app, &session_id, speed.unwrap_or(1.0)).await
+    stop_and_switch_to_capture(&app, &session_id, speed.unwrap_or(1.0)).await
 }
 
-/// Resume a suspended session with a fresh buffer.
-/// The old buffer is orphaned (becomes available for standalone viewing).
-/// A new buffer is created for the session and streaming starts.
+/// Resume a suspended session with a fresh capture.
+/// The old capture is orphaned (becomes available for standalone viewing).
+/// A new capture is created for the session and streaming starts.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn resume_reader_session_fresh(session_id: String) -> Result<IOState, String> {
     resume_session_fresh(&session_id).await
 }
 
-/// Copy a buffer for an app that is detaching from a session.
+/// Copy a capture for an app that is detaching from a session.
 /// Creates an orphaned copy of the capture that can be used standalone.
 /// Returns the new capture ID.
 #[tauri::command(rename_all = "snake_case")]
@@ -1089,7 +1089,7 @@ pub async fn update_reader_time_range(
 }
 
 /// Reconfigure a running session with new time range.
-/// This stops the current stream, orphans the old buffer, creates a new buffer,
+/// This stops the current stream, orphans the old capture, creates a new capture,
 /// and starts streaming with the new time range - all while keeping the session alive.
 /// Other apps joined to this session remain connected.
 #[tauri::command(rename_all = "snake_case")]
@@ -1107,7 +1107,7 @@ pub async fn seek_reader_session(session_id: String, timestamp_us: i64) -> Resul
     seek_session(&session_id, timestamp_us).await
 }
 
-/// Seek to a specific frame index (preferred for buffer playback - avoids floating-point issues)
+/// Seek to a specific frame index (preferred for capture playback - avoids floating-point issues)
 #[tauri::command(rename_all = "snake_case")]
 pub async fn seek_reader_session_by_frame(session_id: String, frame_index: i64) -> Result<(), String> {
     seek_session_by_frame(&session_id, frame_index).await
@@ -1128,14 +1128,14 @@ pub async fn destroy_reader_session(session_id: String) -> Result<(), String> {
         profile_tracker::unregister_usage_by_session(&profile_id, &session_id);
     }
 
-    // Buffer orphaning is handled by destroy_session() which also emits
-    // the buffer-changed signal. Don't orphan here to avoid a double-call
-    // that would cause destroy_session's emit to have an empty buffer list.
+    // Capture orphaning is handled by destroy_session() which also emits
+    // the capture-changed signal. Don't orphan here to avoid a double-call
+    // that would cause destroy_session's emit to have an empty capture list.
     destroy_session(&session_id).await
 }
 
-/// Create a reader session for a buffer.
-/// The buffer is registered as a source profile so it appears in
+/// Create a reader session for a capture.
+/// The capture is registered as a source profile so it appears in
 /// `sourceProfileIds` and the session manager graph.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn create_capture_source_session(
@@ -1192,9 +1192,9 @@ pub async fn transition_to_capture_source(
     Ok(result.capabilities)
 }
 
-/// Switch a session to buffer replay mode without destroying it.
+/// Switch a session to capture replay mode without destroying it.
 /// This swaps the session's reader to a CaptureSource that reads from the session's
-/// owned buffer. All listeners stay connected and can replay the captured data.
+/// owned capture. All listeners stay connected and can replay the captured data.
 /// Use this after ingest completes to enable playback controls.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn switch_session_to_capture_replay(
@@ -1202,10 +1202,10 @@ pub async fn switch_session_to_capture_replay(
     session_id: String,
     speed: Option<f64>,
 ) -> Result<IOCapabilities, String> {
-    switch_to_buffer_replay(&app, &session_id, speed.unwrap_or(1.0)).await
+    switch_to_capture_replay(&app, &session_id, speed.unwrap_or(1.0)).await
 }
 
-/// Resume a session from buffer playback back to live streaming.
+/// Resume a session from capture playback back to live streaming.
 /// Uses stored source configs to rebuild the reader (supports multi-source).
 /// Falls back to loading from settings for single-source sessions without stored configs.
 /// Re-registers device profiles with the tracker before reconnecting.
@@ -1263,7 +1263,7 @@ pub async fn resume_session_to_live(
         crate::profile_tracker::register_usage(&config.profile_id, &session_id);
     }
 
-    // Restore original profile IDs to SESSION_PROFILES (replacing the buffer ID)
+    // Restore original profile IDs to SESSION_PROFILES (replacing the capture ID)
     let profile_ids: Vec<String> = configs.iter().map(|c| c.profile_id.clone()).collect();
     replace_session_profiles(&session_id, &profile_ids);
 
@@ -1285,7 +1285,7 @@ pub async fn resume_session_to_live(
     resume_to_live_session(&session_id, new_reader).await
 }
 
-/// Step one frame forward or backward in the buffer.
+/// Step one frame forward or backward in the capture.
 /// Returns the new frame index and timestamp after stepping, or None if at the boundary.
 /// Only works when the session is paused.
 /// Requires either current_frame_index or current_timestamp_us to determine position.
@@ -1350,7 +1350,7 @@ pub async fn get_session_listener_list(session_id: String) -> Result<Vec<Listene
     get_session_listeners(&session_id).await
 }
 
-/// Evict a listener from a session, giving it a copy of the current buffer.
+/// Evict a listener from a session, giving it a copy of the current capture.
 /// Used by the Session Manager to remove a listener without destroying the session.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn evict_session_listener_cmd(
@@ -1612,7 +1612,7 @@ pub async fn probe_device(
     #[cfg(not(target_os = "ios"))]
     use crate::io::slcan::reader::probe_slcan_device;
 
-    // Buffer IDs — metadata already in memory, no profile lookup needed
+    // Capture IDs — metadata already in memory, no profile lookup needed
     if capture_store::is_known_capture(&profile_id) {
         if let Some(meta) = capture_store::get_capture_metadata(&profile_id) {
             let bus_count = if meta.buses.is_empty() { 1 } else { meta.buses.len() as u8 };
@@ -1636,10 +1636,10 @@ pub async fn probe_device(
                 bus_count,
                 error: None,
             });
-            // Don't cache buffer probes — metadata may change as data streams in
+            // Don't cache capture probes — metadata may change as data streams in
             return Ok(result);
         } else {
-            return Err(format!("Buffer '{}' not found", profile_id));
+            return Err(format!("Capture '{}' not found", profile_id));
         }
     }
 
