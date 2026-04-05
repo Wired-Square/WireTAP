@@ -120,6 +120,11 @@ jobs:
           args: --target ${{ matrix.target }}
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
+      - name: Build gs_usb_cli
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        run: cargo build --release --features cli --bin gs_usb_cli --target ${{ matrix.target }}
+        working-directory: src-tauri
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -127,3 +132,24 @@ jobs:
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/
           if-no-files-found: error
+
+      - name: Upload gs_usb_cli artifact
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: gs_usb_cli-${{ matrix.target }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/gs_usb_cli${{ runner.os == 'Windows' && '.exe' || '' }}
+          if-no-files-found: error
+
+      - name: Upload gs_usb_cli to release
+        if: startsWith(github.ref, 'refs/tags/v') && (runner.os == 'macOS' || runner.os == 'Windows')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BINARY="src-tauri/target/${{ matrix.target }}/release/gs_usb_cli${{ runner.os == 'Windows' && '.exe' || '' }}"
+          EXT="${{ runner.os == 'Windows' && '.exe' || '' }}"
+          ASSET_NAME="gs_usb_cli-${{ matrix.target }}${EXT}"
+          mv "$BINARY" "$ASSET_NAME"
+          gh release upload "${{ github.ref_name }}" "$ASSET_NAME" --clobber
+        shell: bash

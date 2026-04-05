@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **CI: build gs_usb_cli for macOS and Windows**: The GitHub Actions build workflow now compiles `gs_usb_cli` (diagnostic CLI for gs_usb/candleLight adapters) on macOS (ARM64, x86_64) and Windows (x86_64). Binaries are uploaded as build artifacts on every run and attached to GitHub releases on version tags.
+
 ## [0.6.0] - 2026-04-04
 
 ### Added
