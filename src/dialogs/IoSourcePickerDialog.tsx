@@ -268,6 +268,12 @@ export default function IoSourcePickerDialog({
   const probedProfilesRef = useRef<Set<string>>(new Set());
   // Tracks whether the user has clicked "Change" to expand the collapsed view (prevents re-collapsing)
   const hasUserExpandedRef = useRef(false);
+  // Tracks whether the on-open initialisation has already run for the current
+  // open cycle. Without this, the init effect below re-runs on every parent
+  // re-render (because selectedIds prop can change reference during streaming)
+  // and clobbers `hasUserExpandedRef`, causing the collapsed view to re-snap
+  // back after clicking "Change".
+  const didInitForOpenRef = useRef(false);
 
   // Active multi-source sessions (for sharing between apps)
   const [activeMultiSourceSessions, setActiveMultiSourceSessions] = useState<ActiveSessionInfo[]>([]);
@@ -381,9 +387,18 @@ export default function IoSourcePickerDialog({
 
   const isMultiSourceLive = liveMultiSourceSession !== null;
 
-  // Load bookmarks and buffers when dialog opens
+  // Load bookmarks and buffers when dialog opens.
+  // Guarded by didInitForOpenRef so we only run the initialisation once per
+  // open cycle — re-running it while open would reset `hasUserExpandedRef`
+  // and re-collapse the source list after the user clicks "Change".
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      didInitForOpenRef.current = false;
+      return;
+    }
+    if (didInitForOpenRef.current) return;
+    didInitForOpenRef.current = true;
+    {
       getAllFavorites().then(setBookmarks).catch(console.error);
       // Refresh known buffer IDs so isCaptureProfileId() is up-to-date
       useSessionStore.getState().loadCaptureIds();
@@ -465,10 +480,13 @@ export default function IoSourcePickerDialog({
       setSingleBusOverrideMap(new Map());
       probedProfilesRef.current.clear();
     }
-  // Note: externalLoadSpeed intentionally not in deps - we only use it for initialization
-  // If it were a dep, changing speed would re-run this effect and reset checkedSourceId
+  // Only `isOpen` is a real dep — loadProfileId/selectedId/selectedIds are
+  // captured for initial values on open and must NOT retrigger the effect
+  // (see didInitForOpenRef guard above), since parent re-renders during a
+  // running capture can change their identities without meaningful value
+  // changes, which would re-collapse the picker after the user clicks Change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, loadProfileId, selectedId, selectedIds]);
+  }, [isOpen]);
 
   // Refresh buffer list periodically while dialog is open
   // This catches transitions from streaming to stopped even if the stream-ended
@@ -1312,6 +1330,12 @@ export default function IoSourcePickerDialog({
     setBuffers(allBuffers);
 
     onImport?.(metadata);
+
+    // Register the new capture id so isCaptureProfileId() recognises it.
+    // Without this, the onSelect(metadata.id) → handleIoProfileChange call
+    // below takes the non-buffer branch and skips the capture-load pipeline
+    // that populates frameInfoMap (tooltip/frame picker/Tools button).
+    useSessionStore.getState().addKnownCaptureId(metadata.id);
 
     // Notify other windows that buffer has changed
     const payload: CaptureChangedPayload = {
