@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
-import { Search, Activity, Send, FileText, Calculator, DatabaseZap, Settings, BarChart3 } from "lucide-react";
+import { Search, Activity, Send, FileText, Calculator, DatabaseZap, Settings, BarChart3, Server } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
 
 export interface AppNodeData {
@@ -23,6 +23,7 @@ const appConfig: Record<string, { icon: typeof Search; colour: string }> = {
   "frame-calculator": { icon: Calculator, colour: "text-teal-400" },
   query: { icon: DatabaseZap, colour: "text-amber-400" },
   graph: { icon: BarChart3, colour: "text-pink-400" },
+  modbus: { icon: Server, colour: "text-amber-400" },
   settings: { icon: Settings, colour: "text-orange-400" },
 };
 

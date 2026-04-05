@@ -553,14 +553,20 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
     let graph_item = MenuItemBuilder::with_id("app-graph", "Graph")
         .accelerator("cmdOrCtrl+5")
         .build(app)?;
-    let catalog_item = MenuItemBuilder::with_id("app-catalog-editor", "Catalog Editor")
+    let modbus_item = MenuItemBuilder::with_id("app-modbus", "Modbus")
         .accelerator("cmdOrCtrl+6")
         .build(app)?;
-    let calculator_item = MenuItemBuilder::with_id("app-calculator", "Calculator")
+    let rules_item = MenuItemBuilder::with_id("app-rules", "Rules")
         .accelerator("cmdOrCtrl+7")
         .build(app)?;
-    let sessions_item = MenuItemBuilder::with_id("app-session-manager", "Sessions")
+    let catalog_item = MenuItemBuilder::with_id("app-catalog-editor", "Catalog Editor")
         .accelerator("cmdOrCtrl+8")
+        .build(app)?;
+    let calculator_item = MenuItemBuilder::with_id("app-calculator", "Calculator")
+        .accelerator("cmdOrCtrl+9")
+        .build(app)?;
+    let sessions_item = MenuItemBuilder::with_id("app-session-manager", "Sessions")
+        .accelerator("cmdOrCtrl+0")
         .build(app)?;
 
     let apps_menu = SubmenuBuilder::new(app, "Apps")
@@ -569,6 +575,8 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
         .item(&transmit_item)
         .item(&query_item)
         .item(&graph_item)
+        .item(&modbus_item)
+        .item(&rules_item)
         .separator()
         .item(&catalog_item)
         .item(&calculator_item)
@@ -731,7 +739,7 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
             }
             // App menu items - open as tabs in focused window
             "app-discovery" | "app-decoder" | "app-transmit"
-            | "app-query" | "app-graph"
+            | "app-query" | "app-graph" | "app-modbus" | "app-rules"
             | "app-catalog-editor" | "app-calculator"
             | "app-session-manager" => {
                 let panel_id = event_id.strip_prefix("app-").unwrap_or(event_id);

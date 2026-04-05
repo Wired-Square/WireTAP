@@ -6,6 +6,14 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Added
 
+- **Modbus and Rules in Apps menu**: Both apps now appear in the native Apps menu with keyboard shortcuts (Cmd+6, Cmd+7). Renumbered Catalog Editor through Sessions (Cmd+8–0).
+
+- **Modbus app**: New dedicated Modbus panel for register polling over TCP and RTU (serial). Supports holding, input, coil, and discrete registers with decoded signal display, per-source pause/resume, and catalogue sharing with the Decoder via session. Composite frame keys (`protocol:id`) allow CAN and Modbus frames to coexist without ID collisions in mixed-protocol sessions. Includes coloured register type badges, relative time display with format toggle, and full session controls (leave, clear buffer, profile display).
+
+- **Modbus RTU reader**: New `ModbusRtuReader` IO device for active Modbus RTU polling over serial connections.
+
+- **Protocol-aware frame keys**: All stores now use composite frame keys (`can:0x100`, `modbus:40001`) so frames from different protocols coexist without ID collisions.
+
 - **`multi_source` trait on `InterfaceTraits`**: New boolean trait indicating whether a source can be combined with others in a multi-source session. Set to `true` for all realtime sources, `false` for timeline/buffer sources. Replaces the hardcoded `isMultiSourceCapable` field in the frontend profile trait registry with a backend-authoritative trait. Validation in `validate_session_traits()` now uses this trait instead of a timeline-specific rule.
 
 - **Unified `watchSource()` and `loadSource()` session methods**: New methods in `useIOSessionManager` that handle both single and multi-source sessions through a single entry point. Internal routing based on the `multi_source` trait.
@@ -55,6 +63,10 @@ All notable changes to WireTAP will be documented in this file.
 - **Buffer mode passed explicitly**: `isBufferMode` is now passed as an explicit prop through the top bar component hierarchy instead of being derived from `ioProfile` format, decoupling session ID format from buffer mode detection.
 
 ### Fixed
+
+- **Modbus not visible in Sessions view**: Added Modbus to the session-aware panels set and icon mapping so it appears in the Session Manager visual graph.
+
+- **CSP blocking WebSocket IPC in production builds**: Added `ws://127.0.0.1:*` and `ws://localhost:*` to the Content Security Policy `connect-src` directive. Production builds were silently blocking Tauri's WebSocket IPC, preventing frame data from reaching the frontend.
 
 - **Session menu shows "Buffer" after stop-to-buffer switch**: The Session menu now shows "Source: Buffer" instead of the stale device name (e.g., "Source: GVRET USB") when a realtime session switches to buffer replay mode.
 
