@@ -638,6 +638,36 @@ async function setupSessionEventListeners(
             time_range: null,
             capabilities: capabilities as IOCapabilities,
           });
+          // Refresh capture fields from backend — after a live→buffer transition
+          // (e.g. stopAndSwitchToBuffer), StreamEnded may not have landed yet or
+          // may have been clobbered by an intermediate `running` lifecycle blip
+          // that resets capture to zeros at line 619. Fetch fresh metadata so
+          // session.capture.count reflects reality for the tooltip/Tools button.
+          const captureId = prevSession?.capture?.id ?? null;
+          if (captureId) {
+            import("../api/capture").then(({ getCaptureMetadataById }) =>
+              getCaptureMetadataById(captureId).then((meta) => {
+                if (meta) {
+                  const currentSession = useSessionStore.getState().sessions[sessionId];
+                  if (currentSession) {
+                    updateSession(sessionId, {
+                      capture: {
+                        ...currentSession.capture,
+                        available: true,
+                        id: meta.id,
+                        kind: meta.kind,
+                        count: meta.count,
+                        startTimeUs: meta.start_time_us,
+                        endTimeUs: meta.end_time_us,
+                        name: meta.name,
+                        persistent: meta.persistent,
+                      },
+                    });
+                  }
+                }
+              }).catch(() => {/* ignore */})
+            );
+          }
         } else if (isNowStopped) {
           updateSession(sessionId, updates);
           invokeCallbacks(eventListeners, "onSuspended", {
@@ -1054,7 +1084,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       };
     });
 
-    // For buffer-mode sessions, fetch buffer metadata to populate name/persistent
+    // For buffer-mode sessions, fetch capture metadata to populate the
+    // session's capture fields. Without this, count/available/kind/times
+    // stay at their initial zero values forever — which makes the session
+    // tooltip show "Frames: 0, Unique: 0" and breaks any downstream code
+    // that reads session.capture.count (e.g. the Discovery top-bar tooltip).
     if (captureId) {
       import("../api/capture").then(({ getCaptureMetadataById }) =>
         getCaptureMetadataById(captureId!).then((meta) => {
@@ -1068,6 +1102,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                     ...s.sessions[sessionId],
                     capture: {
                       ...s.sessions[sessionId].capture,
+                      available: true,
+                      kind: meta.kind,
+                      count: meta.count,
+                      startTimeUs: meta.start_time_us,
+                      endTimeUs: meta.end_time_us,
                       name: meta.name,
                       persistent: meta.persistent,
                     },
@@ -1810,10 +1849,12 @@ getGlobalShowAppError = () => useSessionStore.getState().showAppError;
 let _unlistenBufferMeta: (() => void) | null = null;
 let _unlistenBufferChanged: (() => void) | null = null;
 
-{
-  // Clean up previous registrations (HMR guard)
-  _unlistenBufferMeta?.();
-  _unlistenBufferChanged?.();
+(() => {
+  // Clean up previous registrations (HMR guard).
+  // Cast is needed because TS narrows these `let` vars to `null` here —
+  // they're only reassigned inside the deferred `.then` callbacks below.
+  (_unlistenBufferMeta as (() => void) | null)?.();
+  (_unlistenBufferChanged as (() => void) | null)?.();
 
   // Rename / pin changes
   listen<{ captureId: string; name?: string; persistent?: boolean }>(
@@ -1840,10 +1881,16 @@ let _unlistenBufferChanged: (() => void) | null = null;
     }
   ).then(fn => { _unlistenBufferMeta = fn; });
 
-  // Buffer deleted — remove from knownCaptureIds and clear buffer state on affected sessions
-  listen<{ deletedBufferIds?: string[] }>(
+  // Capture created/deleted — keep knownCaptureIds and session state in sync
+  listen<{ deletedBufferIds?: string[]; metadata?: { id: string } | null }>(
     WINDOW_EVENTS.BUFFER_CHANGED,
     (event) => {
+      // New/updated capture — register its id so isCaptureProfileId() recognises it
+      const metadata = event.payload.metadata;
+      if (metadata && metadata.id) {
+        useSessionStore.getState().addKnownCaptureId(metadata.id);
+      }
+
       const ids = event.payload.deletedBufferIds;
       if (!ids || ids.length === 0) return;
       const deletedSet = new Set(ids);
@@ -1870,7 +1917,7 @@ let _unlistenBufferChanged: (() => void) | null = null;
       }
     }
   ).then(fn => { _unlistenBufferChanged = fn; });
-}
+})();
 
 // ============================================================================
 // Convenience Hooks
