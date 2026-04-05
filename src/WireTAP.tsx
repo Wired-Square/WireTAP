@@ -54,11 +54,11 @@ export default function WireTAP() {
   // Load settings store eagerly so all apps have access to IO profiles,
   // preferred catalogs, etc. without requiring the Settings panel to be open.
   const loadSettingsStore = useSettingsStore((s) => s.loadSettings);
-  const loadBufferIds = useSessionStore((s) => s.loadBufferIds);
+  const loadCaptureIds = useSessionStore((s) => s.loadCaptureIds);
   useEffect(() => {
     loadSettingsStore();
-    loadBufferIds();
-  }, [loadSettingsStore, loadBufferIds]);
+    loadCaptureIds();
+  }, [loadSettingsStore, loadCaptureIds]);
 
   // Telemetry consent state
   const settingsLoaded = useSettingsStore((s) => s.originalSettings !== null);

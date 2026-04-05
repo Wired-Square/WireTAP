@@ -7,8 +7,8 @@ import { useState, useRef, useEffect } from "react";
 import { Star, FileText, Square, Play, GitMerge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { iconSm, iconXs } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
-import type { BufferMetadata } from "../api/buffer";
-import { isBufferProfileId } from "../hooks/useIOSessionManager";
+import type { CaptureMetadata } from "../api/capture";
+import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import {
   buttonBase,
   dangerButtonBase,
@@ -29,7 +29,7 @@ export interface SessionButtonProps {
   /** Profile IDs when in multi-bus mode (for display count) */
   multiBusProfiles?: string[];
   /** Buffer metadata (for buffer display name) */
-  bufferMetadata?: BufferMetadata | null;
+  captureMetadata?: CaptureMetadata | null;
   /** Default read profile ID (for star icon) */
   defaultReadProfileId?: string | null;
   /** Current session ID (e.g., "f_abc123") - displayed in nav bar */
@@ -45,14 +45,14 @@ export interface SessionButtonProps {
   /** Whether button should be disabled (e.g., while streaming) */
   disabled?: boolean;
   /** Whether the session is in buffer replay mode */
-  isBufferMode?: boolean;
+  isCaptureMode?: boolean;
 }
 
 export function SessionButton({
   ioProfile,
   ioProfiles,
   multiBusProfiles = [],
-  bufferMetadata,
+  captureMetadata,
   defaultReadProfileId,
   sessionId,
   ioState,
@@ -60,9 +60,9 @@ export function SessionButton({
   totalFrameCount,
   onClick,
   disabled = false,
-  isBufferMode: isBufferModeProp,
+  isCaptureMode: isBufferModeProp,
 }: SessionButtonProps) {
-  const isBufferProfile = isBufferModeProp ?? isBufferProfileId(ioProfile);
+  const isBufferProfile = isBufferModeProp ?? isCaptureProfileId(ioProfile);
   const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
 
   // Show as multi-bus when multiBusProfiles has entries
@@ -75,7 +75,7 @@ export function SessionButton({
   let sessionIdInDisplayName = false;
   if (isBufferProfile) {
     // Buffer: show label if set, then buffer ID, then fallback
-    displayName = bufferMetadata?.name || bufferMetadata?.id || "Buffer";
+    displayName = captureMetadata?.name || captureMetadata?.id || "Capture";
     sessionIdInDisplayName = true;
   } else if (showAsMultiBus) {
     // Multi-bus: show sessionId with profile count (e.g., "f_abc123 (2)")
@@ -123,7 +123,7 @@ export function SessionButton({
 
   let typeLabel: string;
   if (isBufferProfile) {
-    typeLabel = "Buffer";
+    typeLabel = "Capture";
   } else if (showAsMultiBus) {
     typeLabel = "Multi-Source";
   } else if (selectedProfile?.kind) {
@@ -140,7 +140,7 @@ export function SessionButton({
   } else if (selectedProfile) {
     sourceNames = [selectedProfile.name];
   } else if (isBufferProfile) {
-    sourceNames = [bufferMetadata?.name || bufferMetadata?.id || "Buffer"];
+    sourceNames = [captureMetadata?.name || captureMetadata?.id || "Buffer"];
   } else {
     sourceNames = [];
   }
@@ -335,7 +335,7 @@ export interface IOSessionControlsProps {
   /** Profile IDs when in multi-bus mode */
   multiBusProfiles?: string[];
   /** Buffer metadata (for buffer display name) */
-  bufferMetadata?: BufferMetadata | null;
+  captureMetadata?: CaptureMetadata | null;
   /** Default read profile ID (for star icon) */
   defaultReadProfileId?: string | null;
   /** Current session ID (e.g., "f_abc123") - displayed in nav bar */
@@ -377,9 +377,9 @@ export interface IOSessionControlsProps {
 
   // Buffer action props (shown when viewing a buffer)
   /** Whether the session is in buffer replay mode (viewing stored buffer data) */
-  isBufferMode?: boolean;
+  isCaptureMode?: boolean;
   /** Whether the current buffer is persistent (pinned) */
-  bufferPersistent?: boolean;
+  capturePersistent?: boolean;
   /** Called when user toggles buffer pin */
   onToggleBufferPin?: () => void;
   /** Called when user renames the buffer */
@@ -402,7 +402,7 @@ export function IOSessionControls({
   ioProfile,
   ioProfiles,
   multiBusProfiles = [],
-  bufferMetadata,
+  captureMetadata,
   defaultReadProfileId,
   sessionId,
   ioState,
@@ -423,8 +423,8 @@ export function IOSessionControls({
   onOpenBookmarkPicker,
   hideSessionControls = false,
   // Buffer action props
-  isBufferMode: isBufferModeProp,
-  bufferPersistent = false,
+  isCaptureMode: isBufferModeProp,
+  capturePersistent = false,
   onToggleBufferPin,
   onRenameBuffer,
   // Clear buffer props
@@ -433,10 +433,10 @@ export function IOSessionControls({
 }: IOSessionControlsProps) {
   // Auto-hide session controls when in buffer mode (playback controls are in the toolbar instead),
   // but always show when stopped so the Resume button remains accessible
-  const isBufferMode = isBufferModeProp ?? isBufferProfileId(ioProfile);
-  const shouldHideControls = (hideSessionControls || isBufferMode) && !isStopped;
+  const isCaptureMode = isBufferModeProp ?? isCaptureProfileId(ioProfile);
+  const shouldHideControls = (hideSessionControls || isCaptureMode) && !isStopped;
   // Live session = we have an ioProfile that's not a buffer
-  const isLiveSession = ioProfile !== null && !isBufferMode;
+  const isLiveSession = ioProfile !== null && !isCaptureMode;
 
   // Rename popover state
   const [isRenaming, setIsRenaming] = useState(false);
@@ -451,7 +451,7 @@ export function IOSessionControls({
   }, [isRenaming]);
 
   const startRename = () => {
-    setRenameValue(bufferMetadata?.name || ioProfile || "");
+    setRenameValue(captureMetadata?.name || ioProfile || "");
     setIsRenaming(true);
   };
 
@@ -474,19 +474,19 @@ export function IOSessionControls({
         ioProfile={ioProfile}
         ioProfiles={ioProfiles}
         multiBusProfiles={multiBusProfiles}
-        bufferMetadata={bufferMetadata}
+        captureMetadata={captureMetadata}
         defaultReadProfileId={defaultReadProfileId}
         sessionId={sessionId}
         ioState={ioState}
         frameCount={frameCount}
         totalFrameCount={totalFrameCount}
         onClick={onOpenIoSessionPicker}
-        disabled={isStreaming && !isBufferMode}
-        isBufferMode={isBufferMode}
+        disabled={isStreaming && !isCaptureMode}
+        isCaptureMode={isCaptureMode}
       />
 
       {/* Buffer actions - pin and rename (shown when viewing a buffer) */}
-      {isBufferMode && bufferMetadata?.id && (
+      {isCaptureMode && captureMetadata?.id && (
         <div className="relative flex items-center gap-0.5">
           {onRenameBuffer && (
             <button
@@ -501,13 +501,13 @@ export function IOSessionControls({
             <button
               onClick={onToggleBufferPin}
               className={`p-1 rounded transition-colors hover:bg-[var(--hover-bg)] ${
-                bufferPersistent
+                capturePersistent
                   ? "text-[color:var(--status-warning-text)]"
                   : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
               }`}
-              title={bufferPersistent ? "Unpin buffer (will be cleared on restart)" : "Pin buffer (survives restart)"}
+              title={capturePersistent ? "Unpin capture (will be cleared on restart)" : "Pin capture (survives restart)"}
             >
-              {bufferPersistent ? <Pin className={iconXs} /> : <PinOff className={iconXs} />}
+              {capturePersistent ? <Pin className={iconXs} /> : <PinOff className={iconXs} />}
             </button>
           )}
           {/* Rename popover */}
@@ -524,7 +524,7 @@ export function IOSessionControls({
                   if (e.key === "Escape") cancelRename();
                 }}
                 className="w-48 px-2 py-1 text-sm bg-transparent border border-[color:var(--status-info-text)] rounded outline-none text-[color:var(--text-primary)]"
-                placeholder="Buffer name"
+                placeholder="Capture name"
               />
             </div>
           )}
@@ -532,12 +532,12 @@ export function IOSessionControls({
       )}
 
       {/* Clear buffer button — hidden for persistent buffers */}
-      {onClearBuffer && ioProfile && !(isBufferMode && bufferPersistent) && (
+      {onClearBuffer && ioProfile && !(isCaptureMode && capturePersistent) && (
         <button
           onClick={onClearBuffer}
           disabled={!hasData}
           className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] enabled:hover:!bg-red-600 enabled:hover:!text-white disabled:opacity-30 disabled:cursor-not-allowed"
-          title={isBufferMode ? "Delete buffer" : "Clear buffer and start fresh"}
+          title={isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}
         >
           <Trash2 className={iconXs} />
         </button>

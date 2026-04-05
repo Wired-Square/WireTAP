@@ -8,7 +8,7 @@ import { Filter, Calculator, Copy, ClipboardCopy } from "lucide-react";
 import { useDiscoveryStore } from "../../../stores/discoveryStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
 import { keyOf, parseFrameKey } from "../../../utils/frameKey";
-import { getBufferFramesPaginatedFiltered } from "../../../api/buffer";
+import { getCaptureFramesPaginatedFiltered } from "../../../api/capture";
 import { FrameDataTable, FRAME_PAGE_SIZE_OPTIONS } from "../components";
 import { PaginationToolbar } from "../components";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
@@ -20,7 +20,7 @@ import { formatFrameId } from "../../../utils/frameIds";
 import { sendHexDataToCalculator } from "../../../utils/windowCommunication";
 import type { FrameMessage } from "../../../types/frame";
 import type { FrameRow } from "../components";
-import type { BufferMetadata } from "../../../api/buffer";
+import type { CaptureMetadata } from "../../../api/capture";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import type React from "react";
 
@@ -29,7 +29,7 @@ type Props = {
   displayTimeFormat: "delta-last" | "delta-start" | "timestamp" | "human";
   isStreaming: boolean;
   streamStartTimeUs?: number | null;
-  bufferMetadata?: BufferMetadata | null;
+  captureMetadata?: CaptureMetadata | null;
   useLocalTimezone?: boolean;
 };
 
@@ -38,7 +38,7 @@ export default function FilteredTabContent({
   displayTimeFormat,
   isStreaming,
   streamStartTimeUs,
-  bufferMetadata,
+  captureMetadata,
   useLocalTimezone = false,
 }: Props) {
   const frames = useDiscoveryStore((s) => s.frames);
@@ -105,11 +105,11 @@ export default function FilteredTabContent({
 
   // Effective start time for delta calculations
   const effectiveStartTimeUs = useMemo(() => {
-    if (bufferMode.enabled && bufferMetadata?.start_time_us != null) {
-      return bufferMetadata.start_time_us;
+    if (bufferMode.enabled && captureMetadata?.start_time_us != null) {
+      return captureMetadata.start_time_us;
     }
     return streamStartTimeUs;
-  }, [bufferMode.enabled, bufferMetadata?.start_time_us, streamStartTimeUs]);
+  }, [bufferMode.enabled, captureMetadata?.start_time_us, streamStartTimeUs]);
 
   const formatTime = useCallback(
     (ts_us: number, prevTs_us: number | null): React.ReactNode => {
@@ -190,8 +190,8 @@ export default function FilteredTabContent({
       setBufferLoading(true);
       try {
         const offset = currentPage * pageSize;
-        const response = await getBufferFramesPaginatedFiltered(
-          bufferMetadata?.id ?? '',
+        const response = await getCaptureFramesPaginatedFiltered(
+          captureMetadata?.id ?? '',
           offset,
           pageSize,
           filteredOutIds

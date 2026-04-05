@@ -246,10 +246,10 @@ export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
   const bufferAvailable = payload.getUint8(offset) !== 0;
   offset += 1;
 
-  const [bufferId, next2] = decodeLengthPrefixedStr(payload, offset);
+  const [captureId, next2] = decodeLengthPrefixedStr(payload, offset);
   offset = next2;
 
-  const [bufferType, next3] = decodeLengthPrefixedStr(payload, offset);
+  const [captureKind, next3] = decodeLengthPrefixedStr(payload, offset);
   offset = next3;
 
   const count = payload.getUint32(offset, true);
@@ -276,8 +276,8 @@ export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
   return {
     reason,
     capture_available: bufferAvailable,
-    capture_id: bufferId.length > 0 ? bufferId : null,
-    capture_kind: bufferType.length > 0 ? bufferType : null,
+    capture_id: captureId.length > 0 ? captureId : null,
+    capture_kind: captureKind.length > 0 ? captureKind : null,
     count,
     time_range,
   };

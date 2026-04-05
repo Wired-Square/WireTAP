@@ -25,7 +25,7 @@ import {
 } from "../../../hooks/useSelectionSetHandlers";
 import { useTimeHandlers, type TimeHandlers } from "../../../hooks/useTimeHandlers";
 import type { PlaybackSpeed, FrameMessage } from "../../../stores/discoveryStore";
-import type { BufferMetadata, TimestampedByte } from "../../../api/buffer";
+import type { CaptureMetadata, TimestampedByte } from "../../../api/capture";
 import type { ExportDataMode } from "../../../dialogs/ExportFramesDialog";
 import type { SelectionSet } from "../../../utils/selectionSets";
 import { type LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
@@ -49,7 +49,7 @@ export interface UseDiscoveryHandlersParams {
   // Frame state
   frames: FrameMessage[];
   framedData: FrameMessage[];
-  framedBufferId: string | null;
+  framedCaptureId: string | null;
   frameInfoMap: Map<string, any>;
   selectedFrames: Set<string>;
 
@@ -82,7 +82,7 @@ export interface UseDiscoveryHandlersParams {
   setBookmarkFrameId: (id: number) => void;
   setBookmarkFrameTime: (time: string) => void;
   resetWatchFrameCount: () => void;
-  setBufferMetadata: (meta: BufferMetadata | null) => void;
+  setCaptureMetadata: (meta: CaptureMetadata | null) => void;
 
   // Manager session switching methods
   stopWatch: () => Promise<void>;
@@ -128,10 +128,10 @@ export interface UseDiscoveryHandlersParams {
   applySelectionSet: (set: SelectionSet) => void;
 
   // API functions (for export/other features)
-  getBufferBytesPaginated: (offset: number, limit: number) => Promise<{ bytes: TimestampedByte[] }>;
-  getBufferFramesPaginated: (offset: number, limit: number) => Promise<{ frames: any[] }>;
-  getBufferFramesPaginatedById: (id: string, offset: number, limit: number) => Promise<{ frames: any[] }>;
-  bufferMetadata: BufferMetadata | null;
+  getCaptureBytesPaginated: (offset: number, limit: number) => Promise<{ bytes: TimestampedByte[] }>;
+  getCaptureFramesPaginated: (offset: number, limit: number) => Promise<{ frames: any[] }>;
+  getCaptureFramesPaginatedById: (id: string, offset: number, limit: number) => Promise<{ frames: any[] }>;
+  captureMetadata: CaptureMetadata | null;
   pickFileToSave: (options: any) => Promise<string | null>;
   saveCatalog: (path: string, content: string) => Promise<void>;
 
@@ -174,7 +174,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     resetFraming: params.resetFraming,
     setBackendByteCount: params.setBackendByteCount,
     addSerialBytes: params.addSerialBytes,
-    setBufferMetadata: params.setBufferMetadata,
+    setCaptureMetadata: params.setCaptureMetadata,
   });
 
   // Playback handlers (uses shared usePlaybackHandlers for play/pause/stop consistency)
@@ -221,7 +221,7 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
   const exportHandlers = useDiscoveryExportHandlers({
     frames: params.frames,
     framedData: params.framedData,
-    framedBufferId: params.framedBufferId,
+    framedCaptureId: params.framedCaptureId,
     backendByteCount: params.backendByteCount,
     backendFrameCount: params.backendFrameCount,
     serialBytesBufferLength: params.serialBytesBufferLength,
@@ -234,9 +234,9 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     dumpDir: params.dumpDir,
     openSaveDialog: params.openSaveDialog,
     saveFrames: params.saveFrames,
-    getBufferBytesPaginated: params.getBufferBytesPaginated,
-    getBufferFramesPaginated: params.getBufferFramesPaginated,
-    getBufferFramesPaginatedById: params.getBufferFramesPaginatedById,
+    getCaptureBytesPaginated: params.getCaptureBytesPaginated,
+    getCaptureFramesPaginated: params.getCaptureFramesPaginated,
+    getCaptureFramesPaginatedById: params.getCaptureFramesPaginatedById,
     pickFileToSave: params.pickFileToSave,
     saveCatalog: params.saveCatalog,
     closeExportDialog: params.closeExportDialog,

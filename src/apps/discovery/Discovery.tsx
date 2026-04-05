@@ -33,8 +33,8 @@ import BookmarkEditorDialog from "../../dialogs/BookmarkEditorDialog";
 import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
-import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
-import { getBufferMetadata, getBufferMetadataById, getBufferFramesPaginated, getBufferFramesPaginatedFiltered, getBufferBytesPaginated, getBufferFrameInfo, getBufferBytesById, getBufferFramesPaginatedById, type BufferMetadata } from "../../api/buffer";
+import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveCaptureMetadata";
+import { getCaptureMetadata, getCaptureMetadataById, getCaptureFramesPaginated, getCaptureFramesPaginatedFiltered, getCaptureBytesPaginated, getCaptureFrameInfo, getCaptureBytesById, getCaptureFramesPaginatedById, type CaptureMetadata } from "../../api/capture";
 import { WINDOW_EVENTS } from "../../events/registry";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import ToolboxDialog from "../../dialogs/ToolboxDialog";
@@ -102,7 +102,7 @@ export default function Discovery() {
 
   // ── Serial store ──
   const { isSerialMode, framedData, framingAccepted, serialBytesBuffer,
-    backendByteCount, backendFrameCount, framedBufferId } =
+    backendByteCount, backendFrameCount, framedCaptureId } =
     useDiscoverySerialStore(useShallow((s) => ({
       isSerialMode: s.isSerialMode,
       framedData: s.framedData,
@@ -110,7 +110,7 @@ export default function Discovery() {
       serialBytesBuffer: s.serialBytesBuffer,
       backendByteCount: s.backendByteCount,
       backendFrameCount: s.backendFrameCount,
-      framedBufferId: s.framedBufferId,
+      framedCaptureId: s.framedCaptureId,
     })));
   const serialActiveTab = useDiscoverySerialStore((s) => s.activeTab);
   const setSerialMode = useDiscoverySerialStore((s) => s.setSerialMode);
@@ -251,7 +251,7 @@ export default function Discovery() {
   const [playbackDirection, setPlaybackDirection] = useState<"forward" | "backward">("forward");
 
   // Buffer metadata state (for imported CSV files)
-  const [bufferMetadata, setBufferMetadata] = useState<BufferMetadata | null>(null);
+  const [captureMetadata, setCaptureMetadata] = useState<CaptureMetadata | null>(null);
 
   // Time range visibility
   const [showTimeRange] = useState(false);
@@ -316,14 +316,14 @@ export default function Discovery() {
   // This fetches buffer metadata and frame info so Discovery can show timeline controls
   const handleSessionSuspended = useCallback(async (payload: import("../../api/io").SessionSuspendedPayload) => {
     if (payload.buffer_count > 0 && payload.buffer_id) {
-      const meta = await getBufferMetadata(payload.buffer_id);
+      const meta = await getCaptureMetadata(payload.buffer_id);
       if (meta) {
-        setBufferMetadata(meta);
+        setCaptureMetadata(meta);
         enableBufferMode(meta.count);
 
         // Fetch frame info from backend buffer (populates frame picker)
         try {
-          const frameInfoList = await getBufferFrameInfo(payload.buffer_id);
+          const frameInfoList = await getCaptureFrameInfo(payload.buffer_id);
           console.log(`[Discovery] Session suspended - loaded ${frameInfoList.length} unique frame IDs from buffer`);
           setFrameInfoFromBuffer(frameInfoList);
         } catch (err) {
@@ -340,9 +340,9 @@ export default function Discovery() {
   // Ingest complete handler - passed to useIOSessionManager
   const handleIngestComplete = useCallback(async (payload: StreamEndedInfo) => {
     if (payload.capture_available && payload.count > 0 && payload.capture_id) {
-      const meta = await getBufferMetadata(payload.capture_id);
+      const meta = await getCaptureMetadata(payload.capture_id);
       if (meta) {
-        setBufferMetadata(meta);
+        setCaptureMetadata(meta);
 
         await emit(WINDOW_EVENTS.BUFFER_CHANGED, {
           metadata: meta,
@@ -355,7 +355,7 @@ export default function Discovery() {
       if (payload.capture_kind === "bytes" && meta) {
         console.log(`[Discovery] Loading ${payload.count} bytes from buffer into serial view`);
         try {
-          const bytes = await getBufferBytesById(meta.id);
+          const bytes = await getCaptureBytesById(meta.id);
           const entries = bytes.map((b) => ({
             byte: b.byte,
             timestampUs: b.timestamp_us,
@@ -379,7 +379,7 @@ export default function Discovery() {
 
         // Load frame info for the frame picker
         try {
-          const frameInfoList = await getBufferFrameInfo(payload.capture_id);
+          const frameInfoList = await getCaptureFrameInfo(payload.capture_id);
           console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from buffer`);
           setFrameInfoFromBuffer(frameInfoList);
         } catch (e) {
@@ -429,7 +429,7 @@ export default function Discovery() {
     clearFramePicker();
     clearAnalysisResults();
     disableBufferMode();
-    setBufferMetadata(null); // Clear stale metadata so effectiveStartTimeUs doesn't use old values
+    setCaptureMetadata(null); // Clear stale metadata so effectiveStartTimeUs doesn't use old values
     clearSerialBytes();
     resetFraming();
     setBackendByteCount(0);
@@ -443,13 +443,13 @@ export default function Discovery() {
   // Handle session destroyed — switch to orphaned buffer if available
   const handleSessionDestroyed = useCallback(async (orphanedBufferIds: string[]) => {
     if (orphanedBufferIds.length === 0) return;
-    const bufferId = orphanedBufferIds[0];
+    const captureId = orphanedBufferIds[0];
     try {
-      const meta = await getBufferMetadataById(bufferId);
+      const meta = await getCaptureMetadataById(captureId);
       if (meta) {
-        setBufferMetadata(meta);
+        setCaptureMetadata(meta);
         enableBufferMode(meta.count);
-        const frameInfoList = await getBufferFrameInfo(bufferId);
+        const frameInfoList = await getCaptureFrameInfo(captureId);
         setFrameInfoFromBuffer(frameInfoList);
       }
     } catch (err) {
@@ -494,7 +494,7 @@ export default function Discovery() {
     isStopped,
     canReturnToLive,
     isRealtime,
-    isBufferMode,
+    isCaptureMode,
     sessionReady,
     capabilities,
     joinerCount,
@@ -519,11 +519,11 @@ export default function Discovery() {
   const {
     sessionId,
     state: readerState,
-    bufferId: sessionBufferId,
-    bufferType,
-    bufferStartTimeUs,
-    bufferEndTimeUs,
-    bufferCount,
+    captureId: sessionBufferId,
+    captureKind,
+    captureStartTimeUs,
+    captureEndTimeUs,
+    captureCount,
     start,
     pause,
     resume,
@@ -561,22 +561,22 @@ export default function Discovery() {
   // - Joining a session already in buffer mode (another app stopped)
   // - Session is paused with buffered data (for stepping through frames)
   useEffect(() => {
-    const shouldFetchMetadata = sessionId && sessionBufferId && !bufferMetadata && (
-      (isBufferMode && !isStreaming) ||  // Explicit buffer mode
-      (isPaused && bufferCount > 0)       // Paused with buffered frames
+    const shouldFetchMetadata = sessionId && sessionBufferId && !captureMetadata && (
+      (isCaptureMode && !isStreaming) ||  // Explicit buffer mode
+      (isPaused && captureCount > 0)       // Paused with buffered frames
     );
 
     if (shouldFetchMetadata) {
       (async () => {
         try {
           // Fetch buffer metadata
-          const meta = await getBufferMetadata(sessionBufferId);
+          const meta = await getCaptureMetadata(sessionBufferId);
           if (meta) {
-            setBufferMetadata(meta);
+            setCaptureMetadata(meta);
             enableBufferMode(meta.count);
 
             // Fetch frame info from backend buffer (populates frame picker)
-            const frameInfoList = await getBufferFrameInfo(sessionBufferId);
+            const frameInfoList = await getCaptureFrameInfo(sessionBufferId);
             console.log(`[Discovery] Loaded ${frameInfoList.length} unique frame IDs from buffer`);
             setFrameInfoFromBuffer(frameInfoList);
           }
@@ -585,7 +585,7 @@ export default function Discovery() {
         }
       })();
     }
-  }, [isBufferMode, isStreaming, isPaused, bufferCount, bufferMetadata, sessionId, sessionBufferId, enableBufferMode, setFrameInfoFromBuffer]);
+  }, [isCaptureMode, isStreaming, isPaused, captureCount, captureMetadata, sessionId, sessionBufferId, enableBufferMode, setFrameInfoFromBuffer]);
 
   // Keep paused ref in sync with manager state (for callbacks that can't access manager directly)
   useEffect(() => {
@@ -594,8 +594,8 @@ export default function Discovery() {
 
   // Keep buffer mode ref in sync (useBufferFrameView handles display in buffer mode)
   useEffect(() => {
-    inBufferModeRef.current = isBufferMode || bufferMode.enabled;
-  }, [isBufferMode, bufferMode.enabled]);
+    inBufferModeRef.current = isCaptureMode || bufferMode.enabled;
+  }, [isCaptureMode, bufferMode.enabled]);
 
   // Centralised IO picker handlers - ensures consistent behavior with other apps
   const ioPickerProps = useIOSourcePickerHandlers({
@@ -672,10 +672,10 @@ export default function Discovery() {
 
   // Update currentTime when buffer metadata changes
   useEffect(() => {
-    if (bufferMetadata?.start_time_us != null && !isStreaming) {
-      updateCurrentTime(bufferMetadata.start_time_us / 1_000_000);
+    if (captureMetadata?.start_time_us != null && !isStreaming) {
+      updateCurrentTime(captureMetadata.start_time_us / 1_000_000);
     }
-  }, [bufferMetadata?.start_time_us, isStreaming, updateCurrentTime]);
+  }, [captureMetadata?.start_time_us, isStreaming, updateCurrentTime]);
 
   const displayTimeSeconds = isRealtime ? realtimeClock : currentTime;
 
@@ -696,9 +696,9 @@ export default function Discovery() {
 
     if (!ioProfile) {
       newIsSerialMode = false;
-    } else if (isBufferMode) {
+    } else if (isCaptureMode) {
       // Buffer mode: check buffer metadata for bytes type
-      newIsSerialMode = bufferMetadata?.kind === "bytes" || bufferType === "bytes" || framedBufferId !== null;
+      newIsSerialMode = captureMetadata?.kind === "bytes" || captureKind === "bytes" || framedCaptureId !== null;
     } else {
       // Live session: check session traits from capabilities
       newIsSerialMode = capabilities?.traits?.protocols?.includes("serial") ?? false;
@@ -710,7 +710,7 @@ export default function Discovery() {
       clearSerialBytes();
     }
     prevIsSerialModeRef.current = newIsSerialMode;
-  }, [ioProfile, capabilities, bufferMetadata, bufferType, framedBufferId, setSerialMode, clearSerialBytes]);
+  }, [ioProfile, capabilities, captureMetadata, captureKind, framedCaptureId, setSerialMode, clearSerialBytes]);
 
   // Raw bytes are now routed through sessionStore via the onBytes callback.
   // No ad-hoc Tauri listener needed here.
@@ -736,8 +736,8 @@ export default function Discovery() {
 
   // Merged buffer metadata using session values for cross-app timeline sync
   const effectiveBufferMetadata = useEffectiveBufferMetadata(
-    { bufferStartTimeUs, bufferEndTimeUs, bufferCount, bufferName: session.bufferName, bufferPersistent: session.bufferPersistent },
-    bufferMetadata
+    { captureStartTimeUs, captureEndTimeUs, captureCount, captureName: session.captureName, capturePersistent: session.capturePersistent },
+    captureMetadata
   );
 
   // Export dialog computed values
@@ -755,10 +755,10 @@ export default function Discovery() {
       return backendByteCount > 0 ? backendByteCount : serialBytesBuffer.length;
     }
     if (bufferMode.enabled) return bufferMode.totalFrames;
-    if (isSerialMode && framedBufferId && backendFrameCount > 0) return backendFrameCount;
+    if (isSerialMode && framedCaptureId && backendFrameCount > 0) return backendFrameCount;
     if (isSerialMode && framedData.length > 0) return framedData.length;
     return frames.length;
-  }, [exportDataMode, backendByteCount, serialBytesBuffer.length, bufferMode, isSerialMode, framedBufferId, backendFrameCount, framedData.length, frames.length]);
+  }, [exportDataMode, backendByteCount, serialBytesBuffer.length, bufferMode, isSerialMode, framedCaptureId, backendFrameCount, framedData.length, frames.length]);
 
   const exportDefaultFilename = useMemo(() => {
     const protocol = exportDataMode === "bytes" ? "serial" : (protocolLabel || "can");
@@ -868,7 +868,7 @@ export default function Discovery() {
     // Frame state
     frames,
     framedData,
-    framedBufferId,
+    framedCaptureId,
     frameInfoMap,
     selectedFrames,
 
@@ -901,7 +901,7 @@ export default function Discovery() {
     setBookmarkFrameId,
     setBookmarkFrameTime,
     resetWatchFrameCount,
-    setBufferMetadata,
+    setCaptureMetadata,
 
     // Manager session switching methods
     stopWatch,
@@ -946,10 +946,10 @@ export default function Discovery() {
     applySelectionSet,
 
     // API functions (for export/other features)
-    getBufferBytesPaginated: (offset, limit) => getBufferBytesPaginated((bufferMetadata?.id ?? sessionBufferId)!, offset, limit),
-    getBufferFramesPaginated: (offset, limit) => getBufferFramesPaginated((bufferMetadata?.id ?? sessionBufferId)!, offset, limit),
-    getBufferFramesPaginatedById,
-    bufferMetadata,
+    getCaptureBytesPaginated: (offset, limit) => getCaptureBytesPaginated((captureMetadata?.id ?? sessionBufferId)!, offset, limit),
+    getCaptureFramesPaginated: (offset, limit) => getCaptureFramesPaginated((captureMetadata?.id ?? sessionBufferId)!, offset, limit),
+    getCaptureFramesPaginatedById,
+    captureMetadata,
     pickFileToSave,
     saveCatalog,
 
@@ -971,9 +971,9 @@ export default function Discovery() {
       // Buffer-only mode: look up timestamp from buffer
       // Buffer API uses numeric IDs — extract from composite keys
       const selectedNumericIds = Array.from(selectedFrames).map(fk => parseFrameKey(fk).frameId);
-      const frameBufferId = bufferMetadata?.id ?? sessionBufferId;
+      const frameBufferId = captureMetadata?.id ?? sessionBufferId;
       try {
-        const response = await getBufferFramesPaginatedFiltered(frameBufferId!, frameIndex, 1, selectedNumericIds);
+        const response = await getCaptureFramesPaginatedFiltered(frameBufferId!, frameIndex, 1, selectedNumericIds);
         if (response.frames.length > 0) {
           updateCurrentTime(response.frames[0].timestamp_us / 1_000_000);
         }
@@ -981,7 +981,7 @@ export default function Discovery() {
         // Best effort — timestamp syncs when page loads
       }
     }
-  }, [sessionId, capabilities, seekByFrame, selectedFrames, bufferMetadata, sessionBufferId, setCurrentFrameIndex, updateCurrentTime]);
+  }, [sessionId, capabilities, seekByFrame, selectedFrames, captureMetadata, sessionBufferId, setCurrentFrameIndex, updateCurrentTime]);
 
   // ── Menu session control ──
   const bookmarkProfileId = sourceProfileId || ioProfile;
@@ -1037,7 +1037,7 @@ export default function Discovery() {
           ioProfile={ioProfile}
           onIoProfileChange={handlers.handleIoProfileChange}
           defaultReadProfileId={settings?.default_read_profile}
-          bufferMetadata={effectiveBufferMetadata ?? bufferMetadata}
+          captureMetadata={effectiveBufferMetadata ?? captureMetadata}
           sessionId={sessionId}
           isStreaming={isStreaming}
           multiBusProfiles={sessionId ? ioProfiles : []}
@@ -1053,8 +1053,8 @@ export default function Discovery() {
           supportsSpeed={capabilities?.supports_speed_control ?? false}
           onOpenSpeedPicker={() => dialogs.speedPicker.open()}
           frameCount={frameList.length}
-          uniqueFrameCount={isBufferMode ? frameInfoMap.size : watchUniqueFrameCount}
-          totalFrameCount={isBufferMode ? bufferCount : watchFrameCount}
+          uniqueFrameCount={isCaptureMode ? frameInfoMap.size : watchUniqueFrameCount}
+          totalFrameCount={isCaptureMode ? captureCount : watchFrameCount}
           selectedFrameCount={selectedFrames.size}
           onOpenFramePicker={() => dialogs.framePicker.open()}
           isSerialMode={isSerialMode}
@@ -1063,15 +1063,15 @@ export default function Discovery() {
           serialActiveTab={serialActiveTab}
           onUndoFraming={undoAcceptFraming}
           isModbusProfile={isModbusProfile}
-          isBufferMode={isBufferMode}
-          bufferPersistent={session.bufferPersistent}
+          isCaptureMode={isCaptureMode}
+          capturePersistent={session.capturePersistent}
           onToggleBufferPin={() => {
-            const bid = bufferMetadata?.id ?? sessionBufferId;
-            if (bid) useSessionStore.getState().setSessionBufferPersistent(bid, !session.bufferPersistent);
+            const bid = captureMetadata?.id ?? sessionBufferId;
+            if (bid) useSessionStore.getState().setSessionCapturePersistent(bid, !session.capturePersistent);
           }}
           onRenameBuffer={(newName) => {
-            const bid = bufferMetadata?.id ?? sessionBufferId;
-            if (bid) useSessionStore.getState().renameSessionBuffer(bid, newName);
+            const bid = captureMetadata?.id ?? sessionBufferId;
+            if (bid) useSessionStore.getState().renameSessionCapture(bid, newName);
           }}
           onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
           onClearBuffer={handlers.handleClearDiscoveredFrames}
@@ -1093,7 +1093,7 @@ export default function Discovery() {
         ) : (
           <DiscoveryFramesView
             frames={frames}
-            bufferId={bufferMetadata?.id ?? (bufferMode.enabled ? sessionBufferId : null)}
+            captureId={captureMetadata?.id ?? (bufferMode.enabled ? sessionBufferId : null)}
             protocol={protocolLabel}
             onCancelScan={handleCancelModbusScan}
             displayFrameIdFormat={displayFrameIdFormat}
@@ -1111,7 +1111,7 @@ export default function Discovery() {
             onMaxBufferChange={setMaxBuffer}
             currentTimeUs={currentTime !== null ? currentTime * 1_000_000 : sessionCurrentTimeUs}
             onScrub={handlers.handleScrub}
-            bufferMetadata={effectiveBufferMetadata}
+            captureMetadata={effectiveBufferMetadata}
             isRecorded={isRecorded}
             // Playback controls
             playbackState={isStreaming && !isPaused ? "playing" : "paused"}
@@ -1134,8 +1134,8 @@ export default function Discovery() {
             onSpeedChange={handlers.handleSpeedChange}
             onFrameChange={handleFrameChangeWithBuffer}
             // Timeline source streaming controls
-            isLiveStreaming={isRecorded && isStreaming && !isPaused && !isBufferMode}
-            isStreamPaused={isRecorded && isPaused && !isBufferMode}
+            isLiveStreaming={isRecorded && isStreaming && !isPaused && !isCaptureMode}
+            isStreamPaused={isRecorded && isPaused && !isCaptureMode}
             onResumeStream={resume}
             useLocalTimezone={settings?.display_timezone === 'local'}
           />
@@ -1208,8 +1208,8 @@ export default function Discovery() {
         defaultId={settings?.default_read_profile}
         onSelect={handlers.handleIoProfileChange}
         {...ioPickerProps}
-        onImport={setBufferMetadata}
-        bufferMetadata={bufferMetadata}
+        onImport={setCaptureMetadata}
+        captureMetadata={captureMetadata}
         defaultDir={settings?.dump_dir}
         loadSpeed={playbackSpeed}
         onLoadSpeedChange={(speed) => handlers.handleSpeedChange(speed)}

@@ -10,7 +10,7 @@ import type {
   CsvColumnRole,
   CsvColumnMapping,
   TimestampUnit,
-} from "../../api/buffer";
+} from "../../api/capture";
 import {
   bgSurface,
   textSecondary,

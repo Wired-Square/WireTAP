@@ -22,11 +22,11 @@ import SourceNode from "../nodes/SourceNode";
 import SessionNode from "../nodes/SessionNode";
 import AppNode from "../nodes/AppNode";
 import InterfaceEdge from "../edges/InterfaceEdge";
-import { buildSessionGraph, calculateFitViewPadding, type BufferInfo } from "../utils/layoutUtils";
+import { buildSessionGraph, calculateFitViewPadding, type CaptureInfo } from "../utils/layoutUtils";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import type { ActiveSessionInfo } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
-import { listBuffers } from "../../../api/buffer";
+import { listCaptures } from "../../../api/capture";
 
 // Register custom node and edge types
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,17 +64,17 @@ export default function SessionCanvas({
   const setSelectedNode = useSessionManagerStore((s) => s.setSelectedNode);
 
   // Fetch buffer metadata for source node display
-  const [bufferInfoMap, setBufferInfoMap] = useState<Map<string, BufferInfo>>(new Map());
+  const [bufferInfoMap, setBufferInfoMap] = useState<Map<string, CaptureInfo>>(new Map());
   useEffect(() => {
-    listBuffers()
+    listCaptures()
       .then((buffers) => {
-        const map = new Map<string, BufferInfo>();
+        const map = new Map<string, CaptureInfo>();
         for (const b of buffers) {
           map.set(b.id, {
             name: b.name,
             persistent: b.persistent,
             count: b.count,
-            bufferType: b.kind,
+            captureKind: b.kind,
           });
         }
         setBufferInfoMap(map);

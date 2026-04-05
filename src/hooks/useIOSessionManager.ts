@@ -16,14 +16,14 @@ import {
   createAndStartMultiSourceSession,
   joinMultiSourceSession,
   useSessionStore,
-  isBufferProfileId,
+  isCaptureProfileId,
   type CreateMultiSourceOptions,
   type PerInterfaceFramingConfig,
   type BusSourceInfo,
 } from "../stores/sessionStore";
 
 // Re-export for backward compatibility
-export { isBufferProfileId };
+export { isCaptureProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
@@ -189,7 +189,7 @@ export interface UseIOSessionManagerResult {
   /** Whether realtime (live device) */
   isRealtime: boolean;
   /** Whether in buffer mode */
-  isBufferMode: boolean;
+  isCaptureMode: boolean;
   /** Whether session is ready */
   sessionReady: boolean;
   /** IO capabilities */
@@ -610,9 +610,9 @@ export function useIOSessionManager(
 
     // Switch to orphaned buffer if available, otherwise clear profile
     if (orphanedBufferIds.length > 0) {
-      const bufferId = orphanedBufferIds[0];
-      setIoProfile(bufferId);
-      setSourceProfileId(bufferId);
+      const captureId = orphanedBufferIds[0];
+      setIoProfile(captureId);
+      setSourceProfileId(captureId);
     } else {
       setIoProfile(null);
     }
@@ -634,7 +634,7 @@ export function useIOSessionManager(
     onSuspended,
     onSwitchedToBuffer: (payload) => {
       // Fires for ALL apps on the session (including the one that clicked Stop).
-      // Session stays the same — isBufferMode is now derived from capabilities
+      // Session stays the same — isCaptureMode is now derived from capabilities
       // (temporal_mode="buffer"). sourceProfileId stays set so canReturnToLive works.
       setIsWatching(false);
       setMultiBusProfiles([]); // Clear device profile IDs so Data Source picker doesn't show old device
@@ -657,15 +657,15 @@ export function useIOSessionManager(
   // Buffer mode = viewing buffer data. Detected via:
   // 1. Profile ID is a buffer ID (direct buffer selection), OR
   // 2. Session capabilities report temporal_mode="buffer" (device switched to BufferReader)
-  const isBufferMode = isBufferProfileId(ioProfile) || isBufferProfileId(sourceProfileId)
+  const isCaptureMode = isCaptureProfileId(ioProfile) || isCaptureProfileId(sourceProfileId)
     || session.capabilities?.traits.temporal_mode === "buffer";
   // Stopped with a profile selected (ready to restart)
   // For realtime sources: can restart the live stream
   // For timeline sources: can restart from the beginning
   const isStopped = !isDetached && readerState === "stopped" && ioProfile !== null;
   // Can return to live: was originally a realtime source but switched to buffer replay
-  // Detected by isBufferMode + sourceProfileId being a real profile (not a buffer ID itself)
-  const canReturnToLive = !isDetached && isBufferMode && sourceProfileId !== null && !isBufferProfileId(sourceProfileId);
+  // Detected by isCaptureMode + sourceProfileId being a real profile (not a buffer ID itself)
+  const canReturnToLive = !isDetached && isCaptureMode && sourceProfileId !== null && !isCaptureProfileId(sourceProfileId);
   const sessionReady = session.isReady;
   const capabilities = session.capabilities;
   const joinerCount = session.joinerCount;
@@ -714,17 +714,17 @@ export function useIOSessionManager(
   // Real-time/recorded: clear buffer data in backend (session keeps running)
   // Buffer (non-persistent): delete buffer + leave session
   const handleClearBuffer = useCallback(async () => {
-    const { clearBufferData, deleteBuffer } = await import("../api/buffer");
+    const { clearCaptureData, deleteCapture } = await import("../api/capture");
     // For buffer sessions, sourceProfileId holds the buf_N ID;
     // for real-time/recorded sessions the buffer ID is on the session object.
-    const bid = isBufferProfileId(sourceProfileId) ? sourceProfileId : session.bufferId;
+    const bid = isCaptureProfileId(sourceProfileId) ? sourceProfileId : session.captureId;
 
-    if (isBufferProfileId(sourceProfileId)) {
+    if (isCaptureProfileId(sourceProfileId)) {
       // Buffer mode: delete buffer + leave session (clean leave, no suspend/copy)
       tlog.info(`[IOSessionManager] Clear buffer: deleting buffer ${bid} and leaving session`);
       if (bid) {
-        await deleteBuffer(bid);
-        useSessionStore.getState().removeKnownBufferId(bid);
+        await deleteCapture(bid);
+        useSessionStore.getState().removeKnownCaptureId(bid);
         const { emit } = await import("@tauri-apps/api/event");
         const { WINDOW_EVENTS } = await import("../events/registry");
         emit(WINDOW_EVENTS.BUFFER_CHANGED, { metadata: null, deletedBufferIds: [bid], timestamp: Date.now() });
@@ -737,7 +737,7 @@ export function useIOSessionManager(
     } else {
       // Real-time or recorded: clear buffer data, session continues streaming
       tlog.info(`[IOSessionManager] Clear buffer: clearing data for buffer ${bid}`);
-      if (bid) await clearBufferData(bid);
+      if (bid) await clearCaptureData(bid);
     }
   }, [session, ioProfile, setMultiBusProfiles, setIoProfile]);
 
@@ -889,7 +889,7 @@ export function useIOSessionManager(
       // Timeline/buffer: reinitialize path
       onBeforeWatch?.();
       const profileId = profileIds[0];
-      const isBuffer = isBufferProfileId(profileId);
+      const isBuffer = isCaptureProfileId(profileId);
       const sessionId = isBuffer ? generateBufferSessionId() : generateRecordedSessionId();
 
       await session.reinitialize(profileId, {
@@ -1279,7 +1279,7 @@ export function useIOSessionManager(
     setIoProfile(profileId);
 
     // Set default speed from the selected profile if it has one (non-buffer only)
-    if (profileId && !isBufferProfileId(profileId)) {
+    if (profileId && !isCaptureProfileId(profileId)) {
       const profile = ioProfiles.find((p) => p.id === profileId);
       if (profile && (profile.kind === "postgres" || profile.kind === "csv_file") && profile.connection?.default_speed) {
         const defaultSpeed = parseFloat(profile.connection.default_speed);
@@ -1365,7 +1365,7 @@ export function useIOSessionManager(
     isStopped,
     canReturnToLive,
     isRealtime,
-    isBufferMode,
+    isCaptureMode,
     sessionReady,
     capabilities,
     joinerCount,

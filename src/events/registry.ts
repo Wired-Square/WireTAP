@@ -1,6 +1,6 @@
 // Event registry for inter-window communication
 
-import type { BufferMetadata } from "../api/buffer";
+import type { CaptureMetadata } from "../api/capture";
 
 export const WINDOW_EVENTS = {
   // Catalog events
@@ -50,18 +50,18 @@ export interface LoadHexDataPayload {
   timestamp: number;
 }
 
-export interface BufferMetadataUpdatedPayload {
+export interface CaptureMetadataUpdatedPayload {
   /** Buffer ID that was updated */
-  bufferId: string;
+  captureId: string;
   /** New name (if renamed) */
   name?: string;
   /** New persistent flag (if changed) */
   persistent?: boolean;
 }
 
-export interface BufferChangedPayload {
+export interface CaptureChangedPayload {
   /** Null if buffer was cleared */
-  metadata: BufferMetadata | null;
+  metadata: CaptureMetadata | null;
   /** What triggered this change: "ingested", "streamed", "imported", "cleared" */
   action?: "ingested" | "streamed" | "imported" | "cleared";
   /** Buffer IDs that were deleted (for cross-window cleanup) */

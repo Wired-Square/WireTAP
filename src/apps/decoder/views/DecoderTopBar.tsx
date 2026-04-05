@@ -5,7 +5,7 @@ import { iconSm, iconMd } from "../../../styles/spacing";
 import type { CatalogMetadata } from "../../../api/catalog";
 import type { IOProfile } from "../../../types/common";
 import type { PlaybackSpeed } from "../../../components/TimeController";
-import type { BufferMetadata } from "../../../api/buffer";
+import type { CaptureMetadata } from "../../../api/capture";
 import AppTopBar from "../../../components/AppTopBar";
 import { buttonBase, iconButtonBase, toggleButtonClass } from "../../../styles/buttonStyles";
 
@@ -21,7 +21,7 @@ type Props = {
   ioProfile: string | null;
   onIoProfileChange: (id: string | null) => void;
   defaultReadProfileId?: string | null;
-  bufferMetadata?: BufferMetadata | null;
+  captureMetadata?: CaptureMetadata | null;
   /** Current session ID (e.g., "f_abc123") */
   sessionId?: string | null;
   /** Profile IDs when in multi-bus mode */
@@ -51,9 +51,9 @@ type Props = {
 
   // Buffer actions
   /** Whether the session is in buffer replay mode */
-  isBufferMode?: boolean;
+  isCaptureMode?: boolean;
   /** Whether the current buffer is persistent (pinned) */
-  bufferPersistent?: boolean;
+  capturePersistent?: boolean;
   /** Called when user toggles buffer pin */
   onToggleBufferPin?: () => void;
   /** Called when user renames the buffer */
@@ -110,7 +110,7 @@ export default function DecoderTopBar({
   ioProfiles,
   ioProfile,
   defaultReadProfileId,
-  bufferMetadata,
+  captureMetadata,
   sessionId,
   multiBusProfiles = [],
   ioState,
@@ -124,8 +124,8 @@ export default function DecoderTopBar({
   onLeave,
   supportsTimeRange = false,
   onOpenBookmarkPicker,
-  isBufferMode = false,
-  bufferPersistent = false,
+  isCaptureMode = false,
+  capturePersistent = false,
   onToggleBufferPin,
   onRenameBuffer,
   onClearBuffer,
@@ -164,7 +164,7 @@ export default function DecoderTopBar({
         ioProfile,
         ioProfiles,
         multiBusProfiles,
-        bufferMetadata,
+        captureMetadata,
         defaultReadProfileId,
         sessionId,
         ioState,
@@ -177,12 +177,12 @@ export default function DecoderTopBar({
         isStreaming,
         isStopped, // Show Resume in both realtime and buffer mode (to return to live)
         supportsTimeRange,
-        onStop: !isBufferMode ? onStopStream : undefined, // Hide Stop only in buffer mode
+        onStop: !isCaptureMode ? onStopStream : undefined, // Hide Stop only in buffer mode
         onResume, // Always show Resume when stopped (resumeFresh handles live return)
         onLeave,
         onOpenBookmarkPicker,
-        isBufferMode,
-        bufferPersistent,
+        isCaptureMode,
+        capturePersistent,
         onToggleBufferPin,
         onRenameBuffer,
         onClearBuffer,

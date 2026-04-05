@@ -1,7 +1,7 @@
-// src/api/bufferquery.ts
+// src/api/capturequery.ts
 //
-// API wrappers for buffer query commands. These run analytical queries
-// against the local SQLite buffer database instead of PostgreSQL.
+// API wrappers for capture query commands. These run analytical queries
+// against the local SQLite capture database instead of PostgreSQL.
 
 import { invoke } from "@tauri-apps/api/core";
 import type {
@@ -21,8 +21,8 @@ import type {
  *
  * Time bounds are in microseconds (matching buffer timestamp_us).
  */
-export async function queryByteChangesBuffer(
-  bufferId: string,
+export async function queryByteChangesCapture(
+  captureId: string,
   frameId: number,
   byteIndex: number,
   isExtended: boolean | null,
@@ -31,7 +31,7 @@ export async function queryByteChangesBuffer(
   limit?: number,
 ): Promise<ByteChangeQueryResult> {
   return invoke("capture_query_byte_changes", {
-    captureId: bufferId,
+    captureId: captureId,
     frameId,
     byteIndex,
     isExtended,
@@ -46,8 +46,8 @@ export async function queryByteChangesBuffer(
  *
  * Returns timestamps where any byte in the frame's payload changed.
  */
-export async function queryFrameChangesBuffer(
-  bufferId: string,
+export async function queryFrameChangesCapture(
+  captureId: string,
   frameId: number,
   isExtended: boolean | null,
   startTimeUs?: number,
@@ -55,7 +55,7 @@ export async function queryFrameChangesBuffer(
   limit?: number,
 ): Promise<FrameChangeQueryResult> {
   return invoke("capture_query_frame_changes", {
-    captureId: bufferId,
+    captureId: captureId,
     frameId,
     isExtended,
     startTimeUs,
@@ -69,8 +69,8 @@ export async function queryFrameChangesBuffer(
  *
  * Tolerance is in microseconds (frontend converts from ms).
  */
-export async function queryMirrorValidationBuffer(
-  bufferId: string,
+export async function queryMirrorValidationCapture(
+  captureId: string,
   mirrorFrameId: number,
   sourceFrameId: number,
   isExtended: boolean | null,
@@ -80,7 +80,7 @@ export async function queryMirrorValidationBuffer(
   limit?: number,
 ): Promise<MirrorValidationQueryResult> {
   return invoke("capture_query_mirror_validation", {
-    captureId: bufferId,
+    captureId: captureId,
     mirrorFrameId,
     sourceFrameId,
     isExtended,
@@ -97,8 +97,8 @@ export async function queryMirrorValidationBuffer(
  * Groups payloads by mux selector byte and computes per-byte and optional
  * 16-bit word statistics for each mux case.
  */
-export async function queryMuxStatisticsBuffer(
-  bufferId: string,
+export async function queryMuxStatisticsCapture(
+  captureId: string,
   frameId: number,
   muxSelectorByte: number,
   isExtended: boolean | null,
@@ -109,7 +109,7 @@ export async function queryMuxStatisticsBuffer(
   limit?: number,
 ): Promise<MuxStatisticsQueryResult> {
   return invoke("capture_query_mux_statistics", {
-    captureId: bufferId,
+    captureId: captureId,
     frameId,
     muxSelectorByte,
     isExtended,
@@ -124,15 +124,15 @@ export async function queryMuxStatisticsBuffer(
 /**
  * Query for first and last occurrence of a frame within a buffer.
  */
-export async function queryFirstLastBuffer(
-  bufferId: string,
+export async function queryFirstLastCapture(
+  captureId: string,
   frameId: number,
   isExtended: boolean | null,
   startTimeUs?: number,
   endTimeUs?: number,
 ): Promise<FirstLastQueryResult> {
   return invoke("capture_query_first_last", {
-    captureId: bufferId,
+    captureId: captureId,
     frameId,
     isExtended,
     startTimeUs,
@@ -143,8 +143,8 @@ export async function queryFirstLastBuffer(
 /**
  * Query frame transmission frequency within a buffer.
  */
-export async function queryFrequencyBuffer(
-  bufferId: string,
+export async function queryFrequencyCapture(
+  captureId: string,
   frameId: number,
   isExtended: boolean | null,
   bucketSizeMs: number,
@@ -153,7 +153,7 @@ export async function queryFrequencyBuffer(
   limit?: number,
 ): Promise<FrequencyQueryResult> {
   return invoke("capture_query_frequency", {
-    captureId: bufferId,
+    captureId: captureId,
     frameId,
     isExtended,
     bucketSizeMs,
@@ -166,8 +166,8 @@ export async function queryFrequencyBuffer(
 /**
  * Query byte value distribution within a buffer.
  */
-export async function queryDistributionBuffer(
-  bufferId: string,
+export async function queryDistributionCapture(
+  captureId: string,
   frameId: number,
   byteIndex: number,
   isExtended: boolean | null,
@@ -175,7 +175,7 @@ export async function queryDistributionBuffer(
   endTimeUs?: number,
 ): Promise<DistributionQueryResult> {
   return invoke("capture_query_distribution", {
-    captureId: bufferId,
+    captureId: captureId,
     frameId,
     byteIndex,
     isExtended,
@@ -187,8 +187,8 @@ export async function queryDistributionBuffer(
 /**
  * Query for transmission gaps within a buffer.
  */
-export async function queryGapAnalysisBuffer(
-  bufferId: string,
+export async function queryGapAnalysisCapture(
+  captureId: string,
   frameId: number,
   isExtended: boolean | null,
   gapThresholdMs: number,
@@ -197,7 +197,7 @@ export async function queryGapAnalysisBuffer(
   limit?: number,
 ): Promise<GapAnalysisQueryResult> {
   return invoke("capture_query_gap_analysis", {
-    captureId: bufferId,
+    captureId: captureId,
     frameId,
     isExtended,
     gapThresholdMs,
@@ -210,8 +210,8 @@ export async function queryGapAnalysisBuffer(
 /**
  * Search for a byte pattern across all frame IDs within a buffer.
  */
-export async function queryPatternSearchBuffer(
-  bufferId: string,
+export async function queryPatternSearchCapture(
+  captureId: string,
   pattern: number[],
   patternMask: number[],
   startTimeUs?: number,
@@ -219,7 +219,7 @@ export async function queryPatternSearchBuffer(
   limit?: number,
 ): Promise<PatternSearchQueryResult> {
   return invoke("capture_query_pattern_search", {
-    captureId: bufferId,
+    captureId: captureId,
     pattern,
     patternMask,
     startTimeUs,

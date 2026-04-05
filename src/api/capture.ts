@@ -1,45 +1,45 @@
-// ui/src/api/buffer.ts
+// ui/src/api/capture.ts
 //
-// API wrappers for the multi-buffer registry system.
-// Supports multiple named buffers with typed storage (frames or bytes).
+// API wrappers for the multi-capture registry system.
+// Supports multiple named captures with typed storage (frames or bytes).
 
 import { invoke } from "@tauri-apps/api/core";
 import type { IOCapabilities } from "./io";
 
 /**
- * Buffer type - determines what kind of data is stored
+ * Capture kind - determines what kind of data is stored
  */
-export type BufferType = "frames" | "bytes";
+export type CaptureKind = "frames" | "bytes";
 
 /**
- * Metadata about a buffer in the registry
+ * Metadata about a capture in the registry
  */
-export interface BufferMetadata {
+export interface CaptureMetadata {
   /** Unique capture ID (e.g., "xk9m2p", "r7f3kw") */
   id: string;
   /** Kind of data stored: "frames" (CAN, framed serial) or "bytes" (raw serial) */
-  kind: BufferType;
+  kind: CaptureKind;
   /** Display name (e.g., "GVRET 10:30am", "Serial dump") */
   name: string;
-  /** Number of items (frames for frame buffers, bytes for byte buffers) */
+  /** Number of items (frames for frame captures, bytes for byte captures) */
   count: number;
   /** Timestamp of first item (microseconds) */
   start_time_us: number | null;
   /** Timestamp of last item (microseconds) */
   end_time_us: number | null;
-  /** When the buffer was created (Unix timestamp in seconds) */
+  /** When the capture was created (Unix timestamp in seconds) */
   created_at: number;
-  /** Whether this buffer is actively receiving data (is the streaming target) */
+  /** Whether this capture is actively receiving data (is the streaming target) */
   is_streaming: boolean;
   /**
-   * Session ID that owns this buffer (null = orphaned, available for standalone use).
-   * Buffers with an owning session are only accessible through that session.
-   * When a session is destroyed, the buffer is orphaned.
+   * Session ID that owns this capture (null = orphaned, available for standalone use).
+   * Captures with an owning session are only accessible through that session.
+   * When a session is destroyed, the capture is orphaned.
    */
   owning_session_id: string | null;
-  /** Whether this buffer survives app restart when 'clear buffers on start' is enabled */
+  /** Whether this capture survives app restart when 'clear captures on start' is enabled */
   persistent: boolean;
-  /** Distinct bus numbers present in this buffer's data (sorted) */
+  /** Distinct bus numbers present in this capture's data (sorted) */
   buses: number[];
 }
 
@@ -50,7 +50,7 @@ export interface BufferMetadata {
  * @param filePath - Full path to the CSV file
  * @returns Metadata about the imported data
  */
-export async function importCsvToBuffer(sessionId: string, filePath: string): Promise<BufferMetadata> {
+export async function importCsvToCapture(sessionId: string, filePath: string): Promise<CaptureMetadata> {
   return invoke("import_csv_to_capture", { session_id: sessionId, file_path: filePath });
 }
 
@@ -74,7 +74,7 @@ export interface SequenceGap {
 
 /** Result of a CSV import, including buffer metadata and sequence diagnostics */
 export interface CsvImportResult {
-  metadata: BufferMetadata;
+  metadata: CaptureMetadata;
   sequence_gaps: SequenceGap[];
   /** Total number of dropped frames estimated from sequence gaps */
   total_dropped: number;
@@ -227,16 +227,16 @@ export async function importCsvBatchWithMapping(
  * Get metadata for a specific buffer.
  * Returns null if the buffer doesn't exist.
  *
- * @param bufferId - The buffer ID to look up
+ * @param captureId - The buffer ID to look up
  */
-export async function getBufferMetadata(bufferId: string): Promise<BufferMetadata | null> {
-  return invoke("get_capture_metadata", { capture_id: bufferId });
+export async function getCaptureMetadata(captureId: string): Promise<CaptureMetadata | null> {
+  return invoke("get_capture_metadata", { capture_id: captureId });
 }
 
 /**
  * A single CAN frame from the buffer.
  */
-export interface BufferFrame {
+export interface CaptureFrame {
   protocol: string;
   timestamp_us: number;
   frame_id: number;
@@ -252,17 +252,17 @@ export interface BufferFrame {
 /**
  * Get all frames from the shared buffer.
  * Returns an empty array if no data is loaded.
- * WARNING: For large buffers (>100k frames), use getBufferFramesPaginated instead.
+ * WARNING: For large buffers (>100k frames), use getCaptureFramesPaginated instead.
  */
-export async function getBufferFrames(bufferId: string): Promise<BufferFrame[]> {
-  return invoke("get_capture_frames", { capture_id: bufferId });
+export async function getCaptureFrames(captureId: string): Promise<CaptureFrame[]> {
+  return invoke("get_capture_frames", { capture_id: captureId });
 }
 
 /**
  * Response for paginated buffer frames
  */
 export interface PaginatedFramesResponse {
-  frames: BufferFrame[];
+  frames: CaptureFrame[];
   total_count: number;
   offset: number;
   limit: number;
@@ -277,12 +277,12 @@ export interface PaginatedFramesResponse {
  * @param offset - Starting index (0-based)
  * @param limit - Maximum number of frames to return
  */
-export async function getBufferFramesPaginated(
-  bufferId: string,
+export async function getCaptureFramesPaginated(
+  captureId: string,
   offset: number,
   limit: number
 ): Promise<PaginatedFramesResponse> {
-  return invoke("get_capture_frames_paginated", { capture_id: bufferId, offset, limit });
+  return invoke("get_capture_frames_paginated", { capture_id: captureId, offset, limit });
 }
 
 /**
@@ -293,14 +293,14 @@ export async function getBufferFramesPaginated(
  * @param limit - Maximum number of frames to return
  * @param selectedIds - Array of frame IDs to include (empty = all frames)
  */
-export async function getBufferFramesPaginatedFiltered(
-  bufferId: string,
+export async function getCaptureFramesPaginatedFiltered(
+  captureId: string,
   offset: number,
   limit: number,
   selectedIds: number[]
 ): Promise<PaginatedFramesResponse> {
   return invoke("get_capture_frames_paginated_filtered", {
-    capture_id: bufferId,
+    capture_id: captureId,
     offset,
     limit,
     selected_ids: selectedIds,
@@ -311,7 +311,7 @@ export async function getBufferFramesPaginatedFiltered(
  * Response for tail buffer frames
  */
 export interface TailResponse {
-  frames: BufferFrame[];
+  frames: CaptureFrame[];
   /** 1-based original capture position (rowid) for each frame, parallel to `frames`. */
   capture_indices: number[];
   total_filtered_count: number;
@@ -325,13 +325,13 @@ export interface TailResponse {
  * @param limit - Maximum number of frames to return
  * @param selectedIds - Array of frame IDs to filter by (empty = all frames)
  */
-export async function getBufferFramesTail(
-  bufferId: string,
+export async function getCaptureFramesTail(
+  captureId: string,
   limit: number,
   selectedIds: number[]
 ): Promise<TailResponse> {
   return invoke("get_capture_frames_tail", {
-    capture_id: bufferId,
+    capture_id: captureId,
     limit,
     selected_ids: selectedIds,
   });
@@ -341,17 +341,17 @@ export async function getBufferFramesTail(
  * Get a page of frames from a specific buffer by ID.
  * Use this to fetch frames from a derived buffer (e.g., framing results).
  *
- * @param bufferId - The buffer ID
+ * @param captureId - The buffer ID
  * @param offset - Starting index (0-based)
  * @param limit - Maximum number of frames to return
  */
-export async function getBufferFramesPaginatedById(
-  bufferId: string,
+export async function getCaptureFramesPaginatedById(
+  captureId: string,
   offset: number,
   limit: number
 ): Promise<PaginatedFramesResponse> {
   return invoke("get_capture_frames_paginated_by_id", {
-    capture_id: bufferId,
+    capture_id: captureId,
     offset,
     limit,
   });
@@ -360,7 +360,7 @@ export async function getBufferFramesPaginatedById(
 /**
  * Frame info extracted from the buffer
  */
-export interface BufferFrameInfo {
+export interface CaptureFrameInfo {
   frame_id: number;
   max_dlc: number;
   bus: number;
@@ -372,8 +372,8 @@ export interface BufferFrameInfo {
  * Get unique frame IDs and their metadata from the buffer.
  * Used to build the frame picker after a large ingest.
  */
-export async function getBufferFrameInfo(bufferId: string): Promise<BufferFrameInfo[]> {
-  return invoke("get_capture_frame_info", { capture_id: bufferId });
+export async function getCaptureFrameInfo(captureId: string): Promise<CaptureFrameInfo[]> {
+  return invoke("get_capture_frame_info", { capture_id: captureId });
 }
 
 /**
@@ -384,13 +384,13 @@ export async function getBufferFrameInfo(bufferId: string): Promise<BufferFrameI
  * @param selectedIds - Array of frame IDs to filter by (empty = all frames)
  * @returns Offset of the first frame at or after the given timestamp
  */
-export async function findBufferOffsetForTimestamp(
-  bufferId: string,
+export async function findCaptureOffsetForTimestamp(
+  captureId: string,
   timestampUs: number,
   selectedIds: number[]
 ): Promise<number> {
   return invoke("find_capture_offset_for_timestamp", {
-    capture_id: bufferId,
+    capture_id: captureId,
     timestamp_us: timestampUs,
     selected_ids: selectedIds,
   });
@@ -398,20 +398,20 @@ export async function findBufferOffsetForTimestamp(
 
 /**
  * Create a reader session for the shared buffer.
- * The buffer must have data loaded (via importCsvToBuffer).
+ * The buffer must have data loaded (via importCsvToCapture).
  *
  * @param sessionId - Unique session ID (e.g., "discovery", "decoder")
  * @param speed - Playback speed (0 = no limit, 1 = realtime)
  * @returns Reader capabilities
  */
-export async function createBufferReaderSession(
+export async function createCaptureSourceSession(
   sessionId: string,
-  bufferId: string,
+  captureId: string,
   speed?: number
 ): Promise<IOCapabilities> {
   return invoke("create_capture_source_session", {
     session_id: sessionId,
-    capture_id: bufferId,
+    capture_id: captureId,
     speed,
   });
 }
@@ -424,15 +424,15 @@ export async function createBufferReaderSession(
  * List all buffers in the registry.
  * Returns metadata for all buffers (frame and byte types).
  */
-export async function listBuffers(): Promise<BufferMetadata[]> {
+export async function listCaptures(): Promise<CaptureMetadata[]> {
   return invoke("list_captures");
 }
 
 /**
  * List all known buffer IDs (lightweight — no metadata).
- * Used to populate the known buffer ID set for `isBufferProfileId()` lookups.
+ * Used to populate the known buffer ID set for `isCaptureProfileId()` lookups.
  */
-export async function listBufferIds(): Promise<string[]> {
+export async function listCaptureIds(): Promise<string[]> {
   return invoke("list_capture_ids");
 }
 
@@ -441,74 +441,74 @@ export async function listBufferIds(): Promise<string[]> {
  * These are buffers available for standalone selection in the IO picker.
  * Includes CSV imports and buffers from destroyed sessions.
  */
-export async function listOrphanedBuffers(): Promise<BufferMetadata[]> {
+export async function listOrphanedCaptures(): Promise<CaptureMetadata[]> {
   return invoke("list_orphaned_captures");
 }
 
 /**
  * Delete a specific buffer by ID.
  *
- * @param bufferId - The buffer ID to delete
+ * @param captureId - The buffer ID to delete
  */
-export async function deleteBuffer(bufferId: string): Promise<void> {
-  await invoke("delete_capture", { capture_id: bufferId });
+export async function deleteCapture(captureId: string): Promise<void> {
+  await invoke("delete_capture", { capture_id: captureId });
   // Remove from known buffer ID cache
   const { useSessionStore } = await import("../stores/sessionStore");
-  useSessionStore.getState().removeKnownBufferId(bufferId);
+  useSessionStore.getState().removeKnownCaptureId(captureId);
 }
 
 /**
  * Clear a buffer's data without deleting the buffer itself.
  * The session keeps its reference and can continue writing new frames.
  *
- * @param bufferId - The buffer ID to clear
+ * @param captureId - The buffer ID to clear
  */
-export async function clearBufferData(bufferId: string): Promise<void> {
-  return invoke("clear_capture", { capture_id: bufferId });
+export async function clearCaptureData(captureId: string): Promise<void> {
+  return invoke("clear_capture", { capture_id: captureId });
 }
 
 /**
  * Rename a buffer.
  *
- * @param bufferId - The buffer ID to rename
+ * @param captureId - The buffer ID to rename
  * @param newName - The new display name
  * @returns Updated buffer metadata
  */
-export async function renameBuffer(bufferId: string, newName: string): Promise<BufferMetadata> {
-  return invoke("rename_capture", { capture_id: bufferId, new_name: newName });
+export async function renameCapture(captureId: string, newName: string): Promise<CaptureMetadata> {
+  return invoke("rename_capture", { capture_id: captureId, new_name: newName });
 }
 
 /**
  * Set a buffer's persistent (pinned) flag.
  * Persistent buffers survive app restart when 'clear buffers on start' is enabled.
  *
- * @param bufferId - The buffer ID
+ * @param captureId - The buffer ID
  * @param persistent - Whether the buffer should be persistent
  * @returns Updated buffer metadata
  */
-export async function setBufferPersistent(bufferId: string, persistent: boolean): Promise<BufferMetadata> {
-  return invoke("set_capture_persistent", { capture_id: bufferId, persistent });
+export async function setCapturePersistent(captureId: string, persistent: boolean): Promise<CaptureMetadata> {
+  return invoke("set_capture_persistent", { capture_id: captureId, persistent });
 }
 
 /**
  * Get metadata for a specific buffer by ID.
  *
- * @param bufferId - The buffer ID to look up
+ * @param captureId - The buffer ID to look up
  * @returns Buffer metadata, or null if not found
  */
-export async function getBufferMetadataById(bufferId: string): Promise<BufferMetadata | null> {
-  return invoke("get_capture_metadata_by_id", { capture_id: bufferId });
+export async function getCaptureMetadataById(captureId: string): Promise<CaptureMetadata | null> {
+  return invoke("get_capture_metadata_by_id", { capture_id: captureId });
 }
 
 /**
  * Get frames from a specific frame buffer by ID.
  * Throws if the buffer doesn't exist or is not a frame buffer.
  *
- * @param bufferId - The buffer ID
+ * @param captureId - The buffer ID
  * @returns Array of frames
  */
-export async function getBufferFramesById(bufferId: string): Promise<BufferFrame[]> {
-  return invoke("get_capture_frames_by_id", { capture_id: bufferId });
+export async function getCaptureFramesById(captureId: string): Promise<CaptureFrame[]> {
+  return invoke("get_capture_frames_by_id", { capture_id: captureId });
 }
 
 /**
@@ -525,21 +525,21 @@ export interface TimestampedByte {
  * Get raw bytes from a specific byte buffer by ID.
  * Throws if the buffer doesn't exist or is not a byte buffer.
  *
- * @param bufferId - The buffer ID
+ * @param captureId - The buffer ID
  * @returns Array of timestamped bytes
  */
-export async function getBufferBytesById(bufferId: string): Promise<TimestampedByte[]> {
-  return invoke("get_capture_bytes_by_id", { capture_id: bufferId });
+export async function getCaptureBytesById(captureId: string): Promise<TimestampedByte[]> {
+  return invoke("get_capture_bytes_by_id", { capture_id: captureId });
 }
 
 /**
  * Set a specific buffer as active (for legacy single-buffer compatibility).
- * The active buffer is used by functions like getBufferFrames() and getBufferMetadata().
+ * The active buffer is used by functions like getCaptureFrames() and getCaptureMetadata().
  *
- * @param bufferId - The buffer ID to set as active
+ * @param captureId - The buffer ID to set as active
  */
-export async function setActiveBuffer(bufferId: string): Promise<void> {
-  return invoke("set_active_capture", { capture_id: bufferId });
+export async function setActiveCapture(captureId: string): Promise<void> {
+  return invoke("set_active_capture", { capture_id: captureId });
 }
 
 /**
@@ -550,11 +550,11 @@ export async function setActiveBuffer(bufferId: string): Promise<void> {
  * @param frames - Array of frames to store
  * @returns Metadata of the created buffer
  */
-export async function createFrameBufferFromFrames(
+export async function createFrameCaptureFromFrames(
   sessionId: string,
   name: string,
-  frames: BufferFrame[]
-): Promise<BufferMetadata> {
+  frames: CaptureFrame[]
+): Promise<CaptureMetadata> {
   return invoke("create_frame_capture_from_frames", { session_id: sessionId, name, frames });
 }
 
@@ -579,34 +579,34 @@ export interface PaginatedBytesResponse {
  * @param offset - Starting index (0-based)
  * @param limit - Maximum number of bytes to return
  */
-export async function getBufferBytesPaginated(
-  bufferId: string,
+export async function getCaptureBytesPaginated(
+  captureId: string,
   offset: number,
   limit: number
 ): Promise<PaginatedBytesResponse> {
-  return invoke("get_capture_bytes_paginated", { capture_id: bufferId, offset, limit });
+  return invoke("get_capture_bytes_paginated", { capture_id: captureId, offset, limit });
 }
 
 /**
  * Get the total byte count from the active buffer.
  */
-export async function getBufferBytesCount(bufferId: string): Promise<number> {
-  return invoke("get_capture_bytes_count", { capture_id: bufferId });
+export async function getCaptureBytesCount(captureId: string): Promise<number> {
+  return invoke("get_capture_bytes_count", { capture_id: captureId });
 }
 
 /**
  * Get a page of bytes from a specific buffer by ID.
  *
- * @param bufferId - The buffer ID
+ * @param captureId - The buffer ID
  * @param offset - Starting index (0-based)
  * @param limit - Maximum number of bytes to return
  */
-export async function getBufferBytesPaginatedById(
-  bufferId: string,
+export async function getCaptureBytesPaginatedById(
+  captureId: string,
   offset: number,
   limit: number
 ): Promise<PaginatedBytesResponse> {
-  return invoke("get_capture_bytes_paginated_by_id", { capture_id: bufferId, offset, limit });
+  return invoke("get_capture_bytes_paginated_by_id", { capture_id: captureId, offset, limit });
 }
 
 // ============================================================================
@@ -685,7 +685,7 @@ export interface FramingResult {
  * @param reuseBufferId - Optional ID of existing framing buffer to reuse (avoids proliferation)
  * @returns Result with frame count and buffer ID (same as reuseBufferId if reused, or new ID)
  */
-export async function applyFramingToBuffer(
+export async function applyFramingToCapture(
   sessionId: string,
   config: BackendFramingConfig,
   reuseBufferId?: string | null
@@ -704,32 +704,32 @@ export async function applyFramingToBuffer(
  * @param targetTimeUs - Target timestamp in microseconds
  * @returns Offset of the first byte at or after the given timestamp
  */
-export async function findBufferBytesOffsetForTimestamp(
-  bufferId: string,
+export async function findCaptureBytesOffsetForTimestamp(
+  captureId: string,
   targetTimeUs: number
 ): Promise<number> {
-  return invoke("find_capture_bytes_offset_for_timestamp", { capture_id: bufferId, target_time_us: targetTimeUs });
+  return invoke("find_capture_bytes_offset_for_timestamp", { capture_id: captureId, target_time_us: targetTimeUs });
 }
 
 /**
  * Search a frame buffer for frames matching a query string.
  * Returns 0-based offsets in the selected-ID-filtered result set.
  *
- * @param bufferId - The buffer ID to search
+ * @param captureId - The buffer ID to search
  * @param query - Search string (whitespace already stripped by caller)
  * @param searchId - Whether to search the frame ID column
  * @param searchData - Whether to search the payload (data) column
  * @param selectedIds - Frame IDs to include (empty = all)
  */
-export async function searchBufferFrames(
-  bufferId: string,
+export async function searchCaptureFrames(
+  captureId: string,
   query: string,
   searchId: boolean,
   searchData: boolean,
   selectedIds: number[]
 ): Promise<number[]> {
   return invoke("search_capture_frames", {
-    capture_id: bufferId,
+    capture_id: captureId,
     query,
     search_id: searchId,
     search_data: searchData,

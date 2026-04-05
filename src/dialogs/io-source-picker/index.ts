@@ -1,6 +1,6 @@
 // ui/src/dialogs/io-source-picker/index.ts
 
-export { default as BufferList } from "./BufferList";
+export { default as CaptureList } from "./CaptureList";
 export { default as SourceList } from "./SourceList";
 export { default as LoadOptions } from "./LoadOptions";
 export { default as FramingOptions } from "./FramingOptions";

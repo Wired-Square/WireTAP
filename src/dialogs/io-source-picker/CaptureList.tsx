@@ -1,4 +1,4 @@
-// ui/src/dialogs/io-source-picker/BufferList.tsx
+// ui/src/dialogs/io-source-picker/CaptureList.tsx
 //
 // Shows buffers available for replay (from completed sessions or CSV imports).
 
@@ -8,19 +8,19 @@ import { iconMd, iconSm, iconXs } from "../../styles/spacing";
 import { badgeSmallInfo } from "../../styles/badgeStyles";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
-import type { BufferMetadata } from "../../api/buffer";
+import type { CaptureMetadata } from "../../api/capture";
 import { useSessionStore } from "../../stores/sessionStore";
 import DeviceBusConfig from "./DeviceBusConfig";
 import type { BusMapping } from "../../api/io";
 
 type Props = {
-  buffers: BufferMetadata[];
-  selectedBufferId: string | null;
+  buffers: CaptureMetadata[];
+  selectedCaptureId: string | null;
   checkedSourceId: string | null;
   /** Source IDs selected in multi-bus mode */
   checkedSourceIds?: string[];
-  onSelectBuffer: (bufferId: string) => void;
-  onDeleteBuffer: (bufferId: string) => void;
+  onSelectBuffer: (captureId: string) => void;
+  onDeleteBuffer: (captureId: string) => void;
   onClearAllBuffers: () => void;
   /** Called after a buffer is renamed so the parent can refresh */
   onBufferRenamed?: () => void;
@@ -38,9 +38,9 @@ type Props = {
   probeError?: string | null;
 };
 
-export default function BufferList({
+export default function CaptureList({
   buffers,
-  selectedBufferId,
+  selectedCaptureId,
   checkedSourceId,
   checkedSourceIds = [],
   onSelectBuffer,
@@ -66,7 +66,7 @@ export default function BufferList({
     }
   }, [renamingId]);
 
-  const startRename = (buffer: BufferMetadata) => {
+  const startRename = (buffer: CaptureMetadata) => {
     setRenamingId(buffer.id);
     setRenameValue(buffer.name);
   };
@@ -77,10 +77,10 @@ export default function BufferList({
       return;
     }
     try {
-      await useSessionStore.getState().renameSessionBuffer(renamingId, renameValue.trim());
+      await useSessionStore.getState().renameSessionCapture(renamingId, renameValue.trim());
       onBufferRenamed?.();
     } catch (e) {
-      console.error("[BufferList] Failed to rename buffer:", e);
+      console.error("[CaptureList] Failed to rename buffer:", e);
     }
     setRenamingId(null);
   };
@@ -89,13 +89,13 @@ export default function BufferList({
     setRenamingId(null);
   };
 
-  const togglePersistent = async (buffer: BufferMetadata, e: React.MouseEvent) => {
+  const togglePersistent = async (buffer: CaptureMetadata, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await useSessionStore.getState().setSessionBufferPersistent(buffer.id, !buffer.persistent);
+      await useSessionStore.getState().setSessionCapturePersistent(buffer.id, !buffer.persistent);
       onBufferPersistenceChanged?.();
     } catch (err) {
-      console.error("[BufferList] Failed to toggle persistence:", err);
+      console.error("[CaptureList] Failed to toggle persistence:", err);
     }
   };
 
@@ -124,7 +124,7 @@ export default function BufferList({
       </div>
       <div className="p-3 space-y-2">
         {buffers.map((buffer) => {
-          const isThisBufferSelected = selectedBufferId === buffer.id && !checkedSourceId && checkedSourceIds.length === 0;
+          const isThisBufferSelected = selectedCaptureId === buffer.id && !checkedSourceId && checkedSourceIds.length === 0;
           const isRenaming = renamingId === buffer.id;
           const sessionId = activeSessionBufferMap.get(buffer.id);
           const isInSession = sessionId !== undefined;
@@ -210,7 +210,7 @@ export default function BufferList({
                     ? "text-[color:var(--status-warning-text)]"
                     : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
                 }`}
-                title={buffer.persistent ? "Unpin buffer (will be cleared on restart)" : "Pin buffer (survives restart)"}
+                title={buffer.persistent ? "Unpin capture (will be cleared on restart)" : "Pin capture (survives restart)"}
               >
                 {buffer.persistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
               </button>
@@ -221,7 +221,7 @@ export default function BufferList({
                     onDeleteBuffer(buffer.id);
                   }}
                   className="p-1 rounded transition-colors hover:bg-[var(--status-danger-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--status-danger-text)]"
-                  title="Delete buffer"
+                  title="Delete capture"
                 >
                   <Trash2 className={iconSm} />
                 </button>

@@ -146,7 +146,7 @@ export default function AppTopBar({
             ioProfile={ioSession.ioProfile}
             ioProfiles={ioSession.ioProfiles}
             multiBusProfiles={ioSession.multiBusProfiles}
-            bufferMetadata={ioSession.bufferMetadata}
+            captureMetadata={ioSession.captureMetadata}
             defaultReadProfileId={ioSession.defaultReadProfileId}
             sessionId={ioSession.sessionId}
             ioState={ioSession.ioState}
@@ -164,8 +164,8 @@ export default function AppTopBar({
             onLeave={ioSession.onLeave}
             onOpenBookmarkPicker={ioSession.onOpenBookmarkPicker}
             hideSessionControls={ioSession.hideSessionControls}
-            isBufferMode={ioSession.isBufferMode}
-            bufferPersistent={ioSession.bufferPersistent}
+            isCaptureMode={ioSession.isCaptureMode}
+            capturePersistent={ioSession.capturePersistent}
             onToggleBufferPin={ioSession.onToggleBufferPin}
             onRenameBuffer={ioSession.onRenameBuffer}
             onClearBuffer={ioSession.onClearBuffer}

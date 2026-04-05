@@ -61,7 +61,7 @@ type Props = {
   allowMultiSelect?: boolean;
   /** Profile usage info - which sessions are using each profile */
   profileUsage?: Map<string, ProfileUsageInfo>;
-  /** Content to render after the Active Sessions section (e.g., BufferList) */
+  /** Content to render after the Active Sessions section (e.g., CaptureList) */
   renderAfterSessions?: ReactNode;
   /** Map of buffer ID to display name (for resolving buffer source names in active sessions) */
   bufferNames?: Map<string, string>;
@@ -130,21 +130,21 @@ export default function SourceList({
     let icon: ReactNode = null;
 
     // Session type detection for styling
-    const isBufferSession = checkedMultiSourceSession?.deviceType === "buffer";
+    const isCaptureSession = checkedMultiSourceSession?.deviceType === "buffer";
     const isMultiSource = checkedMultiSourceSession?.deviceType === "multi_source";
 
     if (isCsvSelected) {
       displayName = "CSV, CAN Dump";
       subtitle = "Import from file";
-    } else if (isBufferSession && checkedMultiSourceSession) {
+    } else if (isCaptureSession && checkedMultiSourceSession) {
       // Buffer session — show buffer ID + source name from buffer metadata
       displayName = checkedMultiSourceSession.sessionId;
       const storageBackend = getBufferStorageLabel(checkedMultiSourceSession.deviceType);
-      // Resolve buffer name from metadata (e.g., "f_bc38de") via bufferId or sourceProfileIds
-      const bufferId = checkedMultiSourceSession.bufferId
+      // Resolve buffer name from metadata (e.g., "f_bc38de") via captureId or sourceProfileIds
+      const captureId = checkedMultiSourceSession.captureId
         ?? (checkedMultiSourceSession.sourceProfileIds ?? [])[0];
-      const bufferName = bufferId ? bufferNames?.get(bufferId) : undefined;
-      const profileName = bufferName || storageBackend;
+      const captureName = captureId ? bufferNames?.get(captureId) : undefined;
+      const profileName = captureName || storageBackend;
       subtitle = `└─ ${profileName} (${storageBackend})`;
       icon = <Database className={`${iconMd} text-[color:var(--text-cyan)]`} />;
     } else if (isMultiSource && checkedMultiSourceSession) {
@@ -184,28 +184,28 @@ export default function SourceList({
     // Styling: purple for multi-source, cyan for buffer, green for recorded, blue for profiles
     const bgClass = isMultiSource
       ? "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)]"
-      : isBufferSession
+      : isCaptureSession
       ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
       : checkedMultiSourceSession
       ? "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)]"
       : "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]";
     const indicatorClass = isMultiSource
       ? "border-[color:var(--text-purple)]"
-      : isBufferSession
+      : isCaptureSession
       ? "border-[color:var(--text-cyan)]"
       : checkedMultiSourceSession
       ? "border-[color:var(--text-green)]"
       : "border-[color:var(--status-info-text)]";
     const dotClass = isMultiSource
       ? "bg-[var(--text-purple)]"
-      : isBufferSession
+      : isCaptureSession
       ? "bg-[var(--text-cyan)]"
       : checkedMultiSourceSession
       ? "bg-[var(--text-green)]"
       : "bg-[var(--status-info-text)]";
     const changeClass = isMultiSource
       ? "text-[color:var(--text-purple)]"
-      : isBufferSession
+      : isCaptureSession
       ? "text-[color:var(--text-cyan)]"
       : checkedMultiSourceSession
       ? "text-[color:var(--text-green)]"
@@ -283,10 +283,10 @@ export default function SourceList({
     } else if (isBuffer) {
       // Buffer session — cyan database icon, resolve name from buffer metadata
       const storageBackend = getBufferStorageLabel(session.deviceType);
-      const bufferId = session.bufferId
+      const captureId = session.captureId
         ?? (session.sourceProfileIds ?? [])[0];
-      const bufferName = bufferId ? bufferNames?.get(bufferId) : undefined;
-      const profileName = bufferName || storageBackend;
+      const captureName = captureId ? bufferNames?.get(captureId) : undefined;
+      const profileName = captureName || storageBackend;
       return {
         displayName,
         subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
@@ -372,11 +372,11 @@ export default function SourceList({
                       )}
                       <span>{info.subtitle}</span>
                       {/* Show buffer info if available */}
-                      {session.bufferId && (
+                      {session.captureId && (
                         <>
                           <span className="text-[color:var(--text-muted)]">·</span>
                           <span className="text-[color:var(--text-cyan)]">
-                            {session.bufferFrameCount?.toLocaleString() ?? "?"} frames
+                            {session.captureFrameCount?.toLocaleString() ?? "?"} frames
                           </span>
                         </>
                       )}
@@ -395,7 +395,7 @@ export default function SourceList({
         </div>
       )}
 
-      {/* Slot for BufferList (rendered between Active Sessions and source lists) */}
+      {/* Slot for CaptureList (rendered between Active Sessions and source lists) */}
       {renderAfterSessions}
 
       {/* External Sources */}

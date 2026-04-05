@@ -16,7 +16,7 @@ import {
 import Dialog from "../components/Dialog";
 import ContextMenu, { type ContextMenuItem } from "../components/ContextMenu";
 import { DialogFooter } from "../components/forms/DialogFooter";
-import { previewCsv } from "../api/buffer";
+import { previewCsv } from "../api/capture";
 import {
   h3,
   cardElevated,

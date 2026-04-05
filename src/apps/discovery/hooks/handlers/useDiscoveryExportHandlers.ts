@@ -5,7 +5,7 @@
 import { useCallback } from "react";
 import type { FrameMessage } from "../../../../stores/discoveryStore";
 import type { ExportFormat, ExportDataMode } from "../../../../dialogs/ExportFramesDialog";
-import type { TimestampedByte } from "../../../../api/buffer";
+import type { TimestampedByte } from "../../../../api/capture";
 import { useSessionStore } from "../../../../stores/sessionStore";
 import { withAppError } from "../../../../utils/appError";
 
@@ -13,7 +13,7 @@ export interface UseDiscoveryExportHandlersParams {
   // State
   frames: FrameMessage[];
   framedData: FrameMessage[];
-  framedBufferId: string | null;
+  framedCaptureId: string | null;
   backendByteCount: number;
   backendFrameCount: number;
   serialBytesBufferLength: number;
@@ -30,9 +30,9 @@ export interface UseDiscoveryExportHandlersParams {
   saveFrames: (decoderDir: string, format: 'hex' | 'decimal') => Promise<void>;
 
   // API functions
-  getBufferBytesPaginated: (offset: number, limit: number) => Promise<{ bytes: TimestampedByte[] }>;
-  getBufferFramesPaginated: (offset: number, limit: number) => Promise<{ frames: any[] }>;
-  getBufferFramesPaginatedById: (id: string, offset: number, limit: number) => Promise<{ frames: any[] }>;
+  getCaptureBytesPaginated: (offset: number, limit: number) => Promise<{ bytes: TimestampedByte[] }>;
+  getCaptureFramesPaginated: (offset: number, limit: number) => Promise<{ frames: any[] }>;
+  getCaptureFramesPaginatedById: (id: string, offset: number, limit: number) => Promise<{ frames: any[] }>;
   pickFileToSave: (options: any) => Promise<string | null>;
   saveCatalog: (path: string, content: string) => Promise<void>;
 
@@ -43,7 +43,7 @@ export interface UseDiscoveryExportHandlersParams {
 export function useDiscoveryExportHandlers({
   frames,
   framedData,
-  framedBufferId,
+  framedCaptureId,
   backendByteCount,
   backendFrameCount,
   serialBytesBufferLength: _serialBytesBufferLength,
@@ -56,9 +56,9 @@ export function useDiscoveryExportHandlers({
   dumpDir,
   openSaveDialog,
   saveFrames,
-  getBufferBytesPaginated,
-  getBufferFramesPaginated,
-  getBufferFramesPaginatedById,
+  getCaptureBytesPaginated,
+  getCaptureFramesPaginated,
+  getCaptureFramesPaginatedById,
   pickFileToSave,
   saveCatalog,
   closeExportDialog,
@@ -85,7 +85,7 @@ export function useDiscoveryExportHandlers({
         let bytesToExport: { byte: number; timestampUs: number }[];
 
         if (backendByteCount > 0) {
-          const response = await getBufferBytesPaginated(0, backendByteCount);
+          const response = await getCaptureBytesPaginated(0, backendByteCount);
           bytesToExport = response.bytes.map((b: TimestampedByte) => ({
             byte: b.byte,
             timestampUs: b.timestamp_us,
@@ -102,10 +102,10 @@ export function useDiscoveryExportHandlers({
         let framesToExport: FrameMessage[];
 
         if (bufferModeEnabled) {
-          const response = await getBufferFramesPaginated(0, bufferModeTotalFrames);
+          const response = await getCaptureFramesPaginated(0, bufferModeTotalFrames);
           framesToExport = response.frames as FrameMessage[];
-        } else if (isSerialMode && framedBufferId && backendFrameCount > 0) {
-          const response = await getBufferFramesPaginatedById(framedBufferId, 0, backendFrameCount);
+        } else if (isSerialMode && framedCaptureId && backendFrameCount > 0) {
+          const response = await getCaptureFramesPaginatedById(framedCaptureId, 0, backendFrameCount);
           framesToExport = response.frames as FrameMessage[];
         } else if (isSerialMode && framedData.length > 0) {
           framesToExport = framedData;
@@ -145,13 +145,13 @@ export function useDiscoveryExportHandlers({
     bufferModeEnabled,
     bufferModeTotalFrames,
     isSerialMode,
-    framedBufferId,
+    framedCaptureId,
     backendFrameCount,
     framedData,
     frames,
-    getBufferBytesPaginated,
-    getBufferFramesPaginated,
-    getBufferFramesPaginatedById,
+    getCaptureBytesPaginated,
+    getCaptureFramesPaginated,
+    getCaptureFramesPaginatedById,
     pickFileToSave,
     saveCatalog,
     closeExportDialog,

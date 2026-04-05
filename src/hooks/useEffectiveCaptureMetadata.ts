@@ -4,19 +4,19 @@
 // Ensures apps in the same session see the same timeline range.
 
 import { useMemo } from "react";
-import type { BufferMetadata } from "../api/buffer";
+import type { CaptureMetadata } from "../api/capture";
 
 interface SessionBufferInfo {
   /** Buffer start time from session (microseconds) */
-  bufferStartTimeUs: number | null;
+  captureStartTimeUs: number | null;
   /** Buffer end time from session (microseconds) */
-  bufferEndTimeUs: number | null;
+  captureEndTimeUs: number | null;
   /** Buffer frame/byte count from session */
-  bufferCount: number;
+  captureCount: number;
   /** Buffer display name from session (takes priority over local metadata) */
-  bufferName?: string | null;
+  captureName?: string | null;
   /** Buffer persistent flag from session (takes priority over local metadata) */
-  bufferPersistent?: boolean;
+  capturePersistent?: boolean;
 }
 
 /**
@@ -26,16 +26,16 @@ interface SessionBufferInfo {
  * Local metadata provides additional fields like `id` and `buffer_type`.
  *
  * @param sessionBuffer - Buffer info from useIOSession/useIOSessionManager
- * @param localMetadata - Local BufferMetadata (e.g., from getBufferMetadata())
- * @returns Merged BufferMetadata or null if no data available
+ * @param localMetadata - Local CaptureMetadata (e.g., from getCaptureMetadata())
+ * @returns Merged CaptureMetadata or null if no data available
  */
 export function useEffectiveBufferMetadata(
   sessionBuffer: SessionBufferInfo,
-  localMetadata: BufferMetadata | null
-): BufferMetadata | null {
+  localMetadata: CaptureMetadata | null
+): CaptureMetadata | null {
   return useMemo(() => {
     // Return null if we have neither session nor local data
-    if (!localMetadata && !sessionBuffer.bufferStartTimeUs) {
+    if (!localMetadata && !sessionBuffer.captureStartTimeUs) {
       return null;
     }
 
@@ -50,23 +50,23 @@ export function useEffectiveBufferMetadata(
     return {
       id,
       kind: localMetadata?.kind ?? "frames",
-      name: sessionBuffer.bufferName ?? localMetadata?.name ?? "",
+      name: sessionBuffer.captureName ?? localMetadata?.name ?? "",
       // Prefer session values for cross-app timeline sync
-      start_time_us: sessionBuffer.bufferStartTimeUs ?? localMetadata?.start_time_us,
-      end_time_us: sessionBuffer.bufferEndTimeUs ?? localMetadata?.end_time_us,
-      count: sessionBuffer.bufferCount || localMetadata?.count || 0,
+      start_time_us: sessionBuffer.captureStartTimeUs ?? localMetadata?.start_time_us,
+      end_time_us: sessionBuffer.captureEndTimeUs ?? localMetadata?.end_time_us,
+      count: sessionBuffer.captureCount || localMetadata?.count || 0,
       created_at: localMetadata?.created_at ?? 0,
       is_streaming: localMetadata?.is_streaming ?? false,
       owning_session_id: localMetadata?.owning_session_id ?? null,
-      persistent: sessionBuffer.bufferPersistent ?? localMetadata?.persistent ?? false,
+      persistent: sessionBuffer.capturePersistent ?? localMetadata?.persistent ?? false,
       buses: localMetadata?.buses ?? [],
-    } as BufferMetadata;
+    } as CaptureMetadata;
   }, [
-    sessionBuffer.bufferStartTimeUs,
-    sessionBuffer.bufferEndTimeUs,
-    sessionBuffer.bufferCount,
-    sessionBuffer.bufferName,
-    sessionBuffer.bufferPersistent,
+    sessionBuffer.captureStartTimeUs,
+    sessionBuffer.captureEndTimeUs,
+    sessionBuffer.captureCount,
+    sessionBuffer.captureName,
+    sessionBuffer.capturePersistent,
     localMetadata,
   ]);
 }

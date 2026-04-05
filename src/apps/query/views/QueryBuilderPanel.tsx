@@ -15,7 +15,7 @@ import {
 import type { ResolvedSignal } from "../../../utils/catalogParser";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
-import type { BufferMetadata } from "../../../api/buffer";
+import type { CaptureMetadata } from "../../../api/capture";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
 import { primaryButtonBase, buttonBase } from "../../../styles/buttonStyles";
 import { inputBase } from "../../../styles/inputStyles";
@@ -25,18 +25,18 @@ import { bgSurface, borderDefault, textSecondary, textMuted } from "../../../sty
 
 interface Props {
   profileId: string | null;
-  bufferId?: string | null;
+  captureId?: string | null;
   disabled?: boolean;
   favourites: TimeRangeFavorite[];
   timeBounds: TimeBounds;
   onTimeBoundsChange: (bounds: TimeBounds) => void;
-  buffers?: BufferMetadata[];
-  onSelectBuffer?: (bufferId: string | null) => void;
+  buffers?: CaptureMetadata[];
+  onSelectBuffer?: (captureId: string | null) => void;
 }
 
 export default function QueryBuilderPanel({
   profileId,
-  bufferId,
+  captureId,
   disabled = false,
   favourites,
   timeBounds,
@@ -198,12 +198,12 @@ export default function QueryBuilderPanel({
 
   // Add to queue handler
   const handleAddToQueue = useCallback(() => {
-    if (bufferId) {
-      enqueueQuery(bufferId, "buffer", timeBounds, limitOverride);
+    if (captureId) {
+      enqueueQuery(captureId, "buffer", timeBounds, limitOverride);
     } else if (profileId) {
       enqueueQuery(profileId, "postgres", timeBounds, limitOverride);
     }
-  }, [profileId, bufferId, timeBounds, limitOverride, enqueueQuery]);
+  }, [profileId, captureId, timeBounds, limitOverride, enqueueQuery]);
 
   // Handle query type change
   const handleQueryTypeChange = useCallback(
@@ -412,7 +412,7 @@ export default function QueryBuilderPanel({
   );
 
   // Whether we're targeting a buffer (SQLite) vs PostgreSQL
-  const isBufferSource = !!bufferId;
+  const isBufferSource = !!captureId;
 
   // Generate SQL query preview
   const sqlPreview = useMemo(() => {
@@ -696,15 +696,15 @@ LIMIT ${limitOverride.toLocaleString()}
         {/* Buffer Source Selector (shown when buffers are available) */}
         {buffers.length > 0 && (
           <div>
-            <label className={labelSmallMuted}>Buffer Source</label>
+            <label className={labelSmallMuted}>Capture Source</label>
             <div className={`${flexRowGap2} mt-1`}>
               <HardDrive className={`${iconSm} ${textSecondary} flex-shrink-0`} />
               <select
-                value={bufferId ?? ""}
+                value={captureId ?? ""}
                 onChange={(e) => onSelectBuffer?.(e.target.value || null)}
                 className={`${inputBase} flex-1`}
               >
-                <option value="">{profileId ? "Using PostgreSQL profile" : "— Select buffer —"}</option>
+                <option value="">{profileId ? "Using PostgreSQL profile" : "— Select capture —"}</option>
                 {buffers.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name} ({b.count.toLocaleString()} frames)

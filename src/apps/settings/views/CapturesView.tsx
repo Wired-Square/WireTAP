@@ -1,11 +1,11 @@
-// ui/src/apps/settings/views/BuffersView.tsx
+// ui/src/apps/settings/views/CapturesView.tsx
 
 import Input from "../../../components/forms/Input";
 import Select from "../../../components/forms/Select";
 import { labelDefault, helpText } from "../../../styles";
 import { textPrimary } from "../../../styles/colourTokens";
 
-type BuffersViewProps = {
+type CapturesViewProps = {
   clearBuffersOnStart: boolean;
   onChangeClearBuffersOnStart: (value: boolean) => void;
   bufferStorage: string;
@@ -28,7 +28,7 @@ type BuffersViewProps = {
   onChangeTransmitMaxHistory: (value: number) => void;
 };
 
-export default function BuffersView({
+export default function CapturesView({
   clearBuffersOnStart,
   onChangeClearBuffersOnStart,
   bufferStorage,
@@ -49,19 +49,19 @@ export default function BuffersView({
   onChangeDecoderMaxDecodedPerSource,
   transmitMaxHistory,
   onChangeTransmitMaxHistory,
-}: BuffersViewProps) {
+}: CapturesViewProps) {
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Buffers</h2>
+      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Captures</h2>
 
       {/* Storage Section */}
       <div className="space-y-4">
         <h3 className={`text-lg font-medium ${textPrimary}`}>Storage</h3>
 
         <div className="space-y-2">
-          <label className={labelDefault}>Buffer Storage</label>
+          <label className={labelDefault}>Capture Storage</label>
           <p className={helpText}>
-            Storage backend for captured frame data and imported buffers.
+            Storage backend for captured frame data and imported captures.
           </p>
           <Select
             value={bufferStorage}
@@ -80,11 +80,11 @@ export default function BuffersView({
           />
           <div>
             <span className={labelDefault}>
-              Clear buffers on start
+              Clear captures on start
             </span>
             <p className={helpText}>
               Delete all captured frame and byte data when the app launches.
-              Disable to preserve buffer data across sessions (uses disk space).
+              Disable to preserve capture data across sessions (uses disk space).
             </p>
           </div>
         </label>

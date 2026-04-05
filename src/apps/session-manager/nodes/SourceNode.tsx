@@ -16,13 +16,13 @@ export interface SourceNodeData {
   /** Device bus numbers with disabled mappings (shown as muted handles) */
   disabledBuses?: number[];
   /** Buffer display name (when source is a buffer) */
-  bufferName?: string;
+  captureName?: string;
   /** Whether this buffer is pinned (persistent across restarts) */
   isPersistent?: boolean;
   /** Number of items in the buffer */
-  bufferCount?: number;
+  captureCount?: number;
   /** Buffer data type ("frames" or "bytes") */
-  bufferType?: string;
+  captureKind?: string;
 }
 
 interface SourceNodeProps {
@@ -31,7 +31,7 @@ interface SourceNodeProps {
 }
 
 function SourceNode({ data, selected }: SourceNodeProps) {
-  const { profileName, deviceType, isRealtime, isActive, outputBuses, disabledBuses, bufferName, isPersistent, bufferCount, bufferType } = data;
+  const { profileName, deviceType, isRealtime, isActive, outputBuses, disabledBuses, captureName, isPersistent, captureCount, captureKind } = data;
   // Merge enabled + disabled buses for handle layout (disabled shown as muted)
   const allBuses = [
     ...(outputBuses ?? []).map((b) => ({ bus: b, enabled: true })),
@@ -60,7 +60,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
       <div className="flex items-center gap-2 mb-1">
         <Icon className={`${iconSm} ${iconColour}`} />
         <span className="font-medium text-sm text-[color:var(--text-primary)] truncate">
-          {bufferName || profileName}
+          {captureName || profileName}
         </span>
         {isPersistent && (
           <Pin className={`${iconXs} text-amber-400 flex-shrink-0`} />
@@ -74,9 +74,9 @@ function SourceNode({ data, selected }: SourceNodeProps) {
           <Radio className="w-3 h-3 text-purple-500 animate-pulse" />
         )}
       </div>
-      {bufferCount != null && (
+      {captureCount != null && (
         <div className="text-[10px] text-[color:var(--text-muted)] mt-0.5">
-          {bufferCount.toLocaleString()} {bufferType ?? "frames"}
+          {captureCount.toLocaleString()} {captureKind ?? "frames"}
         </div>
       )}
 

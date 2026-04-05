@@ -78,7 +78,7 @@ export function useIOSourcePickerHandlers({
   const {
     ioProfile,
     isStreaming,
-    isBufferMode,
+    isCaptureMode,
     watchFrameCount,
     isLoading,
     loadProfileId,
@@ -188,8 +188,8 @@ export function useIOSourcePickerHandlers({
     // Note: Uses isStreaming (session is running) rather than isWatching (app initiated watch)
     // so the dialog correctly shows streaming state even when joined to another app's session.
     // Buffer sessions are excluded — buffer playback is not loading.
-    isLoading: isLoading || (isStreaming && !isBufferMode),
-    loadProfileId: isLoading ? loadProfileId : (isStreaming && !isBufferMode ? ioProfile : null),
+    isLoading: isLoading || (isStreaming && !isCaptureMode),
+    loadProfileId: isLoading ? loadProfileId : (isStreaming && !isCaptureMode ? ioProfile : null),
     loadFrameCount: isLoading ? loadFrameCount : watchFrameCount,
     loadError: loadError ?? null,
     // Handlers

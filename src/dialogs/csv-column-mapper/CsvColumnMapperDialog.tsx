@@ -18,9 +18,9 @@ import {
   type CsvColumnRole,
   type TimestampUnit,
   type Delimiter,
-  type BufferMetadata,
+  type CaptureMetadata,
   type CsvImportResult,
-} from "../../api/buffer";
+} from "../../api/capture";
 import {
   h3,
   cardElevated,
@@ -80,7 +80,7 @@ export type CsvColumnMapperDialogProps = {
   sessionId: string;
   onCancel: () => void;
   /** Called when import succeeds — returns the buffer metadata */
-  onImportComplete: (metadata: BufferMetadata) => void;
+  onImportComplete: (metadata: CaptureMetadata) => void;
 };
 
 export default function CsvColumnMapperDialog({

@@ -26,7 +26,7 @@ import {
 } from '../../../utils/graphLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "buffers" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
+export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
 // Buffer setting defaults — single source of truth, referenced by settingsStore and useSettings

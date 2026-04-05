@@ -24,7 +24,7 @@ import DisplayView from "./views/DisplayView";
 import CatalogsView from "./views/CatalogsView";
 import DataIOView from "./views/DataIOView";
 import GeneralView from "./views/GeneralView";
-import BuffersView from "./views/BuffersView";
+import CapturesView from "./views/CapturesView";
 import BookmarksView from "./views/BookmarksView";
 import SelectionSetsView from "./views/SelectionSetsView";
 import GraphLayoutsView from "./views/GraphLayoutsView";
@@ -246,7 +246,7 @@ export default function Settings() {
   // Sidebar items (Storage hidden on iOS due to sandboxing restrictions)
   const sidebarItems: SideBarItem[] = [
     { id: "bookmarks", label: "Bookmarks", icon: Bookmark },
-    { id: "buffers", label: "Buffers", icon: Database },
+    { id: "captures", label: "Captures", icon: Database },
     { id: "catalogs", label: "Catalogs", icon: BookOpen },
     { id: "data-io", label: "Data IO", icon: Cable },
     { id: "display", label: "Display", icon: Monitor },
@@ -341,8 +341,8 @@ export default function Settings() {
             />
           )}
 
-          {currentSection === "buffers" && (
-            <BuffersView
+          {currentSection === "captures" && (
+            <CapturesView
               clearBuffersOnStart={clearBuffersOnStart}
               onChangeClearBuffersOnStart={setClearBuffersOnStart}
               bufferStorage={bufferStorage}

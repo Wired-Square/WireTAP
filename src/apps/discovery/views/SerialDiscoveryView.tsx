@@ -54,7 +54,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
   const clearSourceMapping = useDiscoverySerialStore((s) => s.clearSourceMapping);
   const setRawBytesViewConfig = useDiscoverySerialStore((s) => s.setRawBytesViewConfig);
   const backendByteCount = useDiscoverySerialStore((s) => s.backendByteCount);
-  const framedBufferId = useDiscoverySerialStore((s) => s.framedBufferId);
+  const framedCaptureId = useDiscoverySerialStore((s) => s.framedCaptureId);
   const backendFrameCount = useDiscoverySerialStore((s) => s.backendFrameCount);
   const minFrameLength = useDiscoverySerialStore((s) => s.minFrameLength);
   const setMinFrameLength = useDiscoverySerialStore((s) => s.setMinFrameLength);
@@ -152,10 +152,10 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
   // Auto-switch to framed tab when frames are first generated (only once)
   // Check multiple sources:
   // - framedData.length > 0: client-side framing produced frames
-  // - framedBufferId !== null: client-side framing created a backend buffer
+  // - framedCaptureId !== null: client-side framing created a backend buffer
   // - backendFrameCount > 0: real-time backend framing is producing frames
   useEffect(() => {
-    const hasFrames = framedData.length > 0 || framedBufferId !== null || backendFrameCount > 0;
+    const hasFrames = framedData.length > 0 || framedCaptureId !== null || backendFrameCount > 0;
     if (hasFrames && !hasAutoSwitchedRef.current) {
       hasAutoSwitchedRef.current = true;
       setActiveTab('framed');
@@ -164,7 +164,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
     if (!hasFrames) {
       hasAutoSwitchedRef.current = false;
     }
-  }, [framedData.length, framedBufferId, backendFrameCount, setActiveTab]);
+  }, [framedData.length, framedCaptureId, backendFrameCount, setActiveTab]);
 
   // Switch to framed tab when framing is accepted (Raw Bytes tab will be hidden)
   useEffect(() => {
@@ -216,7 +216,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
         frameCount={
           isStreaming && framedData.length === 0
             ? filteredStreamingFrames.length
-            : (framedBufferId ? backendFrameCount : (backendFrameCount > 0 ? backendFrameCount : completeFrames.length))
+            : (framedCaptureId ? backendFrameCount : (backendFrameCount > 0 ? backendFrameCount : completeFrames.length))
         }
         byteCount={backendByteCount > 0 ? backendByteCount : serialBytesBuffer.length}
         filteredCount={effectiveFilteredCount}

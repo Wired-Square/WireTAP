@@ -2,7 +2,7 @@
 
 import { Search, ChevronRight, Save, Info, Wrench, Download, Undo2 } from "lucide-react";
 import type { IOProfile } from "../../../types/common";
-import type { BufferMetadata } from "../../../api/buffer";
+import type { CaptureMetadata } from "../../../api/capture";
 import AppTopBar from "../../../components/AppTopBar";
 import { buttonBase, iconButtonBase } from "../../../styles/buttonStyles";
 import { iconMd, iconSm } from "../../../styles/spacing";
@@ -13,7 +13,7 @@ type Props = {
   ioProfile: string | null;
   onIoProfileChange: (id: string | null) => void;
   defaultReadProfileId?: string | null;
-  bufferMetadata?: BufferMetadata | null;
+  captureMetadata?: CaptureMetadata | null;
   /** Current session ID (e.g., "f_abc123") */
   sessionId?: string | null;
   isStreaming: boolean;
@@ -69,9 +69,9 @@ type Props = {
 
   // Buffer actions
   /** Whether the session is in buffer replay mode */
-  isBufferMode?: boolean;
+  isCaptureMode?: boolean;
   /** Whether the current buffer is persistent (pinned) */
-  bufferPersistent?: boolean;
+  capturePersistent?: boolean;
   /** Called when user toggles buffer pin */
   onToggleBufferPin?: () => void;
   /** Called when user renames the buffer */
@@ -95,7 +95,7 @@ export default function DiscoveryTopBar({
   ioProfiles,
   ioProfile,
   defaultReadProfileId,
-  bufferMetadata,
+  captureMetadata,
   sessionId,
   isStreaming,
   multiBusProfiles = [],
@@ -116,8 +116,8 @@ export default function DiscoveryTopBar({
   serialActiveTab = 'raw',
   onUndoFraming,
   isModbusProfile = false,
-  isBufferMode = false,
-  bufferPersistent = false,
+  isCaptureMode = false,
+  capturePersistent = false,
   onToggleBufferPin,
   onRenameBuffer,
   onClearBuffer,
@@ -144,7 +144,7 @@ export default function DiscoveryTopBar({
         ioProfile,
         ioProfiles,
         multiBusProfiles,
-        bufferMetadata,
+        captureMetadata,
         defaultReadProfileId,
         sessionId,
         ioState,
@@ -157,12 +157,12 @@ export default function DiscoveryTopBar({
         isStreaming,
         isStopped, // Show Resume in both realtime and buffer mode (to return to live)
         supportsTimeRange,
-        onStop: !isBufferMode ? onStopWatch : undefined, // Hide Stop only in buffer mode
+        onStop: !isCaptureMode ? onStopWatch : undefined, // Hide Stop only in buffer mode
         onResume, // Always show Resume when stopped (resumeFresh handles live return)
         onLeave,
         onOpenBookmarkPicker,
-        isBufferMode,
-        bufferPersistent,
+        isCaptureMode,
+        capturePersistent,
         onToggleBufferPin,
         onRenameBuffer,
         onClearBuffer,

@@ -31,11 +31,11 @@ export interface SessionGraphData {
 }
 
 /** Buffer metadata for source node display */
-export interface BufferInfo {
+export interface CaptureInfo {
   name: string;
   persistent: boolean;
   count: number;
-  bufferType: string;
+  captureKind: string;
 }
 
 /**
@@ -46,7 +46,7 @@ export interface BufferInfo {
 export function buildSessionGraph(
   sessions: ActiveSessionInfo[],
   profiles: IOProfile[],
-  bufferInfoMap?: Map<string, BufferInfo>,
+  bufferInfoMap?: Map<string, CaptureInfo>,
   openPanelIds?: string[],
   listenerIds?: Record<string, string>,
 ): SessionGraphData {
@@ -130,22 +130,22 @@ export function buildSessionGraph(
   const bufferSourceIds = [...activeProfileIds].filter(
     (id) => !profileIdSet.has(id)
   );
-  bufferSourceIds.forEach((bufferId, i) => {
+  bufferSourceIds.forEach((captureId, i) => {
     const index = activeProfiles.length + i;
-    const info = bufferInfoMap?.get(bufferId);
+    const info = bufferInfoMap?.get(captureId);
     const nodeData: SourceNodeData = {
-      profileId: bufferId,
-      profileName: info?.name ?? bufferId,
+      profileId: captureId,
+      profileName: info?.name ?? captureId,
       deviceType: "sqlite",
       isRealtime: false,
       isActive: true,
-      bufferName: info?.name,
+      captureName: info?.name,
       isPersistent: info?.persistent,
-      bufferCount: info?.count,
-      bufferType: info?.bufferType,
+      captureCount: info?.count,
+      captureKind: info?.captureKind,
     };
     nodes.push({
-      id: `source-${bufferId}`,
+      id: `source-${captureId}`,
       type: "source",
       position: { x: START_X, y: START_Y + index * ROW_SPACING },
       data: nodeData,

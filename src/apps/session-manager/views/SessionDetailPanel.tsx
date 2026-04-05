@@ -271,13 +271,13 @@ function SessionDetails({
       <SessionDecoderPicker session={session} />
 
       {/* Buffer Info */}
-      {session.bufferId && (
+      {session.captureId && (
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
             Buffer
           </label>
           <p className="text-sm text-[color:var(--text-primary)]">
-            {session.bufferFrameCount?.toLocaleString() ?? 0} frames
+            {session.captureFrameCount?.toLocaleString() ?? 0} frames
           </p>
         </div>
       )}

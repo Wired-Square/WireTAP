@@ -7,7 +7,7 @@ import { TOOL_TAB_CONFIG } from "../../../stores/discoveryStore";
 import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../../stores/discoveryFrameStore";
 import { useDiscoveryUIStore } from "../../../stores/discoveryUIStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
-import { type BufferMetadata, searchBufferFrames } from "../../../api/buffer";
+import { type CaptureMetadata, searchCaptureFrames } from "../../../api/capture";
 import { FrameDataTable, type TabDefinition, FRAME_PAGE_SIZE_OPTIONS } from "../components";
 import DiscoveryFindBar, { type FindSearchMode } from "../components/DiscoveryFindBar";
 import AppTabView from "../../../components/AppTabView";
@@ -23,7 +23,7 @@ import type { FrameMessage } from "../../../types/frame";
 import { keyOf, parseFrameKey } from "../../../utils/frameKey";
 import type { IOCapabilities } from "../../../api/io";
 import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
-import { useBufferFrameView } from "../hooks/useBufferFrameView";
+import { useBufferFrameView } from "../hooks/useCaptureFrameView";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import { bytesToHex } from "../../../utils/byteUtils";
 import { formatFrameId } from "../../../utils/frameIds";
@@ -39,10 +39,10 @@ import ReplayDialog from "../../../dialogs/ReplayDialog";
 const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 60];
 
 type Props = {
-  /** @deprecated Use bufferId prop instead for buffer-first mode */
+  /** @deprecated Use captureId prop instead for buffer-first mode */
   frames?: FrameMessage[];
   /** Buffer ID for buffer-first mode (recommended) */
-  bufferId?: string | null;
+  captureId?: string | null;
   protocol: string;
   displayFrameIdFormat: "hex" | "decimal";
   displayTimeFormat: "delta-last" | "delta-start" | "timestamp" | "human";
@@ -73,7 +73,7 @@ type Props = {
   onScrub?: (timeUs: number) => void;
 
   // Buffer metadata (for timeline in buffer mode)
-  bufferMetadata?: BufferMetadata | null;
+  captureMetadata?: CaptureMetadata | null;
 
   // Whether the data source is recorded (e.g., PostgreSQL, CSV) vs live
   isRecorded?: boolean;
@@ -109,7 +109,7 @@ type Props = {
 
 function DiscoveryFramesView({
   frames = [],
-  bufferId,
+  captureId,
   protocol,
   displayFrameIdFormat,
   displayTimeFormat,
@@ -127,7 +127,7 @@ function DiscoveryFramesView({
   onMaxBufferChange,
   currentTimeUs,
   onScrub,
-  bufferMetadata,
+  captureMetadata,
   isRecorded = false,
   playbackState = "paused",
   playbackDirection = "forward",
@@ -216,25 +216,25 @@ function DiscoveryFramesView({
     setHeaderContextMenu(null);
   }, []);
 
-  // Use buffer-first hook when bufferId is available
+  // Use buffer-first hook when captureId is available
   // This provides a unified interface for streaming (tail poll) and stopped (pagination)
   // Use || to treat empty string IDs as absent (stale effectiveBufferMetadata can produce id: "")
-  const effectiveBufferId = bufferId || bufferMetadata?.id || null;
+  const effectiveBufferId = captureId || captureMetadata?.id || null;
   const useBufferFirstMode = effectiveBufferId !== null;
 
   // Buffer playback = pagination mode (not tail-follow). True for: recorded source, paused stream, or store-level buffer mode (after ingest)
-  const isBufferPlayback = isRecorded || isStreamPaused || bufferMode.enabled;
+  const isCapturePlayback = isRecorded || isStreamPaused || bufferMode.enabled;
 
   const bufferFrameView = useBufferFrameView({
-    bufferId: effectiveBufferId,
+    captureId: effectiveBufferId,
     isStreaming,
     selectedFrames,
     pageSize: renderBuffer === -1 ? 1000 : renderBuffer,
     tailSize: renderBuffer === -1 ? 100 : renderBuffer,
     pollIntervalMs: BUFFER_POLL_INTERVAL_MS,
-    isBufferPlayback,
+    isCapturePlayback,
     // During buffer playback, the hook follows the playback position and auto-navigates pages
-    followTimeUs: isBufferPlayback ? currentTimeUs : null,
+    followTimeUs: isCapturePlayback ? currentTimeUs : null,
   });
 
   // Tab state for CAN frames view - stored in UI store so analysis can switch to it
@@ -324,11 +324,11 @@ function DiscoveryFramesView({
   // Determine the effective start time for delta calculations
   // In buffer mode, use buffer metadata; otherwise use streamStartTimeUs from props
   const effectiveStartTimeUs = useMemo(() => {
-    if (bufferMode.enabled && bufferMetadata?.start_time_us != null) {
-      return bufferMetadata.start_time_us;
+    if (bufferMode.enabled && captureMetadata?.start_time_us != null) {
+      return captureMetadata.start_time_us;
     }
     return streamStartTimeUs;
-  }, [bufferMode.enabled, bufferMetadata?.start_time_us, streamStartTimeUs]);
+  }, [bufferMode.enabled, captureMetadata?.start_time_us, streamStartTimeUs]);
 
   const formatTime = (
     ts_us: number,
@@ -867,7 +867,7 @@ function DiscoveryFramesView({
       setIsFindSearching(true);
       findDebounceRef.current = setTimeout(async () => {
         try {
-          const results = await searchBufferFrames(
+          const results = await searchCaptureFrames(
             effectiveBufferId,
             q,
             findMode !== 'data',
@@ -1096,7 +1096,7 @@ function DiscoveryFramesView({
   const showPlaybackControls = isRecorded || isLiveStreaming || (!isStreaming && bufferMode.enabled);
   // In buffer-first mode, never fall back to frameCount (frames.length) which may be stale
   // from the streaming array and differ from the actual buffer count.
-  const effectiveTotalFrames = bufferFrameView.totalCount || bufferMetadata?.count || bufferMode.totalFrames || (!useBufferFirstMode ? frameCount : undefined) || undefined;
+  const effectiveTotalFrames = bufferFrameView.totalCount || captureMetadata?.count || bufferMode.totalFrames || (!useBufferFirstMode ? frameCount : undefined) || undefined;
   effectiveTotalFramesRef.current = effectiveTotalFrames;
 
   // Wrapped play handlers: auto-seek to start/end when at boundary so playback has
@@ -1300,7 +1300,7 @@ function DiscoveryFramesView({
           displayTimeFormat={displayTimeFormat}
           isStreaming={isStreaming}
           streamStartTimeUs={effectiveStartTimeUs}
-          bufferMetadata={bufferMetadata}
+          captureMetadata={captureMetadata}
           useLocalTimezone={useLocalTimezone}
         />
       )}
@@ -1363,7 +1363,7 @@ function DiscoveryFramesView({
     <ReplayDialog
       isOpen={showReplayDialog}
       onClose={() => setShowReplayDialog(false)}
-      bufferId={bufferId ?? null}
+      captureId={captureId ?? null}
     />
     </>
   );

@@ -7,9 +7,9 @@
 // Note: Playback handlers (play/pause/stop/step) are in useDiscoveryPlaybackHandlers.
 
 import { useCallback } from "react";
-import { getBufferFrameInfo, setActiveBuffer, type BufferMetadata } from "../../../../api/buffer";
-import { isBufferProfileId, type LoadOptions } from "../../../../hooks/useIOSessionManager";
-import { useBufferSession } from "../../../../hooks/useBufferSession";
+import { getCaptureFrameInfo, setActiveCapture, type CaptureMetadata } from "../../../../api/capture";
+import { isCaptureProfileId, type LoadOptions } from "../../../../hooks/useIOSessionManager";
+import { useCaptureSession } from "../../../../hooks/useCaptureSession";
 
 export interface UseDiscoverySessionHandlersParams {
   // Session actions
@@ -32,7 +32,7 @@ export interface UseDiscoverySessionHandlersParams {
   addSerialBytes: (entries: { byte: number; timestampUs: number }[]) => void;
 
   // Buffer state
-  setBufferMetadata: (meta: BufferMetadata | null) => void;
+  setCaptureMetadata: (meta: CaptureMetadata | null) => void;
 }
 
 export function useDiscoverySessionHandlers({
@@ -51,13 +51,13 @@ export function useDiscoverySessionHandlers({
   resetFraming,
   setBackendByteCount,
   addSerialBytes: _addSerialBytes,
-  setBufferMetadata,
+  setCaptureMetadata,
 }: UseDiscoverySessionHandlersParams) {
   void _addSerialBytes; // Reserved for future bytes mode support
 
   // Centralized buffer session handler with Discovery-specific callbacks
-  const { switchToBuffer } = useBufferSession({
-    setBufferMetadata,
+  const { switchToCapture } = useCaptureSession({
+    setCaptureMetadata,
     updateCurrentTime: updateCurrentTime ?? (() => {}),
     setCurrentFrameIndex: setCurrentFrameIndex ?? (() => {}),
     // Clear previous state before switching
@@ -83,12 +83,12 @@ export function useDiscoverySessionHandlers({
       }
 
       if (isFramesMode) {
-        // Set active buffer so getBufferFrameInfo reads from the correct buffer
-        await setActiveBuffer(meta.id);
+        // Set active buffer so getCaptureFrameInfo reads from the correct buffer
+        await setActiveCapture(meta.id);
         enableBufferMode(meta.count);
         setMaxBuffer?.(meta.count);
         try {
-          const frameInfoList = await getBufferFrameInfo(meta.id);
+          const frameInfoList = await getCaptureFrameInfo(meta.id);
           setFrameInfoFromBuffer(frameInfoList);
         } catch (e) {
           console.error("[DiscoverySessionHandlers] Failed to load frame info:", e);
@@ -102,13 +102,13 @@ export function useDiscoverySessionHandlers({
     console.log(`[DiscoverySessionHandlers] handleIoProfileChange called - profileId=${profileId}`);
 
     // Check if switching to a buffer session
-    if (isBufferProfileId(profileId)) {
+    if (isCaptureProfileId(profileId)) {
       // Create a proper session for the buffer so it appears in the session manager
       // and has playback/timeline controls. watchSource calls onBeforeWatch (clears state),
       // creates a BufferReader session, and sets sourceProfileId to the buffer ID.
       await watchSource([profileId!], { speed: 1 });
       // Load buffer metadata and enable buffer UI (frame picker, pagination)
-      await switchToBuffer(profileId!);
+      await switchToCapture(profileId!);
     } else {
       // Manager handles: clear multi-bus, set profile, default speed
       selectProfile(profileId);
@@ -124,7 +124,7 @@ export function useDiscoverySessionHandlers({
   }, [
     selectProfile,
     watchSource,
-    switchToBuffer,
+    switchToCapture,
     clearAnalysisResults,
     clearBuffer,
     clearFramePicker,

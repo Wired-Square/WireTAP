@@ -174,9 +174,9 @@ function SessionNode({ data, selected }: SessionNodeProps) {
                 {session.listenerCount} app{session.listenerCount !== 1 ? "s" : ""}
               </span>
             </div>
-            {session.bufferFrameCount !== null && session.bufferFrameCount > 0 && (
+            {session.captureFrameCount !== null && session.captureFrameCount > 0 && (
               <div>
-                {session.bufferFrameCount.toLocaleString()} frames buffered
+                {session.captureFrameCount.toLocaleString()} frames buffered
               </div>
             )}
             <div className="text-[10px] opacity-70">{session.deviceType === "buffer" ? "sqlite" : session.deviceType}</div>

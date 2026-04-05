@@ -3,7 +3,7 @@
 import { Download, Loader2, Upload, Check, Plug, Play, GitMerge, Unplug, RotateCcw } from "lucide-react";
 import type { IOProfile } from "../../hooks/useSettings";
 import { CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
-import { isBufferProfileId } from "../../hooks/useIOSessionManager";
+import { isCaptureProfileId } from "../../hooks/useIOSessionManager";
 import { primaryButtonBase, successButtonBase, panelFooter, errorBoxCompact, dangerButtonBase } from "../../styles";
 import { iconMd, iconSm } from "../../styles/spacing";
 
@@ -177,7 +177,7 @@ export default function ActionButtons({
           </button>
           {releaseButton}
         </div>
-      ) : checkedSourceId && isBufferProfileId(checkedSourceId) ? (
+      ) : checkedSourceId && isCaptureProfileId(checkedSourceId) ? (
         // Buffer source selected — show Connect (with bus mappings)
         <div className="flex gap-2">
           <button

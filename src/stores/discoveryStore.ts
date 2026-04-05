@@ -104,7 +104,7 @@ type CombinedDiscoveryState = {
   backendFrameCount: number;
   framedPageSize: number;
   rawBytesPageSize: number;
-  framedBufferId: string | null;
+  framedCaptureId: string | null;
   minFrameLength: number;
 
   // Toolbox store
@@ -158,7 +158,7 @@ type CombinedDiscoveryState = {
   clearSerialBytes: (preserveBackendCount?: boolean) => void;
   setFramingConfig: (config: import('./discoverySerialStore').FramingConfig | null) => void;
   applyFraming: () => Promise<FrameMessage[]>;
-  acceptFraming: (bufferName?: string) => Promise<FrameMessage[]>;
+  acceptFraming: (captureName?: string) => Promise<FrameMessage[]>;
   resetFraming: () => void;
   undoAcceptFraming: () => void;
   applyFrameIdMapping: (config: import('./discoverySerialStore').ByteExtractionConfig) => void;
@@ -251,7 +251,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     backendFrameCount: serialStore.backendFrameCount,
     framedPageSize: serialStore.framedPageSize,
     rawBytesPageSize: serialStore.rawBytesPageSize,
-    framedBufferId: serialStore.framedBufferId,
+    framedCaptureId: serialStore.framedCaptureId,
     minFrameLength: serialStore.minFrameLength,
 
     // Toolbox store state
@@ -357,12 +357,12 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     clearSerialBytes: serialStore.clearSerialBytes,
     setFramingConfig: serialStore.setFramingConfig,
     applyFraming: () => serialStore.applyFraming(frameStore.streamStartTimeUs, uiStore.ioProfile ?? undefined),
-    acceptFraming: async (bufferName?: string) => {
+    acceptFraming: async (captureName?: string) => {
       // Get backend buffer info BEFORE calling acceptFraming (which clears serialBytes)
-      const { framedBufferId, backendFrameCount } = serialStore;
-      const hasBackendFrames = framedBufferId !== null && backendFrameCount > 0;
-      // Streaming mode: frames go directly to mainFrames (framedBufferId is null)
-      const hasStreamingFrames = framedBufferId === null && backendFrameCount > 0;
+      const { framedCaptureId, backendFrameCount } = serialStore;
+      const hasBackendFrames = framedCaptureId !== null && backendFrameCount > 0;
+      // Streaming mode: frames go directly to mainFrames (framedCaptureId is null)
+      const hasStreamingFrames = framedCaptureId === null && backendFrameCount > 0;
 
       const frames = serialStore.acceptFraming();
 
@@ -370,8 +370,8 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         // Backend framing mode: frames are stored in backend buffer
         // Load frame info from the backend buffer for the frame picker
         try {
-          const { getBufferFrameInfo } = await import('../api/buffer');
-          const frameInfoList = await getBufferFrameInfo(framedBufferId);
+          const { getCaptureFrameInfo } = await import('../api/capture');
+          const frameInfoList = await getCaptureFrameInfo(framedCaptureId);
           // Pass 'serial' protocol since this is from serial framing
           frameStore.setFrameInfoFromBuffer(frameInfoList, 'serial');
           frameStore.enableBufferMode(backendFrameCount);
@@ -446,13 +446,13 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         // Local framing mode: frames are in memory
         frameStore.setFrames(frames);
         // Create a frame buffer from the accepted framing
-        const { createFrameBufferFromFrames } = await import('../api/buffer');
-        const name = bufferName || `Framed Serial ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        const { createFrameCaptureFromFrames } = await import('../api/capture');
+        const name = captureName || `Framed Serial ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
         // Filter out incomplete frames before storing
         const completeFrames = frames.filter(f => !f.incomplete);
         if (completeFrames.length > 0) {
           try {
-            await createFrameBufferFromFrames(uiStore.ioProfile ?? '', name, completeFrames);
+            await createFrameCaptureFromFrames(uiStore.ioProfile ?? '', name, completeFrames);
           } catch (e) {
             tlog.info(`[discoveryStore] Failed to create frame buffer: ${e}`);
           }
@@ -515,18 +515,18 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         let serialFrames: FrameMessage[] = framedData.length > 0 ? framedData : frames;
 
         // If no local frames but backend buffer exists, fetch from backend
-        if (serialFrames.length === 0 && serialStore.framedBufferId && serialStore.backendFrameCount > 0) {
+        if (serialFrames.length === 0 && serialStore.framedCaptureId && serialStore.backendFrameCount > 0) {
           toolboxStore.setIsRunning(true);
           try {
-            const { getBufferFramesPaginatedById } = await import('../api/buffer');
+            const { getCaptureFramesPaginatedById } = await import('../api/capture');
             const BATCH_SIZE = 50000;
             serialFrames = [];
             let offset = 0;
             const totalCount = serialStore.backendFrameCount;
 
             while (offset < totalCount) {
-              const response = await getBufferFramesPaginatedById(
-                serialStore.framedBufferId,
+              const response = await getCaptureFramesPaginatedById(
+                serialStore.framedCaptureId,
                 offset,
                 BATCH_SIZE
               );
@@ -567,13 +567,13 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         selectedFrameData = framedData.length > 0 ? framedData : frames;
         if (selectedFrameData.length === 0) return;
       } else if (bufferMode.enabled) {
-        const { getBufferFramesPaginatedFiltered } = await import('../api/buffer');
+        const { getCaptureFramesPaginatedFiltered } = await import('../api/capture');
         const { useSessionStore } = await import('./sessionStore');
         const sessionId = uiStore.ioProfile ?? '';
-        const bufferId = useSessionStore.getState().sessions[sessionId]?.buffer?.id ?? '';
+        const captureId = useSessionStore.getState().sessions[sessionId]?.capture?.id ?? '';
         // Buffer DB still uses numeric IDs — extract from composite keys
         const selectedNumericIds = Array.from(targetKeys).map(fk => parseFrameKey(fk).frameId);
-        if (selectedNumericIds.length === 0 || !bufferId) return;
+        if (selectedNumericIds.length === 0 || !captureId) return;
 
         toolboxStore.setIsRunning(true);
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -583,13 +583,13 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
         let offset = 0;
 
         try {
-          const firstResponse = await getBufferFramesPaginatedFiltered(bufferId, 0, BATCH_SIZE, selectedNumericIds);
+          const firstResponse = await getCaptureFramesPaginatedFiltered(captureId, 0, BATCH_SIZE, selectedNumericIds);
           const totalCount = firstResponse.total_count;
           selectedFrameData.push(...(firstResponse.frames as FrameMessage[]));
           offset = firstResponse.frames.length;
 
           while (offset < totalCount) {
-            const response = await getBufferFramesPaginatedFiltered(bufferId, offset, BATCH_SIZE, selectedNumericIds);
+            const response = await getCaptureFramesPaginatedFiltered(captureId, offset, BATCH_SIZE, selectedNumericIds);
             selectedFrameData.push(...(response.frames as FrameMessage[]));
             offset += response.frames.length;
           }

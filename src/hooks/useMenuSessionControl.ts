@@ -14,7 +14,7 @@ import {
   type BookmarkMenuInfo,
 } from "../api/menu";
 import { getFavoritesForProfile } from "../utils/favorites";
-import { isBufferProfileId } from "./useIOSessionManager";
+import { isCaptureProfileId } from "./useIOSessionManager";
 import type { IOCapabilities } from "../api/io";
 
 /** Callback map for session-control actions dispatched from the native menu. */
@@ -84,9 +84,9 @@ export function useMenuSessionControl({
     const { profileName, isStreaming, isPaused, capabilities, joinerCount } =
       sessionState;
 
-    // Show "Buffer" instead of the original device name when in buffer mode
+    // Show "Capture" instead of the original device name when in capture replay mode
     const effectiveProfileName =
-      capabilities?.traits.temporal_mode === "buffer" ? "Buffer" : profileName;
+      capabilities?.traits.temporal_mode === "buffer" ? "Capture" : profileName;
 
     const bookmarksEnabled =
       !!bookmarks &&
@@ -117,7 +117,7 @@ export function useMenuSessionControl({
     const profileId = bookmarks.profileId;
 
     const update = async () => {
-      if (profileId && !isBufferProfileId(profileId)) {
+      if (profileId && !isCaptureProfileId(profileId)) {
         const favs = await getFavoritesForProfile(profileId);
         const items: BookmarkMenuInfo[] = favs.map((b) => ({
           id: b.id,

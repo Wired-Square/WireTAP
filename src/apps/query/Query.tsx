@@ -20,7 +20,7 @@ import type { FrameMessage } from "../../types/frame";
 import type { PlaybackPosition } from "../../api/io";
 import type { CatalogMetadata } from "../../api/catalog";
 import { listCatalogs } from "../../api/catalog";
-import { listBuffers, type BufferMetadata } from "../../api/buffer";
+import { listCaptures, type CaptureMetadata } from "../../api/capture";
 
 import { getFavoritesForProfile, type TimeRangeFavorite } from "../../utils/favorites";
 import { loadCatalog } from "../../utils/catalogParser";
@@ -62,14 +62,14 @@ export default function Query() {
   const [favourites, setFavourites] = useState<TimeRangeFavorite[]>([]);
 
   // Buffer sources state
-  const [buffers, setBuffers] = useState<BufferMetadata[]>([]);
-  const [selectedBufferId, setSelectedBufferId] = useState<string | null>(null);
+  const [buffers, setBuffers] = useState<CaptureMetadata[]>([]);
+  const [selectedCaptureId, setSelectedBufferId] = useState<string | null>(null);
 
   // Load available buffers on mount
   useEffect(() => {
     const loadBuffers = async () => {
       try {
-        const all = await listBuffers();
+        const all = await listCaptures();
         // Only show frame buffers with data
         setBuffers(all.filter((b) => b.kind === "frames" && b.count > 0));
       } catch (e) {
@@ -237,14 +237,14 @@ export default function Query() {
   }, [sessionCatalogPath, session.sessionId, sourceProfileId]);
 
   // Determine active source — postgres profile or buffer (mutually exclusive)
-  const hasSource = !!sourceProfileId || !!selectedBufferId;
+  const hasSource = !!sourceProfileId || !!selectedCaptureId;
 
   // Clear buffer selection when a postgres profile is selected, and vice versa
   useEffect(() => {
-    if (sourceProfileId && selectedBufferId) {
+    if (sourceProfileId && selectedCaptureId) {
       setSelectedBufferId(null);
     }
-  }, [sourceProfileId, selectedBufferId]);
+  }, [sourceProfileId, selectedCaptureId]);
 
   // Load favourites when source profile changes
   useEffect(() => {
@@ -377,10 +377,10 @@ export default function Query() {
 
   // Protocol badge for data source
   const protocolBadges: ProtocolBadge[] = useMemo(() => {
-    if (selectedBufferId) return [{ label: "Buffer", color: "amber" as const }];
+    if (selectedCaptureId) return [{ label: "Capture", color: "amber" as const }];
     if (sourceProfileId) return [{ label: "PostgreSQL", color: "blue" as const }];
     return [];
-  }, [sourceProfileId, selectedBufferId]);
+  }, [sourceProfileId, selectedCaptureId]);
 
   return (
     <AppLayout
@@ -417,7 +417,7 @@ export default function Query() {
         {activeTab === "query" && (
           <QueryBuilderPanel
             profileId={sourceProfileId}
-            bufferId={selectedBufferId}
+            captureId={selectedCaptureId}
             disabled={!hasSource}
             favourites={favourites}
             timeBounds={timeBounds}
@@ -442,7 +442,7 @@ export default function Query() {
           />
         )}
         {activeTab === "stats" && (
-          selectedBufferId
+          selectedCaptureId
             ? <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                 <p className="text-xs text-[color:var(--text-muted)]">
                   Stats are only available for PostgreSQL sources.

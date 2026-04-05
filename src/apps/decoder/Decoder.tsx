@@ -7,7 +7,7 @@ import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFra
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers';
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
-import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveBufferMetadata";
+import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveCaptureMetadata";
 import { useFocusStore } from '../../stores/focusStore';
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
@@ -24,7 +24,7 @@ import DecoderTopBar from "./views/DecoderTopBar";
 import DecoderFramesView from "./views/DecoderFramesView";
 import FramePickerDialog from "../../dialogs/FramePickerDialog";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
-import { getBufferMetadata, type BufferMetadata } from "../../api/buffer";
+import { getCaptureMetadata, type CaptureMetadata } from "../../api/capture";
 import SpeedPickerDialog from "../../dialogs/SpeedPickerDialog";
 import CatalogPickerDialog from "../../dialogs/CatalogPickerDialog";
 import FlashNotification from "../../components/FlashNotification";
@@ -33,7 +33,7 @@ import SaveSelectionSetDialog from "../../dialogs/SaveSelectionSetDialog";
 import FilterDialog from "./dialogs/FilterDialog";
 import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
 import { useSelectionSets } from "../../hooks/useSelectionSets";
-import { WINDOW_EVENTS, type CatalogSavedPayload, type BufferChangedPayload } from "../../events/registry";
+import { WINDOW_EVENTS, type CatalogSavedPayload, type CaptureChangedPayload } from "../../events/registry";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useDecoderHandlers } from "./hooks/useDecoderHandlers";
 import type { PlaybackSpeed, PlaybackState } from "../../components/TimeController";
@@ -60,7 +60,7 @@ export default function Decoder() {
     'filter',
     'decoderConflict',
   ] as const);
-  const [bufferMetadata, setBufferMetadata] = useState<BufferMetadata | null>(null);
+  const [captureMetadata, setCaptureMetadata] = useState<CaptureMetadata | null>(null);
   const [decoderConflictOptions, setDecoderConflictOptions] = useState<DecoderConflictOption[]>([]);
 
   // Selection sets for the dropdown in FramePicker (auto-refreshes cross-panel)
@@ -380,8 +380,8 @@ export default function Decoder() {
   const handleStreamEnded = useCallback(async (payload: StreamEndedInfo) => {
     // Update buffer metadata
     if (payload.capture_available && payload.capture_id) {
-      const meta = await getBufferMetadata(payload.capture_id);
-      setBufferMetadata(meta);
+      const meta = await getCaptureMetadata(payload.capture_id);
+      setCaptureMetadata(meta);
 
       // Notify other windows about the buffer change
       if (meta) {
@@ -399,18 +399,18 @@ export default function Decoder() {
     }
   }, []);
 
-  // Ref for bufferMetadata to avoid stale closures in callbacks
-  const bufferMetadataRef = useRef(bufferMetadata);
+  // Ref for captureMetadata to avoid stale closures in callbacks
+  const captureMetadataRef = useRef(captureMetadata);
   useEffect(() => {
-    bufferMetadataRef.current = bufferMetadata;
-  }, [bufferMetadata]);
+    captureMetadataRef.current = captureMetadata;
+  }, [captureMetadata]);
 
   // Handle buffer playback completion - reset slider to start
   const handleStreamComplete = useCallback(() => {
     // Mark stream as completed to ignore any stale time updates
     streamCompletedRef.current = true;
     // Reset current time to the start of the buffer
-    const meta = bufferMetadataRef.current;
+    const meta = captureMetadataRef.current;
     if (meta?.start_time_us != null) {
       updateCurrentTime(meta.start_time_us / 1_000_000);
     }
@@ -420,9 +420,9 @@ export default function Decoder() {
   const handleIngestComplete = useCallback(async (payload: StreamEndedInfo) => {
     if (payload.capture_available && payload.count > 0 && payload.capture_id) {
       // Get the updated buffer metadata
-      const meta = await getBufferMetadata(payload.capture_id);
+      const meta = await getCaptureMetadata(payload.capture_id);
       if (meta) {
-        setBufferMetadata(meta);
+        setCaptureMetadata(meta);
 
         // Notify other windows about the buffer change
         await emit(WINDOW_EVENTS.BUFFER_CHANGED, {
@@ -450,8 +450,8 @@ export default function Decoder() {
   // This fetches buffer metadata so Decoder can show timeline controls
   const handleSessionSuspended = useCallback(async (payload: import("../../api/io").SessionSuspendedPayload) => {
     if (payload.buffer_count > 0 && payload.buffer_id) {
-      const meta = await getBufferMetadata(payload.buffer_id);
-      setBufferMetadata(meta);
+      const meta = await getCaptureMetadata(payload.buffer_id);
+      setCaptureMetadata(meta);
     }
   }, []);
 
@@ -494,7 +494,7 @@ export default function Decoder() {
     isStopped,
     canReturnToLive,
     isRealtime,
-    isBufferMode,
+    isCaptureMode,
     capabilities,
     joinerCount,
     // Centralised playback position (from session store)
@@ -523,9 +523,9 @@ export default function Decoder() {
     state: readerState,
     isReady,
     bufferAvailable,
-    bufferStartTimeUs,
-    bufferEndTimeUs,
-    bufferCount,
+    captureStartTimeUs,
+    captureEndTimeUs,
+    captureCount,
     start,
     pause,
     resume,
@@ -538,33 +538,33 @@ export default function Decoder() {
 
   // Merged buffer metadata using session values for cross-app timeline sync
   const effectiveBufferMetadata = useEffectiveBufferMetadata(
-    { bufferStartTimeUs, bufferEndTimeUs, bufferCount, bufferName: session.bufferName, bufferPersistent: session.bufferPersistent },
-    bufferMetadata
+    { captureStartTimeUs, captureEndTimeUs, captureCount, captureName: session.captureName, capturePersistent: session.capturePersistent },
+    captureMetadata
   );
 
   // Derive decoding state - include "starting" to prevent race conditions
   // Use isStreaming from manager plus check for "starting" state
   const isDecoding = isStreaming || readerState === "starting";
   // Has buffer data available for replay - only relevant when in buffer mode
-  const hasBufferData = isBufferMode && (bufferAvailable || (effectiveBufferMetadata?.count ?? 0) > 0);
+  const hasBufferData = isCaptureMode && (bufferAvailable || (effectiveBufferMetadata?.count ?? 0) > 0);
 
   // Fetch buffer metadata when joining a session already in buffer mode
   // This handles the case where another app stopped the session before we joined
   useEffect(() => {
-    if (isBufferMode && !isStreaming && !bufferMetadata && sessionId) {
+    if (isCaptureMode && !isStreaming && !captureMetadata && sessionId) {
       const sess = useSessionStore.getState().sessions[sessionId];
-      const bid = sess?.buffer?.id;
+      const bid = sess?.capture?.id;
       if (bid) {
-        getBufferMetadata(bid).then(meta => {
+        getCaptureMetadata(bid).then(meta => {
           if (meta) {
-            setBufferMetadata(meta);
+            setCaptureMetadata(meta);
           }
         }).catch(err => {
           console.warn('[Decoder] Failed to fetch buffer metadata:', err);
         });
       }
     }
-  }, [isBufferMode, isStreaming, bufferMetadata, sessionId]);
+  }, [isCaptureMode, isStreaming, captureMetadata, sessionId]);
 
   // Subscribe to the session's catalogPath in sessionStore.
   // Returns undefined when the session doesn't exist yet, null when it exists with no
@@ -700,7 +700,7 @@ export default function Decoder() {
     setActiveBookmarkId,
 
     // Buffer state
-    setBufferMetadata,
+    setCaptureMetadata,
 
     // Buffer bounds for frame index calculation during scrub
     minTimeUs: effectiveBufferMetadata?.start_time_us,
@@ -772,9 +772,9 @@ export default function Decoder() {
       switchToBufferReplay(playbackSpeed).then(async () => {
         // Refresh buffer metadata after transition
         const sess = useSessionStore.getState().sessions[sessionId!];
-        const bid = sess?.buffer?.id;
-        const meta = bid ? await getBufferMetadata(bid) : null;
-        setBufferMetadata(meta);
+        const bid = sess?.capture?.id;
+        const meta = bid ? await getCaptureMetadata(bid) : null;
+        setCaptureMetadata(meta);
         // Use the actual buffer ID for unique session naming
         if (meta) {
           setIoProfile(meta.id);
@@ -839,10 +839,10 @@ export default function Decoder() {
   // Listen for buffer changes from other windows
   useEffect(() => {
     const setupListener = async () => {
-      const unlisten = await listen<BufferChangedPayload>(
+      const unlisten = await listen<CaptureChangedPayload>(
         WINDOW_EVENTS.BUFFER_CHANGED,
         (event) => {
-          setBufferMetadata(event.payload.metadata);
+          setCaptureMetadata(event.payload.metadata);
         }
       );
       return unlisten;
@@ -984,20 +984,20 @@ export default function Decoder() {
             ioProfile={ioProfile}
             onIoProfileChange={handlers.handleIoProfileChange}
             defaultReadProfileId={settings?.default_read_profile}
-            bufferMetadata={effectiveBufferMetadata ?? bufferMetadata}
+            captureMetadata={effectiveBufferMetadata ?? captureMetadata}
             sessionId={sessionId}
             multiBusProfiles={sessionId ? ioProfiles : []}
             ioState={readerState}
             isRealtime={isRealtime}
-            isBufferMode={isBufferMode}
-            bufferPersistent={session.bufferPersistent}
+            isCaptureMode={isCaptureMode}
+            capturePersistent={session.capturePersistent}
             onToggleBufferPin={() => {
-              const bid = bufferMetadata?.id ?? session.bufferId;
-              if (bid) useSessionStore.getState().setSessionBufferPersistent(bid, !session.bufferPersistent);
+              const bid = captureMetadata?.id ?? session.captureId;
+              if (bid) useSessionStore.getState().setSessionCapturePersistent(bid, !session.capturePersistent);
             }}
             onRenameBuffer={(newName) => {
-              const bid = bufferMetadata?.id ?? session.bufferId;
-              if (bid) useSessionStore.getState().renameSessionBuffer(bid, newName);
+              const bid = captureMetadata?.id ?? session.captureId;
+              if (bid) useSessionStore.getState().renameSessionCapture(bid, newName);
             }}
             onClearBuffer={handleClearBuffer}
             hasData={frameList.length > 0 || hasBufferData}
@@ -1011,8 +1011,8 @@ export default function Decoder() {
             supportsTimeRange={capabilities?.supports_time_range ?? false}
             onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
             frameCount={frameList.length}
-            uniqueFrameCount={isBufferMode ? frameList.length : watchUniqueFrameCount}
-            totalFrameCount={isBufferMode ? bufferCount : watchFrameCount}
+            uniqueFrameCount={isCaptureMode ? frameList.length : watchUniqueFrameCount}
+            totalFrameCount={isCaptureMode ? captureCount : watchFrameCount}
             selectedFrameCount={selectedFrames.size}
             onOpenFramePicker={() => dialogs.framePicker.open()}
             onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
@@ -1127,8 +1127,8 @@ export default function Decoder() {
         selectedIds={ioProfiles.length > 0 ? ioProfiles : []}
         defaultId={settings?.default_read_profile}
         onSelect={handlers.handleIoProfileChange}
-        onImport={(meta) => setBufferMetadata(meta)}
-        bufferMetadata={bufferMetadata}
+        onImport={(meta) => setCaptureMetadata(meta)}
+        captureMetadata={captureMetadata}
         defaultDir={settings?.dump_dir}
         loadSpeed={loadSpeed}
         onLoadSpeedChange={(speed) => setIngestSpeed(speed)}

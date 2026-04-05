@@ -134,9 +134,9 @@ function addSessionLog(entry: SessionLogInput) {
  * Checks against the cached set of known buffer IDs from the Rust backend.
  * The set is populated on app startup and updated when buffers are created/deleted.
  */
-export function isBufferProfileId(profileId: string | null): boolean {
+export function isCaptureProfileId(profileId: string | null): boolean {
   if (!profileId) return false;
-  return useSessionStore.getState().knownBufferIds.has(profileId);
+  return useSessionStore.getState().knownCaptureIds.has(profileId);
 }
 
 /** Getter for event listeners - set after store is created */
@@ -174,21 +174,21 @@ export interface Session {
   errorMessage: string | null;
   /** Number of listeners connected to this session (from Rust backend) */
   listenerCount: number;
-  /** Buffer info after stream ends */
-  buffer: {
+  /** Capture info after stream ends */
+  capture: {
     available: boolean;
     id: string | null;
-    type: "frames" | "bytes" | null;
+    kind: "frames" | "bytes" | null;
     count: number;
-    /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
+    /** Session ID that owns this capture (for detecting ingest/cross-app captures) */
     owningSessionId: string | null;
     /** Start time of captured data in microseconds (null if empty or unknown) */
     startTimeUs: number | null;
     /** End time of captured data in microseconds (null if empty or unknown) */
     endTimeUs: number | null;
-    /** Display name of the buffer (null until fetched) */
+    /** Display name of the capture (null until fetched) */
     name: string | null;
-    /** Whether the buffer survives "clear buffers on start" */
+    /** Whether the capture survives "clear captures on start" */
     persistent: boolean;
   };
   /** Timestamp when session was created/joined */
@@ -206,7 +206,7 @@ export interface Session {
   /** Decoder catalog path for this session (frontend-only, shared across apps) */
   catalogPath: string | null;
   /** Buffer ID for raw bytes streams (set when buffer-changed signal fires) */
-  bytesBufferId: string | null;
+  bytesCaptureId: string | null;
 }
 
 /** Options for creating a session */
@@ -301,7 +301,7 @@ export interface SessionStore {
   /** Event listeners per session (frontend-only, for routing events to callbacks) */
   _eventListeners: Record<string, SessionEventListeners>;
   /** Cached set of known buffer IDs (populated from Rust backend on startup) */
-  knownBufferIds: Set<string>;
+  knownCaptureIds: Set<string>;
 
   // ---- Actions: Session Lifecycle ----
   /** Open a session - creates if not exists, joins if exists */
@@ -356,13 +356,13 @@ export interface SessionStore {
   /** Seek to frame index (preferred for buffer playback) */
   seekSessionByFrame: (sessionId: string, frameIndex: number) => Promise<void>;
   /** Switch to buffer replay mode */
-  switchToBuffer: (sessionId: string, speed?: number, bufferId?: string) => Promise<void>;
+  switchToCapture: (sessionId: string, speed?: number, captureId?: string) => Promise<void>;
 
   // ---- Actions: Buffer Metadata ----
   /** Rename a buffer and update all sessions that reference it */
-  renameSessionBuffer: (bufferId: string, newName: string) => Promise<void>;
+  renameSessionCapture: (captureId: string, newName: string) => Promise<void>;
   /** Toggle buffer persistence and update all sessions that reference it */
-  setSessionBufferPersistent: (bufferId: string, persistent: boolean) => Promise<void>;
+  setSessionCapturePersistent: (captureId: string, persistent: boolean) => Promise<void>;
 
   // ---- Actions: Transmission ----
   /** Transmit a CAN frame through a session */
@@ -420,11 +420,11 @@ export interface SessionStore {
 
   // ---- Buffer ID Registry ----
   /** Load all buffer IDs from the backend into the cached set */
-  loadBufferIds: () => Promise<void>;
+  loadCaptureIds: () => Promise<void>;
   /** Add a buffer ID to the cached set (call when a buffer is created) */
-  addKnownBufferId: (id: string) => void;
+  addKnownCaptureId: (id: string) => void;
   /** Remove a buffer ID from the cached set (call when a buffer is deleted) */
-  removeKnownBufferId: (id: string) => void;
+  removeKnownCaptureId: (id: string) => void;
 }
 
 // ============================================================================
@@ -493,28 +493,28 @@ async function setupSessionEventListeners(
         updateSession(sessionId, {
           ioState: ioState as IOStateType,
           streamEndedReason: info.reason as Session["streamEndedReason"],
-          buffer: {
+          capture: {
             available: info.capture_available,
             id: info.capture_id,
-            type: info.capture_kind as "frames" | "bytes" | null,
+            kind: info.capture_kind as "frames" | "bytes" | null,
             count: info.count,
             owningSessionId: sessionId,
             startTimeUs: info.time_range?.[0] ?? null,
             endTimeUs: info.time_range?.[1] ?? null,
-            name: useSessionStore.getState().sessions[sessionId]?.buffer?.name ?? null,
-            persistent: useSessionStore.getState().sessions[sessionId]?.buffer?.persistent ?? false,
+            name: useSessionStore.getState().sessions[sessionId]?.capture?.name ?? null,
+            persistent: useSessionStore.getState().sessions[sessionId]?.capture?.persistent ?? false,
           },
         });
         if (info.capture_id) {
-          useSessionStore.getState().addKnownBufferId(info.capture_id);
+          useSessionStore.getState().addKnownCaptureId(info.capture_id);
         }
-        if (info.capture_id && !useSessionStore.getState().sessions[sessionId]?.buffer?.name) {
-          import("../api/buffer").then(({ getBufferMetadataById }) =>
-            getBufferMetadataById(info.capture_id!).then((meta) => {
+        if (info.capture_id && !useSessionStore.getState().sessions[sessionId]?.capture?.name) {
+          import("../api/capture").then(({ getCaptureMetadataById }) =>
+            getCaptureMetadataById(info.capture_id!).then((meta) => {
               if (meta) {
                 updateSession(sessionId, {
-                  buffer: {
-                    ...useSessionStore.getState().sessions[sessionId]?.buffer!,
+                  capture: {
+                    ...useSessionStore.getState().sessions[sessionId]?.capture!,
                     name: meta.name,
                     persistent: meta.persistent,
                   },
@@ -615,10 +615,10 @@ async function setupSessionEventListeners(
         if (isNowRunning && wasStoppedOrPaused) {
           updates.stoppedExplicitly = false;
           updates.streamEndedReason = null;
-          updates.buffer = {
+          updates.capture = {
             available: false,
             id: null,
-            type: null,
+            kind: null,
             count: 0,
             owningSessionId: sessionId,
             startTimeUs: null,
@@ -631,18 +631,18 @@ async function setupSessionEventListeners(
         } else if (isNowStopped && (capabilities as IOCapabilities | null)?.traits.temporal_mode === "buffer") {
           updateSession(sessionId, updates);
           invokeCallbacks(eventListeners, "onSwitchedToBuffer", {
-            buffer_id: prevSession?.buffer?.id ?? null,
-            buffer_count: prevSession?.buffer?.count ?? 0,
-            buffer_type: prevSession?.buffer?.type ?? null,
+            buffer_id: prevSession?.capture?.id ?? null,
+            buffer_count: prevSession?.capture?.count ?? 0,
+            buffer_type: prevSession?.capture?.kind ?? null,
             time_range: null,
             capabilities: capabilities as IOCapabilities,
           });
         } else if (isNowStopped) {
           updateSession(sessionId, updates);
           invokeCallbacks(eventListeners, "onSuspended", {
-            buffer_id: prevSession?.buffer?.id ?? null,
-            buffer_count: prevSession?.buffer?.count ?? 0,
-            buffer_type: prevSession?.buffer?.type ?? null,
+            buffer_id: prevSession?.capture?.id ?? null,
+            buffer_count: prevSession?.capture?.count ?? 0,
+            buffer_type: prevSession?.capture?.kind ?? null,
             time_range: null,
           });
         } else {
@@ -698,7 +698,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sessions: {},
   activeSessionId: null,
   _eventListeners: {},
-  knownBufferIds: new Set<string>(),
+  knownCaptureIds: new Set<string>(),
   pendingJoins: {},
   appErrorDialog: {
     isOpen: false,
@@ -771,8 +771,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     let capabilities: IOCapabilities;
     let ioState: IOStateType = "stopped";
     let listenerCount = 1;
-    let bufferId: string | null = null;
-    let bufferType: "frames" | "bytes" | null = null;
+    let captureId: string | null = null;
+    let captureKind: "frames" | "bytes" | null = null;
 
     if (backendExists) {
       // Join existing backend session using registerSessionListener only
@@ -783,8 +783,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       capabilities = regResult.capabilities;
       ioState = getStateType(regResult.state);
       listenerCount = regResult.listener_count;
-      bufferId = regResult.capture_id;
-      bufferType = regResult.capture_kind;
+      captureId = regResult.capture_id;
+      captureKind = regResult.capture_kind;
 
       // Handle startup error (error that occurred before listener registered)
       if (regResult.startup_error) {
@@ -804,20 +804,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // Create new backend session
       console.log(`[sessionStore:openSession] Backend does not exist, creating new session`);
       // Auto-detect buffer mode from profile ID (supports both legacy and new buffer ID formats)
-      const isBufferMode = isBufferProfileId(profileId) || options.useBuffer;
-      console.log(`[sessionStore:openSession] isBufferMode=${isBufferMode}`);
+      const isCaptureMode = isCaptureProfileId(profileId) || options.useBuffer;
+      console.log(`[sessionStore:openSession] isCaptureMode=${isCaptureMode}`);
 
       const createOptions: CreateIOSessionOptions = {
         sessionId,
-        profileId: isBufferMode ? undefined : profileId, // Don't pass fake profile ID for buffer mode
-        bufferId: isBufferMode ? profileId : undefined, // Pass buffer ID so Rust registers it as source
+        profileId: isCaptureMode ? undefined : profileId, // Don't pass fake profile ID for buffer mode
+        captureId: isCaptureMode ? profileId : undefined, // Pass buffer ID so Rust registers it as source
         startTime: options.startTime,
         endTime: options.endTime,
         // For buffer mode, default to 1x speed (paced playback) instead of 0 (no pacing)
-        speed: options.speed ?? (isBufferMode ? 1.0 : undefined),
+        speed: options.speed ?? (isCaptureMode ? 1.0 : undefined),
         limit: options.limit,
         filePath: options.filePath,
-        useBuffer: isBufferMode,
+        useBuffer: isCaptureMode,
         framingEncoding: options.framingEncoding,
         delimiter: options.delimiter,
         maxFrameLength: options.maxFrameLength,
@@ -835,9 +835,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         console.log(`[sessionStore:openSession] createIOSession succeeded`);
 
         // For buffer mode, the session IS the buffer — set buffer ID so actions can find it
-        if (isBufferMode) {
-          bufferId = profileId;
-          bufferType = "frames"; // Buffer sessions default to frames
+        if (isCaptureMode) {
+          captureId = profileId;
+          captureKind = "frames"; // Buffer sessions default to frames
         }
 
         // Backend auto-starts the session, so query the actual state
@@ -851,8 +851,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           const regResult = await registerSessionListener(sessionId, listenerId, appName);
           listenerCount = regResult.listener_count;
           // Pick up buffer info from the registration result (more accurate than our guess)
-          if (regResult.capture_id) bufferId = regResult.capture_id;
-          if (regResult.capture_kind) bufferType = regResult.capture_kind;
+          if (regResult.capture_id) captureId = regResult.capture_id;
+          if (regResult.capture_kind) captureKind = regResult.capture_kind;
           // Handle startup error (error that occurred before listener registered)
           if (regResult.startup_error) {
             get().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
@@ -869,8 +869,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           capabilities = regResult.capabilities;
           ioState = getStateType(regResult.state);
           listenerCount = regResult.listener_count;
-          bufferId = regResult.capture_id;
-          bufferType = regResult.capture_kind;
+          captureId = regResult.capture_id;
+          captureKind = regResult.capture_kind;
 
           // Handle startup error (error that occurred before listener registered)
           if (regResult.startup_error) {
@@ -887,7 +887,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             capabilities: null,
             errorMessage: msg,
             listenerCount: 0,
-            buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
+            capture: { available: false, id: null, kind: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
             createdAt: Date.now(),
             hasQueuedMessages: false,
             stoppedExplicitly: false,
@@ -895,7 +895,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             speed: null,
             playbackPosition: null,
             catalogPath: null,
-            bytesBufferId: null,
+            bytesCaptureId: null,
           };
           set((s) => ({
             sessions: { ...s.sessions, [sessionId]: errorSession },
@@ -996,8 +996,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // and can be accessed via pagination without streaming. User can start playback manually.
     // EXCEPTION 2: skipAutoStart option - for connect-only mode (Query app) where we want
     // to create the session but not start streaming until user explicitly requests it.
-    const isBufferSession = isBufferProfileId(profileId);
-    const shouldAutoStart = ioState === "stopped" && !isBufferSession && !options.skipAutoStart;
+    const isCaptureSession = isCaptureProfileId(profileId);
+    const shouldAutoStart = ioState === "stopped" && !isCaptureSession && !options.skipAutoStart;
     if (shouldAutoStart) {
       try {
         await startReaderSession(sessionId);
@@ -1027,16 +1027,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         capabilities,
         errorMessage: null,
         listenerCount: finalListenerCount,
-        buffer: {
+        capture: {
           available: false,
-          id: bufferId,
-          type: bufferType,
+          id: captureId,
+          kind: captureKind,
           count: 0,
           owningSessionId: null,
-          startTimeUs: existingSession?.buffer?.startTimeUs ?? null,
-          endTimeUs: existingSession?.buffer?.endTimeUs ?? null,
-          name: existingSession?.buffer?.name ?? null,
-          persistent: existingSession?.buffer?.persistent ?? false,
+          startTimeUs: existingSession?.capture?.startTimeUs ?? null,
+          endTimeUs: existingSession?.capture?.endTimeUs ?? null,
+          name: existingSession?.capture?.name ?? null,
+          persistent: existingSession?.capture?.persistent ?? false,
         },
         createdAt: existingSession?.createdAt ?? Date.now(),
         hasQueuedMessages: existingSession?.hasQueuedMessages ?? false,
@@ -1045,7 +1045,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         speed: existingSession?.speed ?? null,
         playbackPosition: existingSession?.playbackPosition ?? null,
         catalogPath: existingSession?.catalogPath ?? null,
-        bytesBufferId: existingSession?.bytesBufferId ?? null,
+        bytesCaptureId: existingSession?.bytesCaptureId ?? null,
       };
 
       return {
@@ -1054,19 +1054,19 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     });
 
     // For buffer-mode sessions, fetch buffer metadata to populate name/persistent
-    if (bufferId) {
-      import("../api/buffer").then(({ getBufferMetadataById }) =>
-        getBufferMetadataById(bufferId!).then((meta) => {
+    if (captureId) {
+      import("../api/capture").then(({ getCaptureMetadataById }) =>
+        getCaptureMetadataById(captureId!).then((meta) => {
           if (meta) {
             const currentSession = get().sessions[sessionId];
-            if (currentSession && currentSession.buffer.id === bufferId) {
+            if (currentSession && currentSession.capture.id === captureId) {
               set((s) => ({
                 sessions: {
                   ...s.sessions,
                   [sessionId]: {
                     ...s.sessions[sessionId],
-                    buffer: {
-                      ...s.sessions[sessionId].buffer,
+                    capture: {
+                      ...s.sessions[sessionId].capture,
                       name: meta.name,
                       persistent: meta.persistent,
                     },
@@ -1454,7 +1454,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         const capabilities = await switchSessionToBufferReplay(sessionId, 1.0);
         // Buffer state will be updated by the session-lifecycle event handler.
         // Use existing session buffer state for the log message if already available.
-        const existingBuffer = get().sessions[sessionId]?.buffer;
+        const existingBuffer = get().sessions[sessionId]?.capture;
         addSessionLog({
           eventType: "state-change",
           sessionId,
@@ -1600,8 +1600,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     });
   },
 
-  switchToBuffer: async (sessionId, speed, bufferId) => {
-    const capabilities = await transitionToBufferReader(sessionId, bufferId ?? '', speed);
+  switchToCapture: async (sessionId, speed, captureId) => {
+    const capabilities = await transitionToBufferReader(sessionId, captureId ?? '', speed);
     set((s) => ({
       sessions: {
         ...s.sessions,
@@ -1616,15 +1616,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   // ---- Buffer Metadata ----
-  renameSessionBuffer: async (bufferId, newName) => {
-    const { renameBuffer } = await import("../api/buffer");
-    await renameBuffer(bufferId, newName);
+  renameSessionCapture: async (captureId, newName) => {
+    const { renameCapture } = await import("../api/capture");
+    await renameCapture(captureId, newName);
     // Update ALL sessions that share this buffer ID
     const sessions = get().sessions;
     const updated: Record<string, Session> = {};
     for (const [sid, session] of Object.entries(sessions)) {
-      if (session.buffer.id === bufferId) {
-        updated[sid] = { ...session, buffer: { ...session.buffer, name: newName } };
+      if (session.capture.id === captureId) {
+        updated[sid] = { ...session, capture: { ...session.capture, name: newName } };
       }
     }
     if (Object.keys(updated).length > 0) {
@@ -1632,18 +1632,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
     // Notify other windows
     const { WINDOW_EVENTS } = await import("../events/registry");
-    emit(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, { bufferId, name: newName });
+    emit(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, { captureId, name: newName });
   },
 
-  setSessionBufferPersistent: async (bufferId, persistent) => {
-    const { setBufferPersistent } = await import("../api/buffer");
-    await setBufferPersistent(bufferId, persistent);
+  setSessionCapturePersistent: async (captureId, persistent) => {
+    const { setCapturePersistent } = await import("../api/capture");
+    await setCapturePersistent(captureId, persistent);
     // Update ALL sessions that share this buffer ID
     const sessions = get().sessions;
     const updated: Record<string, Session> = {};
     for (const [sid, session] of Object.entries(sessions)) {
-      if (session.buffer.id === bufferId) {
-        updated[sid] = { ...session, buffer: { ...session.buffer, persistent } };
+      if (session.capture.id === captureId) {
+        updated[sid] = { ...session, capture: { ...session.capture, persistent } };
       }
     }
     if (Object.keys(updated).length > 0) {
@@ -1651,7 +1651,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
     // Notify other windows
     const { WINDOW_EVENTS } = await import("../events/registry");
-    emit(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, { bufferId, persistent });
+    emit(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, { captureId, persistent });
   },
 
   // ---- Transmission ----
@@ -1779,23 +1779,23 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   // ---- Buffer ID Registry ----
-  loadBufferIds: async () => {
-    const { listBufferIds } = await import("../api/buffer");
-    const ids = await listBufferIds();
-    set({ knownBufferIds: new Set(ids) });
+  loadCaptureIds: async () => {
+    const { listCaptureIds } = await import("../api/capture");
+    const ids = await listCaptureIds();
+    set({ knownCaptureIds: new Set(ids) });
   },
-  addKnownBufferId: (id) => {
+  addKnownCaptureId: (id) => {
     set((state) => {
-      const next = new Set(state.knownBufferIds);
+      const next = new Set(state.knownCaptureIds);
       next.add(id);
-      return { knownBufferIds: next };
+      return { knownCaptureIds: next };
     });
   },
-  removeKnownBufferId: (id) => {
+  removeKnownCaptureId: (id) => {
     set((state) => {
-      const next = new Set(state.knownBufferIds);
+      const next = new Set(state.knownCaptureIds);
       next.delete(id);
-      return { knownBufferIds: next };
+      return { knownCaptureIds: next };
     });
   },
 }));
@@ -1817,18 +1817,18 @@ import("../events/registry").then(({ WINDOW_EVENTS }) => {
   _unlistenBufferChanged?.();
 
   // Rename / pin changes
-  listen<{ bufferId: string; name?: string; persistent?: boolean }>(
+  listen<{ captureId: string; name?: string; persistent?: boolean }>(
     WINDOW_EVENTS.BUFFER_METADATA_UPDATED,
     (event) => {
-      const { bufferId, name, persistent } = event.payload;
+      const { captureId, name, persistent } = event.payload;
       const sessions = useSessionStore.getState().sessions;
       const updated: Record<string, Session> = {};
       for (const [sid, session] of Object.entries(sessions)) {
-        if (session.buffer.id === bufferId) {
+        if (session.capture.id === captureId) {
           updated[sid] = {
             ...session,
-            buffer: {
-              ...session.buffer,
+            capture: {
+              ...session.capture,
               ...(name !== undefined && { name }),
               ...(persistent !== undefined && { persistent }),
             },
@@ -1841,7 +1841,7 @@ import("../events/registry").then(({ WINDOW_EVENTS }) => {
     }
   ).then(fn => { _unlistenBufferMeta = fn; });
 
-  // Buffer deleted — remove from knownBufferIds and clear buffer state on affected sessions
+  // Buffer deleted — remove from knownCaptureIds and clear buffer state on affected sessions
   listen<{ deletedBufferIds?: string[] }>(
     WINDOW_EVENTS.BUFFER_CHANGED,
     (event) => {
@@ -1852,17 +1852,17 @@ import("../events/registry").then(({ WINDOW_EVENTS }) => {
 
       // Remove from known buffer IDs
       for (const id of ids) {
-        state.removeKnownBufferId(id);
+        state.removeKnownCaptureId(id);
       }
 
       // Clear buffer info on any session referencing a deleted buffer
       const sessions = state.sessions;
       const updated: Record<string, Session> = {};
       for (const [sid, session] of Object.entries(sessions)) {
-        if (session.buffer.id && deletedSet.has(session.buffer.id)) {
+        if (session.capture.id && deletedSet.has(session.capture.id)) {
           updated[sid] = {
             ...session,
-            buffer: { available: false, id: null, type: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
+            capture: { available: false, id: null, kind: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
           };
         }
       }

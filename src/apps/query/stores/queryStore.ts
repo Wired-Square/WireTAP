@@ -29,16 +29,16 @@ import {
   type PatternSearchResult,
 } from "../../../api/dbquery";
 import {
-  queryByteChangesBuffer,
-  queryFrameChangesBuffer,
-  queryMirrorValidationBuffer,
-  queryMuxStatisticsBuffer,
-  queryFirstLastBuffer,
-  queryFrequencyBuffer,
-  queryDistributionBuffer,
-  queryGapAnalysisBuffer,
-  queryPatternSearchBuffer,
-} from "../../../api/bufferquery";
+  queryByteChangesCapture,
+  queryFrameChangesCapture,
+  queryMirrorValidationCapture,
+  queryMuxStatisticsCapture,
+  queryFirstLastCapture,
+  queryFrequencyCapture,
+  queryDistributionCapture,
+  queryGapAnalysisCapture,
+  queryPatternSearchCapture,
+} from "../../../api/capturequery";
 import type { TimeBounds } from "../../../components/TimeBoundsInput";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { ParsedCatalog } from "../../../utils/catalogParser";
@@ -203,7 +203,7 @@ export interface QueuedQuery {
   /** Profile ID for the database connection (PostgreSQL queries) */
   profileId: string;
   /** Buffer ID for buffer queries (when set, routes to SQLite instead of PostgreSQL) */
-  bufferId?: string;
+  captureId?: string;
   /** Current status */
   status: QueryStatus;
   /** When the query was submitted */
@@ -478,7 +478,7 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       queryType,
       queryParams: { ...queryParams },
       profileId: sourceType === "postgres" ? sourceId : "",
-      bufferId: sourceType === "buffer" ? sourceId : undefined,
+      captureId: sourceType === "buffer" ? sourceId : undefined,
       status: "pending",
       submittedAt: Date.now(),
       results: null,
@@ -561,9 +561,9 @@ export const useQueryStore = create<QueryState>((set, get) => ({
       let results: QueryResult | null = null;
       let stats: QueryStats | undefined;
 
-      const { profileId, bufferId, queryType, queryParams, timeBounds, resultLimit } = nextQuery;
+      const { profileId, captureId, queryType, queryParams, timeBounds, resultLimit } = nextQuery;
 
-      if (bufferId) {
+      if (captureId) {
         // ── Buffer query path (SQLite) ──
         // Convert ISO time bounds to microseconds for buffer queries
         const toMicroseconds = (dt: string | undefined): number | undefined => {
@@ -582,8 +582,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
 
         switch (queryType) {
           case "byte_changes": {
-            const response = await queryByteChangesBuffer(
-              bufferId,
+            const response = await queryByteChangesCapture(
+              captureId,
               queryParams.frameId,
               queryParams.byteIndex,
               queryParams.isExtended,
@@ -597,8 +597,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
 
           case "frame_changes": {
-            const response = await queryFrameChangesBuffer(
-              bufferId,
+            const response = await queryFrameChangesCapture(
+              captureId,
               queryParams.frameId,
               queryParams.isExtended,
               startTimeUs,
@@ -611,8 +611,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
 
           case "mirror_validation": {
-            const response = await queryMirrorValidationBuffer(
-              bufferId,
+            const response = await queryMirrorValidationCapture(
+              captureId,
               queryParams.mirrorFrameId,
               queryParams.sourceFrameId,
               queryParams.isExtended,
@@ -627,8 +627,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
 
           case "mux_statistics": {
-            const response = await queryMuxStatisticsBuffer(
-              bufferId,
+            const response = await queryMuxStatisticsCapture(
+              captureId,
               queryParams.frameId,
               queryParams.muxSelectorByte,
               queryParams.isExtended,
@@ -644,8 +644,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
 
           case "first_last": {
-            const response = await queryFirstLastBuffer(
-              bufferId,
+            const response = await queryFirstLastCapture(
+              captureId,
               queryParams.frameId,
               queryParams.isExtended,
               startTimeUs,
@@ -657,8 +657,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
 
           case "frequency": {
-            const response = await queryFrequencyBuffer(
-              bufferId,
+            const response = await queryFrequencyCapture(
+              captureId,
               queryParams.frameId,
               queryParams.isExtended,
               queryParams.bucketSizeMs,
@@ -672,8 +672,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
 
           case "distribution": {
-            const response = await queryDistributionBuffer(
-              bufferId,
+            const response = await queryDistributionCapture(
+              captureId,
               queryParams.frameId,
               queryParams.byteIndex,
               queryParams.isExtended,
@@ -686,8 +686,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
 
           case "gap_analysis": {
-            const response = await queryGapAnalysisBuffer(
-              bufferId,
+            const response = await queryGapAnalysisCapture(
+              captureId,
               queryParams.frameId,
               queryParams.isExtended,
               queryParams.gapThresholdMs,
@@ -701,8 +701,8 @@ export const useQueryStore = create<QueryState>((set, get) => ({
           }
 
           case "pattern_search": {
-            const response = await queryPatternSearchBuffer(
-              bufferId,
+            const response = await queryPatternSearchCapture(
+              captureId,
               queryParams.pattern,
               queryParams.patternMask,
               startTimeUs,

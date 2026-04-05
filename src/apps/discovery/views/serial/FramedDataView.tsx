@@ -7,7 +7,7 @@ import { useDiscoveryStore, type FrameMessage } from '../../../../stores/discove
 import { useDiscoverySerialStore } from '../../../../stores/discoverySerialStore';
 import { useDiscoveryToolboxStore } from '../../../../stores/discoveryToolboxStore';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
-import { getBufferFramesPaginatedById, getBufferMetadataById, findBufferOffsetForTimestamp, type BufferFrame } from '../../../../api/buffer';
+import { getCaptureFramesPaginatedById, getCaptureMetadataById, findCaptureOffsetForTimestamp, type CaptureFrame } from '../../../../api/capture';
 import type { SerialFrameConfig } from '../../../../utils/frameExport';
 import { resolveByteIndexSync } from '../../../../utils/analysis/checksums';
 import {
@@ -190,7 +190,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
   const setPageSize = useDiscoverySerialStore((s) => s.setFramedPageSize);
 
   // Backend buffer ID and frame count (set when framing is applied in backend)
-  const framedBufferId = useDiscoverySerialStore((s) => s.framedBufferId);
+  const framedCaptureId = useDiscoverySerialStore((s) => s.framedCaptureId);
   const backendFrameCount = useDiscoverySerialStore((s) => s.backendFrameCount);
   // Trigger to force refetch when framing is reapplied (even if buffer ID/count unchanged)
   const framedDataTrigger = useDiscoverySerialStore((s) => s.framedDataTrigger);
@@ -204,7 +204,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
   const [isLoadingPage, setIsLoadingPage] = useState(false);
 
   // Determine if we're using backend buffer mode
-  const useBackendBuffer = framedBufferId !== null;
+  const useBackendBuffer = framedCaptureId !== null;
 
   // Extraction configurations - read directly from serial store
   const idConfig = useDiscoverySerialStore((s) => s.frameIdExtractionConfig);
@@ -258,7 +258,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
 
   // Fetch buffer metadata when backend buffer ID changes (for time range only)
   useEffect(() => {
-    if (!framedBufferId) {
+    if (!framedCaptureId) {
       setBackendFrames([]);
       setBackendTimeRange(null);
       return;
@@ -266,7 +266,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
 
     const fetchMetadata = async () => {
       try {
-        const metadata = await getBufferMetadataById(framedBufferId);
+        const metadata = await getCaptureMetadataById(framedCaptureId);
         if (metadata) {
           if (metadata.start_time_us !== null && metadata.end_time_us !== null) {
             setBackendTimeRange({ min: metadata.start_time_us, max: metadata.end_time_us });
@@ -279,11 +279,11 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
 
     fetchMetadata();
     setCurrentPage(0); // Reset to first page when buffer changes
-  }, [framedBufferId]);
+  }, [framedCaptureId]);
 
   // Fetch frames from backend when page changes or frame count updates (backend buffer mode)
   useEffect(() => {
-    if (!useBackendBuffer || !framedBufferId || backendFrameCount === 0) return;
+    if (!useBackendBuffer || !framedCaptureId || backendFrameCount === 0) return;
 
     const fetchPage = async () => {
       setIsLoadingPage(true);
@@ -294,10 +294,10 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
           ? Math.max(0, backendFrameCount - effectiveSize)
           : currentPage * effectiveSize;
         // Fetch from the specific frames buffer by ID (not the active buffer)
-        const response = await getBufferFramesPaginatedById(framedBufferId, offset, effectiveSize);
+        const response = await getCaptureFramesPaginatedById(framedCaptureId, offset, effectiveSize);
 
-        // Convert BufferFrame to FrameMessage
-        const fetchedFrames: FrameMessage[] = response.frames.map((f: BufferFrame) => ({
+        // Convert CaptureFrame to FrameMessage
+        const fetchedFrames: FrameMessage[] = response.frames.map((f: CaptureFrame) => ({
           protocol: f.protocol,
           timestamp_us: f.timestamp_us,
           frame_id: f.frame_id,
@@ -320,7 +320,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
     };
 
     fetchPage();
-  }, [useBackendBuffer, framedBufferId, currentPage, pageSize, backendFrameCount, isStreaming, framedDataTrigger]);
+  }, [useBackendBuffer, framedCaptureId, currentPage, pageSize, backendFrameCount, isStreaming, framedDataTrigger]);
 
   // Filter to complete frames only (for prop-based frames)
   const completeFrames = useMemo(() => {
@@ -382,7 +382,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
     if (useBackendBuffer) {
       // Use backend binary search to find offset
       try {
-        const offset = await findBufferOffsetForTimestamp(framedBufferId!, targetTimeUs, []);
+        const offset = await findCaptureOffsetForTimestamp(framedCaptureId!, targetTimeUs, []);
         const targetPage = Math.floor(offset / effectivePageSize);
         setCurrentPage(targetPage);
       } catch (error) {

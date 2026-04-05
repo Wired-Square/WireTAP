@@ -173,21 +173,21 @@ export interface UseIOSessionResult {
   /** Whether buffer data is available for replay (set after stream ends) */
   bufferAvailable: boolean;
   /** ID of the buffer that was created (set after stream ends) */
-  bufferId: string | null;
+  captureId: string | null;
   /** Type of buffer: "frames" or "bytes" (set after stream ends) */
-  bufferType: "frames" | "bytes" | null;
+  captureKind: "frames" | "bytes" | null;
   /** Number of items in the buffer - frames or bytes depending on type (set after stream ends) */
-  bufferCount: number;
+  captureCount: number;
   /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
   bufferOwningSessionId: string | null;
   /** Start time of buffer data in microseconds (null if empty or unknown) */
-  bufferStartTimeUs: number | null;
+  captureStartTimeUs: number | null;
   /** End time of buffer data in microseconds (null if empty or unknown) */
-  bufferEndTimeUs: number | null;
+  captureEndTimeUs: number | null;
   /** Display name of the buffer (null until fetched) */
-  bufferName: string | null;
+  captureName: string | null;
   /** Whether the buffer survives "clear buffers on start" */
-  bufferPersistent: boolean;
+  capturePersistent: boolean;
   /** Number of apps connected to this session (for showing Detach vs Stop) */
   joinerCount: number;
   /** Whether the session was stopped explicitly by user (vs stream ending naturally) */
@@ -329,7 +329,7 @@ export function useIOSession(
   const setSessionTimeRange = useSessionStore((s) => s.setSessionTimeRange);
   const seekSession = useSessionStore((s) => s.seekSession);
   const seekSessionByFrame = useSessionStore((s) => s.seekSessionByFrame);
-  const switchToBuffer = useSessionStore((s) => s.switchToBuffer);
+  const switchToCapture = useSessionStore((s) => s.switchToCapture);
   const reinitializeSession = useSessionStore((s) => s.reinitializeSession);
   const registerCallbacks = useSessionStore((s) => s.registerCallbacks);
   const clearCallbacks = useSessionStore((s) => s.clearCallbacks);
@@ -409,8 +409,8 @@ export function useIOSession(
 
       const ioStateChanged = session.ioState !== prevSession.ioState;
       const capsChanged = session.capabilities !== prevSession.capabilities;
-      const bufferNameChanged = session.buffer.name !== prevSession.buffer.name;
-      const bufferPersistentChanged = session.buffer.persistent !== prevSession.buffer.persistent;
+      const bufferNameChanged = session.capture.name !== prevSession.capture.name;
+      const bufferPersistentChanged = session.capture.persistent !== prevSession.capture.persistent;
 
       if (!ioStateChanged && !capsChanged && !bufferNameChanged && !bufferPersistentChanged) return;
 
@@ -436,8 +436,8 @@ export function useIOSession(
         if (bufferNameChanged || bufferPersistentChanged) {
           refState.buffer = {
             ...refState.buffer,
-            name: session.buffer.name,
-            persistent: session.buffer.persistent,
+            name: session.capture.name,
+            persistent: session.capture.persistent,
           };
         }
         expectedStateRef.current = { ...expectedStateRef.current, state: refState };
@@ -449,8 +449,8 @@ export function useIOSession(
         if (bufferNameChanged || bufferPersistentChanged) {
           updated.buffer = {
             ...prev.buffer,
-            name: session.buffer.name,
-            persistent: session.buffer.persistent,
+            name: session.capture.name,
+            persistent: session.capture.persistent,
           };
         }
         return updated;
@@ -1154,7 +1154,7 @@ export function useIOSession(
     async (speed?: number) => {
       if (!effectiveSessionId) return;
       try {
-        await switchToBuffer(effectiveSessionId, speed);
+        await switchToCapture(effectiveSessionId, speed);
 
         // Refetch capabilities since the reader changed (BufferReader has different capabilities)
         const caps = await getIOSessionCapabilities(effectiveSessionId);
@@ -1166,7 +1166,7 @@ export function useIOSession(
         callbacksRef.current.onError?.(msg);
       }
     },
-    [effectiveSessionId, switchToBuffer]
+    [effectiveSessionId, switchToCapture]
   );
 
   const rejoin = useCallback(async (profileId?: string, profileName?: string) => {
@@ -1245,14 +1245,14 @@ export function useIOSession(
     isReady: effectiveState?.isReady ?? false,
     errorMessage: effectiveState?.errorMessage ?? null,
     bufferAvailable: effectiveState?.buffer?.available ?? false,
-    bufferId: effectiveState?.buffer?.id ?? null,
-    bufferType: effectiveState?.buffer?.type ?? null,
-    bufferCount: effectiveState?.buffer?.count ?? 0,
+    captureId: effectiveState?.buffer?.id ?? null,
+    captureKind: effectiveState?.buffer?.type ?? null,
+    captureCount: effectiveState?.buffer?.count ?? 0,
     bufferOwningSessionId: effectiveState?.buffer?.owningSessionId ?? null,
-    bufferStartTimeUs: effectiveState?.buffer?.startTimeUs ?? null,
-    bufferEndTimeUs: effectiveState?.buffer?.endTimeUs ?? null,
-    bufferName: effectiveState?.buffer?.name ?? null,
-    bufferPersistent: effectiveState?.buffer?.persistent ?? false,
+    captureStartTimeUs: effectiveState?.buffer?.startTimeUs ?? null,
+    captureEndTimeUs: effectiveState?.buffer?.endTimeUs ?? null,
+    captureName: effectiveState?.buffer?.name ?? null,
+    capturePersistent: effectiveState?.buffer?.persistent ?? false,
     joinerCount: effectiveState?.listenerCount ?? 0,
     stoppedExplicitly: effectiveState?.stoppedExplicitly ?? false,
     streamEndedReason: effectiveState?.streamEndedReason ?? null,

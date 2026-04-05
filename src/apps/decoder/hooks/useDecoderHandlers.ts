@@ -24,7 +24,7 @@ import {
 } from "./handlers/useDecoderCatalogHandlers";
 import type { PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from "../../../api/io";
-import type { BufferMetadata } from "../../../api/buffer";
+import type { CaptureMetadata } from "../../../api/capture";
 import type { FrameDetail } from "../../../types/decoder";
 import type { LoadOptions as ManagerLoadOptions } from "../../../hooks/useIOSessionManager";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
@@ -96,7 +96,7 @@ export interface UseDecoderHandlersParams {
   setActiveBookmarkId: (id: string | null) => void;
 
   // Buffer state
-  setBufferMetadata: (meta: BufferMetadata | null) => void;
+  setCaptureMetadata: (meta: CaptureMetadata | null) => void;
 
   // Buffer bounds for frame index calculation during scrub
   minTimeUs?: number | null;
@@ -118,7 +118,7 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
     selectProfile: params.selectProfile,
     watchSource: params.watchSource,
     playbackSpeed: params.playbackSpeed,
-    setBufferMetadata: params.setBufferMetadata,
+    setCaptureMetadata: params.setCaptureMetadata,
     updateCurrentTime: params.updateCurrentTime,
     setCurrentFrameIndex: params.setCurrentFrameIndex,
   });

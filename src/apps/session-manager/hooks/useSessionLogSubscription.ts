@@ -255,7 +255,7 @@ export function useSessionLogSubscription(): void {
           const parts = [
             `State: ${session.state}`,
             `Listeners: ${session.listenerCount}`,
-            `Frames: ${session.bufferFrameCount ?? 0}`,
+            `Frames: ${session.captureFrameCount ?? 0}`,
           ];
           if (session.capabilities?.supports_speed_control) {
             parts.push(`Speed: 1x`); // TODO: add speed to ActiveSessionInfo if needed

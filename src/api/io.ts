@@ -189,7 +189,7 @@ export interface CreateIOSessionOptions {
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName?: string;
   /** Buffer ID for buffer reader sessions (e.g., "xk9m2p") */
-  bufferId?: string;
+  captureId?: string;
   /** Modbus TCP poll groups as JSON string (catalog-derived, for modbus_tcp profiles) */
   modbusPollsJson?: string;
 }
@@ -205,7 +205,7 @@ export async function createIOSession(
   if (options.useBuffer) {
     return invoke("create_capture_source_session", {
       session_id: options.sessionId,
-      capture_id: options.bufferId,
+      capture_id: options.captureId,
       speed: options.speed,
     });
   }
@@ -381,10 +381,10 @@ export async function resumeReaderSessionFresh(sessionId: string): Promise<IOSta
  * Returns the new buffer ID.
  */
 export async function copyBufferForDetach(
-  bufferId: string,
+  captureId: string,
   newName: string
 ): Promise<string> {
-  return invoke("copy_capture_for_detach", { capture_id: bufferId, new_name: newName });
+  return invoke("copy_capture_for_detach", { capture_id: captureId, new_name: newName });
 }
 
 /**
@@ -610,7 +610,7 @@ export interface PlaybackPosition {
  */
 export async function stepBufferFrame(
   sessionId: string,
-  bufferId: string,
+  captureId: string,
   currentFrameIndex: number | null,
   currentTimestampUs: number | null,
   backward: boolean,
@@ -618,7 +618,7 @@ export async function stepBufferFrame(
 ): Promise<StepResult | null> {
   return invoke("step_capture_frame", {
     session_id: sessionId,
-    capture_id: bufferId,
+    capture_id: captureId,
     current_frame_index: currentFrameIndex,
     current_timestamp_us: currentTimestampUs,
     backward,
@@ -720,14 +720,14 @@ export function parseStateString(stateStr: string): IOStateType {
  * This is used after a streaming source (GVRET, PostgreSQL) ends to replay captured frames.
  * @param sessionId The session ID
  * @param speed Initial playback speed (default: 1.0)
- * @param bufferId Optional buffer ID to register as session source
+ * @param captureId Optional buffer ID to register as session source
  */
 export async function transitionToBufferReader(
   sessionId: string,
-  bufferId: string,
+  captureId: string,
   speed?: number,
 ): Promise<IOCapabilities> {
-  return invoke("transition_to_capture_source", { session_id: sessionId, capture_id: bufferId, speed });
+  return invoke("transition_to_capture_source", { session_id: sessionId, capture_id: captureId, speed });
 }
 
 /**
@@ -1330,9 +1330,9 @@ export interface ActiveSessionInfo {
   /** Profile IDs feeding this session */
   sourceProfileIds: string[];
   /** Buffer ID owned by this session (if any) */
-  bufferId: string | null;
+  captureId: string | null;
   /** Frame count in the owned buffer */
-  bufferFrameCount: number | null;
+  captureFrameCount: number | null;
   /** Whether the session is actively streaming data */
   isStreaming: boolean;
 }
@@ -1390,8 +1390,8 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
       })),
     })) ?? null,
     sourceProfileIds: s.source_profile_ids ?? [],
-    bufferId: s.capture_id ?? null,
-    bufferFrameCount: s.capture_frame_count ?? null,
+    captureId: s.capture_id ?? null,
+    captureFrameCount: s.capture_frame_count ?? null,
     isStreaming: s.is_streaming ?? false,
   }));
 }
@@ -1620,12 +1620,12 @@ export interface ModbusScanState {
 }
 
 /** Fetch the most recent bytes from a buffer (tail view). */
-export async function getBufferBytesTail(
-  bufferId: string,
+export async function getCaptureBytesTail(
+  captureId: string,
   tailSize: number
 ): Promise<BytesTailResponse> {
   return invoke("get_capture_bytes_tail", {
-    capture_id: bufferId,
+    capture_id: captureId,
     tail_size: tailSize,
   });
 }

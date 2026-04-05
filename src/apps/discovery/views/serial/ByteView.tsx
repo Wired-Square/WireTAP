@@ -7,7 +7,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import type { SerialBytesEntry, RawBytesViewConfig } from '../../../../stores/discoveryStore';
 import { useDiscoverySerialStore } from '../../../../stores/discoverySerialStore';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
-import { getBufferBytesPaginated, getBufferMetadataById, findBufferBytesOffsetForTimestamp, type TimestampedByte } from '../../../../api/buffer';
+import { getCaptureBytesPaginated, getCaptureMetadataById, findCaptureBytesOffsetForTimestamp, type TimestampedByte } from '../../../../api/capture';
 import { byteToHex, byteToAscii } from '../../../../utils/byteUtils';
 import { formatHumanUs, formatIsoUs, renderDeltaNode } from '../../../../utils/timeFormat';
 import { PaginationToolbar, TimelineSection, BYTE_PAGE_SIZE_OPTIONS } from '../../components';
@@ -78,7 +78,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
 
   // Backend buffer state from store
   const backendByteCount = useDiscoverySerialStore((s) => s.backendByteCount);
-  const bytesBufferId = useDiscoverySerialStore((s) => s.bytesBufferId);
+  const bytesCaptureId = useDiscoverySerialStore((s) => s.bytesCaptureId);
   const rawBytesPageSize = useDiscoverySerialStore((s) => s.rawBytesPageSize);
   const setRawBytesPageSize = useDiscoverySerialStore((s) => s.setRawBytesPageSize);
   const bufferReadyTrigger = useDiscoverySerialStore((s) => s.bufferReadyTrigger);
@@ -125,7 +125,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
 
     const fetchMetadata = async () => {
       try {
-        const metadata = await getBufferMetadataById(bytesBufferId ?? '');
+        const metadata = await getCaptureMetadataById(bytesCaptureId ?? '');
         if (metadata && metadata.start_time_us !== null && metadata.end_time_us !== null) {
           setTimeRange({ min: metadata.start_time_us, max: metadata.end_time_us });
         }
@@ -156,7 +156,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
       try {
         // Pagination mode: show page based on currentPage
         const offset = currentPage * pageSize;
-        const response = await getBufferBytesPaginated(bytesBufferId ?? '', offset, pageSize);
+        const response = await getCaptureBytesPaginated(bytesCaptureId ?? '', offset, pageSize);
 
         // Only update state if this effect instance is still current
         if (cancelled) return;
@@ -170,7 +170,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
       } catch (error) {
         if (cancelled) return;
         // Suppress "No active buffer" errors - this is expected during the brief transition
-        // between stream end (when buffer is finalized) and setActiveBuffer() being called
+        // between stream end (when buffer is finalized) and setActiveCapture() being called
         const errorStr = String(error);
         if (!errorStr.includes('No active buffer')) {
           console.error('Failed to fetch bytes from backend:', error);
@@ -293,7 +293,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
 
     try {
       // Use backend binary search to find byte offset for timestamp
-      const offset = await findBufferBytesOffsetForTimestamp(bytesBufferId ?? '', targetTimeUs);
+      const offset = await findCaptureBytesOffsetForTimestamp(bytesCaptureId ?? '', targetTimeUs);
       const targetPage = Math.floor(offset / pageSize);
       setCurrentPage(targetPage);
     } catch (error) {

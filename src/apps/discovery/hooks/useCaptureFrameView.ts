@@ -6,12 +6,12 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
-  getBufferFramesTail,
-  getBufferFramesPaginatedFiltered,
-  findBufferOffsetForTimestamp,
-  getBufferMetadataById,
-  type BufferFrame,
-} from "../../../api/buffer";
+  getCaptureFramesTail,
+  getCaptureFramesPaginatedFiltered,
+  findCaptureOffsetForTimestamp,
+  getCaptureMetadataById,
+  type CaptureFrame,
+} from "../../../api/capture";
 import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
 import { wsTransport } from "../../../services/wsTransport";
 import { useDiscoveryFrameStore, getDiscoveryFrameBuffer } from "../../../stores/discoveryFrameStore";
@@ -24,7 +24,7 @@ export type FrameWithHex = FrameMessage & { hexBytes: string[] };
 
 export interface UseBufferFrameViewOptions {
   /** Buffer ID to read from (null = no buffer) */
-  bufferId: string | null;
+  captureId: string | null;
   /** Whether currently streaming (determines tail vs pagination mode) */
   isStreaming: boolean;
   /** Selected composite frame keys filter (empty = all) */
@@ -36,7 +36,7 @@ export interface UseBufferFrameViewOptions {
   /** Poll interval for tail updates in ms (default: 200) */
   pollIntervalMs?: number;
   /** Buffer playback mode - uses pagination even when isStreaming is true */
-  isBufferPlayback?: boolean;
+  isCapturePlayback?: boolean;
   /** When set, the hook auto-navigates to the page containing this timestamp during pagination mode.
    *  Used for play/play backward and stepping — the hook owns the page state so it handles navigation internally. */
   followTimeUs?: number | null;
@@ -63,8 +63,8 @@ export interface UseBufferFrameViewResult {
   navigateToTimestamp: (timeUs: number) => Promise<void>;
 }
 
-/** Convert BufferFrame to FrameMessage with hex bytes */
-function addHexBytes(frames: BufferFrame[]): FrameWithHex[] {
+/** Convert CaptureFrame to FrameMessage with hex bytes */
+function addHexBytes(frames: CaptureFrame[]): FrameWithHex[] {
   return frames.map((f) => ({
     protocol: f.protocol,
     timestamp_us: f.timestamp_us,
@@ -90,13 +90,13 @@ export function useBufferFrameView(
   options: UseBufferFrameViewOptions
 ): UseBufferFrameViewResult {
   const {
-    bufferId,
+    captureId,
     isStreaming,
     selectedFrames,
     pageSize,
     tailSize = 50,
     pollIntervalMs = BUFFER_POLL_INTERVAL_MS,
-    isBufferPlayback = false,
+    isCapturePlayback = false,
     followTimeUs,
   } = options;
 
@@ -129,26 +129,26 @@ export function useBufferFrameView(
 
   // Reset state when buffer changes
   useEffect(() => {
-    if (prevBufferIdRef.current !== bufferId) {
+    if (prevBufferIdRef.current !== captureId) {
       setFrames([]);
       setBufferIndices([]);
       setTotalCount(0);
       setCurrentPage(0);
       setTimeRange(null);
-      prevBufferIdRef.current = bufferId;
+      prevBufferIdRef.current = captureId;
     }
-  }, [bufferId]);
+  }, [captureId]);
 
   // Fetch buffer metadata for time range
   useEffect(() => {
-    if (!bufferId) {
+    if (!captureId) {
       setTimeRange(null);
       return;
     }
 
     const fetchMetadata = async () => {
       try {
-        const meta = await getBufferMetadataById(bufferId);
+        const meta = await getCaptureMetadataById(captureId);
         if (meta && meta.start_time_us != null && meta.end_time_us != null) {
           setTimeRange({
             startUs: meta.start_time_us,
@@ -161,10 +161,10 @@ export function useBufferFrameView(
     };
 
     fetchMetadata();
-  }, [bufferId]);
+  }, [captureId]);
 
   useEffect(() => {
-    if (!bufferId || !isStreaming || isBufferPlayback) return;
+    if (!captureId || !isStreaming || isCapturePlayback) return;
 
     if (wsTransport.isConnected) {
       // WS mode: read frames directly from the discovery frame buffer
@@ -204,8 +204,8 @@ export function useBufferFrameView(
     let isMounted = true;
     const fetchTail = async () => {
       try {
-        const response = await getBufferFramesTail(
-          bufferId,
+        const response = await getCaptureFramesTail(
+          captureId,
           tailSize,
           selectedIdsRef.current
         );
@@ -226,12 +226,12 @@ export function useBufferFrameView(
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [bufferId, isStreaming, isBufferPlayback, tailSize, pollIntervalMs]);
+  }, [captureId, isStreaming, isCapturePlayback, tailSize, pollIntervalMs]);
 
   // PAGINATION MODE: Fetch page when stopped or during buffer playback
   useEffect(() => {
     // Run pagination when stopped, OR when in buffer playback mode
-    if (!bufferId || (isStreaming && !isBufferPlayback)) return;
+    if (!captureId || (isStreaming && !isCapturePlayback)) return;
 
     let isMounted = true;
 
@@ -239,8 +239,8 @@ export function useBufferFrameView(
       setIsLoading(true);
       try {
         const offset = currentPage * pageSize;
-        const response = await getBufferFramesPaginatedFiltered(
-          bufferId,
+        const response = await getCaptureFramesPaginatedFiltered(
+          captureId,
           offset,
           pageSize,
           selectedIdsRef.current
@@ -265,20 +265,20 @@ export function useBufferFrameView(
     return () => {
       isMounted = false;
     };
-  }, [bufferId, isStreaming, isBufferPlayback, currentPage, pageSize, selectedFrames]);
+  }, [captureId, isStreaming, isCapturePlayback, currentPage, pageSize, selectedFrames]);
 
   // Navigate to timestamp (for timeline scrub and step following)
   const navigateToTimestamp = useCallback(
     async (timeUs: number) => {
-      // Only require a valid bufferId - let callers decide when navigation is appropriate
+      // Only require a valid captureId - let callers decide when navigation is appropriate
       // This allows navigation when paused (isStreaming=true but stepping through frames)
-      if (!bufferId) return;
+      if (!captureId) return;
 
       try {
         // Ensure integer timestamp (backend expects u64)
         const timeUsInt = Math.round(timeUs);
-        const offset = await findBufferOffsetForTimestamp(
-          bufferId,
+        const offset = await findCaptureOffsetForTimestamp(
+          captureId,
           timeUsInt,
           selectedIdsRef.current
         );
@@ -288,7 +288,7 @@ export function useBufferFrameView(
         console.error("[useBufferFrameView] timestamp navigation error:", e);
       }
     },
-    [bufferId]
+    [captureId]
   );
 
   // FOLLOW MODE: Auto-navigate to page containing followTimeUs during buffer playback
@@ -306,7 +306,7 @@ export function useBufferFrameView(
   // Shared follow-navigate helper used by both the effect and the catchup path
   const doFollowNavigate = useCallback((timeUs: number) => {
     const timeUsInt = Math.round(timeUs);
-    findBufferOffsetForTimestamp(bufferId ?? '', timeUsInt, selectedIdsRef.current)
+    findCaptureOffsetForTimestamp(captureId ?? '', timeUsInt, selectedIdsRef.current)
       .then((offset) => {
         const targetPage = Math.floor(offset / pageSizeRef.current);
         setCurrentPage(targetPage);
@@ -325,7 +325,7 @@ export function useBufferFrameView(
   }, []);
 
   useEffect(() => {
-    if (followTimeUs == null || !bufferId || !isBufferPlayback) return;
+    if (followTimeUs == null || !captureId || !isCapturePlayback) return;
     if (followPendingRef.current) {
       // A navigation is in flight — record the latest timestamp so we can catch up
       lastSkippedFollowRef.current = followTimeUs;
@@ -344,7 +344,7 @@ export function useBufferFrameView(
     followPendingRef.current = true;
     lastSkippedFollowRef.current = null;
     doFollowNavigate(followTimeUs);
-  }, [followTimeUs, bufferId, isBufferPlayback, doFollowNavigate]);
+  }, [followTimeUs, captureId, isCapturePlayback, doFollowNavigate]);
 
   // Track previous selection to detect actual changes
   const prevSelectedFramesRef = useRef<Set<string>>(selectedFrames);
@@ -356,11 +356,11 @@ export function useBufferFrameView(
       prevSet.size !== selectedFrames.size ||
       [...selectedFrames].some((fk) => !prevSet.has(fk));
 
-    if (changed && bufferId) {
+    if (changed && captureId) {
       setCurrentPage(0);
       prevSelectedFramesRef.current = selectedFrames;
     }
-  }, [selectedFrames, bufferId]);
+  }, [selectedFrames, captureId]);
 
   // Calculate total pages
   const totalPages = useMemo(() => {

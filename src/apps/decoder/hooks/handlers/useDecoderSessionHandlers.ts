@@ -6,9 +6,9 @@
 
 import { useCallback } from "react";
 import type { PlaybackSpeed } from "../../../../components/TimeController";
-import { isBufferProfileId, type LoadOptions } from "../../../../hooks/useIOSessionManager";
-import { useBufferSession } from "../../../../hooks/useBufferSession";
-import type { BufferMetadata } from "../../../../api/buffer";
+import { isCaptureProfileId, type LoadOptions } from "../../../../hooks/useIOSessionManager";
+import { useCaptureSession } from "../../../../hooks/useCaptureSession";
+import type { CaptureMetadata } from "../../../../api/capture";
 
 export interface UseDecoderSessionHandlersParams {
   // Manager session switching methods
@@ -20,7 +20,7 @@ export interface UseDecoderSessionHandlersParams {
   playbackSpeed: PlaybackSpeed;
 
   // Buffer state (for centralized buffer handler)
-  setBufferMetadata: (meta: BufferMetadata | null) => void;
+  setCaptureMetadata: (meta: CaptureMetadata | null) => void;
   updateCurrentTime: (timeSeconds: number) => void;
   setCurrentFrameIndex: (index: number) => void;
 }
@@ -30,13 +30,13 @@ export function useDecoderSessionHandlers({
   selectProfile,
   watchSource,
   playbackSpeed,
-  setBufferMetadata,
+  setCaptureMetadata,
   updateCurrentTime,
   setCurrentFrameIndex,
 }: UseDecoderSessionHandlersParams) {
   // Centralized buffer session handler
-  const { switchToBuffer } = useBufferSession({
-    setBufferMetadata,
+  const { switchToCapture } = useCaptureSession({
+    setCaptureMetadata,
     updateCurrentTime,
     setCurrentFrameIndex,
   });
@@ -50,18 +50,18 @@ export function useDecoderSessionHandlers({
   // Handle IO profile change - manager handles common logic, app handles buffer mode
   const handleIoProfileChange = useCallback(
     async (profileId: string | null) => {
-      if (isBufferProfileId(profileId)) {
+      if (isCaptureProfileId(profileId)) {
         // Create a proper session for the buffer so it appears in the session manager
         // and has playback/timeline controls
         await watchSource([profileId!], { speed: playbackSpeed });
         // Load buffer metadata for the UI
-        await switchToBuffer(profileId!);
+        await switchToCapture(profileId!);
       } else {
         // Manager handles: clear multi-bus, set profile, default speed
         selectProfile(profileId);
       }
     },
-    [selectProfile, watchSource, switchToBuffer, playbackSpeed]
+    [selectProfile, watchSource, switchToCapture, playbackSpeed]
   );
 
   return {

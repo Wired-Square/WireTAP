@@ -13,7 +13,7 @@ import { useTransmitStore } from "../stores/transmitStore";
 import { getDiscoveryFrameBuffer, useDiscoveryFrameStore } from "../stores/discoveryFrameStore";
 import { openPanel } from "../utils/windowCommunication";
 import { useSessionStore } from "../stores/sessionStore";
-import { getBufferFramesPaginatedById } from "../api/buffer";
+import { getCaptureFramesPaginatedById } from "../api/capture";
 import type { ReplayFrame } from "../api/transmit";
 
 function formatDuration(us: number): string {
@@ -39,10 +39,10 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   /** Buffer ID for buffer-first mode (when frames are stored in the Rust backend) */
-  bufferId?: string | null;
+  captureId?: string | null;
 }
 
-export default function ReplayDialog({ isOpen, onClose, bufferId }: Props) {
+export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
   const startReplay = useTransmitStore((s) => s.startReplay);
   const bufferMode = useDiscoveryFrameStore((s) => s.bufferMode);
   const sessions = useSessionStore((s) => s.sessions);
@@ -171,9 +171,9 @@ export default function ReplayDialog({ isOpen, onClose, bufferId }: Props) {
     setIsStarting(true);
     try {
       let frames: ReplayFrame[];
-      if (bufferMode.enabled && bufferId) {
+      if (bufferMode.enabled && captureId) {
         const count = endIdx - startIdx + 1;
-        const response = await getBufferFramesPaginatedById(bufferId, startIdx - 1, count);
+        const response = await getCaptureFramesPaginatedById(captureId, startIdx - 1, count);
         frames = response.frames.map((f) => ({
           timestamp_us: f.timestamp_us,
           frame: {
