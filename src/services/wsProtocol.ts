@@ -225,13 +225,22 @@ function decodeLengthPrefixedStr(
   return [str, offset + 2 + len];
 }
 
+// Wire format: 1 byte state_type, followed by a length-prefixed error
+// message iff state_type == 4 (Error). Matches Rust encode_session_state
+// in src-tauri/src/ws/protocol.rs.
+const SESSION_STATE_NAMES = ["stopped", "starting", "running", "paused", "error"] as const;
+
 export function decodeSessionState(payload: DataView): {
   state: string;
   errorMsg?: string;
 } {
-  const [state, next] = decodeLengthPrefixedStr(payload, 0);
-  if (next < payload.byteLength) {
-    const [errorMsg] = decodeLengthPrefixedStr(payload, next);
+  if (payload.byteLength < 1) {
+    return { state: "stopped" };
+  }
+  const stateType = payload.getUint8(0);
+  const state = SESSION_STATE_NAMES[stateType] ?? `unknown(${stateType})`;
+  if (stateType === 4 && payload.byteLength >= 3) {
+    const [errorMsg] = decodeLengthPrefixedStr(payload, 1);
     return { state, errorMsg };
   }
   return { state };

@@ -386,8 +386,6 @@ export default function Graph() {
       profileIds.map(id => profiles.find(p => p.id === id)?.preferred_catalog).filter(Boolean)
     )] as string[];
 
-    tlog.debug(`[Graph] auto-load check: profileIds=${JSON.stringify(profileIds)}, preferred=${JSON.stringify(preferredCatalogs)}, localCatalog=${catalogPath}`);
-
     if (preferredCatalogs.length === 1) {
       const path = buildCatalogPath(preferredCatalogs[0], decoderDir);
       tlog.debug(`[Graph] auto-loading preferred decoder → ${path}`);

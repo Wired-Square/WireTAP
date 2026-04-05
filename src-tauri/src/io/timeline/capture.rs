@@ -45,6 +45,18 @@ impl CaptureSource {
             .map(|m| m.buses)
             .unwrap_or_default();
 
+        // Bind the capture to this session so WS frame dispatch
+        // (send_new_frames) can locate it via get_session_frame_capture_id.
+        // Without this, no FrameData is broadcast and apps that rely on the
+        // onFrames callback (Decoder, etc.) see nothing while playback runs.
+        // Ownership is released by orphan_captures_for_session on session destroy.
+        if let Err(e) = capture_store::set_capture_owner(&buffer_id, &session_id) {
+            tlog!(
+                "[CaptureSource] Failed to set capture owner for '{}' on session '{}': {}",
+                buffer_id, session_id, e
+            );
+        }
+
         Self {
             app,
             reader_state: TimelineReaderState::new(session_id, speed),
@@ -639,11 +651,8 @@ async fn run_buffer_stream(
             last_frame_time_secs = Some(frame_time_secs);
 
             if batch_buffer.len() >= NO_LIMIT_BATCH_SIZE {
+                crate::ws::dispatch::send_frames(&session_id, &batch_buffer);
                 batch_buffer.clear();
-
-                if throttle.should_signal("frames-ready") {
-                    signal_frames_ready(&session_id);
-                }
 
                 crate::io::store_playback_position(&session_id, PlaybackPosition {
                     timestamp_us: playback_time_us,
@@ -696,11 +705,8 @@ async fn run_buffer_stream(
 
                 last_pacing_check = std::time::Instant::now();
 
+                crate::ws::dispatch::send_frames(&session_id, &batch_buffer);
                 batch_buffer.clear();
-
-                if throttle.should_signal("frames-ready") {
-                    signal_frames_ready(&session_id);
-                }
 
                 crate::io::store_playback_position(&session_id, PlaybackPosition {
                     timestamp_us: playback_time_us,
@@ -714,12 +720,10 @@ async fn run_buffer_stream(
                 tokio::task::yield_now().await;
             }
         } else {
-            // Normal speed: signal any pending batch first
+            // Normal speed: flush any pending batch first
             if !batch_buffer.is_empty() {
+                crate::ws::dispatch::send_frames(&session_id, &batch_buffer);
                 batch_buffer.clear();
-                if throttle.should_signal("frames-ready") {
-                    signal_frames_ready(&session_id);
-                }
             }
 
             // Sleep for inter-frame delay (cap at 10 seconds)
@@ -738,12 +742,9 @@ async fn run_buffer_stream(
                 continue;
             }
 
-            // Signal single frame availability
+            // Send this single frame to all WS subscribers
             total_emitted += 1;
-
-            if throttle.should_signal("frames-ready") {
-                signal_frames_ready(&session_id);
-            }
+            crate::ws::dispatch::send_frames(&session_id, std::slice::from_ref(&frame));
 
             crate::io::store_playback_position(&session_id, PlaybackPosition {
                 timestamp_us: playback_time_us,
@@ -756,11 +757,11 @@ async fn run_buffer_stream(
         }
     }
 
-    // Signal any remaining batch
+    // Flush any remaining batch
     if !batch_buffer.is_empty() {
+        crate::ws::dispatch::send_frames(&session_id, &batch_buffer);
         batch_buffer.clear();
         throttle.flush();
-        signal_frames_ready(&session_id);
 
         // Emit final position so frontend highlights the last frame.
         // Forward: frame_index is one-past-end (post-increment), subtract 1.
