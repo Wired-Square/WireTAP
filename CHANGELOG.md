@@ -6,7 +6,17 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **Buffer → Capture rename**: Sweeping terminology rename across Rust backend, IPC contract, frontend internals, UI strings, and documentation. **Breaking wire change** for external IPC consumers: Tauri command names (`list_buffers` → `list_captures`, `get_buffer_metadata` → `get_capture_metadata`, `create_buffer_reader_session` → `create_capture_source_session`, and ~20 others) and JSON field names (`buffer_id` → `capture_id`, `buffer_type` → `kind`/`capture_kind`, etc.) all change atomically. Rust types renamed (`BufferReader` → `CaptureSource`, `BufferMetadata` → `CaptureMetadata`, `BufferType` → `CaptureKind`, etc.). SQLite schema migrated idempotently (`buffer_metadata` → `capture_metadata`). Frontend types, hooks, stores, components, and user-visible strings swept ("Pin/Unpin/Delete/Clear buffer" → "...capture", Settings "Buffers" section → "Captures"). Memory-pool labels ("History Buffer Size", "Graph Buffer Size") and the `temporal_mode === "buffer"` enum / `MsgType.BufferChanged` WS message are preserved until the next protocol version bump. Reference docs renamed `docs/buffer-flow.md` → `docs/capture-flow.md` and `docs/buffer-database-schema.md` → `docs/capture-database-schema.md`.
+
 - **CI: build gs_usb_cli for macOS and Windows**: The GitHub Actions build workflow now compiles `gs_usb_cli` (diagnostic CLI for gs_usb/candleLight adapters) on macOS (ARM64, x86_64) and Windows (x86_64). Binaries are uploaded as build artifacts on every run and attached to GitHub releases on version tags.
+
+### Fixed
+
+- **Loading a capture showed no frames in Discovery**: `useIOSession` hard-coded `localState.buffer.id: null` on every state initialisation and its sessionStore sync subscription only watched `capture.name`/`capture.persistent`, so `session.capture.id` never propagated to the hook's derived `captureId`. Discovery's `sessionBufferId` stayed `null`, the buffer-mode effect never fired, and `useBufferFrameView` had no capture to page through. Added a `captureToBuffer()` helper that mirrors all `Session.capture` fields (id/kind/count/available/owningSessionId/startTimeUs/endTimeUs/name/persistent) into `localState.buffer`, and applied it at the three `setLocalState` initialisation sites plus the sync subscription. No new Tauri listeners or Zustand subscriptions — preserves the memory fix from the WebView growth cleanup.
+
+- **Captures stranded after app restart**: On app startup, `hydrate_from_db()` preserved `owning_session_id` from SQLite, but those sessions no longer existed in memory. Captures were stuck in limbo — not in any live session's list and not reported by `list_orphaned_captures()` — so they never appeared in the Data Source picker. `hydrate_from_db()` now clears `owning_session_id` on every capture during hydrate and logs the cleanup.
+
+- **Capture DB failed to initialise on pre-migration databases**: The single `SCHEMA_SQL` batch ran `CREATE TABLE` + `CREATE INDEX` before the buffer→capture migration, but the index definitions referenced `capture_id` columns that didn't exist yet. `initialise()` returned an error, left the DB mutex at `None`, and every subsequent write failed with "Database not initialised". Split schema into `SCHEMA_TABLES_SQL` (runs first) and `SCHEMA_INDEXES_SQL` (runs after `migrate_buffer_to_capture`).
 
 ## [0.6.0] - 2026-04-04
 

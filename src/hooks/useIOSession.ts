@@ -100,6 +100,51 @@ interface LocalSessionState {
   playbackPosition: PlaybackPosition | null;
 }
 
+/** Empty buffer state used when no session.capture info is available yet. */
+const EMPTY_BUFFER: LocalSessionState["buffer"] = {
+  available: false,
+  id: null,
+  type: null,
+  count: 0,
+  owningSessionId: null,
+  startTimeUs: null,
+  endTimeUs: null,
+  name: null,
+  persistent: false,
+};
+
+/**
+ * Map a Session.capture (from sessionStore) into the nested buffer shape
+ * used by LocalSessionState. Handles the `kind → type` field rename.
+ * Returns EMPTY_BUFFER when the capture is undefined (session not yet in store).
+ */
+function captureToBuffer(
+  capture: {
+    available: boolean;
+    id: string | null;
+    kind: "frames" | "bytes" | null;
+    count: number;
+    owningSessionId: string | null;
+    startTimeUs: number | null;
+    endTimeUs: number | null;
+    name: string | null;
+    persistent: boolean;
+  } | undefined,
+): LocalSessionState["buffer"] {
+  if (!capture) return { ...EMPTY_BUFFER };
+  return {
+    available: capture.available,
+    id: capture.id,
+    type: capture.kind,
+    count: capture.count,
+    owningSessionId: capture.owningSessionId,
+    startTimeUs: capture.startTimeUs,
+    endTimeUs: capture.endTimeUs,
+    name: capture.name,
+    persistent: capture.persistent,
+  };
+}
+
 export interface UseIOSessionOptions {
   /**
    * App name for identifying this hook instance in logs and callbacks.
@@ -409,10 +454,20 @@ export function useIOSession(
 
       const ioStateChanged = session.ioState !== prevSession.ioState;
       const capsChanged = session.capabilities !== prevSession.capabilities;
-      const bufferNameChanged = session.capture.name !== prevSession.capture.name;
-      const bufferPersistentChanged = session.capture.persistent !== prevSession.capture.persistent;
+      const c = session.capture;
+      const pc = prevSession.capture;
+      const captureChanged =
+        c.id !== pc.id ||
+        c.kind !== pc.kind ||
+        c.count !== pc.count ||
+        c.available !== pc.available ||
+        c.owningSessionId !== pc.owningSessionId ||
+        c.startTimeUs !== pc.startTimeUs ||
+        c.endTimeUs !== pc.endTimeUs ||
+        c.name !== pc.name ||
+        c.persistent !== pc.persistent;
 
-      if (!ioStateChanged && !capsChanged && !bufferNameChanged && !bufferPersistentChanged) return;
+      if (!ioStateChanged && !capsChanged && !captureChanged) return;
 
       // Build the partial update
       const patch: Partial<LocalSessionState> = {};
@@ -422,9 +477,6 @@ export function useIOSession(
       if (capsChanged && session.capabilities) {
         patch.capabilities = session.capabilities;
       }
-      if (bufferNameChanged || bufferPersistentChanged) {
-        // Buffer fields are nested — built in setLocalState below
-      }
 
       // Update expectedStateRef if it's active (e.g., buffer sessions that
       // don't auto-start never receive streaming events to clear the ref, so
@@ -433,12 +485,8 @@ export function useIOSession(
         const refState = { ...expectedStateRef.current.state };
         if (ioStateChanged) refState.ioState = session.ioState;
         if (capsChanged && session.capabilities) refState.capabilities = session.capabilities;
-        if (bufferNameChanged || bufferPersistentChanged) {
-          refState.buffer = {
-            ...refState.buffer,
-            name: session.capture.name,
-            persistent: session.capture.persistent,
-          };
+        if (captureChanged) {
+          refState.buffer = captureToBuffer(c);
         }
         expectedStateRef.current = { ...expectedStateRef.current, state: refState };
       }
@@ -446,12 +494,8 @@ export function useIOSession(
       setLocalState((prev) => {
         if (!prev) return prev;
         const updated = { ...prev, ...patch };
-        if (bufferNameChanged || bufferPersistentChanged) {
-          updated.buffer = {
-            ...prev.buffer,
-            name: session.capture.name,
-            persistent: session.capture.persistent,
-          };
+        if (captureChanged) {
+          updated.buffer = captureToBuffer(c);
         }
         return updated;
       });
@@ -484,23 +528,14 @@ export function useIOSession(
         if (cancelled) return;
 
         if (state && caps) {
+          const storeCapture = useSessionStore.getState().sessions[effectiveSessionId]?.capture;
           setLocalState({
             ioState: getStateType(state),
             capabilities: caps,
             errorMessage: state.type === "Error" ? state.message : null,
             listenerCount: joinerCount,
             isReady: true,
-            buffer: {
-              available: false,
-              id: null,
-              type: null,
-              count: 0,
-              owningSessionId: null,
-              startTimeUs: null,
-              endTimeUs: null,
-              name: null,
-              persistent: false,
-            },
+            buffer: captureToBuffer(storeCapture),
             stoppedExplicitly: false,
             streamEndedReason: null,
             speed: null,
@@ -688,23 +723,14 @@ export function useIOSession(
             getReaderSessionJoinerCount(effectiveSessionId),
           ]);
           if (state && caps && isMountedRef.current) {
+            const storeCapture = useSessionStore.getState().sessions[effectiveSessionId]?.capture;
             setLocalState({
               ioState: getStateType(state),
               capabilities: caps,
               errorMessage: state.type === "Error" ? state.message : null,
               listenerCount: joinerCount,
               isReady: true,
-              buffer: {
-                available: false,
-                id: null,
-                type: null,
-                count: 0,
-                owningSessionId: null,
-                startTimeUs: null,
-                endTimeUs: null,
-                name: null,
-                persistent: false,
-              },
+              buffer: captureToBuffer(storeCapture),
               stoppedExplicitly: false,
               streamEndedReason: null,
               speed: null,
@@ -1095,23 +1121,14 @@ export function useIOSession(
             getReaderSessionJoinerCount(targetSessionId),
           ]);
           if (state && caps) {
+            const storeCapture = useSessionStore.getState().sessions[targetSessionId]?.capture;
             const newState: LocalSessionState = {
               ioState: getStateType(state),
               capabilities: caps,
               errorMessage: state.type === "Error" ? state.message : null,
               listenerCount: joinerCount,
               isReady: true,
-              buffer: {
-                available: false,
-                id: null,
-                type: null,
-                count: 0,
-                owningSessionId: null,
-                startTimeUs: null,
-                endTimeUs: null,
-                name: null,
-                persistent: false,
-              },
+              buffer: captureToBuffer(storeCapture),
               stoppedExplicitly: false,
               streamEndedReason: null,
               speed: opts?.speed ?? null,
