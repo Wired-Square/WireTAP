@@ -587,6 +587,18 @@ export function useIOSession(
             } catch {
               // Cache may have expired
             }
+            // Register orphaned captures so isCaptureProfileId() recognises them.
+            // Normally `StreamEnded` (WS) would have done this already, but the
+            // destroy path unsubscribes the session's WS channel in
+            // cleanupDestroyedSession before StreamEnded is processed, so on a
+            // leave-session-with-orphan the capture id never made it into
+            // knownCaptureIds. Without this, the subsequent re-setup via
+            // setIoProfile(captureId) takes the profile branch in openSession
+            // and calls create_reader_session instead of
+            // create_capture_source_session.
+            for (const id of bufferIds) {
+              useSessionStore.getState().addKnownCaptureId(id);
+            }
             callbacksRef.current.onDestroyed?.(bufferIds);
           }
         }
@@ -613,6 +625,11 @@ export function useIOSession(
             useSessionStore.getState().cleanupEvictedListener(effectiveSessionId, listenerIdRef.current);
             // Clear local state
             setLocalState(null);
+            // Register copied captures in knownCaptureIds — same rationale as
+            // the destroy path above.
+            for (const id of event.payload.capture_ids) {
+              useSessionStore.getState().addKnownCaptureId(id);
+            }
             // Notify higher-level hooks with copied capture IDs (same path as destroy)
             callbacksRef.current.onDestroyed?.(event.payload.capture_ids);
           }
