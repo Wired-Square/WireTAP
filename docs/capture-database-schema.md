@@ -1,10 +1,25 @@
-# Buffer Database Schema
+# Capture Database Schema
 
-SQLite database used for ephemeral storage of captured CAN frames and raw serial bytes during a session. Data is stored on disk to avoid unbounded memory growth during long captures.
+SQLite database used for on-disk storage of captured CAN frames and raw
+serial bytes. Bulk data lives on disk to avoid unbounded memory growth
+during long captures; metadata lives in RAM.
 
-**Location:** `{app_data_dir}/buffers.db` (e.g. `~/Library/Application Support/com.wired.wiretap/buffers.db` on macOS)
+**Location:** `{app_data_dir}/buffers.db` (e.g.
+`~/Library/Application Support/com.wired.wiretap/buffers.db` on macOS).
+The file name is a legacy carry-over from the pre-rename era; it will be
+renamed in a future cleanup.
 
-**Lifecycle:** Cleared on each app launch. Buffer data is ephemeral and not intended to persist across sessions.
+**Lifecycle:** Non-pinned captures can optionally be cleared on each app
+launch (setting: *Clear captures on start*). Pinned (persistent) captures
+always survive restart. See [capture-flow.md § Persistence](capture-flow.md#7-persistence).
+
+**Schema migration:** On first launch of a post-rename build, the database
+detects the legacy `buffer_metadata` table and atomically renames it to
+`capture_metadata`, plus renames the `buffer_id` / `buffer_type` columns
+on `frames`, `bytes`, and `capture_metadata` to `capture_id` / `capture_kind`.
+The migration is idempotent — safe to run multiple times. See
+`migrate_buffer_to_capture` in
+[src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs).
 
 **PRAGMAs:**
 
@@ -24,7 +39,7 @@ Stores CAN frames and framed serial messages. One row per frame received.
 | Column | Type | Nullable | Default | Description |
 |--------|------|----------|---------|-------------|
 | `rowid` | INTEGER | NO | autoincrement | Primary key. Insertion order is preserved and used for pagination, chunked streaming, and position tracking. |
-| `buffer_id` | TEXT | NO | | Logical buffer this frame belongs to (e.g. `buf_1`, `buf_2`). Multiple buffers coexist in the same table. |
+| `capture_id` | TEXT | NO | | Logical capture this frame belongs to (6–8 char random ID, e.g. `xk9m2p`). Multiple captures coexist in the same table. |
 | `protocol` | TEXT | NO | | Protocol identifier (e.g. `can`, `j1939`, `obd2`, `isotp`). |
 | `timestamp_us` | INTEGER | NO | | Timestamp in microseconds. Source-dependent (device clock or import timestamp). |
 | `frame_id` | INTEGER | NO | | CAN arbitration ID (11-bit or 29-bit). Stored as unsigned 32-bit value. |
@@ -44,18 +59,36 @@ Stores raw serial bytes for unframed serial sessions.
 | Column | Type | Nullable | Default | Description |
 |--------|------|----------|---------|-------------|
 | `rowid` | INTEGER | NO | autoincrement | Primary key. Insertion order preserved. |
-| `buffer_id` | TEXT | NO | | Logical buffer this byte belongs to. |
+| `capture_id` | TEXT | NO | | Logical capture this byte belongs to. |
 | `byte_val` | INTEGER | NO | | The byte value (0-255). |
 | `timestamp_us` | INTEGER | NO | | Timestamp in microseconds. |
 | `bus` | INTEGER | NO | 0 | Bus/interface number. |
+
+### `capture_metadata`
+
+One row per capture. Survives `ALTER TABLE RENAME` from the legacy
+`buffer_metadata` during Stage 1 migration.
+
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `capture_id` | TEXT | NO | | Primary key. Matches `frames.capture_id` / `bytes.capture_id`. |
+| `capture_kind` | TEXT | NO | | `"frames"` or `"bytes"`. |
+| `name` | TEXT | NO | | Display name (user-editable). |
+| `count` | INTEGER | NO | 0 | Item count (frames or bytes). |
+| `start_time_us` | INTEGER | YES | NULL | Timestamp of first item, or NULL if empty. |
+| `end_time_us` | INTEGER | YES | NULL | Timestamp of last item, or NULL if empty. |
+| `created_at` | INTEGER | NO | | Unix timestamp (seconds) when the capture was created. |
+| `owning_session_id` | TEXT | YES | NULL | Session ID that owns this capture. NULL = orphaned. |
+| `persistent` | INTEGER | NO | 0 | Boolean (0/1). `1` if pinned (survives restart). |
+| `buses` | TEXT | NO | `'[]'` | JSON array of distinct bus numbers seen in this capture's data. |
 
 ## Indexes
 
 | Index | Columns | Purpose |
 |-------|---------|---------|
-| `idx_frames_buffer_ts` | `(buffer_id, timestamp_us)` | Timestamp-based seeks and lookback window queries. |
-| `idx_frames_buffer_fid` | `(buffer_id, frame_id)` | Filtered pagination by frame ID. |
-| `idx_bytes_buffer_ts` | `(buffer_id, timestamp_us)` | Timestamp-based seeks for byte buffers. |
+| `idx_frames_capture_ts` | `(capture_id, timestamp_us)` | Timestamp-based seeks and lookback window queries. |
+| `idx_frames_capture_fid` | `(capture_id, frame_id)` | Filtered pagination by frame ID. |
+| `idx_bytes_capture_ts` | `(capture_id, timestamp_us)` | Timestamp-based seeks for byte captures. |
 
 ## Query Patterns
 
@@ -66,32 +99,32 @@ Stores raw serial bytes for unframed serial sessions.
 
 ### Cold path (on-demand from frontend)
 
-- **Paginated read:** `SELECT ... WHERE buffer_id = ? ORDER BY rowid LIMIT ? OFFSET ?`
+- **Paginated read:** `SELECT ... WHERE capture_id = ? ORDER BY rowid LIMIT ? OFFSET ?`
 - **Filtered paginated read:** Adds `AND frame_id IN (...)` clause.
 - **Tail read:** `ORDER BY rowid DESC LIMIT ?`, then reverse in application code.
 - **Frame info aggregation:** `SELECT frame_id, MAX(dlc), MIN(bus), MAX(is_extended), (MIN(dlc) != MAX(dlc)) ... GROUP BY frame_id`
-- **Offset for timestamp:** `SELECT COUNT(*) WHERE buffer_id = ? AND timestamp_us < ?`
+- **Offset for timestamp:** `SELECT COUNT(*) WHERE capture_id = ? AND timestamp_us < ?`
 
-### Buffer reader (chunked streaming for playback)
+### Capture replay (chunked streaming for playback)
 
-- **Forward chunk:** `SELECT ... WHERE buffer_id = ? AND rowid > ? ORDER BY rowid ASC LIMIT 2000`
-- **Reverse chunk:** `SELECT ... WHERE buffer_id = ? AND rowid < ? ORDER BY rowid DESC LIMIT 2000`
+- **Forward chunk:** `SELECT ... WHERE capture_id = ? AND rowid > ? ORDER BY rowid ASC LIMIT 2000`
+- **Reverse chunk:** `SELECT ... WHERE capture_id = ? AND rowid < ? ORDER BY rowid DESC LIMIT 2000`
 - **Snapshot (seek while paused):** Most recent frame per unique `frame_id` within a lookback window:
   ```sql
   SELECT f.* FROM frames f
   INNER JOIN (
       SELECT frame_id, MAX(rowid) as max_rowid
       FROM frames
-      WHERE buffer_id = ? AND rowid <= ? AND timestamp_us >= ?
+      WHERE capture_id = ? AND rowid <= ? AND timestamp_us >= ?
       GROUP BY frame_id
   ) latest ON f.rowid = latest.max_rowid
   ```
-- **Step frame:** `SELECT ... WHERE buffer_id = ? AND rowid > ? [AND frame_id IN (...)] ORDER BY rowid ASC LIMIT 1`
+- **Step frame:** `SELECT ... WHERE capture_id = ? AND rowid > ? [AND frame_id IN (...)] ORDER BY rowid ASC LIMIT 1`
 
-### Buffer management
+### Capture management
 
-- **Copy buffer:** `INSERT INTO frames (...) SELECT ... FROM frames WHERE buffer_id = ? ORDER BY rowid` (no memory spike).
-- **Delete buffer:** `DELETE FROM frames WHERE buffer_id = ?` (+ same for bytes).
+- **Copy capture:** `INSERT INTO frames (...) SELECT ... FROM frames WHERE capture_id = ? ORDER BY rowid` (no memory spike).
+- **Delete capture:** `DELETE FROM frames WHERE capture_id = ?` (+ same for bytes).
 - **Clear all:** `DELETE FROM frames; DELETE FROM bytes;`
 
 ## Architecture
@@ -100,36 +133,36 @@ Stores raw serial bytes for unframed serial sessions.
 
 | Module | File | Role |
 |--------|------|------|
-| `buffer_db` | `src-tauri/src/buffer_db.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
-| `buffer_store` | `src-tauri/src/buffer_store.rs` | Public API. Metadata in RAM (`RwLock<BufferRegistry>`), delegates data ops to `buffer_db`. |
-| `BufferReader` | `src-tauri/src/io/timeline/buffer.rs` | Playback engine. Reads chunks from `buffer_db` for streaming. |
+| `capture_db` | `src-tauri/src/capture_db.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
+| `capture_store` | `src-tauri/src/capture_store.rs` | Public API. Metadata in RAM (`RwLock<CaptureRegistry>`), delegates data ops to `capture_db`. |
+| `CaptureSource` | `src-tauri/src/io/timeline/capture.rs` | Playback engine. Reads chunks from `capture_db` for streaming. |
 
 ### Data flow
 
 ```
-Device/Import → buffer_store::append_frames()
+Device/Import → capture_store::append_frames_to_session()
                   ├─ Update metadata in RAM (count, timestamps)
-                  └─ buffer_db::insert_frames() → SQLite
+                  └─ capture_db::insert_frames() → SQLite
 
-Frontend pagination → Tauri command → buffer_store::get_buffer_frames_paginated()
-                                        └─ buffer_db::get_frames_paginated() → SQLite
+Frontend pagination → Tauri command → capture_store::get_capture_frames_paginated()
+                                        └─ capture_db::get_frames_paginated() → SQLite
 
-Playback → BufferReader::run_buffer_stream()
-             └─ buffer_db::read_frame_chunk() → SQLite (2000 frames at a time)
+Playback → CaptureSource::run_buffer_stream()
+             └─ capture_db::read_frame_chunk() → SQLite (2000 frames at a time)
 ```
 
 ### Lock ordering
 
 The system uses two locks:
 
-1. `BUFFER_REGISTRY` (`RwLock`) — protects buffer metadata in RAM
+1. `CAPTURE_REGISTRY` (`RwLock`) — protects capture metadata in RAM
 2. `DB` (`Mutex`) — protects the SQLite connection
 
-**Rule:** Always acquire `BUFFER_REGISTRY` first, release it, then call `buffer_db` (which acquires `DB`). Never hold both simultaneously. This prevents deadlocks.
+**Rule:** Always acquire `CAPTURE_REGISTRY` first, release it, then call `capture_db` (which acquires `DB`). Never hold both simultaneously. This prevents deadlocks.
 
 ### Why SQLite instead of in-memory storage
 
-Long-running CAN captures (~480k frames, ~17 minutes) previously crashed consistently. The old `buffer_store` kept all frames in an unbounded `Vec<FrameMessage>` — at 480k frames that's ~72 MB, and functions like `get_frames()` and `copy_buffer()` cloned the entire Vec, temporarily doubling memory. Combined with WebView memory in the Tauri process, this exceeded the memory budget and caused WebKit to kill the WebView.
+Long-running CAN captures (~480k frames, ~17 minutes) previously crashed consistently. The old in-memory store kept all frames in an unbounded `Vec<FrameMessage>` — at 480k frames that's ~72 MB, and functions like `get_frames()` and `copy_capture()` cloned the entire Vec, temporarily doubling memory. Combined with WebView memory in the Tauri process, this exceeded the memory budget and caused WebKit to kill the WebView.
 
 With SQLite, steady-state RAM at 480k frames drops from ~72 MB (+ clone overhead) to ~5-10 MB (metadata only). Bulk data lives on disk with efficient indexed access.
 
@@ -146,23 +179,27 @@ sqlite3 ~/Library/Application\ Support/com.wired.wiretap/buffers.db
 ### Useful queries
 
 ```sql
--- List all buffers and their frame counts
-SELECT buffer_id, COUNT(*) as frame_count,
+-- List all captures and their frame counts
+SELECT capture_id, COUNT(*) as frame_count,
        MIN(timestamp_us) as first_ts, MAX(timestamp_us) as last_ts
-FROM frames GROUP BY buffer_id;
+FROM frames GROUP BY capture_id;
+
+-- List all captures with metadata (name, kind, persistence)
+SELECT capture_id, capture_kind, name, count, persistent, owning_session_id
+FROM capture_metadata;
 
 -- Check database size
 SELECT page_count * page_size as size_bytes
 FROM pragma_page_count(), pragma_page_size();
 
--- List unique frame IDs in a buffer
+-- List unique frame IDs in a capture
 SELECT frame_id, COUNT(*) as count, MAX(dlc) as max_dlc
-FROM frames WHERE buffer_id = 'buf_1'
+FROM frames WHERE capture_id = 'xk9m2p'
 GROUP BY frame_id ORDER BY frame_id;
 
 -- Get the last 10 frames
 SELECT rowid, frame_id, dlc, hex(payload), timestamp_us
-FROM frames WHERE buffer_id = 'buf_1'
+FROM frames WHERE capture_id = 'xk9m2p'
 ORDER BY rowid DESC LIMIT 10;
 
 -- Check WAL mode is active
