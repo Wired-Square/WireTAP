@@ -12,7 +12,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Create draft release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --draft \
+            --title "WireTAP ${{ github.ref_name }}" \
+            --notes "See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+
   build:
+    needs: [create-release]
+    if: always()
     strategy:
       fail-fast: false
       matrix:
@@ -98,11 +118,8 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         with:
           args: --target ${{ matrix.target }}
-          # Only create release when pushing a version tag
+          # Release is pre-created by create-release job; tauri-action finds it and uploads assets
           tagName: ${{ github.ref_name }}
-          releaseName: 'WireTAP ${{ github.ref_name }}'
-          releaseBody: |
-            See the [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
           releaseDraft: true
           prerelease: false
         if: startsWith(github.ref, 'refs/tags/v')
