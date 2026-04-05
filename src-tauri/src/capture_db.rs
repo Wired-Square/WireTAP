@@ -19,7 +19,10 @@ use crate::io::FrameMessage;
 /// rusqlite::Connection is !Sync, so we use Mutex (not RwLock).
 static DB: Lazy<Mutex<Option<Connection>>> = Lazy::new(|| Mutex::new(None));
 
-const SCHEMA_SQL: &str = "
+/// Table creation only. Indexes are created in a separate step AFTER the
+/// buffer→capture migration, because pre-migration legacy databases have
+/// `buffer_id` columns that our new index definitions can't reference yet.
+const SCHEMA_TABLES_SQL: &str = "
 CREATE TABLE IF NOT EXISTS frames (
     rowid INTEGER PRIMARY KEY,
     capture_id TEXT NOT NULL,
@@ -54,7 +57,11 @@ CREATE TABLE IF NOT EXISTS capture_metadata (
     created_at INTEGER NOT NULL,
     owning_session_id TEXT
 );
+";
 
+/// Index creation — runs AFTER the buffer→capture migration has renamed
+/// columns on the `frames` and `bytes` tables.
+const SCHEMA_INDEXES_SQL: &str = "
 CREATE INDEX IF NOT EXISTS idx_frames_capture_ts ON frames (capture_id, timestamp_us);
 CREATE INDEX IF NOT EXISTS idx_frames_capture_fid ON frames (capture_id, frame_id);
 CREATE INDEX IF NOT EXISTS idx_bytes_capture_ts ON bytes (capture_id, timestamp_us);
@@ -87,6 +94,9 @@ fn migrate_buffer_to_capture(conn: &mut Connection) -> Result<(), String> {
     // The CREATE TABLE IF NOT EXISTS above will have already created an EMPTY
     // `capture_metadata` table on this run. Drop it so we can rename the
     // legacy table into place (with all its data).
+    //
+    // Legacy indexes are dropped here; the post-migration step in initialise()
+    // recreates them under the new `idx_*_capture_*` names.
     tx.execute_batch(
         "DROP TABLE IF EXISTS capture_metadata;
          ALTER TABLE buffer_metadata RENAME TO capture_metadata;
@@ -96,10 +106,7 @@ fn migrate_buffer_to_capture(conn: &mut Connection) -> Result<(), String> {
          ALTER TABLE bytes RENAME COLUMN buffer_id TO capture_id;
          DROP INDEX IF EXISTS idx_frames_buffer_ts;
          DROP INDEX IF EXISTS idx_frames_buffer_fid;
-         DROP INDEX IF EXISTS idx_bytes_buffer_ts;
-         CREATE INDEX IF NOT EXISTS idx_frames_capture_ts ON frames (capture_id, timestamp_us);
-         CREATE INDEX IF NOT EXISTS idx_frames_capture_fid ON frames (capture_id, frame_id);
-         CREATE INDEX IF NOT EXISTS idx_bytes_capture_ts ON bytes (capture_id, timestamp_us);",
+         DROP INDEX IF EXISTS idx_bytes_buffer_ts;",
     )
     .map_err(|e| format!("Failed to execute buffer→capture migration: {}", e))?;
 
@@ -124,14 +131,21 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
     let mut conn = Connection::open(&db_path)
         .map_err(|e| format!("Failed to open capture database: {}", e))?;
 
-    // Create tables and indexes first (idempotent — IF NOT EXISTS)
-    conn.execute_batch(SCHEMA_SQL)
-        .map_err(|e| format!("Failed to create schema: {}", e))?;
+    // Create tables first (idempotent — IF NOT EXISTS).
+    // Indexes are deferred until AFTER the buffer→capture migration because
+    // they reference the renamed column names (`capture_id`) that don't exist
+    // on pre-migration legacy databases.
+    conn.execute_batch(SCHEMA_TABLES_SQL)
+        .map_err(|e| format!("Failed to create tables: {}", e))?;
 
     // Migrate legacy buffer_* schema to capture_* if present.
-    // Must run BEFORE the ADD COLUMN migrations below so we're targeting the
-    // correct table name.
+    // Must run BEFORE index creation and the ADD COLUMN migrations below,
+    // so both target the correct (renamed) column names.
     migrate_buffer_to_capture(&mut conn)?;
+
+    // Create indexes now that columns have their final names.
+    conn.execute_batch(SCHEMA_INDEXES_SQL)
+        .map_err(|e| format!("Failed to create indexes: {}", e))?;
 
     // Schema migration: add persistent column (idempotent — ignores duplicate column error)
     let _ = conn.execute(
