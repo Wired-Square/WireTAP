@@ -6,6 +6,7 @@ import type { CatalogMetadata } from "../../../api/catalog";
 import type { IOProfile } from "../../../types/common";
 import type { PlaybackSpeed } from "../../../components/TimeController";
 import type { CaptureMetadata } from "../../../api/capture";
+import type { BusSourceInfo } from "../../../utils/busFormat";
 import AppTopBar from "../../../components/AppTopBar";
 import { buttonBase, iconButtonBase, toggleButtonClass } from "../../../styles/buttonStyles";
 
@@ -28,21 +29,24 @@ type Props = {
   multiBusProfiles?: string[];
   /** Current IO state (running, stopped, paused, error) */
   ioState?: string | null;
-  /** Whether the session is a realtime source (not buffer replay) */
-  isRealtime?: boolean;
+  /** Bus-to-source mapping for tooltip display */
+  outputBusToSource?: Map<number, BusSourceInfo>;
 
   // Speed (for top bar display, not playback controls)
   speed: PlaybackSpeed;
   supportsSpeed?: boolean;
 
-  // Streaming state (Watch is initiated via data source dialog)
+  // Streaming state
   isStreaming?: boolean;
-  onStopStream?: () => void;
+  /** Whether the session is paused */
+  isPaused?: boolean;
   /** Whether the session is stopped (not streaming) but has a profile selected */
   isStopped?: boolean;
-  /** Called when user wants to resume a stopped session */
-  onResume?: () => void;
-  /** Called when user wants to leave session (session continues running) */
+  /** Play/resume the session */
+  onPlay?: () => void;
+  /** Pause the session */
+  onPause?: () => void;
+  /** Called when user wants to leave session */
   onLeave?: () => void;
   /** Whether the IO source supports time range filtering */
   supportsTimeRange?: boolean;
@@ -114,13 +118,14 @@ export default function DecoderTopBar({
   sessionId,
   multiBusProfiles = [],
   ioState,
-  isRealtime: _isRealtime = true,
+  outputBusToSource,
   speed,
   supportsSpeed = false,
   isStreaming = false,
-  onStopStream,
+  isPaused = false,
   isStopped = false,
-  onResume,
+  onPlay,
+  onPause,
   onLeave,
   supportsTimeRange = false,
   onOpenBookmarkPicker,
@@ -170,15 +175,17 @@ export default function DecoderTopBar({
         ioState,
         frameCount: uniqueFrameCount,
         totalFrameCount,
+        outputBusToSource,
         onOpenIoSessionPicker,
         speed,
         supportsSpeed,
         onOpenSpeedPicker,
         isStreaming,
-        isStopped, // Show Resume in both realtime and buffer mode (to return to live)
+        isPaused,
+        isStopped,
         supportsTimeRange,
-        onStop: !isCaptureMode ? onStopStream : undefined, // Hide Stop only in buffer mode
-        onResume, // Always show Resume when stopped (resumeFresh handles live return)
+        onPlay,
+        onPause,
         onLeave,
         onOpenBookmarkPicker,
         isCaptureMode,

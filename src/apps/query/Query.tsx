@@ -396,10 +396,11 @@ export default function Query() {
           uniqueFrameCount={watchUniqueFrameCount}
           totalFrameCount={watchFrameCount}
           isStreaming={isStreaming || hasSource}
+          isPaused={isPaused}
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
-          onStop={handlers.handleStopWatch}
-          onResume={session.start}
+          onPause={handlers.handleStopWatch}
+          onPlay={session.start}
           onLeave={handleLeave}
         />
       }

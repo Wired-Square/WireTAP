@@ -746,13 +746,13 @@ export async function switchSessionToBufferReplay(
 }
 
 /**
- * Stop a realtime session and switch all listeners to buffer replay.
+ * Stop a realtime session and switch all listeners to capture replay.
  * Emits `session-lifecycle` signal so all apps on the session refresh state.
- * Falls back to normal suspend if no buffer exists.
+ * Falls back to normal suspend if no capture exists.
  * @param sessionId The session ID
- * @param speed Initial buffer playback speed (default: 1.0)
+ * @param speed Initial capture playback speed (default: 1.0)
  */
-export async function stopAndSwitchToBuffer(
+export async function stopAndSwitchToCapture(
   sessionId: string,
   speed?: number
 ): Promise<IOCapabilities> {
@@ -875,7 +875,7 @@ export async function registerSessionSubscriber(
   subscriberId: string,
   appName?: string
 ): Promise<RegisterSubscriberResult> {
-  return invoke("register_session_listener", {
+  return invoke("register_session_subscriber", {
     session_id: sessionId,
     subscriber_id: subscriberId,
     app_name: appName,
@@ -895,7 +895,7 @@ export async function unregisterSessionSubscriber(
 ): Promise<number> {
   console.log(`[unregisterSessionSubscriber] session=${sessionId}, listener=${subscriberId}`);
   console.log(`[unregisterSessionSubscriber] stack:`, new Error().stack);
-  return invoke("unregister_session_listener", {
+  return invoke("unregister_session_subscriber", {
     session_id: sessionId,
     subscriber_id: subscriberId,
   });

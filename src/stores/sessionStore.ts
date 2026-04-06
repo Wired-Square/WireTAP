@@ -639,7 +639,7 @@ async function setupSessionEventSubscribers(
             capabilities: capabilities as IOCapabilities,
           });
           // Refresh capture fields from backend — after a live→buffer transition
-          // (e.g. stopAndSwitchToBuffer), StreamEnded may not have landed yet or
+          // (e.g. stopAndSwitchToCapture), StreamEnded may not have landed yet or
           // may have been clobbered by an intermediate `running` lifecycle blip
           // that resets capture to zeros at line 619. Fetch fresh metadata so
           // session.capture.count reflects reality for the tooltip/Tools button.

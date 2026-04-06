@@ -224,13 +224,14 @@ export default function TestPattern() {
           sessionId={session.sessionId}
           multiBusProfiles={session.sessionId ? multiBusProfiles : []}
           isStreaming={isStreaming}
+          isPaused={false}
           isStopped={isStopped || canReturnToLive}
           ioState={session.state}
           frameCount={watchUniqueFrameCount}
           totalFrameCount={watchFrameCount}
           onOpenIoPicker={() => dialogs.ioSessionPicker.open()}
-          onStop={() => session.stop()}
-          onResume={() => session.start()}
+          onPause={() => session.stop()}
+          onPlay={() => session.start()}
           onLeave={managerLeave}
           role={role}
           mode={mode}

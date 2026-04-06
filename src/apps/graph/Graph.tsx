@@ -514,10 +514,11 @@ export default function Graph() {
           sessionId={sessionId}
           ioState={readerState}
           isStreaming={isStreaming}
+          isPaused={isPaused}
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
-          onStop={stopWatch}
-          onResume={resumeWithNewBuffer}
+          onPause={stopWatch}
+          onPlay={resumeWithNewBuffer}
           onLeave={!isDetached ? handleLeave : undefined}
           onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
           catalogs={catalogs}

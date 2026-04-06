@@ -22,6 +22,7 @@ interface Props {
 
   // Session state
   isStreaming: boolean;
+  isPaused?: boolean;
   isStopped?: boolean;
   /** Current IO state (running, stopped, paused, error) */
   ioState?: string | null;
@@ -47,8 +48,8 @@ interface Props {
 
   // Handlers
   onOpenIoPicker: () => void;
-  onStop?: () => void;
-  onResume?: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
   onLeave?: () => void;
 
   // Loading/error state
@@ -63,6 +64,7 @@ export default function TransmitTopBar({
   sessionId,
   multiBusProfiles = [],
   isStreaming,
+  isPaused = false,
   isStopped = false,
   ioState,
   speed = 1,
@@ -74,8 +76,8 @@ export default function TransmitTopBar({
   uniqueFrameCount,
   totalFrameCount,
   onOpenIoPicker,
-  onStop,
-  onResume,
+  onPlay,
+  onPause,
   onLeave,
   isLoading = false,
   error = null,
@@ -103,9 +105,10 @@ export default function TransmitTopBar({
         supportsTimeRange,
         onOpenBookmarkPicker,
         isStreaming,
+        isPaused,
         isStopped,
-        onStop,
-        onResume,
+        onPlay,
+        onPause,
         onLeave,
       }}
       actions={

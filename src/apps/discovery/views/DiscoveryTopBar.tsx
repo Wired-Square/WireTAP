@@ -3,6 +3,7 @@
 import { Search, ChevronRight, Save, Info, Wrench, Download, Undo2 } from "lucide-react";
 import type { IOProfile } from "../../../types/common";
 import type { CaptureMetadata } from "../../../api/capture";
+import type { BusSourceInfo } from "../../../utils/busFormat";
 import AppTopBar from "../../../components/AppTopBar";
 import { buttonBase, iconButtonBase } from "../../../styles/buttonStyles";
 import { iconMd, iconSm } from "../../../styles/spacing";
@@ -17,20 +18,23 @@ type Props = {
   /** Current session ID (e.g., "f_abc123") */
   sessionId?: string | null;
   isStreaming: boolean;
+  /** Whether the session is paused */
+  isPaused?: boolean;
   /** Profile IDs when in multi-bus mode */
   multiBusProfiles?: string[];
   /** Current IO state (running, stopped, paused, error) */
   ioState?: string | null;
-  /** Whether the session is a realtime source (not buffer replay) */
-  isRealtime?: boolean;
+  /** Bus-to-source mapping for tooltip display */
+  outputBusToSource?: Map<number, BusSourceInfo>;
 
-  // Stop control (Watch is initiated via data source dialog)
-  onStopWatch?: () => void;
+  // Session controls
   /** Whether the session is stopped (not streaming) but has a profile selected */
   isStopped?: boolean;
-  /** Called when user wants to resume a stopped session */
-  onResume?: () => void;
-  /** Called when user wants to leave session (session continues running) */
+  /** Play/resume the session */
+  onPlay?: () => void;
+  /** Pause the session */
+  onPause?: () => void;
+  /** Called when user wants to leave session */
   onLeave?: () => void;
   /** Whether the IO source supports time range filtering */
   supportsTimeRange?: boolean;
@@ -98,12 +102,13 @@ export default function DiscoveryTopBar({
   captureMetadata,
   sessionId,
   isStreaming,
+  isPaused = false,
   multiBusProfiles = [],
   ioState,
-  isRealtime: _isRealtime = true,
-  onStopWatch,
+  outputBusToSource,
   isStopped = false,
-  onResume,
+  onPlay,
+  onPause,
   onLeave,
   frameCount,
   uniqueFrameCount,
@@ -150,15 +155,17 @@ export default function DiscoveryTopBar({
         ioState,
         frameCount: uniqueFrameCount,
         totalFrameCount,
+        outputBusToSource,
         onOpenIoSessionPicker,
         speed,
         supportsSpeed,
         onOpenSpeedPicker,
         isStreaming,
-        isStopped, // Show Resume in both realtime and buffer mode (to return to live)
+        isPaused,
+        isStopped,
         supportsTimeRange,
-        onStop: !isCaptureMode ? onStopWatch : undefined, // Hide Stop only in buffer mode
-        onResume, // Always show Resume when stopped (resumeFresh handles live return)
+        onPlay,
+        onPause,
         onLeave,
         onOpenBookmarkPicker,
         isCaptureMode,

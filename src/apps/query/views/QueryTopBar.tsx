@@ -28,12 +28,13 @@ interface Props {
 
   // Session state (from useIOSessionManager)
   isStreaming: boolean;
+  isPaused?: boolean;
   isStopped?: boolean;
   supportsTimeRange?: boolean;
 
   // Session actions
-  onStop?: () => void;
-  onResume?: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
   onLeave?: () => void;
   onOpenBookmarkPicker?: () => void;
 }
@@ -49,10 +50,11 @@ export default function QueryTopBar({
   totalFrameCount,
   onOpenIoSessionPicker,
   isStreaming,
+  isPaused,
   isStopped,
   supportsTimeRange,
-  onStop,
-  onResume,
+  onPlay,
+  onPause,
   onLeave,
   onOpenBookmarkPicker,
 }: Props) {
@@ -68,10 +70,11 @@ export default function QueryTopBar({
         totalFrameCount,
         onOpenIoSessionPicker,
         isStreaming,
+        isPaused,
         isStopped,
         supportsTimeRange,
-        onStop,
-        onResume,
+        onPlay,
+        onPause,
         onLeave,
         onOpenBookmarkPicker,
       }}

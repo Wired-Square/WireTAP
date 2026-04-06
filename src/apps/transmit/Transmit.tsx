@@ -283,12 +283,13 @@ export default function Transmit() {
           sessionId={session.sessionId}
           multiBusProfiles={session.sessionId ? multiBusProfiles : []}
           isStreaming={isStreaming}
+          isPaused={isPaused}
           isStopped={isStopped || canReturnToLive}
           ioState={session.state}
           capabilities={capabilities ? { protocols: capabilities.traits.protocols, available_buses: capabilities.available_buses } : null}
           onOpenIoPicker={handlers.handleOpenIoPicker}
-          onStop={handlers.handleStop}
-          onResume={handlers.handleResume}
+          onPause={handlers.handleStop}
+          onPlay={handlers.handleResume}
           onLeave={managerLeave}
           uniqueFrameCount={watchUniqueFrameCount}
           totalFrameCount={watchFrameCount}

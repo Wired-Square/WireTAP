@@ -28,10 +28,11 @@ interface Props {
   sessionId?: string | null;
   ioState?: string | null;
   isStreaming: boolean;
+  isPaused?: boolean;
   isStopped?: boolean;
   supportsTimeRange?: boolean;
-  onStop?: () => void;
-  onResume?: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
   onLeave?: () => void;
   onOpenIoSessionPicker: () => void;
 
@@ -69,10 +70,11 @@ export default function GraphTopBar({
   sessionId,
   ioState,
   isStreaming,
+  isPaused,
   isStopped,
   supportsTimeRange,
-  onStop,
-  onResume,
+  onPlay,
+  onPause,
   onLeave,
   onOpenIoSessionPicker,
   catalogs,
@@ -162,10 +164,11 @@ export default function GraphTopBar({
         totalFrameCount: watchFrameCount,
         onOpenIoSessionPicker,
         isStreaming,
+        isPaused,
         isStopped,
         supportsTimeRange,
-        onStop,
-        onResume,
+        onPlay,
+        onPause,
         onLeave,
       }}
       catalog={{

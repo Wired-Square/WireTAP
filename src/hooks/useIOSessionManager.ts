@@ -27,7 +27,7 @@ export { isCaptureProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToBuffer, resumeSessionToLive, type StreamEndedInfo, type IOCapabilities } from "../api/io";
+import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToCapture, resumeSessionToLive, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -672,24 +672,45 @@ export function useIOSessionManager(
   const joinerCount = session.joinerCount;
 
   // ---- Handlers ----
-  // Leave session, keeping a reference to the buffer data.
-  // When other listeners remain, we copy the buffer so the session's buffer stays intact.
-  // When we're the last listener, we skip the copy — leaving the session orphans the
-  // buffer automatically, and we can reference it directly.
-  // Leave session: unregister listener, fully reset app state, no data preserved
+  // Leave session: behaviour depends on current mode.
+  // - Capture mode → full disconnect (No Source)
+  // - Realtime/Recorded → stop source and switch to capture replay in-place
   const handleLeave = useCallback(async () => {
-    // App-specific cleanup (clear frames, decoded data, etc.)
-    onBeforeWatch?.();
-    // Unregister listener from the session
-    await session.leave();
-    // Full state reset
-    setMultiBusProfiles([]);
-    setMultiSessionId(null);
-    setIoProfile(null);
-    setSourceProfileId(null);
-    setIsWatching(false);
-    setIsDetached(false);
-  }, [session, onBeforeWatch, setMultiBusProfiles, setIoProfile]);
+    const currentIsCaptureMode = isCaptureProfileId(ioProfile) || isCaptureProfileId(sourceProfileId)
+      || session.capabilities?.traits.temporal_mode === "buffer";
+
+    if (currentIsCaptureMode) {
+      // Already viewing a capture → "second leave" → No Source
+      onBeforeWatch?.();
+      await session.leave();
+      setMultiBusProfiles([]);
+      setMultiSessionId(null);
+      setIoProfile(null);
+      setSourceProfileId(null);
+      setIsWatching(false);
+      setIsDetached(false);
+    } else {
+      // Realtime or Recorded → stop source, switch to capture in-place.
+      // session-lifecycle event fires → capabilities update → isCaptureMode flips true.
+      const sessionId = session.sessionId;
+      if (!sessionId) return;
+      try {
+        await stopAndSwitchToCapture(sessionId, 1.0);
+        tlog.debug(`[IOSessionManager:${appName}] Leave: switched to capture`);
+      } catch (e) {
+        // No capture available (e.g., 0 frames received) — full disconnect
+        tlog.info(`[IOSessionManager:${appName}] Leave: no capture, disconnecting: ${e}`);
+        onBeforeWatch?.();
+        await session.leave();
+        setMultiBusProfiles([]);
+        setMultiSessionId(null);
+        setIoProfile(null);
+        setSourceProfileId(null);
+        setIsWatching(false);
+        setIsDetached(false);
+      }
+    }
+  }, [session, onBeforeWatch, setMultiBusProfiles, setIoProfile, ioProfile, sourceProfileId, appName]);
 
   const handleRejoin = useCallback(async () => {
     await session.rejoin();
@@ -958,10 +979,10 @@ export function useIOSessionManager(
 
     if (isRealtimeSession) {
       try {
-        await stopAndSwitchToBuffer(session.sessionId, 1.0);
-        tlog.debug(`[IOSessionManager:${appName}] Stopped realtime session and switched to buffer`);
+        await stopAndSwitchToCapture(session.sessionId, 1.0);
+        tlog.debug(`[IOSessionManager:${appName}] Stopped realtime session and switched to capture`);
       } catch (e) {
-        tlog.info(`[IOSessionManager:${appName}] stopAndSwitchToBuffer failed, falling back to suspend: ${e}`);
+        tlog.info(`[IOSessionManager:${appName}] stopAndSwitchToCapture failed, falling back to suspend: ${e}`);
         await session.suspend();
       }
       setIsWatching(false);

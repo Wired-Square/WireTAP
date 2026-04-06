@@ -14,11 +14,12 @@ interface Props {
   sessionId?: string | null;
   multiBusProfiles?: string[];
   isStreaming: boolean;
+  isPaused?: boolean;
   isStopped?: boolean;
   ioState?: string | null;
   onOpenIoPicker: () => void;
-  onStop?: () => void;
-  onResume?: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
   onLeave?: () => void;
 
   // Transport mode
@@ -50,11 +51,12 @@ export default function ModbusTopBar({
   sessionId,
   multiBusProfiles = [],
   isStreaming,
+  isPaused = false,
   isStopped = false,
   ioState,
   onOpenIoPicker,
-  onStop,
-  onResume,
+  onPlay,
+  onPause,
   onLeave,
   onClearBuffer,
   hasData = false,
@@ -81,9 +83,10 @@ export default function ModbusTopBar({
         ioState,
         onOpenIoSessionPicker: onOpenIoPicker,
         isStreaming,
+        isPaused,
         isStopped,
-        onStop,
-        onResume,
+        onPlay,
+        onPause,
         onLeave,
         onClearBuffer,
         hasData,

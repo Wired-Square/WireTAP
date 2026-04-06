@@ -242,11 +242,12 @@ export default function Modbus() {
           sessionId={sessionId}
           multiBusProfiles={multiBusProfiles}
           isStreaming={isStreaming}
+          isPaused={false}
           isStopped={isStopped}
           ioState={session.state}
           onOpenIoPicker={() => setIoPickerOpen(true)}
-          onStop={stopWatch}
-          onResume={reconnectWithPolls}
+          onPause={stopWatch}
+          onPlay={reconnectWithPolls}
           onLeave={!isDetached ? handleLeave : undefined}
           onClearBuffer={async () => { clearState(); await handleClearBuffer(); }}
           hasData={registerVersion > 0}

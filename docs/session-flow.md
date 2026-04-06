@@ -36,7 +36,7 @@ Every IO source declares its capabilities via two embedded structs on
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  InterfaceTraits                                         │
-│    temporal_mode:  "realtime" | "timeline"               │
+│    temporal_mode:  "realtime" | "recorded"               │
 │    protocols:      ["can"] | ["canfd","can"]             │
 │                    | ["serial"] | ["modbus"] | ...       │
 │    tx_frames:      bool  (CAN, Modbus, framed serial)    │
@@ -69,8 +69,8 @@ with `multi_source: false` cannot be combined with others.
 | Modbus RTU        | [io/modbus_rtu/](../src-tauri/src/io/modbus_rtu/) | realtime | modbus | ✓         | ✗        | ✓     |
 | FrameLink         | [io/framelink/](../src-tauri/src/io/framelink/) | realtime | (per rule) | ✓ | ✗        | ✓     |
 | Virtual device    | [io/virtual_device/](../src-tauri/src/io/virtual_device/) | realtime | can\|serial | loopback | loopback | ✓ |
-| PostgreSQL        | [io/timeline/postgres.rs](../src-tauri/src/io/timeline/postgres.rs) | timeline | can | ✗ | ✗ | ✗ |
-| Buffer replay     | [io/timeline/buffer.rs](../src-tauri/src/io/timeline/buffer.rs) | timeline | (inherited) | ✗ | ✗ | ✗ |
+| PostgreSQL        | [io/recorded/postgres.rs](../src-tauri/src/io/recorded/postgres.rs) | recorded | can | ✗ | ✗ | ✗ |
+| Buffer replay     | [io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs) | buffer | (inherited) | ✗ | ✗ | ✗ |
 
 ¹ Framed serial (SLIP, Modbus RTU, delimiter) emits frames, not raw bytes.
 
@@ -180,33 +180,48 @@ A session is an `IOSession` stored in the global `IO_SESSIONS` HashMap in
 `Box<dyn IOSource>` plus listener metadata, source config, profile bookkeeping,
 and capabilities.
 
+Every session eventually becomes a capture. The unified lifecycle is:
+
+```
+  REALTIME:   connect → streaming → leave → CAPTURE → leave → No Source
+  CAPTURE:    connect → paused → play → running → leave → No Source
+  RECORDED:   connect → streaming → leave → CAPTURE → leave → No Source
+  IMPORT:     → CAPTURE (same as above)
+```
+
 ```
                   ┌────────────┐
-                  │  RUNNING   │
+                  │  RUNNING   │ ◀──── play (resume/start)
                   └─────┬──────┘
                         │
-        ┌───────────────┼───────────────┬───────────────┐
-        ▼               ▼               ▼               ▼
-  ┌──────────┐  ┌──────────────┐  ┌──────────┐  ┌──────────────┐
-  │  PAUSED  │  │ STOP (realtime)│ │ STOPPED │  │ LEAVE         │
-  │          │  │ → buffer replay│ │ (timeline)│ │ (last listener)│
-  │ resume() │  └───────┬────────┘ └──────────┘  └──────┬───────┘
-  │ → RUN    │          │                                │
-  └──────────┘          ▼                                ▼
-                 ┌────────────────┐            ┌──────────────────┐
-                 │ CAPTURE REPLAY │            │ destroy_session  │
-                 │ (CaptureSource │            │  (remove from    │
-                 │   swapped in)  │            │   IO_SESSIONS)   │
-                 └────────────────┘            └──────────────────┘
+        ┌───────────────┼───────────────┐
+        ▼               ▼               ▼
+  ┌──────────┐  ┌──────────────────┐  ┌──────────────────┐
+  │  PAUSED  │  │ LEAVE (realtime/ │  │ LEAVE (capture)  │
+  │          │  │  recorded)       │  │                  │
+  │ play →   │  │ → switch to      │  │ → full disconnect│
+  │  RUNNING │  │   capture replay │  │   (No Source)    │
+  └──────────┘  └───────┬──────────┘  └──────┬───────────┘
+                        │                     │
+                        ▼                     ▼
+                 ┌────────────────┐   ┌──────────────────┐
+                 │ CAPTURE REPLAY │   │ destroy_session  │
+                 │ (CaptureSource │   │  (remove from    │
+                 │   swapped in)  │   │   IO_SESSIONS)   │
+                 └────────────────┘   └──────────────────┘
 ```
 
-### STOP (realtime source)
+### LEAVE (realtime or recorded source) — "first leave"
+
+When a user presses Leave on a realtime or recorded (PostgreSQL) session,
+`handleLeave` calls `stopAndSwitchToCapture`, which transitions the session
+to capture replay in-place:
 
 ```
-App clicks STOP
+App clicks Leave (realtime/recorded)
      │
      ▼
-stop_and_switch_to_buffer(session_id, speed)       src-tauri/src/io/mod.rs
+stop_and_switch_to_capture(session_id, speed)       src-tauri/src/io/mod.rs
      ├─ device.stop()                               → emit_stream_ended
      │                                              → finalize_session_captures
      ├─ pick frame capture via get_session_capture_ids
@@ -220,8 +235,22 @@ stop_and_switch_to_buffer(session_id, speed)       src-tauri/src/io/mod.rs
         and transitions to capture replay mode together.
 ```
 
-`canReturnToLive` becomes true because the original `source_configs` are
-retained on the `IOSession`.
+If no capture is available (e.g., 0 frames received), the backend returns
+an error and `handleLeave` falls back to a full disconnect.
+
+### LEAVE (capture) — "second leave"
+
+When a user presses Leave while already viewing a capture, `handleLeave`
+calls `session.leave()` to unregister the listener, fully resets app state,
+and the session is destroyed.
+
+### Play / Pause
+
+Play and Pause buttons are always visible in the session controls.
+- **Realtime running** → Pause calls `session.pause()`.
+- **Realtime paused** → Play calls `session.resume()`.
+- **Capture paused** → Play starts forward playback.
+- **Capture running** → Pause pauses playback.
 
 ### RESUME to live
 
@@ -230,16 +259,12 @@ stored `source_configs`, calls `profile_tracker::can_use_profile()` for each,
 and then uses `replace_session_source(..., auto_start=true)` to swap in the
 live reader.
 
-### STOP (timeline source)
+### Capture labelling during streaming
 
-Timeline sessions (PostgreSQL, buffer) use the existing `suspend_session` /
-`switch_to_buffer_replay` pair. Only the initiating app transitions; other
-listeners stay on the running session if any remain.
-
-### LEAVE
-
-`session.leave()` unregisters one listener and resets that app's local state.
-The session is destroyed only when the **last** listener leaves.
+Rename (pencil) and Pin icons are visible whenever capture metadata exists —
+including during realtime streaming. Renaming a capture automatically pins
+it (marks it persistent). The speed button is always visible but greyed out
+(disabled) for realtime sessions where speed control is not supported.
 
 ### `replace_session_source` — the shared primitive
 

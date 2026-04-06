@@ -12,6 +12,20 @@ All notable changes to WireTAP will be documented in this file.
 
 - **Session → Import from File… menu item** (Cmd+Shift+I): New native menu shortcut to import CSV/CAN dump files directly into a capture. Opens the OS file picker and column mapper without requiring the full IO Source Picker dialog. Available in Discovery, Decoder, and Graph panels.
 
+- **Simplified session lifecycle — every session becomes a capture**: Unified leave behaviour across all session types. Leaving a realtime or recorded (PostgreSQL) session now stops the source and switches to capture replay in-place (via `stopAndSwitchToCapture`), rather than destroying the session. Leaving from capture mode performs a full disconnect (No Source). This gives a consistent two-step flow: Realtime → Capture → No Source.
+
+- **Session controls always visible**: Play/Pause, Speed, Leave, and Rename/Pin buttons are now always visible in the session top bar regardless of mode. Play/Pause work appropriately for both realtime (pause/resume stream) and capture (pause/resume playback) sessions. Speed button is greyed out for realtime sessions. Leave button shows contextual tooltip ("Stop & review capture" vs "Disconnect").
+
+- **Capture labelling during realtime streaming**: Rename (pencil) and Pin icons are visible whenever capture metadata exists, including during realtime streaming — allowing users to pre-label and pin captures before leaving. Renaming a capture automatically pins it.
+
+- **Enhanced session tooltip**: Hover tooltip now shows Capture label, and bus-mapped Interface entries (e.g., "bus0: Sungrow GOU (GVRET TCP)") replacing the old Source row. Tooltip automatically clamps to viewport boundaries to avoid clipping at screen edges.
+
+### Fixed
+
+- **Clear capture stalls frame delivery**: Clearing a capture's data during realtime streaming (bin icon) left the WS frame delivery offset at the old value, so `send_new_frames` never delivered new frames. The offset is now reset when capture data is cleared.
+
+- **Stale Tauri command names**: Frontend API wrappers `registerSessionSubscriber` and `unregisterSessionSubscriber` were still invoking the old `register_session_listener` / `unregister_session_listener` commands (renamed in the Listener → Subscriber sweep). Updated to match the Rust backend.
+
 ### Changed
 
 - **Listener → Subscriber rename**: Renamed session listener vocabulary to subscriber across the full stack. Rust: `SessionListener` → `SessionSubscriber`, `register_listener` → `register_subscriber`, `listener_id` → `subscriber_id`, `listener_count` → `subscriber_count`, `ListenerInfo` → `SubscriberInfo`, `RegisterListenerResult` → `RegisterSubscriberResult`, `TimelineControl` → `PlaybackControl`. **Breaking wire changes**: Tauri commands (`register_session_listener` → `register_session_subscriber`, `unregister_session_listener` → `unregister_session_subscriber`, `evict_session_listener_cmd` → `evict_session_subscriber_cmd`, `get_session_listener_list` → `get_session_subscriber_list`, `set_session_listener_active` → `set_session_subscriber_active`), `listener-evicted` event → `subscriber-evicted`, serialised fields (`listener_id` → `subscriber_id`, `listener_count` → `subscriber_count`, `creator_listener_id` → `creator_subscriber_id`). Frontend types, stores, hooks, and UI strings swept.

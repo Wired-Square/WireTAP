@@ -502,6 +502,7 @@ export default function Decoder() {
   const {
     // Multi-bus state
     multiBusProfiles: ioProfiles,
+    outputBusToSource,
     // Source profile ID (for bookmark lookups - preserved when session ID differs)
     sourceProfileId,
     // Session
@@ -524,7 +525,6 @@ export default function Decoder() {
     isDetached,
     // Ingest state
     isLoading,
-    stopLoad,
     // Session switching methods
     stopWatch,
     resumeWithNewBuffer,
@@ -1007,7 +1007,7 @@ export default function Decoder() {
             sessionId={sessionId}
             multiBusProfiles={sessionId ? ioProfiles : []}
             ioState={readerState}
-            isRealtime={isRealtime}
+            outputBusToSource={outputBusToSource}
             isCaptureMode={isCaptureMode}
             capturePersistent={session.capturePersistent}
             onToggleBufferPin={() => {
@@ -1016,16 +1016,24 @@ export default function Decoder() {
             }}
             onRenameBuffer={(newName) => {
               const bid = captureMetadata?.id ?? session.captureId;
-              if (bid) useSessionStore.getState().renameSessionCapture(bid, newName);
+              if (bid) {
+                const store = useSessionStore.getState();
+                store.renameSessionCapture(bid, newName);
+                // Auto-pin on rename — naming implies keeping
+                if (!session.capturePersistent) {
+                  store.setSessionCapturePersistent(bid, true);
+                }
+              }
             }}
             onClearBuffer={handleClearBuffer}
             hasData={frameList.length > 0 || hasBufferData}
             speed={playbackSpeed}
             supportsSpeed={capabilities?.supports_speed_control ?? false}
             isStreaming={isDecoding || isLoading}
-            onStopStream={isDecoding ? handlers.handleStopWatch : stopLoad}
+            isPaused={isPaused}
             isStopped={isStopped || canReturnToLive}
-            onResume={resumeWithNewBuffer}
+            onPlay={isStopped || canReturnToLive ? resumeWithNewBuffer : handlers.handlePlay}
+            onPause={isDecoding ? handlers.handlePause : undefined}
             onLeave={!isDetached ? handleLeave : undefined}
             supportsTimeRange={capabilities?.supports_time_range ?? false}
             onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}

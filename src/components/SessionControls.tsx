@@ -1,17 +1,17 @@
 // src/components/SessionControls.tsx
 //
 // Shared session control components for top bars.
-// Handles reader display, stop/resume/leave controls.
+// Handles reader display, play/pause/leave controls, speed, and capture metadata.
 
-import { useState, useRef, useEffect } from "react";
-import { Star, FileText, Square, Play, GitMerge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Star, FileText, Play, Pause, GitMerge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { iconSm, iconXs } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
+import type { BusSourceInfo } from "../utils/busFormat";
 import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import {
   buttonBase,
-  dangerButtonBase,
   warningButtonBase,
   successIconButton,
 } from "../styles/buttonStyles";
@@ -40,6 +40,8 @@ export interface SessionButtonProps {
   frameCount?: number;
   /** Total number of frames seen (shown in tooltip when available) */
   totalFrameCount?: number;
+  /** Bus-to-source mapping for multi-bus tooltip display */
+  outputBusToSource?: Map<number, BusSourceInfo>;
   /** Click handler to open session picker */
   onClick: () => void;
   /** Whether button should be disabled (e.g., while streaming) */
@@ -58,6 +60,7 @@ export function SessionButton({
   ioState,
   frameCount,
   totalFrameCount,
+  outputBusToSource,
   onClick,
   disabled = false,
   isCaptureMode: isBufferModeProp,
@@ -125,28 +128,64 @@ export function SessionButton({
   if (isBufferProfile) {
     typeLabel = "Capture";
   } else if (showAsMultiBus) {
-    typeLabel = "Multi-Source";
+    typeLabel = "Realtime";
   } else if (selectedProfile?.kind) {
     typeLabel = getIOKindLabel(selectedProfile.kind);
   } else {
     typeLabel = "Unknown";
   }
 
-  let sourceNames: string[];
-  if (showAsMultiBus) {
-    sourceNames = multiBusProfiles.map(
-      (pid) => ioProfiles.find((p) => p.id === pid)?.name ?? pid
-    );
+  // Build interface entries for tooltip (shown last)
+  let interfaceEntries: { label: string; kind: string }[] = [];
+  if (outputBusToSource && outputBusToSource.size > 0) {
+    // Multi-bus: show bus-mapped interface info
+    interfaceEntries = Array.from(outputBusToSource.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([bus, info]) => {
+        const profile = ioProfiles.find((p) => p.name === info.profileName);
+        const kind = profile?.kind ? getIOKindLabel(profile.kind) : "";
+        return { label: `bus${bus}: ${info.profileName}`, kind };
+      });
   } else if (selectedProfile) {
-    sourceNames = [selectedProfile.name];
-  } else if (isBufferProfile) {
-    sourceNames = [captureMetadata?.name || captureMetadata?.id || "Buffer"];
-  } else {
-    sourceNames = [];
+    const kind = selectedProfile.kind ? getIOKindLabel(selectedProfile.kind) : "";
+    interfaceEntries = [{ label: selectedProfile.name, kind }];
   }
 
+  // Tooltip boundary clamping — adjust left offset so the tooltip stays on-screen
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltipOffset, setTooltipOffset] = useState(0);
+  const [arrowOffset, setArrowOffset] = useState("50%");
+
+  const clampTooltip = useCallback(() => {
+    const tip = tooltipRef.current;
+    const container = containerRef.current;
+    if (!tip || !container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const tipWidth = tip.offsetWidth;
+    const margin = 8;
+
+    // Default: centered on the button
+    const centeredLeft = containerRect.left + containerRect.width / 2 - tipWidth / 2;
+    let offset = 0;
+
+    if (centeredLeft < margin) {
+      // Clipping left edge
+      offset = margin - centeredLeft;
+    } else if (centeredLeft + tipWidth > window.innerWidth - margin) {
+      // Clipping right edge
+      offset = (window.innerWidth - margin) - (centeredLeft + tipWidth);
+    }
+
+    setTooltipOffset(offset);
+    // Move arrow to stay centered over button
+    const arrowPos = tipWidth / 2 - offset;
+    setArrowOffset(`${arrowPos}px`);
+  }, []);
+
   return (
-    <div className="relative group shrink-0">
+    <div className="relative group shrink-0" ref={containerRef} onMouseEnter={clampTooltip}>
       <button
         onClick={onClick}
         disabled={disabled}
@@ -174,9 +213,11 @@ export function SessionButton({
       {/* Session preview tooltip */}
       {showTooltip && (
         <div
+          ref={tooltipRef}
+          style={{ transform: `translateX(calc(-50% + ${tooltipOffset}px))` }}
           className={[
-            "absolute left-1/2 -translate-x-1/2 top-full mt-2",
-            "min-w-[180px] max-w-[260px]",
+            "absolute left-1/2 top-full mt-2",
+            "min-w-[180px] max-w-[280px]",
             "px-3 py-2 rounded-lg border shadow-xl z-50",
             "bg-[var(--bg-surface)] border-[color:var(--border-default)]",
             "text-xs",
@@ -186,7 +227,10 @@ export function SessionButton({
           ].join(" ")}
         >
           {/* Arrow */}
-          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45 bg-[var(--bg-surface)] border-l border-t border-[color:var(--border-default)]" />
+          <div
+            style={{ left: arrowOffset }}
+            className="absolute -top-1 -translate-x-1/2 w-2 h-2 rotate-45 bg-[var(--bg-surface)] border-l border-t border-[color:var(--border-default)]"
+          />
 
           {/* State */}
           {statusLabel && (
@@ -202,6 +246,16 @@ export function SessionButton({
             <span className="font-medium text-[color:var(--text-primary)]">{typeLabel}</span>
           </div>
 
+          {/* Capture label */}
+          {captureMetadata?.id && (
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <span className="text-[color:var(--text-muted)]">Capture</span>
+              <span className="font-medium text-[color:var(--text-primary)] truncate max-w-[160px]">
+                {captureMetadata.name || captureMetadata.id}
+              </span>
+            </div>
+          )}
+
           {/* Frame counts */}
           {totalFrameCount != null && (
             <div className="flex items-center justify-between gap-3 mb-1">
@@ -216,16 +270,16 @@ export function SessionButton({
             </div>
           )}
 
-          {/* Sources */}
-          {sourceNames.length > 0 && (
-            <div className="flex items-start justify-between gap-3">
+          {/* Interfaces (shown last, one per bus) */}
+          {interfaceEntries.length > 0 && (
+            <div className="flex items-start justify-between gap-3 mt-1 pt-1 border-t border-[color:var(--border-default)]">
               <span className="text-[color:var(--text-muted)] shrink-0">
-                {sourceNames.length > 1 ? "Sources" : "Source"}
+                {interfaceEntries.length > 1 ? "Interfaces" : "Interface"}
               </span>
               <div className="flex flex-col items-end">
-                {sourceNames.map((name, i) => (
-                  <span key={i} className="text-[color:var(--text-primary)] truncate max-w-[160px]">
-                    {name}
+                {interfaceEntries.map((entry, i) => (
+                  <span key={i} className="text-[color:var(--text-primary)] truncate max-w-[170px]">
+                    {entry.label}{entry.kind ? ` (${entry.kind})` : ""}
                   </span>
                 ))}
               </div>
@@ -238,23 +292,27 @@ export function SessionButton({
 }
 
 // ============================================================================
-// Session Action Buttons - stop, resume, leave
+// Session Action Buttons - play, pause, leave
 // ============================================================================
 
 export interface SessionActionButtonsProps {
-  /** Whether the session is actively streaming */
+  /** Whether the session is actively streaming (running or paused) */
   isStreaming: boolean;
+  /** Whether the session is paused */
+  isPaused?: boolean;
   /** Whether the session is stopped but can be resumed */
   isStopped?: boolean;
   /** Whether the IO source supports time range filtering (shows bookmark button) */
   supportsTimeRange?: boolean;
-  /** Whether we're connected to a live session (not a buffer) - enables Leave button */
-  isLiveSession?: boolean;
-  /** Stop the session */
-  onStop?: () => void;
-  /** Resume a stopped session */
-  onResume?: () => void;
-  /** Leave the session (last to leave triggers auto-destroy) */
+  /** Whether we have an active source (enables Leave button) */
+  hasSource?: boolean;
+  /** Whether we're in capture/buffer mode (affects leave tooltip) */
+  isCaptureMode?: boolean;
+  /** Play/resume the session */
+  onPlay?: () => void;
+  /** Pause the session */
+  onPause?: () => void;
+  /** Leave the session */
   onLeave?: () => void;
   /** Open bookmark picker (for time range sources) */
   onOpenBookmarkPicker?: () => void;
@@ -262,16 +320,20 @@ export interface SessionActionButtonsProps {
 
 export function SessionActionButtons({
   isStreaming,
+  isPaused = false,
   isStopped = false,
   supportsTimeRange = false,
-  isLiveSession = false,
-  onStop,
-  onResume,
+  hasSource = false,
+  isCaptureMode = false,
+  onPlay,
+  onPause,
   onLeave,
   onOpenBookmarkPicker,
 }: SessionActionButtonsProps) {
-  // Show Leave for live sessions
-  const showSessionManagement = isLiveSession;
+  // Show Play when paused or stopped
+  const showPlay = (isPaused || isStopped) && onPlay;
+  // Show Pause when running (streaming but not paused)
+  const showPause = isStreaming && !isPaused && onPause;
 
   return (
     <>
@@ -286,34 +348,34 @@ export function SessionActionButtons({
         </button>
       )}
 
-      {/* Stop button - only shown when actively streaming */}
-      {isStreaming && onStop && (
+      {/* Play button - shown when paused or stopped */}
+      {showPlay && (
         <button
-          onClick={onStop}
-          className={dangerButtonBase}
-          title="Stop IO Stream"
-        >
-          <Square className={iconSm} />
-        </button>
-      )}
-
-      {/* Resume button - shown when session is stopped but profile is selected */}
-      {isStopped && onResume && (
-        <button
-          onClick={onResume}
+          onClick={onPlay}
           className={successIconButton}
-          title="Resume IO Stream"
+          title={isStopped ? "Resume IO stream" : "Play"}
         >
           <Play className={iconSm} />
         </button>
       )}
 
-      {/* Leave button - shown when joined to a live session */}
-      {showSessionManagement && onLeave && (
+      {/* Pause button - shown when running */}
+      {showPause && (
+        <button
+          onClick={onPause}
+          className={buttonBase}
+          title="Pause"
+        >
+          <Pause className={iconSm} />
+        </button>
+      )}
+
+      {/* Leave button - always shown when a source is connected */}
+      {hasSource && onLeave && (
         <button
           onClick={onLeave}
           className={warningButtonBase}
-          title="Leave session"
+          title={isCaptureMode ? "Disconnect" : "Stop & review capture"}
         >
           <LogOut className={iconSm} />
         </button>
@@ -346,6 +408,8 @@ export interface IOSessionControlsProps {
   frameCount?: number;
   /** Total number of frames seen (shown in tooltip when available) */
   totalFrameCount?: number;
+  /** Bus-to-source mapping for multi-bus tooltip display */
+  outputBusToSource?: Map<number, BusSourceInfo>;
   /** Click handler to open session picker */
   onOpenIoSessionPicker: () => void;
 
@@ -360,22 +424,22 @@ export interface IOSessionControlsProps {
   // Session action props
   /** Whether the session is actively streaming */
   isStreaming: boolean;
+  /** Whether the session is paused */
+  isPaused?: boolean;
   /** Whether the session is stopped but can be resumed */
   isStopped?: boolean;
   /** Whether the IO source supports time range filtering */
   supportsTimeRange?: boolean;
-  /** Stop the session */
-  onStop?: () => void;
-  /** Resume a stopped session */
-  onResume?: () => void;
-  /** Leave the session (last to leave triggers auto-destroy) */
+  /** Play/resume the session */
+  onPlay?: () => void;
+  /** Pause the session */
+  onPause?: () => void;
+  /** Leave the session */
   onLeave?: () => void;
   /** Open bookmark picker (for time range sources) */
   onOpenBookmarkPicker?: () => void;
-  /** Hide session action buttons (for buffer mode where playback controls are elsewhere) */
-  hideSessionControls?: boolean;
 
-  // Buffer action props (shown when viewing a buffer)
+  // Buffer action props (shown when capture metadata is available)
   /** Whether the session is in buffer replay mode (viewing stored buffer data) */
   isCaptureMode?: boolean;
   /** Whether the current buffer is persistent (pinned) */
@@ -394,7 +458,7 @@ export interface IOSessionControlsProps {
 
 /**
  * Combined IO session controls component.
- * Includes reader button, speed picker button, and session action buttons (stop/resume/leave/bookmark).
+ * Includes reader button, speed picker button, and session action buttons (play/pause/leave/bookmark).
  * Use this instead of separate SessionButton + SessionActionButtons for consistent layout.
  */
 export function IOSessionControls({
@@ -408,6 +472,7 @@ export function IOSessionControls({
   ioState,
   frameCount,
   totalFrameCount,
+  outputBusToSource,
   onOpenIoSessionPicker,
   // Speed props
   speed = 1,
@@ -415,13 +480,13 @@ export function IOSessionControls({
   onOpenSpeedPicker,
   // Session action props
   isStreaming,
+  isPaused = false,
   isStopped = false,
   supportsTimeRange = false,
-  onStop,
-  onResume,
+  onPlay,
+  onPause,
   onLeave,
   onOpenBookmarkPicker,
-  hideSessionControls = false,
   // Buffer action props
   isCaptureMode: isBufferModeProp,
   capturePersistent = false,
@@ -431,12 +496,8 @@ export function IOSessionControls({
   onClearBuffer,
   hasData = false,
 }: IOSessionControlsProps) {
-  // Auto-hide session controls when in buffer mode (playback controls are in the toolbar instead),
-  // but always show when stopped so the Resume button remains accessible
   const isCaptureMode = isBufferModeProp ?? isCaptureProfileId(ioProfile);
-  const shouldHideControls = (hideSessionControls || isCaptureMode) && !isStopped;
-  // Live session = we have an ioProfile that's not a buffer
-  const isLiveSession = ioProfile !== null && !isCaptureMode;
+  const hasSource = ioProfile !== null;
 
   // Rename popover state
   const [isRenaming, setIsRenaming] = useState(false);
@@ -480,19 +541,20 @@ export function IOSessionControls({
         ioState={ioState}
         frameCount={frameCount}
         totalFrameCount={totalFrameCount}
+        outputBusToSource={outputBusToSource}
         onClick={onOpenIoSessionPicker}
         disabled={isStreaming && !isCaptureMode}
         isCaptureMode={isCaptureMode}
       />
 
-      {/* Buffer actions - pin and rename (shown when viewing a buffer) */}
-      {isCaptureMode && captureMetadata?.id && (
+      {/* Capture actions - pin and rename (shown when capture metadata is available) */}
+      {captureMetadata?.id && (
         <div className="relative flex items-center gap-0.5">
           {onRenameBuffer && (
             <button
               onClick={startRename}
               className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-              title="Rename buffer"
+              title="Rename capture"
             >
               <Pencil className={iconXs} />
             </button>
@@ -543,30 +605,31 @@ export function IOSessionControls({
         </button>
       )}
 
-      {/* Speed button - only show if reader supports speed and not in buffer mode */}
-      {supportsSpeed && onOpenSpeedPicker && !shouldHideControls && (
+      {/* Speed button - always visible when source connected, greyed out for realtime */}
+      {hasSource && onOpenSpeedPicker && (
         <button
-          onClick={onOpenSpeedPicker}
-          className={buttonBase}
-          title="Set playback speed"
+          onClick={supportsSpeed ? onOpenSpeedPicker : undefined}
+          disabled={!supportsSpeed}
+          className={`${buttonBase} ${!supportsSpeed ? "opacity-40 cursor-default" : ""}`}
+          title={supportsSpeed ? "Set playback speed" : "Speed control (available for captures)"}
         >
           <span>{speed === 0 ? "0x" : speed === 1 ? "1x" : `${speed}x`}</span>
         </button>
       )}
 
-      {/* Session control buttons (bookmark, stop, resume, leave) - hidden in buffer mode */}
-      {!shouldHideControls && (
-        <SessionActionButtons
-          isStreaming={isStreaming}
-          isStopped={isStopped}
-          supportsTimeRange={supportsTimeRange}
-          isLiveSession={isLiveSession}
-          onStop={onStop}
-          onResume={onResume}
-          onLeave={onLeave}
-          onOpenBookmarkPicker={onOpenBookmarkPicker}
-        />
-      )}
+      {/* Session control buttons (play, pause, leave, bookmark) - always visible */}
+      <SessionActionButtons
+        isStreaming={isStreaming}
+        isPaused={isPaused}
+        isStopped={isStopped}
+        supportsTimeRange={supportsTimeRange}
+        hasSource={hasSource}
+        isCaptureMode={isCaptureMode}
+        onPlay={onPlay}
+        onPause={onPause}
+        onLeave={onLeave}
+        onOpenBookmarkPicker={onOpenBookmarkPicker}
+      />
     </>
   );
 }

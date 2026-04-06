@@ -2057,21 +2057,14 @@ pub async fn stop_and_switch_to_capture(app: &AppHandle, session_id: &str, speed
 
         Ok(result.capabilities)
     } else {
-        // No capture — fall back to normal suspend
-        let session = sessions
-            .get(session_id)
-            .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-        let state = session.source.state();
-        let caps = session.source.capabilities();
-        crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &state, &caps);
-
+        // No capture available (e.g., 0 frames received) — return error so
+        // the frontend can fall back to a full leave/disconnect.
         tlog!(
-            "[reader] stop_and_switch_to_capture('{}') - no capture, fell back to suspend",
+            "[reader] stop_and_switch_to_capture('{}') - no capture available",
             session_id
         );
 
-        Ok(caps)
+        Err(format!("No capture available for session '{}'", session_id))
     }
 }
 

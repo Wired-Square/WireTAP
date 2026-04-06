@@ -483,6 +483,7 @@ export default function Discovery() {
   const {
     // Multi-bus state
     multiBusProfiles: ioProfiles,
+    outputBusToSource,
     sourceProfileId,
     setSourceProfileId,
     // Session
@@ -1042,12 +1043,13 @@ export default function Discovery() {
           captureMetadata={effectiveBufferMetadata ?? captureMetadata}
           sessionId={sessionId}
           isStreaming={isStreaming}
+          isPaused={isPaused}
           multiBusProfiles={sessionId ? ioProfiles : []}
           ioState={readerState}
-          isRealtime={isRealtime}
-          onStopWatch={handlers.handleStop}
+          outputBusToSource={outputBusToSource}
           isStopped={isStopped || canReturnToLive}
-          onResume={resumeWithNewBuffer}
+          onPlay={isStopped || canReturnToLive ? resumeWithNewBuffer : handlers.handlePlay}
+          onPause={handlers.handlePause}
           onLeave={handleLeave}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
           onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
@@ -1073,7 +1075,14 @@ export default function Discovery() {
           }}
           onRenameBuffer={(newName) => {
             const bid = captureMetadata?.id ?? sessionBufferId;
-            if (bid) useSessionStore.getState().renameSessionCapture(bid, newName);
+            if (bid) {
+              const store = useSessionStore.getState();
+              store.renameSessionCapture(bid, newName);
+              // Auto-pin on rename — naming implies keeping
+              if (!session.capturePersistent) {
+                store.setSessionCapturePersistent(bid, true);
+              }
+            }
           }}
           onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
           onClearBuffer={handlers.handleClearDiscoveredFrames}

@@ -298,10 +298,13 @@ pub fn delete_capture(id: &str) -> Result<(), String> {
 /// Clear a capture's data without deleting the capture itself.
 /// Resets metadata (count, times, buses) so the session can continue
 /// writing new frames into the same capture.
+/// Also resets the WS frame delivery offset so new frames are sent to subscribers.
 pub fn clear_capture(id: &str) -> Result<(), String> {
+    let owning_session: Option<String>;
     {
         let mut registry = CAPTURE_REGISTRY.write().unwrap();
         if let Some(cap) = registry.captures.get_mut(id) {
+            owning_session = cap.metadata.owning_session_id.clone();
             cap.metadata.count = 0;
             cap.metadata.start_time_us = None;
             cap.metadata.end_time_us = None;
@@ -315,6 +318,13 @@ pub fn clear_capture(id: &str) -> Result<(), String> {
     if let Err(e) = capture_db::delete_capture_data(id) {
         tlog!("[CaptureStore] Failed to clear capture data from SQLite: {}", e);
     }
+
+    // Reset the WS frame delivery offset so new frames arriving into
+    // this capture are delivered to subscribers from the beginning.
+    if let Some(session_id) = &owning_session {
+        crate::ws::dispatch::reset_frame_offset(session_id);
+    }
+
     tlog!("[CaptureStore] Cleared capture '{}'", id);
     Ok(())
 }

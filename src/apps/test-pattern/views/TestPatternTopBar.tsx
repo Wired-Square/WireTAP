@@ -33,13 +33,14 @@ interface Props {
   sessionId?: string | null;
   multiBusProfiles?: string[];
   isStreaming: boolean;
+  isPaused?: boolean;
   isStopped?: boolean;
   ioState?: string | null;
   frameCount?: number;
   totalFrameCount?: number;
   onOpenIoPicker: () => void;
-  onStop?: () => void;
-  onResume?: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
   onLeave?: () => void;
 
   // Test config
@@ -73,13 +74,14 @@ export default function TestPatternTopBar({
   sessionId,
   multiBusProfiles = [],
   isStreaming,
+  isPaused = false,
   isStopped = false,
   ioState,
   frameCount,
   totalFrameCount,
   onOpenIoPicker,
-  onStop,
-  onResume,
+  onPlay,
+  onPause,
   onLeave,
   role,
   mode,
@@ -117,9 +119,10 @@ export default function TestPatternTopBar({
         totalFrameCount,
         onOpenIoSessionPicker: onOpenIoPicker,
         isStreaming,
+        isPaused,
         isStopped,
-        onStop,
-        onResume,
+        onPlay,
+        onPause,
         onLeave,
       }}
       actions={
