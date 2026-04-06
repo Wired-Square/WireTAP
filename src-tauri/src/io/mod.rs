@@ -625,9 +625,9 @@ const SUSPENSION_GRACE_PERIOD_SECS: u64 = 300; // 5 minutes
 
 /// A registered listener for an IO session
 #[derive(Clone, Debug)]
-pub struct SessionListener {
+pub struct SessionSubscriber {
     /// Unique ID for this listener instance (e.g., "discovery_1", "decoder_2")
-    pub listener_id: String,
+    pub subscriber_id: String,
     /// Human-readable app name (e.g., "discovery", "decoder")
     pub app_name: String,
     /// When this listener was registered
@@ -645,7 +645,7 @@ pub struct IOSession {
     /// Number of apps connected to this session (legacy counter, for backwards compatibility)
     pub joiner_count: usize,
     /// Map of listener IDs to their listener info (replaces joiner_heartbeats)
-    pub listeners: HashMap<String, SessionListener>,
+    pub subscribers: HashMap<String, SessionSubscriber>,
     /// Display names of the sources in this session (for logging)
     pub source_names: Vec<String>,
     /// Original source configs for rebuilding the live reader on resume.
@@ -677,7 +677,7 @@ fn emit_state_change(session_id: &str, _previous: &IOState, current: &IOState) {
 fn emit_joiner_count_change(
     session_id: &str,
     joiner_count: usize,
-    _listener_id: Option<&str>,
+    _subscriber_id: Option<&str>,
     _app_name: Option<&str>,
     _change: Option<&str>,
 ) {
@@ -685,7 +685,7 @@ fn emit_joiner_count_change(
 }
 
 /// Emit a speed change event for a session.
-/// Sends listener_count = 0xFFFF as a sentinel meaning "no listener count update".
+/// Sends subscriber_count = 0xFFFF as a sentinel meaning "no listener count update".
 fn emit_speed_change(session_id: &str, speed: f64) {
     crate::ws::dispatch::send_session_info(session_id, speed, 0xFFFF);
 }
@@ -782,7 +782,7 @@ async fn update_wake_lock() {
     // Check if any session is actively running with listeners
     let sessions = IO_SESSIONS.lock().await;
     let any_active = sessions.values().any(|session| {
-        matches!(session.source.state(), IOState::Running) && !session.listeners.is_empty()
+        matches!(session.source.state(), IOState::Running) && !session.subscribers.is_empty()
     });
     drop(sessions);
 
@@ -1104,11 +1104,11 @@ pub struct SessionLifecyclePayload {
     /// Current state - only for "created"
     pub state: Option<String>,
     /// Number of listeners
-    pub listener_count: usize,
+    pub subscriber_count: usize,
     /// Source profile IDs
     pub source_profile_ids: Vec<String>,
     /// The listener ID that created the session (only for "created")
-    pub creator_listener_id: Option<String>,
+    pub creator_subscriber_id: Option<String>,
 }
 
 /// Emit a global session lifecycle event to all windows.
@@ -1270,7 +1270,7 @@ pub struct CreateSessionResult {
     /// Whether this was a new session (true) or joined existing (false)
     pub is_new: bool,
     /// Total listener count
-    pub listener_count: usize,
+    pub subscriber_count: usize,
 }
 
 /// Create a new IO session with an initial listener.
@@ -1280,7 +1280,7 @@ pub async fn create_session(
     app: AppHandle,
     session_id: String,
     device: Box<dyn IOSource>,
-    listener_id: Option<String>,
+    subscriber_id: Option<String>,
     app_name: Option<String>,
     source_names: Option<Vec<String>>,
     source_configs: Vec<SourceConfig>,
@@ -1294,7 +1294,7 @@ pub async fn create_session(
     // Check if session already exists - join it instead of overwriting
     if let Some(existing) = sessions.get_mut(&session_id) {
         let capabilities = existing.source.capabilities();
-        let listener_count: usize;
+        let subscriber_count: usize;
 
         // Clear suspension if the session was in the grace period
         if existing.suspended_at.take().is_some() {
@@ -1302,46 +1302,46 @@ pub async fn create_session(
                 "[reader] Session '{}' clearing suspension (new listener joining)",
                 session_id
             );
-            // Resume will happen via register_listener or auto-start
+            // Resume will happen via register_subscriber or auto-start
         }
 
-        if let Some(lid) = listener_id {
+        if let Some(lid) = subscriber_id {
             // Check if already registered
-            if let Some(listener) = existing.listeners.get_mut(&lid) {
+            if let Some(listener) = existing.subscribers.get_mut(&lid) {
                 // Already registered - update heartbeat
                 listener.last_heartbeat = now;
             } else {
                 // New listener joining existing session
                 let resolved_name = app_name.clone().unwrap_or_else(|| lid.clone());
-                existing.listeners.insert(
+                existing.subscribers.insert(
                     lid.clone(),
-                    SessionListener {
-                        listener_id: lid.clone(),
+                    SessionSubscriber {
+                        subscriber_id: lid.clone(),
                         app_name: resolved_name.clone(),
                         registered_at: now,
                         last_heartbeat: now,
                         is_active: true, // New listeners are active by default
                     },
                 );
-                existing.joiner_count = existing.listeners.len();
+                existing.joiner_count = existing.subscribers.len();
 
                 tlog!(
                     "[reader] Session '{}' - listener '{}' joined existing session, total: {}",
-                    session_id, lid, existing.listeners.len()
+                    session_id, lid, existing.subscribers.len()
                 );
 
                 // Emit joiner count change
-                emit_joiner_count_change(&session_id, existing.listeners.len(), Some(&lid), Some(&resolved_name), Some("joined"));
+                emit_joiner_count_change(&session_id, existing.subscribers.len(), Some(&lid), Some(&resolved_name), Some("joined"));
             }
-            listener_count = existing.listeners.len();
+            subscriber_count = existing.subscribers.len();
         } else {
-            listener_count = existing.listeners.len();
+            subscriber_count = existing.subscribers.len();
         }
 
         return CreateSessionResult {
             capabilities,
             is_new: false,
-            listener_count,
+            subscriber_count,
         };
     }
 
@@ -1349,13 +1349,13 @@ pub async fn create_session(
     let capabilities = device.capabilities();
 
     // Create initial listeners map
-    let mut listeners = HashMap::new();
-    if let Some(lid) = listener_id.clone() {
+    let mut subscribers = HashMap::new();
+    if let Some(lid) = subscriber_id.clone() {
         let resolved_name = app_name.unwrap_or_else(|| lid.clone());
-        listeners.insert(
+        subscribers.insert(
             lid.clone(),
-            SessionListener {
-                listener_id: lid.clone(),
+            SessionSubscriber {
+                subscriber_id: lid.clone(),
                 app_name: resolved_name,
                 registered_at: now,
                 last_heartbeat: now,
@@ -1370,15 +1370,15 @@ pub async fn create_session(
         tlog!("[reader] Session '{}' created with no initial listener", session_id);
     }
 
-    let listener_count = listeners.len().max(1);
+    let subscriber_count = subscribers.len().max(1);
     let source_type = device.source_type().to_string();
     let state = device.state();
     let app_for_event = app.clone();
     let session = IOSession {
         source: device,
         app,
-        joiner_count: listener_count,
-        listeners,
+        joiner_count: subscriber_count,
+        subscribers,
         source_names: source_names.unwrap_or_default(),
         source_configs,
         suspended_at: None,
@@ -1395,15 +1395,15 @@ pub async fn create_session(
         event_type: "created".to_string(),
         source_type: Some(source_type),
         state: Some(format!("{:?}", state)),
-        listener_count,
+        subscriber_count,
         source_profile_ids,
-        creator_listener_id: listener_id,
+        creator_subscriber_id: subscriber_id,
     });
 
     CreateSessionResult {
         capabilities,
         is_new: true,
-        listener_count,
+        subscriber_count,
     }
 }
 
@@ -1526,12 +1526,12 @@ pub async fn leave_session(session_id: &str) -> Result<usize, String> {
 /// Called by the WS server when a client heartbeat arrives, bridging the WS
 /// keepalive to the IO session watchdog so the frontend can skip per-listener
 /// `register_session_listener` invoke polling.
-pub async fn touch_listener_heartbeats(session_ids: &[String]) {
+pub async fn touch_subscriber_heartbeats(session_ids: &[String]) {
     let mut sessions = IO_SESSIONS.lock().await;
     let now = std::time::Instant::now();
     for sid in session_ids {
         if let Some(session) = sessions.get_mut(sid.as_str()) {
-            for listener in session.listeners.values_mut() {
+            for listener in session.subscribers.values_mut() {
                 listener.last_heartbeat = now;
             }
         }
@@ -1539,7 +1539,7 @@ pub async fn touch_listener_heartbeats(session_ids: &[String]) {
 }
 
 // Legacy heartbeat_session and remove_listener functions removed
-// Use register_listener and unregister_listener instead
+// Use register_subscriber and unregister_subscriber instead
 
 /// Clean up stale listeners from all sessions.
 /// Called periodically by the watchdog task.
@@ -1547,11 +1547,11 @@ pub async fn touch_listener_heartbeats(session_ids: &[String]) {
 /// When all listeners go stale, the session is NOT destroyed immediately.
 /// Instead the reader is paused and a grace period starts. This tolerates
 /// WKWebView timer throttling during display sleep / App Nap. If heartbeats
-/// resume within the grace period, the session is resumed (see `register_listener`).
+/// resume within the grace period, the session is resumed (see `register_subscriber`).
 /// Only after `SUSPENSION_GRACE_PERIOD_SECS` does the watchdog destroy the session.
 ///
 /// Returns a list of (session_id, removed_count, remaining_count) for sessions that had stale listeners.
-pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
+pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
     let mut results = Vec::new();
     let mut sessions_to_destroy: Vec<String> = Vec::new();
     let mut sessions_to_pause: Vec<String> = Vec::new();
@@ -1590,23 +1590,23 @@ pub async fn cleanup_stale_listeners() -> Vec<(String, usize, usize)> {
                 continue;
             }
 
-            let before_count = session.listeners.len();
+            let before_count = session.subscribers.len();
 
             // Remove stale listeners
-            session.listeners.retain(|listener_id, listener| {
+            session.subscribers.retain(|subscriber_id, listener| {
                 let is_stale = now.duration_since(listener.last_heartbeat) > timeout;
                 if is_stale {
                     tlog!(
                         "[reader] Session '{}' removing stale listener '{}' (no heartbeat for {:?})",
                         session_id,
-                        listener_id,
+                        subscriber_id,
                         now.duration_since(listener.last_heartbeat)
                     );
                 }
                 !is_stale
             });
 
-            let after_count = session.listeners.len();
+            let after_count = session.subscribers.len();
             let removed_count = before_count - after_count;
 
             if removed_count > 0 {
@@ -1738,7 +1738,7 @@ async fn log_session_status() {
             IOState::Paused => "paused",
             IOState::Error(_) => "error",
         };
-        let listener_ids: Vec<&str> = session.listeners.keys().map(|s| s.as_str()).collect();
+        let subscriber_ids: Vec<&str> = session.subscribers.keys().map(|s| s.as_str()).collect();
         let sources = if session.source_names.is_empty() {
             String::new()
         } else {
@@ -1753,8 +1753,8 @@ async fn log_session_status() {
             "[session status]   '{}': state={}, listeners={} {:?}{}{}",
             session_id,
             state,
-            session.listeners.len(),
-            listener_ids,
+            session.subscribers.len(),
+            subscriber_ids,
             sources,
             suspended
         );
@@ -1790,7 +1790,7 @@ pub fn start_heartbeat_watchdog(app: AppHandle) {
             tick_count += 1;
 
             // Cleanup stale listeners every tick
-            let results = cleanup_stale_listeners().await;
+            let results = cleanup_stale_subscribers().await;
             for (session_id, removed, remaining) in results {
                 tlog!(
                     "[reader watchdog] Session '{}': removed {} stale listeners, {} remaining",
@@ -2460,9 +2460,9 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
             event_type: "destroyed".to_string(),
             source_type: None,
             state: None,
-            listener_count: 0,
+            subscriber_count: 0,
             source_profile_ids,
-            creator_listener_id: None,
+            creator_subscriber_id: None,
         });
     }
     // Clear the closing flag now that the session is fully destroyed
@@ -2494,9 +2494,9 @@ pub struct ActiveSessionInfo {
     /// Session capabilities
     pub capabilities: IOCapabilities,
     /// Number of listeners
-    pub listener_count: usize,
+    pub subscriber_count: usize,
     /// Individual listener details
-    pub listeners: Vec<ListenerInfo>,
+    pub subscribers: Vec<SubscriberInfo>,
     /// For multi-source sessions: the source configurations
     pub broker_configs: Option<Vec<broker::SourceConfig>>,
     /// Profile IDs feeding this session (populated from SESSION_PROFILES in sessions.rs)
@@ -2533,11 +2533,11 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
 
             // Build individual listener details
             let now = std::time::Instant::now();
-            let listeners: Vec<ListenerInfo> = session
-                .listeners
+            let subscribers: Vec<SubscriberInfo> = session
+                .subscribers
                 .values()
-                .map(|l| ListenerInfo {
-                    listener_id: l.listener_id.clone(),
+                .map(|l| SubscriberInfo {
+                    subscriber_id: l.subscriber_id.clone(),
                     app_name: l.app_name.clone(),
                     registered_seconds_ago: now.duration_since(l.registered_at).as_secs(),
                     is_active: l.is_active,
@@ -2549,8 +2549,8 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
                 source_type: session.source.source_type().to_string(),
                 state: session.source.state(),
                 capabilities: session.source.capabilities(),
-                listener_count: session.listeners.len(),
-                listeners,
+                subscriber_count: session.subscribers.len(),
+                subscribers,
                 broker_configs: session.source.broker_configs(),
                 source_profile_ids,
                 capture_id,
@@ -2603,8 +2603,8 @@ pub async fn transmit_serial(session_id: &str, bytes: &[u8]) -> Result<TransmitR
 
 /// Info about a registered listener (for TypeScript)
 #[derive(Clone, Debug, Serialize)]
-pub struct ListenerInfo {
-    pub listener_id: String,
+pub struct SubscriberInfo {
+    pub subscriber_id: String,
     /// Human-readable app name (e.g., "discovery", "decoder")
     pub app_name: String,
     /// Seconds since registration
@@ -2615,7 +2615,7 @@ pub struct ListenerInfo {
 
 /// Result of registering a listener
 #[derive(Clone, Debug, Serialize)]
-pub struct RegisterListenerResult {
+pub struct RegisterSubscriberResult {
     /// Session capabilities
     pub capabilities: IOCapabilities,
     /// Current session state
@@ -2625,7 +2625,7 @@ pub struct RegisterListenerResult {
     /// Capture kind ("frames" or "bytes")
     pub capture_kind: Option<String>,
     /// Total number of listeners
-    pub listener_count: usize,
+    pub subscriber_count: usize,
     /// Error that occurred before this listener registered (one-shot, cleared after return)
     pub startup_error: Option<String>,
 }
@@ -2634,7 +2634,7 @@ pub struct RegisterListenerResult {
 /// This is the primary way for frontend components to join a session.
 /// If the listener is already registered, this updates their heartbeat.
 /// Returns session info for the registered listener.
-pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Option<&str>) -> Result<RegisterListenerResult, String> {
+pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name: Option<&str>) -> Result<RegisterSubscriberResult, String> {
     let mut sessions = IO_SESSIONS.lock().await;
     let session = sessions
         .get_mut(session_id)
@@ -2649,7 +2649,7 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
         let suspended_for = now.duration_since(suspended_at);
         tlog!(
             "[reader] Session '{}' resuming from suspension (was suspended for {:?}, listener '{}' heartbeat)",
-            session_id, suspended_for, listener_id
+            session_id, suspended_for, subscriber_id
         );
         // Only resume if the device is paused (we paused it during suspension)
         matches!(session.source.state(), IOState::Paused)
@@ -2657,16 +2657,16 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
         false
     };
 
-    if let Some(listener) = session.listeners.get_mut(listener_id) {
+    if let Some(listener) = session.subscribers.get_mut(subscriber_id) {
         // Already registered - update heartbeat
         listener.last_heartbeat = now;
     } else {
         // New listener - register them
-        let resolved_app_name = app_name.unwrap_or(listener_id).to_string();
-        session.listeners.insert(
-            listener_id.to_string(),
-            SessionListener {
-                listener_id: listener_id.to_string(),
+        let resolved_app_name = app_name.unwrap_or(subscriber_id).to_string();
+        session.subscribers.insert(
+            subscriber_id.to_string(),
+            SessionSubscriber {
+                subscriber_id: subscriber_id.to_string(),
                 app_name: resolved_app_name.clone(),
                 registered_at: now,
                 last_heartbeat: now,
@@ -2675,17 +2675,17 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
         );
 
         // Update legacy joiner_count
-        session.joiner_count = session.listeners.len();
+        session.joiner_count = session.subscribers.len();
 
         tlog!(
             "[reader] Session '{}' registered listener '{}', total: {}",
             session_id,
-            listener_id,
-            session.listeners.len()
+            subscriber_id,
+            session.subscribers.len()
         );
 
         // Emit joiner count change
-        emit_joiner_count_change(session_id, session.listeners.len(), Some(listener_id), Some(&resolved_app_name), Some("joined"));
+        emit_joiner_count_change(session_id, session.subscribers.len(), Some(subscriber_id), Some(&resolved_app_name), Some("joined"));
     }
 
     // Get session's frame capture
@@ -2719,12 +2719,12 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
         tlog!("[reader] Returning startup error for session '{}': {}", session_id, err);
     }
 
-    Ok(RegisterListenerResult {
+    Ok(RegisterSubscriberResult {
         capabilities: session.source.capabilities(),
         state: session.source.state(),
         capture_id,
         capture_kind,
-        listener_count: session.listeners.len(),
+        subscriber_count: session.subscribers.len(),
         startup_error,
     })
 }
@@ -2732,7 +2732,7 @@ pub async fn register_listener(session_id: &str, listener_id: &str, app_name: Op
 /// Unregister a listener from a session.
 /// If this was the last listener, the session will be stopped and destroyed.
 /// Returns the remaining listener count.
-pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<usize, String> {
+pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Result<usize, String> {
     // Phase 1: Remove the listener under the lock, extract session if last listener left
     let (remaining, session_to_destroy) = {
         let mut sessions = IO_SESSIONS.lock().await;
@@ -2742,22 +2742,22 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
             return Ok(0);
         };
 
-        let Some(removed) = session.listeners.remove(listener_id) else {
+        let Some(removed) = session.subscribers.remove(subscriber_id) else {
             // Listener wasn't registered - that's fine
-            return Ok(session.listeners.len());
+            return Ok(session.subscribers.len());
         };
 
         let removed_app_name = removed.app_name;
-        session.joiner_count = session.listeners.len();
-        let remaining = session.listeners.len();
+        session.joiner_count = session.subscribers.len();
+        let remaining = session.subscribers.len();
 
         tlog!(
             "[reader] Session '{}' unregistered listener '{}', remaining: {}",
-            session_id, listener_id, remaining
+            session_id, subscriber_id, remaining
         );
 
         // Emit joiner count change
-        emit_joiner_count_change(session_id, remaining, Some(listener_id), Some(&removed_app_name), Some("left"));
+        emit_joiner_count_change(session_id, remaining, Some(subscriber_id), Some(&removed_app_name), Some("left"));
 
         if remaining == 0 {
             tlog!("[reader] Session '{}' has no listeners left, destroying", session_id);
@@ -2782,9 +2782,9 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
             event_type: "destroyed".to_string(),
             source_type: None,
             state: None,
-            listener_count: 0,
+            subscriber_count: 0,
             source_profile_ids,
-            creator_listener_id: None,
+            creator_subscriber_id: None,
         });
         // Clear any closing flag
         clear_session_closing(session_id);
@@ -2801,49 +2801,49 @@ pub async fn unregister_listener(session_id: &str, listener_id: &str) -> Result<
 /// This is used by the Session Manager to remove a listener without destroying the session.
 /// The evicted listener receives a capture copy so it can continue viewing data standalone.
 /// Returns the list of copied capture IDs.
-pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_id: &str) -> Result<Vec<String>, String> {
+pub async fn evict_session_subscriber(app: &AppHandle, session_id: &str, subscriber_id: &str) -> Result<Vec<String>, String> {
     // Copy the capture before unregistering (so the evicted listener gets a snapshot)
     let mut copied_capture_ids = Vec::new();
     if let Some(capture_id) = crate::capture_store::get_session_capture_ids(session_id).into_iter().next() {
-        let copy_name = format!("{} (evicted)", listener_id);
+        let copy_name = format!("{} (evicted)", subscriber_id);
         match crate::capture_store::copy_capture(&capture_id, copy_name) {
             Ok(copied_id) => {
                 tlog!(
                     "[reader] Copied capture '{}' -> '{}' for evicted listener '{}'",
-                    capture_id, copied_id, listener_id
+                    capture_id, copied_id, subscriber_id
                 );
                 copied_capture_ids.push(copied_id);
             }
             Err(e) => {
                 tlog!(
                     "[reader] Failed to copy capture for evicted listener '{}': {}",
-                    listener_id, e
+                    subscriber_id, e
                 );
             }
         }
     }
 
     // Unregister the listener (this may destroy the session if it was the last one)
-    let remaining = unregister_listener(session_id, listener_id).await?;
+    let remaining = unregister_subscriber(session_id, subscriber_id).await?;
 
     // Emit listener-evicted event so the frontend can clean up the evicted app
     #[derive(Clone, Debug, Serialize)]
     struct ListenerEvictedPayload {
         session_id: String,
-        listener_id: String,
+        subscriber_id: String,
         capture_ids: Vec<String>,
     }
 
     let payload = ListenerEvictedPayload {
         session_id: session_id.to_string(),
-        listener_id: listener_id.to_string(),
+        subscriber_id: subscriber_id.to_string(),
         capture_ids: copied_capture_ids.clone(),
     };
-    let _ = app.emit("listener-evicted", payload);
+    let _ = app.emit("subscriber-evicted", payload);
 
     tlog!(
         "[reader] Evicted listener '{}' from session '{}' (remaining: {}, capture copies: {:?})",
-        listener_id, session_id, remaining, copied_capture_ids
+        subscriber_id, session_id, remaining, copied_capture_ids
     );
 
     Ok(copied_capture_ids)
@@ -3043,25 +3043,25 @@ pub async fn update_source_bus_mappings(
 
 /// Get all listeners for a session.
 /// Useful for debugging and for the frontend to understand session state.
-pub async fn get_session_listeners(session_id: &str) -> Result<Vec<ListenerInfo>, String> {
+pub async fn get_session_subscribers(session_id: &str) -> Result<Vec<SubscriberInfo>, String> {
     let sessions = IO_SESSIONS.lock().await;
     let session = sessions
         .get(session_id)
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
     let now = std::time::Instant::now();
-    let listeners: Vec<ListenerInfo> = session
-        .listeners
+    let subscribers: Vec<SubscriberInfo> = session
+        .subscribers
         .values()
-        .map(|l| ListenerInfo {
-            listener_id: l.listener_id.clone(),
+        .map(|l| SubscriberInfo {
+            subscriber_id: l.subscriber_id.clone(),
             app_name: l.app_name.clone(),
             registered_seconds_ago: now.duration_since(l.registered_at).as_secs(),
             is_active: l.is_active,
         })
         .collect();
 
-    Ok(listeners)
+    Ok(subscribers)
 }
 
 /// Result of attempting a safe reinitialize
@@ -3072,7 +3072,7 @@ pub struct ReinitializeResult {
     /// Reason for failure (if success is false)
     pub reason: Option<String>,
     /// List of other listeners preventing reinitialize (if any)
-    pub other_listeners: Vec<String>,
+    pub other_subscribers: Vec<String>,
 }
 
 /// Check if it's safe to reinitialize a session.
@@ -3083,7 +3083,7 @@ pub struct ReinitializeResult {
 /// The caller should create a new session after this returns success.
 pub async fn reinitialize_session_if_safe(
     session_id: &str,
-    listener_id: &str,
+    subscriber_id: &str,
 ) -> Result<ReinitializeResult, String> {
     let mut sessions = IO_SESSIONS.lock().await;
 
@@ -3092,26 +3092,26 @@ pub async fn reinitialize_session_if_safe(
         return Ok(ReinitializeResult {
             success: true,
             reason: None,
-            other_listeners: vec![],
+            other_subscribers: vec![],
         });
     };
 
     // Check if this listener is the only one
-    let other_listeners: Vec<String> = session
-        .listeners
+    let other_subscribers: Vec<String> = session
+        .subscribers
         .keys()
-        .filter(|id| *id != listener_id)
+        .filter(|id| *id != subscriber_id)
         .cloned()
         .collect();
 
-    if !other_listeners.is_empty() {
+    if !other_subscribers.is_empty() {
         return Ok(ReinitializeResult {
             success: false,
             reason: Some(format!(
                 "Cannot reinitialize: {} other listener(s) connected",
-                other_listeners.len()
+                other_subscribers.len()
             )),
-            other_listeners,
+            other_subscribers,
         });
     }
 
@@ -3124,9 +3124,9 @@ pub async fn reinitialize_session_if_safe(
             event_type: "destroyed".to_string(),
             source_type: None,
             state: None,
-            listener_count: 0,
+            subscriber_count: 0,
             source_profile_ids,
-            creator_listener_id: None,
+            creator_subscriber_id: None,
         });
         let _ = session.source.stop().await;
     }
@@ -3134,34 +3134,34 @@ pub async fn reinitialize_session_if_safe(
 
     tlog!(
         "[reader] Session '{}' reinitialized by listener '{}'",
-        session_id, listener_id
+        session_id, subscriber_id
     );
 
     Ok(ReinitializeResult {
         success: true,
         reason: None,
-        other_listeners: vec![],
+        other_subscribers: vec![],
     })
 }
 
 /// Set the active state of a listener.
 /// When a listener detaches (stops receiving frames), set is_active to false.
 /// When they rejoin, set is_active to true.
-pub async fn set_listener_active(session_id: &str, listener_id: &str, is_active: bool) -> Result<(), String> {
+pub async fn set_subscriber_active(session_id: &str, subscriber_id: &str, is_active: bool) -> Result<(), String> {
     let mut sessions = IO_SESSIONS.lock().await;
     let session = sessions
         .get_mut(session_id)
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
-    if let Some(listener) = session.listeners.get_mut(listener_id) {
+    if let Some(listener) = session.subscribers.get_mut(subscriber_id) {
         let was_active = listener.is_active;
         listener.is_active = is_active;
         tlog!(
             "[reader] Session '{}' listener '{}' active: {} -> {}",
-            session_id, listener_id, was_active, is_active
+            session_id, subscriber_id, was_active, is_active
         );
         Ok(())
     } else {
-        Err(format!("Listener '{}' not found in session '{}'", listener_id, session_id))
+        Err(format!("Listener '{}' not found in session '{}'", subscriber_id, session_id))
     }
 }

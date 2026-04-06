@@ -27,7 +27,7 @@ export { isCaptureProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionListenerActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToBuffer, resumeSessionToLive, type StreamEndedInfo, type IOCapabilities } from "../api/io";
+import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToBuffer, resumeSessionToLive, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -786,7 +786,7 @@ export function useIOSessionManager(
 
     const createOptions: CreateMultiSourceOptions = {
       sessionId,
-      listenerId: session.listenerId,
+      subscriberId: session.subscriberId,
       appName,
       profileIds,
       busMappings: effectiveBusMappings,
@@ -854,7 +854,7 @@ export function useIOSessionManager(
     // Join the session and set up heartbeats
     await joinMultiSourceSession({
       sessionId,
-      listenerId: session.listenerId,
+      subscriberId: session.subscriberId,
       appName,
       sourceProfileIds,
     });
@@ -1119,7 +1119,7 @@ export function useIOSessionManager(
     // Mark our listener as INACTIVE so we don't receive frames
     // This is the key difference from watchSource - we connect but don't stream
     try {
-      await setSessionListenerActive(sessionId, appName, false);
+      await setSessionSubscriberActive(sessionId, appName, false);
     } catch {
       // Ignore - listener may not be fully registered yet
     }

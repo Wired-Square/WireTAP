@@ -28,8 +28,8 @@ import {
   seekReaderSessionByFrame,
   transitionToBufferReader,
   sessionTransmitFrame,
-  registerSessionListener,
-  unregisterSessionListener,
+  registerSessionSubscriber,
+  unregisterSessionSubscriber,
   reinitializeSessionIfSafe,
   createMultiSourceSession,
   getStateType,
@@ -92,10 +92,10 @@ const _visibilityHandler = () => {
     // to revive any sessions that were paused during display sleep / App Nap.
     const eventListenersMap = getEventListeners();
     for (const [sessionId, listeners] of Object.entries(eventListenersMap)) {
-      if (listeners.registeredListeners.size > 0) {
-        tlog.info(`[visibility] sending immediate heartbeats for session '${sessionId}' (${listeners.registeredListeners.size} listeners)`);
-        for (const lid of listeners.registeredListeners) {
-          registerSessionListener(sessionId, lid).catch((e) => {
+      if (listeners.registeredSubscribers.size > 0) {
+        tlog.info(`[visibility] sending immediate heartbeats for session '${sessionId}' (${listeners.registeredSubscribers.size} listeners)`);
+        for (const lid of listeners.registeredSubscribers) {
+          registerSessionSubscriber(sessionId, lid).catch((e) => {
             tlog.info(`[visibility] heartbeat failed for ${sessionId}/${lid}: ${e}`);
           });
         }
@@ -141,7 +141,7 @@ export function isCaptureProfileId(profileId: string | null): boolean {
 }
 
 /** Getter for event listeners - set after store is created */
-let getEventListeners: (() => Record<string, SessionEventListeners>) | null = null;
+let getEventListeners: (() => Record<string, SessionEventSubscribers>) | null = null;
 
 /** Getter for showAppError - set after store is created */
 let getGlobalShowAppError: (() => ((title: string, message: string, details?: string) => void) | null) | null = null;
@@ -174,7 +174,7 @@ export interface Session {
   /** Error message if lifecycleState is "error" */
   errorMessage: string | null;
   /** Number of listeners connected to this session (from Rust backend) */
-  listenerCount: number;
+  subscriberCount: number;
   /** Capture info after stream ends */
   capture: {
     available: boolean;
@@ -274,7 +274,7 @@ export interface SessionCallbacks {
 }
 
 /** Session event listeners - one set per session */
-interface SessionEventListeners {
+interface SessionEventSubscribers {
   /** Session ID this listener set belongs to (for WS unsubscribe on cleanup) */
   sessionId: string;
   /** Unlisten functions for Tauri events */
@@ -286,7 +286,7 @@ interface SessionEventListeners {
   /** Heartbeat interval ID (for keeping listeners alive in Rust backend) */
   heartbeatIntervalId: ReturnType<typeof setInterval> | null;
   /** Listener IDs that need heartbeats (separate from callbacks for timing) */
-  registeredListeners: Set<string>;
+  registeredSubscribers: Set<string>;
 }
 
 // ============================================================================
@@ -300,7 +300,7 @@ export interface SessionStore {
   /** Currently selected session ID for transmission (Transmit app) */
   activeSessionId: string | null;
   /** Event listeners per session (frontend-only, for routing events to callbacks) */
-  _eventListeners: Record<string, SessionEventListeners>;
+  _eventListeners: Record<string, SessionEventSubscribers>;
   /** Cached set of known buffer IDs (populated from Rust backend on startup) */
   knownCaptureIds: Set<string>;
 
@@ -309,22 +309,22 @@ export interface SessionStore {
   openSession: (
     profileId: string,
     profileName: string,
-    listenerId: string,
+    subscriberId: string,
     appName: string,
     options?: CreateSessionOptions
   ) => Promise<Session>;
   /** Leave a session (unregister listener) */
-  leaveSession: (sessionId: string, listenerId: string) => Promise<void>;
+  leaveSession: (sessionId: string, subscriberId: string) => Promise<void>;
   /** Remove session from list entirely */
   removeSession: (sessionId: string) => Promise<void>;
   /** Clean up a session that was destroyed externally (local-only, no backend calls) */
   cleanupDestroyedSession: (sessionId: string) => void;
   /** Clean up after a listener is evicted from a session (local-only, no backend calls) */
-  cleanupEvictedListener: (sessionId: string, listenerId: string) => void;
+  cleanupEvictedSubscriber: (sessionId: string, subscriberId: string) => void;
   /** Reinitialize a session with new options (atomic check via Rust) */
   reinitializeSession: (
     sessionId: string,
-    listenerId: string,
+    subscriberId: string,
     appName: string,
     profileId: string,
     profileName: string,
@@ -378,9 +378,9 @@ export interface SessionStore {
 
   // ---- Actions: Callbacks ----
   /** Register callbacks for a listener */
-  registerCallbacks: (sessionId: string, listenerId: string, callbacks: SessionCallbacks) => void;
+  registerCallbacks: (sessionId: string, subscriberId: string, callbacks: SessionCallbacks) => void;
   /** Clear callbacks for a specific listener */
-  clearCallbacks: (sessionId: string, listenerId: string) => void;
+  clearCallbacks: (sessionId: string, subscriberId: string) => void;
 
   // ---- Selectors ----
   /** Get session by ID */
@@ -434,7 +434,7 @@ export interface SessionStore {
 
 /** Invoke all callbacks for an event type */
 function invokeCallbacks<T>(
-  eventListeners: SessionEventListeners,
+  eventListeners: SessionEventSubscribers,
   eventType: keyof SessionCallbacks,
   payload: T
 ) {
@@ -447,9 +447,9 @@ function invokeCallbacks<T>(
 }
 
 /** Set up Tauri event listeners for a session */
-async function setupSessionEventListeners(
+async function setupSessionEventSubscribers(
   sessionId: string,
-  eventListeners: SessionEventListeners,
+  eventListeners: SessionEventSubscribers,
   updateSession: (id: string, updates: Partial<Session>) => void
 ): Promise<UnlistenFn[]> {
   // ==========================================================================
@@ -571,13 +571,13 @@ async function setupSessionEventListeners(
     // SessionInfo (0x09) — speed + listener count decoded from binary.
     // Either field may be a sentinel meaning "no update":
     //   speed = -1.0 → listener-count-only update
-    //   listener_count = 0xFFFF (65535) → speed-only update
+    //   subscriber_count = 0xFFFF (65535) → speed-only update
     eventListeners.wsUnlistenFunctions.push(
       wsTransport.onSessionMessage(sessionId, MsgType.SessionInfo, (payload) => {
         const info = decodeSessionInfo(payload);
         const updates: Record<string, unknown> = {};
-        if (info.listener_count < 0xFFFF) {
-          updates.listenerCount = info.listener_count;
+        if (info.subscriber_count < 0xFFFF) {
+          updates.subscriberCount = info.subscriber_count;
         }
         if (info.speed >= 0) {
           updates.speed = info.speed;
@@ -696,7 +696,7 @@ async function setupSessionEventListeners(
 }
 
 /** Clean up session event listeners */
-function cleanupEventListeners(eventListeners: SessionEventListeners) {
+function cleanupEventListeners(eventListeners: SessionEventSubscribers) {
   // Clear heartbeat interval
   if (eventListeners.heartbeatIntervalId) {
     clearInterval(eventListeners.heartbeatIntervalId);
@@ -717,7 +717,7 @@ function cleanupEventListeners(eventListeners: SessionEventListeners) {
   wsTransport.unsubscribe(eventListeners.sessionId);
 
   eventListeners.callbacks.clear();
-  eventListeners.registeredListeners.clear();
+  eventListeners.registeredSubscribers.clear();
 }
 
 // ============================================================================
@@ -739,8 +739,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   // ---- Session Lifecycle ----
-  openSession: async (profileId, profileName, listenerId, appName, options = {}) => {
-    tlog.debug(`[sessionStore:openSession] Called with profileId=${profileId}, profileName=${profileName}, listenerId=${listenerId}`);
+  openSession: async (profileId, profileName, subscriberId, appName, options = {}) => {
+    tlog.debug(`[sessionStore:openSession] Called with profileId=${profileId}, profileName=${profileName}, subscriberId=${subscriberId}`);
     console.log(`[sessionStore:openSession] Options: ${JSON.stringify(options)}`);
 
     // Session ID can be explicitly provided (for recorded sources that need unique IDs)
@@ -753,7 +753,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (existingSession?.lifecycleState === "connected") {
       // Register this listener with Rust backend
       try {
-        const result = await registerSessionListener(sessionId, listenerId, appName);
+        const result = await registerSessionSubscriber(sessionId, subscriberId, appName);
 
         // Handle startup error (error that occurred before listener registered)
         if (result.startup_error) {
@@ -763,7 +763,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         // Add listener to heartbeat tracking
         const eventListeners = get()._eventListeners[sessionId];
         if (eventListeners) {
-          eventListeners.registeredListeners.add(listenerId);
+          eventListeners.registeredSubscribers.add(subscriberId);
         }
 
         // Update session with latest info from Rust
@@ -772,7 +772,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             ...s.sessions,
             [sessionId]: {
               ...s.sessions[sessionId],
-              listenerCount: result.listener_count,
+              subscriberCount: result.subscriber_count,
             },
           },
         }));
@@ -801,19 +801,19 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Step 4: Create or join the backend session
     let capabilities: IOCapabilities;
     let ioState: IOStateType = "stopped";
-    let listenerCount = 1;
+    let subscriberCount = 1;
     let captureId: string | null = null;
     let captureKind: "frames" | "bytes" | null = null;
 
     if (backendExists) {
-      // Join existing backend session using registerSessionListener only
+      // Join existing backend session using registerSessionSubscriber only
       // Don't call joinReaderSession - it increments joiner_count separately from the listener map,
       // which causes count to overshoot when React StrictMode double-mounts components
       console.log(`[sessionStore:openSession] Backend exists, joining session ${sessionId}`);
-      const regResult = await registerSessionListener(sessionId, listenerId, appName);
+      const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
       capabilities = regResult.capabilities;
       ioState = getStateType(regResult.state);
-      listenerCount = regResult.listener_count;
+      subscriberCount = regResult.subscriber_count;
       captureId = regResult.capture_id;
       captureKind = regResult.capture_kind;
 
@@ -829,7 +829,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         profileId,
         profileName,
         appName,
-        details: `Joined existing session (${listenerCount} listeners, state: ${ioState})`,
+        details: `Joined existing session (${subscriberCount} listeners, state: ${ioState})`,
       });
     } else {
       // Create new backend session
@@ -855,7 +855,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         emitRawBytes: options.emitRawBytes,
         minFrameLength: options.minFrameLength,
         busOverride: options.busOverride,
-        listenerId, // For session logging
+        subscriberId, // For session logging
         appName, // Human-readable app name
         modbusPollsJson: options.modbusPollsJson,
       };
@@ -879,8 +879,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
         // Register as owner listener
         try {
-          const regResult = await registerSessionListener(sessionId, listenerId, appName);
-          listenerCount = regResult.listener_count;
+          const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
+          subscriberCount = regResult.subscriber_count;
           // Pick up buffer info from the registration result (more accurate than our guess)
           if (regResult.capture_id) captureId = regResult.capture_id;
           if (regResult.capture_kind) captureKind = regResult.capture_kind;
@@ -894,12 +894,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
 
-        // If profile is in use, try to join instead using registerSessionListener only
+        // If profile is in use, try to join instead using registerSessionSubscriber only
         if (msg.includes("Profile is in use by session")) {
-          const regResult = await registerSessionListener(sessionId, listenerId, appName);
+          const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
           capabilities = regResult.capabilities;
           ioState = getStateType(regResult.state);
-          listenerCount = regResult.listener_count;
+          subscriberCount = regResult.subscriber_count;
           captureId = regResult.capture_id;
           captureKind = regResult.capture_kind;
 
@@ -917,7 +917,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             ioState: "error",
             capabilities: null,
             errorMessage: msg,
-            listenerCount: 0,
+            subscriberCount: 0,
             capture: { available: false, id: null, kind: null, count: 0, owningSessionId: null, startTimeUs: null, endTimeUs: null, name: null, persistent: false },
             createdAt: Date.now(),
             hasQueuedMessages: false,
@@ -949,7 +949,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         wsUnlistenFunctions: [],
         callbacks: new Map(),
         heartbeatIntervalId: null,
-        registeredListeners: new Set(),
+        registeredSubscribers: new Set(),
       };
 
       // Set immediately BEFORE async setup to claim the slot
@@ -980,7 +980,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           }));
         };
 
-        eventListeners.unlistenFunctions = await setupSessionEventListeners(
+        eventListeners.unlistenFunctions = await setupSessionEventSubscribers(
           sessionId,
           eventListeners,
           updateSession
@@ -994,15 +994,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           const heartbeatSessionId = sessionId;
           eventListeners.heartbeatIntervalId = setInterval(async () => {
             const listeners = get()._eventListeners[heartbeatSessionId];
-            if (!listeners || listeners.registeredListeners.size === 0) return;
+            if (!listeners || listeners.registeredSubscribers.size === 0) return;
 
             tlog.info(
-              `[heartbeat:${heartbeatSessionId}] sending for ${listeners.registeredListeners.size} listener(s)`
+              `[heartbeat:${heartbeatSessionId}] sending for ${listeners.registeredSubscribers.size} listener(s)`
             );
 
-            for (const lid of listeners.registeredListeners) {
+            for (const lid of listeners.registeredSubscribers) {
               try {
-                await registerSessionListener(heartbeatSessionId, lid);
+                await registerSessionSubscriber(heartbeatSessionId, lid);
               } catch (e) {
                 tlog.info(
                   `[heartbeat:${heartbeatSessionId}] failed for ${lid}: ${e}`
@@ -1017,7 +1017,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Add this listener to the registered listeners set for heartbeat tracking
     const currentEventListeners = get()._eventListeners[sessionId];
     if (currentEventListeners) {
-      currentEventListeners.registeredListeners.add(listenerId);
+      currentEventListeners.registeredSubscribers.add(subscriberId);
     }
 
     // Step 5.5: Start the session if it's still stopped (for playback sources like PostgreSQL, CSV)
@@ -1039,15 +1039,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
 
     // Step 6: Create session entry
-    // IMPORTANT: Use a function updater to preserve any listenerCount updates
+    // IMPORTANT: Use a function updater to preserve any subscriberCount updates
     // that may have occurred via events while we were setting up.
-    // The `listenerCount` variable may be stale by now.
+    // The `subscriberCount` variable may be stale by now.
     set((s) => {
       // Check if session already exists with a higher listener count
       // (could have been updated by session-info event)
       const existingSession = s.sessions[sessionId];
-      const currentListenerCount = existingSession?.listenerCount ?? 0;
-      const finalListenerCount = Math.max(listenerCount, currentListenerCount);
+      const currentListenerCount = existingSession?.subscriberCount ?? 0;
+      const finalListenerCount = Math.max(subscriberCount, currentListenerCount);
 
       const session: Session = {
         id: sessionId,
@@ -1057,7 +1057,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         ioState,
         capabilities,
         errorMessage: null,
-        listenerCount: finalListenerCount,
+        subscriberCount: finalListenerCount,
         capture: {
           available: false,
           id: captureId,
@@ -1123,16 +1123,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     return get().sessions[sessionId];
   },
 
-  leaveSession: async (sessionId, listenerId) => {
-    console.log(`[sessionStore:leaveSession] Called with sessionId=${sessionId}, listenerId=${listenerId}`);
+  leaveSession: async (sessionId, subscriberId) => {
+    console.log(`[sessionStore:leaveSession] Called with sessionId=${sessionId}, subscriberId=${subscriberId}`);
     const eventListeners = get()._eventListeners[sessionId];
     console.log(`[sessionStore:leaveSession] eventListeners exists=${!!eventListeners}`);
 
     try {
       // Unregister listener from Rust backend
-      console.log(`[sessionStore:leaveSession] Calling unregisterSessionListener...`);
-      const remaining = await unregisterSessionListener(sessionId, listenerId);
-      console.log(`[sessionStore:leaveSession] unregisterSessionListener returned remaining=${remaining}`);
+      console.log(`[sessionStore:leaveSession] Calling unregisterSessionSubscriber...`);
+      const remaining = await unregisterSessionSubscriber(sessionId, subscriberId);
+      console.log(`[sessionStore:leaveSession] unregisterSessionSubscriber returned remaining=${remaining}`);
 
       // Log session-left event
       const session = get().sessions[sessionId];
@@ -1141,14 +1141,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         sessionId,
         profileId: session?.profileId ?? null,
         profileName: session?.profileName ?? null,
-        appName: listenerId,
+        appName: subscriberId,
         details: `Left session (${remaining} listeners remaining)`,
       });
 
       // Remove callbacks and registered listener for heartbeats
       if (eventListeners) {
-        eventListeners.callbacks.delete(listenerId);
-        eventListeners.registeredListeners.delete(listenerId);
+        eventListeners.callbacks.delete(subscriberId);
+        eventListeners.registeredSubscribers.delete(subscriberId);
         console.log(`[sessionStore:leaveSession] callbacks.size=${eventListeners.callbacks.size}`);
 
         // If no more local callbacks, clean up event listeners
@@ -1156,7 +1156,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           console.log(`[sessionStore:leaveSession] No more callbacks, cleaning up event listeners`);
           cleanupEventListeners(eventListeners);
 
-          // NOTE: Don't call leaveReaderSession here - unregisterSessionListener already
+          // NOTE: Don't call leaveReaderSession here - unregisterSessionSubscriber already
           // handles the backend cleanup including stopping the session when no listeners remain.
           // Calling leaveReaderSession would double-decrement joiner_count.
 
@@ -1172,7 +1172,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                   [sessionId]: {
                     ...s.sessions[sessionId],
                     lifecycleState: "disconnected",
-                    listenerCount: 0,
+                    subscriberCount: 0,
                   },
                 },
                 _eventListeners: remainingListeners,
@@ -1205,7 +1205,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               ...s.sessions,
               [sessionId]: {
                 ...s.sessions[sessionId],
-                listenerCount: remaining,
+                subscriberCount: remaining,
               },
             },
           }));
@@ -1226,9 +1226,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
     // Unregister all local listeners from Rust backend
     if (eventListeners) {
-      for (const listenerId of eventListeners.registeredListeners) {
+      for (const subscriberId of eventListeners.registeredSubscribers) {
         try {
-          await unregisterSessionListener(sessionId, listenerId);
+          await unregisterSessionSubscriber(sessionId, subscriberId);
         } catch {
           // Ignore - session may already be gone
         }
@@ -1236,7 +1236,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       cleanupEventListeners(eventListeners);
     }
 
-    // Note: Don't call leaveReaderSession - unregisterSessionListener already handles it.
+    // Note: Don't call leaveReaderSession - unregisterSessionSubscriber already handles it.
     // The backend auto-destroys sessions when the last listener unregisters.
 
     // Remove from store
@@ -1270,14 +1270,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     });
   },
 
-  cleanupEvictedListener: (sessionId, listenerId) => {
-    tlog.info(`[sessionStore:cleanupEvictedListener] Cleaning up evicted listener '${listenerId}' from session '${sessionId}'`);
+  cleanupEvictedSubscriber: (sessionId, subscriberId) => {
+    tlog.info(`[sessionStore:cleanupEvictedSubscriber] Cleaning up evicted listener '${subscriberId}' from session '${sessionId}'`);
     const eventListeners = get()._eventListeners[sessionId];
 
     if (eventListeners) {
       // Remove this listener's callback and registration
-      eventListeners.callbacks.delete(listenerId);
-      eventListeners.registeredListeners.delete(listenerId);
+      eventListeners.callbacks.delete(subscriberId);
+      eventListeners.registeredSubscribers.delete(subscriberId);
 
       // If no more local callbacks, full cleanup (like cleanupDestroyedSession)
       if (eventListeners.callbacks.size === 0) {
@@ -1299,7 +1299,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             ...s.sessions,
             [sessionId]: {
               ...s.sessions[sessionId],
-              listenerCount: Math.max(0, (s.sessions[sessionId]?.listenerCount ?? 1) - 1),
+              subscriberCount: Math.max(0, (s.sessions[sessionId]?.subscriberCount ?? 1) - 1),
             },
           },
         }));
@@ -1307,12 +1307,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
 
-  reinitializeSession: async (sessionId, listenerId, appName, profileId, profileName, options) => {
-    console.log(`[sessionStore:reinitializeSession] Called with sessionId=${sessionId}, listenerId=${listenerId}, profileId=${profileId}, profileName=${profileName}`);
+  reinitializeSession: async (sessionId, subscriberId, appName, profileId, profileName, options) => {
+    console.log(`[sessionStore:reinitializeSession] Called with sessionId=${sessionId}, subscriberId=${subscriberId}, profileId=${profileId}, profileName=${profileName}`);
     console.log(`[sessionStore:reinitializeSession] Options: ${JSON.stringify(options)}`);
 
     // Use Rust's atomic reinitialize check
-    const result = await reinitializeSessionIfSafe(sessionId, listenerId);
+    const result = await reinitializeSessionIfSafe(sessionId, subscriberId);
     console.log(`[sessionStore:reinitializeSession] reinitializeSessionIfSafe result: ${JSON.stringify(result)}`);
 
     if (!result.success) {
@@ -1330,7 +1330,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       // If no session exists, create one
       // Pass sessionId via options so openSession uses it instead of defaulting to profileId
       console.log(`[sessionStore:reinitializeSession] No existing session, calling openSession`);
-      return get().openSession(profileId, profileName, listenerId, appName, { ...options, sessionId });
+      return get().openSession(profileId, profileName, subscriberId, appName, { ...options, sessionId });
     }
 
     // Clean up local event listeners but keep session in store
@@ -1363,7 +1363,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Create new session - this will update the existing entry in the store
     // Pass sessionId via options so openSession uses it instead of defaulting to profileId
     console.log(`[sessionStore:reinitializeSession] Success, calling openSession for profileId=${profileId}, sessionId=${sessionId}`);
-    const result2 = await get().openSession(profileId, profileName, listenerId, appName, { ...options, sessionId });
+    const result2 = await get().openSession(profileId, profileName, subscriberId, appName, { ...options, sessionId });
     console.log(`[sessionStore:reinitializeSession] openSession complete, result.id=${result2?.id}`);
     return result2;
   },
@@ -1721,17 +1721,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   // ---- Callbacks ----
-  registerCallbacks: (sessionId, listenerId, callbacks) => {
+  registerCallbacks: (sessionId, subscriberId, callbacks) => {
     const eventListeners = get()._eventListeners[sessionId];
     if (eventListeners) {
-      eventListeners.callbacks.set(listenerId, callbacks);
+      eventListeners.callbacks.set(subscriberId, callbacks);
     }
   },
 
-  clearCallbacks: (sessionId, listenerId) => {
+  clearCallbacks: (sessionId, subscriberId) => {
     const eventListeners = get()._eventListeners[sessionId];
     if (eventListeners) {
-      eventListeners.callbacks.delete(listenerId);
+      eventListeners.callbacks.delete(subscriberId);
     }
   },
 
@@ -2009,7 +2009,7 @@ export interface CreateMultiSourceOptions {
   /** Unique session ID for the merged session (e.g., "discovery-multi") */
   sessionId: string;
   /** Listener instance ID for this app (e.g., "discovery_1", "decoder_2") */
-  listenerId: string;
+  subscriberId: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName: string;
   /** Profile IDs to combine */
@@ -2081,7 +2081,7 @@ export async function createAndStartMultiSourceSession(
 ): Promise<MultiSourceSessionResult> {
   const {
     sessionId,
-    listenerId,
+    subscriberId,
     appName,
     profileIds,
     busMappings,
@@ -2139,13 +2139,13 @@ export async function createAndStartMultiSourceSession(
   const capabilities = await createMultiSourceSession({
     sessionId,
     sources,
-    listenerId,
+    subscriberId,
     appName,
     modbusPollsJson: options.modbusPollsJson,
   });
 
   // Register this listener with the session
-  const regResult = await registerSessionListener(sessionId, listenerId, appName);
+  const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
   // Handle startup error (error that occurred before listener registered)
   if (regResult.startup_error) {
     useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
@@ -2163,7 +2163,7 @@ export async function createAndStartMultiSourceSession(
       wsUnlistenFunctions: [],
       callbacks: new Map(),
       heartbeatIntervalId: null,
-      registeredListeners: new Set(),
+      registeredSubscribers: new Set(),
     };
 
     useSessionStore.setState((s) => {
@@ -2189,7 +2189,7 @@ export async function createAndStartMultiSourceSession(
         }));
       };
 
-      eventListeners.unlistenFunctions = await setupSessionEventListeners(
+      eventListeners.unlistenFunctions = await setupSessionEventSubscribers(
         sessionId,
         eventListeners,
         updateSession
@@ -2201,11 +2201,11 @@ export async function createAndStartMultiSourceSession(
         const heartbeatSessionId = sessionId;
         eventListeners.heartbeatIntervalId = setInterval(async () => {
           const listeners = useSessionStore.getState()._eventListeners[heartbeatSessionId];
-          if (!listeners || listeners.registeredListeners.size === 0) return;
+          if (!listeners || listeners.registeredSubscribers.size === 0) return;
 
-          for (const lid of listeners.registeredListeners) {
+          for (const lid of listeners.registeredSubscribers) {
             try {
-              await registerSessionListener(heartbeatSessionId, lid);
+              await registerSessionSubscriber(heartbeatSessionId, lid);
             } catch {
               // Ignore heartbeat errors - session may have been destroyed
             }
@@ -2216,7 +2216,7 @@ export async function createAndStartMultiSourceSession(
   }
 
   // Add this listener to the registered listeners set for heartbeat tracking
-  eventListeners.registeredListeners.add(listenerId);
+  eventListeners.registeredSubscribers.add(subscriberId);
 
   return {
     sessionId,
@@ -2232,7 +2232,7 @@ export interface JoinMultiSourceOptions {
   /** Session ID to join */
   sessionId: string;
   /** Listener instance ID for this app */
-  listenerId: string;
+  subscriberId: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName: string;
   /** Source profile IDs (for display purposes) */
@@ -2249,11 +2249,11 @@ export interface JoinMultiSourceOptions {
 export async function joinMultiSourceSession(
   options: JoinMultiSourceOptions
 ): Promise<MultiSourceSessionResult> {
-  const { sessionId, listenerId, appName, sourceProfileIds = [] } = options;
+  const { sessionId, subscriberId, appName, sourceProfileIds = [] } = options;
 
-  // Join the existing session using registerSessionListener only
+  // Join the existing session using registerSessionSubscriber only
   // Don't call joinReaderSession - it increments joiner_count separately from the listener map
-  const regResult = await registerSessionListener(sessionId, listenerId, appName);
+  const regResult = await registerSessionSubscriber(sessionId, subscriberId, appName);
   // Handle startup error (error that occurred before listener registered)
   if (regResult.startup_error) {
     useSessionStore.getState().showAppError("Stream Error", "An error occurred while starting the session.", regResult.startup_error);
@@ -2269,7 +2269,7 @@ export async function joinMultiSourceSession(
       wsUnlistenFunctions: [],
       callbacks: new Map(),
       heartbeatIntervalId: null,
-      registeredListeners: new Set(),
+      registeredSubscribers: new Set(),
     };
 
     useSessionStore.setState((s) => {
@@ -2295,7 +2295,7 @@ export async function joinMultiSourceSession(
         }));
       };
 
-      eventListeners.unlistenFunctions = await setupSessionEventListeners(
+      eventListeners.unlistenFunctions = await setupSessionEventSubscribers(
         sessionId,
         eventListeners,
         updateSession
@@ -2307,11 +2307,11 @@ export async function joinMultiSourceSession(
         const heartbeatSessionId = sessionId;
         eventListeners.heartbeatIntervalId = setInterval(async () => {
           const listeners = useSessionStore.getState()._eventListeners[heartbeatSessionId];
-          if (!listeners || listeners.registeredListeners.size === 0) return;
+          if (!listeners || listeners.registeredSubscribers.size === 0) return;
 
-          for (const lid of listeners.registeredListeners) {
+          for (const lid of listeners.registeredSubscribers) {
             try {
-              await registerSessionListener(heartbeatSessionId, lid);
+              await registerSessionSubscriber(heartbeatSessionId, lid);
             } catch {
               // Ignore heartbeat errors - session may have been destroyed
             }
@@ -2322,7 +2322,7 @@ export async function joinMultiSourceSession(
   }
 
   // Add this listener to the registered listeners set for heartbeat tracking
-  eventListeners.registeredListeners.add(listenerId);
+  eventListeners.registeredSubscribers.add(subscriberId);
 
   return {
     sessionId,

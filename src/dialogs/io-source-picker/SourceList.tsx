@@ -271,7 +271,7 @@ export default function SourceList({
 
       return {
         displayName,
-        subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
+        subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
         sourceDetails,
         icon: GitMerge,
         iconColour: "text-[color:var(--text-purple)]",
@@ -289,7 +289,7 @@ export default function SourceList({
       const profileName = captureName || storageBackend;
       return {
         displayName,
-        subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
+        subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
         sourceDetails: `${profileName} (${storageBackend})`,
         icon: Database,
         iconColour: "text-[color:var(--text-cyan)]",
@@ -309,7 +309,7 @@ export default function SourceList({
       const deviceKind = profile?.kind || session.sourceType;
       return {
         displayName,
-        subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
+        subtitle: `${session.subscriberCount} subscriber${session.subscriberCount !== 1 ? "s" : ""}`,
         sourceDetails: `${profileName} (${deviceKind})`,
         icon: Database,
         iconColour: "text-[color:var(--text-green)]",

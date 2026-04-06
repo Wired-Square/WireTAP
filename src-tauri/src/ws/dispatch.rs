@@ -229,8 +229,8 @@ pub fn send_capture_changed(session_id: &str) {
     server.send_to_channel(channel, msg);
 }
 
-/// Send session info (speed + listener count).
-pub fn send_session_info(session_id: &str, speed: f64, listener_count: u16) {
+/// Send session info (speed + subscriber count).
+pub fn send_session_info(session_id: &str, speed: f64, subscriber_count: u16) {
     let server = match ws_server() {
         Some(s) => s,
         None => return,
@@ -239,7 +239,7 @@ pub fn send_session_info(session_id: &str, speed: f64, listener_count: u16) {
         Some(c) => c,
         None => return,
     };
-    let payload = protocol::encode_session_info(speed, listener_count);
+    let payload = protocol::encode_session_info(speed, subscriber_count);
     let msg = protocol::encode_message(MsgType::SessionInfo, channel, &payload);
     server.send_to_channel(channel, msg);
 }
@@ -351,7 +351,7 @@ pub fn send_session_lifecycle(payload: &crate::io::SessionLifecyclePayload) {
         &payload.session_id,
         payload.source_type.as_deref(),
         state_byte,
-        payload.listener_count as u16,
+        payload.subscriber_count as u16,
     );
     let msg = protocol::encode_message(MsgType::SessionLifecycle, 0, &encoded);
     server.send_global(msg);

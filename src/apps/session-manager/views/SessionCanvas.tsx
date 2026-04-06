@@ -45,7 +45,7 @@ interface SessionCanvasProps {
   sessions: ActiveSessionInfo[];
   profiles: IOProfile[];
   openPanelIds?: string[];
-  listenerIds?: Record<string, string>;
+  subscriberIds?: Record<string, string>;
   onEnableBusMapping?: (sessionId: string, profileId: string, deviceBus: number, outputBus: number) => void;
   onCreateBusMapping?: (sessionId: string, profileId: string, deviceBus: number, newOutputBus: number) => void;
   onConnectAppToSession?: (sessionId: string, appName: string) => void;
@@ -55,7 +55,7 @@ export default function SessionCanvas({
   sessions,
   profiles,
   openPanelIds,
-  listenerIds,
+  subscriberIds,
   onEnableBusMapping,
   onCreateBusMapping,
   onConnectAppToSession,
@@ -83,8 +83,8 @@ export default function SessionCanvas({
   }, [sessions]);
 
   const graphData = useMemo(
-    () => buildSessionGraph(sessions, profiles, bufferInfoMap, openPanelIds, listenerIds),
-    [sessions, profiles, bufferInfoMap, openPanelIds, listenerIds]
+    () => buildSessionGraph(sessions, profiles, bufferInfoMap, openPanelIds, subscriberIds),
+    [sessions, profiles, bufferInfoMap, openPanelIds, subscriberIds]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(graphData.nodes as Node[]);

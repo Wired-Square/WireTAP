@@ -185,7 +185,7 @@ export interface CreateIOSessionOptions {
   /** Bus number override for single-bus devices (0-7) */
   busOverride?: number;
   /** Listener instance ID for session logging (e.g., "discovery_1", "decoder_2") */
-  listenerId?: string;
+  subscriberId?: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName?: string;
   /** Buffer ID for buffer reader sessions (e.g., "xk9m2p") */
@@ -236,7 +236,7 @@ export async function createIOSession(
     // Bus override for single-bus devices
     bus_override: options.busOverride,
     // Listener ID for session logging
-    listener_id: options.listenerId,
+    subscriber_id: options.subscriberId,
     // Human-readable app name
     app_name: options.appName,
     // Modbus TCP poll groups (catalog-derived)
@@ -297,7 +297,7 @@ export async function leaveReaderSession(sessionId: string): Promise<number> {
   return invoke("leave_reader_session", { session_id: sessionId });
 }
 
-// Legacy heartbeat functions removed - use registerSessionListener/unregisterSessionListener instead
+// Legacy heartbeat functions removed - use registerSessionSubscriber/unregisterSessionSubscriber instead
 
 /**
  * Get the current joiner count for a session.
@@ -833,9 +833,9 @@ export async function sessionTransmitFrame(
 /**
  * Info about a registered listener.
  */
-export interface ListenerInfo {
+export interface SubscriberInfo {
   /** Unique instance ID for this listener (e.g., "discovery_1", "decoder_2") */
-  listener_id: string;
+  subscriber_id: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   app_name: string;
   /** Seconds since registration */
@@ -847,7 +847,7 @@ export interface ListenerInfo {
 /**
  * Result of registering a listener.
  */
-export interface RegisterListenerResult {
+export interface RegisterSubscriberResult {
   /** Session capabilities */
   capabilities: IOCapabilities;
   /** Current session state */
@@ -857,7 +857,7 @@ export interface RegisterListenerResult {
   /** Capture kind ("frames" or "bytes") */
   capture_kind: "frames" | "bytes" | null;
   /** Total number of listeners */
-  listener_count: number;
+  subscriber_count: number;
   /** Error that occurred before this listener registered (one-shot, cleared after return) */
   startup_error: string | null;
 }
@@ -867,17 +867,17 @@ export interface RegisterListenerResult {
  * This is the primary way for frontend components to join a session.
  * If the listener is already registered, this updates their heartbeat.
  * @param sessionId The session ID
- * @param listenerId A unique ID for this listener (e.g., "discovery", "decoder")
+ * @param subscriberId A unique ID for this listener (e.g., "discovery", "decoder")
  * @returns Session info including whether this listener is the owner
  */
-export async function registerSessionListener(
+export async function registerSessionSubscriber(
   sessionId: string,
-  listenerId: string,
+  subscriberId: string,
   appName?: string
-): Promise<RegisterListenerResult> {
+): Promise<RegisterSubscriberResult> {
   return invoke("register_session_listener", {
     session_id: sessionId,
-    listener_id: listenerId,
+    subscriber_id: subscriberId,
     app_name: appName,
   });
 }
@@ -886,18 +886,18 @@ export async function registerSessionListener(
  * Unregister a listener from a session.
  * If this was the last listener, the session will be stopped (but not destroyed).
  * @param sessionId The session ID
- * @param listenerId The listener ID to unregister
+ * @param subscriberId The listener ID to unregister
  * @returns The remaining listener count
  */
-export async function unregisterSessionListener(
+export async function unregisterSessionSubscriber(
   sessionId: string,
-  listenerId: string
+  subscriberId: string
 ): Promise<number> {
-  console.log(`[unregisterSessionListener] session=${sessionId}, listener=${listenerId}`);
-  console.log(`[unregisterSessionListener] stack:`, new Error().stack);
+  console.log(`[unregisterSessionSubscriber] session=${sessionId}, listener=${subscriberId}`);
+  console.log(`[unregisterSessionSubscriber] stack:`, new Error().stack);
   return invoke("unregister_session_listener", {
     session_id: sessionId,
-    listener_id: listenerId,
+    subscriber_id: subscriberId,
   });
 }
 
@@ -905,16 +905,16 @@ export async function unregisterSessionListener(
  * Evict a listener from a session, giving it a copy of the current buffer.
  * Used by the Session Manager to remove a listener without destroying the session.
  * @param sessionId The session ID
- * @param listenerId The listener ID to evict
+ * @param subscriberId The listener ID to evict
  * @returns List of copied buffer IDs given to the evicted listener
  */
-export async function evictSessionListener(
+export async function evictSessionSubscriber(
   sessionId: string,
-  listenerId: string
+  subscriberId: string
 ): Promise<string[]> {
   return invoke("evict_session_listener_cmd", {
     session_id: sessionId,
-    listener_id: listenerId,
+    subscriber_id: subscriberId,
   });
 }
 
@@ -1010,9 +1010,9 @@ export async function updateSourceBusMappings(
  * @param sessionId The session ID
  * @returns List of registered listeners
  */
-export async function getSessionListeners(
+export async function getSessionSubscribers(
   sessionId: string
-): Promise<ListenerInfo[]> {
+): Promise<SubscriberInfo[]> {
   return invoke("get_session_listener_list", { session_id: sessionId });
 }
 
@@ -1025,7 +1025,7 @@ export interface ReinitializeResult {
   /** Reason for failure (if success is false) */
   reason?: string;
   /** List of other listeners preventing reinitialize (if any) */
-  other_listeners: string[];
+  other_subscribers: string[];
 }
 
 /**
@@ -1035,16 +1035,16 @@ export interface ReinitializeResult {
  *
  * If safe, the session will be destroyed so a new one can be created.
  * @param sessionId The session ID
- * @param listenerId The requesting listener's ID
+ * @param subscriberId The requesting listener's ID
  * @returns Result indicating success or failure with reason
  */
 export async function reinitializeSessionIfSafe(
   sessionId: string,
-  listenerId: string
+  subscriberId: string
 ): Promise<ReinitializeResult> {
   return invoke("reinitialize_session_if_safe_cmd", {
     session_id: sessionId,
-    listener_id: listenerId,
+    subscriber_id: subscriberId,
   });
 }
 
@@ -1054,17 +1054,17 @@ export async function reinitializeSessionIfSafe(
  * When they rejoin, set isActive to true to resume receiving frames.
  * This is handled in Rust to avoid frontend race conditions.
  * @param sessionId The session ID
- * @param listenerId The listener ID
+ * @param subscriberId The listener ID
  * @param isActive Whether the listener should receive frames
  */
-export async function setSessionListenerActive(
+export async function setSessionSubscriberActive(
   sessionId: string,
-  listenerId: string,
+  subscriberId: string,
   isActive: boolean
 ): Promise<void> {
   return invoke("set_session_listener_active", {
     session_id: sessionId,
-    listener_id: listenerId,
+    subscriber_id: subscriberId,
     is_active: isActive,
   });
 }
@@ -1250,7 +1250,7 @@ export interface CreateMultiSourceSessionOptions {
   /** Array of source configurations */
   sources: MultiSourceInput[];
   /** Listener instance ID for session logging (e.g., "discovery_1", "decoder_2") */
-  listenerId?: string;
+  subscriberId?: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName?: string;
   /** Shared Modbus poll groups JSON (injected into all modbus_tcp sources) */
@@ -1303,7 +1303,7 @@ export async function createMultiSourceSession(
   return invoke("create_multi_source_session", {
     session_id: options.sessionId,
     sources: rustSources,
-    listener_id: options.listenerId,
+    subscriber_id: options.subscriberId,
     app_name: options.appName,
     modbus_polls: options.modbusPollsJson,
   });
@@ -1322,9 +1322,9 @@ export interface ActiveSessionInfo {
   /** Session capabilities */
   capabilities: IOCapabilities;
   /** Number of listeners */
-  listenerCount: number;
+  subscriberCount: number;
   /** Individual listener details */
-  listeners: ListenerInfo[];
+  subscribers: SubscriberInfo[];
   /** For broker sessions: the source configurations */
   brokerConfigs: MultiSourceInput[] | null;
   /** Profile IDs feeding this session */
@@ -1347,9 +1347,9 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     source_type: string;
     state: IOState; // Rust sends { type: "Running" } etc, not simple string
     capabilities: IOCapabilities;
-    listener_count: number;
-    listeners: Array<{
-      listener_id: string;
+    subscriber_count: number;
+    subscribers: Array<{
+      subscriber_id: string;
       app_name: string;
       registered_seconds_ago: number;
       is_active: boolean;
@@ -1376,8 +1376,8 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     sourceType: s.source_type,
     state: getStateType(s.state), // Convert IOState to IOStateType
     capabilities: s.capabilities,
-    listenerCount: s.listener_count,
-    listeners: s.listeners ?? [],
+    subscriberCount: s.subscriber_count,
+    subscribers: s.subscribers ?? [],
     brokerConfigs: s.broker_configs?.map((c) => ({
       profileId: c.profile_id,
       displayName: c.display_name,

@@ -332,11 +332,11 @@ export function decodeBufferChanged(payload: Uint8Array): string {
 
 export function decodeSessionInfo(payload: DataView): {
   speed: number;
-  listener_count: number;
+  subscriber_count: number;
 } {
   const speed = payload.getFloat64(0, true);
-  const listener_count = payload.getUint16(8, true);
-  return { speed, listener_count };
+  const subscriber_count = payload.getUint16(8, true);
+  return { speed, subscriber_count };
 }
 
 export function decodeSubscribeAck(payload: DataView): {

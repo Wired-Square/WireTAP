@@ -146,7 +146,7 @@ enum ServerCommand {
     Activity { conn_id: usize },
     /// Touch IO listener heartbeats for all sessions a connection is subscribed to.
     /// Sent when a client Heartbeat message is received, bridging WS keepalive
-    /// to the IO session watchdog so the frontend can skip `register_session_listener` polling.
+    /// to the IO session watchdog so the frontend can skip `register_session_subscriber` polling.
     HeartbeatListeners { conn_id: usize },
     /// Execute a command received from a client and send the response back.
     ExecuteCommand {
@@ -355,7 +355,7 @@ async fn connection_manager_task(
                                 .filter_map(|ch| channel_map.channel_to_session.get(ch).cloned())
                                 .collect();
                             if !session_ids.is_empty() {
-                                tauri::async_runtime::spawn(touch_listener_heartbeats(session_ids));
+                                tauri::async_runtime::spawn(touch_subscriber_heartbeats(session_ids));
                             }
                         }
                     }
@@ -641,9 +641,9 @@ async fn connection_read_task(
 
 /// Update `last_heartbeat` on all listeners for the given sessions.
 /// This bridges the WS keepalive to the IO session watchdog, allowing
-/// the frontend to stop sending per-listener `register_session_listener` invoke calls.
-async fn touch_listener_heartbeats(session_ids: Vec<String>) {
-    crate::io::touch_listener_heartbeats(&session_ids).await;
+/// the frontend to stop sending per-listener `register_session_subscriber` invoke calls.
+async fn touch_subscriber_heartbeats(session_ids: Vec<String>) {
+    crate::io::touch_subscriber_heartbeats(&session_ids).await;
 }
 
 fn generate_token() -> String {

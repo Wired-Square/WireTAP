@@ -14,7 +14,7 @@ export interface SessionNodeData {
   /** Disabled input bus numbers available for reconnection */
   disabledInputBuses?: number[];
   /** Listener IDs connected to this session (drives output handles) */
-  connectedListenerIds?: string[];
+  connectedSubscriberIds?: string[];
 }
 
 interface SessionNodeProps {
@@ -23,7 +23,7 @@ interface SessionNodeProps {
 }
 
 function SessionNode({ data, selected }: SessionNodeProps) {
-  const { session, label, inputBuses, disabledInputBuses, connectedListenerIds } = data;
+  const { session, label, inputBuses, disabledInputBuses, connectedSubscriberIds } = data;
 
   // Build input bus list: enabled + disabled + one extra empty handle
   const allInputBuses = [
@@ -36,8 +36,8 @@ function SessionNode({ data, selected }: SessionNodeProps) {
     : 0;
 
   // Output handles: one per connected listener + one extra empty
-  const listenerIds = connectedListenerIds ?? [];
-  const outputCount = listenerIds.length;
+  const subscriberIds = connectedSubscriberIds ?? [];
+  const outputCount = subscriberIds.length;
 
   const isRunning = session.state === "running";
   const isStopped = session.state === "stopped";
@@ -171,7 +171,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
             <div className="flex items-center gap-1">
               <Users className={iconXs} />
               <span>
-                {session.listenerCount} app{session.listenerCount !== 1 ? "s" : ""}
+                {session.subscriberCount} app{session.subscriberCount !== 1 ? "s" : ""}
               </span>
             </div>
             {session.captureFrameCount !== null && session.captureFrameCount > 0 && (

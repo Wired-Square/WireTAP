@@ -21,10 +21,10 @@ interface SessionLifecyclePayload {
   event_type: "created" | "destroyed";
   source_type: string | null;
   state: string | null;
-  listener_count: number;
+  subscriber_count: number;
   source_profile_ids: string[];
   /** The listener ID that created the session (only for "created") */
-  creator_listener_id: string | null;
+  creator_subscriber_id: string | null;
 }
 
 
@@ -145,18 +145,18 @@ export function useSessionLogSubscription(): void {
           sessionId: p.session_id,
           profileId: p.source_profile_ids[0] ?? null,
           profileName,
-          appName: p.creator_listener_id,
+          appName: p.creator_subscriber_id,
           details: `Session created${modeLabel}`,
         });
         // Log the initial listener (this event fires before we can set up the listener)
-        if (p.listener_count > 0 && p.creator_listener_id) {
+        if (p.subscriber_count > 0 && p.creator_subscriber_id) {
           addEntryFn({
             eventType: "session-joined",
             sessionId: p.session_id,
             profileId: p.source_profile_ids[0] ?? null,
             profileName,
-            appName: p.creator_listener_id,
-            details: `${p.creator_listener_id} joined (${p.listener_count} listeners)`,
+            appName: p.creator_subscriber_id,
+            details: `${p.creator_subscriber_id} joined (${p.subscriber_count} listeners)`,
           });
         }
         setupPerSessionListeners(p.session_id, perSessionListeners);
@@ -254,7 +254,7 @@ export function useSessionLogSubscription(): void {
           const profileName = await resolveProfileName(session.sessionId, session.sourceProfileIds);
           const parts = [
             `State: ${session.state}`,
-            `Listeners: ${session.listenerCount}`,
+            `Listeners: ${session.subscriberCount}`,
             `Frames: ${session.captureFrameCount ?? 0}`,
           ];
           if (session.capabilities?.supports_speed_control) {

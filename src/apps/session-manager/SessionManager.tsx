@@ -12,7 +12,7 @@ import {
   pauseReaderSession,
   resumeReaderSession,
   destroyReaderSession,
-  evictSessionListener,
+  evictSessionSubscriber,
   addSourceToSession,
   removeSourceFromSession,
   updateSourceBusMappings,
@@ -49,7 +49,7 @@ export default function SessionManager() {
 
   // Track which panels are currently open (for unconnected app nodes)
   const openPanelIds = useFocusStore((s) => s.openPanelIds);
-  const listenerIds = useFocusStore((s) => s.listenerIds);
+  const subscriberIds = useFocusStore((s) => s.subscriberIds);
 
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(
@@ -134,9 +134,9 @@ export default function SessionManager() {
     }
   }, [fetchSessions]);
 
-  const handleEvictListener = useCallback(async (sessionId: string, listenerId: string) => {
+  const handleEvictSubscriber = useCallback(async (sessionId: string, subscriberId: string) => {
     try {
-      await evictSessionListener(sessionId, listenerId);
+      await evictSessionSubscriber(sessionId, subscriberId);
       await fetchSessions();
     } catch (error) {
       console.error("[SessionManager] Failed to evict listener:", error);
@@ -284,7 +284,7 @@ export default function SessionManager() {
                   sessions={sessions}
                   profiles={profiles}
                   openPanelIds={openPanelIds}
-                  listenerIds={listenerIds}
+                  subscriberIds={subscriberIds}
                   onEnableBusMapping={handleEnableBusMapping}
                   onCreateBusMapping={handleCreateBusMapping}
                   onConnectAppToSession={handleConnectAppToSession}
@@ -302,7 +302,7 @@ export default function SessionManager() {
               onPauseSession={handlePauseSession}
               onResumeSession={handleResumeSession}
               onDestroySession={handleDestroySession}
-              onEvictListener={handleEvictListener}
+              onEvictSubscriber={handleEvictSubscriber}
               onAddSource={handleAddSource}
               onRemoveSource={handleRemoveSource}
               onDisableBusMapping={handleDisableBusMapping}

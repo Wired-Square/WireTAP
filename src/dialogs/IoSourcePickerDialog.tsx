@@ -31,7 +31,7 @@ import {
   startReaderSession,
   stopReaderSession,
   destroyReaderSession,
-  unregisterSessionListener,
+  unregisterSessionSubscriber,
   updateReaderSpeed,
   probeDevice,
   createDefaultBusMappings,
@@ -162,7 +162,7 @@ type Props = {
   /** Called when user wants to continue without selecting a source */
   onSkip?: () => void;
   /** Listener ID for this app (e.g., "discovery", "decoder") - required for Leave button */
-  listenerId?: string;
+  subscriberId?: string;
   /** Called when user clicks Connect in connect mode (creates session without streaming) */
   onConnect?: (profileId: string) => void;
 };
@@ -196,7 +196,7 @@ export default function IoSourcePickerDialog({
   allowMultiSelect = false,
   disabledProfiles,
   onSkip,
-  listenerId,
+  subscriberId,
   onConnect,
 }: Props) {
   // Use stable empty array when selectedIds is not provided (avoids re-renders)
@@ -1143,7 +1143,7 @@ export default function IoSourcePickerDialog({
 
   // Handle Leave button - unregister listener and reset dialog state
   const handleRelease = async () => {
-    if (!listenerId) return; // Need listener ID to unregister
+    if (!subscriberId) return; // Need listener ID to unregister
 
     // Unregister from any active sessions (doesn't destroy them, other listeners can still use them)
     // Single-select mode: unregister from session for the checked profile
@@ -1151,7 +1151,7 @@ export default function IoSourcePickerDialog({
       const session = getSessionForProfile(checkedSourceId);
       if (session) {
         try {
-          await unregisterSessionListener(session.id, listenerId);
+          await unregisterSessionSubscriber(session.id, subscriberId);
         } catch (e) {
           console.error("Failed to unregister from session:", e);
         }
@@ -1163,7 +1163,7 @@ export default function IoSourcePickerDialog({
       const session = getSessionForProfile(profileId);
       if (session) {
         try {
-          await unregisterSessionListener(session.id, listenerId);
+          await unregisterSessionSubscriber(session.id, subscriberId);
         } catch (e) {
           console.error(`Failed to unregister from session for ${profileId}:`, e);
         }
@@ -1698,7 +1698,7 @@ export default function IoSourcePickerDialog({
           multiSelectMode={isMultiBusMode}
           multiSelectCount={checkedSourceIds.length}
           onMultiConnectClick={handleMultiWatchClick}
-          onRelease={listenerId && (isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileBuffer)) ? handleRelease : undefined}
+          onRelease={subscriberId && (isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileBuffer)) ? handleRelease : undefined}
           // Only show Restart for profiles, not for selecting existing sessions
           onRestartClick={isCheckedProfileLive && !isCheckedProfileStopped && !checkedMultiSourceSession ? handleRestartClick : undefined}
           isMultiSourceLive={isMultiSourceLive}

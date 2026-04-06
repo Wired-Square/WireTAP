@@ -48,7 +48,7 @@ export function buildSessionGraph(
   profiles: IOProfile[],
   bufferInfoMap?: Map<string, CaptureInfo>,
   openPanelIds?: string[],
-  listenerIds?: Record<string, string>,
+  subscriberIds?: Record<string, string>,
 ): SessionGraphData {
   const nodes: FlowNode[] = [];
   const edges: Edge[] = [];
@@ -178,14 +178,14 @@ export function buildSessionGraph(
     });
 
     // Build ordered app IDs for output handles
-    const connectedAppIds = session.listeners.map((l) => l.listener_id);
+    const connectedAppIds = session.subscribers.map((l) => l.subscriber_id);
 
     const nodeData: SessionNodeData = {
       session,
       label: session.sessionId,
       inputBuses: inputBuses.length > 0 ? inputBuses : undefined,
       disabledInputBuses: disabledInputBuses.length > 0 ? disabledInputBuses : undefined,
-      connectedListenerIds: connectedAppIds.length > 0 ? connectedAppIds : undefined,
+      connectedSubscriberIds: connectedAppIds.length > 0 ? connectedAppIds : undefined,
     };
 
     nodes.push({
@@ -240,12 +240,12 @@ export function buildSessionGraph(
     // Column 3: Connected app nodes
     const sessionBaseY = START_Y + index * ROW_SPACING;
 
-    session.listeners.forEach((listener, appIndex) => {
-      const appName = listener.app_name || listener.listener_id;
+    session.subscribers.forEach((listener, appIndex) => {
+      const appName = listener.app_name || listener.subscriber_id;
       connectedAppNames.add(appName.toLowerCase());
 
       const nodeData: AppNodeData = {
-        appId: listener.listener_id,
+        appId: listener.subscriber_id,
         appName,
         sessionId: session.sessionId,
         isActive: listener.is_active,
@@ -253,7 +253,7 @@ export function buildSessionGraph(
         registeredSecondsAgo: listener.registered_seconds_ago,
       };
 
-      const nodeId = `app::${session.sessionId}::${listener.listener_id}`;
+      const nodeId = `app::${session.sessionId}::${listener.subscriber_id}`;
 
       nodes.push({
         id: nodeId,
@@ -267,7 +267,7 @@ export function buildSessionGraph(
 
       // Edge from session output handle to app
       edges.push({
-        id: `edge-${session.sessionId}::${listener.listener_id}`,
+        id: `edge-${session.sessionId}::${listener.subscriber_id}`,
         source: `session-${session.sessionId}`,
         sourceHandle: `out-${appIndex}`,
         target: nodeId,
@@ -294,7 +294,7 @@ export function buildSessionGraph(
 
     unconnectedPanels.forEach((panelId, i) => {
       const nodeData: AppNodeData = {
-        appId: listenerIds?.[panelId] ?? panelId,
+        appId: subscriberIds?.[panelId] ?? panelId,
         appName: panelId,
         isActive: false,
         isConnected: false,

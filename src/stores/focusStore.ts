@@ -8,8 +8,8 @@ interface FocusState {
   focusedPanelId: string | null;
   /** IDs of all currently open Dockview panels */
   openPanelIds: string[];
-  /** Map of panelId → listenerId for session-aware apps (e.g., "query" → "query_k3f7") */
-  listenerIds: Record<string, string>;
+  /** Map of panelId → subscriberId for session-aware apps (e.g., "query" → "query_k3f7") */
+  subscriberIds: Record<string, string>;
   /** Set the focused panel ID */
   setFocusedPanelId: (panelId: string | null) => void;
   /** Track a panel being opened */
@@ -19,7 +19,7 @@ interface FocusState {
   /** Seed the full set of open panels (e.g., after layout restore) */
   setOpenPanels: (panelIds: string[]) => void;
   /** Register a listener ID for an app panel */
-  setListenerId: (panelId: string, listenerId: string) => void;
+  setListenerId: (panelId: string, subscriberId: string) => void;
   /** Remove a listener ID when an app panel unmounts */
   removeListenerId: (panelId: string) => void;
 }
@@ -27,7 +27,7 @@ interface FocusState {
 export const useFocusStore = create<FocusState>((set) => ({
   focusedPanelId: null,
   openPanelIds: [],
-  listenerIds: {},
+  subscriberIds: {},
   setFocusedPanelId: (panelId) => set({ focusedPanelId: panelId }),
   addOpenPanel: (panelId) =>
     set((s) =>
@@ -37,18 +37,18 @@ export const useFocusStore = create<FocusState>((set) => ({
     ),
   removeOpenPanel: (panelId) =>
     set((s) => {
-      const { [panelId]: _, ...remainingListenerIds } = s.listenerIds;
+      const { [panelId]: _, ...remainingListenerIds } = s.subscriberIds;
       return {
         openPanelIds: s.openPanelIds.filter((id) => id !== panelId),
-        listenerIds: remainingListenerIds,
+        subscriberIds: remainingListenerIds,
       };
     }),
   setOpenPanels: (panelIds) => set({ openPanelIds: panelIds }),
-  setListenerId: (panelId, listenerId) =>
-    set((s) => ({ listenerIds: { ...s.listenerIds, [panelId]: listenerId } })),
+  setListenerId: (panelId, subscriberId) =>
+    set((s) => ({ subscriberIds: { ...s.subscriberIds, [panelId]: subscriberId } })),
   removeListenerId: (panelId) =>
     set((s) => {
-      const { [panelId]: _, ...rest } = s.listenerIds;
-      return { listenerIds: rest };
+      const { [panelId]: _, ...rest } = s.subscriberIds;
+      return { subscriberIds: rest };
     }),
 }));

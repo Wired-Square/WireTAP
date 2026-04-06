@@ -484,7 +484,7 @@ pub fn encode_session_lifecycle(
     session_id: &str,
     device_type: Option<&str>,
     state: Option<u8>,
-    listener_count: u16,
+    subscriber_count: u16,
 ) -> Vec<u8> {
     let mut flags: u8 = 0;
     if device_type.is_some() { flags |= 1 << 0; }
@@ -492,7 +492,7 @@ pub fn encode_session_lifecycle(
 
     let mut out = Vec::new();
     out.push(event_type);
-    out.extend_from_slice(&listener_count.to_le_bytes());
+    out.extend_from_slice(&subscriber_count.to_le_bytes());
     out.extend_from_slice(&encode_length_prefixed_str(session_id));
     out.push(flags);
     if let Some(dt) = device_type {
@@ -509,17 +509,17 @@ pub fn encode_session_lifecycle(
 // ----------------------------------------------------------------------------
 
 /// Encode a SessionInfo payload — fixed 10 bytes: f64 LE + u16 LE.
-pub fn encode_session_info(speed: f64, listener_count: u16) -> Vec<u8> {
+pub fn encode_session_info(speed: f64, subscriber_count: u16) -> Vec<u8> {
     let mut out = Vec::with_capacity(10);
     out.extend_from_slice(&speed.to_le_bytes());
-    out.extend_from_slice(&listener_count.to_le_bytes());
+    out.extend_from_slice(&subscriber_count.to_le_bytes());
     out
 }
 
 #[derive(Debug, PartialEq)]
 pub struct SessionInfoMsg {
     pub speed: f64,
-    pub listener_count: u16,
+    pub subscriber_count: u16,
 }
 
 pub fn decode_session_info(payload: &[u8]) -> Result<SessionInfoMsg, ProtocolError> {
@@ -527,8 +527,8 @@ pub fn decode_session_info(payload: &[u8]) -> Result<SessionInfoMsg, ProtocolErr
         return Err(ProtocolError::InsufficientData { needed: 10, available: payload.len() });
     }
     let speed          = f64::from_le_bytes(payload[0..8].try_into().unwrap());
-    let listener_count = u16::from_le_bytes(payload[8..10].try_into().unwrap());
-    Ok(SessionInfoMsg { speed, listener_count })
+    let subscriber_count = u16::from_le_bytes(payload[8..10].try_into().unwrap());
+    Ok(SessionInfoMsg { speed, subscriber_count })
 }
 
 // ----------------------------------------------------------------------------
@@ -1232,14 +1232,14 @@ mod tests {
         let mut pos = 0usize;
 
         let event_type     = payload[pos]; pos += 1;
-        let listener_count = u16::from_le_bytes(payload[pos..pos + 2].try_into().unwrap()); pos += 2;
+        let subscriber_count = u16::from_le_bytes(payload[pos..pos + 2].try_into().unwrap()); pos += 2;
         let session_id     = decode_length_prefixed_str(&payload, &mut pos).unwrap();
         let flags          = payload[pos]; pos += 1;
         let device_type    = decode_length_prefixed_str(&payload, &mut pos).unwrap();
         let state          = payload[pos];
 
         assert_eq!(event_type,     0);
-        assert_eq!(listener_count, 3);
+        assert_eq!(subscriber_count, 3);
         assert_eq!(session_id,     "sess-abc");
         assert!(flags & (1 << 0) != 0, "has_device_type");
         assert!(flags & (1 << 1) != 0, "has_state");
@@ -1253,12 +1253,12 @@ mod tests {
         let mut pos = 0usize;
 
         let event_type     = payload[pos]; pos += 1;
-        let listener_count = u16::from_le_bytes(payload[pos..pos + 2].try_into().unwrap()); pos += 2;
+        let subscriber_count = u16::from_le_bytes(payload[pos..pos + 2].try_into().unwrap()); pos += 2;
         let session_id     = decode_length_prefixed_str(&payload, &mut pos).unwrap();
         let flags          = payload[pos];
 
         assert_eq!(event_type,     1);
-        assert_eq!(listener_count, 0);
+        assert_eq!(subscriber_count, 0);
         assert_eq!(session_id,     "sess-xyz");
         assert_eq!(flags,          0);
         // No further bytes expected after flags
@@ -1275,14 +1275,14 @@ mod tests {
         assert_eq!(payload.len(), 10);
         let msg = decode_session_info(&payload).unwrap();
         assert!((msg.speed - 2.5).abs() < f64::EPSILON);
-        assert_eq!(msg.listener_count, 7);
+        assert_eq!(msg.subscriber_count, 7);
     }
 
     #[test]
     fn session_info_zero_values() {
         let payload = encode_session_info(0.0, 0);
         let msg = decode_session_info(&payload).unwrap();
-        assert_eq!(msg, SessionInfoMsg { speed: 0.0, listener_count: 0 });
+        assert_eq!(msg, SessionInfoMsg { speed: 0.0, subscriber_count: 0 });
     }
 
     #[test]

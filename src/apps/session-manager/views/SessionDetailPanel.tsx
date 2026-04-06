@@ -21,7 +21,7 @@ interface SessionDetailPanelProps {
   onPauseSession: (sessionId: string) => void;
   onResumeSession: (sessionId: string) => void;
   onDestroySession: (sessionId: string) => void;
-  onEvictListener: (sessionId: string, listenerId: string) => void;
+  onEvictSubscriber: (sessionId: string, subscriberId: string) => void;
   onAddSource: (sessionId: string) => void;
   onRemoveSource: (sessionId: string, profileId: string) => void;
   onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
@@ -37,7 +37,7 @@ export default function SessionDetailPanel({
   onPauseSession,
   onResumeSession,
   onDestroySession,
-  onEvictListener,
+  onEvictSubscriber,
   onAddSource,
   onRemoveSource,
   onDisableBusMapping,
@@ -81,11 +81,11 @@ export default function SessionDetailPanel({
         const appName = parts[1];
         return <UnconnectedAppDetails appName={appName} sessions={sessions} onConnectApp={onConnectAppToSession} />;
       }
-      return <AppDetails nodeId={selectedNode.id} sessions={sessions} onEvict={onEvictListener} />;
+      return <AppDetails nodeId={selectedNode.id} sessions={sessions} onEvict={onEvictSubscriber} />;
     }
 
     if (selectedNode.type === "edge") {
-      return <EdgeDetails edgeId={selectedNode.id} sessions={sessions} profiles={profiles} onDisableBusMapping={onDisableBusMapping} onEvictListener={onEvictListener} />;
+      return <EdgeDetails edgeId={selectedNode.id} sessions={sessions} profiles={profiles} onDisableBusMapping={onDisableBusMapping} onEvictSubscriber={onEvictSubscriber} />;
     }
 
     return null;
@@ -263,7 +263,7 @@ function SessionDetails({
           Apps
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
-          {session.listenerCount}
+          {session.subscriberCount}
         </p>
       </div>
 
@@ -389,7 +389,7 @@ function SessionDetails({
 
       {/* Connect unconnected apps */}
       {onConnectApp && openPanelIds && (() => {
-        const connectedApps = new Set(session.listeners.map((l) => (l.app_name || l.listener_id).toLowerCase()));
+        const connectedApps = new Set(session.subscribers.map((l) => (l.app_name || l.subscriber_id).toLowerCase()));
         const SESSION_AWARE = ["discovery", "decoder", "transmit", "query", "graph"];
         const unconnected = openPanelIds.filter(
           (id) => SESSION_AWARE.includes(id) && !connectedApps.has(id)
@@ -832,25 +832,25 @@ function EdgeDetails({
   sessions,
   profiles,
   onDisableBusMapping,
-  onEvictListener,
+  onEvictSubscriber,
 }: {
   edgeId: string;
   sessions: ActiveSessionInfo[];
   profiles: IOProfile[];
   onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
-  onEvictListener: (sessionId: string, listenerId: string) => void;
+  onEvictSubscriber: (sessionId: string, subscriberId: string) => void;
 }) {
   // Parse edge ID to determine type
   // Source→Session: "edge-{profileId}-{sessionId}-b{deviceBus}-b{outputBus}"
-  // Session→Listener: "edge-{sessionId}::{listenerId}"
+  // Session→Listener: "edge-{sessionId}::{subscriberId}"
 
   if (edgeId.includes("::")) {
     // Session → Listener edge
     const match = edgeId.match(/^edge-(.+?)::(.+)$/);
     if (!match) return <p className="text-sm text-[color:var(--text-muted)]">Edge not found</p>;
-    const [, sessionId, listenerId] = match;
+    const [, sessionId, subscriberId] = match;
     const session = sessions.find((s) => s.sessionId === sessionId);
-    const listener = session?.listeners.find((l) => l.listener_id === listenerId);
+    const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
 
     return (
       <div className="space-y-4">
@@ -877,18 +877,18 @@ function EdgeDetails({
             App
           </label>
           <p className="text-sm text-[color:var(--text-primary)] font-mono">
-            {listenerId}
+            {subscriberId}
           </p>
           {listener && (
             <p className="text-xs text-[color:var(--text-muted)] capitalize">
-              {listener.app_name || listenerId}
+              {listener.app_name || subscriberId}
             </p>
           )}
         </div>
 
         <div className="pt-2 border-t border-[color:var(--border-default)]">
           <button
-            onClick={() => onEvictListener(sessionId, listenerId)}
+            onClick={() => onEvictSubscriber(sessionId, subscriberId)}
             className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
           >
             <Unplug className={iconSm} />
@@ -996,14 +996,14 @@ function EdgeDetails({
 }
 
 // Connected app details sub-component
-function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: ActiveSessionInfo[]; onEvict: (sessionId: string, listenerId: string) => void }) {
-  // Parse "app::${sessionId}::${listenerId}"
+function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: ActiveSessionInfo[]; onEvict: (sessionId: string, subscriberId: string) => void }) {
+  // Parse "app::${sessionId}::${subscriberId}"
   const parts = nodeId.split("::");
   const sessionId = parts[1];
-  const listenerId = parts[2];
+  const subscriberId = parts[2];
 
   const session = sessions.find((s) => s.sessionId === sessionId);
-  const listener = session?.listeners.find((l) => l.listener_id === listenerId);
+  const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
 
   if (!listener) {
     return <p className="text-sm text-[color:var(--text-muted)]">App not found</p>;
@@ -1023,7 +1023,7 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
           App ID
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono">
-          {listener.listener_id}
+          {listener.subscriber_id}
         </p>
       </div>
 
@@ -1066,7 +1066,7 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
           Actions
         </label>
         <button
-          onClick={() => onEvict(sessionId, listenerId)}
+          onClick={() => onEvict(sessionId, subscriberId)}
           className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
         >
           <UserMinus className={iconSm} />

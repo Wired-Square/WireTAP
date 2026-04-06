@@ -22,7 +22,7 @@ import { tlog } from "../api/settings";
 // Generate unique listener instance IDs using random suffix.
 // Random is needed because each Tauri window has its own JS context,
 // so a module-level counter would reset to 0 in each window.
-function generateListenerId(appName: string): string {
+function generateSubscriberId(appName: string): string {
   return `${appName}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
@@ -38,7 +38,7 @@ const reinitializingSessions = new Map<string, number | true>();
 // the effects run after setIoProfile() triggers a re-render.
 const REINITIALIZE_GRACE_PERIOD_MS = 300;
 import {
-  setSessionListenerActive,
+  setSessionSubscriberActive,
   getIOSessionState,
   getIOSessionCapabilities,
   getReaderSessionJoinerCount,
@@ -75,7 +75,7 @@ interface LocalSessionState {
   /** Error message if ioState is "error" */
   errorMessage: string | null;
   /** Number of listeners connected to this session */
-  listenerCount: number;
+  subscriberCount: number;
   /** Whether session is ready (created and listeners attached) */
   isReady: boolean;
   /** Buffer info */
@@ -248,7 +248,7 @@ export interface UseIOSessionResult {
   /** Convenience: playbackPosition?.frame_index */
   currentFrameIndex: number | null;
   /** Unique listener instance ID for this hook (e.g., "discovery_1") */
-  listenerId: string;
+  subscriberId: string;
 
   // Actions
   /** Start the reader */
@@ -390,7 +390,7 @@ export function useIOSession(
   // Track the currently active session ID (for cleanup to check if session changed)
   const currentSessionIdRef = useRef<string | null>(null);
   // Generate a unique listener instance ID per hook mount (e.g., "discovery_1")
-  const listenerIdRef = useRef<string>(generateListenerId(appName));
+  const subscriberIdRef = useRef<string>(generateSubscriberId(appName));
   // Track if we're currently leaving to prevent double-leave
   const isLeavingRef = useRef(false);
   // Track when session was created/joined to prevent immediate leave (click-through protection)
@@ -435,7 +435,7 @@ export function useIOSession(
 
   // ---- Register listener ID with focusStore so Visual tab can display it ----
   useEffect(() => {
-    const lid = listenerIdRef.current;
+    const lid = subscriberIdRef.current;
     useFocusStore.getState().setListenerId(appName, lid);
     return () => useFocusStore.getState().removeListenerId(appName);
   }, [appName]);
@@ -533,7 +533,7 @@ export function useIOSession(
             ioState: getStateType(state),
             capabilities: caps,
             errorMessage: state.type === "Error" ? state.message : null,
-            listenerCount: joinerCount,
+            subscriberCount: joinerCount,
             isReady: true,
             buffer: captureToBuffer(storeCapture),
             stoppedExplicitly: false,
@@ -607,13 +607,13 @@ export function useIOSession(
 
       // Listener evicted (from Session Manager "Remove" action).
       // This is a global event - we filter by our session ID and listener ID.
-      const unlistenEvicted = await listen<{ session_id: string; listener_id: string; capture_ids: string[] }>(
-        "listener-evicted",
+      const unlistenEvicted = await listen<{ session_id: string; subscriber_id: string; capture_ids: string[] }>(
+        "subscriber-evicted",
         (event) => {
           if (cancelled) return;
           if (
             event.payload.session_id === effectiveSessionId &&
-            event.payload.listener_id === listenerIdRef.current
+            event.payload.subscriber_id === subscriberIdRef.current
           ) {
             tlog.info(
               `[useIOSession:${appName}] Evicted from session '${effectiveSessionId}', capture copies: ${event.payload.capture_ids}`
@@ -622,7 +622,7 @@ export function useIOSession(
             setupCompleteRef.current = false;
             currentSessionIdRef.current = null;
             // Clean up local state in store (no backend calls - already unregistered)
-            useSessionStore.getState().cleanupEvictedListener(effectiveSessionId, listenerIdRef.current);
+            useSessionStore.getState().cleanupEvictedSubscriber(effectiveSessionId, subscriberIdRef.current);
             // Clear local state
             setLocalState(null);
             // Register copied captures in knownCaptureIds — same rationale as
@@ -698,7 +698,7 @@ export function useIOSession(
         // Open session (creates if not exists, joins if exists)
         // This also registers this listener with the Rust backend
         console.log(`[useIOSession:${appName}] calling openSession...`);
-        await openSession(effectiveSessionId, effectiveProfileName, listenerIdRef.current, appName, {
+        await openSession(effectiveSessionId, effectiveProfileName, subscriberIdRef.current, appName, {
           requireFrames,
         });
         console.log(`[useIOSession:${appName}] openSession completed`);
@@ -707,7 +707,7 @@ export function useIOSession(
         if (!isMountedRef.current) {
           console.log(`[useIOSession:${appName}] component unmounted during openSession, cleaning up`);
           // Unregister from Rust since we registered during openSession
-          leaveSession(effectiveSessionId, listenerIdRef.current).catch(() => {});
+          leaveSession(effectiveSessionId, subscriberIdRef.current).catch(() => {});
           initializingRef.current = false;
           initializingSessionIdRef.current = null;
           return;
@@ -715,7 +715,7 @@ export function useIOSession(
 
         // Register callbacks with the frontend store for event routing
         console.log(`[useIOSession:${appName}] calling registerCallbacks...`);
-        registerCallbacks(effectiveSessionId, listenerIdRef.current, {
+        registerCallbacks(effectiveSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
           onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
           onError: (error) => callbacksRef.current.onError?.(error),
@@ -745,7 +745,7 @@ export function useIOSession(
               ioState: getStateType(state),
               capabilities: caps,
               errorMessage: state.type === "Error" ? state.message : null,
-              listenerCount: joinerCount,
+              subscriberCount: joinerCount,
               isReady: true,
               buffer: captureToBuffer(storeCapture),
               stoppedExplicitly: false,
@@ -800,7 +800,7 @@ export function useIOSession(
         setupCompleteRef.current = false;
 
         // Capture values for delayed cleanup
-        const listenerId = listenerIdRef.current;
+        const listenerId = subscriberIdRef.current;
         const sessionId = effectiveSessionId;
 
         // Delay cleanup to handle StrictMode remount
@@ -909,14 +909,14 @@ export function useIOSession(
       // This is done before clearing callbacks to prevent race conditions
       try {
         console.log(`[useIOSession:${appName}] leave() - marking listener inactive...`);
-        await setSessionListenerActive(effectiveSessionId, listenerIdRef.current, false);
+        await setSessionSubscriberActive(effectiveSessionId, subscriberIdRef.current, false);
       } catch {
         // Ignore - session may not exist
       }
       console.log(`[useIOSession:${appName}] leave() - clearing callbacks...`);
-      clearCallbacks(effectiveSessionId, listenerIdRef.current);
+      clearCallbacks(effectiveSessionId, subscriberIdRef.current);
       console.log(`[useIOSession:${appName}] leave() - calling leaveSession...`);
-      await leaveSession(effectiveSessionId, listenerIdRef.current);
+      await leaveSession(effectiveSessionId, subscriberIdRef.current);
       console.log(`[useIOSession:${appName}] leave() - complete`);
     } finally {
       isLeavingRef.current = false;
@@ -1077,9 +1077,9 @@ export function useIOSession(
         if (oldSessionId && oldSessionId !== targetSessionId) {
           console.log(`[useIOSession:${appName}] reinitialize() - switching sessions, leaving old session '${oldSessionId}'`);
           // Clear callbacks for old session
-          clearCallbacks(oldSessionId, listenerIdRef.current);
+          clearCallbacks(oldSessionId, subscriberIdRef.current);
           // Leave old session (Rust will destroy if we were the last listener)
-          await leaveSession(oldSessionId, listenerIdRef.current);
+          await leaveSession(oldSessionId, subscriberIdRef.current);
         }
 
         // Reinitialize uses Rust's atomic check - if other listeners exist, it won't destroy
@@ -1087,7 +1087,7 @@ export function useIOSession(
         // unless skipAutoStart is set
         await reinitializeSession(
           targetSessionId,
-          listenerIdRef.current,
+          subscriberIdRef.current,
           appName,
           targetProfileId,
           targetProfileName,
@@ -1115,7 +1115,7 @@ export function useIOSession(
         console.log(`[useIOSession:${appName}] reinitialize() - currentSessionIdRef is now '${currentSessionIdRef.current}'`);
 
         // Re-register callbacks after reinitialize
-        registerCallbacks(targetSessionId, listenerIdRef.current, {
+        registerCallbacks(targetSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
           onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
           onError: (error) => callbacksRef.current.onError?.(error),
@@ -1143,7 +1143,7 @@ export function useIOSession(
               ioState: getStateType(state),
               capabilities: caps,
               errorMessage: state.type === "Error" ? state.message : null,
-              listenerCount: joinerCount,
+              subscriberCount: joinerCount,
               isReady: true,
               buffer: captureToBuffer(storeCapture),
               stoppedExplicitly: false,
@@ -1209,17 +1209,17 @@ export function useIOSession(
     const targetProfileName = profileName || effectiveProfileName;
     if (!targetSessionId) return;
     try {
-      await openSession(targetSessionId, targetProfileName, listenerIdRef.current, appName, {});
+      await openSession(targetSessionId, targetProfileName, subscriberIdRef.current, appName, {});
 
       // Mark listener as active in Rust so it receives frames again
       try {
-        await setSessionListenerActive(targetSessionId, listenerIdRef.current, true);
+        await setSessionSubscriberActive(targetSessionId, subscriberIdRef.current, true);
       } catch {
         // Ignore - listener may already be active
       }
 
       // Re-register callbacks
-      registerCallbacks(targetSessionId, listenerIdRef.current, {
+      registerCallbacks(targetSessionId, subscriberIdRef.current, {
         onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
         onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
         onError: (error) => callbacksRef.current.onError?.(error),
@@ -1287,14 +1287,14 @@ export function useIOSession(
     captureEndTimeUs: effectiveState?.buffer?.endTimeUs ?? null,
     captureName: effectiveState?.buffer?.name ?? null,
     capturePersistent: effectiveState?.buffer?.persistent ?? false,
-    joinerCount: effectiveState?.listenerCount ?? 0,
+    joinerCount: effectiveState?.subscriberCount ?? 0,
     stoppedExplicitly: effectiveState?.stoppedExplicitly ?? false,
     streamEndedReason: effectiveState?.streamEndedReason ?? null,
     speed: effectiveState?.speed ?? null,
     playbackPosition: effectiveState?.playbackPosition ?? null,
     currentTimeUs: effectiveState?.playbackPosition?.timestamp_us ?? null,
     currentFrameIndex: effectiveState?.playbackPosition?.frame_index ?? null,
-    listenerId: listenerIdRef.current,
+    subscriberId: subscriberIdRef.current,
     start,
     stop,
     leave,

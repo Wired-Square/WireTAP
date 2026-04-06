@@ -9,13 +9,13 @@ use crate::{
     io::{
         self,
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
-        get_session_listeners, get_session_source_configs, join_session, leave_session, list_sessions, pause_session,
-        reconfigure_session, register_listener, reinitialize_session_if_safe, resume_session,
-        resume_session_fresh, seek_session, seek_session_by_frame, set_listener_active, start_session, stop_session,
-        stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_listener,
-        evict_session_listener, add_source_to_session, remove_source_from_session, update_source_bus_mappings, pause_source_in_session, resume_source_in_session, get_session_source_count,
+        get_session_subscribers, get_session_source_configs, join_session, leave_session, list_sessions, pause_session,
+        reconfigure_session, register_subscriber, reinitialize_session_if_safe, resume_session,
+        resume_session_fresh, seek_session, seek_session_by_frame, set_subscriber_active, start_session, stop_session,
+        stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_subscriber,
+        evict_session_subscriber, add_source_to_session, remove_source_from_session, update_source_bus_mappings, pause_source_in_session, resume_source_in_session, get_session_source_count,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
-        JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
+        JoinSessionResult, SubscriberInfo, RegisterSubscriberResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
         CsvSource, CsvSourceOptions,
         GvretDeviceInfo, probe_gvret_tcp,
@@ -495,7 +495,7 @@ pub async fn create_reader_session(
     // Bus override for single-bus devices (overrides profile config)
     bus_override: Option<u8>,
     // Listener ID (for session logging)
-    listener_id: Option<String>,
+    subscriber_id: Option<String>,
     // Human-readable app name (e.g., "discovery", "decoder")
     app_name: Option<String>,
     // Modbus TCP poll groups (JSON-serialised from frontend catalog)
@@ -881,7 +881,7 @@ pub async fn create_reader_session(
     profile_tracker::register_usage(&profile_id_for_tracking, &session_id);
     register_session_profile(&session_id, &profile_id_for_tracking);
 
-    let result = create_session(app, session_id.clone(), reader, listener_id, app_name, None, vec![]).await;
+    let result = create_session(app, session_id.clone(), reader, subscriber_id, app_name, None, vec![]).await;
 
     // Auto-start the session after creation (only for real-time devices)
     // Playback sources (postgres, csv) should NOT auto-start because frames would be emitted
@@ -898,7 +898,7 @@ pub async fn create_reader_session(
     } else if result.is_new && is_playback_source {
         tlog!("[create_reader_session] Created playback session '{}' (not auto-starting - frontend will start after listener registration)", session_id);
     } else {
-        tlog!("[create_reader_session] Joined existing session '{}' (listener_count: {})", session_id, result.listener_count);
+        tlog!("[create_reader_session] Joined existing session '{}' (subscriber_count: {})", session_id, result.subscriber_count);
     }
 
     Ok(result.capabilities)
@@ -1303,7 +1303,7 @@ pub async fn step_capture_frame(
     step_frame(&app, &session_id, &capture_id, current_frame_index, current_timestamp_us, backward, filter_frame_ids.as_deref())
 }
 
-// Legacy heartbeat commands removed - use register_session_listener/unregister_session_listener instead
+// Legacy heartbeat commands removed - use register_session_subscriber/unregister_session_subscriber instead
 
 /// Transmit a CAN frame through a session.
 /// The session must be connected and support transmission.
@@ -1324,41 +1324,41 @@ pub async fn session_transmit_frame(
 /// If the listener is already registered, this updates their heartbeat.
 /// Returns session info including whether this listener is the owner.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn register_session_listener(
+pub async fn register_session_subscriber(
     session_id: String,
-    listener_id: String,
+    subscriber_id: String,
     app_name: Option<String>,
-) -> Result<RegisterListenerResult, String> {
-    register_listener(&session_id, &listener_id, app_name.as_deref()).await
+) -> Result<RegisterSubscriberResult, String> {
+    register_subscriber(&session_id, &subscriber_id, app_name.as_deref()).await
 }
 
 /// Unregister a listener from a session.
 /// If this was the last listener, the session will be stopped (but not destroyed).
 /// Returns the remaining listener count.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn unregister_session_listener(
+pub async fn unregister_session_subscriber(
     session_id: String,
-    listener_id: String,
+    subscriber_id: String,
 ) -> Result<usize, String> {
-    unregister_listener(&session_id, &listener_id).await
+    unregister_subscriber(&session_id, &subscriber_id).await
 }
 
 /// Get all listeners for a session.
 /// Useful for debugging and for the frontend to understand session state.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn get_session_listener_list(session_id: String) -> Result<Vec<ListenerInfo>, String> {
-    get_session_listeners(&session_id).await
+pub async fn get_session_subscriber_list(session_id: String) -> Result<Vec<SubscriberInfo>, String> {
+    get_session_subscribers(&session_id).await
 }
 
 /// Evict a listener from a session, giving it a copy of the current capture.
 /// Used by the Session Manager to remove a listener without destroying the session.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn evict_session_listener_cmd(
+pub async fn evict_session_subscriber_cmd(
     app: tauri::AppHandle,
     session_id: String,
-    listener_id: String,
+    subscriber_id: String,
 ) -> Result<Vec<String>, String> {
-    evict_session_listener(&app, &session_id, &listener_id).await
+    evict_session_subscriber(&app, &session_id, &subscriber_id).await
 }
 
 /// Add a new IO source to an existing multi-source session.
@@ -1472,9 +1472,9 @@ pub async fn update_source_bus_mappings_cmd(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn reinitialize_session_if_safe_cmd(
     session_id: String,
-    listener_id: String,
+    subscriber_id: String,
 ) -> Result<ReinitializeResult, String> {
-    reinitialize_session_if_safe(&session_id, &listener_id).await
+    reinitialize_session_if_safe(&session_id, &subscriber_id).await
 }
 
 /// Set whether a listener is active (receiving frames).
@@ -1482,12 +1482,12 @@ pub async fn reinitialize_session_if_safe_cmd(
 /// When they rejoin, set is_active to true to resume receiving frames.
 /// This is handled in Rust to avoid frontend race conditions.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn set_session_listener_active(
+pub async fn set_session_subscriber_active(
     session_id: String,
-    listener_id: String,
+    subscriber_id: String,
     is_active: bool,
 ) -> Result<(), String> {
-    set_listener_active(&session_id, &listener_id, is_active).await
+    set_subscriber_active(&session_id, &subscriber_id, is_active).await
 }
 
 /// Probe a GVRET device to discover its capabilities (number of buses, etc.)
@@ -2239,7 +2239,7 @@ pub async fn create_multi_source_session(
     app: tauri::AppHandle,
     session_id: String,
     sources: Vec<MultiSourceInput>,
-    listener_id: Option<String>,
+    subscriber_id: Option<String>,
     app_name: Option<String>,
     modbus_polls: Option<String>,
 ) -> Result<IOCapabilities, String> {
@@ -2333,7 +2333,7 @@ pub async fn create_multi_source_session(
     // Store all profiles for this session (needed for cleanup on destroy)
     register_session_profiles(&session_id, &profile_ids);
 
-    let result = create_session(app, session_id.clone(), Box::new(reader), listener_id, app_name, Some(source_display_names), stored_configs).await;
+    let result = create_session(app, session_id.clone(), Box::new(reader), subscriber_id, app_name, Some(source_display_names), stored_configs).await;
 
     // Auto-start the session if it's new OR if it exists but is stopped
     let should_start = if result.is_new {
