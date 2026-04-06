@@ -491,8 +491,8 @@ export default function Decoder() {
     onSpeedChange: handleSessionSpeedChange,
     // Session switching callbacks
     setPlaybackSpeed: setPlaybackSpeed as (speed: number) => void,
-    onBeforeWatch: clearFrames,
-    onBeforeMultiWatch: clearFrames,
+    onBeforeWatch: () => { clearFrames(); setCaptureMetadata(null); },
+    onBeforeMultiWatch: () => { clearFrames(); setCaptureMetadata(null); },
     streamCompletedRef,
     onSessionReconfigured: handleSessionReconfigured,
     onSessionDestroyed: handleSessionDestroyed,

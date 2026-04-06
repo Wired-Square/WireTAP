@@ -517,8 +517,10 @@ export function IOSessionControls({
   };
 
   const commitRename = () => {
+    if (!isRenaming) return; // Guard against double-fire from blur after Enter/Escape
     const trimmed = renameValue.trim();
-    if (trimmed && onRenameBuffer) {
+    const currentName = captureMetadata?.name || "";
+    if (trimmed && trimmed !== currentName && onRenameBuffer) {
       onRenameBuffer(trimmed);
     }
     setIsRenaming(false);
