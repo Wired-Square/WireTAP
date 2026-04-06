@@ -2,7 +2,7 @@
 //
 // Serial bytes and framing state for Discovery app.
 // Handles raw byte display, client-side framing, and frame ID mapping.
-// Supports backend buffer mode for large captures (bytes stored in Rust).
+// Supports backend capture mode for large captures (bytes stored in Rust).
 
 import { create } from 'zustand';
 import { tlog } from '../api/settings';
@@ -80,21 +80,21 @@ interface DiscoverySerialState {
   // Pagination state for framed data view
   framedPageSize: number;  // 20, 50, 100, 1000, 10000, -1 (All)
 
-  // Backend buffer mode state
-  /** Total byte count in backend buffer (updated during streaming) */
+  // Backend capture mode state
+  /** Total byte count in backend capture (updated during streaming) */
   backendByteCount: number;
   /** Pagination state for raw bytes view */
   rawBytesPageSize: number;
-  /** ID of the active bytes buffer (null = no bytes buffer loaded) */
+  /** ID of the active bytes capture (null = no bytes capture loaded) */
   bytesCaptureId: string | null;
-  /** ID of the frame buffer created by backend framing (null = no framing applied) */
+  /** ID of the frame capture created by backend framing (null = no framing applied) */
   framedCaptureId: string | null;
   /** Frame count from backend framing (updated each time framing is applied) */
   backendFrameCount: number;
   /** Minimum frame length filter (0 = no filter, independent of framing mode) */
   minFrameLength: number;
   /** Trigger counter to force HexDump to re-fetch (incremented after setActiveCapture) */
-  bufferReadyTrigger: number;
+  captureReadyTrigger: number;
   /** Trigger counter to force FramedDataView to re-fetch (incremented after applyFraming) */
   framedDataTrigger: number;
   /** Frame ID extraction config (passed to backend framing) */
@@ -103,9 +103,9 @@ interface DiscoverySerialState {
   sourceExtractionConfig: ByteExtractionConfig | null;
   /** Frames excluded by minFrameLength filter (from backend framing) */
   filteredFrames: FrameMessage[];
-  /** Count of filtered frames in backend buffer */
+  /** Count of filtered frames in backend capture */
   filteredFrameCount: number;
-  /** ID of the filtered frame buffer created by backend framing */
+  /** ID of the filtered frame capture created by backend framing */
   filteredCaptureId: string | null;
 
   // Actions
@@ -127,12 +127,12 @@ interface DiscoverySerialState {
   setActiveTab: (tab: SerialTabId) => void;
   setFramedPageSize: (size: number) => void;
   // Backend buffer actions
-  setBytesBufferId: (id: string | null) => void;
+  setBytesCaptureId: (id: string | null) => void;
   setBackendByteCount: (count: number) => void;
   incrementBackendByteCount: (delta: number) => void;
   fetchBytesFromBackend: (captureId: string, offset: number, limit: number) => Promise<PaginatedBytesResponse>;
   setRawBytesPageSize: (size: number) => void;
-  triggerBufferReady: () => void;
+  triggerCaptureReady: () => void;
   // Filter actions
   setMinFrameLength: (length: number) => void;
   // Backend frame count actions (for real-time streaming with backend framing)
@@ -157,19 +157,19 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
   },
   activeTab: 'raw',
   framedPageSize: 100, // Default page size for framed data
-  backendByteCount: 0, // Total bytes in backend buffer
-  bytesCaptureId: null, // ID of active bytes buffer
+  backendByteCount: 0, // Total bytes in backend capture
+  bytesCaptureId: null, // ID of active bytes capture
   rawBytesPageSize: 1000, // Default page size for raw bytes view
-  framedCaptureId: null, // ID of backend frame buffer
+  framedCaptureId: null, // ID of backend frame capture
   backendFrameCount: 0, // Frame count from backend framing
   minFrameLength: 0, // 0 = no filter
-  bufferReadyTrigger: 0, // Incremented to force HexDump refetch
+  captureReadyTrigger: 0, // Incremented to force HexDump refetch
   framedDataTrigger: 0, // Incremented to force FramedDataView refetch
   frameIdExtractionConfig: null, // Frame ID extraction config
   sourceExtractionConfig: null, // Source address extraction config
   filteredFrames: [], // Frames excluded by minFrameLength filter
   filteredFrameCount: 0, // Count of filtered frames
-  filteredCaptureId: null, // ID of filtered frame buffer
+  filteredCaptureId: null, // ID of filtered frame capture
 
   // Actions
   setSerialMode: (enabled) => {
@@ -226,8 +226,8 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
     // Call clearBackendBuffer() separately when you want to delete all buffers
     //
     // preserveBackendCount: When true, keeps backendByteCount so HexDump continues
-    // to show data from the backend buffer. Use this when transitioning from streaming
-    // to buffer mode where we want to keep displaying the buffer contents.
+    // to show data from the backend capture. Use this when transitioning from streaming
+    // to capture mode where we want to keep displaying the capture contents.
     set((state) => ({
       serialBytes: [],
       serialBytesBuffer: [],
@@ -238,8 +238,8 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
       framedCaptureId: null,
       backendFrameCount: 0,
       minFrameLength: 0,
-      // Reset trigger when clearing for a fresh capture (but preserve when transitioning to buffer mode)
-      bufferReadyTrigger: preserveBackendCount ? state.bufferReadyTrigger : 0,
+      // Reset trigger when clearing for a fresh capture (but preserve when transitioning to capture mode)
+      captureReadyTrigger: preserveBackendCount ? state.captureReadyTrigger : 0,
       filteredFrames: [],
       filteredFrameCount: 0,
       filteredCaptureId: null,
@@ -247,14 +247,14 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
   },
 
   setFramingConfig: async (config) => {
-    const { framedCaptureId: previousBufferId } = get();
+    const { framedCaptureId: previousCaptureId } = get();
 
-    // If clearing framing (config is null), delete the framed buffer and switch to raw tab
-    if (config === null && previousBufferId) {
+    // If clearing framing (config is null), delete the framed capture and switch to raw tab
+    if (config === null && previousCaptureId) {
       try {
-        await deleteCapture(previousBufferId);
+        await deleteCapture(previousCaptureId);
       } catch (e) {
-        tlog.info(`[discoverySerialStore] Failed to delete framed buffer: ${e}`);
+        tlog.info(`[discoverySerialStore] Failed to delete framed capture: ${e}`);
       }
       set({
         framingConfig: null,
@@ -270,7 +270,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
   },
 
   applyFraming: async (_streamStartTimeUs, sessionId) => {
-    const { backendByteCount, framingConfig, framedCaptureId: previousBufferId, minFrameLength, frameIdExtractionConfig, sourceExtractionConfig } = get();
+    const { backendByteCount, framingConfig, framedCaptureId: previousCaptureId, minFrameLength, frameIdExtractionConfig, sourceExtractionConfig } = get();
     if (!framingConfig) {
       set({ framedData: [], framedCaptureId: null, backendFrameCount: 0, filteredFrameCount: 0, filteredCaptureId: null, filteredFrames: [] });
       return [];
@@ -303,14 +303,14 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
     };
 
     try {
-      // Call backend to apply framing - this creates a new frame buffer
-      // Pass previous buffer ID to reuse it (avoids buffer proliferation during live framing)
-      const result = await applyFramingToCapture(sessionId ?? '', backendConfig, previousBufferId);
+      // Call backend to apply framing - this creates a new frame capture
+      // Pass previous capture ID to reuse it (avoids capture proliferation during live framing)
+      const result = await applyFramingToCapture(sessionId ?? '', backendConfig, previousCaptureId);
 
-      // Store the buffer ID and frame count for FramedDataView
-      // Also store filtered frame count and buffer ID for the Filtered tab
+      // Store the capture ID and frame count for FramedDataView
+      // Also store filtered frame count and capture ID for the Filtered tab
       // Note: We don't fetch the frames here - FramedDataView will use pagination
-      // Increment framedDataTrigger to force refetch even if buffer ID/count unchanged
+      // Increment framedDataTrigger to force refetch even if capture ID/count unchanged
       set((state) => ({
         framedCaptureId: result.capture_id,
         backendFrameCount: result.frame_count,
@@ -335,7 +335,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
   acceptFraming: () => {
     const { framedData, framedCaptureId, backendFrameCount } = get();
 
-    // Check if we have frames - either locally, in backend buffer, or streaming frames
+    // Check if we have frames - either locally, in backend capture, or streaming frames
     const hasLocalFrames = framedData.length > 0;
     const hasBackendFrames = framedCaptureId !== null && backendFrameCount > 0;
     // Also check for streaming mode where frames go directly to mainFrames
@@ -493,7 +493,7 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
   setFramedPageSize: (size) => set({ framedPageSize: size }),
 
   // Backend buffer actions
-  setBytesBufferId: (id) => set({ bytesCaptureId: id }),
+  setBytesCaptureId: (id) => set({ bytesCaptureId: id }),
 
   setBackendByteCount: (count) => set({ backendByteCount: count }),
 
@@ -512,8 +512,8 @@ export const useDiscoverySerialStore = create<DiscoverySerialState>((set, get) =
 
   setRawBytesPageSize: (size) => set({ rawBytesPageSize: size }),
 
-  triggerBufferReady: () => set((state) => ({
-    bufferReadyTrigger: state.bufferReadyTrigger + 1,
+  triggerCaptureReady: () => set((state) => ({
+    captureReadyTrigger: state.captureReadyTrigger + 1,
   })),
 
   setMinFrameLength: (length) => set({ minFrameLength: length }),

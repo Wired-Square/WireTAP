@@ -119,19 +119,19 @@ export default function Settings() {
   const resetThemeColours = useSettingsStore((s) => s.resetThemeColours);
 
   // Buffers
-  const clearBuffersOnStart = useSettingsStore(
-    (s) => s.buffers.clearBuffersOnStart,
+  const clearCapturesOnStart = useSettingsStore(
+    (s) => s.buffers.clearCapturesOnStart,
   );
-  const setClearBuffersOnStart = useSettingsStore(
-    (s) => s.setClearBuffersOnStart,
+  const setClearCapturesOnStart = useSettingsStore(
+    (s) => s.setClearCapturesOnStart,
   );
-  const bufferStorage = useSettingsStore((s) => s.buffers.bufferStorage);
-  const setBufferStorage = useSettingsStore((s) => s.setBufferStorage);
-  const discoveryHistoryBuffer = useSettingsStore(
-    (s) => s.buffers.discoveryHistoryBuffer,
+  const captureStorage = useSettingsStore((s) => s.buffers.captureStorage);
+  const setCaptureStorage = useSettingsStore((s) => s.setCaptureStorage);
+  const discoveryHistorySize = useSettingsStore(
+    (s) => s.buffers.discoveryHistorySize,
   );
-  const setDiscoveryHistoryBuffer = useSettingsStore(
-    (s) => s.setDiscoveryHistoryBuffer,
+  const setDiscoveryHistorySize = useSettingsStore(
+    (s) => s.setDiscoveryHistorySize,
   );
   const queryResultLimit = useSettingsStore((s) => s.buffers.queryResultLimit);
   const setQueryResultLimit = useSettingsStore((s) => s.setQueryResultLimit);
@@ -343,12 +343,12 @@ export default function Settings() {
 
           {currentSection === "captures" && (
             <CapturesView
-              clearBuffersOnStart={clearBuffersOnStart}
-              onChangeClearBuffersOnStart={setClearBuffersOnStart}
-              bufferStorage={bufferStorage}
-              onChangeBufferStorage={setBufferStorage}
-              discoveryHistoryBuffer={discoveryHistoryBuffer}
-              onChangeDiscoveryHistoryBuffer={setDiscoveryHistoryBuffer}
+              clearCapturesOnStart={clearCapturesOnStart}
+              onChangeClearCapturesOnStart={setClearCapturesOnStart}
+              captureStorage={captureStorage}
+              onChangeCaptureStorage={setCaptureStorage}
+              discoveryHistorySize={discoveryHistorySize}
+              onChangeDiscoveryHistorySize={setDiscoveryHistorySize}
               queryResultLimit={queryResultLimit}
               onChangeQueryResultLimit={setQueryResultLimit}
               graphBufferSize={graphBufferSize}

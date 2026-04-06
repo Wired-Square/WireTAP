@@ -63,13 +63,13 @@ export default function SessionCanvas({
   const { fitView } = useReactFlow();
   const setSelectedNode = useSessionManagerStore((s) => s.setSelectedNode);
 
-  // Fetch buffer metadata for source node display
-  const [bufferInfoMap, setBufferInfoMap] = useState<Map<string, CaptureInfo>>(new Map());
+  // Fetch capture metadata for source node display
+  const [captureInfoMap, setCaptureInfoMap] = useState<Map<string, CaptureInfo>>(new Map());
   useEffect(() => {
     listCaptures()
-      .then((buffers) => {
+      .then((captures) => {
         const map = new Map<string, CaptureInfo>();
-        for (const b of buffers) {
+        for (const b of captures) {
           map.set(b.id, {
             name: b.name,
             persistent: b.persistent,
@@ -77,14 +77,14 @@ export default function SessionCanvas({
             captureKind: b.kind,
           });
         }
-        setBufferInfoMap(map);
+        setCaptureInfoMap(map);
       })
       .catch(console.error);
   }, [sessions]);
 
   const graphData = useMemo(
-    () => buildSessionGraph(sessions, profiles, bufferInfoMap, openPanelIds, subscriberIds),
-    [sessions, profiles, bufferInfoMap, openPanelIds, subscriberIds]
+    () => buildSessionGraph(sessions, profiles, captureInfoMap, openPanelIds, subscriberIds),
+    [sessions, profiles, captureInfoMap, openPanelIds, subscriberIds]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(graphData.nodes as Node[]);

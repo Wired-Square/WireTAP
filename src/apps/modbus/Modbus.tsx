@@ -91,7 +91,7 @@ export default function Modbus() {
     multiBusProfiles,
     isDetached,
     handleLeave,
-    handleClearBuffer,
+    handleClearCapture,
   } = manager;
 
 
@@ -249,7 +249,7 @@ export default function Modbus() {
           onPause={stopWatch}
           onPlay={reconnectWithPolls}
           onLeave={!isDetached ? handleLeave : undefined}
-          onClearBuffer={async () => { clearState(); await handleClearBuffer(); }}
+          onClearCapture={async () => { clearState(); await handleClearCapture(); }}
           hasData={registerVersion > 0}
           transportMode={transportMode}
           catalogs={catalogs}

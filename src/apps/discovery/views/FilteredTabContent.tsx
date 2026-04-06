@@ -45,7 +45,7 @@ export default function FilteredTabContent({
   const frameVersion = useDiscoveryStore((s) => s.frameVersion);
   const seenIds = useDiscoveryStore((s) => s.seenIds);
   const selectedFrames = useDiscoveryStore((s) => s.selectedFrames);
-  const bufferMode = useDiscoveryStore((s) => s.bufferMode);
+  const captureMode = useDiscoveryStore((s) => s.captureMode);
   const toggleFrameSelection = useDiscoveryStore((s) => s.toggleFrameSelection);
 
   // Column visibility (for header context menu)
@@ -105,11 +105,11 @@ export default function FilteredTabContent({
 
   // Effective start time for delta calculations
   const effectiveStartTimeUs = useMemo(() => {
-    if (bufferMode.enabled && captureMetadata?.start_time_us != null) {
+    if (captureMode.enabled && captureMetadata?.start_time_us != null) {
       return captureMetadata.start_time_us;
     }
     return streamStartTimeUs;
-  }, [bufferMode.enabled, captureMetadata?.start_time_us, streamStartTimeUs]);
+  }, [captureMode.enabled, captureMetadata?.start_time_us, streamStartTimeUs]);
 
   const formatTime = useCallback(
     (ts_us: number, prevTs_us: number | null): React.ReactNode => {
@@ -132,7 +132,7 @@ export default function FilteredTabContent({
 
   // Non-buffer mode: filter frames from the in-memory buffer
   const localResult = useMemo(() => {
-    if (bufferMode.enabled || filteredOutIds.length === 0) return null;
+    if (captureMode.enabled || filteredOutIds.length === 0) return null;
 
     const filteredIdSet = new Set(filteredOutIds);
     const matching: FrameMessage[] = [];
@@ -156,7 +156,7 @@ export default function FilteredTabContent({
     }
 
     return matching;
-  }, [bufferMode.enabled, filteredOutIds, frameVersion, isStreaming, pageSize]);
+  }, [captureMode.enabled, filteredOutIds, frameVersion, isStreaming, pageSize]);
 
   // Paginate the local result
   const localPage = useMemo(() => {
@@ -183,7 +183,7 @@ export default function FilteredTabContent({
 
   // Buffer mode: fetch filtered-out frames from backend
   useEffect(() => {
-    if (!bufferMode.enabled || isStreaming || filteredOutIds.length === 0) return;
+    if (!captureMode.enabled || isStreaming || filteredOutIds.length === 0) return;
 
     let cancelled = false;
     const fetchPage = async () => {
@@ -216,7 +216,7 @@ export default function FilteredTabContent({
     return () => {
       cancelled = true;
     };
-  }, [bufferMode.enabled, isStreaming, filteredOutIds, currentPage, pageSize]);
+  }, [captureMode.enabled, isStreaming, filteredOutIds, currentPage, pageSize]);
 
   // Reset page when selection changes
   useEffect(() => {
@@ -224,16 +224,16 @@ export default function FilteredTabContent({
   }, [selectedFrames]);
 
   // Determine which data to display
-  const displayFrames = bufferMode.enabled ? bufferFrames : localPage.frames;
+  const displayFrames = captureMode.enabled ? bufferFrames : localPage.frames;
 
   // Close context menus on page change
   useEffect(() => {
     setContextMenu(null);
     setHeaderContextMenu(null);
   }, [currentPage, displayFrames]);
-  const totalCount = bufferMode.enabled ? bufferTotalCount : localPage.totalCount;
+  const totalCount = captureMode.enabled ? bufferTotalCount : localPage.totalCount;
   const totalPages = totalCount > 0 && pageSize > 0 ? Math.ceil(totalCount / pageSize) : 1;
-  const loading = bufferMode.enabled ? bufferLoading : false;
+  const loading = captureMode.enabled ? bufferLoading : false;
 
   const handlePageSizeChange = useCallback((size: number) => {
     setPageSize(size);

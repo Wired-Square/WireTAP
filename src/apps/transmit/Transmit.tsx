@@ -163,7 +163,7 @@ export default function Transmit() {
     joinerCount,
     handleLeave: managerLeave,
     stopWatch,
-    resumeWithNewBuffer,
+    resumeWithNewCapture,
     watchFrameCount,
     watchUniqueFrameCount,
   } = manager;
@@ -177,7 +177,7 @@ export default function Transmit() {
   // Compose all handlers using the orchestrator hook
   const handlers = useTransmitHandlers({
     stopWatch,
-    resumeWithNewBuffer,
+    resumeWithNewCapture,
     openIoPicker: () => dialogs.ioSessionPicker.open(),
     closeIoPicker: () => dialogs.ioSessionPicker.close(),
   });
@@ -421,7 +421,7 @@ export default function Transmit() {
         selectedId={ioProfile ?? null}
         defaultId={settings?.default_read_profile}
         onSelect={() => {}}
-        hideBuffers={true}
+        hideCaptures={true}
         allowMultiSelect={true}
         disabledProfiles={transmitStatusMap}
       />

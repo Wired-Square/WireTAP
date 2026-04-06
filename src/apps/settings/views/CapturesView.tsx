@@ -6,12 +6,12 @@ import { labelDefault, helpText } from "../../../styles";
 import { textPrimary } from "../../../styles/colourTokens";
 
 type CapturesViewProps = {
-  clearBuffersOnStart: boolean;
-  onChangeClearBuffersOnStart: (value: boolean) => void;
-  bufferStorage: string;
-  onChangeBufferStorage: (value: string) => void;
-  discoveryHistoryBuffer: number;
-  onChangeDiscoveryHistoryBuffer: (value: number) => void;
+  clearCapturesOnStart: boolean;
+  onChangeClearCapturesOnStart: (value: boolean) => void;
+  captureStorage: string;
+  onChangeCaptureStorage: (value: string) => void;
+  discoveryHistorySize: number;
+  onChangeDiscoveryHistorySize: (value: number) => void;
   queryResultLimit: number;
   onChangeQueryResultLimit: (value: number) => void;
   graphBufferSize: number;
@@ -29,12 +29,12 @@ type CapturesViewProps = {
 };
 
 export default function CapturesView({
-  clearBuffersOnStart,
-  onChangeClearBuffersOnStart,
-  bufferStorage,
-  onChangeBufferStorage,
-  discoveryHistoryBuffer,
-  onChangeDiscoveryHistoryBuffer,
+  clearCapturesOnStart,
+  onChangeClearCapturesOnStart,
+  captureStorage,
+  onChangeCaptureStorage,
+  discoveryHistorySize,
+  onChangeDiscoveryHistorySize,
   queryResultLimit,
   onChangeQueryResultLimit,
   graphBufferSize,
@@ -64,8 +64,8 @@ export default function CapturesView({
             Storage backend for captured frame data and imported captures.
           </p>
           <Select
-            value={bufferStorage}
-            onChange={(e) => onChangeBufferStorage(e.target.value)}
+            value={captureStorage}
+            onChange={(e) => onChangeCaptureStorage(e.target.value)}
           >
             <option value="sqlite">SQLite</option>
           </Select>
@@ -74,8 +74,8 @@ export default function CapturesView({
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
-            checked={clearBuffersOnStart}
-            onChange={(e) => onChangeClearBuffersOnStart(e.target.checked)}
+            checked={clearCapturesOnStart}
+            onChange={(e) => onChangeClearCapturesOnStart(e.target.checked)}
             className="mt-1"
           />
           <div>
@@ -104,11 +104,11 @@ export default function CapturesView({
               min={1000}
               max={10000000}
               step={10000}
-              value={discoveryHistoryBuffer}
+              value={discoveryHistorySize}
               onChange={(e) => {
                 const value = Number(e.target.value);
                 if (value >= 1000 && value <= 10000000) {
-                  onChangeDiscoveryHistoryBuffer(value);
+                  onChangeDiscoveryHistorySize(value);
                 }
               }}
             />

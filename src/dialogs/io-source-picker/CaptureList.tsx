@@ -1,6 +1,6 @@
 // ui/src/dialogs/io-source-picker/CaptureList.tsx
 //
-// Shows buffers available for replay (from completed sessions or CSV imports).
+// Shows captures available for replay (from completed sessions or CSV imports).
 
 import React, { useState, useRef, useEffect } from "react";
 import { Check, FileText, Trash2, Archive, Pencil, Database, Pin, PinOff } from "lucide-react";
@@ -14,20 +14,20 @@ import DeviceBusConfig from "./DeviceBusConfig";
 import type { BusMapping } from "../../api/io";
 
 type Props = {
-  buffers: CaptureMetadata[];
+  captures: CaptureMetadata[];
   selectedCaptureId: string | null;
   checkedSourceId: string | null;
   /** Source IDs selected in multi-bus mode */
   checkedSourceIds?: string[];
-  onSelectBuffer: (captureId: string) => void;
-  onDeleteBuffer: (captureId: string) => void;
-  onClearAllBuffers: () => void;
+  onSelectCapture: (captureId: string) => void;
+  onDeleteCapture: (captureId: string) => void;
+  onClearAllCaptures: () => void;
   /** Called after a buffer is renamed so the parent can refresh */
-  onBufferRenamed?: () => void;
+  onCaptureRenamed?: () => void;
   /** Called after a buffer's persistent flag is toggled so the parent can refresh */
-  onBufferPersistenceChanged?: () => void;
-  /** Map of buffer ID to session ID for buffers owned by active sessions */
-  activeSessionBufferMap?: Map<string, string>;
+  onCapturePersistenceChanged?: () => void;
+  /** Map of buffer ID to session ID for captures owned by active sessions */
+  activeSessionCaptureMap?: Map<string, string>;
   /** Bus mappings for the selected buffer (from shared probe maps) */
   busConfig?: BusMapping[];
   /** Called when buffer bus config changes */
@@ -39,16 +39,16 @@ type Props = {
 };
 
 export default function CaptureList({
-  buffers,
+  captures,
   selectedCaptureId,
   checkedSourceId,
   checkedSourceIds = [],
-  onSelectBuffer,
-  onDeleteBuffer,
-  onClearAllBuffers,
-  onBufferRenamed,
-  onBufferPersistenceChanged,
-  activeSessionBufferMap = new Map(),
+  onSelectCapture,
+  onDeleteCapture,
+  onClearAllCaptures,
+  onCaptureRenamed,
+  onCapturePersistenceChanged,
+  activeSessionCaptureMap = new Map(),
   busConfig,
   onBusConfigChange,
   isProbing = false,
@@ -66,9 +66,9 @@ export default function CaptureList({
     }
   }, [renamingId]);
 
-  const startRename = (buffer: CaptureMetadata) => {
-    setRenamingId(buffer.id);
-    setRenameValue(buffer.name);
+  const startRename = (capture: CaptureMetadata) => {
+    setRenamingId(capture.id);
+    setRenameValue(capture.name);
   };
 
   const commitRename = async () => {
@@ -78,7 +78,7 @@ export default function CaptureList({
     }
     try {
       await useSessionStore.getState().renameSessionCapture(renamingId, renameValue.trim());
-      onBufferRenamed?.();
+      onCaptureRenamed?.();
     } catch (e) {
       console.error("[CaptureList] Failed to rename buffer:", e);
     }
@@ -89,17 +89,17 @@ export default function CaptureList({
     setRenamingId(null);
   };
 
-  const togglePersistent = async (buffer: CaptureMetadata, e: React.MouseEvent) => {
+  const togglePersistent = async (capture: CaptureMetadata, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await useSessionStore.getState().setSessionCapturePersistent(buffer.id, !buffer.persistent);
-      onBufferPersistenceChanged?.();
+      await useSessionStore.getState().setSessionCapturePersistent(capture.id, !capture.persistent);
+      onCapturePersistenceChanged?.();
     } catch (err) {
       console.error("[CaptureList] Failed to toggle persistence:", err);
     }
   };
 
-  if (buffers.length === 0) {
+  if (captures.length === 0) {
     return null;
   }
 
@@ -111,11 +111,11 @@ export default function CaptureList({
           <span className={sectionHeader}>
             Captures
           </span>
-          <span className={captionMuted}>({buffers.length})</span>
+          <span className={captionMuted}>({captures.length})</span>
         </div>
-        {buffers.length > 1 && (
+        {captures.length > 1 && (
           <button
-            onClick={onClearAllBuffers}
+            onClick={onClearAllCaptures}
             className="text-xs text-[color:var(--status-danger-text)] hover:brightness-110"
           >
             Clear All
@@ -123,20 +123,20 @@ export default function CaptureList({
         )}
       </div>
       <div className="p-3 space-y-2">
-        {buffers.map((buffer) => {
-          const isThisBufferSelected = selectedCaptureId === buffer.id && !checkedSourceId && checkedSourceIds.length === 0;
-          const isRenaming = renamingId === buffer.id;
-          const sessionId = activeSessionBufferMap.get(buffer.id);
+        {captures.map((capture) => {
+          const isThisCaptureSelected = selectedCaptureId === capture.id && !checkedSourceId && checkedSourceIds.length === 0;
+          const isRenaming = renamingId === capture.id;
+          const sessionId = activeSessionCaptureMap.get(capture.id);
           const isInSession = sessionId !== undefined;
           return (
-            <React.Fragment key={buffer.id}>
+            <React.Fragment key={capture.id}>
             <div
-              onClick={() => !isRenaming && onSelectBuffer(buffer.id)}
+              onClick={() => !isRenaming && onSelectCapture(capture.id)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => !isRenaming && e.key === "Enter" && onSelectBuffer(buffer.id)}
+              onKeyDown={(e) => !isRenaming && e.key === "Enter" && onSelectCapture(capture.id)}
               className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors cursor-pointer ${
-                isThisBufferSelected
+                isThisCaptureSelected
                   ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
                   : `${bgSurface} border border-[color:var(--border-default)] hover:border-[color:var(--status-info-text)]`
               }`}
@@ -146,7 +146,7 @@ export default function CaptureList({
               ) : (
                 <FileText
                   className={`${iconMd} flex-shrink-0 ${
-                    buffer.kind === "bytes"
+                    capture.kind === "bytes"
                       ? "text-[color:var(--text-purple)]"
                       : "text-[color:var(--status-info-text)]"
                   }`}
@@ -170,33 +170,33 @@ export default function CaptureList({
                   />
                 ) : (
                   <div className={`${textMedium} truncate`}>
-                    {buffer.name}
+                    {capture.name}
                   </div>
                 )}
                 <div className={`${caption} flex items-center gap-2`}>
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
-                    {buffer.id}
+                    {capture.id}
                   </span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
-                    {buffer.count.toLocaleString()} {buffer.kind}
+                    {capture.count.toLocaleString()} {capture.kind}
                   </span>
                   {isInSession && (
                     <span className={badgeSmallInfo}>{sessionId}</span>
                   )}
-                  {buffer.persistent && (
+                  {capture.persistent && (
                     <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)]">
                       pinned
                     </span>
                   )}
                 </div>
               </div>
-              {isThisBufferSelected && (
+              {isThisCaptureSelected && (
                 <Check className={`${iconMd} text-[color:var(--status-info-text)] flex-shrink-0`} />
               )}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  startRename(buffer);
+                  startRename(capture);
                 }}
                 className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
                 title="Rename buffer"
@@ -204,21 +204,21 @@ export default function CaptureList({
                 <Pencil className={iconSm} />
               </button>
               <button
-                onClick={(e) => togglePersistent(buffer, e)}
+                onClick={(e) => togglePersistent(capture, e)}
                 className={`p-1 rounded transition-colors hover:bg-[var(--hover-bg)] ${
-                  buffer.persistent
+                  capture.persistent
                     ? "text-[color:var(--status-warning-text)]"
                     : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
                 }`}
-                title={buffer.persistent ? "Unpin capture (will be cleared on restart)" : "Pin capture (survives restart)"}
+                title={capture.persistent ? "Unpin capture (will be cleared on restart)" : "Pin capture (survives restart)"}
               >
-                {buffer.persistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
+                {capture.persistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
               </button>
-              {!buffer.persistent && (
+              {!capture.persistent && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDeleteBuffer(buffer.id);
+                    onDeleteCapture(capture.id);
                   }}
                   className="p-1 rounded transition-colors hover:bg-[var(--status-danger-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--status-danger-text)]"
                   title="Delete capture"
@@ -228,7 +228,7 @@ export default function CaptureList({
               )}
             </div>
             {/* Show bus mapping UI when this buffer is selected and has buses */}
-            {isThisBufferSelected && busConfig && busConfig.length > 0 && onBusConfigChange ? (
+            {isThisCaptureSelected && busConfig && busConfig.length > 0 && onBusConfigChange ? (
               <DeviceBusConfig
                 deviceInfo={{ bus_count: busConfig.length }}
                 isLoading={isProbing}

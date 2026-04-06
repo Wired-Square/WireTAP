@@ -152,7 +152,7 @@ interface AppSettings {
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
   // Buffer persistence
-  clear_buffers_on_start?: boolean;
+  clear_captures_on_start?: boolean;
   buffer_storage?: string;
   // Modbus settings
   modbus_max_register_errors?: number;
@@ -313,9 +313,9 @@ interface SettingsState {
 
   // Buffer settings
   buffers: {
-    clearBuffersOnStart: boolean;
-    bufferStorage: string;
-    discoveryHistoryBuffer: number;
+    clearCapturesOnStart: boolean;
+    captureStorage: string;
+    discoveryHistorySize: number;
     queryResultLimit: number;
     graphBufferSize: number;
     decoderMaxUnmatchedFrames: number;
@@ -406,9 +406,9 @@ interface SettingsState {
   resetThemeColours: () => void;
 
   // Actions - Buffers
-  setClearBuffersOnStart: (value: boolean) => void;
-  setBufferStorage: (value: string) => void;
-  setDiscoveryHistoryBuffer: (buffer: number) => void;
+  setClearCapturesOnStart: (value: boolean) => void;
+  setCaptureStorage: (value: string) => void;
+  setDiscoveryHistorySize: (buffer: number) => void;
   setQueryResultLimit: (limit: number) => void;
   setGraphBufferSize: (size: number) => void;
   setDecoderMaxUnmatchedFrames: (value: number) => void;
@@ -553,9 +553,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   buffers: {
-    clearBuffersOnStart: DEFAULT_CLEAR_BUFFERS_ON_START,
-    bufferStorage: DEFAULT_BUFFER_STORAGE,
-    discoveryHistoryBuffer: DEFAULT_DISCOVERY_HISTORY_BUFFER,
+    clearCapturesOnStart: DEFAULT_CLEAR_BUFFERS_ON_START,
+    captureStorage: DEFAULT_BUFFER_STORAGE,
+    discoveryHistorySize: DEFAULT_DISCOVERY_HISTORY_BUFFER,
     queryResultLimit: DEFAULT_QUERY_RESULT_LIMIT,
     graphBufferSize: DEFAULT_GRAPH_BUFFER_SIZE,
     decoderMaxUnmatchedFrames: DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
@@ -690,7 +690,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         telemetry_enabled: settings.telemetry_enabled ?? false,
         telemetry_consent_given: settings.telemetry_consent_given ?? false,
         // Buffer persistence
-        clear_buffers_on_start: settings.clear_buffers_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
+        clear_captures_on_start: settings.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
         buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
         // Modbus
         modbus_max_register_errors: settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
@@ -758,9 +758,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           },
         },
         buffers: {
-          clearBuffersOnStart: normalized.clear_buffers_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
-          bufferStorage: normalized.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
-          discoveryHistoryBuffer: normalized.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
+          clearCapturesOnStart: normalized.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
+          captureStorage: normalized.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
+          discoveryHistorySize: normalized.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
           queryResultLimit: normalized.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
           graphBufferSize: normalized.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
           decoderMaxUnmatchedFrames: normalized.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
@@ -879,9 +879,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_unused_colour: display.binaryUnusedColour,
         frame_editor_colours: display.frameEditorColours,
         // Buffers
-        clear_buffers_on_start: buffers.clearBuffersOnStart,
-        buffer_storage: buffers.bufferStorage,
-        discovery_history_buffer: buffers.discoveryHistoryBuffer,
+        clear_captures_on_start: buffers.clearCapturesOnStart,
+        buffer_storage: buffers.captureStorage,
+        discovery_history_buffer: buffers.discoveryHistorySize,
         query_result_limit: buffers.queryResultLimit,
         graph_buffer_size: buffers.graphBufferSize,
         decoder_max_unmatched_frames: buffers.decoderMaxUnmatchedFrames,
@@ -963,8 +963,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       binary_unused_colour: display.binaryUnusedColour,
       frame_editor_colours: display.frameEditorColours,
       // Buffers
-      clear_buffers_on_start: buffers.clearBuffersOnStart,
-      discovery_history_buffer: buffers.discoveryHistoryBuffer,
+      clear_captures_on_start: buffers.clearCapturesOnStart,
+      discovery_history_buffer: buffers.discoveryHistorySize,
       query_result_limit: buffers.queryResultLimit,
       graph_buffer_size: buffers.graphBufferSize,
       decoder_max_unmatched_frames: buffers.decoderMaxUnmatchedFrames,
@@ -1295,23 +1295,23 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   // Buffer actions
-  setClearBuffersOnStart: (value) => {
+  setClearCapturesOnStart: (value) => {
     set((state) => ({
-      buffers: { ...state.buffers, clearBuffersOnStart: value },
+      buffers: { ...state.buffers, clearCapturesOnStart: value },
     }));
     scheduleSave(get().saveSettings);
   },
 
-  setBufferStorage: (value) => {
+  setCaptureStorage: (value) => {
     set((state) => ({
-      buffers: { ...state.buffers, bufferStorage: value },
+      buffers: { ...state.buffers, captureStorage: value },
     }));
     scheduleSave(get().saveSettings);
   },
 
-  setDiscoveryHistoryBuffer: (buffer) => {
+  setDiscoveryHistorySize: (buffer) => {
     set((state) => ({
-      buffers: { ...state.buffers, discoveryHistoryBuffer: buffer },
+      buffers: { ...state.buffers, discoveryHistorySize: buffer },
     }));
     scheduleSave(get().saveSettings);
   },

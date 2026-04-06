@@ -94,7 +94,7 @@ export interface FrameDataTableProps {
   /** Total frames on this page (needed when reversed to calculate correct index) */
   pageFrameCount?: number;
   /** 1-based original buffer positions for each frame. When provided, used for # column instead of computed page offset. */
-  bufferIndices?: number[];
+  captureIndices?: number[];
   /** Optional leading status column — renders per-row status indicator with matching header */
   renderRowStatus?: (frame: FrameRow, index: number) => ReactNode;
   /** Header label for the status column (default: empty) */
@@ -185,7 +185,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   pageStartIndex = 0,
   framesReversed = false,
   pageFrameCount = 0,
-  bufferIndices,
+  captureIndices,
   renderRowStatus,
   statusHeader = '',
   useLocalTimezone = false,
@@ -326,7 +326,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
             const frameIndex = framesReversed
               ? pageStartIndex + pageFrameCount - 1 - idx
               : pageStartIndex + idx;
-            const displayIndex = bufferIndices?.[idx] ?? (frameIndex + 1);
+            const displayIndex = captureIndices?.[idx] ?? (frameIndex + 1);
             const cellHighlight = isCurrentFrame ? bgCyan : '';
 
             return (

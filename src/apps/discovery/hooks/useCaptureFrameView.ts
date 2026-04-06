@@ -46,7 +46,7 @@ export interface UseBufferFrameViewResult {
   /** Frames to display (either tail or current page) */
   frames: FrameWithHex[];
   /** 1-based original buffer position for each frame, parallel to `frames`. */
-  bufferIndices: number[];
+  captureIndices: number[];
   /** Total filtered frame count (for pagination info) */
   totalCount: number;
   /** Whether loading is in progress */
@@ -101,7 +101,7 @@ export function useCaptureFrameView(
   } = options;
 
   const [frames, setFrames] = useState<FrameWithHex[]>([]);
-  const [bufferIndices, setBufferIndices] = useState<number[]>([]);
+  const [captureIndices, setBufferIndices] = useState<number[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
@@ -373,7 +373,7 @@ export function useCaptureFrameView(
 
   return {
     frames,
-    bufferIndices,
+    captureIndices,
     totalCount,
     isLoading,
     currentPage,

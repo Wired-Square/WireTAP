@@ -81,7 +81,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
   const bytesCaptureId = useDiscoverySerialStore((s) => s.bytesCaptureId);
   const rawBytesPageSize = useDiscoverySerialStore((s) => s.rawBytesPageSize);
   const setRawBytesPageSize = useDiscoverySerialStore((s) => s.setRawBytesPageSize);
-  const bufferReadyTrigger = useDiscoverySerialStore((s) => s.bufferReadyTrigger);
+  const captureReadyTrigger = useDiscoverySerialStore((s) => s.captureReadyTrigger);
 
   // Local pagination state (only used when not streaming)
   const [currentPage, setCurrentPage] = useState(0);
@@ -188,7 +188,7 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
     return () => {
       cancelled = true;
     };
-  }, [useBackendBuffer, isStreaming, currentPage, pageSize, bufferReadyTrigger]);
+  }, [useBackendBuffer, isStreaming, currentPage, pageSize, captureReadyTrigger]);
 
   // Determine which entries to display
   // During streaming, use frontend entries (from events) since backend fetch may fail

@@ -72,7 +72,7 @@ type CombinedDiscoveryState = {
   selectedFrames: Set<string>;
   seenIds: Set<string>;
   streamStartTimeUs: number | null;
-  bufferMode: { enabled: boolean; totalFrames: number };
+  captureMode: { enabled: boolean; totalFrames: number };
   renderFrozen: boolean;
 
   // UI store
@@ -141,9 +141,9 @@ type CombinedDiscoveryState = {
   deselectAllFrames: () => void;
   setRenderFrozen: (frozen: boolean) => void;
   refreshFrozenView: () => void;
-  enableBufferMode: (totalFrames: number) => void;
-  disableBufferMode: () => void;
-  setFrameInfoFromBuffer: (frameInfoList: Array<{
+  enableCaptureMode: (totalFrames: number) => void;
+  disableCaptureMode: () => void;
+  setFrameInfoFromCapture: (frameInfoList: Array<{
     frame_id: number;
     max_dlc: number;
     bus: number;
@@ -169,7 +169,7 @@ type CombinedDiscoveryState = {
   setSerialViewConfig: (config: import('./discoverySerialStore').SerialViewConfig) => void;
   toggleShowAscii: () => void;
   setSerialActiveTab: (tab: import('./discoverySerialStore').SerialTabId) => void;
-  setBytesBufferId: (id: string | null) => void;
+  setBytesCaptureId: (id: string | null) => void;
   setBackendByteCount: (count: number) => void;
   incrementBackendByteCount: (delta: number) => void;
   setBackendFrameCount: (count: number) => void;
@@ -177,7 +177,7 @@ type CombinedDiscoveryState = {
   setFramedPageSize: (size: number) => void;
   setRawBytesPageSize: (size: number) => void;
   setMinFrameLength: (length: number) => void;
-  triggerBufferReady: () => void;
+  triggerCaptureReady: () => void;
 
   // Toolbox actions
   toggleToolboxExpanded: () => void;
@@ -219,7 +219,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     selectedFrames: frameStore.selectedFrames,
     seenIds: frameStore.seenIds,
     streamStartTimeUs: frameStore.streamStartTimeUs,
-    bufferMode: frameStore.bufferMode,
+    captureMode: frameStore.captureMode,
     renderFrozen: frameStore.renderFrozen,
 
     // UI store state
@@ -296,9 +296,9 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     },
     setRenderFrozen: frameStore.setRenderFrozen,
     refreshFrozenView: frameStore.refreshFrozenView,
-    enableBufferMode: frameStore.enableBufferMode,
-    disableBufferMode: frameStore.disableBufferMode,
-    setFrameInfoFromBuffer: frameStore.setFrameInfoFromBuffer,
+    enableCaptureMode: frameStore.enableCaptureMode,
+    disableCaptureMode: frameStore.disableCaptureMode,
+    setFrameInfoFromCapture: frameStore.setFrameInfoFromCapture,
 
     // UI store actions
     setMaxBuffer: uiStore.setMaxBuffer,
@@ -373,8 +373,8 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
           const { getCaptureFrameInfo } = await import('../api/capture');
           const frameInfoList = await getCaptureFrameInfo(framedCaptureId);
           // Pass 'serial' protocol since this is from serial framing
-          frameStore.setFrameInfoFromBuffer(frameInfoList, 'serial');
-          frameStore.enableBufferMode(backendFrameCount);
+          frameStore.setFrameInfoFromCapture(frameInfoList, 'serial');
+          frameStore.enableCaptureMode(backendFrameCount);
           tlog.debug(`[discoveryStore] Loaded ${frameInfoList.length} unique frame IDs from backend buffer`);
         } catch (e) {
           tlog.info(`[discoveryStore] Failed to load frame info from backend buffer: ${e}`);
@@ -470,7 +470,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     setSerialViewConfig: serialStore.setSerialViewConfig,
     toggleShowAscii: serialStore.toggleShowAscii,
     setSerialActiveTab: serialStore.setActiveTab,
-    setBytesBufferId: serialStore.setBytesBufferId,
+    setBytesCaptureId: serialStore.setBytesCaptureId,
     setBackendByteCount: serialStore.setBackendByteCount,
     incrementBackendByteCount: serialStore.incrementBackendByteCount,
     setBackendFrameCount: serialStore.setBackendFrameCount,
@@ -478,7 +478,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     setFramedPageSize: serialStore.setFramedPageSize,
     setRawBytesPageSize: serialStore.setRawBytesPageSize,
     setMinFrameLength: serialStore.setMinFrameLength,
-    triggerBufferReady: serialStore.triggerBufferReady,
+    triggerCaptureReady: serialStore.triggerCaptureReady,
 
     // Toolbox store actions
     toggleToolboxExpanded: toolboxStore.toggleToolboxExpanded,
@@ -495,7 +495,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
     // Combined runAnalysis that coordinates between stores
     runAnalysis: async () => {
       const { toolbox } = toolboxStore;
-      const { selectedFrames, bufferMode, frameInfoMap } = frameStore;
+      const { selectedFrames, captureMode, frameInfoMap } = frameStore;
       const frames = getDiscoveryFrameBuffer();
       const { framedData, serialBytesBuffer, isSerialMode } = serialStore;
 
@@ -566,7 +566,7 @@ export function useDiscoveryStore<T>(selector: (state: CombinedDiscoveryState) =
       if (isSerialMode) {
         selectedFrameData = framedData.length > 0 ? framedData : frames;
         if (selectedFrameData.length === 0) return;
-      } else if (bufferMode.enabled) {
+      } else if (captureMode.enabled) {
         const { getCaptureFramesPaginatedFiltered } = await import('../api/capture');
         const { useSessionStore } = await import('./sessionStore');
         const sessionId = uiStore.ioProfile ?? '';

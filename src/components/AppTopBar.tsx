@@ -167,9 +167,9 @@ export default function AppTopBar({
             onOpenBookmarkPicker={ioSession.onOpenBookmarkPicker}
             isCaptureMode={ioSession.isCaptureMode}
             capturePersistent={ioSession.capturePersistent}
-            onToggleBufferPin={ioSession.onToggleBufferPin}
-            onRenameBuffer={ioSession.onRenameBuffer}
-            onClearBuffer={ioSession.onClearBuffer}
+            onToggleCapturePin={ioSession.onToggleCapturePin}
+            onRenameCapture={ioSession.onRenameCapture}
+            onClearCapture={ioSession.onClearCapture}
             hasData={ioSession.hasData}
           />
         )}

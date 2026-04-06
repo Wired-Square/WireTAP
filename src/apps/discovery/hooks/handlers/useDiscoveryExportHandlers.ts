@@ -18,8 +18,8 @@ export interface UseDiscoveryExportHandlersParams {
   backendFrameCount: number;
   serialBytesBufferLength: number;
   exportDataMode: ExportDataMode;
-  bufferModeEnabled: boolean;
-  bufferModeTotalFrames: number;
+  captureModeEnabled: boolean;
+  captureModeTotalFrames: number;
   isSerialMode: boolean;
   decoderDir: string;
   saveFrameIdFormat: 'hex' | 'decimal';
@@ -48,8 +48,8 @@ export function useDiscoveryExportHandlers({
   backendFrameCount,
   serialBytesBufferLength: _serialBytesBufferLength,
   exportDataMode,
-  bufferModeEnabled,
-  bufferModeTotalFrames,
+  captureModeEnabled,
+  captureModeTotalFrames,
   isSerialMode,
   decoderDir,
   saveFrameIdFormat,
@@ -101,8 +101,8 @@ export function useDiscoveryExportHandlers({
         // Export frames
         let framesToExport: FrameMessage[];
 
-        if (bufferModeEnabled) {
-          const response = await getCaptureFramesPaginated(0, bufferModeTotalFrames);
+        if (captureModeEnabled) {
+          const response = await getCaptureFramesPaginated(0, captureModeTotalFrames);
           framesToExport = response.frames as FrameMessage[];
         } else if (isSerialMode && framedCaptureId && backendFrameCount > 0) {
           const response = await getCaptureFramesPaginatedById(framedCaptureId, 0, backendFrameCount);
@@ -142,8 +142,8 @@ export function useDiscoveryExportHandlers({
     dumpDir,
     exportDataMode,
     backendByteCount,
-    bufferModeEnabled,
-    bufferModeTotalFrames,
+    captureModeEnabled,
+    captureModeTotalFrames,
     isSerialMode,
     framedCaptureId,
     backendFrameCount,

@@ -39,7 +39,7 @@ type Props = {
   /** Called when framing config changes */
   onFramingConfigChange: (config: FramingConfig | null) => void;
   /** Whether a bytes buffer is selected (framing can be applied to bytes buffers) */
-  isBytesBufferSelected?: boolean;
+  isBytesCaptureSelected?: boolean;
 };
 
 /** Check if a profile supports framing (serial-based sources) */
@@ -93,7 +93,7 @@ export default function FramingOptions({
   isLoading,
   framingConfig,
   onFramingConfigChange,
-  isBytesBufferSelected = false,
+  isBytesCaptureSelected = false,
 }: Props) {
   // Check if any selected profile in multi-bus mode supports framing
   const anyMultiBusProfileSupportsFraming = checkedSourceIds.some((id) => {
@@ -106,7 +106,7 @@ export default function FramingOptions({
   // 2. Any profile in multi-bus selection supports framing, OR
   // 3. A bytes buffer is selected (to apply framing to existing bytes)
   // Don't show while loading
-  const showFraming = (supportsFraming(checkedProfile) || anyMultiBusProfileSupportsFraming || isBytesBufferSelected) && !isLoading;
+  const showFraming = (supportsFraming(checkedProfile) || anyMultiBusProfileSupportsFraming || isBytesCaptureSelected) && !isLoading;
   if (!showFraming) {
     return null;
   }

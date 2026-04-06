@@ -45,7 +45,7 @@ function generateRecordedSessionId(): string {
   return `t_${shortId}`;
 }
 
-function generateBufferSessionId(): string {
+function generateCaptureSessionId(): string {
   const shortId = Math.random().toString(16).slice(2, 8);
   return `b_${shortId}`;
 }
@@ -145,7 +145,7 @@ export interface UseIOSessionManagerOptions {
   onSessionReconfigured?: (info: SessionReconfigurationInfo) => void;
   /** Called when session is destroyed externally (e.g., from Sessions app).
    *  Receives orphaned capture IDs so apps can switch to capture mode. */
-  onSessionDestroyed?: (orphanedBufferIds: string[]) => void;
+  onSessionDestroyed?: (orphanedCaptureIds: string[]) => void;
 }
 
 /** Result of the IO session manager hook */
@@ -214,7 +214,7 @@ export interface UseIOSessionManagerResult {
   /** Destroy the session entirely */
   handleDestroy: () => Promise<void>;
   /** Clear the session's capture (real-time/recorded: clear data; capture: delete + leave) */
-  handleClearBuffer: () => Promise<void>;
+  handleClearCapture: () => Promise<void>;
 
   // ---- Watch State (for top bar display) ----
   /** Total frame count during watch mode */
@@ -264,7 +264,7 @@ export interface UseIOSessionManagerResult {
   /** Suspend the session - stops streaming, finalises capture, session stays alive */
   suspendSession: () => Promise<void>;
   /** Resume a suspended session with a fresh capture (orphans old capture) */
-  resumeWithNewBuffer: () => Promise<void>;
+  resumeWithNewCapture: () => Promise<void>;
   /** Connect to a profile without streaming (creates session in stopped state, for Query app) */
   connectOnly: (profileId: string, options?: LoadOptions) => Promise<void>;
   /** Select a profile (clear multi-bus, set profile, set default speed) */
@@ -572,7 +572,7 @@ export function useIOSessionManager(
       setIsLoading(false);
 
       // Call app's ingest complete callback
-      // App should: enableBufferMode(count), load frame info for display
+      // App should: enableCaptureMode(count), load frame info for display
       if (onIngestCompleteRef.current) {
         await onIngestCompleteRef.current(payload);
       }
@@ -591,8 +591,8 @@ export function useIOSessionManager(
 
   // Handle external session destruction (e.g., destroyed from Sessions app)
   // Switches to capture mode if orphaned captures are available, otherwise clears state
-  const handleSessionDestroyed = useCallback((orphanedBufferIds: string[]) => {
-    tlog.info(`[IOSessionManager:${appName}] Session destroyed externally, orphaned captures: ${JSON.stringify(orphanedBufferIds)}`);
+  const handleSessionDestroyed = useCallback((orphanedCaptureIds: string[]) => {
+    tlog.info(`[IOSessionManager:${appName}] Session destroyed externally, orphaned captures: ${JSON.stringify(orphanedCaptureIds)}`);
 
     // Clear app state (frame lists, etc.)
     onBeforeWatch?.();
@@ -610,8 +610,8 @@ export function useIOSessionManager(
     streamCompletedRef.current = false;
 
     // Switch to orphaned capture if available, otherwise clear profile
-    if (orphanedBufferIds.length > 0) {
-      const captureId = orphanedBufferIds[0];
+    if (orphanedCaptureIds.length > 0) {
+      const captureId = orphanedCaptureIds[0];
       setIoProfile(captureId);
       setSourceProfileId(captureId);
     } else {
@@ -619,7 +619,7 @@ export function useIOSessionManager(
     }
 
     // Notify app with orphaned capture IDs so it can set up capture mode
-    onSessionDestroyed?.(orphanedBufferIds);
+    onSessionDestroyed?.(orphanedCaptureIds);
   }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
 
   const sessionOptions: UseIOSessionOptions = {
@@ -738,7 +738,7 @@ export function useIOSessionManager(
   // Clear capture — behaviour depends on source type:
   // Real-time/recorded: clear capture data in backend (session keeps running)
   // Buffer (non-persistent): delete capture + leave session
-  const handleClearBuffer = useCallback(async () => {
+  const handleClearCapture = useCallback(async () => {
     const { clearCaptureData, deleteCapture } = await import("../api/capture");
     // For capture sessions, sourceProfileId holds the buf_N ID;
     // for real-time/recorded sessions the capture ID is on the session object.
@@ -751,7 +751,7 @@ export function useIOSessionManager(
         await deleteCapture(bid);
         useSessionStore.getState().removeKnownCaptureId(bid);
         const { emit } = await import("@tauri-apps/api/event");
-        emit(WINDOW_EVENTS.BUFFER_CHANGED, { metadata: null, deletedBufferIds: [bid], timestamp: Date.now() });
+        emit(WINDOW_EVENTS.CAPTURE_CHANGED, { metadata: null, deletedCaptureIds: [bid], timestamp: Date.now() });
       }
       await session.leave();
       setMultiBusProfiles([]);
@@ -913,8 +913,8 @@ export function useIOSessionManager(
       // Recorded/capture: reinitialize path
       onBeforeWatch?.();
       const profileId = profileIds[0];
-      const isBuffer = isCaptureProfileId(profileId);
-      const sessionId = isBuffer ? generateBufferSessionId() : generateRecordedSessionId();
+      const isCapture = isCaptureProfileId(profileId);
+      const sessionId = isCapture ? generateCaptureSessionId() : generateRecordedSessionId();
 
       await session.reinitialize(profileId, {
         startTime: opts.startTime,
@@ -992,10 +992,10 @@ export function useIOSessionManager(
       return;
     }
 
-    // Recorded sources: existing suspend + switchToBufferReplay
+    // Recorded sources: existing suspend + switchToCaptureReplay
     await session.suspend();
     try {
-      await session.switchToBufferReplay(1.0);
+      await session.switchToCaptureReplay(1.0);
       tlog.debug(`[IOSessionManager:${appName}] Switched to capture replay mode after stop`);
     } catch (e) {
       tlog.info(`[IOSessionManager:${appName}] Failed to switch to capture replay after stop: ${e}`);
@@ -1007,7 +1007,7 @@ export function useIOSessionManager(
   const suspendSession = stopWatch;
 
   // Resume a suspended session: return to live if possible, otherwise restart capture
-  const resumeWithNewBuffer = useCallback(async () => {
+  const resumeWithNewCapture = useCallback(async () => {
     onBeforeWatch?.();
 
     if (canReturnToLive && effectiveSessionId) {
@@ -1402,7 +1402,7 @@ export function useIOSessionManager(
     handleRejoin,
     handleLeave,
     handleDestroy,
-    handleClearBuffer,
+    handleClearCapture,
 
     // Watch State
     watchFrameCount,
@@ -1428,7 +1428,7 @@ export function useIOSessionManager(
     watchSource,
     stopWatch,
     suspendSession,
-    resumeWithNewBuffer,
+    resumeWithNewCapture,
     connectOnly,
     selectProfile,
     selectMultipleProfiles,

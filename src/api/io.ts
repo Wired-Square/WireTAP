@@ -152,7 +152,7 @@ export interface CreateIOSessionOptions {
   /** File path for file-based readers */
   filePath?: string;
   /** Use the shared capture source instead of a profile-based reader */
-  useBuffer?: boolean;
+  useCapture?: boolean;
 
   // Serial framing configuration
   /** Framing encoding for serial readers: "slip", "modbus_rtu", "delimiter", or "raw" */
@@ -202,7 +202,7 @@ export async function createIOSession(
   options: CreateIOSessionOptions
 ): Promise<IOCapabilities> {
   // Use capture source if requested
-  if (options.useBuffer) {
+  if (options.useCapture) {
     return invoke("create_capture_source_session", {
       session_id: options.sessionId,
       capture_id: options.captureId,
@@ -380,7 +380,7 @@ export async function resumeReaderSessionFresh(sessionId: string): Promise<IOSta
  * Creates an orphaned copy of the capture that can be used standalone.
  * Returns the new capture ID.
  */
-export async function copyBufferForDetach(
+export async function copyCaptureForDetach(
   captureId: string,
   newName: string
 ): Promise<string> {
@@ -608,7 +608,7 @@ export interface PlaybackPosition {
  * @param filterFrameIds Optional filter - if provided, skips frames that don't match
  * @returns The new frame index and timestamp after stepping, or null if at the boundary
  */
-export async function stepBufferFrame(
+export async function stepCaptureFrame(
   sessionId: string,
   captureId: string,
   currentFrameIndex: number | null,
@@ -1572,7 +1572,7 @@ export interface SourceInfo {
 }
 
 /** Fetch orphaned capture IDs from post-session cache. */
-export async function getOrphanedBufferIds(
+export async function getOrphanedCaptureIds(
   sessionId: string
 ): Promise<string[]> {
   return invoke("get_orphaned_capture_ids", { session_id: sessionId });

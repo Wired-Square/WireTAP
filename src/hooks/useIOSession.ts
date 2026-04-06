@@ -43,7 +43,7 @@ import {
   getIOSessionCapabilities,
   getReaderSessionJoinerCount,
   getStateType,
-  getOrphanedBufferIds,
+  getOrphanedCaptureIds,
   type IOCapabilities,
   type IOStateType,
   type StreamEndedInfo,
@@ -184,7 +184,7 @@ export interface UseIOSessionOptions {
   onTimeUpdate?: (position: PlaybackPosition) => void;
   /** Callback when stream ends (GVRET disconnect, PostgreSQL complete, etc.) */
   onStreamEnded?: (payload: StreamEndedInfo) => void;
-  /** Callback when capture playback completes naturally (reached end of buffer) */
+  /** Callback when capture playback completes naturally (reached end of capture) */
   onStreamComplete?: () => void;
   /** Callback when playback speed changes (from any subscriber on this session) */
   onSpeedChange?: (speed: number) => void;
@@ -199,7 +199,7 @@ export interface UseIOSessionOptions {
   /** Callback when the session's device is replaced in-place (caps/state change, listeners preserved) */
   onSourceReplaced?: (payload: SourceReplacedPayload) => void;
   /** Callback when session is destroyed externally (e.g., from Session Manager or last-subscriber auto-destroy) */
-  onDestroyed?: (orphanedBufferIds: string[]) => void;
+  onDestroyed?: (orphanedCaptureIds: string[]) => void;
 }
 
 export interface UseIOSessionResult {
@@ -223,7 +223,7 @@ export interface UseIOSessionResult {
   captureKind: "frames" | "bytes" | null;
   /** Number of items in the capture - frames or bytes depending on type (set after stream ends) */
   captureCount: number;
-  /** Session ID that owns this capture (for detecting ingest/cross-app buffers) */
+  /** Session ID that owns this capture (for detecting ingest/cross-app captures) */
   captureOwningSessionId: string | null;
   /** Start time of capture data in microseconds (null if empty or unknown) */
   captureStartTimeUs: number | null;
@@ -278,7 +278,7 @@ export interface UseIOSessionResult {
     profileId?: string,
     options?: {
       filePath?: string;
-      useBuffer?: boolean;
+      useCapture?: boolean;
       startTime?: string;
       endTime?: string;
       speed?: number;
@@ -309,7 +309,7 @@ export interface UseIOSessionResult {
     }
   ) => Promise<void>;
   /** Switch to capture replay mode (after stream ends with capture data) */
-  switchToBufferReplay: (speed?: number) => Promise<void>;
+  switchToCaptureReplay: (speed?: number) => Promise<void>;
   /** Rejoin an existing session after leaving (for shared sessions) */
   rejoin: (profileId?: string, profileName?: string) => Promise<void>;
   /** Transmit a CAN frame (only if capabilities.traits.tx_frames is true) */
@@ -442,7 +442,7 @@ export function useIOSession(
 
   // ---- Sync session store → localState ----
   // The session store receives WS push messages (SessionState, SessionLifecycle,
-  // StreamEnded, etc.) and updates sessions[id].ioState / capabilities / buffer.
+  // StreamEnded, etc.) and updates sessions[id].ioState / capabilities / capture.
   // useIOSession manages its own localState — this subscription keeps it in sync
   // so the UI reflects backend state changes (e.g., stop → "stopped").
   useEffect(() => {
@@ -583,7 +583,7 @@ export function useIOSession(
             // Fetch orphaned capture IDs from post-session cache
             let bufferIds: string[] = [];
             try {
-              bufferIds = await getOrphanedBufferIds(effectiveSessionId);
+              bufferIds = await getOrphanedCaptureIds(effectiveSessionId);
             } catch {
               // Cache may have expired
             }
@@ -1030,7 +1030,7 @@ export function useIOSession(
       newProfileId?: string,
       opts?: {
         filePath?: string;
-        useBuffer?: boolean;
+        useCapture?: boolean;
         startTime?: string;
         endTime?: string;
         speed?: number;
@@ -1093,7 +1093,7 @@ export function useIOSession(
           targetProfileName,
           {
             filePath: opts?.filePath,
-            useBuffer: opts?.useBuffer,
+            useCapture: opts?.useCapture,
             startTime: opts?.startTime,
             endTime: opts?.endTime,
             speed: opts?.speed,
@@ -1184,7 +1184,7 @@ export function useIOSession(
     [appName, effectiveSessionId, effectiveProfileName, reinitializeSession, registerCallbacks, clearCallbacks, leaveSession]
   );
 
-  const switchToBufferReplay = useCallback(
+  const switchToCaptureReplay = useCallback(
     async (speed?: number) => {
       if (!effectiveSessionId) return;
       try {
@@ -1307,7 +1307,7 @@ export function useIOSession(
     seek,
     seekByFrame,
     reinitialize,
-    switchToBufferReplay,
+    switchToCaptureReplay,
     rejoin,
     transmitFrame,
   };

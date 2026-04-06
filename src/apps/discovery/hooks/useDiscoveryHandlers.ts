@@ -43,8 +43,8 @@ export interface UseDiscoveryHandlersParams {
   /** Whether the session is stopped (used for play/resume/step logic) */
   isStopped: boolean;
   /** Buffer mode from discovery store - used for UI display */
-  bufferModeEnabled: boolean;
-  bufferModeTotalFrames: number;
+  captureModeEnabled: boolean;
+  captureModeTotalFrames: number;
 
   // Frame state
   frames: FrameMessage[];
@@ -97,7 +97,7 @@ export interface UseDiscoveryHandlersParams {
   resume: () => Promise<void>;
   reinitialize: (profileId?: string, options?: any) => Promise<void>;
   /** Centralised buffer clear from the session manager */
-  handleClearBuffer: () => Promise<void>;
+  handleClearCapture: () => Promise<void>;
   setSpeed: (speed: number) => Promise<void>;
   setTimeRange: (start: string, end: string) => Promise<void>;
   seek: (timestampUs: number) => Promise<void>;
@@ -113,9 +113,9 @@ export interface UseDiscoveryHandlersParams {
   clearBuffer: () => void;
   clearFramePicker: () => void;
   clearAnalysisResults: () => void;
-  enableBufferMode: (count: number) => void;
-  disableBufferMode: () => void;
-  setFrameInfoFromBuffer: (frameInfo: any[]) => void;
+  enableCaptureMode: (count: number) => void;
+  disableCaptureMode: () => void;
+  setFrameInfoFromCapture: (frameInfo: any[]) => void;
   clearSerialBytes: (preserveCount?: boolean) => void;
   resetFraming: () => void;
   setBackendByteCount: (count: number) => void;
@@ -167,9 +167,9 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     clearBuffer: params.clearBuffer,
     clearFramePicker: params.clearFramePicker,
     clearAnalysisResults: params.clearAnalysisResults,
-    enableBufferMode: params.enableBufferMode,
-    disableBufferMode: params.disableBufferMode,
-    setFrameInfoFromBuffer: params.setFrameInfoFromBuffer,
+    enableCaptureMode: params.enableCaptureMode,
+    disableCaptureMode: params.disableCaptureMode,
+    setFrameInfoFromCapture: params.setFrameInfoFromCapture,
     clearSerialBytes: params.clearSerialBytes,
     resetFraming: params.resetFraming,
     setBackendByteCount: params.setBackendByteCount,
@@ -226,8 +226,8 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     backendFrameCount: params.backendFrameCount,
     serialBytesBufferLength: params.serialBytesBufferLength,
     exportDataMode: params.exportDataMode,
-    bufferModeEnabled: params.bufferModeEnabled,
-    bufferModeTotalFrames: params.bufferModeTotalFrames,
+    captureModeEnabled: params.captureModeEnabled,
+    captureModeTotalFrames: params.captureModeTotalFrames,
     isSerialMode: params.isSerialMode,
     decoderDir: params.decoderDir,
     saveFrameIdFormat: params.saveFrameIdFormat,
@@ -272,14 +272,14 @@ export function useDiscoveryHandlers(params: UseDiscoveryHandlersParams): Discov
     }
     params.clearBuffer();
     params.clearFramePicker();
-    await params.handleClearBuffer();
+    await params.handleClearCapture();
   }, [
     params.isSerialMode,
     params.clearSerialBytes,
     params.resetFraming,
     params.clearBuffer,
     params.clearFramePicker,
-    params.handleClearBuffer,
+    params.handleClearCapture,
   ]);
 
   // Handle export click (opens dialog)

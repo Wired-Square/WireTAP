@@ -5,7 +5,7 @@
 
 import { useCallback } from "react";
 import type { PlaybackSpeed } from "../components/TimeController";
-import { stepBufferFrame, updateReaderDirection } from "../api/io";
+import { stepCaptureFrame, updateReaderDirection } from "../api/io";
 import { parseFrameKey } from "../utils/frameKey";
 import { tlog } from "../api/settings";
 
@@ -13,7 +13,7 @@ export interface UsePlaybackHandlersParams {
   // Session ID for direction control
   sessionId: string;
 
-  // Buffer ID for step operations (required for stepBufferFrame)
+  // Buffer ID for step operations (required for stepCaptureFrame)
   captureId?: string;
 
   // Session actions
@@ -140,7 +140,7 @@ export function usePlaybackHandlers({
       const filter = selectedFrameIds && selectedFrameIds.size > 0
         ? Array.from(selectedFrameIds).map(fk => parseFrameKey(fk).frameId)
         : undefined;
-      const result = await stepBufferFrame(sessionId, captureId, currentFrameIndex ?? null, currentTimestampUs ?? null, true, filter);
+      const result = await stepCaptureFrame(sessionId, captureId, currentFrameIndex ?? null, currentTimestampUs ?? null, true, filter);
       // Update the store immediately with the new frame index and timestamp
       if (result != null) {
         setCurrentFrameIndex?.(result.frame_index);
@@ -166,7 +166,7 @@ export function usePlaybackHandlers({
       const filter = selectedFrameIds && selectedFrameIds.size > 0
         ? Array.from(selectedFrameIds).map(fk => parseFrameKey(fk).frameId)
         : undefined;
-      const result = await stepBufferFrame(sessionId, captureId, currentFrameIndex ?? null, currentTimestampUs ?? null, false, filter);
+      const result = await stepCaptureFrame(sessionId, captureId, currentFrameIndex ?? null, currentTimestampUs ?? null, false, filter);
       // Update the store immediately with the new frame index and timestamp
       if (result != null) {
         setCurrentFrameIndex?.(result.frame_index);

@@ -40,13 +40,13 @@ export interface CaptureInfo {
 
 /**
  * Transform session data into React Flow nodes and edges.
- * @param bufferInfoMap Optional map of buffer_id → metadata for buffer source nodes.
+ * @param captureInfoMap Optional map of capture_id → metadata for capture source nodes.
  * @param openPanelIds IDs of currently open Dockview panels (used for unconnected app nodes).
  */
 export function buildSessionGraph(
   sessions: ActiveSessionInfo[],
   profiles: IOProfile[],
-  bufferInfoMap?: Map<string, CaptureInfo>,
+  captureInfoMap?: Map<string, CaptureInfo>,
   openPanelIds?: string[],
   subscriberIds?: Record<string, string>,
 ): SessionGraphData {
@@ -132,7 +132,7 @@ export function buildSessionGraph(
   );
   bufferSourceIds.forEach((captureId, i) => {
     const index = activeProfiles.length + i;
-    const info = bufferInfoMap?.get(captureId);
+    const info = captureInfoMap?.get(captureId);
     const nodeData: SourceNodeData = {
       profileId: captureId,
       profileName: info?.name ?? captureId,

@@ -445,13 +445,13 @@ export interface IOSessionControlsProps {
   /** Whether the current capture is persistent (pinned) */
   capturePersistent?: boolean;
   /** Called when user toggles capture pin */
-  onToggleBufferPin?: () => void;
+  onToggleCapturePin?: () => void;
   /** Called when user renames the capture */
-  onRenameBuffer?: (newName: string) => void;
+  onRenameCapture?: (newName: string) => void;
 
   // Clear capture props
   /** Called when user clicks the clear/trash button. If absent, button is hidden. */
-  onClearBuffer?: () => void;
+  onClearCapture?: () => void;
   /** Whether the app has data that can be cleared (controls disabled state) */
   hasData?: boolean;
 }
@@ -490,10 +490,10 @@ export function IOSessionControls({
   // Capture action props
   isCaptureMode: isCaptureModeProp,
   capturePersistent = false,
-  onToggleBufferPin,
-  onRenameBuffer,
+  onToggleCapturePin,
+  onRenameCapture,
   // Clear capture props
-  onClearBuffer,
+  onClearCapture,
   hasData = false,
 }: IOSessionControlsProps) {
   const isCaptureMode = isCaptureModeProp ?? isCaptureProfileId(ioProfile);
@@ -520,8 +520,8 @@ export function IOSessionControls({
     if (!isRenaming) return; // Guard against double-fire from blur after Enter/Escape
     const trimmed = renameValue.trim();
     const currentName = captureMetadata?.name || "";
-    if (trimmed && trimmed !== currentName && onRenameBuffer) {
-      onRenameBuffer(trimmed);
+    if (trimmed && trimmed !== currentName && onRenameCapture) {
+      onRenameCapture(trimmed);
     }
     setIsRenaming(false);
   };
@@ -552,7 +552,7 @@ export function IOSessionControls({
       {/* Capture actions - pin and rename (shown when capture metadata is available) */}
       {captureMetadata?.id && (
         <div className="relative flex items-center gap-0.5">
-          {onRenameBuffer && (
+          {onRenameCapture && (
             <button
               onClick={startRename}
               className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
@@ -561,9 +561,9 @@ export function IOSessionControls({
               <Pencil className={iconXs} />
             </button>
           )}
-          {onToggleBufferPin && (
+          {onToggleCapturePin && (
             <button
-              onClick={onToggleBufferPin}
+              onClick={onToggleCapturePin}
               className={`p-1 rounded transition-colors hover:bg-[var(--hover-bg)] ${
                 capturePersistent
                   ? "text-[color:var(--status-warning-text)]"
@@ -596,9 +596,9 @@ export function IOSessionControls({
       )}
 
       {/* Clear capture button — hidden for persistent captures */}
-      {onClearBuffer && ioProfile && !(isCaptureMode && capturePersistent) && (
+      {onClearCapture && ioProfile && !(isCaptureMode && capturePersistent) && (
         <button
-          onClick={onClearBuffer}
+          onClick={onClearCapture}
           disabled={!hasData}
           className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] enabled:hover:!bg-red-600 enabled:hover:!text-white disabled:opacity-30 disabled:cursor-not-allowed"
           title={isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}

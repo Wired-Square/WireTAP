@@ -2,8 +2,8 @@
 //
 // Dialog for replaying a range of Discovery frames to a target session with
 // time-accurate inter-frame timing scaled by a speed multiplier.
-// The user specifies a frame index range (1-based) into the live buffer.
-// Duplicate frame IDs are preserved — each buffer entry is replayed as-is.
+// The user specifies a frame index range (1-based) into the live capture.
+// Duplicate frame IDs are preserved — each capture entry is replayed as-is.
 
 import { useState, useEffect, useMemo } from "react";
 import Dialog from "../components/Dialog";
@@ -38,13 +38,13 @@ const BUS_OPTIONS = [0, 1, 2, 3, 4] as const;
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  /** Buffer ID for buffer-first mode (when frames are stored in the Rust backend) */
+  /** Capture ID for capture-first mode (when frames are stored in the Rust backend) */
   captureId?: string | null;
 }
 
 export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
   const startReplay = useTransmitStore((s) => s.startReplay);
-  const bufferMode = useDiscoveryFrameStore((s) => s.bufferMode);
+  const captureMode = useDiscoveryFrameStore((s) => s.captureMode);
   const sessions = useSessionStore((s) => s.sessions);
 
   // Transmit-capable sessions currently connected
@@ -66,10 +66,10 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
   const [startRaw, setStartRaw] = useState("1");
   const [endRaw, setEndRaw] = useState("1");
 
-  // Reset state when dialog opens; snapshot buffer length at open time
+  // Reset state when dialog opens; snapshot capture length at open time
   useEffect(() => {
     if (!isOpen) return;
-    const len = bufferMode.enabled ? bufferMode.totalFrames : getDiscoveryFrameBuffer().length;
+    const len = captureMode.enabled ? captureMode.totalFrames : getDiscoveryFrameBuffer().length;
     setBufferLength(len);
     setStartRaw("1");
     setEndRaw(String(len));
@@ -116,9 +116,9 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
       ? "Start must be ≤ End"
       : null;
 
-  // Slice buffer by 1-based index range; preserves order and duplicate frame IDs
+  // Slice capture by 1-based index range; preserves order and duplicate frame IDs
   const replayFrames = useMemo<ReplayFrame[]>(() => {
-    if (!isOpen || rangeError || startIdx === null || endIdx === null || bufferMode.enabled) return [];
+    if (!isOpen || rangeError || startIdx === null || endIdx === null || captureMode.enabled) return [];
     const buffer = getDiscoveryFrameBuffer();
     return buffer.slice(startIdx - 1, endIdx).map((f) => ({
       timestamp_us: f.timestamp_us,
@@ -132,7 +132,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
         is_rtr: false,
       },
     }));
-  }, [isOpen, startIdx, endIdx, rangeError, bufferMode.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, startIdx, endIdx, rangeError, captureMode.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const frameCount = replayFrames.length;
   const spanUs =
@@ -141,7 +141,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
       : 0;
   const effectiveSpanUs = speed > 0 ? spanUs / speed : spanUs;
 
-  const expectedCount = bufferMode.enabled
+  const expectedCount = captureMode.enabled
     ? startIdx !== null && endIdx !== null && !rangeError
       ? endIdx - startIdx + 1
       : 0
@@ -171,7 +171,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
     setIsStarting(true);
     try {
       let frames: ReplayFrame[];
-      if (bufferMode.enabled && captureId) {
+      if (captureMode.enabled && captureId) {
         const count = endIdx - startIdx + 1;
         const response = await getCaptureFramesPaginatedById(captureId, startIdx - 1, count);
         frames = response.frames.map((f) => ({
@@ -225,7 +225,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
             {/* Frame index range */}
             <div className="space-y-2">
               <label className={labelSmall}>
-                Frame range (of {bufferLength.toLocaleString()} in buffer)
+                Frame range (of {bufferLength.toLocaleString()} in capture)
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -257,8 +257,8 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
               {rangeError && bufferLength > 0 ? (
                 <p className="text-xs text-[color:var(--status-danger-text)]">{rangeError}</p>
               ) : bufferLength === 0 ? (
-                <p className={helpText}>No frames in buffer.</p>
-              ) : bufferMode.enabled ? (
+                <p className={helpText}>No frames in capture.</p>
+              ) : captureMode.enabled ? (
                 <p className={helpText}>
                   {expectedCount.toLocaleString()} frame{expectedCount !== 1 ? "s" : ""} selected
                 </p>

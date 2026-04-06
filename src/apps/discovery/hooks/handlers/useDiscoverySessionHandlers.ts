@@ -23,9 +23,9 @@ export interface UseDiscoverySessionHandlersParams {
   clearBuffer: () => void;
   clearFramePicker: () => void;
   clearAnalysisResults: () => void;
-  enableBufferMode: (count: number) => void;
-  disableBufferMode: () => void;
-  setFrameInfoFromBuffer: (frameInfo: any[]) => void;
+  enableCaptureMode: (count: number) => void;
+  disableCaptureMode: () => void;
+  setFrameInfoFromCapture: (frameInfo: any[]) => void;
   clearSerialBytes: (preserveCount?: boolean) => void;
   resetFraming: () => void;
   setBackendByteCount: (count: number) => void;
@@ -44,9 +44,9 @@ export function useDiscoverySessionHandlers({
   clearBuffer,
   clearFramePicker,
   clearAnalysisResults,
-  enableBufferMode,
-  disableBufferMode,
-  setFrameInfoFromBuffer,
+  enableCaptureMode,
+  disableCaptureMode,
+  setFrameInfoFromCapture,
   clearSerialBytes,
   resetFraming,
   setBackendByteCount,
@@ -65,7 +65,7 @@ export function useDiscoverySessionHandlers({
       clearBuffer();
       clearFramePicker();
       clearAnalysisResults();
-      disableBufferMode();
+      disableCaptureMode();
       clearSerialBytes();
       resetFraming();
       setBackendByteCount(0);
@@ -85,11 +85,11 @@ export function useDiscoverySessionHandlers({
       if (isFramesMode) {
         // Set active buffer so getCaptureFrameInfo reads from the correct buffer
         await setActiveCapture(meta.id);
-        enableBufferMode(meta.count);
+        enableCaptureMode(meta.count);
         setMaxBuffer?.(meta.count);
         try {
           const frameInfoList = await getCaptureFrameInfo(meta.id);
-          setFrameInfoFromBuffer(frameInfoList);
+          setFrameInfoFromCapture(frameInfoList);
         } catch (e) {
           console.error("[DiscoverySessionHandlers] Failed to load frame info:", e);
         }
@@ -116,7 +116,7 @@ export function useDiscoverySessionHandlers({
       clearAnalysisResults();
       clearBuffer();
       clearFramePicker();
-      disableBufferMode();
+      disableCaptureMode();
       clearSerialBytes();
       resetFraming();
       setBackendByteCount(0);
@@ -128,7 +128,7 @@ export function useDiscoverySessionHandlers({
     clearAnalysisResults,
     clearBuffer,
     clearFramePicker,
-    disableBufferMode,
+    disableCaptureMode,
     clearSerialBytes,
     resetFraming,
     setBackendByteCount,

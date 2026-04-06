@@ -123,11 +123,11 @@ type Props = {
   onSelect: (id: string | null) => void;
   /** Called when multiple profiles are selected in multi-bus mode */
   onSelectMultiple?: (ids: string[]) => void;
-  /** Called when CSV is imported - passes the buffer metadata */
+  /** Called when CSV is imported - passes the capture metadata */
   onImport?: (metadata: CaptureMetadata) => void;
-  /** Called when buffer is confirmed with framing config (for applying framing to bytes buffer) */
-  onBufferFramingConfig?: (config: FramingConfig | null) => void;
-  /** Current buffer metadata (if any) */
+  /** Called when capture is confirmed with framing config (for applying framing to bytes capture) */
+  onCaptureFramingConfig?: (config: FramingConfig | null) => void;
+  /** Current capture metadata (if any) */
   captureMetadata?: CaptureMetadata | null;
   /** Default directory for file picker */
   defaultDir?: string;
@@ -153,8 +153,8 @@ type Props = {
    * For multi-source sessions, sourceProfileIds will contain the individual source profile IDs.
    */
   onJoinSession?: (sessionId: string, sourceProfileIds?: string[]) => void;
-  /** Hide buffers section (for transmit-only mode) */
-  hideBuffers?: boolean;
+  /** Hide captures section (for transmit-only mode) */
+  hideCaptures?: boolean;
   /** Enable multi-select mode for real-time profiles */
   allowMultiSelect?: boolean;
   /** Map of profile ID to disabled status with reason (for transmit mode) */
@@ -182,8 +182,8 @@ export default function IoSourcePickerDialog({
   onSelect,
   onSelectMultiple,
   onImport,
-  onBufferFramingConfig,
-  captureMetadata: _captureMetadata, // Deprecated - dialog now fetches buffers directly
+  onCaptureFramingConfig,
+  captureMetadata: _captureMetadata, // Deprecated - dialog now fetches captures directly
   defaultDir,
   // External load state (optional - if provided, dialog uses external state)
   isLoading: externalIsLoading,
@@ -196,7 +196,7 @@ export default function IoSourcePickerDialog({
   onStopLoad,
   loadError: externalLoadError,
   onJoinSession,
-  hideBuffers = false,
+  hideCaptures = false,
   allowMultiSelect = false,
   disabledProfiles,
   onSkip,
@@ -228,9 +228,9 @@ export default function IoSourcePickerDialog({
   // Track auto-import mode (menu shortcut) so cancel closes the dialog
   const autoImportActiveRef = useRef(false);
 
-  // Multi-buffer state
-  const [buffers, setBuffers] = useState<CaptureMetadata[]>([]);
-  const [selectedCaptureId, setSelectedBufferId] = useState<string | null>(null);
+  // Multi-capture state
+  const [captures, setCaptures] = useState<CaptureMetadata[]>([]);
+  const [selectedCaptureId, setSelectedCaptureId] = useState<string | null>(null);
   // (Buffer bus config now uses shared deviceBusConfigMap / singleBusOverrideMap via probeDevice)
 
   // Internal load state (used when external state not provided)
@@ -297,17 +297,17 @@ export default function IoSourcePickerDialog({
   const loadFrameCount = useExternalState ? (externalLoadFrameCount ?? 0) : internalLoadFrameCount;
   const loadError = useExternalState ? (externalLoadError ?? null) : internalLoadError;
 
-  // Probe a buffer and populate the shared device maps.
-  // All buffers go into deviceBusConfigMap (not singleBusOverrideMap) so the
-  // bus mapper always appears — even single-bus buffers show "Bus 0 → Bus 0".
-  const probeBuffer = useCallback(async (captureId: string) => {
+  // Probe a capture and populate the shared device maps.
+  // All captures go into deviceBusConfigMap (not singleBusOverrideMap) so the
+  // bus mapper always appears — even single-bus captures show "Bus 0 → Bus 0".
+  const probeCapture = useCallback(async (captureId: string) => {
     setDeviceProbeLoadingMap((prev) => new Map(prev).set(captureId, true));
     try {
       const result = await probeDevice(captureId);
       setDeviceProbeResultMap((prev) => new Map(prev).set(captureId, result));
-      // Use actual bus numbers from buffer metadata (may be non-sequential)
-      const buffer = buffers.find((b) => b.id === captureId);
-      const busList = buffer?.buses?.length ? buffer.buses : [0]; // default to bus 0
+      // Use actual bus numbers from capture metadata (may be non-sequential)
+      const capture = captures.find((b) => b.id === captureId);
+      const busList = capture?.buses?.length ? capture.buses : [0]; // default to bus 0
       const mappings: BusMapping[] = busList.map((bus) => ({
         deviceBus: bus,
         enabled: true,
@@ -341,7 +341,7 @@ export default function IoSourcePickerDialog({
         return newMap;
       });
     }
-  }, [buffers]);
+  }, [captures]);
 
   // All profiles are read profiles now (mode field removed)
   const readProfiles = ioProfiles;
@@ -370,16 +370,16 @@ export default function IoSourcePickerDialog({
   // Get the session for the checked profile (if any) to check its state
   const checkedProfileSession = checkedSourceId ? getSessionForProfile(checkedSourceId) : undefined;
   const isCheckedProfileStopped = checkedProfileSession?.ioState === "stopped";
-  const isCheckedProfileBuffer = checkedProfileSession?.capabilities?.traits?.temporal_mode === "capture";
+  const isCheckedProfileCapture = checkedProfileSession?.capabilities?.traits?.temporal_mode === "capture";
 
-  // DEBUG: log source picker state for buffer session diagnosis
+  // DEBUG: log source picker state for capture session diagnosis
   if (checkedSourceId && checkedProfileSession) {
     console.log("[SourcePicker] checkedSourceId:", checkedSourceId,
       "ioState:", checkedProfileSession.ioState,
       "temporal_mode:", checkedProfileSession.capabilities?.traits?.temporal_mode,
       "isLive:", isCheckedProfileLive,
       "isStopped:", isCheckedProfileStopped,
-      "isBuffer:", isCheckedProfileBuffer,
+      "isCapture:", isCheckedProfileCapture,
       "inActiveMultiSource:", activeMultiSourceSessions.some((s) => s.sessionId === checkedSourceId));
   }
 
@@ -396,7 +396,7 @@ export default function IoSourcePickerDialog({
 
   const isMultiSourceLive = liveMultiSourceSession !== null;
 
-  // Load bookmarks and buffers when dialog opens.
+  // Load bookmarks and captures when dialog opens.
   // Guarded by didInitForOpenRef so we only run the initialisation once per
   // open cycle — re-running it while open would reset `hasUserExpandedRef`
   // and re-collapse the source list after the user clicks "Change".
@@ -409,23 +409,23 @@ export default function IoSourcePickerDialog({
     didInitForOpenRef.current = true;
     {
       getAllFavorites().then(setBookmarks).catch(console.error);
-      // Refresh known buffer IDs so isCaptureProfileId() is up-to-date
+      // Refresh known capture IDs so isCaptureProfileId() is up-to-date
       useSessionStore.getState().loadCaptureIds();
-      // Load all buffers from the registry and initialize selected buffer
-      listOrphanedCaptures().then((loadedBuffers) => {
-        setBuffers(loadedBuffers);
-        // If a specific buffer is selected (e.g., "xk9m2p"), use that
-        // Otherwise if legacy buffer ID is selected, use the most recent buffer
-        if (isCaptureProfileId(selectedId) && loadedBuffers.length > 0) {
-          // Check if selectedId matches a specific buffer (e.g., "xk9m2p")
-          const matchingBuffer = loadedBuffers.find(b => b.id === selectedId);
-          if (matchingBuffer) {
-            setSelectedBufferId(matchingBuffer.id);
-            // Probe buffer to populate shared bus config maps
-            probeDevice(matchingBuffer.id)
+      // Load all captures from the registry and initialize selected capture
+      listOrphanedCaptures().then((loadedCaptures) => {
+        setCaptures(loadedCaptures);
+        // If a specific capture is selected (e.g., "xk9m2p"), use that
+        // Otherwise if legacy capture ID is selected, use the most recent capture
+        if (isCaptureProfileId(selectedId) && loadedCaptures.length > 0) {
+          // Check if selectedId matches a specific capture (e.g., "xk9m2p")
+          const matchingCapture = loadedCaptures.find(b => b.id === selectedId);
+          if (matchingCapture) {
+            setSelectedCaptureId(matchingCapture.id);
+            // Probe capture to populate shared bus config maps
+            probeDevice(matchingCapture.id)
               .then((result) => {
-                setDeviceProbeResultMap((prev) => new Map(prev).set(matchingBuffer.id, result));
-                const busList = matchingBuffer.buses.length > 0 ? matchingBuffer.buses : [0];
+                setDeviceProbeResultMap((prev) => new Map(prev).set(matchingCapture.id, result));
+                const busList = matchingCapture.buses.length > 0 ? matchingCapture.buses : [0];
                 const mappings: BusMapping[] = busList.map((bus) => ({
                   deviceBus: bus,
                   enabled: true,
@@ -439,16 +439,16 @@ export default function IoSourcePickerDialog({
                     multi_source: false,
                   },
                 }));
-                setDeviceBusConfigMap((prev) => new Map(prev).set(matchingBuffer.id, mappings));
+                setDeviceBusConfigMap((prev) => new Map(prev).set(matchingCapture.id, mappings));
               })
               .catch(console.error);
           } else {
-            // Legacy buffer ID - fall back to most recent buffer
-            const sorted = [...loadedBuffers].sort((a, b) => b.created_at - a.created_at);
-            setSelectedBufferId(sorted[0].id);
+            // Legacy capture ID - fall back to most recent capture
+            const sorted = [...loadedCaptures].sort((a, b) => b.created_at - a.created_at);
+            setSelectedCaptureId(sorted[0].id);
           }
         } else {
-          setSelectedBufferId(null);
+          setSelectedCaptureId(null);
         }
       }).catch(console.error);
       // Reset options when dialog opens
@@ -482,7 +482,7 @@ export default function IoSourcePickerDialog({
       hasUserExpandedRef.current = false;
 
       // Reset multi-select maps and probed profiles ref
-      // (buffer probe results will be populated after listOrphanedCaptures completes)
+      // (capture probe results will be populated after listOrphanedCaptures completes)
       setDeviceProbeResultMap(new Map());
       setDeviceProbeLoadingMap(new Map());
       setDeviceBusConfigMap(new Map());
@@ -507,38 +507,38 @@ export default function IoSourcePickerDialog({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, autoImport]);
 
-  // Refresh buffer list periodically while dialog is open
+  // Refresh capture list periodically while dialog is open
   // This catches transitions from streaming to stopped even if the stream-ended
   // event wasn't received (e.g., stream stopped by another window)
   useEffect(() => {
     if (!isOpen) return;
-    if (buffers.length === 0) return;
+    if (captures.length === 0) return;
 
     // Poll more frequently while streaming, less frequently when not
-    const hasStreamingBuffer = buffers.some(b => b.is_streaming);
-    const pollInterval = hasStreamingBuffer ? 500 : 2000;
+    const hasStreamingCapture = captures.some(b => b.is_streaming);
+    const pollInterval = hasStreamingCapture ? 500 : 2000;
 
     const intervalId = setInterval(() => {
-      listOrphanedCaptures().then(setBuffers).catch(console.error);
+      listOrphanedCaptures().then(setCaptures).catch(console.error);
     }, pollInterval);
 
     return () => clearInterval(intervalId);
-  }, [isOpen, buffers]);
+  }, [isOpen, captures]);
 
-  // Listen for buffer changes from other windows while dialog is open
+  // Listen for capture changes from other windows while dialog is open
   useEffect(() => {
     if (!isOpen) return;
     const unlistenFns: (() => void)[] = [];
     const setup = async () => {
-      // Refresh buffer list on delete/clear/import from another window
-      const u1 = await listen<CaptureChangedPayload>(WINDOW_EVENTS.BUFFER_CHANGED, () => {
-        listOrphanedCaptures().then(setBuffers).catch(console.error);
+      // Refresh capture list on delete/clear/import from another window
+      const u1 = await listen<CaptureChangedPayload>(WINDOW_EVENTS.CAPTURE_CHANGED, () => {
+        listOrphanedCaptures().then(setCaptures).catch(console.error);
         useSessionStore.getState().loadCaptureIds();
       });
       unlistenFns.push(u1);
-      // Refresh buffer list on rename/pin from another window
-      const u2 = await listen(WINDOW_EVENTS.BUFFER_METADATA_UPDATED, () => {
-        listOrphanedCaptures().then(setBuffers).catch(console.error);
+      // Refresh capture list on rename/pin from another window
+      const u2 = await listen(WINDOW_EVENTS.CAPTURE_METADATA_UPDATED, () => {
+        listOrphanedCaptures().then(setCaptures).catch(console.error);
       });
       unlistenFns.push(u2);
     };
@@ -558,7 +558,7 @@ export default function IoSourcePickerDialog({
         console.log("[IoSourcePickerDialog] All active sessions:", sessions);
         // Show joinable sessions:
         // - traits.multi_source: sources that can be combined (all realtime)
-        // - buffer: sessions switched to buffer replay (e.g., stopped live sessions)
+        // - capture: sessions switched to capture replay (e.g., stopped live sessions)
         // - supports_time_range && !is_realtime: recorded sources like PostgreSQL
         const joinableSessions = sessions.filter((s) =>
           s.capabilities.traits.multi_source === true ||
@@ -592,7 +592,7 @@ export default function IoSourcePickerDialog({
     return () => clearInterval(intervalId);
   }, [isOpen, ioProfiles]);
 
-  // After activeMultiSourceSessions loads, if current source is a buffer with an
+  // After activeMultiSourceSessions loads, if current source is a capture with an
   // active session, set checkedReaderId so the collapsed view shows it
   useEffect(() => {
     if (!isOpen) return;
@@ -600,10 +600,10 @@ export default function IoSourcePickerDialog({
     if (checkedSourceId !== null) return;
     if (hasUserExpandedRef.current) return;
 
-    const bufferSession = activeMultiSourceSessions.find(
+    const captureSession = activeMultiSourceSessions.find(
       (s) => s.sessionId === selectedId
     );
-    if (bufferSession) {
+    if (captureSession) {
       setCheckedReaderId(selectedId);
     }
   }, [isOpen, selectedId, checkedSourceId, activeMultiSourceSessions]);
@@ -819,22 +819,22 @@ export default function IoSourcePickerDialog({
       }
 
       if (payload.capture_available && payload.count > 0) {
-        // Refresh the buffer list
-        const allBuffers = await listOrphanedCaptures();
-        setBuffers(allBuffers);
+        // Refresh the capture list
+        const allCaptures = await listOrphanedCaptures();
+        setCaptures(allCaptures);
 
-        // Get the specific buffer that was created (if we have its ID)
+        // Get the specific capture that was created (if we have its ID)
         if (payload.capture_id) {
-          const meta = allBuffers.find((b) => b.id === payload.capture_id);
+          const meta = allCaptures.find((b) => b.id === payload.capture_id);
           if (meta) {
             onImport?.(meta);
 
-            // Notify other windows that buffer has changed
-            const bufferPayload: CaptureChangedPayload = {
+            // Notify other windows that capture has changed
+            const capturePayload: CaptureChangedPayload = {
               metadata: meta,
               timestamp: Date.now(),
             };
-            await emit(WINDOW_EVENTS.BUFFER_CHANGED, bufferPayload);
+            await emit(WINDOW_EVENTS.CAPTURE_CHANGED, capturePayload);
           }
         }
       }
@@ -871,7 +871,7 @@ export default function IoSourcePickerDialog({
         }
       });
       const unlistenFrames = await listen<void>(`frames-ready:${sessionId}`, async () => {
-        // Fetch current buffer count from backend
+        // Fetch current capture count from backend
         try {
           const session = useSessionStore.getState().sessions[sessionId];
           const captureId = session?.capture?.id;
@@ -883,7 +883,7 @@ export default function IoSourcePickerDialog({
             }
           }
         } catch {
-          // Buffer may not exist yet
+          // Capture may not exist yet
         }
       });
 
@@ -991,18 +991,18 @@ export default function IoSourcePickerDialog({
     onClose();
   };
 
-  // Handle Connect for buffer source - passes bus mappings through options
-  const handleBufferConnectClick = () => {
-    // Use selectedCaptureId (from clicking a buffer in the list)
-    // or fall back to checkedSourceId (when dialog reopens with buffer pre-selected)
+  // Handle Connect for capture source - passes bus mappings through options
+  const handleCaptureConnectClick = () => {
+    // Use selectedCaptureId (from clicking a capture in the list)
+    // or fall back to checkedSourceId (when dialog reopens with capture pre-selected)
     const captureId = selectedCaptureId ?? checkedSourceId;
     if (!captureId) return;
     const options = buildLoadOptions(selectedSpeed);
-    // Attach buffer bus mappings from shared device config map
-    const bufferMappings = deviceBusConfigMap.get(captureId);
-    if (bufferMappings && bufferMappings.length > 0) {
+    // Attach capture bus mappings from shared device config map
+    const captureMappings = deviceBusConfigMap.get(captureId);
+    if (captureMappings && captureMappings.length > 0) {
       const busMappings = new Map<string, BusMapping[]>();
-      busMappings.set(captureId, bufferMappings);
+      busMappings.set(captureId, captureMappings);
       options.busMappings = busMappings;
     }
     if (useExternalState) {
@@ -1154,7 +1154,7 @@ export default function IoSourcePickerDialog({
   const handleSelectMultiSourceSession = (sessionId: string) => {
     // Select the multi-source session as the reader
     setCheckedReaderId(sessionId);
-    setSelectedBufferId(null);
+    setSelectedCaptureId(null);
     // Clear multi-bus selection since we're joining an existing session
     setCheckedReaderIds([]);
     setValidationError(null);
@@ -1194,8 +1194,8 @@ export default function IoSourcePickerDialog({
     setCheckedReaderIds([]);
     setValidationError(null);
 
-    // Clear buffer selection
-    setSelectedBufferId(null);
+    // Clear capture selection
+    setSelectedCaptureId(null);
 
     // Reset load options
     setTimeBounds({
@@ -1353,26 +1353,26 @@ export default function IoSourcePickerDialog({
     setCsvHasHeaderPerFile(null);
     setCsvImportSessionId(null);
 
-    // Refresh buffer list
-    const allBuffers = await listOrphanedCaptures();
-    setBuffers(allBuffers);
+    // Refresh capture list
+    const allCaptures = await listOrphanedCaptures();
+    setCaptures(allCaptures);
 
     onImport?.(metadata);
 
     // Register the new capture id so isCaptureProfileId() recognises it.
     // Without this, the onSelect(metadata.id) → handleIoProfileChange call
-    // below takes the non-buffer branch and skips the capture-load pipeline
+    // below takes the non-capture branch and skips the capture-load pipeline
     // that populates frameInfoMap (tooltip/frame picker/Tools button).
     useSessionStore.getState().addKnownCaptureId(metadata.id);
 
-    // Notify other windows that buffer has changed
+    // Notify other windows that capture has changed
     const payload: CaptureChangedPayload = {
       metadata,
       timestamp: Date.now(),
     };
-    await emit(WINDOW_EVENTS.BUFFER_CHANGED, payload);
+    await emit(WINDOW_EVENTS.CAPTURE_CHANGED, payload);
 
-    // Auto-select the buffer and close
+    // Auto-select the capture and close
     autoImportActiveRef.current = false;
     onSelect(metadata.id);
     onClose();
@@ -1390,97 +1390,97 @@ export default function IoSourcePickerDialog({
     }
   };
 
-  // Delete a specific buffer by ID
-  const handleDeleteBuffer = async (captureId: string) => {
+  // Delete a specific capture by ID
+  const handleDeleteCapture = async (captureId: string) => {
     try {
       await deleteCapture(captureId);
 
-      // Remove from known buffer IDs so isCaptureProfileId() stops matching
+      // Remove from known capture IDs so isCaptureProfileId() stops matching
       useSessionStore.getState().removeKnownCaptureId(captureId);
 
-      // Refresh buffer list
-      const allBuffers = await listOrphanedCaptures();
-      setBuffers(allBuffers);
+      // Refresh capture list
+      const allCaptures = await listOrphanedCaptures();
+      setCaptures(allCaptures);
 
-      // If no buffers left and buffer was selected, clear selection
-      if (allBuffers.length === 0 && isCaptureProfileId(selectedId)) {
+      // If no captures left and capture was selected, clear selection
+      if (allCaptures.length === 0 && isCaptureProfileId(selectedId)) {
         onSelect(null);
       }
 
-      // Notify other windows that buffer has been deleted
+      // Notify other windows that capture has been deleted
       const payload: CaptureChangedPayload = {
         metadata: null,
-        deletedBufferIds: [captureId],
+        deletedCaptureIds: [captureId],
         timestamp: Date.now(),
       };
-      await emit(WINDOW_EVENTS.BUFFER_CHANGED, payload);
+      await emit(WINDOW_EVENTS.CAPTURE_CHANGED, payload);
     } catch (e) {
-      console.error("Failed to delete buffer:", e);
+      console.error("Failed to delete capture:", e);
     }
   };
 
-  // Clear all non-streaming, non-persistent buffers
-  const handleClearAllBuffers = async () => {
+  // Clear all non-streaming, non-persistent captures
+  const handleClearAllCaptures = async () => {
     try {
-      // Only delete buffers that are not streaming and not pinned
-      const clearableBuffers = buffers.filter(b => !b.is_streaming && !b.persistent);
-      for (const buffer of clearableBuffers) {
-        await deleteCapture(buffer.id);
-        useSessionStore.getState().removeKnownCaptureId(buffer.id);
+      // Only delete captures that are not streaming and not pinned
+      const clearableCaptures = captures.filter(b => !b.is_streaming && !b.persistent);
+      for (const capture of clearableCaptures) {
+        await deleteCapture(capture.id);
+        useSessionStore.getState().removeKnownCaptureId(capture.id);
       }
 
-      // Refresh buffer list (keep streaming and persistent buffers)
-      const keptBuffers = buffers.filter(b => b.is_streaming || b.persistent);
-      setBuffers(keptBuffers);
+      // Refresh capture list (keep streaming and persistent captures)
+      const keptCaptures = captures.filter(b => b.is_streaming || b.persistent);
+      setCaptures(keptCaptures);
 
-      // If buffer was selected and it was deleted, clear selection
-      const deletedIds = new Set(clearableBuffers.map(b => b.id));
+      // If capture was selected and it was deleted, clear selection
+      const deletedIds = new Set(clearableCaptures.map(b => b.id));
       if (isCaptureProfileId(selectedId)) {
-        // Check if the selected buffer was deleted
-        const selectedBuffer = buffers.find(b => b.id === selectedId);
-        if (selectedBuffer && deletedIds.has(selectedBuffer.id)) {
+        // Check if the selected capture was deleted
+        const selectedCapture = captures.find(b => b.id === selectedId);
+        if (selectedCapture && deletedIds.has(selectedCapture.id)) {
           onSelect(null);
         }
       }
 
-      // Notify other windows that buffers have been cleared
+      // Notify other windows that captures have been cleared
       const payload: CaptureChangedPayload = {
         metadata: null,
-        deletedBufferIds: clearableBuffers.map(b => b.id),
+        deletedCaptureIds: clearableCaptures.map(b => b.id),
         timestamp: Date.now(),
       };
-      await emit(WINDOW_EVENTS.BUFFER_CHANGED, payload);
+      await emit(WINDOW_EVENTS.CAPTURE_CHANGED, payload);
     } catch (e) {
-      console.error("Failed to clear buffers:", e);
+      console.error("Failed to clear captures:", e);
     }
   };
 
-  // Select a specific orphaned buffer (local dialog state only — no session created yet)
-  const handleSelectBuffer = async (captureId: string) => {
+  // Select a specific orphaned capture (local dialog state only — no session created yet)
+  const handleSelectCapture = async (captureId: string) => {
     try {
       await setActiveCapture(captureId);
       setCheckedReaderId(null);
-      setSelectedBufferId(captureId);
+      setSelectedCaptureId(captureId);
       // Don't call onSelect here — that triggers session creation in the parent.
-      // Buffer sessions are only created when the user clicks Connect.
+      // Capture sessions are only created when the user clicks Connect.
 
-      // Probe buffer to populate shared bus config maps
-      probeBuffer(captureId);
+      // Probe capture to populate shared bus config maps
+      probeCapture(captureId);
     } catch (e) {
-      console.error("Failed to set active buffer:", e);
+      console.error("Failed to set active capture:", e);
     }
   };
 
-  const isBufferSelected = isCaptureProfileId(selectedId) || selectedCaptureId !== null;
+  const isCaptureSelected = isCaptureProfileId(selectedId) || selectedCaptureId !== null;
 
-  // Check if a bytes buffer is selected (for framing options)
-  const selectedBuffer = selectedCaptureId ? buffers.find((b) => b.id === selectedCaptureId) : null;
-  const isBytesBufferSelected = selectedBuffer?.kind === "bytes" && !checkedSourceId;
+  // Check if a bytes capture is selected (for framing options)
+  const selectedCapture = selectedCaptureId ? captures.find((b) => b.id === selectedCaptureId) : null;
+  const isBytesCaptureSelected = selectedCapture?.kind === "bytes" && !checkedSourceId;
 
-  // Handle OK button click for buffer selection - pass framing config if configured
-  const handleBufferOkClick = () => {
-    if (isBytesBufferSelected && onBufferFramingConfig) {
-      onBufferFramingConfig(framingConfig);
+  // Handle OK button click for capture selection - pass framing config if configured
+  const handleCaptureOkClick = () => {
+    if (isBytesCaptureSelected && onCaptureFramingConfig) {
+      onCaptureFramingConfig(framingConfig);
     }
     onClose();
   };
@@ -1514,7 +1514,7 @@ export default function IoSourcePickerDialog({
             checkedSourceIds={checkedSourceIds}
             defaultId={defaultId}
             isLoading={isLoading}
-            bufferNames={new Map(buffers.map((b) => [b.id, b.name]))}
+            captureNames={new Map(captures.map((b) => [b.id, b.name]))}
             onSelectSource={(id) => {
               if (id === null) {
                 hasUserExpandedRef.current = true;
@@ -1525,7 +1525,7 @@ export default function IoSourcePickerDialog({
               setCheckedReaderIds([]);
               setValidationError(null);
               if (id !== null) {
-                setSelectedBufferId(null);
+                setSelectedCaptureId(null);
               }
             }}
             onToggleSource={handleToggleReader}
@@ -1632,20 +1632,20 @@ export default function IoSourcePickerDialog({
             activeMultiSourceSessions={activeMultiSourceSessions}
             onSelectMultiSourceSession={handleSelectMultiSourceSession}
             disabledProfiles={disabledProfiles}
-            hideExternal={hideBuffers}
-            hideRecorded={hideBuffers}
+            hideExternal={hideCaptures}
+            hideRecorded={hideCaptures}
             profileUsage={profileUsage}
-            renderAfterSessions={!hideBuffers ? (
+            renderAfterSessions={!hideCaptures ? (
               <CaptureList
-                buffers={buffers}
+                captures={captures}
                 selectedCaptureId={selectedCaptureId}
                 checkedSourceId={checkedSourceId}
                 checkedSourceIds={checkedSourceIds}
-                onSelectBuffer={handleSelectBuffer}
-                onDeleteBuffer={handleDeleteBuffer}
-                onClearAllBuffers={handleClearAllBuffers}
-                onBufferRenamed={() => listOrphanedCaptures().then(setBuffers).catch(console.error)}
-                onBufferPersistenceChanged={() => listOrphanedCaptures().then(setBuffers).catch(console.error)}
+                onSelectCapture={handleSelectCapture}
+                onDeleteCapture={handleDeleteCapture}
+                onClearAllCaptures={handleClearAllCaptures}
+                onCaptureRenamed={() => listOrphanedCaptures().then(setCaptures).catch(console.error)}
+                onCapturePersistenceChanged={() => listOrphanedCaptures().then(setCaptures).catch(console.error)}
                 busConfig={selectedCaptureId ? deviceBusConfigMap.get(selectedCaptureId) : undefined}
                 onBusConfigChange={(config) => {
                   if (selectedCaptureId) {
@@ -1654,7 +1654,7 @@ export default function IoSourcePickerDialog({
                 }}
                 isProbing={selectedCaptureId ? deviceProbeLoadingMap.get(selectedCaptureId) ?? false : false}
                 probeError={selectedCaptureId ? deviceProbeResultMap.get(selectedCaptureId)?.error ?? null : null}
-                activeSessionBufferMap={new Map(
+                activeSessionCaptureMap={new Map(
                   activeMultiSourceSessions
                     .filter((s) => s.sourceType === "capture")
                     .flatMap((s) => {
@@ -1682,8 +1682,8 @@ export default function IoSourcePickerDialog({
                 profileBookmarks={profileBookmarks}
               />
 
-              {/* Only show FramingOptions/FilterOptions for bytes buffer - per-interface framing is now in SingleBusConfig */}
-              {isBytesBufferSelected && (
+              {/* Only show FramingOptions/FilterOptions for bytes capture - per-interface framing is now in SingleBusConfig */}
+              {isBytesCaptureSelected && (
                 <>
                   <FramingOptions
                     checkedProfile={checkedProfile}
@@ -1692,7 +1692,7 @@ export default function IoSourcePickerDialog({
                     isLoading={isLoading}
                     framingConfig={framingConfig}
                     onFramingConfigChange={setFramingConfig}
-                    isBytesBufferSelected={isBytesBufferSelected}
+                    isBytesCaptureSelected={isBytesCaptureSelected}
                   />
 
                   <FilterOptions
@@ -1702,7 +1702,7 @@ export default function IoSourcePickerDialog({
                     isLoading={isLoading}
                     minFrameLength={minFrameLength}
                     onMinFrameLengthChange={setMinFrameLength}
-                    isBytesBufferSelected={isBytesBufferSelected}
+                    isBytesCaptureSelected={isBytesCaptureSelected}
                   />
                 </>
               )}
@@ -1716,9 +1716,9 @@ export default function IoSourcePickerDialog({
           loadProfileId={loadProfileId}
           checkedSourceId={checkedSourceId}
           checkedProfile={checkedProfile}
-          isBufferSelected={isBufferSelected}
-          isCheckedProfileLive={isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileBuffer)}
-          isCheckedProfileStopped={isCheckedProfileStopped && !isCheckedProfileBuffer}
+          isCaptureSelected={isCaptureSelected}
+          isCheckedProfileLive={isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileCapture)}
+          isCheckedProfileStopped={isCheckedProfileStopped && !isCheckedProfileCapture}
           isImporting={isImporting}
           importError={importError}
           onImport={handleImport}
@@ -1726,17 +1726,17 @@ export default function IoSourcePickerDialog({
           onConnectClick={handleConnectClick}
           onJoinClick={handleJoinClick}
           onStartClick={handleStartClick}
-          onClose={handleBufferOkClick}
+          onClose={handleCaptureOkClick}
           onSkip={onSkip}
           multiSelectMode={isMultiBusMode}
           multiSelectCount={checkedSourceIds.length}
           onMultiConnectClick={handleMultiWatchClick}
-          onRelease={subscriberId && (isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileBuffer)) ? handleRelease : undefined}
+          onRelease={subscriberId && (isCheckedProfileLive || (isCheckedProfileStopped && isCheckedProfileCapture)) ? handleRelease : undefined}
           // Only show Restart for profiles, not for selecting existing sessions
           onRestartClick={isCheckedProfileLive && !isCheckedProfileStopped && !checkedMultiSourceSession ? handleRestartClick : undefined}
           isMultiSourceLive={isMultiSourceLive}
           onMultiRestartClick={isMultiSourceLive ? handleMultiRestartClick : undefined}
-          onBufferConnectClick={selectedCaptureId ? handleBufferConnectClick : undefined}
+          onCaptureConnectClick={selectedCaptureId ? handleCaptureConnectClick : undefined}
           onConnectOnlyClick={checkedSourceId && onConnect ? () => {
             onConnect(checkedSourceId);
             onClose();

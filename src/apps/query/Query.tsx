@@ -62,21 +62,21 @@ export default function Query() {
   const [favourites, setFavourites] = useState<TimeRangeFavorite[]>([]);
 
   // Buffer sources state
-  const [buffers, setBuffers] = useState<CaptureMetadata[]>([]);
-  const [selectedCaptureId, setSelectedBufferId] = useState<string | null>(null);
+  const [captures, setCaptures] = useState<CaptureMetadata[]>([]);
+  const [selectedCaptureId, setSelectedCaptureId] = useState<string | null>(null);
 
-  // Load available buffers on mount
+  // Load available captures on mount
   useEffect(() => {
-    const loadBuffers = async () => {
+    const loadCaptures = async () => {
       try {
         const all = await listCaptures();
-        // Only show frame buffers with data
-        setBuffers(all.filter((b) => b.kind === "frames" && b.count > 0));
+        // Only show frame captures with data
+        setCaptures(all.filter((b) => b.kind === "frames" && b.count > 0));
       } catch (e) {
-        console.error("Failed to load buffers:", e);
+        console.error("Failed to load captures:", e);
       }
     };
-    loadBuffers();
+    loadCaptures();
   }, []);
 
   // Time bounds state (for query filtering)
@@ -242,7 +242,7 @@ export default function Query() {
   // Clear buffer selection when a postgres profile is selected, and vice versa
   useEffect(() => {
     if (sourceProfileId && selectedCaptureId) {
-      setSelectedBufferId(null);
+      setSelectedCaptureId(null);
     }
   }, [sourceProfileId, selectedCaptureId]);
 
@@ -423,8 +423,8 @@ export default function Query() {
             favourites={favourites}
             timeBounds={timeBounds}
             onTimeBoundsChange={handleTimeBoundsChangeWrapper}
-            buffers={buffers}
-            onSelectBuffer={setSelectedBufferId}
+            captures={captures}
+            onSelectCapture={setSelectedCaptureId}
           />
         )}
         {activeTab === "queue" && (

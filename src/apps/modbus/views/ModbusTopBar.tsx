@@ -31,7 +31,7 @@ interface Props {
   onOpenCatalogPicker: () => void;
 
   // Clear
-  onClearBuffer?: () => void;
+  onClearCapture?: () => void;
   hasData?: boolean;
 
   // Poll info
@@ -58,7 +58,7 @@ export default function ModbusTopBar({
   onPlay,
   onPause,
   onLeave,
-  onClearBuffer,
+  onClearCapture,
   hasData = false,
   transportMode,
   catalogs,
@@ -88,7 +88,7 @@ export default function ModbusTopBar({
         onPlay,
         onPause,
         onLeave,
-        onClearBuffer,
+        onClearCapture,
         hasData,
       }}
       framePicker={{

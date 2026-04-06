@@ -347,7 +347,7 @@ export default function Graph() {
     isDetached,
     joinerCount,
     handleLeave,
-    resumeWithNewBuffer,
+    resumeWithNewCapture,
     // Watch state
     isWatching,
     watchFrameCount,
@@ -518,7 +518,7 @@ export default function Graph() {
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
           onPause={stopWatch}
-          onPlay={resumeWithNewBuffer}
+          onPlay={resumeWithNewCapture}
           onLeave={!isDetached ? handleLeave : undefined}
           onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
           catalogs={catalogs}

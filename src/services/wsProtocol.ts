@@ -21,7 +21,7 @@ export const MsgType = {
   SessionError: 0x04,
   PlaybackPosition: 0x05,
   DeviceConnected: 0x06,
-  BufferChanged: 0x07,
+  CaptureChanged: 0x07,
   SessionLifecycle: 0x08,
   SessionInfo: 0x09,
   Reconfigured: 0x0a,
@@ -341,7 +341,7 @@ export function decodeDeviceConnected(payload: DataView): {
   return { source_type, address, bus };
 }
 
-export function decodeBufferChanged(payload: Uint8Array): string {
+export function decodeCaptureChanged(payload: Uint8Array): string {
   return new TextDecoder().decode(payload);
 }
 

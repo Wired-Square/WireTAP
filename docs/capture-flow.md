@@ -213,7 +213,7 @@ the source picker.
 destroy_session(session_id)
   ├─ finalize_session_captures(session_id)        // if still streaming
   ├─ orphan_captures_for_session(session_id)      // clears ownership
-  │      └─ emit_buffer_orphaned_as_changed       // post_session cache + WS BufferChanged
+  │      └─ emit_capture_orphaned_as_changed       // post_session cache + WS CaptureChanged
   └─ remove from IO_SESSIONS
 ```
 
@@ -303,11 +303,10 @@ TypeScript wrappers mirror the session-scoped API:
 
 See [src/api/capture.ts](../src/api/capture.ts) for the full list.
 
-The WS `BufferChanged` message (`MsgType 0x07`) signals "something changed
+The WS `CaptureChanged` message (`MsgType 0x07`) signals "something changed
 about this session's captures"; the frontend reacts by re-querying
 `listCaptures()` or `getSessionCaptureIds` rather than trying to diff a
-payload. (The wire-protocol name `BufferChanged` is preserved until a
-protocol version bump.)
+payload.
 
 ---
 

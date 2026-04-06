@@ -14,7 +14,7 @@ type Props = {
   loadProfileId: string | null;
   checkedSourceId: string | null;
   checkedProfile: IOProfile | null;
-  isBufferSelected: boolean;
+  isCaptureSelected: boolean;
   /** Whether the checked profile has an active session (is "live") */
   isCheckedProfileLive?: boolean;
   /** Whether the checked profile's session is stopped (but still exists) */
@@ -51,7 +51,7 @@ type Props = {
   /** Called when user clicks Connect in connect mode (creates session without streaming) */
   onConnectOnlyClick?: () => void;
   /** Called when user clicks Connect for a buffer source (with bus mappings) */
-  onBufferConnectClick?: () => void;
+  onCaptureConnectClick?: () => void;
 };
 
 export default function ActionButtons({
@@ -60,7 +60,7 @@ export default function ActionButtons({
   loadProfileId,
   checkedSourceId,
   checkedProfile,
-  isBufferSelected,
+  isCaptureSelected,
   isCheckedProfileLive,
   isCheckedProfileStopped,
   isImporting,
@@ -80,13 +80,13 @@ export default function ActionButtons({
   isMultiSourceLive = false,
   onMultiRestartClick,
   onConnectOnlyClick,
-  onBufferConnectClick,
+  onCaptureConnectClick,
 }: Props) {
   const isCsvSelected = checkedSourceId === CSV_EXTERNAL_ID;
   const isCheckedRealtime = checkedProfile ? isRealtimeProfile(checkedProfile) : false;
 
   // Show release button when there's a selection that can be released
-  const hasSelection = checkedSourceId !== null || isBufferSelected || (multiSelectMode && multiSelectCount > 0);
+  const hasSelection = checkedSourceId !== null || isCaptureSelected || (multiSelectMode && multiSelectCount > 0);
   const showRelease = onRelease && hasSelection && !isLoading;
 
   // Leave button component for inline use - red button that leaves the session
@@ -181,7 +181,7 @@ export default function ActionButtons({
         // Buffer source selected — show Connect (with bus mappings)
         <div className="flex gap-2">
           <button
-            onClick={onBufferConnectClick ?? onJoinClick ?? onClose}
+            onClick={onCaptureConnectClick ?? onJoinClick ?? onClose}
             className={`flex-1 ${successButtonBase}`}
           >
             <Plug className={iconMd} />
@@ -268,15 +268,15 @@ export default function ActionButtons({
             {releaseButton}
           </div>
         )
-      ) : isBufferSelected ? (
+      ) : isCaptureSelected ? (
         // Buffer is selected - show Connect if bus mapping available, otherwise OK
         <div className="flex gap-2">
           <button
-            onClick={onBufferConnectClick ?? onClose}
-            className={`flex-1 ${onBufferConnectClick ? successButtonBase : primaryButtonBase}`}
+            onClick={onCaptureConnectClick ?? onClose}
+            className={`flex-1 ${onCaptureConnectClick ? successButtonBase : primaryButtonBase}`}
           >
-            {onBufferConnectClick ? <Plug className={iconMd} /> : <Check className={iconMd} />}
-            <span>{onBufferConnectClick ? "Connect" : "OK"}</span>
+            {onCaptureConnectClick ? <Plug className={iconMd} /> : <Check className={iconMd} />}
+            <span>{onCaptureConnectClick ? "Connect" : "OK"}</span>
           </button>
           {releaseButton}
         </div>

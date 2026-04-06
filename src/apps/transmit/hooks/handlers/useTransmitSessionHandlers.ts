@@ -7,22 +7,22 @@ import { useCallback } from "react";
 
 export interface UseTransmitSessionHandlersParams {
   stopWatch: () => Promise<void>;
-  resumeWithNewBuffer: () => Promise<void>;
+  resumeWithNewCapture: () => Promise<void>;
 }
 
 export function useTransmitSessionHandlers({
   stopWatch,
-  resumeWithNewBuffer,
+  resumeWithNewCapture,
 }: UseTransmitSessionHandlersParams) {
   // Handle stop - stop watching (used by TopBar)
   const handleStop = useCallback(async () => {
     await stopWatch();
   }, [stopWatch]);
 
-  // Handle resume - use resumeWithNewBuffer to return to live mode (used by TopBar)
+  // Handle resume - use resumeWithNewCapture to return to live mode (used by TopBar)
   const handleResume = useCallback(async () => {
-    await resumeWithNewBuffer();
-  }, [resumeWithNewBuffer]);
+    await resumeWithNewCapture();
+  }, [resumeWithNewCapture]);
 
   return {
     handleStop,

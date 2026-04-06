@@ -320,7 +320,7 @@ export interface AppSettings {
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
   // Buffer persistence
-  clear_buffers_on_start?: boolean;
+  clear_captures_on_start?: boolean;
   /** Buffer storage backend ("sqlite" is the only option for now) */
   buffer_storage?: string;
   // Decoder buffer limits
@@ -388,7 +388,7 @@ function normalizeSettings(
     telemetry_enabled: settings.telemetry_enabled ?? false,
     telemetry_consent_given: settings.telemetry_consent_given ?? false,
     // Buffer persistence
-    clear_buffers_on_start: settings.clear_buffers_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
+    clear_captures_on_start: settings.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
     buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
     // Decoder buffer limits
     decoder_max_unmatched_frames: settings.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,

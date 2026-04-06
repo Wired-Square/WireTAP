@@ -14,7 +14,7 @@ import {
 export interface UseTransmitHandlersParams {
   // Session manager actions (TopBar only)
   stopWatch: () => Promise<void>;
-  resumeWithNewBuffer: () => Promise<void>;
+  resumeWithNewCapture: () => Promise<void>;
 
   // Dialog control
   openIoPicker: () => void;
@@ -29,7 +29,7 @@ export function useTransmitHandlers(
   // Session handlers (stop, resume - for TopBar)
   const sessionHandlers = useTransmitSessionHandlers({
     stopWatch: params.stopWatch,
-    resumeWithNewBuffer: params.resumeWithNewBuffer,
+    resumeWithNewCapture: params.resumeWithNewCapture,
   });
 
   // UI handlers (tabs, dialogs)

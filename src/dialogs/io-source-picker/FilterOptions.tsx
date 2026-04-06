@@ -23,7 +23,7 @@ type Props = {
   /** Called when filter config changes */
   onMinFrameLengthChange: (minLength: number) => void;
   /** Whether a bytes buffer is selected */
-  isBytesBufferSelected?: boolean;
+  isBytesCaptureSelected?: boolean;
 };
 
 /** Check if a profile supports filtering (serial-based sources) */
@@ -46,7 +46,7 @@ export default function FilterOptions({
   isLoading,
   minFrameLength,
   onMinFrameLengthChange,
-  isBytesBufferSelected = false,
+  isBytesCaptureSelected = false,
 }: Props) {
   // Check if any selected profile in multi-bus mode supports filtering
   const anyMultiBusProfileSupportsFiltering = checkedSourceIds.some((id) => {
@@ -59,7 +59,7 @@ export default function FilterOptions({
   // 2. Any profile in multi-bus selection supports filtering, OR
   // 3. A bytes buffer is selected
   // Don't show while loading
-  const showFilter = (supportsFiltering(checkedProfile) || anyMultiBusProfileSupportsFiltering || isBytesBufferSelected) && !isLoading;
+  const showFilter = (supportsFiltering(checkedProfile) || anyMultiBusProfileSupportsFiltering || isBytesCaptureSelected) && !isLoading;
   if (!showFilter) {
     return null;
   }

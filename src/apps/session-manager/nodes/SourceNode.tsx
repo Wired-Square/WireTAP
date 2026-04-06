@@ -48,9 +48,9 @@ function SourceNode({ data, selected }: SourceNodeProps) {
     ? "bg-purple-500/10"
     : "bg-[var(--bg-surface)]";
 
-  const isBuffer = sourceType === "sqlite";
+  const isCapture = sourceType === "sqlite";
   const Icon = isRealtime ? Wifi : Database;
-  const iconColour = isBuffer ? "text-cyan-400" : isRealtime ? "text-purple-400" : "text-green-400";
+  const iconColour = isCapture ? "text-cyan-400" : isRealtime ? "text-purple-400" : "text-green-400";
 
   return (
     <div

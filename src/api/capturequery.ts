@@ -17,9 +17,9 @@ import type {
 } from "./dbquery";
 
 /**
- * Query for byte changes in a specific frame within a buffer.
+ * Query for byte changes in a specific frame within a capture.
  *
- * Time bounds are in microseconds (matching buffer timestamp_us).
+ * Time bounds are in microseconds (matching capture timestamp_us).
  */
 export async function queryByteChangesCapture(
   captureId: string,
@@ -42,7 +42,7 @@ export async function queryByteChangesCapture(
 }
 
 /**
- * Query for frame payload changes within a buffer.
+ * Query for frame payload changes within a capture.
  *
  * Returns timestamps where any byte in the frame's payload changed.
  */
@@ -65,7 +65,7 @@ export async function queryFrameChangesCapture(
 }
 
 /**
- * Query for mirror validation mismatches within a buffer.
+ * Query for mirror validation mismatches within a capture.
  *
  * Tolerance is in microseconds (frontend converts from ms).
  */
@@ -92,7 +92,7 @@ export async function queryMirrorValidationCapture(
 }
 
 /**
- * Query mux statistics for a multiplexed frame within a buffer.
+ * Query mux statistics for a multiplexed frame within a capture.
  *
  * Groups payloads by mux selector byte and computes per-byte and optional
  * 16-bit word statistics for each mux case.
@@ -122,7 +122,7 @@ export async function queryMuxStatisticsCapture(
 }
 
 /**
- * Query for first and last occurrence of a frame within a buffer.
+ * Query for first and last occurrence of a frame within a capture.
  */
 export async function queryFirstLastCapture(
   captureId: string,
@@ -141,7 +141,7 @@ export async function queryFirstLastCapture(
 }
 
 /**
- * Query frame transmission frequency within a buffer.
+ * Query frame transmission frequency within a capture.
  */
 export async function queryFrequencyCapture(
   captureId: string,
@@ -164,7 +164,7 @@ export async function queryFrequencyCapture(
 }
 
 /**
- * Query byte value distribution within a buffer.
+ * Query byte value distribution within a capture.
  */
 export async function queryDistributionCapture(
   captureId: string,
@@ -185,7 +185,7 @@ export async function queryDistributionCapture(
 }
 
 /**
- * Query for transmission gaps within a buffer.
+ * Query for transmission gaps within a capture.
  */
 export async function queryGapAnalysisCapture(
   captureId: string,
@@ -208,7 +208,7 @@ export async function queryGapAnalysisCapture(
 }
 
 /**
- * Search for a byte pattern across all frame IDs within a buffer.
+ * Search for a byte pattern across all frame IDs within a capture.
  */
 export async function queryPatternSearchCapture(
   captureId: string,

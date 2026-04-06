@@ -30,8 +30,8 @@ interface Props {
   favourites: TimeRangeFavorite[];
   timeBounds: TimeBounds;
   onTimeBoundsChange: (bounds: TimeBounds) => void;
-  buffers?: CaptureMetadata[];
-  onSelectBuffer?: (captureId: string | null) => void;
+  captures?: CaptureMetadata[];
+  onSelectCapture?: (captureId: string | null) => void;
 }
 
 export default function QueryBuilderPanel({
@@ -41,8 +41,8 @@ export default function QueryBuilderPanel({
   favourites,
   timeBounds,
   onTimeBoundsChange,
-  buffers = [],
-  onSelectBuffer,
+  captures = [],
+  onSelectCapture,
 }: Props) {
   // Store selectors
   const queryType = useQueryStore((s) => s.queryType);
@@ -528,16 +528,16 @@ LIMIT ${limitOverride.toLocaleString()}`;
         const patternStr = queryParams.pattern
           .map((b, i) => (queryParams.patternMask[i] === 0 ? "??" : b.toString(16).toUpperCase().padStart(2, "0")))
           .join(" ") || "(empty)";
-        return `-- SQLite buffer query (pattern matching in Rust)
+        return `-- SQLite capture query (pattern matching in Rust)
 SELECT timestamp_us, frame_id, is_extended, payload
 FROM frames
-WHERE buffer_id = ?${timeConditions}
+WHERE capture_id = ?${timeConditions}
 ORDER BY rowid
 LIMIT ${limitOverride.toLocaleString()}
 -- Pattern: ${patternStr}`;
       }
 
-      return `-- Query type "${queryType}" not yet implemented for buffers`;
+      return `-- Query type "${queryType}" not yet implemented for captures`;
     }
 
     // PostgreSQL preview
@@ -693,19 +693,19 @@ LIMIT ${limitOverride.toLocaleString()}
     <div className="flex flex-col h-full">
       {/* Scrollable form content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {/* Buffer Source Selector (shown when buffers are available) */}
-        {buffers.length > 0 && (
+        {/* Buffer Source Selector (shown when captures are available) */}
+        {captures.length > 0 && (
           <div>
             <label className={labelSmallMuted}>Capture Source</label>
             <div className={`${flexRowGap2} mt-1`}>
               <HardDrive className={`${iconSm} ${textSecondary} flex-shrink-0`} />
               <select
                 value={captureId ?? ""}
-                onChange={(e) => onSelectBuffer?.(e.target.value || null)}
+                onChange={(e) => onSelectCapture?.(e.target.value || null)}
                 className={`${inputBase} flex-1`}
               >
                 <option value="">{profileId ? "Using PostgreSQL profile" : "— Select capture —"}</option>
-                {buffers.map((b) => (
+                {captures.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name} ({b.count.toLocaleString()} frames)
                   </option>

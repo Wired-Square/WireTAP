@@ -9,9 +9,9 @@ export const WINDOW_EVENTS = {
   // Settings events
   SETTINGS_CHANGED: 'settings:changed',
 
-  // Buffer events
-  BUFFER_CHANGED: 'buffer:changed',
-  BUFFER_METADATA_UPDATED: 'buffer:metadata-updated',
+  // Capture events
+  CAPTURE_CHANGED: 'capture:changed',
+  CAPTURE_METADATA_UPDATED: 'capture:metadata-updated',
 
   // Window lifecycle events
   WINDOW_OPENED: 'window:opened',
@@ -51,7 +51,7 @@ export interface LoadHexDataPayload {
 }
 
 export interface CaptureMetadataUpdatedPayload {
-  /** Buffer ID that was updated */
+  /** Capture ID that was updated */
   captureId: string;
   /** New name (if renamed) */
   name?: string;
@@ -60,11 +60,11 @@ export interface CaptureMetadataUpdatedPayload {
 }
 
 export interface CaptureChangedPayload {
-  /** Null if buffer was cleared */
+  /** Null if capture was cleared */
   metadata: CaptureMetadata | null;
   /** What triggered this change: "ingested", "streamed", "imported", "cleared" */
   action?: "ingested" | "streamed" | "imported" | "cleared";
-  /** Buffer IDs that were deleted (for cross-window cleanup) */
-  deletedBufferIds?: string[];
+  /** Capture IDs that were deleted (for cross-window cleanup) */
+  deletedCaptureIds?: string[];
   timestamp?: number;
 }

@@ -59,11 +59,11 @@ type Props = {
   /** Whether the current buffer is persistent (pinned) */
   capturePersistent?: boolean;
   /** Called when user toggles buffer pin */
-  onToggleBufferPin?: () => void;
+  onToggleCapturePin?: () => void;
   /** Called when user renames the buffer */
-  onRenameBuffer?: (newName: string) => void;
+  onRenameCapture?: (newName: string) => void;
   /** Called when user clicks the clear/trash button (session-level) */
-  onClearBuffer?: () => void;
+  onClearCapture?: () => void;
   /** Whether the app has data that can be cleared */
   hasData?: boolean;
 
@@ -131,9 +131,9 @@ export default function DecoderTopBar({
   onOpenBookmarkPicker,
   isCaptureMode = false,
   capturePersistent = false,
-  onToggleBufferPin,
-  onRenameBuffer,
-  onClearBuffer,
+  onToggleCapturePin,
+  onRenameCapture,
+  onClearCapture,
   hasData = false,
   frameCount,
   uniqueFrameCount,
@@ -190,9 +190,9 @@ export default function DecoderTopBar({
         onOpenBookmarkPicker,
         isCaptureMode,
         capturePersistent,
-        onToggleBufferPin,
-        onRenameBuffer,
-        onClearBuffer,
+        onToggleCapturePin,
+        onRenameCapture,
+        onClearCapture,
         hasData,
       }}
       framePicker={{

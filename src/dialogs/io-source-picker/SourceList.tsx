@@ -16,7 +16,7 @@ import { AlertCircle } from "lucide-react";
  * Map buffer device type to a human-readable storage backend label.
  * Extensible for future buffer mechanisms (e.g., "parquet", "memory").
  */
-function getBufferStorageLabel(_sourceType: string): string {
+function getCaptureStorageLabel(_sourceType: string): string {
   // Currently all buffers use SQLite. When new buffer backends are added,
   // the backend should report a storage_type field on ActiveSessionInfo
   // and this function should switch on it.
@@ -64,7 +64,7 @@ type Props = {
   /** Content to render after the Active Sessions section (e.g., CaptureList) */
   renderAfterSessions?: ReactNode;
   /** Map of buffer ID to display name (for resolving buffer source names in active sessions) */
-  bufferNames?: Map<string, string>;
+  captureNames?: Map<string, string>;
 };
 
 export default function SourceList({
@@ -87,7 +87,7 @@ export default function SourceList({
   allowMultiSelect = true,
   profileUsage,
   renderAfterSessions,
-  bufferNames,
+  captureNames,
 }: Props) {
   // All profiles are read profiles now (mode field removed), separate by type
   const readProfiles = ioProfiles;
@@ -139,11 +139,11 @@ export default function SourceList({
     } else if (isCaptureSession && checkedMultiSourceSession) {
       // Buffer session — show buffer ID + source name from buffer metadata
       displayName = checkedMultiSourceSession.sessionId;
-      const storageBackend = getBufferStorageLabel(checkedMultiSourceSession.sourceType);
+      const storageBackend = getCaptureStorageLabel(checkedMultiSourceSession.sourceType);
       // Resolve buffer name from metadata (e.g., "f_bc38de") via captureId or sourceProfileIds
       const captureId = checkedMultiSourceSession.captureId
         ?? (checkedMultiSourceSession.sourceProfileIds ?? [])[0];
-      const captureName = captureId ? bufferNames?.get(captureId) : undefined;
+      const captureName = captureId ? captureNames?.get(captureId) : undefined;
       const profileName = captureName || storageBackend;
       subtitle = `└─ ${profileName} (${storageBackend})`;
       icon = <Database className={`${iconMd} text-[color:var(--text-cyan)]`} />;
@@ -249,7 +249,7 @@ export default function SourceList({
   // Get display info for a session
   const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
     const isMultiSource = session.sourceType === "realtime";
-    const isBuffer = session.sourceType === "capture";
+    const isCapture = session.sourceType === "capture";
     // Always use session ID as the primary display name
     const displayName = session.sessionId;
 
@@ -280,12 +280,12 @@ export default function SourceList({
         indicatorColour: "border-[color:var(--text-purple)]",
         dotColour: "bg-[var(--text-purple)]",
       };
-    } else if (isBuffer) {
+    } else if (isCapture) {
       // Buffer session — cyan database icon, resolve name from buffer metadata
-      const storageBackend = getBufferStorageLabel(session.sourceType);
+      const storageBackend = getCaptureStorageLabel(session.sourceType);
       const captureId = session.captureId
         ?? (session.sourceProfileIds ?? [])[0];
-      const captureName = captureId ? bufferNames?.get(captureId) : undefined;
+      const captureName = captureId ? captureNames?.get(captureId) : undefined;
       const profileName = captureName || storageBackend;
       return {
         displayName,

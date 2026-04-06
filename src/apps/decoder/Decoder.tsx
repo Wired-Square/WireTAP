@@ -375,7 +375,7 @@ export default function Decoder() {
   }, [setPlaybackSpeed]);
 
   // State to trigger buffer transition after stream ends
-  const [pendingBufferTransition, setPendingBufferTransition] = useState(false);
+  const [pendingCaptureTransition, setPendingCaptureTransition] = useState(false);
 
   // Handle stream ended - update buffer metadata and trigger transition if needed
   const handleStreamEnded = useCallback(async (payload: StreamEndedInfo) => {
@@ -386,7 +386,7 @@ export default function Decoder() {
 
       // Notify other windows about the buffer change
       if (meta) {
-        await emit(WINDOW_EVENTS.BUFFER_CHANGED, {
+        await emit(WINDOW_EVENTS.CAPTURE_CHANGED, {
           metadata: meta,
           action: "stream-ended",
         });
@@ -395,7 +395,7 @@ export default function Decoder() {
       // Only auto-transition to buffer replay if stream completed naturally
       // Don't transition if user manually stopped (reason === "stopped")
       if (payload.reason === "complete") {
-        setPendingBufferTransition(true);
+        setPendingCaptureTransition(true);
       }
     }
   }, []);
@@ -426,14 +426,14 @@ export default function Decoder() {
         setCaptureMetadata(meta);
 
         // Notify other windows about the buffer change
-        await emit(WINDOW_EVENTS.BUFFER_CHANGED, {
+        await emit(WINDOW_EVENTS.CAPTURE_CHANGED, {
           metadata: meta,
           action: "ingested",
         });
 
         // Close the dialog and transition to buffer replay mode
         dialogs.ioSessionPicker.close();
-        setPendingBufferTransition(true);
+        setPendingCaptureTransition(true);
       }
     }
   }, [dialogs.ioSessionPicker]);
@@ -461,9 +461,9 @@ export default function Decoder() {
   // capture; we fetch its metadata here so the SessionButton label shows the
   // capture id instead of the generic "Capture" fallback, and the tooltip/
   // timeline surfaces the correct time range. Mirrors Discovery's handler.
-  const handleSessionDestroyed = useCallback(async (orphanedBufferIds: string[]) => {
-    if (orphanedBufferIds.length === 0) return;
-    const captureId = orphanedBufferIds[0];
+  const handleSessionDestroyed = useCallback(async (orphanedCaptureIds: string[]) => {
+    if (orphanedCaptureIds.length === 0) return;
+    const captureId = orphanedCaptureIds[0];
     try {
       const meta = await getCaptureMetadata(captureId);
       if (meta) {
@@ -527,7 +527,7 @@ export default function Decoder() {
     isLoading,
     // Session switching methods
     stopWatch,
-    resumeWithNewBuffer,
+    resumeWithNewCapture,
     selectProfile,
     watchSource,
     // Bookmark methods
@@ -553,7 +553,7 @@ export default function Decoder() {
     setTimeRange,
     seek,
     seekByFrame,
-    switchToBufferReplay,
+    switchToCaptureReplay,
   } = session;
 
   // Merged buffer metadata using session values for cross-app timeline sync
@@ -727,10 +727,10 @@ export default function Decoder() {
   });
 
   // Handle clear buffer — app-specific cleanup + centralised buffer clear
-  const handleClearBuffer = useCallback(async () => {
+  const handleClearCapture = useCallback(async () => {
     clearFrames();
-    await manager.handleClearBuffer();
-  }, [clearFrames, manager.handleClearBuffer]);
+    await manager.handleClearCapture();
+  }, [clearFrames, manager.handleClearCapture]);
 
   // Centralised IO picker handlers
   const ioPickerProps = useIOSourcePickerHandlers({
@@ -785,10 +785,10 @@ export default function Decoder() {
 
   // Effect to handle auto-transition to buffer replay after stream ends
   useEffect(() => {
-    if (pendingBufferTransition && !isDecoding) {
-      setPendingBufferTransition(false);
+    if (pendingCaptureTransition && !isDecoding) {
+      setPendingCaptureTransition(false);
       // Transition to buffer replay mode
-      switchToBufferReplay(playbackSpeed).then(async () => {
+      switchToCaptureReplay(playbackSpeed).then(async () => {
         // Refresh buffer metadata after transition
         const sess = useSessionStore.getState().sessions[sessionId!];
         const bid = sess?.capture?.id;
@@ -805,7 +805,7 @@ export default function Decoder() {
         setCurrentFrameIndex(0);
       }).catch((e) => console.error("Failed to switch to buffer replay:", e));
     }
-  }, [pendingBufferTransition, isDecoding, switchToBufferReplay, playbackSpeed, setIoProfile, updateCurrentTime, setCurrentFrameIndex]);
+  }, [pendingCaptureTransition, isDecoding, switchToCaptureReplay, playbackSpeed, setIoProfile, updateCurrentTime, setCurrentFrameIndex]);
 
   // Flush any pending frames when decoding stops to ensure nothing is lost
   useEffect(() => {
@@ -859,7 +859,7 @@ export default function Decoder() {
   useEffect(() => {
     const setupListener = async () => {
       const unlisten = await listen<CaptureChangedPayload>(
-        WINDOW_EVENTS.BUFFER_CHANGED,
+        WINDOW_EVENTS.CAPTURE_CHANGED,
         (event) => {
           setCaptureMetadata(event.payload.metadata);
         }
@@ -1010,11 +1010,11 @@ export default function Decoder() {
             outputBusToSource={outputBusToSource}
             isCaptureMode={isCaptureMode}
             capturePersistent={session.capturePersistent}
-            onToggleBufferPin={() => {
+            onToggleCapturePin={() => {
               const bid = captureMetadata?.id ?? session.captureId;
               if (bid) useSessionStore.getState().setSessionCapturePersistent(bid, !session.capturePersistent);
             }}
-            onRenameBuffer={(newName) => {
+            onRenameCapture={(newName) => {
               const bid = captureMetadata?.id ?? session.captureId;
               if (bid) {
                 const store = useSessionStore.getState();
@@ -1025,14 +1025,14 @@ export default function Decoder() {
                 }
               }
             }}
-            onClearBuffer={handleClearBuffer}
+            onClearCapture={handleClearCapture}
             hasData={frameList.length > 0 || hasCaptureData}
             speed={playbackSpeed}
             supportsSpeed={capabilities?.supports_speed_control ?? false}
             isStreaming={isDecoding || isLoading}
             isPaused={isPaused}
             isStopped={isStopped || canReturnToLive}
-            onPlay={isStopped || canReturnToLive ? resumeWithNewBuffer : handlers.handlePlay}
+            onPlay={isStopped || canReturnToLive ? resumeWithNewCapture : handlers.handlePlay}
             onPause={isDecoding ? handlers.handlePause : undefined}
             onLeave={!isDetached ? handleLeave : undefined}
             supportsTimeRange={capabilities?.supports_time_range ?? false}

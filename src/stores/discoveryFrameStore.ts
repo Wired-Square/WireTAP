@@ -69,8 +69,8 @@ interface DiscoveryFrameState {
   // Stream timing
   streamStartTimeUs: number | null;
 
-  // Buffer mode (for large datasets)
-  bufferMode: {
+  // Capture mode (for large datasets)
+  captureMode: {
     enabled: boolean;
     totalFrames: number;
   };
@@ -98,10 +98,10 @@ interface DiscoveryFrameState {
   setRenderFrozen: (frozen: boolean) => void;
   refreshFrozenView: () => void;
 
-  // Actions - Buffer mode
-  enableBufferMode: (totalFrames: number) => void;
-  disableBufferMode: () => void;
-  setFrameInfoFromBuffer: (frameInfoList: Array<{
+  // Actions - Capture mode
+  enableCaptureMode: (totalFrames: number) => void;
+  disableCaptureMode: () => void;
+  setFrameInfoFromCapture: (frameInfoList: Array<{
     frame_id: number;
     max_dlc: number;
     bus: number;
@@ -117,7 +117,7 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
   selectedFrames: new Set(),
   seenIds: new Set(),
   streamStartTimeUs: null,
-  bufferMode: { enabled: false, totalFrames: 0 },
+  captureMode: { enabled: false, totalFrames: 0 },
   renderFrozen: false,
 
   // Stream timing actions
@@ -463,26 +463,26 @@ export const useDiscoveryFrameStore = create<DiscoveryFrameState>((set, get) => 
     set({ frameVersion: get().frameVersion + 1 });
   },
 
-  // Buffer mode actions
-  enableBufferMode: (totalFrames) => {
-    tlog.debug(`[discoveryFrameStore] Enabling buffer mode with ${totalFrames} frames`);
+  // Capture mode actions
+  enableCaptureMode: (totalFrames) => {
+    tlog.debug(`[discoveryFrameStore] Enabling capture mode with ${totalFrames} frames`);
     _frameBuffer = [];
     set({
-      bufferMode: { enabled: true, totalFrames },
+      captureMode: { enabled: true, totalFrames },
       frameVersion: get().frameVersion + 1,
     });
   },
 
-  disableBufferMode: () => {
-    tlog.debug("[discoveryFrameStore] Disabling buffer mode");
+  disableCaptureMode: () => {
+    tlog.debug("[discoveryFrameStore] Disabling capture mode");
     set({
-      bufferMode: { enabled: false, totalFrames: 0 },
+      captureMode: { enabled: false, totalFrames: 0 },
     });
   },
 
-  setFrameInfoFromBuffer: (frameInfoList, protocol, activeSelectionSetSelectedIds = null) => {
+  setFrameInfoFromCapture: (frameInfoList, protocol, activeSelectionSetSelectedIds = null) => {
     const proto = protocol || 'can';
-    tlog.debug(`[discoveryFrameStore] Setting frame info from buffer: ${frameInfoList.length} unique frames, protocol: ${proto}`);
+    tlog.debug(`[discoveryFrameStore] Setting frame info from capture: ${frameInfoList.length} unique frames, protocol: ${proto}`);
 
     const nextSeenIds = new Set<string>();
     const nextFrameInfoMap = new Map<string, FrameInfo>();
