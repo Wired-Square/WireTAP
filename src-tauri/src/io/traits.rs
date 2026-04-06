@@ -162,13 +162,6 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
             tx_bytes: false,
             multi_source: false,
         },
-        "csv_file" | "csv-file" => InterfaceTraits {
-            temporal_mode: TemporalMode::Recorded,
-            protocols: vec![Protocol::Can],
-            tx_frames: false,
-            tx_bytes: false,
-            multi_source: false,
-        },
         "buffer" => InterfaceTraits {
             temporal_mode: TemporalMode::Buffer,
             protocols: vec![Protocol::Can],

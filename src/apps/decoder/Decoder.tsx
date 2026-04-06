@@ -72,6 +72,7 @@ export default function Decoder() {
   // Track when stream has completed to ignore stale time updates
   // Defined locally and passed to manager so it can reset it during watch operations
   const streamCompletedRef = useRef(false);
+  const autoImportRef = useRef(false);
 
   // Ref for scroll container (for scroll position preservation)
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -768,6 +769,7 @@ export default function Decoder() {
       },
       onClear: () => handlers.handleClear(),
       onPicker: () => dialogs.ioSessionPicker.open(),
+      onImportFromFile: () => { autoImportRef.current = true; dialogs.ioSessionPicker.open(); },
       onJumpToBookmark: async (bookmarkId) => {
         if (bookmarkProfileId) {
           const bookmarks = await getFavoritesForProfile(bookmarkProfileId);
@@ -843,7 +845,7 @@ export default function Decoder() {
       // Set default speed from the default read profile if it has one
       if (settings.default_read_profile && settings.io_profiles) {
         const profile = settings.io_profiles.find((p) => p.id === settings.default_read_profile);
-        if (profile && (profile.kind === "postgres" || profile.kind === "csv_file") && profile.connection?.default_speed) {
+        if (profile && profile.kind === "postgres" && profile.connection?.default_speed) {
           const defaultSpeed = parseFloat(profile.connection.default_speed) as PlaybackSpeed;
           setPlaybackSpeed(defaultSpeed);
         }
@@ -1150,6 +1152,8 @@ export default function Decoder() {
         loadSpeed={loadSpeed}
         onLoadSpeedChange={(speed) => setIngestSpeed(speed)}
         allowMultiSelect={true}
+        autoImport={autoImportRef.current}
+        onAutoImportConsumed={() => { autoImportRef.current = false; }}
       />
 
       <SpeedPickerDialog

@@ -149,7 +149,7 @@ export interface CreateIOSessionOptions {
   speed?: number;
   /** Maximum number of frames to read (optional) */
   limit?: number;
-  /** File path for file-based readers (e.g., csv_file) */
+  /** File path for file-based readers */
   filePath?: string;
   /** Use the shared buffer reader instead of a profile-based reader */
   useBuffer?: boolean;

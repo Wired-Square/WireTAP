@@ -146,17 +146,6 @@ const renderConnectionSummary = (profile: IOProfile) => {
     );
   }
 
-  if (profile.kind === "csv_file") {
-    const speed = c.default_speed || "0";
-    const speedLabel = speed === "0" ? "No limit" : `${speed}x`;
-
-    return (
-      <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="speed" value={speedLabel} />
-      </div>
-    );
-  }
-
   if (profile.kind === "serial") {
     const port = c.port || "(not set)";
     const baud = c.baud_rate || "115200";

@@ -465,7 +465,6 @@ export default function IOProfileDialog({
                 onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
               }
             >
-              {availableKinds.includes("csv_file") && <option value="csv_file">Data File</option>}
               {availableKinds.includes("framelink") && <option value="framelink">FrameLink</option>}
               {availableKinds.includes("gs_usb") && <option value="gs_usb">gs_usb (candleLight)</option>}
               {availableKinds.includes("gvret_tcp") && <option value="gvret_tcp">GVRET TCP</option>}
@@ -1219,48 +1218,6 @@ export default function IOProfileDialog({
                   </p>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* Data File */}
-          {profileForm.kind === "csv_file" && (
-            <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>Data File</h3>
-
-              <FormField label="File Path (optional)" variant="default">
-                <Input
-                  variant="default"
-                  value={profileForm.connection.file_path || ""}
-                  onChange={(e) => onUpdateConnectionField("file_path", e.target.value)}
-                  placeholder="/path/to/file.csv"
-                />
-              </FormField>
-
-              <div className={alertInfo}>
-                <p className="text-sm text-[color:var(--text-info)]">
-                  {profileForm.connection.file_path
-                    ? "This profile will always use the specified file."
-                    : "Leave empty to select a file when starting the stream."}
-                  {" "}Supports CSV, CAN dump, and other delimited formats.
-                </p>
-              </div>
-
-              <FormField label="Default Playback Speed" variant="default">
-                <Select
-                  variant="default"
-                  value={profileForm.connection.default_speed || "0"}
-                  onChange={(e) => onUpdateConnectionField("default_speed", e.target.value)}
-                >
-                  <option value="0.25">0.25x</option>
-                  <option value="0.5">0.5x</option>
-                  <option value="1">1x (realtime)</option>
-                  <option value="2">2x</option>
-                  <option value="10">10x</option>
-                  <option value="30">30x</option>
-                  <option value="60">60x</option>
-                  <option value="0">No Limit (Recommended)</option>
-                </Select>
-              </FormField>
             </div>
           )}
 

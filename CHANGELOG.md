@@ -4,6 +4,14 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+
+- **Data File IO profiles (`csv_file`)**: Removed the CsvSource streaming path and `csv_file` profile kind. CSV files are now exclusively imported into captures via the column mapper — the redundant streaming playback path (which only supported GVRET format) has been deleted. Removed from Rust backend (sessions, traits, IO modules), frontend types, profile dialog, settings UI, and session manager.
+
+### Added
+
+- **Session → Import from File… menu item** (Cmd+Shift+I): New native menu shortcut to import CSV/CAN dump files directly into a capture. Opens the OS file picker and column mapper without requiring the full IO Source Picker dialog. Available in Discovery, Decoder, and Graph panels.
+
 ### Changed
 
 - **Listener → Subscriber rename**: Renamed session listener vocabulary to subscriber across the full stack. Rust: `SessionListener` → `SessionSubscriber`, `register_listener` → `register_subscriber`, `listener_id` → `subscriber_id`, `listener_count` → `subscriber_count`, `ListenerInfo` → `SubscriberInfo`, `RegisterListenerResult` → `RegisterSubscriberResult`, `TimelineControl` → `PlaybackControl`. **Breaking wire changes**: Tauri commands (`register_session_listener` → `register_session_subscriber`, `unregister_session_listener` → `unregister_session_subscriber`, `evict_session_listener_cmd` → `evict_session_subscriber_cmd`, `get_session_listener_list` → `get_session_subscriber_list`, `set_session_listener_active` → `set_session_subscriber_active`), `listener-evicted` event → `subscriber-evicted`, serialised fields (`listener_id` → `subscriber_id`, `listener_count` → `subscriber_count`, `creator_listener_id` → `creator_subscriber_id`). Frontend types, stores, hooks, and UI strings swept.

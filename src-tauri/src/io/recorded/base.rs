@@ -1,6 +1,6 @@
 // ui/src-tauri/src/io/recorded/base.rs
 //
-// Shared control state for recorded sources (Capture, CSV, PostgreSQL).
+// Shared control state for recorded sources (Capture, PostgreSQL).
 // These sources share identical pause/resume and speed control patterns.
 
 use std::sync::{
@@ -11,7 +11,7 @@ use std::sync::{
 use crate::io::IOState;
 
 /// Shared control state for recorded source playback.
-/// Used by CaptureSource, CsvSource, and PostgresSource.
+/// Used by CaptureSource and PostgresSource.
 #[derive(Clone)]
 pub struct PlaybackControl {
     /// Set to true to cancel the stream
@@ -122,7 +122,7 @@ impl Default for PlaybackControl {
 
 /// State management for recorded sources.
 /// Encapsulates the common state machine (Stopped -> Running <-> Paused -> Stopped)
-/// and reduces boilerplate in CaptureSource, CsvSource, and PostgresSource.
+/// and reduces boilerplate in CaptureSource and PostgresSource.
 pub struct RecordedSourceState {
     pub control: PlaybackControl,
     pub state: IOState,

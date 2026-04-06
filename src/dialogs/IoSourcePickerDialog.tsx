@@ -165,6 +165,10 @@ type Props = {
   subscriberId?: string;
   /** Called when user clicks Connect in connect mode (creates session without streaming) */
   onConnect?: (profileId: string) => void;
+  /** When true, immediately trigger file import on open (for menu shortcut). */
+  autoImport?: boolean;
+  /** Called after autoImport has been consumed so the parent can reset the flag. */
+  onAutoImportConsumed?: () => void;
 };
 
 export default function IoSourcePickerDialog({
@@ -198,6 +202,8 @@ export default function IoSourcePickerDialog({
   onSkip,
   subscriberId,
   onConnect,
+  autoImport,
+  onAutoImportConsumed,
 }: Props) {
   // Use stable empty array when selectedIds is not provided (avoids re-renders)
   const selectedIds = selectedIdsProp ?? EMPTY_SELECTED_IDS;
@@ -218,6 +224,9 @@ export default function IoSourcePickerDialog({
   const [showFileOrderDialog, setShowFileOrderDialog] = useState(false);
   const [pendingFilePaths, setPendingFilePaths] = useState<string[] | null>(null);
   const [csvHasHeaderPerFile, setCsvHasHeaderPerFile] = useState<boolean[] | null>(null);
+
+  // Track auto-import mode (menu shortcut) so cancel closes the dialog
+  const autoImportActiveRef = useRef(false);
 
   // Multi-buffer state
   const [buffers, setBuffers] = useState<CaptureMetadata[]>([]);
@@ -487,6 +496,16 @@ export default function IoSourcePickerDialog({
   // changes, which would re-collapse the picker after the user clicks Change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Auto-import mode: immediately open file picker when triggered from menu
+  useEffect(() => {
+    if (!isOpen || !autoImport) return;
+    autoImportActiveRef.current = true;
+    onAutoImportConsumed?.();
+    // Trigger the import flow (opens OS file picker)
+    handleImport();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, autoImport]);
 
   // Refresh buffer list periodically while dialog is open
   // This catches transitions from streaming to stopped even if the stream-ended
@@ -1279,6 +1298,11 @@ export default function IoSourcePickerDialog({
       const filePaths = await pickCsvFilesToOpen(defaultDir);
       if (!filePaths || filePaths.length === 0) {
         setIsImporting(false);
+        // In auto-import mode (menu shortcut), close the dialog on cancel
+        if (autoImportActiveRef.current) {
+          autoImportActiveRef.current = false;
+          onClose();
+        }
         return;
       }
 
@@ -1316,6 +1340,10 @@ export default function IoSourcePickerDialog({
   const handleFileOrderCancel = () => {
     setShowFileOrderDialog(false);
     setPendingFilePaths(null);
+    if (autoImportActiveRef.current) {
+      autoImportActiveRef.current = false;
+      onClose();
+    }
   };
 
   const handleCsvMapperComplete = async (metadata: CaptureMetadata) => {
@@ -1345,6 +1373,7 @@ export default function IoSourcePickerDialog({
     await emit(WINDOW_EVENTS.BUFFER_CHANGED, payload);
 
     // Auto-select the buffer and close
+    autoImportActiveRef.current = false;
     onSelect(metadata.id);
     onClose();
   };
@@ -1355,6 +1384,10 @@ export default function IoSourcePickerDialog({
     setCsvMapperFilePaths(null);
     setCsvHasHeaderPerFile(null);
     setCsvImportSessionId(null);
+    if (autoImportActiveRef.current) {
+      autoImportActiveRef.current = false;
+      onClose();
+    }
   };
 
   // Delete a specific buffer by ID

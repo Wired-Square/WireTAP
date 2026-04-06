@@ -117,14 +117,6 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     multiSource: false,
     hasDeviceBuses: false,
   },
-  csv_file: {
-    temporalMode: "recorded",
-    protocols: ["can"],
-    canTransmit: false,
-    platforms: ["windows", "macos", "linux", "ios"],
-    multiSource: false,
-    hasDeviceBuses: false,
-  },
   modbus_tcp: {
     temporalMode: "realtime",
     protocols: ["modbus"],

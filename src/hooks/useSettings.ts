@@ -23,7 +23,7 @@ import {
 // Profile Kind Type
 // ============================================================================
 
-export type ProfileKindId = 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'csv_file' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp' | 'virtual' | 'framelink';
+export type ProfileKindId = 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp' | 'virtual' | 'framelink';
 
 // ============================================================================
 // Connection Interfaces (per profile kind)
@@ -76,11 +76,6 @@ export interface GvretUsbConnection {
   baud_rate?: string;
   interfaces?: GvretInterfaceConfig[];
   _probed_bus_count?: number;
-}
-
-export interface CsvFileConnection {
-  file_path?: string;
-  default_speed?: string;
 }
 
 export interface SerialConnection {
@@ -185,7 +180,6 @@ export interface ConnectionTypeMap {
   postgres: PostgresConnection;
   gvret_tcp: GvretTcpConnection;
   gvret_usb: GvretUsbConnection;
-  csv_file: CsvFileConnection;
   serial: SerialConnection;
   slcan: SlcanConnection;
   socketcan: SocketcanConnection;

@@ -17,7 +17,6 @@ use crate::{
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
         JoinSessionResult, SubscriberInfo, RegisterSubscriberResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
-        CsvSource, CsvSourceOptions,
         GvretDeviceInfo, probe_gvret_tcp,
         ModbusTcpConfig, ModbusTcpSource,
         ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
@@ -285,7 +284,7 @@ fn is_realtime_device(kind: &str) -> bool {
 /// This extracts the common device configuration logic used by both single-device
 /// and multi-device session creation.
 ///
-/// Returns None for non-realtime devices (postgres, csv_file, mqtt, serial, buffer)
+/// Returns None for non-realtime devices (postgres, mqtt, serial, capture)
 /// which should use their direct readers instead.
 fn create_source_config_from_profile(
     profile: &IOProfile,
@@ -491,7 +490,7 @@ pub async fn create_reader_session(
     end_time: Option<String>,
     speed: Option<f64>,
     limit: Option<i64>,
-    file_path: Option<String>,
+    _file_path: Option<String>,
     // Bus override for single-bus devices (overrides profile config)
     bus_override: Option<u8>,
     // Listener ID (for session logging)
@@ -618,32 +617,6 @@ pub async fn create_reader_session(
                 config,
                 options,
             ))
-        }
-        "csv_file" | "csv-file" => {
-            // Use file_path parameter if provided, otherwise fall back to profile's configured path
-            let profile_file_path = profile
-                .connection
-                .get("file_path")
-                .and_then(|v| v.as_str())
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string());
-
-            let path = file_path.or(profile_file_path).ok_or_else(|| {
-                "CSV file path is required. Please select a file or configure a path in the profile.".to_string()
-            })?;
-
-            let options = CsvSourceOptions {
-                file_path: path,
-                speed: speed.unwrap_or_else(|| {
-                    profile
-                        .connection
-                        .get("default_speed")
-                        .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
-                        .unwrap_or(0.0) // 0 = no limit by default
-                }),
-            };
-
-            Box::new(CsvSource::new(app.clone(), session_id.clone(), options))
         }
         "modbus_tcp" => {
             let host = profile
@@ -870,7 +843,7 @@ pub async fn create_reader_session(
         }
         kind => {
             return Err(format!(
-                "Unsupported reader type '{}'. Supported: modbus_tcp, mqtt, virtual, gvret_tcp, gvret_usb, postgres, csv_file, serial, slcan, socketcan, gs_usb",
+                "Unsupported reader type '{}'. Supported: modbus_tcp, mqtt, virtual, gvret_tcp, gvret_usb, postgres, serial, slcan, socketcan, gs_usb",
                 kind
             ));
         }
@@ -884,10 +857,10 @@ pub async fn create_reader_session(
     let result = create_session(app, session_id.clone(), reader, subscriber_id, app_name, None, vec![]).await;
 
     // Auto-start the session after creation (only for real-time devices)
-    // Playback sources (postgres, csv) should NOT auto-start because frames would be emitted
+    // Playback sources (postgres) should NOT auto-start because frames would be emitted
     // before the frontend has registered its listener and set up event handlers.
     // The frontend will call start_reader_session after registering the listener.
-    let is_playback_source = matches!(profile.kind.as_str(), "postgres" | "csv_file" | "csv-file");
+    let is_playback_source = matches!(profile.kind.as_str(), "postgres");
 
     if result.is_new && !is_playback_source {
         tlog!("[create_reader_session] Auto-starting new session '{}' (device type: {})", session_id, profile.kind);

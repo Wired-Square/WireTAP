@@ -131,6 +131,7 @@ export default function Graph() {
   }, [rawViewMode, rawViewContent, catalogPath, loadLayout]);
 
   // ── Frame batching ──
+  const autoImportRef = useRef(false);
   const pendingValuesRef = useRef<SignalValueEntry[]>([]);
   const flushScheduledRef = useRef(false);
   const pushSignalValuesRef = useRef(pushSignalValues);
@@ -446,6 +447,7 @@ export default function Graph() {
       },
       onClear: clearData,
       onPicker: () => dialogs.ioSessionPicker.open(),
+      onImportFromFile: () => { autoImportRef.current = true; dialogs.ioSessionPicker.open(); },
     },
   });
 
@@ -565,6 +567,8 @@ export default function Graph() {
         selectedId={ioProfile}
         defaultId={settings?.default_read_profile}
         onSelect={setIoProfile}
+        autoImport={autoImportRef.current}
+        onAutoImportConsumed={() => { autoImportRef.current = false; }}
       />
 
       <SignalPickerDialog

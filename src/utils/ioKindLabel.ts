@@ -16,8 +16,6 @@ export function getIOKindLabel(kind: string | undefined): string {
       return "GVRET TCP";
     case "gvret_usb":
       return "GVRET USB";
-    case "csv_file":
-      return "Data File";
     case "serial":
       return "Serial";
     case "slcan":

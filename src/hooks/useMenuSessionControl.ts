@@ -25,6 +25,7 @@ export interface SessionControlCallbacks {
   onStopAll?: () => void;
   onClear?: () => void;
   onPicker?: () => void;
+  onImportFromFile?: () => void;
   onLeave?: () => void;
   onJumpToBookmark?: (bookmarkId: string) => Promise<void>;
   /** Called when "Save Bookmark…" is triggered from the menu. */
@@ -161,6 +162,9 @@ export function useMenuSessionControl({
       const unPicker = await currentWindow.listen("menu-session-picker", () => {
         if (guard()) cb().onPicker?.();
       });
+      const unImportFile = await currentWindow.listen("menu-session-import-file", () => {
+        if (guard()) cb().onImportFromFile?.();
+      });
       const unJump = await currentWindow.listen<string>("menu-jump-to-bookmark", async (event) => {
         if (guard() && event.payload) {
           await cb().onJumpToBookmark?.(event.payload);
@@ -178,6 +182,7 @@ export function useMenuSessionControl({
         unStopAll();
         unClear();
         unPicker();
+        unImportFile();
         unJump();
         unSave();
       };

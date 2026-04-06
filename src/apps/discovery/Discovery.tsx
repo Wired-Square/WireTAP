@@ -270,6 +270,7 @@ export default function Discovery() {
   // Ref to track paused state (used by callbacks that can't access manager state directly)
   // When paused, frame emissions are from stepping - position updates, not new data
   const isPausedRef = useRef(false);
+  const autoImportRef = useRef(false);
   // Ref to track buffer mode (when true, useBufferFrameView handles display - don't accumulate)
   const inBufferModeRef = useRef(false);
 
@@ -1010,6 +1011,7 @@ export default function Discovery() {
       },
       onClear: () => handlers.handleClearDiscoveredFrames(),
       onPicker: () => dialogs.ioSessionPicker.open(),
+      onImportFromFile: () => { autoImportRef.current = true; dialogs.ioSessionPicker.open(); },
       onJumpToBookmark: async (bookmarkId) => {
         const profileId = sourceProfileId || ioProfile;
         if (profileId) {
@@ -1214,6 +1216,8 @@ export default function Discovery() {
         loadSpeed={playbackSpeed}
         onLoadSpeedChange={(speed) => handlers.handleSpeedChange(speed)}
         allowMultiSelect={true}
+        autoImport={autoImportRef.current}
+        onAutoImportConsumed={() => { autoImportRef.current = false; }}
       />
 
       <FramePickerDialog

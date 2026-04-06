@@ -613,6 +613,9 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
     let session_picker_item = MenuItemBuilder::with_id("session-picker", "Select Source…")
         .accelerator("cmdOrCtrl+I")
         .build(app)?;
+    let session_import_item = MenuItemBuilder::with_id("session-import-file", "Import from File…")
+        .accelerator("cmdOrCtrl+Shift+I")
+        .build(app)?;
 
     // Playback controls (frame delivery)
     let session_play_item = MenuItemBuilder::with_id("session-play", "Play")
@@ -639,6 +642,7 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
     let session_menu = SubmenuBuilder::new(app, "Session")
         .item(&session_source_item)
         .item(&session_picker_item)
+        .item(&session_import_item)
         .separator()
         .item(&session_play_item)
         .item(&session_pause_item)
@@ -756,6 +760,9 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
             // Session control menu items
             "session-picker" => {
                 emit_to_focused_window(app, "menu-session-picker", ());
+            }
+            "session-import-file" => {
+                emit_to_focused_window(app, "menu-session-import-file", ());
             }
             "session-play" => {
                 emit_to_focused_window(app, "menu-session-play", ());

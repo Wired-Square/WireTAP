@@ -35,7 +35,7 @@ mod socketcan;
 pub use recorded::{step_frame, CaptureSource, StepResult};
 pub use recorded::{
     parse_csv_file, parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
-    CsvSource, CsvSourceOptions, Delimiter, SequenceGap, TimestampUnit,
+    Delimiter, SequenceGap, TimestampUnit,
 };
 pub use recorded::{PostgresConfig, PostgresSource, PostgresSourceOptions, PostgresSourceType};
 
