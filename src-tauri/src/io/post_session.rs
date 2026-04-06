@@ -27,7 +27,7 @@ pub struct StreamEndedInfo {
 /// Connected source info for a session.
 #[derive(Clone, Debug, Serialize)]
 pub struct SourceInfo {
-    pub device_type: String,
+    pub source_type: String,
     pub address: String,
     pub bus: Option<u8>,
 }
@@ -179,14 +179,14 @@ mod tests {
         store_source(
             sid,
             SourceInfo {
-                device_type: "gs_usb".into(),
+                source_type: "gs_usb".into(),
                 address: "USB1".into(),
                 bus: Some(0),
             },
         );
         let sources = get_sources(sid);
         assert_eq!(sources.len(), 1);
-        assert_eq!(sources[0].device_type, "gs_usb");
+        assert_eq!(sources[0].source_type, "gs_usb");
     }
 
     #[test]

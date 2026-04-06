@@ -12,6 +12,8 @@ All notable changes to WireTAP will be documented in this file.
 
 - **`multi_source_configs` → `broker_configs`**: Renamed the `IODevice` trait method, the `ActiveSessionInfo` serialised field, and the frontend `brokerConfigs` property (was `multiSourceConfigs`). All 7 frontend consumers updated across the source picker, session manager, and layout utilities.
 
+- **IODevice → IOSource trait rename**: Renamed the core IO trait from `IODevice` to `IOSource` — Postgres, CSV imports, and capture replays were never "devices". Updated all 9 trait implementors, the `IOSession.device` field → `IOSession.source`, `device_type()` → `source_type()`, `replace_session_device()` → `replace_session_source()`, `DeviceReplacedPayload` → `SourceReplacedPayload`, `ReplaceDeviceOptions` → `ReplaceSourceOptions`. **Breaking wire changes**: serialised fields `device_type` → `source_type` on `ActiveSessionInfo`, `SessionLifecyclePayload`, `DeviceProbePayload`, `DeviceProbeResult`, and `SourceInfo`; `previous_device_type`/`new_device_type` → `previous_source_type`/`new_source_type` on `SourceReplacedPayload`. Frontend `deviceType` → `sourceType`, `DeviceReplacedPayload` → `SourceReplacedPayload`, `onDeviceReplaced` → `onSourceReplaced` across API types, session store, useIOSession hook, and all UI consumers.
+
 ## [0.6.1] - 2026-04-05
 
 ### Changed

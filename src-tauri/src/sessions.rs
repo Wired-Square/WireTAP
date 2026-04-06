@@ -14,7 +14,7 @@ use crate::{
         resume_session_fresh, seek_session, seek_session_by_frame, set_listener_active, start_session, stop_session,
         stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_listener,
         evict_session_listener, add_source_to_session, remove_source_from_session, update_source_bus_mappings, pause_source_in_session, resume_source_in_session, get_session_source_count,
-        update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IODevice, IOState,
+        update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
         CsvReader, CsvReaderOptions,
@@ -517,7 +517,7 @@ pub async fn create_reader_session(
     // Create the appropriate reader based on profile kind
     // Real-time devices (gvret, slcan, gs_usb, socketcan) use IOBroker for unified handling
     let is_realtime = is_realtime_device(&profile.kind);
-    let reader: Box<dyn IODevice> = if is_realtime {
+    let reader: Box<dyn IOSource> = if is_realtime {
         // Use IOBroker for all real-time devices (unified path)
         let source_config = create_source_config_from_profile(&profile, bus_override)
             .ok_or_else(|| format!("Failed to create source config for profile '{}'", profile.id))?;
@@ -1268,7 +1268,7 @@ pub async fn resume_session_to_live(
     replace_session_profiles(&session_id, &profile_ids);
 
     // Build the new live reader
-    let new_reader: Box<dyn IODevice> = if configs.len() == 1 {
+    let new_reader: Box<dyn IOSource> = if configs.len() == 1 {
         Box::new(IOBroker::single_source(
             app.clone(),
             session_id.clone(),
@@ -1574,7 +1574,7 @@ pub struct DeviceProbeResult {
     /// Whether the probe was successful (device is online and responding)
     pub success: bool,
     /// Device type (e.g., "gvret", "slcan", "gs_usb", "socketcan")
-    pub device_type: String,
+    pub source_type: String,
     /// Whether this is a multi-bus device (GVRET can have multiple CAN buses)
     pub is_multi_bus: bool,
     /// Number of buses available (1 for single-bus devices, 1-5 for GVRET)
@@ -1619,7 +1619,7 @@ pub async fn probe_device(
             let is_multi_bus = meta.buses.len() > 1;
             let result = DeviceProbeResult {
                 success: true,
-                device_type: "buffer".to_string(),
+                source_type: "buffer".to_string(),
                 is_multi_bus,
                 bus_count,
                 primary_info: Some(format!("{} buses", bus_count)),
@@ -1629,7 +1629,7 @@ pub async fn probe_device(
             };
             emit_device_probe(&app, DeviceProbePayload {
                 profile_id: profile_id.clone(),
-                device_type: "buffer".to_string(),
+                source_type: "buffer".to_string(),
                 address: meta.id.clone(),
                 success: true,
                 cached: false,
@@ -1648,7 +1648,7 @@ pub async fn probe_device(
         tlog!("[probe_device] Returning cached probe result for profile '{}'", profile_id);
         emit_device_probe(&app, DeviceProbePayload {
             profile_id: profile_id.clone(),
-            device_type: cached.device_type.clone(),
+            source_type: cached.source_type.clone(),
             address: cached.secondary_info.clone().unwrap_or_default(),
             success: cached.success,
             cached: true,
@@ -1684,7 +1684,7 @@ pub async fn probe_device(
             match probe_gvret_tcp(host, port, timeout_sec).await {
                 Ok(info) => Ok(DeviceProbeResult {
                     success: true,
-                    device_type: "gvret".to_string(),
+                    source_type: "gvret".to_string(),
                     is_multi_bus: true,
                     bus_count: info.bus_count,
                     primary_info: Some(format!("{} buses available", info.bus_count)),
@@ -1694,7 +1694,7 @@ pub async fn probe_device(
                 }),
                 Err(e) => Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "gvret".to_string(),
+                    source_type: "gvret".to_string(),
                     is_multi_bus: true,
                     bus_count: 0,
                     primary_info: None,
@@ -1718,7 +1718,7 @@ pub async fn probe_device(
             match tokio::task::spawn_blocking(move || probe_gvret_usb(&port_owned, baud_rate)).await {
                 Ok(Ok(info)) => Ok(DeviceProbeResult {
                     success: true,
-                    device_type: "gvret".to_string(),
+                    source_type: "gvret".to_string(),
                     is_multi_bus: true,
                     bus_count: info.bus_count,
                     primary_info: Some(format!("{} buses available", info.bus_count)),
@@ -1728,7 +1728,7 @@ pub async fn probe_device(
                 }),
                 Ok(Err(e)) => Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "gvret".to_string(),
+                    source_type: "gvret".to_string(),
                     is_multi_bus: true,
                     bus_count: 0,
                     primary_info: None,
@@ -1738,7 +1738,7 @@ pub async fn probe_device(
                 }),
                 Err(e) => Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "gvret".to_string(),
+                    source_type: "gvret".to_string(),
                     is_multi_bus: true,
                     bus_count: 0,
                     primary_info: None,
@@ -1752,7 +1752,7 @@ pub async fn probe_device(
         "gvret_usb" | "gvret-usb" => {
             Ok(DeviceProbeResult {
                 success: false,
-                device_type: "gvret".to_string(),
+                source_type: "gvret".to_string(),
                 is_multi_bus: true,
                 bus_count: 0,
                 primary_info: None,
@@ -1788,7 +1788,7 @@ pub async fn probe_device(
 
             Ok(DeviceProbeResult {
                 success: result.success,
-                device_type: "slcan".to_string(),
+                source_type: "slcan".to_string(),
                 is_multi_bus: false,
                 bus_count: if result.success { 1 } else { 0 },
                 primary_info: result.version,
@@ -1801,7 +1801,7 @@ pub async fn probe_device(
         "slcan" => {
             Ok(DeviceProbeResult {
                 success: false,
-                device_type: "slcan".to_string(),
+                source_type: "slcan".to_string(),
                 is_multi_bus: false,
                 bus_count: 0,
                 primary_info: None,
@@ -1830,7 +1830,7 @@ pub async fn probe_device(
             match probe_gs_usb_device(bus, address, serial) {
                 Ok(info) => Ok(DeviceProbeResult {
                     success: true,
-                    device_type: "gs_usb".to_string(),
+                    source_type: "gs_usb".to_string(),
                     is_multi_bus: false,
                     bus_count: info.channel_count.unwrap_or(1) as u8,
                     primary_info: info.channel_count.map(|c| format!("{} channel(s)", c)),
@@ -1844,7 +1844,7 @@ pub async fn probe_device(
                 }),
                 Err(e) => Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "gs_usb".to_string(),
+                    source_type: "gs_usb".to_string(),
                     is_multi_bus: false,
                     bus_count: 0,
                     primary_info: None,
@@ -1867,7 +1867,7 @@ pub async fn probe_device(
             if std::path::Path::new(&path).exists() {
                 Ok(DeviceProbeResult {
                     success: true,
-                    device_type: "socketcan".to_string(),
+                    source_type: "socketcan".to_string(),
                     is_multi_bus: false,
                     bus_count: 1,
                     primary_info: Some(format!("Interface: {}", interface)),
@@ -1878,7 +1878,7 @@ pub async fn probe_device(
             } else {
                 Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "socketcan".to_string(),
+                    source_type: "socketcan".to_string(),
                     is_multi_bus: false,
                     bus_count: 0,
                     primary_info: None,
@@ -1903,7 +1903,7 @@ pub async fn probe_device(
             if port_exists {
                 Ok(DeviceProbeResult {
                     success: true,
-                    device_type: "serial".to_string(),
+                    source_type: "serial".to_string(),
                     is_multi_bus: false,
                     bus_count: 1,
                     primary_info: Some(port.to_string()),
@@ -1914,7 +1914,7 @@ pub async fn probe_device(
             } else {
                 Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "serial".to_string(),
+                    source_type: "serial".to_string(),
                     is_multi_bus: false,
                     bus_count: 0,
                     primary_info: None,
@@ -1928,7 +1928,7 @@ pub async fn probe_device(
         "serial" => {
             Ok(DeviceProbeResult {
                 success: false,
-                device_type: "serial".to_string(),
+                source_type: "serial".to_string(),
                 is_multi_bus: false,
                 bus_count: 0,
                 primary_info: None,
@@ -1957,7 +1957,7 @@ pub async fn probe_device(
             ).await {
                 Ok(Ok(_stream)) => Ok(DeviceProbeResult {
                     success: true,
-                    device_type: "modbus_tcp".to_string(),
+                    source_type: "modbus_tcp".to_string(),
                     is_multi_bus: false,
                     bus_count: 1,
                     primary_info: Some("Modbus TCP".to_string()),
@@ -1967,7 +1967,7 @@ pub async fn probe_device(
                 }),
                 Ok(Err(e)) => Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "modbus_tcp".to_string(),
+                    source_type: "modbus_tcp".to_string(),
                     is_multi_bus: false,
                     bus_count: 0,
                     primary_info: None,
@@ -1977,7 +1977,7 @@ pub async fn probe_device(
                 }),
                 Err(_) => Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "modbus_tcp".to_string(),
+                    source_type: "modbus_tcp".to_string(),
                     is_multi_bus: false,
                     bus_count: 0,
                     primary_info: None,
@@ -2011,7 +2011,7 @@ pub async fn probe_device(
                     let bus_count = probe.interfaces.len().max(iface_count as usize) as u8;
                     Ok(DeviceProbeResult {
                         success: true,
-                        device_type: "framelink".to_string(),
+                        source_type: "framelink".to_string(),
                         is_multi_bus: bus_count > 1,
                         bus_count,
                         primary_info: device_id.map(|s| s.to_string()),
@@ -2022,7 +2022,7 @@ pub async fn probe_device(
                 }
                 Err(e) => Ok(DeviceProbeResult {
                     success: false,
-                    device_type: "framelink".to_string(),
+                    source_type: "framelink".to_string(),
                     is_multi_bus: iface_count > 1,
                     bus_count: iface_count,
                     primary_info: device_id.map(|s| s.to_string()),
@@ -2066,7 +2066,7 @@ pub async fn probe_device(
             let supports_fd = traffic_type == "canfd";
             Ok(DeviceProbeResult {
                 success: true,
-                device_type: "virtual".to_string(),
+                source_type: "virtual".to_string(),
                 is_multi_bus: bus_count > 1,
                 bus_count,
                 primary_info: Some(format!("{}", traffic_label)),
@@ -2087,7 +2087,7 @@ pub async fn probe_device(
     if let Ok(ref probe_result) = result {
         emit_device_probe(&app, DeviceProbePayload {
             profile_id: profile_id.clone(),
-            device_type: probe_result.device_type.clone(),
+            source_type: probe_result.source_type.clone(),
             address: probe_result.secondary_info.clone().unwrap_or_default(),
             success: probe_result.success,
             cached: false,

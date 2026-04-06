@@ -8,7 +8,7 @@ import { iconSm, iconXs } from "../../../styles/spacing";
 export interface SourceNodeData {
   profileId: string;
   profileName: string;
-  deviceType: string;
+  sourceType: string;
   isRealtime: boolean;
   isActive: boolean;
   /** Device bus numbers this source outputs (one handle per bus) */
@@ -31,7 +31,7 @@ interface SourceNodeProps {
 }
 
 function SourceNode({ data, selected }: SourceNodeProps) {
-  const { profileName, deviceType, isRealtime, isActive, outputBuses, disabledBuses, captureName, isPersistent, captureCount, captureKind } = data;
+  const { profileName, sourceType, isRealtime, isActive, outputBuses, disabledBuses, captureName, isPersistent, captureCount, captureKind } = data;
   // Merge enabled + disabled buses for handle layout (disabled shown as muted)
   const allBuses = [
     ...(outputBuses ?? []).map((b) => ({ bus: b, enabled: true })),
@@ -48,7 +48,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
     ? "bg-purple-500/10"
     : "bg-[var(--bg-surface)]";
 
-  const isBuffer = deviceType === "sqlite";
+  const isBuffer = sourceType === "sqlite";
   const Icon = isRealtime ? Wifi : Database;
   const iconColour = isBuffer ? "text-cyan-400" : isRealtime ? "text-purple-400" : "text-green-400";
 
@@ -69,7 +69,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
 
       {/* Device type + buffer info */}
       <div className="text-xs text-[color:var(--text-muted)] flex items-center gap-1">
-        <span>{deviceType}</span>
+        <span>{sourceType}</span>
         {isActive && (
           <Radio className="w-3 h-3 text-purple-500 animate-pulse" />
         )}

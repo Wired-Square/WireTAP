@@ -212,7 +212,7 @@ impl TimelineReaderState {
     }
 
     /// Get session ID reference.
-    #[allow(dead_code)] // Used by IODevice trait implementations
+    #[allow(dead_code)] // Used by IOSource trait implementations
     pub fn session_id(&self) -> &str {
         &self.session_id
     }

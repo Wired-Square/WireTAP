@@ -28,7 +28,7 @@ use tokio_modbus::prelude::*;
 use crate::capture_store::{self, CaptureKind};
 use crate::io::{
     emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready,
-    FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle,
+    FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle,
 };
 
 // ============================================================================
@@ -105,7 +105,7 @@ impl ModbusTcpReader {
 }
 
 #[async_trait]
-impl IODevice for ModbusTcpReader {
+impl IOSource for ModbusTcpReader {
     fn capabilities(&self) -> IOCapabilities {
         let mut caps = IOCapabilities::realtime_can()
             .with_buses(vec![])
@@ -241,7 +241,7 @@ impl IODevice for ModbusTcpReader {
         &self.session_id
     }
 
-    fn device_type(&self) -> &'static str {
+    fn source_type(&self) -> &'static str {
         "modbus_tcp"
     }
 }

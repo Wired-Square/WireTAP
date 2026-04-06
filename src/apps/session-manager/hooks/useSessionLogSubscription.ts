@@ -19,7 +19,7 @@ import {
 interface SessionLifecyclePayload {
   session_id: string;
   event_type: "created" | "destroyed";
-  device_type: string | null;
+  source_type: string | null;
   state: string | null;
   listener_count: number;
   source_profile_ids: string[];
@@ -31,7 +31,7 @@ interface SessionLifecyclePayload {
 /** Payload for device-probe event (global, not session-scoped) */
 interface DeviceProbePayload {
   profile_id: string;
-  device_type: string;
+  source_type: string;
   address: string;
   success: boolean;
   cached: boolean;
@@ -135,9 +135,9 @@ export function useSessionLogSubscription(): void {
         sessionProfileNameCache.set(p.session_id, profileName);
         // Determine mode based on device type (realtime = Live, timeline = Playback)
         let modeLabel = "";
-        if (p.device_type) {
+        if (p.source_type) {
           const realtimeDevices = ["gvret_tcp", "gvret_usb", "slcan", "socketcan", "gs_usb", "mqtt", "modbus_tcp", "serial", "framelink", "virtual"];
-          const isRealtime = realtimeDevices.some((d) => p.device_type?.includes(d));
+          const isRealtime = realtimeDevices.some((d) => p.source_type?.includes(d));
           modeLabel = isRealtime ? " (Live)" : " (Playback)";
         }
         addEntryFn({
@@ -197,8 +197,8 @@ export function useSessionLogSubscription(): void {
 
       const cachedTag = p.cached ? " (cached)" : "";
       const details = p.success
-        ? `${p.device_type} at ${p.address}: ${p.bus_count} bus(es)${cachedTag}`
-        : `${p.device_type} at ${p.address}: ${p.error ?? "failed"}${cachedTag}`;
+        ? `${p.source_type} at ${p.address}: ${p.bus_count} bus(es)${cachedTag}`
+        : `${p.source_type} at ${p.address}: ${p.error ?? "failed"}${cachedTag}`;
 
       addEntryFn({
         eventType: "device-probe",
@@ -407,7 +407,7 @@ async function setupPerSessionListeners(
         const latest = sources[sources.length - 1];
         if (latest) {
           const busInfo = latest.bus !== null ? ` (bus ${latest.bus})` : "";
-          addEntry({ eventType: "device-connected", sessionId, profileId, profileName, appName: null, details: `${latest.device_type} connected: ${latest.address}${busInfo}` });
+          addEntry({ eventType: "device-connected", sessionId, profileId, profileName, appName: null, details: `${latest.source_type} connected: ${latest.address}${busInfo}` });
         }
       })
     )) return;

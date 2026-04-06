@@ -27,7 +27,7 @@ use crate::io::modbus_tcp::{PollGroup, RegisterType};
 use crate::io::serial::utils::{to_serialport_data_bits, to_serialport_parity, to_serialport_stop_bits, Parity};
 use crate::io::{
     emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready,
-    FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle,
+    FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle,
 };
 
 // ============================================================================
@@ -86,7 +86,7 @@ impl ModbusRtuReader {
 }
 
 #[async_trait]
-impl IODevice for ModbusRtuReader {
+impl IOSource for ModbusRtuReader {
     fn capabilities(&self) -> IOCapabilities {
         let mut caps = IOCapabilities::realtime_can()
             .with_buses(vec![])
@@ -203,7 +203,7 @@ impl IODevice for ModbusRtuReader {
         &self.session_id
     }
 
-    fn device_type(&self) -> &'static str {
+    fn source_type(&self) -> &'static str {
         "modbus_rtu"
     }
 }

@@ -317,7 +317,7 @@ export default function IoSourcePickerDialog({
       console.error(`[IoSourcePickerDialog] Buffer probe failed for ${captureId}:`, err);
       setDeviceProbeResultMap((prev) => new Map(prev).set(captureId, {
         success: false,
-        deviceType: "buffer",
+        sourceType: "buffer",
         isMultiBus: false,
         busCount: 0,
         primaryInfo: null,
@@ -543,7 +543,7 @@ export default function IoSourcePickerDialog({
         // - supports_time_range && !is_realtime: recorded sources like PostgreSQL
         const joinableSessions = sessions.filter((s) =>
           s.capabilities.traits.multi_source === true ||
-          s.deviceType === "buffer" ||
+          s.sourceType === "buffer" ||
           (s.capabilities.supports_time_range && s.capabilities.traits.temporal_mode === "timeline")
         );
         console.log("[IoSourcePickerDialog] Joinable sessions:", joinableSessions);
@@ -711,7 +711,7 @@ export default function IoSourcePickerDialog({
         probedProfilesRef.current.add(profileId);
         setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, {
           success: true,
-          deviceType: isMultiBus ? "multi" : "single",
+          sourceType: isMultiBus ? "multi" : "single",
           isMultiBus,
           busCount: isMultiBus ? (profile ? buildDefaultBusMappings(profile).length : 5) : 1,
           primaryInfo: "Session active",
@@ -744,7 +744,7 @@ export default function IoSourcePickerDialog({
           console.error(`[IoSourcePickerDialog] Probe failed for ${profileId}:`, err);
           setDeviceProbeResultMap((prev) => new Map(prev).set(profileId, {
             success: false,
-            deviceType: isMultiBus ? "multi" : "unknown",
+            sourceType: isMultiBus ? "multi" : "unknown",
             isMultiBus,
             busCount: 0,
             primaryInfo: null,
@@ -1623,7 +1623,7 @@ export default function IoSourcePickerDialog({
                 probeError={selectedCaptureId ? deviceProbeResultMap.get(selectedCaptureId)?.error ?? null : null}
                 activeSessionBufferMap={new Map(
                   activeMultiSourceSessions
-                    .filter((s) => s.deviceType === "buffer")
+                    .filter((s) => s.sourceType === "buffer")
                     .flatMap((s) => {
                       const entries: [string, string][] = [[s.sessionId, s.sessionId]];
                       if (s.captureId) entries.push([s.captureId, s.sessionId]);

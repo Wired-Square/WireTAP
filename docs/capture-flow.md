@@ -180,7 +180,7 @@ Call sites: [io/mod.rs:1160](../src-tauri/src/io/mod.rs#L1160) (`emit_stream_end
 ```
 stop_and_switch_to_buffer(session_id, speed)
      │
-     ├─ session.device.stop()              // triggers emit_stream_ended
+     ├─ session.source.stop()              // triggers emit_stream_ended
      │      └─ finalize_session_captures   // capture now finalised & persisted
      │
      ├─ get_session_capture_ids(session_id)
@@ -191,7 +191,7 @@ stop_and_switch_to_buffer(session_id, speed)
      ├─ orphan_captures_for_session(session_id)
      │      └─ clears owning_session_id — capture is now standalone
      │
-     └─ replace_session_device(
+     └─ replace_session_source(
             sessions, session_id,
             CaptureSource::new(session_id, capture_id, speed),
             ...
@@ -203,7 +203,7 @@ stop_and_switch_to_buffer(session_id, speed)
 ### Resume to live
 
 A new `IOBroker` is built from the session's retained `source_configs`
-and swapped in via `replace_session_device(..., auto_start=true)`. The orphaned
+and swapped in via `replace_session_source(..., auto_start=true)`. The orphaned
 historical capture remains in the registry and can be re-selected later from
 the source picker.
 
@@ -270,7 +270,7 @@ Schema details — columns, indexes, cleanup policies — are in
 ## 8. CaptureSource — replaying a capture as a session
 
 [src-tauri/src/io/timeline/capture.rs](../src-tauri/src/io/timeline/capture.rs)
-implements `CaptureSource`, the `IODevice` that exposes a stored capture as
+implements `CaptureSource`, the `IOSource` that exposes a stored capture as
 a timeline session. It is constructed with an **explicit** `capture_id` —
 there is no fallback / guess path; frontends must pass the ID they want to
 replay.

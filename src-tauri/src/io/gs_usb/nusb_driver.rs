@@ -33,7 +33,7 @@ use crate::io::gvret::{apply_bus_mapping, BusMapping};
 use crate::io::types::{SourceMessage, TransmitRequest, TransmitSender};
 use crate::io::{
     emit_session_error, emit_stream_ended, now_us, signal_frames_ready, CanTransmitFrame,
-    FrameMessage, IOCapabilities, IODevice, IOState, SignalThrottle, TransmitPayload,
+    FrameMessage, IOCapabilities, IOSource, IOState, SignalThrottle, TransmitPayload,
     TransmitResult,
 };
 
@@ -367,7 +367,7 @@ impl GsUsbReader {
 }
 
 #[async_trait]
-impl IODevice for GsUsbReader {
+impl IOSource for GsUsbReader {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::realtime_can()
             .with_tx(!self.config.listen_only, false)

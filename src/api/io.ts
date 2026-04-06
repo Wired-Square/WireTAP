@@ -672,15 +672,15 @@ export interface SessionResumingPayload {
 }
 
 /**
- * Payload sent when a session's device is replaced in-place.
+ * Payload sent when a session's source is replaced in-place.
  * The session ID and all listeners are preserved.
- * Event name: session-device-replaced:{sessionId}
+ * Event name: session-source-replaced:{sessionId}
  */
-export interface DeviceReplacedPayload {
-  /** Previous device type (e.g., "realtime", "capture") */
-  previous_device_type: string;
-  /** New device type */
-  new_device_type: string;
+export interface SourceReplacedPayload {
+  /** Previous source type (e.g., "realtime", "capture") */
+  previous_source_type: string;
+  /** New source type */
+  new_source_type: string;
   /** New capabilities after the swap */
   capabilities: IOCapabilities;
   /** New IO state after the swap */
@@ -1116,8 +1116,8 @@ export async function probeGvretDevice(profileId: string): Promise<GvretDeviceIn
 export interface DeviceProbeResult {
   /** Whether the probe was successful (device is online and responding) */
   success: boolean;
-  /** Device type (e.g., "gvret", "slcan", "gs_usb", "socketcan") */
-  deviceType: string;
+  /** Source type (e.g., "gvret", "slcan", "gs_usb", "socketcan") */
+  sourceType: string;
   /** Whether this is a multi-bus device (GVRET can have multiple CAN buses) */
   isMultiBus: boolean;
   /** Number of buses available (1 for single-bus devices, 1-5 for GVRET) */
@@ -1151,7 +1151,7 @@ export interface DeviceProbeResult {
 export async function probeDevice(profileId: string): Promise<DeviceProbeResult> {
   const raw = await invoke<{
     success: boolean;
-    device_type: string;
+    source_type: string;
     is_multi_bus: boolean;
     bus_count: number;
     primary_info: string | null;
@@ -1162,7 +1162,7 @@ export async function probeDevice(profileId: string): Promise<DeviceProbeResult>
 
   return {
     success: raw.success,
-    deviceType: raw.device_type,
+    sourceType: raw.source_type,
     isMultiBus: raw.is_multi_bus,
     busCount: raw.bus_count,
     primaryInfo: raw.primary_info,
@@ -1315,8 +1315,8 @@ export async function createMultiSourceSession(
 export interface ActiveSessionInfo {
   /** Session ID */
   sessionId: string;
-  /** Device type (e.g., "gvret_tcp", "realtime") */
-  deviceType: string;
+  /** Source type (e.g., "gvret_tcp", "realtime") */
+  sourceType: string;
   /** Current state */
   state: IOStateType;
   /** Session capabilities */
@@ -1344,7 +1344,7 @@ export interface ActiveSessionInfo {
 export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
   const raw: Array<{
     session_id: string;
-    device_type: string;
+    source_type: string;
     state: IOState; // Rust sends { type: "Running" } etc, not simple string
     capabilities: IOCapabilities;
     listener_count: number;
@@ -1373,7 +1373,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
 
   return raw.map((s) => ({
     sessionId: s.session_id,
-    deviceType: s.device_type,
+    sourceType: s.source_type,
     state: getStateType(s.state), // Convert IOState to IOStateType
     capabilities: s.capabilities,
     listenerCount: s.listener_count,
@@ -1569,7 +1569,7 @@ export async function getSessionSources(
 }
 
 export interface SourceInfo {
-  device_type: string;
+  source_type: string;
   address: string;
   bus: number | null;
 }

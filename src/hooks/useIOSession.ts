@@ -50,7 +50,7 @@ import {
   type SessionSuspendedPayload,
   type SessionSwitchedToBufferPayload,
   type SessionResumingPayload,
-  type DeviceReplacedPayload,
+  type SourceReplacedPayload,
   type CanTransmitFrame,
   type TransmitResult,
   type PlaybackPosition,
@@ -197,7 +197,7 @@ export interface UseIOSessionOptions {
   /** Callback when session is resuming with a new buffer - apps should clear their frame lists */
   onResuming?: (payload: SessionResumingPayload) => void;
   /** Callback when the session's device is replaced in-place (caps/state change, listeners preserved) */
-  onDeviceReplaced?: (payload: DeviceReplacedPayload) => void;
+  onSourceReplaced?: (payload: SourceReplacedPayload) => void;
   /** Callback when session is destroyed externally (e.g., from Session Manager or last-listener auto-destroy) */
   onDestroyed?: (orphanedBufferIds: string[]) => void;
 }
@@ -347,7 +347,7 @@ export function useIOSession(
     onSuspended,
     onSwitchedToBuffer,
     onResuming,
-    onDeviceReplaced,
+    onSourceReplaced,
     onDestroyed,
   } = options;
 
@@ -412,7 +412,7 @@ export function useIOSession(
     onSuspended,
     onSwitchedToBuffer,
     onResuming,
-    onDeviceReplaced,
+    onSourceReplaced,
     onDestroyed,
   });
   useEffect(() => {
@@ -428,10 +428,10 @@ export function useIOSession(
       onSuspended,
       onSwitchedToBuffer,
       onResuming,
-      onDeviceReplaced,
+      onSourceReplaced,
       onDestroyed,
     };
-  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToBuffer, onResuming, onDeviceReplaced, onDestroyed]);
+  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToBuffer, onResuming, onSourceReplaced, onDestroyed]);
 
   // ---- Register listener ID with focusStore so Visual tab can display it ----
   useEffect(() => {
@@ -727,7 +727,7 @@ export function useIOSession(
           onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
           onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-          onDeviceReplaced: (payload) => callbacksRef.current.onDeviceReplaced?.(payload),
+          onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
         });
         console.log(`[useIOSession:${appName}] registerCallbacks completed`);
 
@@ -1127,7 +1127,7 @@ export function useIOSession(
           onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
           onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-          onDeviceReplaced: (payload) => callbacksRef.current.onDeviceReplaced?.(payload),
+          onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
         });
 
         // Update local state after reinitialize
@@ -1231,7 +1231,7 @@ export function useIOSession(
         onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
         onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
         onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
-        onDeviceReplaced: (payload) => callbacksRef.current.onDeviceReplaced?.(payload),
+        onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

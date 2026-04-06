@@ -349,7 +349,7 @@ pub fn send_session_lifecycle(payload: &crate::io::SessionLifecyclePayload) {
     let encoded = protocol::encode_session_lifecycle(
         event_type,
         &payload.session_id,
-        payload.device_type.as_deref(),
+        payload.source_type.as_deref(),
         state_byte,
         payload.listener_count as u16,
     );

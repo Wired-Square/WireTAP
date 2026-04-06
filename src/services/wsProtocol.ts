@@ -308,12 +308,12 @@ export function decodePlaybackPosition(payload: DataView): {
 }
 
 export function decodeDeviceConnected(payload: DataView): {
-  device_type: string;
+  source_type: string;
   address: string;
   bus?: number;
 } {
   let offset = 0;
-  const [device_type, next1] = decodeLengthPrefixedStr(payload, offset);
+  const [source_type, next1] = decodeLengthPrefixedStr(payload, offset);
   offset = next1;
   const [address, next2] = decodeLengthPrefixedStr(payload, offset);
   offset = next2;
@@ -323,7 +323,7 @@ export function decodeDeviceConnected(payload: DataView): {
     bus = payload.getUint8(offset);
   }
 
-  return { device_type, address, bus };
+  return { source_type, address, bus };
 }
 
 export function decodeBufferChanged(payload: Uint8Array): string {

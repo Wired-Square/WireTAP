@@ -204,7 +204,7 @@ function SessionDetails({
           Device Type
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
-          {session.deviceType}
+          {session.sourceType}
         </p>
       </div>
 
@@ -368,7 +368,7 @@ function SessionDetails({
               Resume
             </button>
           )}
-          {session.deviceType === "realtime" && (
+          {session.sourceType === "realtime" && (
             <button
               onClick={() => onAddSource(session.sessionId)}
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-purple-400`}

@@ -11,7 +11,7 @@ use std::time::Duration;
 use tauri::AppHandle;
 
 use super::base::{TimelineControl, TimelineReaderState};
-use crate::io::{emit_session_error, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition, SignalThrottle};
+use crate::io::{emit_session_error, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle};
 use crate::capture_store;
 
 /// CSV reader options for playback control
@@ -50,7 +50,7 @@ impl CsvReader {
 }
 
 #[async_trait]
-impl IODevice for CsvReader {
+impl IOSource for CsvReader {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::timeline_can()
     }

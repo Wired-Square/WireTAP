@@ -16,7 +16,7 @@ import { AlertCircle } from "lucide-react";
  * Map buffer device type to a human-readable storage backend label.
  * Extensible for future buffer mechanisms (e.g., "parquet", "memory").
  */
-function getBufferStorageLabel(_deviceType: string): string {
+function getBufferStorageLabel(_sourceType: string): string {
   // Currently all buffers use SQLite. When new buffer backends are added,
   // the backend should report a storage_type field on ActiveSessionInfo
   // and this function should switch on it.
@@ -130,8 +130,8 @@ export default function SourceList({
     let icon: ReactNode = null;
 
     // Session type detection for styling
-    const isCaptureSession = checkedMultiSourceSession?.deviceType === "buffer";
-    const isMultiSource = checkedMultiSourceSession?.deviceType === "realtime";
+    const isCaptureSession = checkedMultiSourceSession?.sourceType === "buffer";
+    const isMultiSource = checkedMultiSourceSession?.sourceType === "realtime";
 
     if (isCsvSelected) {
       displayName = "CSV, CAN Dump";
@@ -139,7 +139,7 @@ export default function SourceList({
     } else if (isCaptureSession && checkedMultiSourceSession) {
       // Buffer session — show buffer ID + source name from buffer metadata
       displayName = checkedMultiSourceSession.sessionId;
-      const storageBackend = getBufferStorageLabel(checkedMultiSourceSession.deviceType);
+      const storageBackend = getBufferStorageLabel(checkedMultiSourceSession.sourceType);
       // Resolve buffer name from metadata (e.g., "f_bc38de") via captureId or sourceProfileIds
       const captureId = checkedMultiSourceSession.captureId
         ?? (checkedMultiSourceSession.sourceProfileIds ?? [])[0];
@@ -169,8 +169,8 @@ export default function SourceList({
       // Other session types (e.g., single-source recorded sessions like PostgreSQL)
       displayName = checkedMultiSourceSession.sessionId;
       const profile = getProfileForSession(checkedMultiSourceSession.sessionId);
-      const profileName = profile?.name || checkedMultiSourceSession.deviceType;
-      const deviceKind = profile?.kind || checkedMultiSourceSession.deviceType;
+      const profileName = profile?.name || checkedMultiSourceSession.sourceType;
+      const deviceKind = profile?.kind || checkedMultiSourceSession.sourceType;
       subtitle = `└─ ${profileName} (${deviceKind})`;
       icon = <Database className={`${iconMd} text-[color:var(--text-green)]`} />;
     } else if (checkedProfile) {
@@ -248,8 +248,8 @@ export default function SourceList({
 
   // Get display info for a session
   const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
-    const isMultiSource = session.deviceType === "realtime";
-    const isBuffer = session.deviceType === "buffer";
+    const isMultiSource = session.sourceType === "realtime";
+    const isBuffer = session.sourceType === "buffer";
     // Always use session ID as the primary display name
     const displayName = session.sessionId;
 
@@ -282,7 +282,7 @@ export default function SourceList({
       };
     } else if (isBuffer) {
       // Buffer session — cyan database icon, resolve name from buffer metadata
-      const storageBackend = getBufferStorageLabel(session.deviceType);
+      const storageBackend = getBufferStorageLabel(session.sourceType);
       const captureId = session.captureId
         ?? (session.sourceProfileIds ?? [])[0];
       const captureName = captureId ? bufferNames?.get(captureId) : undefined;
@@ -305,8 +305,8 @@ export default function SourceList({
       const profile = sourceProfileIds.length > 0
         ? readProfiles.find((p) => sourceProfileIds.includes(p.id))
         : getProfileForSession(session.sessionId);
-      const profileName = profile?.name || session.deviceType;
-      const deviceKind = profile?.kind || session.deviceType;
+      const profileName = profile?.name || session.sourceType;
+      const deviceKind = profile?.kind || session.sourceType;
       return {
         displayName,
         subtitle: `${session.listenerCount} listener${session.listenerCount !== 1 ? "s" : ""}`,
@@ -356,16 +356,16 @@ export default function SourceList({
                   <div className="flex-1 min-w-0">
                     <div className={`${textMedium} truncate flex items-center gap-2`}>
                       <span>{info.displayName}</span>
-                      {session.state !== "stopped" && session.deviceType !== "buffer" && (
+                      {session.state !== "stopped" && session.sourceType !== "buffer" && (
                         <Radio className={`${iconXs} text-green-500 animate-pulse`} />
                       )}
                     </div>
                     <div className={`${caption} flex items-center gap-2`}>
                       {session.state === "stopped" ? (
                         <span className={badgeSmallWarning}>Stopped</span>
-                      ) : session.state === "paused" && session.deviceType === "buffer" ? (
+                      ) : session.state === "paused" && session.sourceType === "buffer" ? (
                         <span className={badgeSmallInfo}>Paused</span>
-                      ) : session.deviceType === "buffer" ? (
+                      ) : session.sourceType === "buffer" ? (
                         <span className={badgeSmallInfo}>Playing</span>
                       ) : (
                         <span className={badgeSmallSuccess}>Live</span>

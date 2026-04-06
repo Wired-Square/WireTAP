@@ -12,7 +12,7 @@ use tokio_postgres::{NoTls, Row};
 use super::base::{TimelineControl, TimelineReaderState};
 use crate::io::{
     emit_session_error, emit_stream_ended, emit_capture_changed, signal_playback_position,
-    signal_frames_ready, FrameMessage, IOCapabilities, IODevice, IOState, PlaybackPosition,
+    signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition,
     SignalThrottle,
 };
 use crate::capture_store::{self, CaptureKind};
@@ -122,7 +122,7 @@ impl PostgresReader {
 }
 
 #[async_trait]
-impl IODevice for PostgresReader {
+impl IOSource for PostgresReader {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::timeline_can().with_time_range(true)
     }
@@ -192,7 +192,7 @@ impl IODevice for PostgresReader {
         self.reader_state.session_id()
     }
 
-    fn device_type(&self) -> &'static str {
+    fn source_type(&self) -> &'static str {
         "postgres"
     }
 

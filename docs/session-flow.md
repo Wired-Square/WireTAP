@@ -19,7 +19,7 @@ For capture lifecycle and ownership, see [capture-flow.md](capture-flow.md).
 ├─────────────────────────────────────────────────────────────────┤
 │  WebSocket transport        binary frame/event delivery         │
 ├─────────────────────────────────────────────────────────────────┤
-│  Rust backend (io/mod.rs)   IODevice trait, session lifecycle   │
+│  Rust backend (io/mod.rs)   IOSource trait, session lifecycle   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -177,7 +177,7 @@ Defined in [src/stores/sessionStore.ts:711](../src/stores/sessionStore.ts#L711).
 
 A session is an `IOSession` stored in the global `IO_SESSIONS` HashMap in
 [src-tauri/src/io/mod.rs](../src-tauri/src/io/mod.rs). Each session owns a
-`Box<dyn IODevice>` plus listener metadata, source config, profile bookkeeping,
+`Box<dyn IOSource>` plus listener metadata, source config, profile bookkeeping,
 and capabilities.
 
 ```
@@ -212,7 +212,7 @@ stop_and_switch_to_buffer(session_id, speed)       src-tauri/src/io/mod.rs
      ├─ pick frame capture via get_session_capture_ids
      ├─ mark_capture_active
      ├─ orphan capture from session, release profiles
-     ├─ replace_session_device(sessions, id, CaptureSource, …)
+     ├─ replace_session_source(sessions, id, CaptureSource, …)
      └─ emit session-lifecycle scoped (state+caps) → all listeners
                    │
                    ▼
@@ -227,7 +227,7 @@ retained on the `IOSession`.
 
 `resume_session_to_live` rebuilds the original `IOBroker` from the
 stored `source_configs`, calls `profile_tracker::can_use_profile()` for each,
-and then uses `replace_session_device(..., auto_start=true)` to swap in the
+and then uses `replace_session_source(..., auto_start=true)` to swap in the
 live reader.
 
 ### STOP (timeline source)
@@ -241,14 +241,14 @@ listeners stay on the running session if any remain.
 `session.leave()` unregisters one listener and resets that app's local state.
 The session is destroyed only when the **last** listener leaves.
 
-### `replace_session_device` — the shared primitive
+### `replace_session_source` — the shared primitive
 
 All three transitions (stop→buffer, buffer→live, timeline→buffer replay) go
-through [`replace_session_device`](../src-tauri/src/io/mod.rs#L1920):
+through [`replace_session_source`](../src-tauri/src/io/mod.rs#L1920):
 
 1. Stop old device (idempotent — no-op if already stopped).
 2. Record old device type.
-3. Swap `session.device = new_device`.
+3. Swap `session.source = new_device`.
 4. Update `source_names` / `source_configs` if provided.
 5. Clear `suspended_at`.
 6. Optionally `start()` the new device.
@@ -316,7 +316,7 @@ plus `Heartbeat` and `Auth`.
 ### Dispatch path
 
 ```
-IODevice reader task
+IOSource reader task
       │  SourceMessage::Frames
       ▼
 IOBroker merge task
@@ -469,7 +469,7 @@ falls back to polling via an `invoke` command.
 
 ## 9. Transmit
 
-Both `CanFrame` and `RawBytes` go through the unified `IODevice::transmit`
+Both `CanFrame` and `RawBytes` go through the unified `IOSource::transmit`
 method using a `TransmitPayload` enum. The Transmit app chooses its view from
 `InterfaceTraits.protocols` (frame protocols → `CanTransmitView`, byte
 protocols → `SerialTransmitView`) and gates the send itself on
@@ -500,7 +500,7 @@ protocols → `SerialTransmitView`) and gates the send itself on
 
 | File | Role |
 |------|------|
-| [src-tauri/src/io/mod.rs](../src-tauri/src/io/mod.rs) | `IODevice` trait, `IOSession`, lifecycle, `replace_session_device`, heartbeat watchdog |
+| [src-tauri/src/io/mod.rs](../src-tauri/src/io/mod.rs) | `IOSource` trait, `IOSession`, lifecycle, `replace_session_source`, heartbeat watchdog |
 | [src-tauri/src/io/traits.rs](../src-tauri/src/io/traits.rs) | `InterfaceTraits`, `SessionDataStreams`, validation/merge |
 | [src-tauri/src/io/broker/](../src-tauri/src/io/broker/) | `IOBroker` — source aggregator / merge task |
 | [src-tauri/src/io/signal_throttle.rs](../src-tauri/src/io/signal_throttle.rs) | 2 Hz per-signal rate limiter |

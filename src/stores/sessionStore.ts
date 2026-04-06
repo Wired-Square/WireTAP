@@ -39,7 +39,7 @@ import {
   type SessionSuspendedPayload,
   type SessionSwitchedToBufferPayload,
   type SessionResumingPayload,
-  type DeviceReplacedPayload,
+  type SourceReplacedPayload,
   type CanTransmitFrame,
   type TransmitResult,
   type CreateIOSessionOptions,
@@ -270,7 +270,7 @@ export interface SessionCallbacks {
   /** Called when session is resuming with a new buffer - apps should clear their frame lists */
   onResuming?: (payload: SessionResumingPayload) => void;
   /** Called when the session's device is replaced in-place (caps/state change, listeners preserved) */
-  onDeviceReplaced?: (payload: DeviceReplacedPayload) => void;
+  onSourceReplaced?: (payload: SourceReplacedPayload) => void;
 }
 
 /** Session event listeners - one set per session */
@@ -679,9 +679,9 @@ async function setupSessionEventListeners(
         } else {
           updateSession(sessionId, updates);
           if (capabilities) {
-            invokeCallbacks(eventListeners, "onDeviceReplaced", {
-              previous_device_type: "",
-              new_device_type: "",
+            invokeCallbacks(eventListeners, "onSourceReplaced", {
+              previous_source_type: "",
+              new_source_type: "",
               capabilities: capabilities as IOCapabilities,
               state: stateType,
               transition: "",

@@ -110,7 +110,7 @@ export function buildSessionGraph(
     const nodeData: SourceNodeData = {
       profileId: profile.id,
       profileName: profile.name,
-      deviceType: profile.kind,
+      sourceType: profile.kind,
       isRealtime,
       isActive: true,
       outputBuses,
@@ -136,7 +136,7 @@ export function buildSessionGraph(
     const nodeData: SourceNodeData = {
       profileId: captureId,
       profileName: info?.name ?? captureId,
-      deviceType: "sqlite",
+      sourceType: "sqlite",
       isRealtime: false,
       isActive: true,
       captureName: info?.name,

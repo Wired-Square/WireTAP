@@ -26,7 +26,7 @@ use super::socketcan::{encode_frame as encode_socketcan_frame, EncodedFrame};
 use super::traits::{get_traits_for_profile_kind, validate_session_traits};
 use super::types::{SourceMessage, TransmitRequest};
 use super::{
-    CanTransmitFrame, IOCapabilities, IODevice, IOState, InterfaceTraits, SessionDataStreams,
+    CanTransmitFrame, IOCapabilities, IOSource, IOState, InterfaceTraits, SessionDataStreams,
     TransmitPayload, TransmitResult, VirtualBusState, emit_capture_changed,
 };
 use crate::capture_store::{self, CaptureKind};
@@ -444,7 +444,7 @@ impl IOBroker {
 }
 
 #[async_trait]
-impl IODevice for IOBroker {
+impl IOSource for IOBroker {
     fn capabilities(&self) -> IOCapabilities {
         self.combined_capabilities()
     }
@@ -637,7 +637,7 @@ impl IODevice for IOBroker {
         &self.session_id
     }
 
-    fn device_type(&self) -> &'static str {
+    fn source_type(&self) -> &'static str {
         "realtime"
     }
 

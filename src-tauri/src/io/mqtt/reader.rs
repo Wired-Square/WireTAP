@@ -23,7 +23,7 @@ use std::sync::{
 use tauri::AppHandle;
 use tokio::time::Duration;
 
-use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready, FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle};
+use crate::io::{emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle};
 use crate::capture_store::{self, CaptureKind};
 
 // ============================================================================
@@ -152,7 +152,7 @@ impl MqttReader {
 }
 
 #[async_trait]
-impl IODevice for MqttReader {
+impl IOSource for MqttReader {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::realtime_can()
             .with_protocols(vec![Protocol::Can, Protocol::CanFd])

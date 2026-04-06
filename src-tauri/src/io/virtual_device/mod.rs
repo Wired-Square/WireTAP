@@ -23,7 +23,7 @@ use tokio::time::{interval, Duration};
 use crate::capture_store::{self, CaptureKind, TimestampedByte};
 use crate::io::{
     emit_device_connected, emit_stream_ended, now_us, signal_bytes_ready, signal_frames_ready,
-    CanTransmitFrame, FrameMessage, IOCapabilities, IODevice, IOState, Protocol, SignalThrottle,
+    CanTransmitFrame, FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle,
     TransmitPayload, TransmitResult, VirtualBusState,
 };
 
@@ -151,7 +151,7 @@ impl VirtualDeviceReader {
 }
 
 #[async_trait]
-impl IODevice for VirtualDeviceReader {
+impl IOSource for VirtualDeviceReader {
     fn capabilities(&self) -> IOCapabilities {
         let buses: Vec<u8> = self.config.interfaces.iter().map(|i| i.bus).collect();
         let loopback = self.config.loopback;
@@ -184,7 +184,7 @@ impl IODevice for VirtualDeviceReader {
         }
     }
 
-    fn device_type(&self) -> &'static str {
+    fn source_type(&self) -> &'static str {
         "virtual"
     }
 
