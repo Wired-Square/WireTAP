@@ -47,14 +47,14 @@ interface DeviceProbePayload {
 const sessionProfileNameCache = new Map<string, string>();
 
 /**
- * Get profile name from multiSourceConfigs or settings lookup.
+ * Get profile name from brokerConfigs or settings lookup.
  */
 async function resolveProfileName(sessionId: string, profileIds: string[]): Promise<string> {
-  // First try multiSourceConfigs (for multi-source sessions)
+  // First try brokerConfigs (for multi-source sessions)
   try {
     const sessions = await listActiveSessions();
     const session = sessions.find((s) => s.sessionId === sessionId);
-    const names = session?.multiSourceConfigs?.map((c) => c.displayName).filter(Boolean) ?? [];
+    const names = session?.brokerConfigs?.map((c) => c.displayName).filter(Boolean) ?? [];
     if (names.length > 0) return names.join(", ");
   } catch {
     // Fall through to settings lookup

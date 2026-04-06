@@ -175,7 +175,7 @@ export default function SessionManager() {
 
   const handleDisableBusMapping = useCallback(async (sessionId: string, profileId: string, deviceBus: number) => {
     const session = sessions.find((s) => s.sessionId === sessionId);
-    const config = session?.multiSourceConfigs?.find((c) => c.profileId === profileId);
+    const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
     if (!config) return;
 
     const updatedMappings = config.busMappings.map((m) =>
@@ -197,7 +197,7 @@ export default function SessionManager() {
     outputBus: number,
   ) => {
     const session = sessions.find((s) => s.sessionId === sessionId);
-    const config = session?.multiSourceConfigs?.find((c) => c.profileId === profileId);
+    const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
     if (!config) return;
 
     // Re-enable the matching disabled mapping
@@ -223,7 +223,7 @@ export default function SessionManager() {
     newOutputBus: number,
   ) => {
     const session = sessions.find((s) => s.sessionId === sessionId);
-    const config = session?.multiSourceConfigs?.find((c) => c.profileId === profileId);
+    const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
     if (!config) return;
 
     // Add a new enabled mapping

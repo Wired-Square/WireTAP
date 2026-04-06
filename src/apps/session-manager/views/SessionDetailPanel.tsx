@@ -217,7 +217,7 @@ function SessionDetails({
           <div className="mt-1 space-y-1.5">
             {session.sourceProfileIds.map((id) => {
               const profile = profiles.find((p) => p.id === id);
-              const config = session.multiSourceConfigs?.find((c) => c.profileId === id);
+              const config = session.brokerConfigs?.find((c) => c.profileId === id);
               const enabledMappings = config?.busMappings.filter((m) => m.enabled) ?? [];
               return (
                 <div key={id}>
@@ -229,7 +229,7 @@ function SessionDetails({
                     <div className="ml-2 mt-0.5 space-y-0.5">
                       {enabledMappings.map((m) => {
                         // Don't show trash if this is the last enabled mapping on the last source
-                        const totalEnabledAcrossSources = session.multiSourceConfigs?.reduce(
+                        const totalEnabledAcrossSources = session.brokerConfigs?.reduce(
                           (sum, c) => sum + (c.busMappings.filter((b) => b.enabled).length), 0
                         ) ?? 0;
                         const canDisable = totalEnabledAcrossSources > 1;
@@ -368,7 +368,7 @@ function SessionDetails({
               Resume
             </button>
           )}
-          {session.deviceType === "multi_source" && (
+          {session.deviceType === "realtime" && (
             <button
               onClick={() => onAddSource(session.sessionId)}
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-purple-400`}
@@ -470,7 +470,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
 
       {/* Bus Mappings */}
       {usingSessions.length > 0 && usingSessions.some((s) => {
-        const config = s.multiSourceConfigs?.find((c) => c.profileId === profile.id);
+        const config = s.brokerConfigs?.find((c) => c.profileId === profile.id);
         return config?.busMappings.some((m) => m.enabled);
       }) && (
         <div>
@@ -478,7 +478,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
             Bus Mappings
           </label>
           {usingSessions.map((s) => {
-            const config = s.multiSourceConfigs?.find((c) => c.profileId === profile.id);
+            const config = s.brokerConfigs?.find((c) => c.profileId === profile.id);
             const enabledMappings = config?.busMappings.filter((m) => m.enabled) ?? [];
             if (enabledMappings.length === 0) return null;
             return (
@@ -488,7 +488,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
                 )}
                 <div className="ml-2 space-y-0.5">
                   {enabledMappings.map((m) => {
-                    const totalEnabled = s.multiSourceConfigs?.reduce(
+                    const totalEnabled = s.brokerConfigs?.reduce(
                       (sum, c) => sum + (c.busMappings.filter((b) => b.enabled).length), 0
                     ) ?? 0;
                     const canDisable = totalEnabled > 1;
@@ -937,7 +937,7 @@ function EdgeDetails({
   const session = sessions.find((s) => s.sessionId === sessionId);
 
   // Can we disable this mapping? Only if it's not the last enabled mapping
-  const totalEnabled = session?.multiSourceConfigs?.reduce(
+  const totalEnabled = session?.brokerConfigs?.reduce(
     (sum, c) => sum + (c.busMappings.filter((b) => b.enabled).length), 0
   ) ?? 0;
   const canDisable = totalEnabled > 1;

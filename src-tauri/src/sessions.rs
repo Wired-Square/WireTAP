@@ -23,7 +23,7 @@ use crate::{
         ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
         MqttConfig, MqttReader,
         VirtualDeviceConfig, VirtualDeviceReader, VirtualInterfaceConfig, VirtualTrafficType,
-        ModbusRole, MultiSourceReader, SourceConfig,
+        ModbusRole, IOBroker, SourceConfig,
         PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
         CanTransmitFrame, TransmitResult,
         emit_device_probe, DeviceProbePayload,
@@ -272,7 +272,7 @@ fn choose_profile_by_id(settings: &AppSettings, profile_id: Option<&str>) -> Opt
     }
 }
 
-/// Check if a profile kind is a real-time device that can use MultiSourceReader.
+/// Check if a profile kind is a real-time device that can use IOBroker.
 /// These devices support the multi-source architecture for unified session handling.
 fn is_realtime_device(kind: &str) -> bool {
     matches!(
@@ -281,7 +281,7 @@ fn is_realtime_device(kind: &str) -> bool {
     )
 }
 
-/// Create a SourceConfig from an IOProfile for use with MultiSourceReader.
+/// Create a SourceConfig from an IOProfile for use with IOBroker.
 /// This extracts the common device configuration logic used by both single-device
 /// and multi-device session creation.
 ///
@@ -515,14 +515,14 @@ pub async fn create_reader_session(
     let profile_id_for_tracking = profile.id.clone();
 
     // Create the appropriate reader based on profile kind
-    // Real-time devices (gvret, slcan, gs_usb, socketcan) use MultiSourceReader for unified handling
+    // Real-time devices (gvret, slcan, gs_usb, socketcan) use IOBroker for unified handling
     let is_realtime = is_realtime_device(&profile.kind);
     let reader: Box<dyn IODevice> = if is_realtime {
-        // Use MultiSourceReader for all real-time devices (unified path)
+        // Use IOBroker for all real-time devices (unified path)
         let source_config = create_source_config_from_profile(&profile, bus_override)
             .ok_or_else(|| format!("Failed to create source config for profile '{}'", profile.id))?;
 
-        Box::new(MultiSourceReader::single_source(
+        Box::new(IOBroker::single_source(
             app.clone(),
             session_id.clone(),
             source_config,
@@ -1269,13 +1269,13 @@ pub async fn resume_session_to_live(
 
     // Build the new live reader
     let new_reader: Box<dyn IODevice> = if configs.len() == 1 {
-        Box::new(MultiSourceReader::single_source(
+        Box::new(IOBroker::single_source(
             app.clone(),
             session_id.clone(),
             configs.into_iter().next().unwrap(),
         )?)
     } else {
-        Box::new(MultiSourceReader::new(
+        Box::new(IOBroker::new(
             app.clone(),
             session_id.clone(),
             configs,
@@ -1362,7 +1362,7 @@ pub async fn evict_session_listener_cmd(
 }
 
 /// Add a new IO source to an existing multi-source session.
-/// Stops the current device, creates a new MultiSourceReader with all sources (old + new),
+/// Stops the current device, creates a new IOBroker with all sources (old + new),
 /// and restarts. Keeps the same session ID and listeners.
 #[tauri::command(rename_all = "snake_case")]
 pub async fn add_source_to_session_cmd(
@@ -2276,7 +2276,7 @@ pub async fn create_multi_source_session(
         }
     }
 
-    // Validate all profiles are real-time devices supported by MultiSourceReader
+    // Validate all profiles are real-time devices supported by IOBroker
     for config in &source_configs {
         if !is_realtime_device(&config.profile_kind) {
             return Err(format!(
@@ -2324,7 +2324,7 @@ pub async fn create_multi_source_session(
         .map(|c| c.display_name.clone())
         .collect();
     let stored_configs = source_configs.clone();
-    let reader = MultiSourceReader::new(app.clone(), session_id.clone(), source_configs)?;
+    let reader = IOBroker::new(app.clone(), session_id.clone(), source_configs)?;
 
     // Register profile usage BEFORE create_session so lifecycle event has profile IDs
     for profile_id in &profile_ids {

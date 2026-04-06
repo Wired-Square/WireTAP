@@ -63,7 +63,7 @@ export function buildSessionGraph(
   // to match the vertical order of session input handles (avoids edge crossings)
   const profileOutputBus = new Map<string, number>();
   sessions.forEach((session) => {
-    session.multiSourceConfigs?.forEach((config) => {
+    session.brokerConfigs?.forEach((config) => {
       const firstEnabled = config.busMappings.find((m) => m.enabled);
       if (firstEnabled && !profileOutputBus.has(config.profileId)) {
         profileOutputBus.set(config.profileId, firstEnabled.outputBus);
@@ -75,7 +75,7 @@ export function buildSessionGraph(
   const profileDeviceBuses = new Map<string, Set<number>>();
   const profileDisabledBuses = new Map<string, Set<number>>();
   sessions.forEach((session) => {
-    session.multiSourceConfigs?.forEach((config) => {
+    session.brokerConfigs?.forEach((config) => {
       const enabledSet = profileDeviceBuses.get(config.profileId) ?? new Set();
       const disabledSet = profileDisabledBuses.get(config.profileId) ?? new Set();
       for (const m of config.busMappings) {
@@ -161,7 +161,7 @@ export function buildSessionGraph(
     const inputBuses: number[] = [];
     const disabledInputBuses: number[] = [];
     session.sourceProfileIds.forEach((profileId) => {
-      const sourceConfig = session.multiSourceConfigs?.find((c) => c.profileId === profileId);
+      const sourceConfig = session.brokerConfigs?.find((c) => c.profileId === profileId);
       if (!sourceConfig) return;
       const enabledOutputBuses = new Set<number>();
       for (const m of sourceConfig.busMappings) {
@@ -197,7 +197,7 @@ export function buildSessionGraph(
 
     // Create edges from sources to session — one edge per enabled bus mapping
     session.sourceProfileIds.forEach((profileId) => {
-      const sourceConfig = session.multiSourceConfigs?.find((c) => c.profileId === profileId);
+      const sourceConfig = session.brokerConfigs?.find((c) => c.profileId === profileId);
       const enabledMappings = sourceConfig?.busMappings.filter((m) => m.enabled) ?? [];
 
       if (enabledMappings.length === 0) {

@@ -1,6 +1,6 @@
-// io/multi_source/mod.rs
+// io/broker/mod.rs
 //
-// Multi-source reader that combines frames from multiple IO devices.
+// IO broker that combines frames from multiple IO devices.
 // Used for multi-bus capture where frames from diverse sources are merged.
 
 mod merge;
@@ -86,11 +86,12 @@ pub type MergeCmdTx = Arc<Mutex<Option<mpsc::UnboundedSender<MergeCommand>>>>;
 pub type VirtualCmdTx = mpsc::UnboundedSender<VirtualBusCommand>;
 
 // ============================================================================
-// Multi-Source Reader
+// IO Broker
 // ============================================================================
 
-/// Reader that combines frames from multiple IO devices
-pub struct MultiSourceReader {
+/// Broker that sits between IO device producers and session consumers,
+/// routing frames and transmit requests across one or more sources.
+pub struct IOBroker {
     app: AppHandle,
     session_id: String,
     sources: Vec<SourceConfig>,
@@ -119,7 +120,7 @@ pub struct MultiSourceReader {
     virtual_cmd_txs: Arc<Mutex<HashMap<usize, VirtualCmdTx>>>,
 }
 
-impl MultiSourceReader {
+impl IOBroker {
     /// Pause polling for a specific source (by profile ID).
     /// The source stays connected but stops emitting frames.
     pub fn pause_source(&self, profile_id: &str) -> Result<(), String> {
@@ -143,7 +144,7 @@ impl MultiSourceReader {
         Ok(())
     }
 
-    /// Create a multi-source reader with exactly one source.
+    /// Create a broker with exactly one source.
     /// This is the preferred way to create sessions for real-time devices,
     /// as it uses the same code path as multi-device sessions.
     pub fn single_source(
@@ -154,7 +155,7 @@ impl MultiSourceReader {
         Self::new(app, session_id, vec![source])
     }
 
-    /// Create a new multi-source reader
+    /// Create a new IO broker
     ///
     /// Validates that all interfaces have compatible traits:
     /// - All interfaces must have the same temporal mode
@@ -443,7 +444,7 @@ impl MultiSourceReader {
 }
 
 #[async_trait]
-impl IODevice for MultiSourceReader {
+impl IODevice for IOBroker {
     fn capabilities(&self) -> IOCapabilities {
         self.combined_capabilities()
     }
@@ -457,7 +458,7 @@ impl IODevice for MultiSourceReader {
         // If rx was consumed and not recreated (e.g., after error), recreate it
         if self.rx.is_none() {
             tlog!(
-                "[MultiSourceReader] Receiver was consumed, recreating channel for session '{}'",
+                "[IOBroker] Receiver was consumed, recreating channel for session '{}'",
                 self.session_id
             );
             let (tx, rx) = mpsc::channel(SOURCE_CHANNEL_CAPACITY);
@@ -578,7 +579,7 @@ impl IODevice for MultiSourceReader {
 
     async fn stop(&mut self) -> Result<(), String> {
         tlog!(
-            "[MultiSourceReader] Stopping session '{}'",
+            "[IOBroker] Stopping session '{}'",
             self.session_id
         );
 
@@ -592,7 +593,7 @@ impl IODevice for MultiSourceReader {
         // Wait for all tasks to finish
         for handle in self.task_handles.drain(..) {
             if let Err(e) = handle.await {
-                tlog!("[MultiSource] Task panicked during stop: {:?}", e);
+                tlog!("[IOBroker] Task panicked during stop: {:?}", e);
             }
         }
 
@@ -637,7 +638,7 @@ impl IODevice for MultiSourceReader {
     }
 
     fn device_type(&self) -> &'static str {
-        "multi_source"
+        "realtime"
     }
 
     fn set_traffic_enabled(&mut self, enabled: bool) -> Result<(), String> {
@@ -703,7 +704,7 @@ impl IODevice for MultiSourceReader {
             .ok_or_else(|| "Session not running — cannot hot-add source".to_string())?;
         tx.send(MergeCommand::AddSource(source.clone()))
             .map_err(|e| format!("Failed to send add-source command: {}", e))?;
-        // Update local configs so multi_source_configs() reflects the change
+        // Update local configs so broker_configs() reflects the change
         self.sources.push(source);
         Ok(())
     }
@@ -786,7 +787,7 @@ impl IODevice for MultiSourceReader {
         Ok(())
     }
 
-    fn multi_source_configs(&self) -> Option<Vec<SourceConfig>> {
+    fn broker_configs(&self) -> Option<Vec<SourceConfig>> {
         Some(self.sources.clone())
     }
 

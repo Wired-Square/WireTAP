@@ -1,6 +1,6 @@
-// io/multi_source/types.rs
+// io/broker/types.rs
 //
-// Type definitions for multi-source reader sessions.
+// Type definitions for IO broker sessions.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

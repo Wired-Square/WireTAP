@@ -379,7 +379,7 @@ export default function IoSourcePickerDialog({
     if (checkedSourceIds.length === 0) return null;
     // Find a session whose source profiles match our selection
     return activeMultiSourceSessions.find((session) => {
-      const sessionProfileIds = session.multiSourceConfigs?.map((c) => c.profileId) || [];
+      const sessionProfileIds = session.brokerConfigs?.map((c) => c.profileId) || [];
       // Check if selected profiles are a subset of or match the session's profiles
       return checkedSourceIds.every((id) => sessionProfileIds.includes(id));
     }) || null;
@@ -1000,7 +1000,7 @@ export default function IoSourcePickerDialog({
     if (onJoinSession && checkedSourceId) {
       // Check if this is a multi-source session and get source profile IDs
       const multiSourceSession = activeMultiSourceSessions.find((s) => s.sessionId === checkedSourceId);
-      const sourceProfileIds = multiSourceSession?.multiSourceConfigs?.map((c) => c.profileId);
+      const sourceProfileIds = multiSourceSession?.brokerConfigs?.map((c) => c.profileId);
       onJoinSession(checkedSourceId, sourceProfileIds);
     }
     onClose();

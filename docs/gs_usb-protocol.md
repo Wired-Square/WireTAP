@@ -409,4 +409,4 @@ WireTAP probes gs_usb devices before creating a session to verify connectivity a
 | `src-tauri/src/io/gs_usb/codec.rs` | `GsUsbCodec` implementing the `FrameCodec` trait (classic CAN only) |
 | `src-tauri/src/io/gs_usb/linux.rs` | Linux device enumeration via sysfs; maps to SocketCAN interfaces |
 | `src-tauri/src/io/codec.rs` | `FrameCodec` trait definition |
-| `src-tauri/src/io/multi_source/spawner.rs` | Session integration; profile → config mapping |
+| `src-tauri/src/io/broker/spawner.rs` | Session integration; profile → config mapping |

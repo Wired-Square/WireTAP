@@ -171,7 +171,7 @@ export default function SessionCanvas({
 
         // Check if this is re-enabling an existing disabled mapping
         const session = sessions.find((s) => s.sessionId === sessionId);
-        const config = session?.multiSourceConfigs?.find((c) => c.profileId === profileId);
+        const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
         const isDisabledMapping = config?.busMappings.some(
           (m) => m.deviceBus === deviceBus && m.outputBus === outputBus && !m.enabled
         );
@@ -214,7 +214,7 @@ export default function SessionCanvas({
         const outputBus = parseInt(outputBusMatch[1], 10);
 
         const session = sessions.find((s) => s.sessionId === sessionId);
-        const config = session?.multiSourceConfigs?.find((c) => c.profileId === profileId);
+        const config = session?.brokerConfigs?.find((c) => c.profileId === profileId);
 
         // Allow re-enabling disabled mappings
         if (config?.busMappings.some((m) => m.deviceBus === deviceBus && m.outputBus === outputBus && !m.enabled)) {

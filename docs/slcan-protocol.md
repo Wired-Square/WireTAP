@@ -250,4 +250,4 @@ Standard firmware versions formatted as 4 digits (e.g. `1013`) are displayed as 
 | `src-tauri/src/io/slcan/codec.rs` | `SlcanCodec` implementing the `FrameCodec` trait; frame encode/decode |
 | `src-tauri/src/io/slcan/reader.rs` | Device init, probing, streaming read loop, transmit, frame parsing |
 | `src-tauri/src/io/codec.rs` | `FrameCodec` trait definition |
-| `src-tauri/src/io/multi_source/spawner.rs` | Session integration; profile → config mapping |
+| `src-tauri/src/io/broker/spawner.rs` | Session integration; profile → config mapping |

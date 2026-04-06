@@ -22,7 +22,7 @@ pub mod gvret; // GVRET TCP/USB driver
 pub mod modbus_tcp; // pub for scanner command access
 pub mod modbus_rtu; // Modbus RTU master over serial
 mod mqtt;
-mod multi_source;
+mod broker;
 mod virtual_device;
 #[cfg(not(target_os = "ios"))]
 pub mod serial; // pub for Tauri command access (list_serial_ports)
@@ -65,7 +65,7 @@ pub use modbus_tcp::{
 };
 #[cfg(not(target_os = "ios"))]
 pub use gvret::probe_gvret_usb;
-pub use multi_source::{ModbusRole, MultiSourceReader, SourceConfig};
+pub use broker::{ModbusRole, IOBroker, SourceConfig};
 pub use mqtt::{MqttConfig, MqttReader};
 pub use virtual_device::{VirtualDeviceConfig, VirtualDeviceReader, VirtualInterfaceConfig, VirtualTrafficType};
 #[cfg(not(target_os = "ios"))]
@@ -77,8 +77,8 @@ pub use serial::Parity;
 pub use error::IoError;
 
 // Note: SlcanConfig, SlcanReader, SocketCanConfig, SocketIODevice are used internally
-// by MultiSourceReader but not exported from mod.rs since all real-time devices now
-// go through MultiSourceReader
+// by IOBroker but not exported from mod.rs since all real-time devices now
+// go through IOBroker
 
 use async_trait::async_trait;
 #[cfg(not(target_os = "ios"))]
@@ -450,7 +450,7 @@ pub struct ReplaceDeviceOptions {
 /// Payload emitted when a session's device is replaced in-place.
 #[derive(Clone, Debug, Serialize)]
 pub struct DeviceReplacedPayload {
-    /// Previous device type (e.g., "multi_source", "buffer")
+    /// Previous device type (e.g., "realtime", "capture")
     pub previous_device_type: String,
     /// New device type
     pub new_device_type: String,
@@ -519,7 +519,7 @@ pub trait IODevice: Send + Sync {
     #[allow(dead_code)]
     fn session_id(&self) -> &str;
 
-    /// Get device type identifier (e.g., "gvret_tcp", "multi_source")
+    /// Get device type identifier (e.g., "gvret_tcp", "realtime")
     /// Default implementation returns "unknown"
     fn device_type(&self) -> &'static str {
         "unknown"
@@ -547,7 +547,7 @@ pub trait IODevice: Send + Sync {
     }
 
     /// Hot-add a source to a running multi-source session.
-    fn add_source_hot(&mut self, _source: multi_source::SourceConfig) -> Result<(), String> {
+    fn add_source_hot(&mut self, _source: broker::SourceConfig) -> Result<(), String> {
         Err("This device does not support hot source add".to_string())
     }
 
@@ -585,7 +585,7 @@ pub trait IODevice: Send + Sync {
 
     /// For multi-source sessions, return the source configurations.
     /// Default implementation returns None.
-    fn multi_source_configs(&self) -> Option<Vec<multi_source::SourceConfig>> {
+    fn broker_configs(&self) -> Option<Vec<broker::SourceConfig>> {
         None
     }
 
@@ -1099,7 +1099,7 @@ pub struct SessionLifecyclePayload {
     pub session_id: String,
     /// Event type: "created" or "destroyed"
     pub event_type: String,
-    /// Device type (e.g., "gvret_tcp", "multi_source") - only for "created"
+    /// Device type (e.g., "gvret_tcp", "realtime") - only for "created"
     pub device_type: Option<String>,
     /// Current state - only for "created"
     pub state: Option<String>,
@@ -1431,7 +1431,7 @@ pub async fn get_session_source_count(session_id: &str) -> usize {
     let sessions = IO_SESSIONS.lock().await;
     sessions
         .get(session_id)
-        .and_then(|s| s.device.multi_source_configs())
+        .and_then(|s| s.device.broker_configs())
         .map(|c| c.len())
         .unwrap_or(0)
 }
@@ -2487,7 +2487,7 @@ pub async fn session_exists(session_id: &str) -> bool {
 pub struct ActiveSessionInfo {
     /// Session ID
     pub session_id: String,
-    /// Device type (e.g., "gvret_tcp", "multi_source")
+    /// Device type (e.g., "gvret_tcp", "realtime")
     pub device_type: String,
     /// Current state
     pub state: IOState,
@@ -2498,7 +2498,7 @@ pub struct ActiveSessionInfo {
     /// Individual listener details
     pub listeners: Vec<ListenerInfo>,
     /// For multi-source sessions: the source configurations
-    pub multi_source_configs: Option<Vec<multi_source::SourceConfig>>,
+    pub broker_configs: Option<Vec<broker::SourceConfig>>,
     /// Profile IDs feeding this session (populated from SESSION_PROFILES in sessions.rs)
     #[serde(default)]
     pub source_profile_ids: Vec<String>,
@@ -2551,7 +2551,7 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
                 capabilities: session.device.capabilities(),
                 listener_count: session.listeners.len(),
                 listeners,
-                multi_source_configs: session.device.multi_source_configs(),
+                broker_configs: session.device.broker_configs(),
                 source_profile_ids,
                 capture_id,
                 capture_frame_count,
@@ -2850,7 +2850,7 @@ pub async fn evict_session_listener(app: &AppHandle, session_id: &str, listener_
 }
 
 /// Add a new source to an existing multi-source session.
-/// Stops the current device, creates a new MultiSourceReader with all sources (old + new),
+/// Stops the current device, creates a new IOBroker with all sources (old + new),
 /// swaps it into the session, and restarts. Keeps the same session ID and listeners.
 pub async fn add_source_to_session(
     app: &AppHandle,
@@ -2863,7 +2863,7 @@ pub async fn add_source_to_session(
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
     // Get current source configs — only multi-source sessions support this
-    let existing_configs = session.device.multi_source_configs()
+    let existing_configs = session.device.broker_configs()
         .ok_or_else(|| "Session does not support multi-source — cannot add a source".to_string())?;
 
     // Check for duplicate profile
@@ -2888,7 +2888,7 @@ pub async fn add_source_to_session(
         return Ok(capabilities);
     }
 
-    // Cold path: session not running — rebuild the MultiSourceReader
+    // Cold path: session not running — rebuild the IOBroker
     let mut all_configs = existing_configs;
     all_configs.push(new_source);
 
@@ -2896,7 +2896,7 @@ pub async fn add_source_to_session(
         .map(|c| c.display_name.clone())
         .collect();
 
-    let reader = MultiSourceReader::new(app.clone(), session_id.to_string(), all_configs)?;
+    let reader = IOBroker::new(app.clone(), session_id.to_string(), all_configs)?;
     let capabilities = reader.capabilities();
 
     session.device = Box::new(reader);
@@ -2911,7 +2911,7 @@ pub async fn add_source_to_session(
 }
 
 /// Remove a source from an existing multi-source session.
-/// Stops the current device, creates a new MultiSourceReader with the remaining sources
+/// Stops the current device, creates a new IOBroker with the remaining sources
 /// (preserving their bus mappings), swaps it into the session, and restarts.
 pub async fn remove_source_from_session(
     app: &AppHandle,
@@ -2924,7 +2924,7 @@ pub async fn remove_source_from_session(
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
     // Get current source configs — only multi-source sessions support this
-    let existing_configs = session.device.multi_source_configs()
+    let existing_configs = session.device.broker_configs()
         .ok_or_else(|| "Session does not support multi-source — cannot remove a source".to_string())?;
 
     // Check the profile is actually a source
@@ -2945,7 +2945,7 @@ pub async fn remove_source_from_session(
     if matches!(session.device.state(), IOState::Running) {
         session.device.remove_source_hot(profile_id)?;
         // Rebuild source_names from current configs
-        if let Some(configs) = session.device.multi_source_configs() {
+        if let Some(configs) = session.device.broker_configs() {
             session.source_names = configs.iter().map(|c| c.display_name.clone()).collect();
         }
         let capabilities = session.device.capabilities();
@@ -2956,7 +2956,7 @@ pub async fn remove_source_from_session(
         return Ok(capabilities);
     }
 
-    // Cold path: session not running — rebuild the MultiSourceReader
+    // Cold path: session not running — rebuild the IOBroker
     let remaining_configs: Vec<_> = existing_configs
         .into_iter()
         .filter(|c| c.profile_id != profile_id)
@@ -2966,7 +2966,7 @@ pub async fn remove_source_from_session(
         .map(|c| c.display_name.clone())
         .collect();
 
-    let reader = MultiSourceReader::new(app.clone(), session_id.to_string(), remaining_configs)?;
+    let reader = IOBroker::new(app.clone(), session_id.to_string(), remaining_configs)?;
     let capabilities = reader.capabilities();
 
     session.device = Box::new(reader);
@@ -3021,14 +3021,14 @@ pub async fn update_source_bus_mappings(
         .ok_or_else(|| format!("Session '{}' not found", session_id))?;
 
     // Only multi-source sessions support this
-    session.device.multi_source_configs()
+    session.device.broker_configs()
         .ok_or_else(|| "Session does not support multi-source — cannot update bus mappings".to_string())?;
 
     // Delegate to the device implementation (handles hot-swap internally)
     session.device.update_source_bus_mappings(profile_id, bus_mappings)?;
 
     // Rebuild source_names from current configs
-    if let Some(configs) = session.device.multi_source_configs() {
+    if let Some(configs) = session.device.broker_configs() {
         session.source_names = configs.iter().map(|c| c.display_name.clone()).collect();
     }
 

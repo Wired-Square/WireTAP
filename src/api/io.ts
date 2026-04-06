@@ -677,7 +677,7 @@ export interface SessionResumingPayload {
  * Event name: session-device-replaced:{sessionId}
  */
 export interface DeviceReplacedPayload {
-  /** Previous device type (e.g., "multi_source", "buffer") */
+  /** Previous device type (e.g., "realtime", "capture") */
   previous_device_type: string;
   /** New device type */
   new_device_type: string;
@@ -920,7 +920,7 @@ export async function evictSessionListener(
 
 /**
  * Add a new IO source to an existing multi-source session.
- * Stops the current device, creates a new MultiSourceReader with all sources (old + new),
+ * Stops the current device, creates a new IOBroker with all sources (old + new),
  * and restarts. Keeps the same session ID and listeners.
  * @param sessionId The session ID to add the source to
  * @param source The source configuration to add
@@ -1315,7 +1315,7 @@ export async function createMultiSourceSession(
 export interface ActiveSessionInfo {
   /** Session ID */
   sessionId: string;
-  /** Device type (e.g., "gvret_tcp", "multi_source") */
+  /** Device type (e.g., "gvret_tcp", "realtime") */
   deviceType: string;
   /** Current state */
   state: IOStateType;
@@ -1325,8 +1325,8 @@ export interface ActiveSessionInfo {
   listenerCount: number;
   /** Individual listener details */
   listeners: ListenerInfo[];
-  /** For multi-source sessions: the source configurations */
-  multiSourceConfigs: MultiSourceInput[] | null;
+  /** For broker sessions: the source configurations */
+  brokerConfigs: MultiSourceInput[] | null;
   /** Profile IDs feeding this session */
   sourceProfileIds: string[];
   /** Buffer ID owned by this session (if any) */
@@ -1354,7 +1354,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
       registered_seconds_ago: number;
       is_active: boolean;
     }>;
-    multi_source_configs: Array<{
+    broker_configs: Array<{
       profile_id: string;
       display_name: string;
       bus_mappings: Array<{
@@ -1378,7 +1378,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     capabilities: s.capabilities,
     listenerCount: s.listener_count,
     listeners: s.listeners ?? [],
-    multiSourceConfigs: s.multi_source_configs?.map((c) => ({
+    brokerConfigs: s.broker_configs?.map((c) => ({
       profileId: c.profile_id,
       displayName: c.display_name,
       busMappings: c.bus_mappings.map((m) => ({

@@ -1,6 +1,6 @@
-// io/multi_source/spawner.rs
+// io/broker/spawner.rs
 //
-// Per-protocol source spawning for multi-source sessions.
+// Per-protocol source spawning for broker sessions.
 
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};

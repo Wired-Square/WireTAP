@@ -2,6 +2,16 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **MultiSourceReader → IOBroker rename**: Renamed `MultiSourceReader` struct to `IOBroker` and moved the `io/multi_source/` module to `io/broker/`. The broker sits between IO device producers and session consumers, routing frames and transmit requests — the new name reflects this role without implying "multi" or "read-only". Updated all log prefixes (`[MultiSourceReader]` → `[IOBroker]`), the `emit_stream_ended` source tag, and documentation references. `SourceConfig`, `validate_session_traits`, and the `multi_source` trait field are unchanged.
+
+- **device_type `"multi_source"` → `"realtime"`**: The `IOBroker` device type identifier is now `"realtime"` — accurate for both single- and multi-source sessions. Frontend checks in the IO source picker and Session Manager updated to match.
+
+- **`multi_source_configs` → `broker_configs`**: Renamed the `IODevice` trait method, the `ActiveSessionInfo` serialised field, and the frontend `brokerConfigs` property (was `multiSourceConfigs`). All 7 frontend consumers updated across the source picker, session manager, and layout utilities.
+
 ## [0.6.1] - 2026-04-05
 
 ### Changed

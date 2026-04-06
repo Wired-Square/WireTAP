@@ -202,7 +202,7 @@ stop_and_switch_to_buffer(session_id, speed)
 
 ### Resume to live
 
-A new `MultiSourceReader` is built from the session's retained `source_configs`
+A new `IOBroker` is built from the session's retained `source_configs`
 and swapped in via `replace_session_device(..., auto_start=true)`. The orphaned
 historical capture remains in the registry and can be re-selected later from
 the source picker.

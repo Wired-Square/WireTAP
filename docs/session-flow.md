@@ -50,7 +50,7 @@ Every IO source declares its capabilities via two embedded structs on
 ```
 
 Both fields are non-optional on `IOCapabilities`. When multiple interfaces are
-combined through `MultiSourceReader`, `validate_session_traits()` merges them:
+combined through `IOBroker`, `validate_session_traits()` merges them:
 temporal modes must match, protocols are unioned, tx flags are OR'd. Sources
 with `multi_source: false` cannot be combined with others.
 
@@ -225,7 +225,7 @@ retained on the `IOSession`.
 
 ### RESUME to live
 
-`resume_session_to_live` rebuilds the original `MultiSourceReader` from the
+`resume_session_to_live` rebuilds the original `IOBroker` from the
 stored `source_configs`, calls `profile_tracker::can_use_profile()` for each,
 and then uses `replace_session_device(..., auto_start=true)` to swap in the
 live reader.
@@ -319,7 +319,7 @@ plus `Heartbeat` and `Auth`.
 IODevice reader task
       │  SourceMessage::Frames
       ▼
-MultiSourceReader merge task
+IOBroker merge task
       │  sorts by timestamp, batches, writes to capture_store
       ▼
 capture_store::append_frames_to_session(session_id, frames)
@@ -502,7 +502,7 @@ protocols → `SerialTransmitView`) and gates the send itself on
 |------|------|
 | [src-tauri/src/io/mod.rs](../src-tauri/src/io/mod.rs) | `IODevice` trait, `IOSession`, lifecycle, `replace_session_device`, heartbeat watchdog |
 | [src-tauri/src/io/traits.rs](../src-tauri/src/io/traits.rs) | `InterfaceTraits`, `SessionDataStreams`, validation/merge |
-| [src-tauri/src/io/multi_source/](../src-tauri/src/io/multi_source/) | `MultiSourceReader` — source aggregator / merge task |
+| [src-tauri/src/io/broker/](../src-tauri/src/io/broker/) | `IOBroker` — source aggregator / merge task |
 | [src-tauri/src/io/signal_throttle.rs](../src-tauri/src/io/signal_throttle.rs) | 2 Hz per-signal rate limiter |
 | [src-tauri/src/io/post_session.rs](../src-tauri/src/io/post_session.rs) | 10 s TTL cache for post-session fetches |
 | [src-tauri/src/ws/server.rs](../src-tauri/src/ws/server.rs) | WS server, channel allocation, auth |

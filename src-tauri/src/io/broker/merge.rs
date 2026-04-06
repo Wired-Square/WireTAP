@@ -1,4 +1,4 @@
-// io/multi_source/merge.rs
+// io/broker/merge.rs
 //
 // Merge task that spawns sub-readers and combines their frames/bytes.
 
@@ -46,8 +46,8 @@ pub(super) async fn run_merge_task(
     let settings = match settings::load_settings(app.clone()).await {
         Ok(s) => s,
         Err(e) => {
-            tlog!("[MultiSourceReader] Failed to load settings: {}", e);
-            emit_stream_ended(&session_id, "error", "MultiSourceReader");
+            tlog!("[IOBroker] Failed to load settings: {}", e);
+            emit_stream_ended(&session_id, "error", "IOBroker");
             return;
         }
     };
@@ -64,7 +64,7 @@ pub(super) async fn run_merge_task(
             Some(p) => p.clone(),
             None => {
                 tlog!(
-                    "[MultiSourceReader] Profile '{}' not found",
+                    "[IOBroker] Profile '{}' not found",
                     source_config.profile_id
                 );
                 continue;
@@ -134,14 +134,14 @@ pub(super) async fn run_merge_task(
                         }
                     }
                     Some(SourceMessage::Ended(source_idx, reason)) => {
-                        tlog!("[MultiSourceReader] Source {} ended: {}", source_idx, reason);
+                        tlog!("[IOBroker] Source {} ended: {}", source_idx, reason);
                         if let Ok(mut channels) = transmit_channels.lock() {
                             channels.remove(&source_idx);
                         }
                         active_sources = active_sources.saturating_sub(1);
                     }
                     Some(SourceMessage::Error(source_idx, error)) => {
-                        tlog!("[MultiSourceReader] Source {} error: {}", source_idx, error);
+                        tlog!("[IOBroker] Source {} error: {}", source_idx, error);
                         if let Ok(mut channels) = transmit_channels.lock() {
                             channels.remove(&source_idx);
                         }
@@ -149,13 +149,13 @@ pub(super) async fn run_merge_task(
                         active_sources = active_sources.saturating_sub(1);
                     }
                     Some(SourceMessage::TransmitReady(source_idx, tx_sender)) => {
-                        tlog!("[MultiSourceReader] Source {} transmit channel ready", source_idx);
+                        tlog!("[IOBroker] Source {} transmit channel ready", source_idx);
                         if let Ok(mut channels) = transmit_channels.lock() {
                             channels.insert(source_idx, tx_sender);
                         }
                     }
                     Some(SourceMessage::Connected(source_idx, device_type, address, bus_number)) => {
-                        tlog!("[MultiSourceReader] Source {} connected: {} at {}", source_idx, device_type, address);
+                        tlog!("[IOBroker] Source {} connected: {} at {}", source_idx, device_type, address);
                         emit_device_connected(&session_id, &device_type, &address, bus_number);
                     }
                     None => {
@@ -172,7 +172,7 @@ pub(super) async fn run_merge_task(
                         let profile = match settings.io_profiles.iter().find(|p| p.id == source_config.profile_id) {
                             Some(p) => p.clone(),
                             None => {
-                                tlog!("[MultiSourceReader] Hot-add: profile '{}' not found", source_config.profile_id);
+                                tlog!("[IOBroker] Hot-add: profile '{}' not found", source_config.profile_id);
                                 continue;
                             }
                         };
@@ -195,27 +195,27 @@ pub(super) async fn run_merge_task(
                         );
                         source_handles.push(handle);
                         active_sources += 1;
-                        tlog!("[MultiSourceReader] Hot-added source {} (profile '{}')", idx, source_config.profile_id);
+                        tlog!("[IOBroker] Hot-added source {} (profile '{}')", idx, source_config.profile_id);
                     }
                     Some(MergeCommand::RemoveSource(profile_id)) => {
                         if let Some(flag) = source_stop_flags.get(&profile_id) {
                             flag.store(true, Ordering::SeqCst);
-                            tlog!("[MultiSourceReader] Hot-removing source (profile '{}')", profile_id);
+                            tlog!("[IOBroker] Hot-removing source (profile '{}')", profile_id);
                         } else {
-                            tlog!("[MultiSourceReader] Hot-remove: profile '{}' not found in stop flags", profile_id);
+                            tlog!("[IOBroker] Hot-remove: profile '{}' not found in stop flags", profile_id);
                         }
                         // The source reader will send Ended, which decrements active_sources
                     }
                     Some(MergeCommand::PauseSource(profile_id)) => {
                         if let Some(flag) = source_pause_flags.get(&profile_id) {
                             flag.store(true, Ordering::Relaxed);
-                            tlog!("[MultiSourceReader] Paused source polling (profile '{}')", profile_id);
+                            tlog!("[IOBroker] Paused source polling (profile '{}')", profile_id);
                         }
                     }
                     Some(MergeCommand::ResumeSource(profile_id)) => {
                         if let Some(flag) = source_pause_flags.get(&profile_id) {
                             flag.store(false, Ordering::Relaxed);
-                            tlog!("[MultiSourceReader] Resumed source polling (profile '{}')", profile_id);
+                            tlog!("[IOBroker] Resumed source polling (profile '{}')", profile_id);
                         }
                     }
                     None => {
@@ -238,7 +238,7 @@ pub(super) async fn run_merge_task(
                 .map(|(bus, count)| format!("bus {}: {}", bus, count))
                 .collect();
             tlog!(
-                "[MultiSourceReader] Frame counts per bus: {}",
+                "[IOBroker] Frame counts per bus: {}",
                 counts_str.join(", ")
             );
             last_bus_log = std::time::Instant::now();
@@ -301,7 +301,7 @@ pub(super) async fn run_merge_task(
     } else {
         "complete"
     };
-    emit_stream_ended(&session_id, reason, "MultiSourceReader");
+    emit_stream_ended(&session_id, reason, "IOBroker");
 }
 
 /// Spawn a single source reader task. Creates a virtual command channel for virtual sources.

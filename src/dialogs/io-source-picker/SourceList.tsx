@@ -131,7 +131,7 @@ export default function SourceList({
 
     // Session type detection for styling
     const isCaptureSession = checkedMultiSourceSession?.deviceType === "buffer";
-    const isMultiSource = checkedMultiSourceSession?.deviceType === "multi_source";
+    const isMultiSource = checkedMultiSourceSession?.deviceType === "realtime";
 
     if (isCsvSelected) {
       displayName = "CSV, CAN Dump";
@@ -150,7 +150,7 @@ export default function SourceList({
     } else if (isMultiSource && checkedMultiSourceSession) {
       // Multi-source session - show session ID as name, sources with bus mappings below
       displayName = checkedMultiSourceSession.sessionId;
-      const sourceDetails = checkedMultiSourceSession.multiSourceConfigs
+      const sourceDetails = checkedMultiSourceSession.brokerConfigs
         ?.map((c) => {
           const name = c.displayName || c.profileId;
           const enabledMappings = c.busMappings.filter((m) => m.enabled);
@@ -248,14 +248,14 @@ export default function SourceList({
 
   // Get display info for a session
   const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
-    const isMultiSource = session.deviceType === "multi_source";
+    const isMultiSource = session.deviceType === "realtime";
     const isBuffer = session.deviceType === "buffer";
     // Always use session ID as the primary display name
     const displayName = session.sessionId;
 
     if (isMultiSource) {
       // Multi-source session: show sources with bus mappings
-      const sourceDetails = session.multiSourceConfigs
+      const sourceDetails = session.brokerConfigs
         ?.map((c) => {
           const name = c.displayName || c.profileId;
           const enabledMappings = c.busMappings.filter((m) => m.enabled);
