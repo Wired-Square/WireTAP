@@ -27,7 +27,7 @@ export { isCaptureProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToBufferReplay, stopAndSwitchToCapture, resumeSessionToLive, type StreamEndedInfo, type IOCapabilities } from "../api/io";
+import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, stopAndSwitchToCapture, resumeSessionToLive, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -38,7 +38,7 @@ import { WINDOW_EVENTS } from "../events/registry";
  * Generate a unique session ID for recorded sources.
  * Pattern: t_{shortId}
  * - t_ = recorded (postgres, csv, or other recorded sources)
- * - b_ = buffer replay (viewing stored buffer data)
+ * - b_ = capture replay (viewing stored capture data)
  */
 function generateRecordedSessionId(): string {
   const shortId = Math.random().toString(16).slice(2, 8);
@@ -109,7 +109,7 @@ export interface UseIOSessionManagerOptions {
   initialProfileId?: string | null;
   /** Enable ingest session support */
   enableIngest?: boolean;
-  /** Callback before ingest starts (e.g., to clear buffer) */
+  /** Callback before ingest starts (e.g., to clear capture) */
   onBeforeIngestStart?: () => Promise<void>;
   /** Callback when ingest completes */
   onIngestComplete?: (payload: IngestStreamEndedInfo) => Promise<void>;
@@ -125,11 +125,11 @@ export interface UseIOSessionManagerOptions {
   onTimeUpdate?: (position: PlaybackPosition) => void;
   /** Callback when stream ends */
   onStreamEnded?: (payload: StreamEndedInfo) => void;
-  /** Callback when session is suspended (stopped with buffer available) */
+  /** Callback when session is suspended (stopped with capture available) */
   onSuspended?: (payload: import("../api/io").SessionSuspendedPayload) => void;
-  /** Callback when buffer playback completes */
+  /** Callback when capture playback completes */
   onStreamComplete?: () => void;
-  /** Callback when playback speed changes (from any listener on this session) */
+  /** Callback when playback speed changes (from any subscriber on this session) */
   onSpeedChange?: (speed: number) => void;
 
   // ---- Session Switching Callbacks ----
@@ -144,7 +144,7 @@ export interface UseIOSessionManagerOptions {
   /** Called after session is reconfigured (bookmark jump, time range change) */
   onSessionReconfigured?: (info: SessionReconfigurationInfo) => void;
   /** Called when session is destroyed externally (e.g., from Sessions app).
-   *  Receives orphaned buffer IDs so apps can switch to buffer mode. */
+   *  Receives orphaned capture IDs so apps can switch to capture mode. */
   onSessionDestroyed?: (orphanedBufferIds: string[]) => void;
 }
 
@@ -165,7 +165,7 @@ export interface UseIOSessionManagerResult {
   multiBusProfiles: string[];
   /** Set multi-bus profiles */
   setMultiBusProfiles: (profiles: string[]) => void;
-  /** Source profile ID (preserved when switching to buffer) */
+  /** Source profile ID (preserved when switching to capture) */
   sourceProfileId: string | null;
   /** Set source profile ID */
   setSourceProfileId: (profileId: string | null) => void;
@@ -185,11 +185,11 @@ export interface UseIOSessionManagerResult {
   isPaused: boolean;
   /** Whether stopped with a profile selected (realtime mode only) */
   isStopped: boolean;
-  /** Whether in buffer mode and can return to live streaming */
+  /** Whether in capture mode and can return to live streaming */
   canReturnToLive: boolean;
   /** Whether realtime (live device) */
   isRealtime: boolean;
-  /** Whether in buffer mode */
+  /** Whether in capture mode */
   isCaptureMode: boolean;
   /** Whether session is ready */
   sessionReady: boolean;
@@ -209,11 +209,11 @@ export interface UseIOSessionManagerResult {
   isDetached: boolean;
   /** Rejoin after detaching */
   handleRejoin: () => Promise<void>;
-  /** Leave session — unregister listener, fully reset app state (no data preserved) */
+  /** Leave session — unregister subscriber, fully reset app state (no data preserved) */
   handleLeave: () => Promise<void>;
   /** Destroy the session entirely */
   handleDestroy: () => Promise<void>;
-  /** Clear the session's buffer (real-time/recorded: clear data; buffer: delete + leave) */
+  /** Clear the session's capture (real-time/recorded: clear data; capture: delete + leave) */
   handleClearBuffer: () => Promise<void>;
 
   // ---- Watch State (for top bar display) ----
@@ -241,7 +241,7 @@ export interface UseIOSessionManagerResult {
   stopLoad: () => Promise<void>;
   /** Clear ingest error */
   clearIngestError: () => void;
-  /** Unified ingest from one or more sources (fast ingest, auto-transitions to buffer reader) */
+  /** Unified ingest from one or more sources (fast ingest, auto-transitions to capture reader) */
   loadSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
 
   // ---- Multi-Bus Session Handlers ----
@@ -261,9 +261,9 @@ export interface UseIOSessionManagerResult {
   watchSource: (profileIds: string[], options: LoadOptions) => Promise<void>;
   /** Stop watching (stop session, clear watch state) */
   stopWatch: () => Promise<void>;
-  /** Suspend the session - stops streaming, finalizes buffer, session stays alive */
+  /** Suspend the session - stops streaming, finalises capture, session stays alive */
   suspendSession: () => Promise<void>;
-  /** Resume a suspended session with a fresh buffer (orphans old buffer) */
+  /** Resume a suspended session with a fresh capture (orphans old capture) */
   resumeWithNewBuffer: () => Promise<void>;
   /** Connect to a profile without streaming (creates session in stopped state, for Query app) */
   connectOnly: (profileId: string, options?: LoadOptions) => Promise<void>;
@@ -429,7 +429,7 @@ export function useIOSessionManager(
 
   // ---- Derived Values ----
   // Effective session ID: multiSessionId takes priority (all realtime sources now use it),
-  // ioProfile is fallback (recorded sources, buffer profiles)
+  // ioProfile is fallback (recorded sources, capture profiles)
   const effectiveSessionId = multiSessionId ?? ioProfile ?? undefined;
 
   // Profile name for display
@@ -534,7 +534,7 @@ export function useIOSessionManager(
   }, [appName, onBeforeWatch, streamCompletedRef]);
 
   // Handler for when session resumes to live (another app clicked Resume)
-  // This clears frames so the app doesn't show old buffer frames mixed with new live frames
+  // This clears frames so the app doesn't show old capture frames mixed with new live frames
   const handleResuming = useCallback(() => {
     tlog.debug(`[IOSessionManager:${appName}] Session resuming to live - clearing state`);
     // Call the same cleanup as before watch
@@ -554,17 +554,17 @@ export function useIOSessionManager(
     tlog.debug(`[IOSessionManager:${appName}] Stream ended, isLoading=${isLoadingRef.current}, payload: ${JSON.stringify(payload)}`);
 
     if (isLoadingRef.current && payload.capture_available) {
-      // Ingest completed with buffer available - switch to buffer replay mode
-      tlog.debug(`[IOSessionManager:${appName}] Ingest complete - switching to buffer replay mode`);
+      // Ingest completed with capture available - switch to capture replay mode
+      tlog.debug(`[IOSessionManager:${appName}] Ingest complete - switching to capture replay mode`);
 
       const sessionId = loadSessionIdRef.current;
       if (sessionId) {
         try {
-          // Switch session to buffer replay mode (keeps session alive, swaps reader)
-          await switchSessionToBufferReplay(sessionId, 1.0);
-          tlog.debug(`[IOSessionManager:${appName}] Session '${sessionId}' now in buffer replay mode`);
+          // Switch session to capture replay mode (keeps session alive, swaps reader)
+          await switchSessionToCaptureReplay(sessionId, 1.0);
+          tlog.debug(`[IOSessionManager:${appName}] Session '${sessionId}' now in capture replay mode`);
         } catch (e) {
-          tlog.info(`[IOSessionManager:${appName}] Failed to switch to buffer replay: ${e}`);
+          tlog.info(`[IOSessionManager:${appName}] Failed to switch to capture replay: ${e}`);
           setLoadError(e instanceof Error ? e.message : String(e));
         }
       }
@@ -577,8 +577,8 @@ export function useIOSessionManager(
         await onIngestCompleteRef.current(payload);
       }
     } else if (isLoadingRef.current) {
-      // Ingest ended without buffer (error or empty)
-      tlog.debug(`[IOSessionManager:${appName}] Ingest ended without buffer`);
+      // Ingest ended without capture (error or empty)
+      tlog.debug(`[IOSessionManager:${appName}] Ingest ended without capture`);
       setIsLoading(false);
       if (onIngestCompleteRef.current) {
         await onIngestCompleteRef.current(payload);
@@ -590,9 +590,9 @@ export function useIOSessionManager(
   }, [appName, onStreamEnded]);
 
   // Handle external session destruction (e.g., destroyed from Sessions app)
-  // Switches to buffer mode if orphaned buffers are available, otherwise clears state
+  // Switches to capture mode if orphaned captures are available, otherwise clears state
   const handleSessionDestroyed = useCallback((orphanedBufferIds: string[]) => {
-    tlog.info(`[IOSessionManager:${appName}] Session destroyed externally, orphaned buffers: ${JSON.stringify(orphanedBufferIds)}`);
+    tlog.info(`[IOSessionManager:${appName}] Session destroyed externally, orphaned captures: ${JSON.stringify(orphanedBufferIds)}`);
 
     // Clear app state (frame lists, etc.)
     onBeforeWatch?.();
@@ -609,7 +609,7 @@ export function useIOSessionManager(
     setWatchUniqueFrameCount(0);
     streamCompletedRef.current = false;
 
-    // Switch to orphaned buffer if available, otherwise clear profile
+    // Switch to orphaned capture if available, otherwise clear profile
     if (orphanedBufferIds.length > 0) {
       const captureId = orphanedBufferIds[0];
       setIoProfile(captureId);
@@ -618,7 +618,7 @@ export function useIOSessionManager(
       setIoProfile(null);
     }
 
-    // Notify app with orphaned buffer IDs so it can set up buffer mode
+    // Notify app with orphaned capture IDs so it can set up capture mode
     onSessionDestroyed?.(orphanedBufferIds);
   }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
 
@@ -633,13 +633,13 @@ export function useIOSessionManager(
     onTimeUpdate,
     onStreamEnded: handleStreamEndedWithIngest,
     onSuspended,
-    onSwitchedToBuffer: (payload) => {
+    onSwitchedToCapture: (payload) => {
       // Fires for ALL apps on the session (including the one that clicked Stop).
       // Session stays the same — isCaptureMode is now derived from capabilities
-      // (temporal_mode="buffer"). sourceProfileId stays set so canReturnToLive works.
+      // (temporal_mode="capture"). sourceProfileId stays set so canReturnToLive works.
       setIsWatching(false);
       setMultiBusProfiles([]); // Clear device profile IDs so Data Source picker doesn't show old device
-      tlog.debug(`[IOSessionManager:${appName}] Session switched to buffer by event, buffer=${payload.buffer_id}`);
+      tlog.debug(`[IOSessionManager:${appName}] Session switched to capture by event, capture=${payload.capture_id}`);
     },
     onStreamComplete,
     onSpeedChange,
@@ -655,17 +655,17 @@ export function useIOSessionManager(
   const isStreaming = !isDetached && (readerState === "running" || readerState === "paused");
   const isPaused = readerState === "paused";
   const isRealtime = session.capabilities?.traits.temporal_mode === "realtime";
-  // Buffer mode = viewing buffer data. Detected via:
-  // 1. Profile ID is a buffer ID (direct buffer selection), OR
-  // 2. Session capabilities report temporal_mode="buffer" (device switched to BufferReader)
+  // Capture mode = viewing capture data. Detected via:
+  // 1. Profile ID is a capture ID (direct capture selection), OR
+  // 2. Session capabilities report temporal_mode="capture" (device switched to CaptureSource)
   const isCaptureMode = isCaptureProfileId(ioProfile) || isCaptureProfileId(sourceProfileId)
-    || session.capabilities?.traits.temporal_mode === "buffer";
+    || session.capabilities?.traits.temporal_mode === "capture";
   // Stopped with a profile selected (ready to restart)
   // For realtime sources: can restart the live stream
   // For recorded sources: can restart from the beginning
   const isStopped = !isDetached && readerState === "stopped" && ioProfile !== null;
-  // Can return to live: was originally a realtime source but switched to buffer replay
-  // Detected by isCaptureMode + sourceProfileId being a real profile (not a buffer ID itself)
+  // Can return to live: was originally a realtime source but switched to capture replay
+  // Detected by isCaptureMode + sourceProfileId being a real profile (not a capture ID itself)
   const canReturnToLive = !isDetached && isCaptureMode && sourceProfileId !== null && !isCaptureProfileId(sourceProfileId);
   const sessionReady = session.isReady;
   const capabilities = session.capabilities;
@@ -677,7 +677,7 @@ export function useIOSessionManager(
   // - Realtime/Recorded → stop source and switch to capture replay in-place
   const handleLeave = useCallback(async () => {
     const currentIsCaptureMode = isCaptureProfileId(ioProfile) || isCaptureProfileId(sourceProfileId)
-      || session.capabilities?.traits.temporal_mode === "buffer";
+      || session.capabilities?.traits.temporal_mode === "capture";
 
     if (currentIsCaptureMode) {
       // Already viewing a capture → "second leave" → No Source.
@@ -735,18 +735,18 @@ export function useIOSessionManager(
     // Note: the session destruction will emit lifecycle events that update the UI
   }, [session.sessionId, setMultiBusProfiles]);
 
-  // Clear buffer — behaviour depends on source type:
-  // Real-time/recorded: clear buffer data in backend (session keeps running)
-  // Buffer (non-persistent): delete buffer + leave session
+  // Clear capture — behaviour depends on source type:
+  // Real-time/recorded: clear capture data in backend (session keeps running)
+  // Buffer (non-persistent): delete capture + leave session
   const handleClearBuffer = useCallback(async () => {
     const { clearCaptureData, deleteCapture } = await import("../api/capture");
-    // For buffer sessions, sourceProfileId holds the buf_N ID;
-    // for real-time/recorded sessions the buffer ID is on the session object.
+    // For capture sessions, sourceProfileId holds the buf_N ID;
+    // for real-time/recorded sessions the capture ID is on the session object.
     const bid = isCaptureProfileId(sourceProfileId) ? sourceProfileId : session.captureId;
 
     if (isCaptureProfileId(sourceProfileId)) {
-      // Buffer mode: delete buffer + leave session (clean leave, no suspend/copy)
-      tlog.info(`[IOSessionManager] Clear buffer: deleting buffer ${bid} and leaving session`);
+      // Capture mode: delete capture + leave session (clean leave, no suspend/copy)
+      tlog.info(`[IOSessionManager] Clear capture: deleting capture ${bid} and leaving session`);
       if (bid) {
         await deleteCapture(bid);
         useSessionStore.getState().removeKnownCaptureId(bid);
@@ -759,8 +759,8 @@ export function useIOSessionManager(
       setIsWatching(false);
       setIsDetached(false);
     } else {
-      // Real-time or recorded: clear buffer data, session continues streaming
-      tlog.info(`[IOSessionManager] Clear buffer: clearing data for buffer ${bid}`);
+      // Real-time or recorded: clear capture data, session continues streaming
+      tlog.info(`[IOSessionManager] Clear capture: clearing data for capture ${bid}`);
       if (bid) await clearCaptureData(bid);
     }
   }, [session, ioProfile, setMultiBusProfiles, setIoProfile]);
@@ -898,7 +898,7 @@ export function useIOSessionManager(
 
   // Unified watch method: handles both single and multi-source sessions.
   // Routes multi-source-capable (realtime) profiles through startMultiBusSession,
-  // and non-multi-source (recorded/buffer) profiles through session.reinitialize().
+  // and non-multi-source (recorded/capture) profiles through session.reinitialize().
   const watchSource = useCallback(async (
     profileIds: string[],
     opts: LoadOptions,
@@ -910,7 +910,7 @@ export function useIOSessionManager(
     const isSingleNonMulti = profileIds.length === 1 && !allMultiSource;
 
     if (isSingleNonMulti) {
-      // Timeline/buffer: reinitialize path
+      // Recorded/capture: reinitialize path
       onBeforeWatch?.();
       const profileId = profileIds[0];
       const isBuffer = isCaptureProfileId(profileId);
@@ -971,8 +971,8 @@ export function useIOSessionManager(
 
 
   // Stop watching: for realtime sources, atomically stop and switch ALL listeners
-  // to buffer replay. For recorded sources (postgres, csv), suspend and switch to
-  // buffer replay so users can step through buffered frames.
+  // to capture replay. For recorded sources (postgres, csv), suspend and switch to
+  // capture replay so users can step through captured frames.
   const stopWatch = useCallback(async () => {
     if (!session.sessionId) return;
 
@@ -996,9 +996,9 @@ export function useIOSessionManager(
     await session.suspend();
     try {
       await session.switchToBufferReplay(1.0);
-      tlog.debug(`[IOSessionManager:${appName}] Switched to buffer replay mode after stop`);
+      tlog.debug(`[IOSessionManager:${appName}] Switched to capture replay mode after stop`);
     } catch (e) {
-      tlog.info(`[IOSessionManager:${appName}] Failed to switch to buffer replay after stop: ${e}`);
+      tlog.info(`[IOSessionManager:${appName}] Failed to switch to capture replay after stop: ${e}`);
     }
     setIsWatching(false);
   }, [session, appName]);
@@ -1006,15 +1006,15 @@ export function useIOSessionManager(
   // Suspend session: alias for stopWatch (kept for backward compatibility)
   const suspendSession = stopWatch;
 
-  // Resume a suspended session: return to live if possible, otherwise restart buffer
+  // Resume a suspended session: return to live if possible, otherwise restart capture
   const resumeWithNewBuffer = useCallback(async () => {
     onBeforeWatch?.();
 
     if (canReturnToLive && effectiveSessionId) {
-      // Session was stopped from live → buffer; reconnect to the live device
+      // Session was stopped from live → capture; reconnect to the live device
       await resumeSessionToLive(effectiveSessionId);
     } else {
-      // Buffer or recorded replay — just restart the buffer
+      // Buffer or recorded replay — just restart the capture
       await session.resumeFresh();
     }
 
@@ -1023,7 +1023,7 @@ export function useIOSessionManager(
     streamCompletedRef.current = false;
   }, [session, onBeforeWatch, resetWatchFrameCount, canReturnToLive, effectiveSessionId]);
 
-  // Unified load method: fast ingest without rendering, auto-transitions to buffer reader.
+  // Unified load method: fast ingest without rendering, auto-transitions to capture reader.
   // Handles both single and multi-source sessions.
   const loadSource = useCallback(async (
     profileIds: string[],
@@ -1055,7 +1055,7 @@ export function useIOSessionManager(
 
     try {
       if (isSingleNonMulti) {
-        // Timeline/buffer: reinitialize path with speed=0
+        // Recorded/capture: reinitialize path with speed=0
         const profileId = profileIds[0];
         await session.reinitialize(profileId, {
           startTime: opts.startTime,
@@ -1120,7 +1120,7 @@ export function useIOSessionManager(
 
   // Connect only: create session without streaming (for Query app)
   // Creates/joins the session with skipAutoStart to prevent auto-starting playback sources.
-  // Also marks our listener as INACTIVE so we don't receive frames even if session is running.
+  // Also marks our subscriber as INACTIVE so we don't receive frames even if session is running.
   // This is useful when:
   // - Postgres session is new: session stays stopped, Query won't receive frames
   // - Postgres session is shared (Discovery streaming): Query joins but won't receive frames
@@ -1140,12 +1140,12 @@ export function useIOSessionManager(
       sessionIdOverride: sessionId,
     });
 
-    // Mark our listener as INACTIVE so we don't receive frames
+    // Mark our subscriber as INACTIVE so we don't receive frames
     // This is the key difference from watchSource - we connect but don't stream
     try {
       await setSessionSubscriberActive(sessionId, appName, false);
     } catch {
-      // Ignore - listener may not be fully registered yet
+      // Ignore - subscriber may not be fully registered yet
     }
 
     // Clear multi-bus state when connecting to a single source
@@ -1185,7 +1185,7 @@ export function useIOSessionManager(
 
       // For recorded sources:
       // - If jumping to a bookmark for the same profile we're already watching, reuse the session ID
-      //   (other apps stay connected, buffer is finalized and new one created)
+      //   (other apps stay connected, capture is finalised and new one created)
       // - If switching to a different profile, generate a unique session ID
       const targetProfile = ioProfiles.find((p) => p.id === targetProfileId);
       const isRecorded = targetProfile ? !isRealtimeProfile(targetProfile) : false;
@@ -1224,7 +1224,7 @@ export function useIOSessionManager(
       // Step 4: Reconfigure or reinitialize (backend auto-starts and may send frames)
       if (isSameProfile && ioProfile && isRecorded) {
         // Same profile, recorded source - use reconfigure to keep session alive
-        // This stops the stream, orphans old buffer, creates new buffer, and restarts
+        // This stops the stream, orphans old capture, creates new capture, and restarts
         // Other apps joined to this session stay connected
         // Suppress the session-reconfigured event handler since we already ran cleanup
         selfReconfigureRef.current++;
@@ -1296,13 +1296,13 @@ export function useIOSessionManager(
   );
 
   // Select a profile: clear multi-bus, set profile, set default speed
-  // App handlers call this for common logic, then add buffer-specific or app-specific logic
+  // App handlers call this for common logic, then add capture-specific or app-specific logic
   const selectProfile = useCallback((profileId: string | null) => {
     // Clear multi-bus state when selecting a single profile
     setMultiBusProfiles([]);
     setIoProfile(profileId);
 
-    // Set default speed from the selected profile if it has one (non-buffer only)
+    // Set default speed from the selected profile if it has one (non-capture only)
     if (profileId && !isCaptureProfileId(profileId)) {
       const profile = ioProfiles.find((p) => p.id === profileId);
       if (profile && profile.kind === "postgres" && profile.connection?.default_speed) {

@@ -135,7 +135,7 @@ One row per capture. Survives `ALTER TABLE RENAME` from the legacy
 |--------|------|------|
 | `capture_db` | `src-tauri/src/capture_db.rs` | All SQLite operations. Owns the `Mutex<Connection>`. |
 | `capture_store` | `src-tauri/src/capture_store.rs` | Public API. Metadata in RAM (`RwLock<CaptureRegistry>`), delegates data ops to `capture_db`. |
-| `CaptureSource` | `src-tauri/src/io/timeline/capture.rs` | Playback engine. Reads chunks from `capture_db` for streaming. |
+| `CaptureSource` | `src-tauri/src/io/recorded/capture.rs` | Playback engine. Reads chunks from `capture_db` for streaming. |
 
 ### Data flow
 

@@ -73,7 +73,7 @@ impl CaptureSource {
 impl IOSource for CaptureSource {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::recorded_can()
-            .with_temporal_mode(TemporalMode::Buffer)
+            .with_temporal_mode(TemporalMode::Capture)
             .with_seek(true)
             .with_reverse(true)
             .with_buses(self.buses.clone())
@@ -181,7 +181,7 @@ impl IOSource for CaptureSource {
     }
 
     fn source_type(&self) -> &'static str {
-        "buffer"
+        "capture"
     }
 }
 

@@ -13,7 +13,7 @@ For capture lifecycle and ownership, see [capture-flow.md](capture-flow.md).
 ├─────────────────────────────────────────────────────────────────┤
 │  useIOSessionManager        app-level orchestration             │
 ├─────────────────────────────────────────────────────────────────┤
-│  useIOSession               per-listener React hook             │
+│  useIOSession               per-subscriber React hook           │
 ├─────────────────────────────────────────────────────────────────┤
 │  sessionStore               Zustand state, WS message routing   │
 ├─────────────────────────────────────────────────────────────────┤
@@ -70,7 +70,7 @@ with `multi_source: false` cannot be combined with others.
 | FrameLink         | [io/framelink/](../src-tauri/src/io/framelink/) | realtime | (per rule) | ✓ | ✗        | ✓     |
 | Virtual device    | [io/virtual_device/](../src-tauri/src/io/virtual_device/) | realtime | can\|serial | loopback | loopback | ✓ |
 | PostgreSQL        | [io/recorded/postgres.rs](../src-tauri/src/io/recorded/postgres.rs) | recorded | can | ✗ | ✗ | ✗ |
-| Buffer replay     | [io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs) | buffer | (inherited) | ✗ | ✗ | ✗ |
+| Capture replay    | [io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs) | capture | (inherited) | ✗ | ✗ | ✗ |
 
 ¹ Framed serial (SLIP, Modbus RTU, delimiter) emits frames, not raw bytes.
 
@@ -78,7 +78,7 @@ with `multi_source: false` cannot be combined with others.
 
 ## 2. Source selection
 
-All sources — hardware devices, databases, timelines, and buffers — are
+All sources — hardware devices, databases, recorded sources, and captures — are
 selected through a single dialog, [IoSourcePickerDialog](../src/dialogs/IoSourcePickerDialog.tsx).
 
 ```
@@ -87,7 +87,7 @@ selected through a single dialog, [IoSourcePickerDialog](../src/dialogs/IoSource
 │    (SessionControls)   │                    │                          │
 └────────────────────────┘                    │  Loads on open:          │
                                               │   • IO profiles          │
-                                              │   • Orphaned buffers     │
+                                              │   • Orphaned captures    │
                                               │   • Active sessions      │
                                               │   • Profile usage map    │
                                               │   • Bookmarks            │
@@ -96,11 +96,11 @@ selected through a single dialog, [IoSourcePickerDialog](../src/dialogs/IoSource
                                      ┌─────────────────┼─────────────────┐
                                      ▼                 ▼                 ▼
                                realtime source   recorded source     pick an active
-                               (profile)         (postgres, buffer)  session to join
+                               (profile)         (postgres, capture) session to join
 ```
 
 Action buttons are **trait-driven**. A source with `temporal_mode: "realtime"`
-gets `[Connect]`; a `timeline` source gets `[Load]` and `[Connect]`. An
+gets `[Connect]`; a `recorded` source gets `[Load]` and `[Connect]`. An
 existing session gets `[Join]` / `[Restart]` / `[Resume & Join]`. Joinability
 is gated by `InterfaceTraits.multi_source`.
 
@@ -119,14 +119,14 @@ useIOSourcePickerHandlers
         ▼
 useIOSessionManager
         │   watchSource(profileIds[], opts)       unified entry
-        │   loadSource(profileIds[], opts)        (timeline ingest)
+        │   loadSource(profileIds[], opts)        (recorded ingest)
         │   joinSession(sessionId)
         │   ── generates session ID (see § prefixes)
         │   ── onBeforeWatch callbacks
         │   ── flags: isWatching / isLoading
         ▼
-useIOSession              (wraps one sessionStore session for one listener)
-        │   ── registers unique listenerId
+useIOSession              (wraps one sessionStore session for one subscriber)
+        │   ── registers unique subscriberId
         │   ── subscribes to WS messages for this session
         │   ── exposes start/stop/pause/resume/seek/leave/reinitialize
         ▼
@@ -141,10 +141,10 @@ Format: `{prefix}_{6-hex}`.
 | Prefix | Meaning                                                    | Generated in |
 |--------|------------------------------------------------------------|--------------|
 | `f_`   | realtime + rx_frames (CAN, framed serial, GVRET, gs_usb…)  | [useIOSessionManager.ts:297-350](../src/hooks/useIOSessionManager.ts#L297-L350) |
-| `b_`   | realtime + rx_bytes (raw serial), or buffer replay session | [useIOSessionManager.ts:47-50](../src/hooks/useIOSessionManager.ts#L47-L50), :340 |
+| `b_`   | realtime + rx_bytes (raw serial), or capture replay session | [useIOSessionManager.ts:47-50](../src/hooks/useIOSessionManager.ts#L47-L50), :340 |
 | `m_`   | realtime + modbus protocol                                 | :341-342 |
 | `s_`   | realtime fallback                                          | :346, :785 |
-| `t_`   | timeline (PostgreSQL, CSV import, other recorded)          | [useIOSessionManager.ts:42-45](../src/hooks/useIOSessionManager.ts#L42-L45) |
+| `t_`   | recorded (PostgreSQL, CSV import)                           | [useIOSessionManager.ts:42-45](../src/hooks/useIOSessionManager.ts#L42-L45) |
 
 Captures have their own immutable `capture_id` (6–8 char random string such
 as `xk9m2p`). **The capture ID is not the session ID** — a session replaying
@@ -156,17 +156,17 @@ a capture gets a fresh `b_` session ID that owns the capture. See
 Defined in [src/stores/sessionStore.ts:711](../src/stores/sessionStore.ts#L711).
 
 1. Check if the session already exists locally (connected) — if so, register
-   another listener and return.
+   another subscriber and return.
 2. Check if the session exists in the Rust backend via `getIOSessionState`.
 3. Destroy any session that was left in `error` state.
 4. Create or join:
-   - **4a** Backend exists: `registerSessionListener` → read caps/state/capture.
+   - **4a** Backend exists: `registerSessionSubscriber` → read caps/state/capture.
    - **4b** Backend missing: `createIOSession` (or `createCaptureSourceSession`
-     for capture replay) then `registerSessionListener`.
+     for capture replay) then `registerSessionSubscriber`.
 5. Subscribe to the session's WebSocket channel and wire message handlers
    (see [§ WebSocket transport](#websocket-transport)). Start the heartbeat
    interval.
-6. **Step 5.5** — auto-start playback for timeline sources (PostgreSQL, CSV).
+6. **Step 5.5** — auto-start playback for recorded sources (PostgreSQL, CSV).
    Capture replay sessions explicitly do **not** auto-start — the user drives
    playback manually. See [sessionStore.ts:992-999](../src/stores/sessionStore.ts#L992-L999).
 7. Create/update the `Session` entry in the Zustand store and return.
@@ -177,7 +177,7 @@ Defined in [src/stores/sessionStore.ts:711](../src/stores/sessionStore.ts#L711).
 
 A session is an `IOSession` stored in the global `IO_SESSIONS` HashMap in
 [src-tauri/src/io/mod.rs](../src-tauri/src/io/mod.rs). Each session owns a
-`Box<dyn IOSource>` plus listener metadata, source config, profile bookkeeping,
+`Box<dyn IOSource>` plus subscriber metadata, source config, profile bookkeeping,
 and capabilities.
 
 Every session eventually becomes a capture. The unified lifecycle is:
@@ -228,7 +228,7 @@ stop_and_switch_to_capture(session_id, speed)       src-tauri/src/io/mod.rs
      ├─ mark_capture_active
      ├─ orphan capture from session, release profiles
      ├─ replace_session_source(sessions, id, CaptureSource, …)
-     └─ emit session-lifecycle scoped (state+caps) → all listeners
+     └─ emit session-lifecycle scoped (state+caps) → all subscribers
                    │
                    ▼
         Every subscribed app receives the WS SessionLifecycle message
@@ -241,7 +241,7 @@ an error and `handleLeave` falls back to a full disconnect.
 ### LEAVE (capture) — "second leave"
 
 When a user presses Leave while already viewing a capture, `handleLeave`
-calls `session.leave()` to unregister the listener, fully resets app state,
+calls `session.leave()` to unregister the subscriber, fully resets app state,
 and the session is destroyed.
 
 ### Play / Pause
@@ -268,7 +268,7 @@ it (marks it persistent). The speed button is always visible but greyed out
 
 ### `replace_session_source` — the shared primitive
 
-All three transitions (stop→buffer, buffer→live, timeline→buffer replay) go
+All three transitions (stop→capture, capture→live, recorded→capture replay) go
 through [`replace_session_source`](../src-tauri/src/io/mod.rs#L1920):
 
 1. Stop old device (idempotent — no-op if already stopped).
@@ -278,7 +278,7 @@ through [`replace_session_source`](../src-tauri/src/io/mod.rs#L1920):
 5. Clear `suspended_at`.
 6. Optionally `start()` the new device.
 7. Emit a `session-lifecycle` scoped message containing the new state and
-   capabilities so all listeners pick up the change.
+   capabilities so all subscribers pick up the change.
 
 It takes `&mut HashMap<String, IOSession>` rather than the lock itself, so
 callers can hold `IO_SESSIONS` across their full operation and avoid
@@ -317,13 +317,13 @@ Per-session (channel 1..254):
 |---------|-------|---------|
 | `FrameData`         | 0x01 | Binary batch of `FrameEnvelope` records |
 | `SessionState`      | 0x02 | IO state change (stopped/starting/running/paused/error) |
-| `StreamEnded`       | 0x03 | Stream finished with reason + finalised buffer info |
+| `StreamEnded`       | 0x03 | Stream finished with reason + finalised capture info |
 | `SessionError`      | 0x04 | Error string |
 | `PlaybackPosition`  | 0x05 | timestamp_us / frame_index / frame_count |
 | `DeviceConnected`   | 0x06 | A source inside a multi-source session connected |
-| `BufferChanged`     | 0x07 | Buffer created/orphaned; frontend re-fetches |
-| `SessionLifecycle`  | 0x08 | State + capabilities inline; covers device-replaced, resuming, switched-to-buffer |
-| `SessionInfo`       | 0x09 | Speed, listener count |
+| `CaptureChanged`    | 0x07 | Capture created/orphaned; frontend re-fetches |
+| `SessionLifecycle`  | 0x08 | State + capabilities inline; covers device-replaced, resuming, switched-to-capture |
+| `SessionInfo`       | 0x09 | Speed, subscriber count |
 | `Reconfigured`      | 0x0A | Session was reconfigured (time range, bookmark) |
 
 Global (channel 0):
@@ -367,8 +367,8 @@ ws::dispatch::send_new_frames(session_id)
 ```
 
 The 2 Hz throttle lives in [io/signal_throttle.rs](../src-tauri/src/io/signal_throttle.rs).
-Readers write frames into the buffer as fast as they arrive; `send_new_frames`
-pulls from the buffer and pushes to the WS channel at most twice per second.
+Readers write frames into the capture as fast as they arrive; `send_new_frames`
+pulls from the capture and pushes to the WS channel at most twice per second.
 `SignalThrottle::flush()` is called on stream stop so the final batch is
 delivered immediately.
 
@@ -391,7 +391,7 @@ Not everything is on WS. These remain Tauri-emitted:
 - `session-lifecycle` broadcast of created/destroyed (also mirrored on WS
   global channel).
 - `device-probe` — device discovery progress.
-- `listener-evicted` — when the watchdog kicks a stale listener.
+- `subscriber-evicted` — when the watchdog kicks a stale subscriber.
 - `store:changed` — settings changes.
 - `menu-*` — native menu actions.
 - `modbus-scan:*` — scanner progress.
@@ -399,7 +399,7 @@ Not everything is on WS. These remain Tauri-emitted:
 ### post_session cache
 
 When a session ends, its `StreamEndedInfo`, errors, source info, and
-orphaned-buffer IDs are written to [io/post_session.rs](../src-tauri/src/io/post_session.rs)
+orphaned-capture IDs are written to [io/post_session.rs](../src-tauri/src/io/post_session.rs)
 with a 10-second TTL. This exists so a client that unsubscribes in the same
 tick a stream ends can still fetch the outcome via command.
 
@@ -407,7 +407,7 @@ tick a stream ends can still fetch the outcome via command.
 
 ## 6. Watch vs Load (ingest)
 
-Timeline sources (PostgreSQL, buffer) offer two modes. Realtime sources only
+Recorded sources (PostgreSQL, capture) offer two modes. Realtime sources only
 support Watch.
 
 ```
@@ -416,17 +416,17 @@ support Watch.
             ┌───────────────┴───────────────┐
             ▼                               ▼
       [Connect] Watch                 [Load] Ingest
-                                      (timeline only)
+                                      (recorded only)
             │                               │
             ▼                               ▼
-   Frames flow via WS to              Frames counted into buffer
+   Frames flow via WS to              Frames counted into capture
    app onFrames callbacks.            (no UI rendering, fast ingest).
    Dialog closes immediately.         Dialog stays open showing progress.
                                       On StreamEnded, auto-switch to
-                                      buffer replay and close dialog.
+                                      capture replay and close dialog.
 ```
 
-After a Load the session transitions into buffer replay; both paths end with
+After a Load the session transitions into capture replay; both paths end with
 apps receiving frames through the same `onFrames` callback chain.
 
 ---
@@ -439,7 +439,7 @@ apps receiving frames through the same `onFrames` callback chain.
 └──────────────┘                      │
                                       ▼
                              Session "f_abc123"
-                             listeners: [Discovery]
+                             subscribers: [Discovery]
                                       │
         ┌─────────────────────────────┼─────────────────────────────┐
         ▼                             ▼                             ▼
@@ -450,15 +450,15 @@ apps receiving frames through the same `onFrames` callback chain.
 └──────────────┘              └──────────────┘              └──────────────┘
                                       │
                              Session "f_abc123"
-                             listeners: [Discovery, Decoder, Graph, Transmit]
+                             subscribers: [Discovery, Decoder, Graph, Transmit]
                              Frames → all four apps via the same WS channel.
                              Playback position, speed, and state are shared.
                                       │
-                         Last listener leaves → destroy_session
+                         Last subscriber leaves → destroy_session
 ```
 
-Each app registers a unique `listenerId`. The Rust side tracks them in
-`SessionListener` records and destroys the session when the last one leaves.
+Each app registers a unique `subscriberId`. The Rust side tracks them in
+`SessionSubscriber` records and destroys the session when the last one leaves.
 
 ---
 
@@ -467,9 +467,9 @@ Each app registers a unique `listenerId`. The Rust side tracks them in
 Defined in [io/mod.rs:616-624](../src-tauri/src/io/mod.rs#L616-L624):
 
 ```
-HEARTBEAT_TIMEOUT_SECS          = 30   // listener is stale after 30s silence
+HEARTBEAT_TIMEOUT_SECS          = 30   // subscriber is stale after 30s silence
 HEARTBEAT_CHECK_INTERVAL_SECS   = 5    // watchdog runs every 5s
-SUSPENSION_GRACE_PERIOD_SECS    = 300  // session survives 5 min with no listeners
+SUSPENSION_GRACE_PERIOD_SECS    = 300  // session survives 5 min with no subscribers
 ```
 
 Watchdog loop:
@@ -477,12 +477,12 @@ Watchdog loop:
 ```
 every 5s:
   for each session:
-    for each listener:
-      if now - last_heartbeat > 30s: remove listener
-    if session has no listeners:
+    for each subscriber:
+      if now - last_heartbeat > 30s: remove subscriber
+    if session has no subscribers:
       if not yet suspended: pause device, set suspended_at = now
       else if now - suspended_at > 5 min: destroy_session
-    if listener heartbeats resume: clear suspended_at, device.resume()
+    if subscriber heartbeats resume: clear suspended_at, device.resume()
 ```
 
 The 30-second stale threshold (up from 10s) is tuned for WKWebView timer
@@ -511,12 +511,12 @@ protocols → `SerialTransmitView`) and gates the send itself on
 | [src/components/SessionControls.tsx](../src/components/SessionControls.tsx) | `SessionButton`, `SessionActionButtons`, playback controls |
 | [src/dialogs/IoSourcePickerDialog.tsx](../src/dialogs/IoSourcePickerDialog.tsx) | Unified source selection dialog |
 | [src/dialogs/io-source-picker/ActionButtons.tsx](../src/dialogs/io-source-picker/ActionButtons.tsx) | Trait-driven action buttons |
-| [src/dialogs/io-source-picker/LoadOptions.tsx](../src/dialogs/io-source-picker/LoadOptions.tsx) | Timeline options (time bounds, speed) |
+| [src/dialogs/io-source-picker/LoadOptions.tsx](../src/dialogs/io-source-picker/LoadOptions.tsx) | Recorded source options (time bounds, speed) |
 | [src/dialogs/io-source-picker/FramingOptions.tsx](../src/dialogs/io-source-picker/FramingOptions.tsx) | Serial framing options |
 | [src/hooks/useIOSourcePickerHandlers.ts](../src/hooks/useIOSourcePickerHandlers.ts) | Dialog → session manager bridge |
 | [src/hooks/useIOSessionManager.ts](../src/hooks/useIOSessionManager.ts) | `watchSource` / `loadSource` / `joinSession` orchestration |
-| [src/hooks/useIOSession.ts](../src/hooks/useIOSession.ts) | Per-listener session hook |
-| [src/hooks/useBufferSession.ts](../src/hooks/useBufferSession.ts) | Buffer switching helper |
+| [src/hooks/useIOSession.ts](../src/hooks/useIOSession.ts) | Per-subscriber session hook |
+| [src/hooks/useCaptureSession.ts](../src/hooks/useCaptureSession.ts) | Capture switching helper |
 | [src/stores/sessionStore.ts](../src/stores/sessionStore.ts) | Zustand store, `openSession`, WS routing to callbacks |
 | [src/services/wsTransport.ts](../src/services/wsTransport.ts) | WebSocket client, subscribe/unsubscribe, message decode |
 | [src/api/io.ts](../src/api/io.ts) | `IOCapabilities`, `InterfaceTraits`, `SessionDataStreams` types, Tauri command wrappers |

@@ -326,7 +326,7 @@ export default function IoSourcePickerDialog({
       console.error(`[IoSourcePickerDialog] Buffer probe failed for ${captureId}:`, err);
       setDeviceProbeResultMap((prev) => new Map(prev).set(captureId, {
         success: false,
-        sourceType: "buffer",
+        sourceType: "capture",
         isMultiBus: false,
         busCount: 0,
         primaryInfo: null,
@@ -370,7 +370,7 @@ export default function IoSourcePickerDialog({
   // Get the session for the checked profile (if any) to check its state
   const checkedProfileSession = checkedSourceId ? getSessionForProfile(checkedSourceId) : undefined;
   const isCheckedProfileStopped = checkedProfileSession?.ioState === "stopped";
-  const isCheckedProfileBuffer = checkedProfileSession?.capabilities?.traits?.temporal_mode === "buffer";
+  const isCheckedProfileBuffer = checkedProfileSession?.capabilities?.traits?.temporal_mode === "capture";
 
   // DEBUG: log source picker state for buffer session diagnosis
   if (checkedSourceId && checkedProfileSession) {
@@ -562,7 +562,7 @@ export default function IoSourcePickerDialog({
         // - supports_time_range && !is_realtime: recorded sources like PostgreSQL
         const joinableSessions = sessions.filter((s) =>
           s.capabilities.traits.multi_source === true ||
-          s.sourceType === "buffer" ||
+          s.sourceType === "capture" ||
           (s.capabilities.supports_time_range && s.capabilities.traits.temporal_mode === "recorded")
         );
         console.log("[IoSourcePickerDialog] Joinable sessions:", joinableSessions);
@@ -1656,7 +1656,7 @@ export default function IoSourcePickerDialog({
                 probeError={selectedCaptureId ? deviceProbeResultMap.get(selectedCaptureId)?.error ?? null : null}
                 activeSessionBufferMap={new Map(
                   activeMultiSourceSessions
-                    .filter((s) => s.sourceType === "buffer")
+                    .filter((s) => s.sourceType === "capture")
                     .flatMap((s) => {
                       const entries: [string, string][] = [[s.sessionId, s.sessionId]];
                       if (s.captureId) entries.push([s.captureId, s.sessionId]);

@@ -87,12 +87,12 @@ export function useMenuSessionControl({
 
     // Show "Capture" instead of the original device name when in capture replay mode
     const effectiveProfileName =
-      capabilities?.traits.temporal_mode === "buffer" ? "Capture" : profileName;
+      capabilities?.traits.temporal_mode === "capture" ? "Capture" : profileName;
 
     const bookmarksEnabled =
       !!bookmarks &&
       (capabilities?.traits.temporal_mode === "recorded" ||
-        capabilities?.traits.temporal_mode === "buffer");
+        capabilities?.traits.temporal_mode === "capture");
 
     updateMenuState({
       hasSession: true,

@@ -14,9 +14,9 @@ import type { FrameMessage } from "../types/frame";
  * Temporal mode of an interface/session.
  * - "realtime": Live streaming from hardware (GVRET, slcan, gs_usb, SocketCAN, MQTT)
  * - "recorded": Recorded playback (PostgreSQL, CSV)
- * - "buffer": Buffer replay from captured data
+ * - "capture": Capture replay from previously captured data
  */
-export type TemporalMode = "realtime" | "recorded" | "buffer";
+export type TemporalMode = "realtime" | "recorded" | "capture";
 
 /**
  * Protocol family for frame-based communication.
@@ -79,9 +79,9 @@ export interface IOCapabilities {
   supports_time_range: boolean;
   /** Supports speed control (PostgreSQL: true, GVRET: false) */
   supports_speed_control: boolean;
-  /** Supports seeking to a specific timestamp (BufferReader: true, others: false) */
+  /** Supports seeking to a specific timestamp (CaptureSource: true, others: false) */
   supports_seek: boolean;
-  /** Supports reverse playback (BufferReader: true, others: false) */
+  /** Supports reverse playback (CaptureSource: true, others: false) */
   supports_reverse?: boolean;
   /** Supports extended (29-bit) CAN IDs */
   supports_extended_id: boolean;
@@ -151,7 +151,7 @@ export interface CreateIOSessionOptions {
   limit?: number;
   /** File path for file-based readers */
   filePath?: string;
-  /** Use the shared buffer reader instead of a profile-based reader */
+  /** Use the shared capture source instead of a profile-based reader */
   useBuffer?: boolean;
 
   // Serial framing configuration
@@ -188,7 +188,7 @@ export interface CreateIOSessionOptions {
   subscriberId?: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   appName?: string;
-  /** Buffer ID for buffer reader sessions (e.g., "xk9m2p") */
+  /** Capture ID for capture source sessions (e.g., "xk9m2p") */
   captureId?: string;
   /** Modbus TCP poll groups as JSON string (catalog-derived, for modbus_tcp profiles) */
   modbusPollsJson?: string;
@@ -201,7 +201,7 @@ export interface CreateIOSessionOptions {
 export async function createIOSession(
   options: CreateIOSessionOptions
 ): Promise<IOCapabilities> {
-  // Use buffer reader if requested
+  // Use capture source if requested
   if (options.useBuffer) {
     return invoke("create_capture_source_session", {
       session_id: options.sessionId,
@@ -356,9 +356,9 @@ export async function resumeSourcePolling(sessionId: string, profileId: string):
 }
 
 /**
- * Suspend a reader session - stops streaming, finalizes buffer, session stays alive.
- * The buffer remains owned by the session and all joined apps can view it.
- * Use `resumeReaderSessionFresh` to start streaming again with a new buffer.
+ * Suspend a reader session - stops streaming, finalises capture, session stays alive.
+ * The capture remains owned by the session and all joined apps can view it.
+ * Use `resumeReaderSessionFresh` to start streaming again with a new capture.
  * Returns the confirmed state after the operation.
  */
 export async function suspendReaderSession(sessionId: string): Promise<IOState> {
@@ -366,9 +366,9 @@ export async function suspendReaderSession(sessionId: string): Promise<IOState> 
 }
 
 /**
- * Resume a suspended session with a fresh buffer.
- * The old buffer is orphaned (becomes available for standalone viewing).
- * A new buffer is created for the session and streaming starts.
+ * Resume a suspended session with a fresh capture.
+ * The old capture is orphaned (becomes available for standalone viewing).
+ * A new capture is created for the session and streaming starts.
  * Returns the confirmed state after the operation.
  */
 export async function resumeReaderSessionFresh(sessionId: string): Promise<IOState> {
@@ -376,9 +376,9 @@ export async function resumeReaderSessionFresh(sessionId: string): Promise<IOSta
 }
 
 /**
- * Copy a buffer for an app that is detaching from a session.
- * Creates an orphaned copy of the buffer that can be used standalone.
- * Returns the new buffer ID.
+ * Copy a capture for an app that is detaching from a session.
+ * Creates an orphaned copy of the capture that can be used standalone.
+ * Returns the new capture ID.
  */
 export async function copyBufferForDetach(
   captureId: string,
@@ -492,7 +492,7 @@ export async function updateReaderTimeRange(
 
 /**
  * Reconfigure a running session with new time range.
- * This stops the current stream, orphans the old buffer, creates a new buffer,
+ * This stops the current stream, orphans the old capture, creates a new capture,
  * and starts streaming with the new time range - all while keeping the session alive.
  * Other apps joined to this session remain connected.
  */
@@ -536,7 +536,7 @@ export async function getProfileUsage(profileId: string): Promise<ProfileUsage |
 
 /**
  * Seek a reader session to a specific timestamp.
- * Only works for readers that support seeking (e.g., BufferReader).
+ * Only works for readers that support seeking (e.g., CaptureSource).
  * @param sessionId The session ID
  * @param timestampUs The target timestamp in microseconds
  */
@@ -549,7 +549,7 @@ export async function seekReaderSession(
 
 /**
  * Seek a reader session to a specific frame index.
- * Preferred over timestamp-based seeking for buffer playback as it avoids floating-point issues.
+ * Preferred over timestamp-based seeking for capture playback as it avoids floating-point issues.
  * @param sessionId The session ID
  * @param frameIndex The target frame index (0-based)
  */
@@ -565,7 +565,7 @@ export async function seekReaderSessionByFrame(
 
 /**
  * Set playback direction for a reader session.
- * Only works for readers that support reverse playback (e.g., BufferReader).
+ * Only works for readers that support reverse playback (e.g., CaptureSource).
  * @param sessionId The session ID
  * @param reverse true for backwards playback, false for forward
  */
@@ -577,7 +577,7 @@ export async function updateReaderDirection(
 }
 
 /**
- * Result of a step operation in the buffer.
+ * Result of a step operation in the capture.
  */
 export interface StepResult {
   /** The new frame index after stepping */
@@ -587,20 +587,20 @@ export interface StepResult {
 }
 
 /**
- * Playback position - emitted with playback-time events during buffer streaming.
+ * Playback position - emitted with playback-time events during capture streaming.
  */
 export interface PlaybackPosition {
   /** Current timestamp in microseconds */
   timestamp_us: number;
   /** Current frame index (0-based) */
   frame_index: number;
-  /** Total frame count in buffer (optional, for recorded sources) */
+  /** Total frame count in capture (optional, for recorded sources) */
   frame_count?: number;
 }
 
 /**
- * Step one frame forward or backward in the buffer.
- * Only works for buffer readers when paused.
+ * Step one frame forward or backward in the capture.
+ * Only works for capture sources when paused.
  * @param sessionId The session ID
  * @param currentFrameIndex The current frame index (0-based), or null to use timestamp
  * @param currentTimestampUs The current timestamp in microseconds (used if frame index is null)
@@ -627,53 +627,50 @@ export async function stepBufferFrame(
 }
 
 /**
- * Payload sent when a session is suspended (stopped with buffer available).
- * Event name: session-suspended:{sessionId}
+ * Payload sent when a session is suspended (stopped with capture available).
  */
 export interface SessionSuspendedPayload {
-  /** ID of the session's buffer */
-  buffer_id: string | null;
-  /** Number of items in the buffer */
-  buffer_count: number;
-  /** Buffer type: "frames" or "bytes" */
-  buffer_type: "frames" | "bytes" | null;
+  /** ID of the session's capture */
+  capture_id: string | null;
+  /** Number of items in the capture */
+  capture_count: number;
+  /** Capture kind: "frames" or "bytes" */
+  capture_kind: "frames" | "bytes" | null;
   /** Time range of captured data [first_us, last_us] or null if empty */
   time_range: [number, number] | null;
 }
 
 /**
- * Payload emitted when a realtime session is stopped and switched to buffer replay.
- * All listeners on the session receive this event and should transition to buffer mode.
- * Event name: session-switched-to-buffer:{sessionId}
+ * Payload emitted when a realtime session is stopped and switched to capture replay.
+ * All subscribers on the session receive this event and should transition to capture mode.
  */
-export interface SessionSwitchedToBufferPayload {
-  /** ID of the session's buffer */
-  buffer_id: string | null;
-  /** Number of items in the buffer */
-  buffer_count: number;
-  /** Buffer type: "frames" or "bytes" */
-  buffer_type: "frames" | "bytes" | null;
+export interface SessionSwitchedToCapturePayload {
+  /** ID of the session's capture */
+  capture_id: string | null;
+  /** Number of items in the capture */
+  capture_count: number;
+  /** Capture kind: "frames" or "bytes" */
+  capture_kind: "frames" | "bytes" | null;
   /** Time range of captured data [first_us, last_us] or null if empty */
   time_range: [number, number] | null;
-  /** New capabilities after switching to BufferReader */
+  /** New capabilities after switching to CaptureSource */
   capabilities: IOCapabilities;
 }
 
 /**
- * Payload sent when a session is resuming with a new buffer.
+ * Payload sent when a session is resuming with a new capture.
  * Apps should clear their frame lists when receiving this event.
- * Event name: session-resuming:{sessionId}
  */
 export interface SessionResumingPayload {
-  /** ID of the new buffer being created */
-  new_buffer_id: string;
-  /** ID of the old buffer that was orphaned (available for standalone viewing) */
-  orphaned_buffer_id: string | null;
+  /** ID of the new capture being created */
+  new_capture_id: string;
+  /** ID of the old capture that was orphaned (available for standalone viewing) */
+  orphaned_capture_id: string | null;
 }
 
 /**
  * Payload sent when a session's source is replaced in-place.
- * The session ID and all listeners are preserved.
+ * The session ID and all subscribers are preserved.
  * Event name: session-source-replaced:{sessionId}
  */
 export interface SourceReplacedPayload {
@@ -685,7 +682,7 @@ export interface SourceReplacedPayload {
   capabilities: IOCapabilities;
   /** New IO state after the swap */
   state: string;
-  /** Context hint for the frontend ("buffer", "live", "reinitialize") */
+  /** Context hint for the frontend ("capture", "live", "reinitialize") */
   transition: string;
 }
 
@@ -698,8 +695,8 @@ export interface StateChangePayload {
   previous: string;
   /** Current state as a string */
   current: string;
-  /** Active buffer ID if streaming to a buffer */
-  buffer_id: string | null;
+  /** Active capture ID if streaming to a capture */
+  capture_id: string | null;
 }
 
 /**
@@ -716,13 +713,13 @@ export function parseStateString(stateStr: string): IOStateType {
 }
 
 /**
- * Transition an existing session to use a buffer for replay.
+ * Transition an existing session to use a capture for replay.
  * This is used after a streaming source (GVRET, PostgreSQL) ends to replay captured frames.
  * @param sessionId The session ID
+ * @param captureId The capture ID to register as session source
  * @param speed Initial playback speed (default: 1.0)
- * @param captureId Optional buffer ID to register as session source
  */
-export async function transitionToBufferReader(
+export async function transitionToCaptureSource(
   sessionId: string,
   captureId: string,
   speed?: number,
@@ -731,14 +728,14 @@ export async function transitionToBufferReader(
 }
 
 /**
- * Switch a session to buffer replay mode without destroying it.
- * This swaps the session's reader to a BufferReader that reads from the session's
- * owned buffer. All listeners stay connected and can replay the captured data.
+ * Switch a session to capture replay mode without destroying it.
+ * This swaps the session's source to a CaptureSource that reads from the session's
+ * owned capture. All subscribers stay connected and can replay the captured data.
  * Use this after ingest completes to enable playback controls.
  * @param sessionId The session ID
  * @param speed Initial playback speed (default: 1.0)
  */
-export async function switchSessionToBufferReplay(
+export async function switchSessionToCaptureReplay(
   sessionId: string,
   speed?: number
 ): Promise<IOCapabilities> {
@@ -746,7 +743,7 @@ export async function switchSessionToBufferReplay(
 }
 
 /**
- * Stop a realtime session and switch all listeners to capture replay.
+ * Stop a realtime session and switch all subscribers to capture replay.
  * Emits `session-lifecycle` signal so all apps on the session refresh state.
  * Falls back to normal suspend if no capture exists.
  * @param sessionId The session ID
@@ -760,11 +757,11 @@ export async function stopAndSwitchToCapture(
 }
 
 /**
- * Resume a session from buffer playback back to live streaming.
- * This is the reverse of switchSessionToBufferReplay.
+ * Resume a session from capture playback back to live streaming.
+ * This is the reverse of switchSessionToCaptureReplay.
  * It recreates the original reader from the stored profile configuration,
- * orphans the current buffer (preserving data for later viewing), and starts
- * streaming into a fresh buffer.
+ * orphans the current capture (preserving data for later viewing), and starts
+ * streaming into a fresh capture.
  *
  * Only supported for realtime devices (gvret, slcan, gs_usb, socketcan).
  * Returns an error for recorded sources (postgres, csv, mqtt).
@@ -831,21 +828,21 @@ export async function sessionTransmitFrame(
 // ============================================================================
 
 /**
- * Info about a registered listener.
+ * Info about a registered subscriber.
  */
 export interface SubscriberInfo {
-  /** Unique instance ID for this listener (e.g., "discovery_1", "decoder_2") */
+  /** Unique instance ID for this subscriber (e.g., "discovery_1", "decoder_2") */
   subscriber_id: string;
   /** Human-readable app name (e.g., "discovery", "decoder") */
   app_name: string;
   /** Seconds since registration */
   registered_seconds_ago: number;
-  /** Whether this listener is actively receiving frames */
+  /** Whether this subscriber is actively receiving frames */
   is_active: boolean;
 }
 
 /**
- * Result of registering a listener.
+ * Result of registering a subscriber.
  */
 export interface RegisterSubscriberResult {
   /** Session capabilities */
@@ -858,17 +855,17 @@ export interface RegisterSubscriberResult {
   capture_kind: "frames" | "bytes" | null;
   /** Total number of listeners */
   subscriber_count: number;
-  /** Error that occurred before this listener registered (one-shot, cleared after return) */
+  /** Error that occurred before this subscriber registered (one-shot, cleared after return) */
   startup_error: string | null;
 }
 
 /**
- * Register a listener for a session.
+ * Register a subscriber for a session.
  * This is the primary way for frontend components to join a session.
- * If the listener is already registered, this updates their heartbeat.
+ * If the subscriber is already registered, this updates their heartbeat.
  * @param sessionId The session ID
- * @param subscriberId A unique ID for this listener (e.g., "discovery", "decoder")
- * @returns Session info including whether this listener is the owner
+ * @param subscriberId A unique ID for this subscriber (e.g., "discovery", "decoder")
+ * @returns Session info including whether this subscriber is the owner
  */
 export async function registerSessionSubscriber(
   sessionId: string,
@@ -883,17 +880,17 @@ export async function registerSessionSubscriber(
 }
 
 /**
- * Unregister a listener from a session.
- * If this was the last listener, the session will be stopped (but not destroyed).
+ * Unregister a subscriber from a session.
+ * If this was the last subscriber, the session will be stopped (but not destroyed).
  * @param sessionId The session ID
- * @param subscriberId The listener ID to unregister
- * @returns The remaining listener count
+ * @param subscriberId The subscriber ID to unregister
+ * @returns The remaining subscriber count
  */
 export async function unregisterSessionSubscriber(
   sessionId: string,
   subscriberId: string
 ): Promise<number> {
-  console.log(`[unregisterSessionSubscriber] session=${sessionId}, listener=${subscriberId}`);
+  console.log(`[unregisterSessionSubscriber] session=${sessionId}, subscriber=${subscriberId}`);
   console.log(`[unregisterSessionSubscriber] stack:`, new Error().stack);
   return invoke("unregister_session_subscriber", {
     session_id: sessionId,
@@ -902,11 +899,11 @@ export async function unregisterSessionSubscriber(
 }
 
 /**
- * Evict a listener from a session, giving it a copy of the current buffer.
- * Used by the Session Manager to remove a listener without destroying the session.
+ * Evict a subscriber from a session, giving it a copy of the current capture.
+ * Used by the Session Manager to remove a subscriber without destroying the session.
  * @param sessionId The session ID
- * @param subscriberId The listener ID to evict
- * @returns List of copied buffer IDs given to the evicted listener
+ * @param subscriberId The subscriber ID to evict
+ * @returns List of copied capture IDs given to the evicted subscriber
  */
 export async function evictSessionSubscriber(
   sessionId: string,
@@ -1008,7 +1005,7 @@ export async function updateSourceBusMappings(
  * Get all listeners for a session.
  * Useful for debugging and for the frontend to understand session state.
  * @param sessionId The session ID
- * @returns List of registered listeners
+ * @returns List of registered subscribers
  */
 export async function getSessionSubscribers(
   sessionId: string
@@ -1030,12 +1027,12 @@ export interface ReinitializeResult {
 
 /**
  * Check if it's safe to reinitialize a session and do so if safe.
- * Reinitialize is only safe if the requesting listener is the only listener.
+ * Reinitialize is only safe if the requesting subscriber is the only subscriber.
  * This is an atomic check-and-act operation to prevent race conditions.
  *
  * If safe, the session will be destroyed so a new one can be created.
  * @param sessionId The session ID
- * @param subscriberId The requesting listener's ID
+ * @param subscriberId The requesting subscriber's ID
  * @returns Result indicating success or failure with reason
  */
 export async function reinitializeSessionIfSafe(
@@ -1049,13 +1046,13 @@ export async function reinitializeSessionIfSafe(
 }
 
 /**
- * Set whether a listener is active (receiving frames).
- * When a listener detaches, set isActive to false to stop receiving frames.
+ * Set whether a subscriber is active (receiving frames).
+ * When a subscriber detaches, set isActive to false to stop receiving frames.
  * When they rejoin, set isActive to true to resume receiving frames.
  * This is handled in Rust to avoid frontend race conditions.
  * @param sessionId The session ID
- * @param subscriberId The listener ID
- * @param isActive Whether the listener should receive frames
+ * @param subscriberId The subscriber ID
+ * @param isActive Whether the subscriber should receive frames
  */
 export async function setSessionSubscriberActive(
   sessionId: string,
@@ -1323,15 +1320,15 @@ export interface ActiveSessionInfo {
   capabilities: IOCapabilities;
   /** Number of listeners */
   subscriberCount: number;
-  /** Individual listener details */
+  /** Individual subscriber details */
   subscribers: SubscriberInfo[];
   /** For broker sessions: the source configurations */
   brokerConfigs: MultiSourceInput[] | null;
   /** Profile IDs feeding this session */
   sourceProfileIds: string[];
-  /** Buffer ID owned by this session (if any) */
+  /** Capture ID owned by this session (if any) */
   captureId: string | null;
-  /** Frame count in the owned buffer */
+  /** Frame count in the owned capture */
   captureFrameCount: number | null;
   /** Whether the session is actively streaming data */
   isStreaming: boolean;
@@ -1530,7 +1527,7 @@ export async function cancelModbusScan(): Promise<void> {
 // Signal-then-fetch query API
 // ============================================================================
 
-/** Fetch current playback position for a recorded/buffer session. */
+/** Fetch current playback position for a recorded/capture session. */
 export async function getPlaybackPosition(
   sessionId: string
 ): Promise<PlaybackPosition | null> {
@@ -1574,7 +1571,7 @@ export interface SourceInfo {
   bus: number | null;
 }
 
-/** Fetch orphaned buffer IDs from post-session cache. */
+/** Fetch orphaned capture IDs from post-session cache. */
 export async function getOrphanedBufferIds(
   sessionId: string
 ): Promise<string[]> {
@@ -1619,7 +1616,7 @@ export interface ModbusScanState {
   device_info: DeviceInfoEntry[];
 }
 
-/** Fetch the most recent bytes from a buffer (tail view). */
+/** Fetch the most recent bytes from a capture (tail view). */
 export async function getCaptureBytesTail(
   captureId: string,
   tailSize: number

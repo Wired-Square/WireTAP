@@ -1,7 +1,7 @@
 // ui/src/stores/sessionStore.ts
 //
 // Centralized IO session manager for all apps (Discovery, Decoder, Transmit).
-// Session lifecycle and listener management is handled by Rust backend.
+// Session lifecycle and subscriber management is handled by Rust backend.
 // This store manages frontend state and event listeners.
 
 import * as Sentry from "@sentry/react";
@@ -20,13 +20,13 @@ import {
   suspendReaderSession,
   resumeReaderSessionFresh,
   resumeSessionToLive,
-  switchSessionToBufferReplay,
+  switchSessionToCaptureReplay,
   updateReaderSpeed,
   updateReaderTimeRange,
   destroyReaderSession,
   seekReaderSession,
   seekReaderSessionByFrame,
-  transitionToBufferReader,
+  transitionToCaptureSource,
   sessionTransmitFrame,
   registerSessionSubscriber,
   unregisterSessionSubscriber,
@@ -37,7 +37,7 @@ import {
   type IOStateType,
   type StreamEndedInfo,
   type SessionSuspendedPayload,
-  type SessionSwitchedToBufferPayload,
+  type SessionSwitchedToCapturePayload,
   type SessionResumingPayload,
   type SourceReplacedPayload,
   type CanTransmitFrame,
@@ -131,8 +131,8 @@ function addSessionLog(entry: SessionLogInput) {
 }
 
 /**
- * Check if a profile ID represents a buffer.
- * Checks against the cached set of known buffer IDs from the Rust backend.
+ * Check if a profile ID represents a capture.
+ * Checks against the cached set of known capture IDs from the Rust backend.
  * The set is populated on app startup and updated when buffers are created/deleted.
  */
 export function isCaptureProfileId(profileId: string | null): boolean {
@@ -206,7 +206,7 @@ export interface Session {
   playbackPosition: PlaybackPosition | null;
   /** Decoder catalog path for this session (frontend-only, shared across apps) */
   catalogPath: string | null;
-  /** Buffer ID for raw bytes streams (set when buffer-changed signal fires) */
+  /** Capture ID for raw bytes streams (set when capture-changed signal fires) */
   bytesCaptureId: string | null;
 }
 
@@ -228,7 +228,7 @@ export interface CreateSessionOptions {
   limit?: number;
   /** File path for file-based readers */
   filePath?: string;
-  /** Use the shared buffer reader */
+  /** Use the shared capture source */
   useBuffer?: boolean;
   /** Framing encoding for serial readers */
   framingEncoding?: FramingEncoding;
@@ -251,7 +251,7 @@ export interface CreateSessionOptions {
 /** Payload for session-reconfigured event (now empty — apps just clear state) */
 export type SessionReconfiguredPayload = Record<string, never>;
 
-/** Callbacks for a session - stored per listener in the frontend */
+/** Callbacks for a session - stored per subscriber in the frontend */
 export interface SessionCallbacks {
   onFrames?: (frames: FrameMessage[]) => void;
   onBytes?: (payload: RawBytesPayload) => void;
@@ -263,25 +263,25 @@ export interface SessionCallbacks {
   onSpeedChange?: (speed: number) => void;
   /** Called when session is reconfigured (e.g., bookmark jump) - apps should clear state */
   onReconfigure?: (payload: SessionReconfiguredPayload) => void;
-  /** Called when session is suspended (stopped with buffer available) */
+  /** Called when session is suspended (stopped with capture available) */
   onSuspended?: (payload: SessionSuspendedPayload) => void;
-  /** Called when session is stopped and switched to buffer replay (all listeners transition) */
-  onSwitchedToBuffer?: (payload: SessionSwitchedToBufferPayload) => void;
-  /** Called when session is resuming with a new buffer - apps should clear their frame lists */
+  /** Called when session is stopped and switched to capture replay (all subscribers transition) */
+  onSwitchedToCapture?: (payload: SessionSwitchedToCapturePayload) => void;
+  /** Called when session is resuming with a new capture - apps should clear their frame lists */
   onResuming?: (payload: SessionResumingPayload) => void;
-  /** Called when the session's device is replaced in-place (caps/state change, listeners preserved) */
+  /** Called when the session's device is replaced in-place (caps/state change, subscribers preserved) */
   onSourceReplaced?: (payload: SourceReplacedPayload) => void;
 }
 
 /** Session event listeners - one set per session */
 interface SessionEventSubscribers {
-  /** Session ID this listener set belongs to (for WS unsubscribe on cleanup) */
+  /** Session ID this subscriber set belongs to (for WS unsubscribe on cleanup) */
   sessionId: string;
   /** Unlisten functions for Tauri events */
   unlistenFunctions: UnlistenFn[];
   /** Unlisten functions for WebSocket message handlers */
   wsUnlistenFunctions: (() => void)[];
-  /** Callbacks registered by listeners, keyed by listener ID */
+  /** Callbacks registered by subscribers, keyed by subscriber ID */
   callbacks: Map<string, SessionCallbacks>;
   /** Heartbeat interval ID (for keeping listeners alive in Rust backend) */
   heartbeatIntervalId: ReturnType<typeof setInterval> | null;
@@ -301,7 +301,7 @@ export interface SessionStore {
   activeSessionId: string | null;
   /** Event listeners per session (frontend-only, for routing events to callbacks) */
   _eventListeners: Record<string, SessionEventSubscribers>;
-  /** Cached set of known buffer IDs (populated from Rust backend on startup) */
+  /** Cached set of known capture IDs (populated from Rust backend on startup) */
   knownCaptureIds: Set<string>;
 
   // ---- Actions: Session Lifecycle ----
@@ -313,13 +313,13 @@ export interface SessionStore {
     appName: string,
     options?: CreateSessionOptions
   ) => Promise<Session>;
-  /** Leave a session (unregister listener) */
+  /** Leave a session (unregister subscriber) */
   leaveSession: (sessionId: string, subscriberId: string) => Promise<void>;
   /** Remove session from list entirely */
   removeSession: (sessionId: string) => Promise<void>;
   /** Clean up a session that was destroyed externally (local-only, no backend calls) */
   cleanupDestroyedSession: (sessionId: string) => void;
-  /** Clean up after a listener is evicted from a session (local-only, no backend calls) */
+  /** Clean up after a subscriber is evicted from a session (local-only, no backend calls) */
   cleanupEvictedSubscriber: (sessionId: string, subscriberId: string) => void;
   /** Reinitialize a session with new options (atomic check via Rust) */
   reinitializeSession: (
@@ -340,9 +340,9 @@ export interface SessionStore {
   pauseSession: (sessionId: string) => Promise<void>;
   /** Resume streaming on a session */
   resumeSession: (sessionId: string) => Promise<void>;
-  /** Suspend a session - stops streaming, finalizes buffer, session stays alive */
+  /** Suspend a session - stops streaming, finalises capture, session stays alive */
   suspendSession: (sessionId: string) => Promise<void>;
-  /** Resume a suspended session with a fresh buffer (orphans old buffer) */
+  /** Resume a suspended session with a fresh capture (orphans old capture) */
   resumeSessionFresh: (sessionId: string) => Promise<void>;
   /** Update playback speed */
   setSessionSpeed: (sessionId: string, speed: number) => Promise<void>;
@@ -354,15 +354,15 @@ export interface SessionStore {
   ) => Promise<void>;
   /** Seek to timestamp */
   seekSession: (sessionId: string, timestampUs: number) => Promise<void>;
-  /** Seek to frame index (preferred for buffer playback) */
+  /** Seek to frame index (preferred for capture playback) */
   seekSessionByFrame: (sessionId: string, frameIndex: number) => Promise<void>;
-  /** Switch to buffer replay mode */
+  /** Switch to capture replay mode */
   switchToCapture: (sessionId: string, speed?: number, captureId?: string) => Promise<void>;
 
-  // ---- Actions: Buffer Metadata ----
-  /** Rename a buffer and update all sessions that reference it */
+  // ---- Actions: Capture Metadata ----
+  /** Rename a capture and update all sessions that reference it */
   renameSessionCapture: (captureId: string, newName: string) => Promise<void>;
-  /** Toggle buffer persistence and update all sessions that reference it */
+  /** Toggle capture persistence and update all sessions that reference it */
   setSessionCapturePersistent: (captureId: string, persistent: boolean) => Promise<void>;
 
   // ---- Actions: Transmission ----
@@ -377,9 +377,9 @@ export interface SessionStore {
   setHasQueuedMessages: (sessionId: string, hasQueue: boolean) => void;
 
   // ---- Actions: Callbacks ----
-  /** Register callbacks for a listener */
+  /** Register callbacks for a subscriber */
   registerCallbacks: (sessionId: string, subscriberId: string, callbacks: SessionCallbacks) => void;
-  /** Clear callbacks for a specific listener */
+  /** Clear callbacks for a specific subscriber */
   clearCallbacks: (sessionId: string, subscriberId: string) => void;
 
   // ---- Selectors ----
@@ -628,17 +628,17 @@ async function setupSessionEventSubscribers(
             persistent: false,
           };
           updateSession(sessionId, updates);
-          invokeCallbacks(eventListeners, "onResuming", { new_buffer_id: "", orphaned_buffer_id: null });
-        } else if (isNowStopped && (capabilities as IOCapabilities | null)?.traits.temporal_mode === "buffer") {
+          invokeCallbacks(eventListeners, "onResuming", { new_capture_id: "", orphaned_capture_id: null });
+        } else if (isNowStopped && (capabilities as IOCapabilities | null)?.traits.temporal_mode === "capture") {
           updateSession(sessionId, updates);
-          invokeCallbacks(eventListeners, "onSwitchedToBuffer", {
-            buffer_id: prevSession?.capture?.id ?? null,
-            buffer_count: prevSession?.capture?.count ?? 0,
-            buffer_type: prevSession?.capture?.kind ?? null,
+          invokeCallbacks(eventListeners, "onSwitchedToCapture", {
+            capture_id: prevSession?.capture?.id ?? null,
+            capture_count: prevSession?.capture?.count ?? 0,
+            capture_kind: prevSession?.capture?.kind ?? null,
             time_range: null,
             capabilities: capabilities as IOCapabilities,
           });
-          // Refresh capture fields from backend — after a live→buffer transition
+          // Refresh capture fields from backend — after a live→capture transition
           // (e.g. stopAndSwitchToCapture), StreamEnded may not have landed yet or
           // may have been clobbered by an intermediate `running` lifecycle blip
           // that resets capture to zeros at line 619. Fetch fresh metadata so
@@ -671,9 +671,9 @@ async function setupSessionEventSubscribers(
         } else if (isNowStopped) {
           updateSession(sessionId, updates);
           invokeCallbacks(eventListeners, "onSuspended", {
-            buffer_id: prevSession?.capture?.id ?? null,
-            buffer_count: prevSession?.capture?.count ?? 0,
-            buffer_type: prevSession?.capture?.kind ?? null,
+            capture_id: prevSession?.capture?.id ?? null,
+            capture_count: prevSession?.capture?.count ?? 0,
+            capture_kind: prevSession?.capture?.kind ?? null,
             time_range: null,
           });
         } else {
@@ -1423,7 +1423,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   stopSession: async (sessionId) => {
     // Set stoppedExplicitly BEFORE the async call to avoid race condition:
     // The stream-ended event (which updates buffer state) may fire before
-    // stopReaderSession returns. Effects checking both bufferAvailable and
+    // stopReaderSession returns. Effects checking both captureAvailable and
     // stoppedExplicitly need both to be true at the same time.
     set((s) => ({
       sessions: {
@@ -1481,19 +1481,19 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   suspendSession: async (sessionId) => {
-    // Check if the session is a realtime source - if so, switch to buffer replay mode
+    // Check if the session is a realtime source - if so, switch to capture replay mode
     // so playback controls work. For recorded sources, just stop the source.
     const session = get().sessions[sessionId];
     const isRealtime = session?.capabilities?.traits.temporal_mode === "realtime";
     const profileName = session?.profileName ?? sessionId;
 
     if (isRealtime) {
-      // Realtime source: switch to CaptureSource for buffer playback
-      tlog.info(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to buffer replay`);
+      // Realtime source: switch to CaptureSource for capture playback
+      tlog.info(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to capture replay`);
       try {
-        const capabilities = await switchSessionToBufferReplay(sessionId, 1.0);
-        // Buffer state will be updated by the session-lifecycle event handler.
-        // Use existing session buffer state for the log message if already available.
+        const capabilities = await switchSessionToCaptureReplay(sessionId, 1.0);
+        // Capture state will be updated by the session-lifecycle event handler.
+        // Use existing session capture state for the log message if already available.
         const existingBuffer = get().sessions[sessionId]?.capture;
         addSessionLog({
           eventType: "state-change",
@@ -1501,7 +1501,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           profileId: session?.profileId ?? null,
           profileName,
           appName: null,
-          details: `Switched to buffer replay mode (temporal_mode: ${capabilities.traits.temporal_mode}, buffer: ${existingBuffer?.id ?? 'none'})`,
+          details: `Switched to capture replay mode (temporal_mode: ${capabilities.traits.temporal_mode}, buffer: ${existingBuffer?.id ?? 'none'})`,
         });
         set((s) => ({
           sessions: {
@@ -1575,7 +1575,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       tlog.info(`[sessionStore] resumeSessionFresh: trying resumeSessionToLive for '${sessionId}'`);
       const capabilities = await resumeSessionToLive(sessionId);
-      // Success - session is now back in live mode with a fresh buffer
+      // Success - session is now back in live mode with a fresh capture
       tlog.info(`[sessionStore] resumeSessionFresh: '${sessionId}' resumed to live mode`);
       set((s) => ({
         sessions: {
@@ -1641,7 +1641,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   switchToCapture: async (sessionId, speed, captureId) => {
-    const capabilities = await transitionToBufferReader(sessionId, captureId ?? '', speed);
+    const capabilities = await transitionToCaptureSource(sessionId, captureId ?? '', speed);
     set((s) => ({
       sessions: {
         ...s.sessions,
@@ -1655,7 +1655,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }));
   },
 
-  // ---- Buffer Metadata ----
+  // ---- Capture Metadata ----
   renameSessionCapture: async (captureId, newName) => {
     const { renameCapture } = await import("../api/capture");
     await renameCapture(captureId, newName);
@@ -1896,7 +1896,7 @@ let _unlistenBufferChanged: (() => void) | null = null;
       const deletedSet = new Set(ids);
       const state = useSessionStore.getState();
 
-      // Remove from known buffer IDs
+      // Remove from known capture IDs
       for (const id of ids) {
         state.removeKnownCaptureId(id);
       }

@@ -130,7 +130,7 @@ export default function SourceList({
     let icon: ReactNode = null;
 
     // Session type detection for styling
-    const isCaptureSession = checkedMultiSourceSession?.sourceType === "buffer";
+    const isCaptureSession = checkedMultiSourceSession?.sourceType === "capture";
     const isMultiSource = checkedMultiSourceSession?.sourceType === "realtime";
 
     if (isCsvSelected) {
@@ -249,7 +249,7 @@ export default function SourceList({
   // Get display info for a session
   const getSessionDisplayInfo = (session: ActiveSessionInfo) => {
     const isMultiSource = session.sourceType === "realtime";
-    const isBuffer = session.sourceType === "buffer";
+    const isBuffer = session.sourceType === "capture";
     // Always use session ID as the primary display name
     const displayName = session.sessionId;
 
@@ -356,16 +356,16 @@ export default function SourceList({
                   <div className="flex-1 min-w-0">
                     <div className={`${textMedium} truncate flex items-center gap-2`}>
                       <span>{info.displayName}</span>
-                      {session.state !== "stopped" && session.sourceType !== "buffer" && (
+                      {session.state !== "stopped" && session.sourceType !== "capture" && (
                         <Radio className={`${iconXs} text-green-500 animate-pulse`} />
                       )}
                     </div>
                     <div className={`${caption} flex items-center gap-2`}>
                       {session.state === "stopped" ? (
                         <span className={badgeSmallWarning}>Stopped</span>
-                      ) : session.state === "paused" && session.sourceType === "buffer" ? (
+                      ) : session.state === "paused" && session.sourceType === "capture" ? (
                         <span className={badgeSmallInfo}>Paused</span>
-                      ) : session.sourceType === "buffer" ? (
+                      ) : session.sourceType === "capture" ? (
                         <span className={badgeSmallInfo}>Playing</span>
                       ) : (
                         <span className={badgeSmallSuccess}>Live</span>

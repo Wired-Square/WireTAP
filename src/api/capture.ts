@@ -676,24 +676,24 @@ export interface FramingResult {
 }
 
 /**
- * Apply framing to the active byte buffer.
- * If reuseBufferId is provided and valid, that buffer is cleared and reused.
- * Otherwise, a new frame buffer is created.
- * This avoids buffer proliferation during live framing.
+ * Apply framing to the active byte capture.
+ * If reuseCaptureId is provided and valid, that capture is cleared and reused.
+ * Otherwise, a new frame capture is created.
+ * This avoids capture proliferation during live framing.
  *
  * @param config - Framing configuration
- * @param reuseBufferId - Optional ID of existing framing buffer to reuse (avoids proliferation)
- * @returns Result with frame count and buffer ID (same as reuseBufferId if reused, or new ID)
+ * @param reuseCaptureId - Optional ID of existing framing capture to reuse (avoids proliferation)
+ * @returns Result with frame count and capture ID (same as reuseCaptureId if reused, or new ID)
  */
 export async function applyFramingToCapture(
   sessionId: string,
   config: BackendFramingConfig,
-  reuseBufferId?: string | null
+  reuseCaptureId?: string | null
 ): Promise<FramingResult> {
   return invoke("apply_framing_to_capture", {
     session_id: sessionId,
     config,
-    reuse_capture_id: reuseBufferId ?? null,
+    reuse_capture_id: reuseCaptureId ?? null,
   });
 }
 

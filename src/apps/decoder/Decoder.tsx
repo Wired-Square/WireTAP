@@ -7,7 +7,7 @@ import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFra
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers';
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
-import { useEffectiveBufferMetadata } from "../../hooks/useEffectiveCaptureMetadata";
+import { useEffectiveCaptureMetadata } from "../../hooks/useEffectiveCaptureMetadata";
 import { useFocusStore } from '../../stores/focusStore';
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../../apps/settings/stores/settingsStore";
@@ -448,10 +448,10 @@ export default function Decoder() {
   }, [setStartTime, setEndTime, setActiveBookmarkId]);
 
   // Handle session suspended (from any app sharing this session)
-  // This fetches buffer metadata so Decoder can show timeline controls
+  // This fetches capture metadata so Decoder can show timeline controls
   const handleSessionSuspended = useCallback(async (payload: import("../../api/io").SessionSuspendedPayload) => {
-    if (payload.buffer_count > 0 && payload.buffer_id) {
-      const meta = await getCaptureMetadata(payload.buffer_id);
+    if (payload.capture_count > 0 && payload.capture_id) {
+      const meta = await getCaptureMetadata(payload.capture_id);
       setCaptureMetadata(meta);
     }
   }, []);
@@ -542,7 +542,7 @@ export default function Decoder() {
     sessionId,
     state: readerState,
     isReady,
-    bufferAvailable,
+    captureAvailable,
     captureStartTimeUs,
     captureEndTimeUs,
     captureCount,
@@ -557,7 +557,7 @@ export default function Decoder() {
   } = session;
 
   // Merged buffer metadata using session values for cross-app timeline sync
-  const effectiveBufferMetadata = useEffectiveBufferMetadata(
+  const effectiveCaptureMetadata = useEffectiveCaptureMetadata(
     { captureStartTimeUs, captureEndTimeUs, captureCount, captureName: session.captureName, capturePersistent: session.capturePersistent },
     captureMetadata
   );
@@ -566,7 +566,7 @@ export default function Decoder() {
   // Use isStreaming from manager plus check for "starting" state
   const isDecoding = isStreaming || readerState === "starting";
   // Has buffer data available for replay - only relevant when in buffer mode
-  const hasBufferData = isCaptureMode && (bufferAvailable || (effectiveBufferMetadata?.count ?? 0) > 0);
+  const hasCaptureData = isCaptureMode && (captureAvailable || (effectiveCaptureMetadata?.count ?? 0) > 0);
 
   // Fetch buffer metadata when joining a session already in buffer mode
   // This handles the case where another app stopped the session before we joined
@@ -721,9 +721,9 @@ export default function Decoder() {
     setCaptureMetadata,
 
     // Buffer bounds for frame index calculation during scrub
-    minTimeUs: effectiveBufferMetadata?.start_time_us,
-    maxTimeUs: effectiveBufferMetadata?.end_time_us,
-    totalFrames: effectiveBufferMetadata?.count,
+    minTimeUs: effectiveCaptureMetadata?.start_time_us,
+    maxTimeUs: effectiveCaptureMetadata?.end_time_us,
+    totalFrames: effectiveCaptureMetadata?.count,
   });
 
   // Handle clear buffer — app-specific cleanup + centralised buffer clear
@@ -1003,7 +1003,7 @@ export default function Decoder() {
             ioProfile={ioProfile}
             onIoProfileChange={handlers.handleIoProfileChange}
             defaultReadProfileId={settings?.default_read_profile}
-            captureMetadata={effectiveBufferMetadata ?? captureMetadata}
+            captureMetadata={effectiveCaptureMetadata ?? captureMetadata}
             sessionId={sessionId}
             multiBusProfiles={sessionId ? ioProfiles : []}
             ioState={readerState}
@@ -1026,7 +1026,7 @@ export default function Decoder() {
               }
             }}
             onClearBuffer={handleClearBuffer}
-            hasData={frameList.length > 0 || hasBufferData}
+            hasData={frameList.length > 0 || hasCaptureData}
             speed={playbackSpeed}
             supportsSpeed={capabilities?.supports_speed_control ?? false}
             isStreaming={isDecoding || isLoading}
@@ -1080,7 +1080,7 @@ export default function Decoder() {
           playbackState={getPlaybackState()}
           playbackDirection={playbackDirection}
           capabilities={capabilities}
-          isRecorded={capabilities?.traits.temporal_mode === "recorded" || capabilities?.traits.temporal_mode === "buffer"}
+          isRecorded={capabilities?.traits.temporal_mode === "recorded" || capabilities?.traits.temporal_mode === "capture"}
           onPlay={() => { setPlaybackDirection("forward"); handlers.handlePlay(); }}
           onPlayBackward={() => { setPlaybackDirection("backward"); handlers.handlePlayBackward(); }}
           onPause={handlers.handlePause}
@@ -1088,7 +1088,7 @@ export default function Decoder() {
           onStepForward={handlers.handleStepForward}
           playbackSpeed={playbackSpeed}
           onSpeedChange={handlers.handleSpeedChange}
-          hasBufferData={hasBufferData}
+          hasCaptureData={hasCaptureData}
           activeBookmarkId={activeBookmarkId}
           onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
           showTimeRange={showTimeRange}
@@ -1097,11 +1097,11 @@ export default function Decoder() {
           endTime={endTime}
           onStartTimeChange={handlers.handleStartTimeChange}
           onEndTimeChange={handlers.handleEndTimeChange}
-          minTimeUs={effectiveBufferMetadata?.start_time_us}
-          maxTimeUs={effectiveBufferMetadata?.end_time_us}
+          minTimeUs={effectiveCaptureMetadata?.start_time_us}
+          maxTimeUs={effectiveCaptureMetadata?.end_time_us}
           currentTimeUs={sessionCurrentTimeUs}
           currentFrameIndex={sessionCurrentFrameIndex}
-          totalFrames={effectiveBufferMetadata?.count}
+          totalFrames={effectiveCaptureMetadata?.count}
           onScrub={handlers.handleScrub}
           onFrameChange={handlers.handleFrameChange}
           signalColours={{

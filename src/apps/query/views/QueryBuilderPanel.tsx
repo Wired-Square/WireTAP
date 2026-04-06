@@ -199,7 +199,7 @@ export default function QueryBuilderPanel({
   // Add to queue handler
   const handleAddToQueue = useCallback(() => {
     if (captureId) {
-      enqueueQuery(captureId, "buffer", timeBounds, limitOverride);
+      enqueueQuery(captureId, "capture", timeBounds, limitOverride);
     } else if (profileId) {
       enqueueQuery(profileId, "postgres", timeBounds, limitOverride);
     }

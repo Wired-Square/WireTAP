@@ -8,7 +8,7 @@ captures, see [session-flow.md](session-flow.md). For the on-disk schema, see
 ## 1. What is a capture?
 
 A **capture** is an append-only store for a single session's frame or byte
-data. While a session is running, its reader writes frames or raw bytes into
+data. While a session is running, its source writes frames or raw bytes into
 the capture. When the session stops, the capture is finalised but remains
 available for replay, export, or analysis.
 
@@ -60,7 +60,7 @@ own `b_`-prefixed session ID (see
 ```rust
 struct CaptureRegistry {
     buffers: HashMap<String, NamedCapture>,
-    streaming_ids: HashSet<String>,   // receiving appends from a live reader
+    streaming_ids: HashSet<String>,   // receiving appends from a live source
     active_ids:    HashSet<String>,   // being rendered by a UI panel
     ...
 }
@@ -69,7 +69,7 @@ struct CaptureRegistry {
 `streaming_ids` and `active_ids` are **independent** sets:
 
 - A capture in `streaming_ids` is the write target of a currently-running
-  reader. `is_streaming` on `CaptureMetadata` is computed from this set.
+  source. `is_streaming` on `CaptureMetadata` is computed from this set.
 - A capture in `active_ids` is currently visible in a UI panel. Marking a
   capture active is a pure UI concern and does not affect writing.
 
@@ -84,7 +84,7 @@ contamination when two sessions ran concurrently (see git commit `a320fb8`).
 ## 5. Public API
 
 All of these are in [src-tauri/src/capture_store.rs](../src-tauri/src/capture_store.rs).
-Session readers and lifecycle code should use the session-scoped API; direct
+Session sources and lifecycle code should use the session-scoped API; direct
 capture-ID calls exist for queries and pagination.
 
 ### Creation
@@ -114,7 +114,7 @@ hijacks the user's view.
 | `append_frames_to_session(session_id, frames)` | Resolves the session's frame capture, then appends. No-op if the session has no frame capture (warns in log). |
 | `append_raw_bytes_to_session(session_id, bytes)` | Same, for byte captures. |
 
-Readers only need their `session_id` — they never carry a `capture_id`
+Sources only need their `session_id` — they never carry a `capture_id`
 through the streaming loop.
 
 ### Lifecycle
@@ -148,14 +148,14 @@ through the streaming loop.
 ### Live capture
 
 ```
-Reader task starts (e.g. gs_usb, multi_source)
+Source task starts (e.g. gs_usb, multi_source)
      │
      ├─ create_capture(Frames, session_name) → new capture_id
      ├─ set_capture_owner(capture_id, session_id)
      │  (for dual-stream sessions, also create a Bytes capture)
      │
      ▼
-Reader loop:
+Source loop:
   read frames from device
   append_frames_to_session(session_id, frames)
   signal_frames_ready(session_id)      ← 2 Hz throttled (see session-flow.md § WebSocket transport)
@@ -269,7 +269,7 @@ Schema details — columns, indexes, cleanup policies — are in
 
 ## 8. CaptureSource — replaying a capture as a session
 
-[src-tauri/src/io/timeline/capture.rs](../src-tauri/src/io/timeline/capture.rs)
+[src-tauri/src/io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs)
 implements `CaptureSource`, the `IOSource` that exposes a stored capture as
 a timeline session. It is constructed with an **explicit** `capture_id` —
 there is no fallback / guess path; frontends must pass the ID they want to
@@ -319,6 +319,6 @@ protocol version bump.)
 | [src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs) | SQLite persistence |
 | [src-tauri/src/captures.rs](../src-tauri/src/captures.rs) | Tauri commands (list/read/import/delete) |
 | [src-tauri/src/framing.rs](../src-tauri/src/framing.rs) | `apply_framing_to_capture` — byte capture → frame capture |
-| [src-tauri/src/io/timeline/capture.rs](../src-tauri/src/io/timeline/capture.rs) | `CaptureSource` timeline device |
+| [src-tauri/src/io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs) | `CaptureSource` timeline device |
 | [src/api/capture.ts](../src/api/capture.ts) | TypeScript wrappers |
 | [docs/capture-database-schema.md](capture-database-schema.md) | On-disk schema reference |

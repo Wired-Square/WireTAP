@@ -211,8 +211,8 @@ pub fn get_session_count_for_profile(profile_id: &str) -> usize {
 }
 
 /// Clean up profile tracking for a destroyed session.
-/// This should be called when a session is destroyed via unregister_listener
-/// (auto-destroy when last listener leaves), since that code path doesn't
+/// This should be called when a session is destroyed via unregister_subscriber
+/// (auto-destroy when last subscriber leaves), since that code path doesn't
 /// go through destroy_reader_session which normally handles this.
 pub fn cleanup_session_profiles(session_id: &str) {
     let profile_ids = take_session_profiles(session_id);
@@ -1592,7 +1592,7 @@ pub async fn probe_device(
             let is_multi_bus = meta.buses.len() > 1;
             let result = DeviceProbeResult {
                 success: true,
-                source_type: "buffer".to_string(),
+                source_type: "capture".to_string(),
                 is_multi_bus,
                 bus_count,
                 primary_info: Some(format!("{} buses", bus_count)),
@@ -1602,7 +1602,7 @@ pub async fn probe_device(
             };
             emit_device_probe(&app, DeviceProbePayload {
                 profile_id: profile_id.clone(),
-                source_type: "buffer".to_string(),
+                source_type: "capture".to_string(),
                 address: meta.id.clone(),
                 success: true,
                 cached: false,

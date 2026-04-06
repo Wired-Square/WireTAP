@@ -103,11 +103,11 @@ export function useDiscoverySessionHandlers({
 
     // Check if switching to a buffer session
     if (isCaptureProfileId(profileId)) {
-      // Create a proper session for the buffer so it appears in the session manager
+      // Create a proper session for the capture so it appears in the session manager
       // and has playback controls. watchSource calls onBeforeWatch (clears state),
-      // creates a BufferReader session, and sets sourceProfileId to the buffer ID.
+      // creates a CaptureSource session, and sets sourceProfileId to the capture ID.
       await watchSource([profileId!], { speed: 1 });
-      // Load buffer metadata and enable buffer UI (frame picker, pagination)
+      // Load capture metadata and enable capture UI (frame picker, pagination)
       await switchToCapture(profileId!);
     } else {
       // Manager handles: clear multi-bus, set profile, default speed

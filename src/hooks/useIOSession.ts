@@ -8,10 +8,10 @@
 // SIMPLIFIED MODEL: Session ID = Profile ID
 // Multiple apps using the same profile automatically share the session.
 //
-// Listener management is handled by Rust backend:
-// - registerSessionListener() - registers this hook as a listener
-// - unregisterSessionListener() - removes this hook as a listener
-// - Rust tracks all listeners and destroys session when last one leaves
+// Subscriber management is handled by Rust backend:
+// - registerSessionSubscriber() - registers this hook as a subscriber
+// - unregisterSessionSubscriber() - removes this hook as a subscriber
+// - Rust tracks all subscribers and destroys session when last one leaves
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -19,7 +19,7 @@ import { useSessionStore } from "../stores/sessionStore";
 import { useFocusStore } from "../stores/focusStore";
 import { tlog } from "../api/settings";
 
-// Generate unique listener instance IDs using random suffix.
+// Generate unique subscriber instance IDs using random suffix.
 // Random is needed because each Tauri window has its own JS context,
 // so a module-level counter would reset to 0 in each window.
 function generateSubscriberId(appName: string): string {
@@ -48,7 +48,7 @@ import {
   type IOStateType,
   type StreamEndedInfo,
   type SessionSuspendedPayload,
-  type SessionSwitchedToBufferPayload,
+  type SessionSwitchedToCapturePayload,
   type SessionResumingPayload,
   type SourceReplacedPayload,
   type CanTransmitFrame,
@@ -74,12 +74,12 @@ interface LocalSessionState {
   capabilities: IOCapabilities | null;
   /** Error message if ioState is "error" */
   errorMessage: string | null;
-  /** Number of listeners connected to this session */
+  /** Number of subscribers connected to this session */
   subscriberCount: number;
-  /** Whether session is ready (created and listeners attached) */
+  /** Whether session is ready (created and subscribers attached) */
   isReady: boolean;
-  /** Buffer info */
-  buffer: {
+  /** Capture info */
+  capture: {
     available: boolean;
     id: string | null;
     type: "frames" | "bytes" | null;
@@ -100,8 +100,8 @@ interface LocalSessionState {
   playbackPosition: PlaybackPosition | null;
 }
 
-/** Empty buffer state used when no session.capture info is available yet. */
-const EMPTY_BUFFER: LocalSessionState["buffer"] = {
+/** Empty capture state used when no session.capture info is available yet. */
+const EMPTY_CAPTURE: LocalSessionState["capture"] = {
   available: false,
   id: null,
   type: null,
@@ -114,11 +114,11 @@ const EMPTY_BUFFER: LocalSessionState["buffer"] = {
 };
 
 /**
- * Map a Session.capture (from sessionStore) into the nested buffer shape
+ * Map a Session.capture (from sessionStore) into the nested capture shape
  * used by LocalSessionState. Handles the `kind → type` field rename.
- * Returns EMPTY_BUFFER when the capture is undefined (session not yet in store).
+ * Returns EMPTY_CAPTURE when the capture is undefined (session not yet in store).
  */
-function captureToBuffer(
+function captureToLocal(
   capture: {
     available: boolean;
     id: string | null;
@@ -130,8 +130,8 @@ function captureToBuffer(
     name: string | null;
     persistent: boolean;
   } | undefined,
-): LocalSessionState["buffer"] {
-  if (!capture) return { ...EMPTY_BUFFER };
+): LocalSessionState["capture"] {
+  if (!capture) return { ...EMPTY_CAPTURE };
   return {
     available: capture.available,
     id: capture.id,
@@ -148,7 +148,7 @@ function captureToBuffer(
 export interface UseIOSessionOptions {
   /**
    * App name for identifying this hook instance in logs and callbacks.
-   * Used as the listener ID for callback registration.
+   * Used as the subscriber ID for callback registration.
    * Example: "discovery", "decoder", "transmit"
    */
   appName: string;
@@ -184,21 +184,21 @@ export interface UseIOSessionOptions {
   onTimeUpdate?: (position: PlaybackPosition) => void;
   /** Callback when stream ends (GVRET disconnect, PostgreSQL complete, etc.) */
   onStreamEnded?: (payload: StreamEndedInfo) => void;
-  /** Callback when buffer playback completes naturally (reached end of buffer) */
+  /** Callback when capture playback completes naturally (reached end of buffer) */
   onStreamComplete?: () => void;
-  /** Callback when playback speed changes (from any listener on this session) */
+  /** Callback when playback speed changes (from any subscriber on this session) */
   onSpeedChange?: (speed: number) => void;
   /** Callback when session is reconfigured (e.g., bookmark jump) - apps should clear their state */
   onReconfigure?: () => void;
-  /** Callback when session is suspended (stopped with buffer available) */
+  /** Callback when session is suspended (stopped with capture available) */
   onSuspended?: (payload: SessionSuspendedPayload) => void;
-  /** Callback when session is stopped and switched to buffer replay (all listeners transition) */
-  onSwitchedToBuffer?: (payload: SessionSwitchedToBufferPayload) => void;
-  /** Callback when session is resuming with a new buffer - apps should clear their frame lists */
+  /** Callback when session is stopped and switched to capture replay (all listeners transition) */
+  onSwitchedToCapture?: (payload: SessionSwitchedToCapturePayload) => void;
+  /** Callback when session is resuming with a new capture - apps should clear their frame lists */
   onResuming?: (payload: SessionResumingPayload) => void;
   /** Callback when the session's device is replaced in-place (caps/state change, listeners preserved) */
   onSourceReplaced?: (payload: SourceReplacedPayload) => void;
-  /** Callback when session is destroyed externally (e.g., from Session Manager or last-listener auto-destroy) */
+  /** Callback when session is destroyed externally (e.g., from Session Manager or last-subscriber auto-destroy) */
   onDestroyed?: (orphanedBufferIds: string[]) => void;
 }
 
@@ -215,23 +215,23 @@ export interface UseIOSessionResult {
   isReady: boolean;
   /** Error message if state is 'error' */
   errorMessage: string | null;
-  /** Whether buffer data is available for replay (set after stream ends) */
-  bufferAvailable: boolean;
-  /** ID of the buffer that was created (set after stream ends) */
+  /** Whether capture data is available for replay (set after stream ends) */
+  captureAvailable: boolean;
+  /** ID of the capture that was created (set after stream ends) */
   captureId: string | null;
-  /** Type of buffer: "frames" or "bytes" (set after stream ends) */
+  /** Kind of capture: "frames" or "bytes" (set after stream ends) */
   captureKind: "frames" | "bytes" | null;
-  /** Number of items in the buffer - frames or bytes depending on type (set after stream ends) */
+  /** Number of items in the capture - frames or bytes depending on type (set after stream ends) */
   captureCount: number;
-  /** Session ID that owns this buffer (for detecting ingest/cross-app buffers) */
-  bufferOwningSessionId: string | null;
-  /** Start time of buffer data in microseconds (null if empty or unknown) */
+  /** Session ID that owns this capture (for detecting ingest/cross-app buffers) */
+  captureOwningSessionId: string | null;
+  /** Start time of capture data in microseconds (null if empty or unknown) */
   captureStartTimeUs: number | null;
-  /** End time of buffer data in microseconds (null if empty or unknown) */
+  /** End time of capture data in microseconds (null if empty or unknown) */
   captureEndTimeUs: number | null;
-  /** Display name of the buffer (null until fetched) */
+  /** Display name of the capture (null until fetched) */
   captureName: string | null;
-  /** Whether the buffer survives "clear buffers on start" */
+  /** Whether the capture survives "clear captures on start" */
   capturePersistent: boolean;
   /** Number of apps connected to this session (for showing Detach vs Stop) */
   joinerCount: number;
@@ -247,7 +247,7 @@ export interface UseIOSessionResult {
   currentTimeUs: number | null;
   /** Convenience: playbackPosition?.frame_index */
   currentFrameIndex: number | null;
-  /** Unique listener instance ID for this hook (e.g., "discovery_1") */
+  /** Unique subscriber instance ID for this hook (e.g., "discovery_1") */
   subscriberId: string;
 
   // Actions
@@ -261,9 +261,9 @@ export interface UseIOSessionResult {
   pause: () => Promise<void>;
   /** Resume the reader from pause */
   resume: () => Promise<void>;
-  /** Suspend the session - stops streaming, finalizes buffer, session stays alive */
+  /** Suspend the session - stops streaming, finalises capture, session stays alive */
   suspend: () => Promise<void>;
-  /** Resume a suspended session with a fresh buffer (orphans old buffer) */
+  /** Resume a suspended session with a fresh capture (orphans old capture) */
   resumeFresh: () => Promise<void>;
   /** Update playback speed (only if capabilities.supports_speed_control) */
   setSpeed: (speed: number) => Promise<void>;
@@ -271,9 +271,9 @@ export interface UseIOSessionResult {
   setTimeRange: (start?: string, end?: string) => Promise<void>;
   /** Seek to a specific timestamp (only if capabilities.supports_seek) */
   seek: (timestampUs: number) => Promise<void>;
-  /** Seek to a specific frame index (preferred for buffer playback - avoids float issues) */
+  /** Seek to a specific frame index (preferred for capture playback - avoids float issues) */
   seekByFrame: (frameIndex: number) => Promise<void>;
-  /** Reinitialize the session (e.g., after profile change, file selection, or buffer switch) */
+  /** Reinitialize the session (e.g., after profile change, file selection, or capture switch) */
   reinitialize: (
     profileId?: string,
     options?: {
@@ -308,7 +308,7 @@ export interface UseIOSessionResult {
       modbusPollsJson?: string;
     }
   ) => Promise<void>;
-  /** Switch to buffer replay mode (after stream ends with buffer data) */
+  /** Switch to capture replay mode (after stream ends with capture data) */
   switchToBufferReplay: (speed?: number) => Promise<void>;
   /** Rejoin an existing session after leaving (for shared sessions) */
   rejoin: (profileId?: string, profileName?: string) => Promise<void>;
@@ -345,7 +345,7 @@ export function useIOSession(
     onSpeedChange,
     onReconfigure,
     onSuspended,
-    onSwitchedToBuffer,
+    onSwitchedToCapture,
     onResuming,
     onSourceReplaced,
     onDestroyed,
@@ -389,7 +389,7 @@ export function useIOSession(
   const isMountedRef = useRef(true);
   // Track the currently active session ID (for cleanup to check if session changed)
   const currentSessionIdRef = useRef<string | null>(null);
-  // Generate a unique listener instance ID per hook mount (e.g., "discovery_1")
+  // Generate a unique subscriber instance ID per hook mount (e.g., "discovery_1")
   const subscriberIdRef = useRef<string>(generateSubscriberId(appName));
   // Track if we're currently leaving to prevent double-leave
   const isLeavingRef = useRef(false);
@@ -410,7 +410,7 @@ export function useIOSession(
     onSpeedChange,
     onReconfigure,
     onSuspended,
-    onSwitchedToBuffer,
+    onSwitchedToCapture,
     onResuming,
     onSourceReplaced,
     onDestroyed,
@@ -426,14 +426,14 @@ export function useIOSession(
       onSpeedChange,
       onReconfigure,
       onSuspended,
-      onSwitchedToBuffer,
+      onSwitchedToCapture,
       onResuming,
       onSourceReplaced,
       onDestroyed,
     };
-  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToBuffer, onResuming, onSourceReplaced, onDestroyed]);
+  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onSourceReplaced, onDestroyed]);
 
-  // ---- Register listener ID with focusStore so Visual tab can display it ----
+  // ---- Register subscriber ID with focusStore so Visual tab can display it ----
   useEffect(() => {
     const lid = subscriberIdRef.current;
     useFocusStore.getState().setListenerId(appName, lid);
@@ -478,7 +478,7 @@ export function useIOSession(
         patch.capabilities = session.capabilities;
       }
 
-      // Update expectedStateRef if it's active (e.g., buffer sessions that
+      // Update expectedStateRef if it's active (e.g., capture sessions that
       // don't auto-start never receive streaming events to clear the ref, so
       // effectiveState would read stale values from the ref instead of localState)
       if (expectedStateRef.current?.sessionId === effectiveSessionId) {
@@ -486,7 +486,7 @@ export function useIOSession(
         if (ioStateChanged) refState.ioState = session.ioState;
         if (capsChanged && session.capabilities) refState.capabilities = session.capabilities;
         if (captureChanged) {
-          refState.buffer = captureToBuffer(c);
+          refState.capture = captureToLocal(c);
         }
         expectedStateRef.current = { ...expectedStateRef.current, state: refState };
       }
@@ -495,7 +495,7 @@ export function useIOSession(
         if (!prev) return prev;
         const updated = { ...prev, ...patch };
         if (captureChanged) {
-          updated.buffer = captureToBuffer(c);
+          updated.capture = captureToLocal(c);
         }
         return updated;
       });
@@ -535,7 +535,7 @@ export function useIOSession(
             errorMessage: state.type === "Error" ? state.message : null,
             subscriberCount: joinerCount,
             isReady: true,
-            buffer: captureToBuffer(storeCapture),
+            capture: captureToLocal(storeCapture),
             stoppedExplicitly: false,
             streamEndedReason: null,
             speed: null,
@@ -557,11 +557,11 @@ export function useIOSession(
 
       // Session-scoped event listeners removed — all push communication now flows
       // through the WebSocket handlers in sessionStore. Only global Tauri events
-      // remain (session-lifecycle for destroy, listener-evicted).
+      // remain (session-lifecycle for destroy, subscriber-evicted).
 
-      // Session destroyed externally (from Session Manager, last-listener auto-destroy, etc.)
+      // Session destroyed externally (from Session Manager, last-subscriber auto-destroy, etc.)
       // This is a global event - we filter by our session ID.
-      // Orphaned buffer IDs are fetched from the post-session cache.
+      // Orphaned capture IDs are fetched from the post-session cache.
       const unlistenLifecycle = await listen<{ session_id: string; event_type: string }>(
         "session-lifecycle",
         async (event) => {
@@ -580,7 +580,7 @@ export function useIOSession(
             useSessionStore.getState().cleanupDestroyedSession(effectiveSessionId);
             // Clear local state
             setLocalState(null);
-            // Fetch orphaned buffer IDs from post-session cache
+            // Fetch orphaned capture IDs from post-session cache
             let bufferIds: string[] = [];
             try {
               bufferIds = await getOrphanedBufferIds(effectiveSessionId);
@@ -606,7 +606,7 @@ export function useIOSession(
       unlistenFns.push(unlistenLifecycle);
 
       // Listener evicted (from Session Manager "Remove" action).
-      // This is a global event - we filter by our session ID and listener ID.
+      // This is a global event - we filter by our session ID and subscriber ID.
       const unlistenEvicted = await listen<{ session_id: string; subscriber_id: string; capture_ids: string[] }>(
         "subscriber-evicted",
         (event) => {
@@ -696,7 +696,7 @@ export function useIOSession(
 
       try {
         // Open session (creates if not exists, joins if exists)
-        // This also registers this listener with the Rust backend
+        // This also registers this subscriber with the Rust backend
         console.log(`[useIOSession:${appName}] calling openSession...`);
         await openSession(effectiveSessionId, effectiveProfileName, subscriberIdRef.current, appName, {
           requireFrames,
@@ -725,7 +725,7 @@ export function useIOSession(
           onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
           onReconfigure: () => callbacksRef.current.onReconfigure?.(),
           onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
-          onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
+          onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
           onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
         });
@@ -747,7 +747,7 @@ export function useIOSession(
               errorMessage: state.type === "Error" ? state.message : null,
               subscriberCount: joinerCount,
               isReady: true,
-              buffer: captureToBuffer(storeCapture),
+              capture: captureToLocal(storeCapture),
               stoppedExplicitly: false,
               streamEndedReason: null,
               speed: null,
@@ -829,7 +829,7 @@ export function useIOSession(
           // Clear frontend callbacks
           clearCallbacks(sessionId, listenerId);
 
-          // Unregister from Rust backend - Rust will destroy session if last listener
+          // Unregister from Rust backend - Rust will destroy session if last subscriber
           console.log(`[useIOSession:${appName}] calling leaveSession('${sessionId}', '${listenerId}')...`);
           leaveSession(sessionId, listenerId).catch(() => {});
         }, 100);
@@ -905,10 +905,10 @@ export function useIOSession(
     }
     isLeavingRef.current = true;
     try {
-      // First, mark listener as inactive in Rust so it stops receiving frames immediately
+      // First, mark subscriber as inactive in Rust so it stops receiving frames immediately
       // This is done before clearing callbacks to prevent race conditions
       try {
-        console.log(`[useIOSession:${appName}] leave() - marking listener inactive...`);
+        console.log(`[useIOSession:${appName}] leave() - marking subscriber inactive...`);
         await setSessionSubscriberActive(effectiveSessionId, subscriberIdRef.current, false);
       } catch {
         // Ignore - session may not exist
@@ -1078,7 +1078,7 @@ export function useIOSession(
           console.log(`[useIOSession:${appName}] reinitialize() - switching sessions, leaving old session '${oldSessionId}'`);
           // Clear callbacks for old session
           clearCallbacks(oldSessionId, subscriberIdRef.current);
-          // Leave old session (Rust will destroy if we were the last listener)
+          // Leave old session (Rust will destroy if we were the last subscriber)
           await leaveSession(oldSessionId, subscriberIdRef.current);
         }
 
@@ -1125,7 +1125,7 @@ export function useIOSession(
           onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
           onReconfigure: () => callbacksRef.current.onReconfigure?.(),
           onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
-          onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
+          onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
           onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
         });
@@ -1145,7 +1145,7 @@ export function useIOSession(
               errorMessage: state.type === "Error" ? state.message : null,
               subscriberCount: joinerCount,
               isReady: true,
-              buffer: captureToBuffer(storeCapture),
+              capture: captureToLocal(storeCapture),
               stoppedExplicitly: false,
               streamEndedReason: null,
               speed: opts?.speed ?? null,
@@ -1190,7 +1190,7 @@ export function useIOSession(
       try {
         await switchToCapture(effectiveSessionId, speed);
 
-        // Refetch capabilities since the reader changed (BufferReader has different capabilities)
+        // Refetch capabilities since the reader changed (CaptureSource has different capabilities)
         const caps = await getIOSessionCapabilities(effectiveSessionId);
         if (caps) {
           setLocalState((prev) => prev ? { ...prev, capabilities: caps } : prev);
@@ -1211,11 +1211,11 @@ export function useIOSession(
     try {
       await openSession(targetSessionId, targetProfileName, subscriberIdRef.current, appName, {});
 
-      // Mark listener as active in Rust so it receives frames again
+      // Mark subscriber as active in Rust so it receives frames again
       try {
         await setSessionSubscriberActive(targetSessionId, subscriberIdRef.current, true);
       } catch {
-        // Ignore - listener may already be active
+        // Ignore - subscriber may already be active
       }
 
       // Re-register callbacks
@@ -1229,7 +1229,7 @@ export function useIOSession(
         onSpeedChange: (speed) => callbacksRef.current.onSpeedChange?.(speed),
         onReconfigure: () => callbacksRef.current.onReconfigure?.(),
         onSuspended: (payload) => callbacksRef.current.onSuspended?.(payload),
-        onSwitchedToBuffer: (payload) => callbacksRef.current.onSwitchedToBuffer?.(payload),
+        onSwitchedToCapture: (payload) => callbacksRef.current.onSwitchedToCapture?.(payload),
         onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
         onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
       });
@@ -1278,15 +1278,15 @@ export function useIOSession(
     state: effectiveState?.ioState ?? "stopped",
     isReady: effectiveState?.isReady ?? false,
     errorMessage: effectiveState?.errorMessage ?? null,
-    bufferAvailable: effectiveState?.buffer?.available ?? false,
-    captureId: effectiveState?.buffer?.id ?? null,
-    captureKind: effectiveState?.buffer?.type ?? null,
-    captureCount: effectiveState?.buffer?.count ?? 0,
-    bufferOwningSessionId: effectiveState?.buffer?.owningSessionId ?? null,
-    captureStartTimeUs: effectiveState?.buffer?.startTimeUs ?? null,
-    captureEndTimeUs: effectiveState?.buffer?.endTimeUs ?? null,
-    captureName: effectiveState?.buffer?.name ?? null,
-    capturePersistent: effectiveState?.buffer?.persistent ?? false,
+    captureAvailable: effectiveState?.capture?.available ?? false,
+    captureId: effectiveState?.capture?.id ?? null,
+    captureKind: effectiveState?.capture?.type ?? null,
+    captureCount: effectiveState?.capture?.count ?? 0,
+    captureOwningSessionId: effectiveState?.capture?.owningSessionId ?? null,
+    captureStartTimeUs: effectiveState?.capture?.startTimeUs ?? null,
+    captureEndTimeUs: effectiveState?.capture?.endTimeUs ?? null,
+    captureName: effectiveState?.capture?.name ?? null,
+    capturePersistent: effectiveState?.capture?.persistent ?? false,
     joinerCount: effectiveState?.subscriberCount ?? 0,
     stoppedExplicitly: effectiveState?.stoppedExplicitly ?? false,
     streamEndedReason: effectiveState?.streamEndedReason ?? null,

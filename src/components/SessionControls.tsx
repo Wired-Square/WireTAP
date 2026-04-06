@@ -28,7 +28,7 @@ export interface SessionButtonProps {
   ioProfiles: IOProfile[];
   /** Profile IDs when in multi-bus mode (for display count) */
   multiBusProfiles?: string[];
-  /** Buffer metadata (for buffer display name) */
+  /** Capture metadata (for capture display name) */
   captureMetadata?: CaptureMetadata | null;
   /** Default read profile ID (for star icon) */
   defaultReadProfileId?: string | null;
@@ -46,7 +46,7 @@ export interface SessionButtonProps {
   onClick: () => void;
   /** Whether button should be disabled (e.g., while streaming) */
   disabled?: boolean;
-  /** Whether the session is in buffer replay mode */
+  /** Whether the session is in capture replay mode */
   isCaptureMode?: boolean;
 }
 
@@ -63,21 +63,21 @@ export function SessionButton({
   outputBusToSource,
   onClick,
   disabled = false,
-  isCaptureMode: isBufferModeProp,
+  isCaptureMode: isCaptureModeProp,
 }: SessionButtonProps) {
-  const isBufferProfile = isBufferModeProp ?? isCaptureProfileId(ioProfile);
+  const isCaptureProfile = isCaptureModeProp ?? isCaptureProfileId(ioProfile);
   const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
 
   // Show as multi-bus when multiBusProfiles has entries
-  // BUT: never show as multi-bus when viewing a buffer (buffer takes precedence)
-  const showAsMultiBus = !isBufferProfile && multiBusProfiles.length > 0;
+  // BUT: never show as multi-bus when viewing a capture (capture takes precedence)
+  const showAsMultiBus = !isCaptureProfile && multiBusProfiles.length > 0;
 
-  // Determine display name (buffer takes precedence over multi-bus)
+  // Determine display name (capture takes precedence over multi-bus)
   let displayName: string;
   // Track whether sessionId is already shown in displayName (to avoid duplication)
   let sessionIdInDisplayName = false;
-  if (isBufferProfile) {
-    // Buffer: show label if set, then buffer ID, then fallback
+  if (isCaptureProfile) {
+    // Capture: show label if set, then capture ID, then fallback
     displayName = captureMetadata?.name || captureMetadata?.id || "Capture";
     sessionIdInDisplayName = true;
   } else if (showAsMultiBus) {
@@ -96,7 +96,7 @@ export function SessionButton({
     displayName = "No source";
   }
 
-  const isDefaultReader = !isBufferProfile && !showAsMultiBus && selectedProfile?.id === defaultReadProfileId;
+  const isDefaultReader = !isCaptureProfile && !showAsMultiBus && selectedProfile?.id === defaultReadProfileId;
 
   // Determine status dot colour based on ioState
   const getStatusColour = (): string | null => {
@@ -125,7 +125,7 @@ export function SessionButton({
   const statusLabel = getStatusLabel();
 
   let typeLabel: string;
-  if (isBufferProfile) {
+  if (isCaptureProfile) {
     typeLabel = "Capture";
   } else if (showAsMultiBus) {
     typeLabel = "Realtime";
@@ -194,7 +194,7 @@ export function SessionButton({
       >
         {showAsMultiBus ? (
           <GitMerge className={`${iconSm} text-purple-500 flex-shrink-0`} />
-        ) : isBufferProfile ? (
+        ) : isCaptureProfile ? (
           <FileText className={`${iconSm} text-blue-500 flex-shrink-0`} />
         ) : isDefaultReader ? (
           <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
@@ -306,7 +306,7 @@ export interface SessionActionButtonsProps {
   supportsTimeRange?: boolean;
   /** Whether we have an active source (enables Leave button) */
   hasSource?: boolean;
-  /** Whether we're in capture/buffer mode (affects leave tooltip) */
+  /** Whether we're in capture mode (affects leave tooltip) */
   isCaptureMode?: boolean;
   /** Play/resume the session */
   onPlay?: () => void;
@@ -396,7 +396,7 @@ export interface IOSessionControlsProps {
   ioProfiles: IOProfile[];
   /** Profile IDs when in multi-bus mode */
   multiBusProfiles?: string[];
-  /** Buffer metadata (for buffer display name) */
+  /** Capture metadata (for capture display name) */
   captureMetadata?: CaptureMetadata | null;
   /** Default read profile ID (for star icon) */
   defaultReadProfileId?: string | null;
@@ -439,17 +439,17 @@ export interface IOSessionControlsProps {
   /** Open bookmark picker (for time range sources) */
   onOpenBookmarkPicker?: () => void;
 
-  // Buffer action props (shown when capture metadata is available)
-  /** Whether the session is in buffer replay mode (viewing stored buffer data) */
+  // Capture action props (shown when capture metadata is available)
+  /** Whether the session is in capture replay mode (viewing stored capture data) */
   isCaptureMode?: boolean;
-  /** Whether the current buffer is persistent (pinned) */
+  /** Whether the current capture is persistent (pinned) */
   capturePersistent?: boolean;
-  /** Called when user toggles buffer pin */
+  /** Called when user toggles capture pin */
   onToggleBufferPin?: () => void;
-  /** Called when user renames the buffer */
+  /** Called when user renames the capture */
   onRenameBuffer?: (newName: string) => void;
 
-  // Clear buffer props
+  // Clear capture props
   /** Called when user clicks the clear/trash button. If absent, button is hidden. */
   onClearBuffer?: () => void;
   /** Whether the app has data that can be cleared (controls disabled state) */
@@ -487,16 +487,16 @@ export function IOSessionControls({
   onPause,
   onLeave,
   onOpenBookmarkPicker,
-  // Buffer action props
-  isCaptureMode: isBufferModeProp,
+  // Capture action props
+  isCaptureMode: isCaptureModeProp,
   capturePersistent = false,
   onToggleBufferPin,
   onRenameBuffer,
-  // Clear buffer props
+  // Clear capture props
   onClearBuffer,
   hasData = false,
 }: IOSessionControlsProps) {
-  const isCaptureMode = isBufferModeProp ?? isCaptureProfileId(ioProfile);
+  const isCaptureMode = isCaptureModeProp ?? isCaptureProfileId(ioProfile);
   const hasSource = ioProfile !== null;
 
   // Rename popover state
@@ -595,7 +595,7 @@ export function IOSessionControls({
         </div>
       )}
 
-      {/* Clear buffer button — hidden for persistent buffers */}
+      {/* Clear capture button — hidden for persistent captures */}
       {onClearBuffer && ioProfile && !(isCaptureMode && capturePersistent) && (
         <button
           onClick={onClearBuffer}

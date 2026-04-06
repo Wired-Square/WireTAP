@@ -95,8 +95,8 @@ type Props = {
   playbackSpeed?: PlaybackSpeed;
   onSpeedChange?: (speed: PlaybackSpeed) => void;
 
-  // Whether we have buffer data available for replay
-  hasBufferData?: boolean;
+  // Whether we have capture data available for replay
+  hasCaptureData?: boolean;
 
   // Time range / bookmark
   activeBookmarkId?: string | null;
@@ -855,7 +855,7 @@ export default function DecoderFramesView({
   onStepForward,
   playbackSpeed = 1,
   onSpeedChange,
-  hasBufferData = false,
+  hasCaptureData = false,
   activeBookmarkId,
   onOpenBookmarkPicker,
   showTimeRange,
@@ -1010,7 +1010,7 @@ export default function DecoderFramesView({
   // The frameIdFilter prop is kept for potential future use but not used for view filtering
 
   // Whether timeline should be shown
-  const showTimeline = hasBufferData && minTimeUs != null && maxTimeUs != null && minTimeUs < maxTimeUs;
+  const showTimeline = hasCaptureData && minTimeUs != null && maxTimeUs != null && minTimeUs < maxTimeUs;
 
   // ── Context menu state ──
 
@@ -1455,7 +1455,7 @@ export default function DecoderFramesView({
               currentTimeUs: currentTimeUs ?? minTimeUs ?? 0,
               onScrub: onScrub ?? (() => {}),
               displayTimeFormat: "human",
-              disabled: !hasBufferData,
+              disabled: !hasCaptureData,
             }
           : undefined
       }

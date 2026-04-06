@@ -23,7 +23,7 @@ import type { FrameMessage } from "../../../types/frame";
 import { keyOf, parseFrameKey } from "../../../utils/frameKey";
 import type { IOCapabilities } from "../../../api/io";
 import { BUFFER_POLL_INTERVAL_MS } from "../../../constants";
-import { useBufferFrameView } from "../hooks/useCaptureFrameView";
+import { useCaptureFrameView } from "../hooks/useCaptureFrameView";
 import ContextMenu, { type ContextMenuItem } from "../../../components/ContextMenu";
 import { bytesToHex } from "../../../utils/byteUtils";
 import { formatFrameId } from "../../../utils/frameIds";
@@ -218,14 +218,14 @@ function DiscoveryFramesView({
 
   // Use buffer-first hook when captureId is available
   // This provides a unified interface for streaming (tail poll) and stopped (pagination)
-  // Use || to treat empty string IDs as absent (stale effectiveBufferMetadata can produce id: "")
+  // Use || to treat empty string IDs as absent (stale effectiveCaptureMetadata can produce id: "")
   const effectiveBufferId = captureId || captureMetadata?.id || null;
   const useBufferFirstMode = effectiveBufferId !== null;
 
   // Buffer playback = pagination mode (not tail-follow). True for: recorded source, paused stream, or store-level buffer mode (after ingest)
   const isCapturePlayback = isRecorded || isStreamPaused || bufferMode.enabled;
 
-  const bufferFrameView = useBufferFrameView({
+  const captureFrameView = useCaptureFrameView({
     captureId: effectiveBufferId,
     isStreaming,
     selectedFrames,
@@ -467,14 +467,14 @@ function DiscoveryFramesView({
   let filteredCount: number;
   let effectiveCurrentPage: number;
   let effectiveTotalPages: number;
-  let isBufferFirstLoading = false;
+  let isCaptureFirstLoading = false;
   let streamingIndices: number[] | undefined;
 
   // Keep stable reference to hook's setCurrentPage
-  const hookSetCurrentPageRef = useRef(bufferFrameView.setCurrentPage);
+  const hookSetCurrentPageRef = useRef(captureFrameView.setCurrentPage);
   useEffect(() => {
-    hookSetCurrentPageRef.current = bufferFrameView.setCurrentPage;
-  }, [bufferFrameView.setCurrentPage]);
+    hookSetCurrentPageRef.current = captureFrameView.setCurrentPage;
+  }, [captureFrameView.setCurrentPage]);
 
   // Use stable callbacks for page changes to avoid infinite loops in useEffect dependencies
   const setCurrentPageStable = useCallback((page: number) => {
@@ -515,13 +515,13 @@ function DiscoveryFramesView({
   }, [handleFrameScrub]);
 
   if (useBufferFirstMode) {
-    // Buffer-first mode: useBufferFrameView provides everything
+    // Capture-first mode: useCaptureFrameView provides everything
     // Covers: CSV import, buffer replay, paused stream, recorded sources
-    visibleFrames = bufferFrameView.frames;
-    filteredCount = bufferFrameView.totalCount;
-    effectiveCurrentPage = bufferFrameView.currentPage;
-    effectiveTotalPages = bufferFrameView.totalPages;
-    isBufferFirstLoading = bufferFrameView.isLoading;
+    visibleFrames = captureFrameView.frames;
+    filteredCount = captureFrameView.totalCount;
+    effectiveCurrentPage = captureFrameView.currentPage;
+    effectiveTotalPages = captureFrameView.totalPages;
+    isCaptureFirstLoading = captureFrameView.isLoading;
   } else if (isStreaming) {
     // Active streaming (no buffer) - show tail of in-memory frames
     const result = streamingResult ?? { visibleFrames: [], filteredCount: -1, indices: [] };
@@ -763,10 +763,10 @@ function DiscoveryFramesView({
   }, [setRenderBuffer, setCurrentPageStable]);
 
   // Keep stable reference to hook's navigateToTimestamp
-  const hookNavigateToTimestampRef = useRef(bufferFrameView.navigateToTimestamp);
+  const hookNavigateToTimestampRef = useRef(captureFrameView.navigateToTimestamp);
   useEffect(() => {
-    hookNavigateToTimestampRef.current = bufferFrameView.navigateToTimestamp;
-  }, [bufferFrameView.navigateToTimestamp]);
+    hookNavigateToTimestampRef.current = captureFrameView.navigateToTimestamp;
+  }, [captureFrameView.navigateToTimestamp]);
 
   // Handle timeline scrub - use hook's navigateToTimestamp in buffer-first mode
   const handleBufferFirstScrub = useCallback(async (timeUs: number) => {
@@ -776,13 +776,13 @@ function DiscoveryFramesView({
 
   // Compute timeline props based on mode
   const timelineProps = useMemo(() => {
-    // Buffer-first mode: use hook's time range, session's currentTimeUs for position
-    if (useBufferFirstMode && bufferFrameView.timeRange) {
+    // Capture-first mode: use hook's time range, session's currentTimeUs for position
+    if (useBufferFirstMode && captureFrameView.timeRange) {
       return {
         show: true,
-        minTimeUs: bufferFrameView.timeRange.startUs,
-        maxTimeUs: bufferFrameView.timeRange.endUs,
-        currentTimeUs: currentTimeUs ?? bufferFrameView.timeRange.startUs,
+        minTimeUs: captureFrameView.timeRange.startUs,
+        maxTimeUs: captureFrameView.timeRange.endUs,
+        currentTimeUs: currentTimeUs ?? captureFrameView.timeRange.startUs,
         onScrub: handleBufferFirstScrub,
         disabled: false,
       };
@@ -799,7 +799,7 @@ function DiscoveryFramesView({
       };
     }
     return { show: false, minTimeUs: 0, maxTimeUs: 0, currentTimeUs: 0, onScrub: () => {}, disabled: true };
-  }, [useBufferFirstMode, bufferFrameView.timeRange, isStreaming, frameVersion, currentTimeUs, handleBufferFirstScrub, handleNormalScrub]);
+  }, [useBufferFirstMode, captureFrameView.timeRange, isStreaming, frameVersion, currentTimeUs, handleBufferFirstScrub, handleNormalScrub]);
 
   // Calculate which row to highlight based on current frame index or timestamp
   // Returns the index within visibleFrames, or null if current frame is not visible
@@ -1096,7 +1096,7 @@ function DiscoveryFramesView({
   const showPlaybackControls = isRecorded || isLiveStreaming || (!isStreaming && bufferMode.enabled);
   // In buffer-first mode, never fall back to frameCount (frames.length) which may be stale
   // from the streaming array and differ from the actual buffer count.
-  const effectiveTotalFrames = bufferFrameView.totalCount || captureMetadata?.count || bufferMode.totalFrames || (!useBufferFirstMode ? frameCount : undefined) || undefined;
+  const effectiveTotalFrames = captureFrameView.totalCount || captureMetadata?.count || bufferMode.totalFrames || (!useBufferFirstMode ? frameCount : undefined) || undefined;
   effectiveTotalFramesRef.current = effectiveTotalFrames;
 
   // Wrapped play handlers: auto-seek to start/end when at boundary so playback has
@@ -1167,7 +1167,7 @@ function DiscoveryFramesView({
     }
     // During live streaming: show total frame count
     if (isStreaming && !isStreamPaused) {
-      const count = useBufferFirstMode ? bufferFrameView.totalCount : frames.length;
+      const count = useBufferFirstMode ? captureFrameView.totalCount : frames.length;
       if (count > 0) {
         return (
           <span className="px-1.5 text-xs font-mono text-gray-400 tabular-nums text-center">
@@ -1219,13 +1219,13 @@ function DiscoveryFramesView({
               pageSizeOptions: FRAME_PAGE_SIZE_OPTIONS,
               onPageChange: setCurrentPageStable,
               onPageSizeChange: handlePageSizeChange,
-              loading: (!useBufferFirstMode && isFiltering) || isBufferFirstLoading,
+              loading: (!useBufferFirstMode && isFiltering) || isCaptureFirstLoading,
               disabled: isStreaming && !isStreamPaused && !isRecorded,
               leftContent: timeRangeInputs,
               centerContent: playbackControls,
               infoContent: frameCounterInfo,
               rightContent: speedSelector,
-              hidePagination: (!useBufferFirstMode && isFiltering) || isBufferFirstLoading,
+              hidePagination: (!useBufferFirstMode && isFiltering) || isCaptureFirstLoading,
             }
           : undefined
       }
@@ -1274,7 +1274,7 @@ function DiscoveryFramesView({
             onBookmark={onBookmark}
             emptyMessage={
               isStreamPaused
-                ? (isBufferFirstLoading ? 'Loading frames...' : 'No frames in buffer')
+                ? (isCaptureFirstLoading ? 'Loading frames...' : 'No frames in buffer')
                 : (isStreaming ? 'Waiting for frames...' : 'No frames to display')
             }
             showCalculator={false}
@@ -1286,7 +1286,7 @@ function DiscoveryFramesView({
             pageStartIndex={effectivePageStartIndex}
             framesReversed={framesWereReversed}
             pageFrameCount={visibleFrames.length}
-            bufferIndices={useBufferFirstMode ? bufferFrameView.bufferIndices : streamingIndices}
+            bufferIndices={useBufferFirstMode ? captureFrameView.bufferIndices : streamingIndices}
             onContextMenu={handleContextMenu}
             onHeaderContextMenu={handleHeaderContextMenu}
             useLocalTimezone={useLocalTimezone}

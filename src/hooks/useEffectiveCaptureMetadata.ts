@@ -1,46 +1,46 @@
-// src/hooks/useEffectiveBufferMetadata.ts
+// src/hooks/useEffectiveCaptureMetadata.ts
 //
-// Centralised hook for merging session buffer info with local buffer metadata.
+// Centralised hook for merging session capture info with local capture metadata.
 // Ensures apps in the same session see the same timeline range.
 
 import { useMemo } from "react";
 import type { CaptureMetadata } from "../api/capture";
 
-interface SessionBufferInfo {
-  /** Buffer start time from session (microseconds) */
+interface SessionCaptureInfo {
+  /** Capture start time from session (microseconds) */
   captureStartTimeUs: number | null;
-  /** Buffer end time from session (microseconds) */
+  /** Capture end time from session (microseconds) */
   captureEndTimeUs: number | null;
-  /** Buffer frame/byte count from session */
+  /** Capture frame/byte count from session */
   captureCount: number;
-  /** Buffer display name from session (takes priority over local metadata) */
+  /** Capture display name from session (takes priority over local metadata) */
   captureName?: string | null;
-  /** Buffer persistent flag from session (takes priority over local metadata) */
+  /** Capture persistent flag from session (takes priority over local metadata) */
   capturePersistent?: boolean;
 }
 
 /**
- * Merges session buffer info with local buffer metadata.
+ * Merges session capture info with local capture metadata.
  *
  * Session values take priority for time range and count (for cross-app sync).
- * Local metadata provides additional fields like `id` and `buffer_type`.
+ * Local metadata provides additional fields like `id` and `capture_kind`.
  *
- * @param sessionBuffer - Buffer info from useIOSession/useIOSessionManager
+ * @param sessionCapture - Capture info from useIOSession/useIOSessionManager
  * @param localMetadata - Local CaptureMetadata (e.g., from getCaptureMetadata())
  * @returns Merged CaptureMetadata or null if no data available
  */
-export function useEffectiveBufferMetadata(
-  sessionBuffer: SessionBufferInfo,
+export function useEffectiveCaptureMetadata(
+  sessionCapture: SessionCaptureInfo,
   localMetadata: CaptureMetadata | null
 ): CaptureMetadata | null {
   return useMemo(() => {
     // Return null if we have neither session nor local data
-    if (!localMetadata && !sessionBuffer.captureStartTimeUs) {
+    if (!localMetadata && !sessionCapture.captureStartTimeUs) {
       return null;
     }
 
-    // Need a real buffer ID to be useful — without one, downstream code
-    // incorrectly enters buffer-first mode with an empty string ID
+    // Need a real capture ID to be useful — without one, downstream code
+    // incorrectly enters capture-first mode with an empty string ID
     const id = localMetadata?.id;
     if (!id) {
       return null;
@@ -50,23 +50,23 @@ export function useEffectiveBufferMetadata(
     return {
       id,
       kind: localMetadata?.kind ?? "frames",
-      name: sessionBuffer.captureName ?? localMetadata?.name ?? "",
+      name: sessionCapture.captureName ?? localMetadata?.name ?? "",
       // Prefer session values for cross-app timeline sync
-      start_time_us: sessionBuffer.captureStartTimeUs ?? localMetadata?.start_time_us,
-      end_time_us: sessionBuffer.captureEndTimeUs ?? localMetadata?.end_time_us,
-      count: sessionBuffer.captureCount || localMetadata?.count || 0,
+      start_time_us: sessionCapture.captureStartTimeUs ?? localMetadata?.start_time_us,
+      end_time_us: sessionCapture.captureEndTimeUs ?? localMetadata?.end_time_us,
+      count: sessionCapture.captureCount || localMetadata?.count || 0,
       created_at: localMetadata?.created_at ?? 0,
       is_streaming: localMetadata?.is_streaming ?? false,
       owning_session_id: localMetadata?.owning_session_id ?? null,
-      persistent: sessionBuffer.capturePersistent ?? localMetadata?.persistent ?? false,
+      persistent: sessionCapture.capturePersistent ?? localMetadata?.persistent ?? false,
       buses: localMetadata?.buses ?? [],
     } as CaptureMetadata;
   }, [
-    sessionBuffer.captureStartTimeUs,
-    sessionBuffer.captureEndTimeUs,
-    sessionBuffer.captureCount,
-    sessionBuffer.captureName,
-    sessionBuffer.capturePersistent,
+    sessionCapture.captureStartTimeUs,
+    sessionCapture.captureEndTimeUs,
+    sessionCapture.captureCount,
+    sessionCapture.captureName,
+    sessionCapture.capturePersistent,
     localMetadata,
   ]);
 }

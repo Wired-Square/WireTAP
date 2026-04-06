@@ -1,7 +1,7 @@
-// ui/src/apps/discovery/hooks/useBufferFrameView.ts
+// ui/src/apps/discovery/hooks/useCaptureFrameView.ts
 //
-// Hook for buffer-first frame display in Discovery app.
-// Provides a unified interface for viewing frames from a buffer,
+// Hook for capture-first frame display in Discovery app.
+// Provides a unified interface for viewing frames from a capture,
 // with tail polling during streaming and pagination when stopped.
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -86,7 +86,7 @@ function addHexBytes(frames: CaptureFrame[]): FrameWithHex[] {
  * - When stopped: Standard pagination with page controls
  * - No large frontend frame arrays - all data stays in backend
  */
-export function useBufferFrameView(
+export function useCaptureFrameView(
   options: UseBufferFrameViewOptions
 ): UseBufferFrameViewResult {
   const {
@@ -156,7 +156,7 @@ export function useBufferFrameView(
           });
         }
       } catch (e) {
-        console.error("[useBufferFrameView] metadata fetch error:", e);
+        console.error("[useCaptureFrameView] metadata fetch error:", e);
       }
     };
 
@@ -217,7 +217,7 @@ export function useBufferFrameView(
           setTimeRange((prev) => prev ? { ...prev, endUs: response.capture_end_time_us! } : null);
         }
       } catch (e) {
-        console.error("[useBufferFrameView] tail fetch error:", e);
+        console.error("[useCaptureFrameView] tail fetch error:", e);
       }
     };
     fetchTail();
@@ -252,7 +252,7 @@ export function useBufferFrameView(
         setBufferIndices(response.capture_indices);
         setTotalCount(response.total_count);
       } catch (e) {
-        console.error("[useBufferFrameView] page fetch error:", e);
+        console.error("[useCaptureFrameView] page fetch error:", e);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -285,7 +285,7 @@ export function useBufferFrameView(
         const targetPage = Math.floor(offset / pageSizeRef.current);
         setCurrentPage(targetPage);
       } catch (e) {
-        console.error("[useBufferFrameView] timestamp navigation error:", e);
+        console.error("[useCaptureFrameView] timestamp navigation error:", e);
       }
     },
     [captureId]
@@ -314,7 +314,7 @@ export function useBufferFrameView(
         const targetPage = Math.floor(offset / pageSizeRef.current);
         setCurrentPage(targetPage);
       })
-      .catch((e) => console.error("[useBufferFrameView] follow navigation error:", e))
+      .catch((e) => console.error("[useCaptureFrameView] follow navigation error:", e))
       .finally(() => {
         followPendingRef.current = false;
         // If timestamps were skipped while this navigation was pending, catch up

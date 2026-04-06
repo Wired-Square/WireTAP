@@ -162,8 +162,8 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
             tx_bytes: false,
             multi_source: false,
         },
-        "buffer" => InterfaceTraits {
-            temporal_mode: TemporalMode::Buffer,
+        "capture" => InterfaceTraits {
+            temporal_mode: TemporalMode::Capture,
             protocols: vec![Protocol::Can],
             tx_frames: false,
             tx_bytes: false,
