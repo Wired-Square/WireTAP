@@ -657,7 +657,7 @@ export default function Decoder() {
   const handlers = useDecoderHandlers({
     // Session actions (low-level, for playback)
     start,
-    stop: stopWatch, // Use manager's stopWatch for buffer switch on timeline sources
+    stop: stopWatch, // Use manager's stopWatch for buffer switch on recorded sources
     pause,
     resume,
     setSpeed,
@@ -1070,7 +1070,7 @@ export default function Decoder() {
           playbackState={getPlaybackState()}
           playbackDirection={playbackDirection}
           capabilities={capabilities}
-          isRecorded={capabilities?.traits.temporal_mode === "timeline" || capabilities?.traits.temporal_mode === "buffer"}
+          isRecorded={capabilities?.traits.temporal_mode === "recorded" || capabilities?.traits.temporal_mode === "buffer"}
           onPlay={() => { setPlaybackDirection("forward"); handlers.handlePlay(); }}
           onPlayBackward={() => { setPlaybackDirection("backward"); handlers.handlePlayBackward(); }}
           onPause={handlers.handlePause}

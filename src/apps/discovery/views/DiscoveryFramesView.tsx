@@ -93,7 +93,7 @@ type Props = {
   onSpeedChange?: (speed: PlaybackSpeed) => void;
   /** Frame-based seeking (preferred for buffer playback) */
   onFrameChange?: (frameIndex: number) => void;
-  /** Whether a timeline source is actively streaming (e.g., PostgreSQL fetching) */
+  /** Whether a recorded source is actively streaming (e.g., PostgreSQL fetching) */
   isLiveStreaming?: boolean;
   /** Whether the timeline stream is paused (separate from buffer playback pause) */
   isStreamPaused?: boolean;

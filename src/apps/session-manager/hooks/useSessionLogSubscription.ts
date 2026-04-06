@@ -133,7 +133,7 @@ export function useSessionLogSubscription(): void {
         if (!isCurrentInstance()) return; // Check again after async
         // Cache the profile name for when the session is destroyed
         sessionProfileNameCache.set(p.session_id, profileName);
-        // Determine mode based on device type (realtime = Live, timeline = Playback)
+        // Determine mode based on source type (realtime = Live, recorded = Playback)
         let modeLabel = "";
         if (p.source_type) {
           const realtimeDevices = ["gvret_tcp", "gvret_usb", "slcan", "socketcan", "gs_usb", "mqtt", "modbus_tcp", "serial", "framelink", "virtual"];

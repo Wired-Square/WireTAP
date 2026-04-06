@@ -15,8 +15,8 @@ import type { BusMapping } from "../api/io";
 /** Supported platforms */
 export type Platform = "windows" | "macos" | "linux" | "ios";
 
-/** Temporal mode - realtime (live streaming) or timeline (recorded data) */
-export type TemporalMode = "realtime" | "timeline";
+/** Temporal mode - realtime (live streaming) or recorded (recorded data) */
+export type TemporalMode = "realtime" | "recorded";
 
 /** Protocol type - determines frame format and compatibility */
 export type Protocol = "can" | "canfd" | "modbus" | "serial";
@@ -110,7 +110,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     hasDeviceBuses: false,
   },
   postgres: {
-    temporalMode: "timeline",
+    temporalMode: "recorded",
     protocols: ["can"], // Can also be modbus/serial depending on source_type
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],
@@ -118,7 +118,7 @@ const PROFILE_TRAIT_REGISTRY: Record<ProfileKind, ProfileTraits> = {
     hasDeviceBuses: false,
   },
   csv_file: {
-    temporalMode: "timeline",
+    temporalMode: "recorded",
     protocols: ["can"],
     canTransmit: false,
     platforms: ["windows", "macos", "linux", "ios"],

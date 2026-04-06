@@ -730,8 +730,8 @@ export default function Discovery() {
 
   const protocolLabel = frames.length > 0 ? frames[0].protocol : "can";
 
-  // Non-realtime sources: timeline (postgres, csv) and buffer replay
-  const isRecorded = capabilities?.traits.temporal_mode === "timeline"
+  // Non-realtime sources: recorded (postgres, csv) and buffer replay
+  const isRecorded = capabilities?.traits.temporal_mode === "recorded"
     || capabilities?.traits.temporal_mode === "buffer";
 
   // Merged buffer metadata using session values for cross-app timeline sync
@@ -1133,7 +1133,7 @@ export default function Discovery() {
             onStepForward={handlers.handleStepForward}
             onSpeedChange={handlers.handleSpeedChange}
             onFrameChange={handleFrameChangeWithBuffer}
-            // Timeline source streaming controls
+            // Recorded source streaming controls
             isLiveStreaming={isRecorded && isStreaming && !isPaused && !isCaptureMode}
             isStreamPaused={isRecorded && isPaused && !isCaptureMode}
             onResumeStream={resume}

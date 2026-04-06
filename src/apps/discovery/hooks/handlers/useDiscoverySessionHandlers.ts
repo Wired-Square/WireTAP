@@ -104,7 +104,7 @@ export function useDiscoverySessionHandlers({
     // Check if switching to a buffer session
     if (isCaptureProfileId(profileId)) {
       // Create a proper session for the buffer so it appears in the session manager
-      // and has playback/timeline controls. watchSource calls onBeforeWatch (clears state),
+      // and has playback controls. watchSource calls onBeforeWatch (clears state),
       // creates a BufferReader session, and sets sourceProfileId to the buffer ID.
       await watchSource([profileId!], { speed: 1 });
       // Load buffer metadata and enable buffer UI (frame picker, pagination)

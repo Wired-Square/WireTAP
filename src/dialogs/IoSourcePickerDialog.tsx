@@ -305,7 +305,7 @@ export default function IoSourcePickerDialog({
         outputBus: bus,
         interfaceId: `can${bus}`,
         traits: {
-          temporal_mode: "timeline" as TemporalMode,
+          temporal_mode: "recorded" as TemporalMode,
           protocols: ["can", "canfd"] as Protocol[],
           tx_frames: false,
           tx_bytes: false,
@@ -423,7 +423,7 @@ export default function IoSourcePickerDialog({
                   outputBus: bus,
                   interfaceId: `can${bus}`,
                   traits: {
-                    temporal_mode: "timeline" as TemporalMode,
+                    temporal_mode: "recorded" as TemporalMode,
                     protocols: ["can", "canfd"] as Protocol[],
                     tx_frames: false,
                     tx_bytes: false,
@@ -544,7 +544,7 @@ export default function IoSourcePickerDialog({
         const joinableSessions = sessions.filter((s) =>
           s.capabilities.traits.multi_source === true ||
           s.sourceType === "buffer" ||
-          (s.capabilities.supports_time_range && s.capabilities.traits.temporal_mode === "timeline")
+          (s.capabilities.supports_time_range && s.capabilities.traits.temporal_mode === "recorded")
         );
         console.log("[IoSourcePickerDialog] Joinable sessions:", joinableSessions);
         setActiveMultiSourceSessions(joinableSessions);

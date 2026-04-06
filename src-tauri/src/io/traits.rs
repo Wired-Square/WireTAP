@@ -156,14 +156,14 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
             multi_source: true,
         },
         "postgres" => InterfaceTraits {
-            temporal_mode: TemporalMode::Timeline,
+            temporal_mode: TemporalMode::Recorded,
             protocols: vec![Protocol::Can],
             tx_frames: false,
             tx_bytes: false,
             multi_source: false,
         },
         "csv_file" | "csv-file" => InterfaceTraits {
-            temporal_mode: TemporalMode::Timeline,
+            temporal_mode: TemporalMode::Recorded,
             protocols: vec![Protocol::Can],
             tx_frames: false,
             tx_bytes: false,
@@ -264,7 +264,7 @@ mod tests {
                 multi_source: true,
             },
             InterfaceTraits {
-                temporal_mode: TemporalMode::Timeline,
+                temporal_mode: TemporalMode::Recorded,
                 protocols: vec![Protocol::Can],
                 tx_frames: false,
                 tx_bytes: false,
@@ -307,14 +307,14 @@ mod tests {
     fn test_timeline_multiple_interfaces_invalid() {
         let traits = vec![
             InterfaceTraits {
-                temporal_mode: TemporalMode::Timeline,
+                temporal_mode: TemporalMode::Recorded,
                 protocols: vec![Protocol::Can],
                 tx_frames: false,
                 tx_bytes: false,
                 multi_source: false,
             },
             InterfaceTraits {
-                temporal_mode: TemporalMode::Timeline,
+                temporal_mode: TemporalMode::Recorded,
                 protocols: vec![Protocol::Can],
                 tx_frames: false,
                 tx_bytes: false,

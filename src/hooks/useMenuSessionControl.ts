@@ -90,7 +90,7 @@ export function useMenuSessionControl({
 
     const bookmarksEnabled =
       !!bookmarks &&
-      (capabilities?.traits.temporal_mode === "timeline" ||
+      (capabilities?.traits.temporal_mode === "recorded" ||
         capabilities?.traits.temporal_mode === "buffer");
 
     updateMenuState({

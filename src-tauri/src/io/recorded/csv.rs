@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/timeline/csv.rs
+// ui/src-tauri/src/io/recorded/csv.rs
 //
 // CSV File Source - streams CAN data from CSV files (GVRET/SavvyCAN format)
 // Format: Time Stamp,ID,Extended,Bus,LEN,D1,D2,D3,D4,D5,D6,D7,D8
@@ -10,7 +10,7 @@ use std::io::{BufRead, BufReader};
 use std::time::Duration;
 use tauri::AppHandle;
 
-use super::base::{TimelineControl, RecordedSourceState};
+use super::base::{PlaybackControl, RecordedSourceState};
 use crate::io::{emit_session_error, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle};
 use crate::capture_store;
 
@@ -34,7 +34,7 @@ impl Default for CsvSourceOptions {
 pub struct CsvSource {
     app: AppHandle,
     options: CsvSourceOptions,
-    /// Common timeline reader state (control, state, session_id, task_handle)
+    /// Common recorded source state (control, state, session_id, task_handle)
     reader_state: RecordedSourceState,
 }
 
@@ -52,7 +52,7 @@ impl CsvSource {
 #[async_trait]
 impl IOSource for CsvSource {
     fn capabilities(&self) -> IOCapabilities {
-        IOCapabilities::timeline_can()
+        IOCapabilities::recorded_can()
     }
 
     async fn start(&mut self) -> Result<(), String> {
@@ -1447,7 +1447,7 @@ fn spawn_csv_stream(
     app_handle: AppHandle,
     session_id: String,
     options: CsvSourceOptions,
-    control: TimelineControl,
+    control: PlaybackControl,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = run_csv_stream(app_handle.clone(), session_id.clone(), options, control)
@@ -1465,7 +1465,7 @@ async fn run_csv_stream(
     _app_handle: AppHandle,
     session_id: String,
     options: CsvSourceOptions,
-    control: TimelineControl,
+    control: PlaybackControl,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tlog!(
         "[CSV:{}] Opening file: {}",

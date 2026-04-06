@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/timeline/base.rs
+// ui/src-tauri/src/io/recorded/base.rs
 //
 // Shared control state for recorded sources (Capture, CSV, PostgreSQL).
 // These sources share identical pause/resume and speed control patterns.
@@ -10,10 +10,10 @@ use std::sync::{
 
 use crate::io::IOState;
 
-/// Shared control state for timeline playback.
+/// Shared control state for recorded source playback.
 /// Used by CaptureSource, CsvSource, and PostgresSource.
 #[derive(Clone)]
-pub struct TimelineControl {
+pub struct PlaybackControl {
     /// Set to true to cancel the stream
     pub cancel_flag: Arc<AtomicBool>,
     /// Set to true to pause playback
@@ -26,8 +26,8 @@ pub struct TimelineControl {
     pub reverse_flag: Arc<AtomicBool>,
 }
 
-impl TimelineControl {
-    /// Create new timeline control with the given initial speed.
+impl PlaybackControl {
+    /// Create new playback control with the given initial speed.
     /// Speed of 0 means no pacing (unlimited speed).
     /// Speed > 0 enables pacing at that multiplier (1.0 = realtime).
     pub fn new(initial_speed: f64) -> Self {
@@ -114,7 +114,7 @@ impl TimelineControl {
     }
 }
 
-impl Default for TimelineControl {
+impl Default for PlaybackControl {
     fn default() -> Self {
         Self::new(0.0) // No pacing by default
     }
@@ -124,7 +124,7 @@ impl Default for TimelineControl {
 /// Encapsulates the common state machine (Stopped -> Running <-> Paused -> Stopped)
 /// and reduces boilerplate in CaptureSource, CsvSource, and PostgresSource.
 pub struct RecordedSourceState {
-    pub control: TimelineControl,
+    pub control: PlaybackControl,
     pub state: IOState,
     pub session_id: String,
     pub task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
@@ -134,7 +134,7 @@ impl RecordedSourceState {
     /// Create a new source state with the given session ID and initial speed.
     pub fn new(session_id: String, speed: f64) -> Self {
         Self {
-            control: TimelineControl::new(speed),
+            control: PlaybackControl::new(speed),
             state: IOState::Stopped,
             session_id,
             task_handle: None,
@@ -224,21 +224,21 @@ mod tests {
 
     #[test]
     fn test_initial_speed_zero_disables_pacing() {
-        let ctrl = TimelineControl::new(0.0);
+        let ctrl = PlaybackControl::new(0.0);
         assert!(!ctrl.is_pacing_enabled());
         assert!((ctrl.read_speed() - 1.0).abs() < 0.001); // Stores 1.0 when disabled
     }
 
     #[test]
     fn test_initial_speed_nonzero_enables_pacing() {
-        let ctrl = TimelineControl::new(2.0);
+        let ctrl = PlaybackControl::new(2.0);
         assert!(ctrl.is_pacing_enabled());
         assert!((ctrl.read_speed() - 2.0).abs() < 0.001);
     }
 
     #[test]
     fn test_set_speed_zero_disables_pacing() {
-        let ctrl = TimelineControl::new(1.0);
+        let ctrl = PlaybackControl::new(1.0);
         assert!(ctrl.is_pacing_enabled());
 
         ctrl.set_speed(0.0).unwrap();
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_set_speed_nonzero_enables_pacing() {
-        let ctrl = TimelineControl::new(0.0);
+        let ctrl = PlaybackControl::new(0.0);
         assert!(!ctrl.is_pacing_enabled());
 
         ctrl.set_speed(1.5).unwrap();
@@ -257,13 +257,13 @@ mod tests {
 
     #[test]
     fn test_set_speed_negative_fails() {
-        let ctrl = TimelineControl::new(1.0);
+        let ctrl = PlaybackControl::new(1.0);
         assert!(ctrl.set_speed(-1.0).is_err());
     }
 
     #[test]
     fn test_pause_resume() {
-        let ctrl = TimelineControl::new(1.0);
+        let ctrl = PlaybackControl::new(1.0);
         assert!(!ctrl.is_paused());
 
         ctrl.pause();
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_cancel() {
-        let ctrl = TimelineControl::new(1.0);
+        let ctrl = PlaybackControl::new(1.0);
         assert!(!ctrl.is_cancelled());
 
         ctrl.cancel();
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_reset() {
-        let ctrl = TimelineControl::new(1.0);
+        let ctrl = PlaybackControl::new(1.0);
         ctrl.cancel();
         ctrl.pause();
         assert!(ctrl.is_cancelled());

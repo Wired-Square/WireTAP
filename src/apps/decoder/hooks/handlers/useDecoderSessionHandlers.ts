@@ -52,7 +52,7 @@ export function useDecoderSessionHandlers({
     async (profileId: string | null) => {
       if (isCaptureProfileId(profileId)) {
         // Create a proper session for the buffer so it appears in the session manager
-        // and has playback/timeline controls
+        // and has playback controls
         await watchSource([profileId!], { speed: playbackSpeed });
         // Load buffer metadata for the UI
         await switchToCapture(profileId!);

@@ -1,7 +1,7 @@
-// ui/src-tauri/src/io/timeline/mod.rs
+// ui/src-tauri/src/io/recorded/mod.rs
 //
-// Timeline readers for playback from recorded sources.
-// These readers share common control patterns via RecordedSourceState.
+// Recorded sources for playback from captured/imported data.
+// These sources share common control patterns via RecordedSourceState.
 
 mod base;
 mod capture;

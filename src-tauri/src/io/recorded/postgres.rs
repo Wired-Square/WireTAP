@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/timeline/postgres.rs
+// ui/src-tauri/src/io/recorded/postgres.rs
 //
 // PostgreSQL Source - streams historical CAN data from a PostgreSQL database.
 
@@ -9,7 +9,7 @@ use std::time::Duration;
 use tauri::AppHandle;
 use tokio_postgres::{NoTls, Row};
 
-use super::base::{TimelineControl, RecordedSourceState};
+use super::base::{PlaybackControl, RecordedSourceState};
 use crate::io::{
     emit_session_error, emit_stream_ended, emit_capture_changed, signal_playback_position,
     signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition,
@@ -100,7 +100,7 @@ pub struct PostgresSource {
     app: AppHandle,
     config: PostgresConfig,
     options: PostgresSourceOptions,
-    /// Common timeline reader state (control, state, session_id, task_handle)
+    /// Common recorded source state (control, state, session_id, task_handle)
     reader_state: RecordedSourceState,
 }
 
@@ -124,7 +124,7 @@ impl PostgresSource {
 #[async_trait]
 impl IOSource for PostgresSource {
     fn capabilities(&self) -> IOCapabilities {
-        IOCapabilities::timeline_can().with_time_range(true)
+        IOCapabilities::recorded_can().with_time_range(true)
     }
 
     async fn start(&mut self) -> Result<(), String> {
@@ -223,7 +223,7 @@ fn spawn_postgres_stream(
     session_id: String,
     config: PostgresConfig,
     options: PostgresSourceOptions,
-    control: TimelineControl,
+    control: PlaybackControl,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         if let Err(e) =
@@ -245,7 +245,7 @@ async fn run_postgres_stream(
     session_id: String,
     config: PostgresConfig,
     options: PostgresSourceOptions,
-    control: TimelineControl,
+    control: PlaybackControl,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture is created synchronously in start() before this task is spawned.
     // This prevents double capture creation when resume_session_fresh() is called.

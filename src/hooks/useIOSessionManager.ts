@@ -35,9 +35,9 @@ import { isMultiSourceCapable, buildDefaultBusMappings } from "../utils/profileT
 import { WINDOW_EVENTS } from "../events/registry";
 
 /**
- * Generate a unique session ID for recorded/timeline sources.
+ * Generate a unique session ID for recorded sources.
  * Pattern: t_{shortId}
- * - t_ = timeline (postgres, csv, or other recorded sources)
+ * - t_ = recorded (postgres, csv, or other recorded sources)
  * - b_ = buffer replay (viewing stored buffer data)
  */
 function generateRecordedSessionId(): string {
@@ -662,7 +662,7 @@ export function useIOSessionManager(
     || session.capabilities?.traits.temporal_mode === "buffer";
   // Stopped with a profile selected (ready to restart)
   // For realtime sources: can restart the live stream
-  // For timeline sources: can restart from the beginning
+  // For recorded sources: can restart from the beginning
   const isStopped = !isDetached && readerState === "stopped" && ioProfile !== null;
   // Can return to live: was originally a realtime source but switched to buffer replay
   // Detected by isCaptureMode + sourceProfileId being a real profile (not a buffer ID itself)
@@ -874,7 +874,7 @@ export function useIOSessionManager(
 
   // Unified watch method: handles both single and multi-source sessions.
   // Routes multi-source-capable (realtime) profiles through startMultiBusSession,
-  // and non-multi-source (timeline/buffer) profiles through session.reinitialize().
+  // and non-multi-source (recorded/buffer) profiles through session.reinitialize().
   const watchSource = useCallback(async (
     profileIds: string[],
     opts: LoadOptions,
@@ -947,7 +947,7 @@ export function useIOSessionManager(
 
 
   // Stop watching: for realtime sources, atomically stop and switch ALL listeners
-  // to buffer replay. For timeline sources (postgres, csv), suspend and switch to
+  // to buffer replay. For recorded sources (postgres, csv), suspend and switch to
   // buffer replay so users can step through buffered frames.
   const stopWatch = useCallback(async () => {
     if (!session.sessionId) return;
@@ -968,7 +968,7 @@ export function useIOSessionManager(
       return;
     }
 
-    // Timeline sources: existing suspend + switchToBufferReplay
+    // Recorded sources: existing suspend + switchToBufferReplay
     await session.suspend();
     try {
       await session.switchToBufferReplay(1.0);
@@ -990,7 +990,7 @@ export function useIOSessionManager(
       // Session was stopped from live → buffer; reconnect to the live device
       await resumeSessionToLive(effectiveSessionId);
     } else {
-      // Buffer or timeline replay — just restart the buffer
+      // Buffer or recorded replay — just restart the buffer
       await session.resumeFresh();
     }
 

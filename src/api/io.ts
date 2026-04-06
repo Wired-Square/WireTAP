@@ -13,10 +13,10 @@ import type { FrameMessage } from "../types/frame";
 /**
  * Temporal mode of an interface/session.
  * - "realtime": Live streaming from hardware (GVRET, slcan, gs_usb, SocketCAN, MQTT)
- * - "timeline": Recorded playback (PostgreSQL, CSV)
+ * - "recorded": Recorded playback (PostgreSQL, CSV)
  * - "buffer": Buffer replay from captured data
  */
-export type TemporalMode = "realtime" | "timeline" | "buffer";
+export type TemporalMode = "realtime" | "recorded" | "buffer";
 
 /**
  * Protocol family for frame-based communication.
@@ -594,7 +594,7 @@ export interface PlaybackPosition {
   timestamp_us: number;
   /** Current frame index (0-based) */
   frame_index: number;
-  /** Total frame count in buffer (optional, for timeline sources) */
+  /** Total frame count in buffer (optional, for recorded sources) */
   frame_count?: number;
 }
 
@@ -767,7 +767,7 @@ export async function stopAndSwitchToBuffer(
  * streaming into a fresh buffer.
  *
  * Only supported for realtime devices (gvret, slcan, gs_usb, socketcan).
- * Returns an error for timeline sources (postgres, csv, mqtt).
+ * Returns an error for recorded sources (postgres, csv, mqtt).
  *
  * @param sessionId The session ID
  */
@@ -1530,7 +1530,7 @@ export async function cancelModbusScan(): Promise<void> {
 // Signal-then-fetch query API
 // ============================================================================
 
-/** Fetch current playback position for a timeline/buffer session. */
+/** Fetch current playback position for a recorded/buffer session. */
 export async function getPlaybackPosition(
   sessionId: string
 ): Promise<PlaybackPosition | null> {

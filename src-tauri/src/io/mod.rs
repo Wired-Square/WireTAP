@@ -13,8 +13,8 @@ pub mod post_session;
 pub mod traits; // InterfaceTraits validation
 mod types;
 
-// Timeline readers (buffer, csv, postgres)
-mod timeline;
+// Recorded sources (capture, csv, postgres)
+mod recorded;
 
 // Real-time drivers
 pub mod gs_usb; // pub for Tauri command access
@@ -31,13 +31,13 @@ pub mod slcan; // pub for slcan transmit_frame access
 pub mod framelink;
 mod socketcan;
 
-// Re-export timeline readers
-pub use timeline::{step_frame, CaptureSource, StepResult};
-pub use timeline::{
+// Re-export recorded sources
+pub use recorded::{step_frame, CaptureSource, StepResult};
+pub use recorded::{
     parse_csv_file, parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
     CsvSource, CsvSourceOptions, Delimiter, SequenceGap, TimestampUnit,
 };
-pub use timeline::{PostgresConfig, PostgresSource, PostgresSourceOptions, PostgresSourceType};
+pub use recorded::{PostgresConfig, PostgresSource, PostgresSourceOptions, PostgresSourceType};
 
 // Re-export codec types (platform-specific codecs are conditionally exported from codec.rs)
 #[allow(unused_imports)]
@@ -128,7 +128,7 @@ pub struct PlaybackPosition {
     pub timestamp_us: i64,
     /// Current frame index (0-based)
     pub frame_index: usize,
-    /// Total frame count in capture (optional, for timeline sources)
+    /// Total frame count in capture (optional, for recorded sources)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frame_count: Option<usize>,
 }
@@ -229,8 +229,8 @@ pub enum TransmitPayload {
 pub enum TemporalMode {
     /// Real-time streaming from live devices (GVRET, slcan, gs_usb, SocketCAN, MQTT)
     Realtime,
-    /// Timeline/playback from recorded sources (PostgreSQL, CSV)
-    Timeline,
+    /// Playback from recorded sources (PostgreSQL, CSV)
+    Recorded,
     /// Buffer replay from in-memory captured data
     Buffer,
 }
@@ -341,13 +341,13 @@ impl IOCapabilities {
         }
     }
 
-    /// Create capabilities for a timeline/replay CAN source (buffer, csv, postgres).
+    /// Create capabilities for a recorded/replay CAN source (capture, csv, postgres).
     ///
     /// Defaults:
     /// - Supports pause/resume and speed control
     /// - No transmit (replay source)
     /// - No seek (override with `with_seek`)
-    pub fn timeline_can() -> Self {
+    pub fn recorded_can() -> Self {
         Self {
             can_pause: true,
             supports_time_range: false,
@@ -358,7 +358,7 @@ impl IOCapabilities {
             supports_rtr: false,
             available_buses: vec![],
             traits: InterfaceTraits {
-                temporal_mode: TemporalMode::Timeline,
+                temporal_mode: TemporalMode::Recorded,
                 protocols: vec![Protocol::Can],
                 tx_frames: false,
                 tx_bytes: false,
@@ -390,25 +390,25 @@ impl IOCapabilities {
         self
     }
 
-    /// Set seek support (for timeline sources)
+    /// Set seek support (for recorded sources)
     pub fn with_seek(mut self, supports_seek: bool) -> Self {
         self.supports_seek = supports_seek;
         self
     }
 
-    /// Set reverse playback support (for timeline sources)
+    /// Set reverse playback support (for recorded sources)
     pub fn with_reverse(mut self, supports_reverse: bool) -> Self {
         self.supports_reverse = supports_reverse;
         self
     }
 
-    /// Set temporal mode (e.g., capture replay overrides timeline_can's default)
+    /// Set temporal mode (e.g., capture replay overrides recorded_can's default)
     pub fn with_temporal_mode(mut self, mode: TemporalMode) -> Self {
         self.traits.temporal_mode = mode;
         self
     }
 
-    /// Set time range filter support (for timeline sources)
+    /// Set time range filter support (for recorded sources)
     pub fn with_time_range(mut self, supports_time_range: bool) -> Self {
         self.supports_time_range = supports_time_range;
         self
@@ -649,7 +649,7 @@ pub struct IOSession {
     /// Display names of the sources in this session (for logging)
     pub source_names: Vec<String>,
     /// Original source configs for rebuilding the live reader on resume.
-    /// Empty for non-multi-source sessions (timeline, buffer).
+    /// Empty for non-multi-source sessions (recorded, buffer).
     pub source_configs: Vec<SourceConfig>,
     /// When all listeners went stale. During this grace period the reader is paused
     /// but the session stays alive, allowing recovery after display sleep / App Nap.
@@ -694,7 +694,7 @@ fn emit_speed_change(session_id: &str, speed: f64) {
 static IO_SESSIONS: Lazy<Mutex<HashMap<String, IOSession>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-/// Playback position cache — updated during capture/timeline streaming, polled by frontend
+/// Playback position cache — updated during capture/recorded streaming, polled by frontend
 static PLAYBACK_POSITIONS: Lazy<RwLock<HashMap<String, PlaybackPosition>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
@@ -2100,7 +2100,7 @@ pub async fn resume_session_fresh(session_id: &str) -> Result<IOState, String> {
     crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &previous, &caps);
 
     // Start the device - this will orphan old capture and create new one
-    // Timeline readers (PostgreSQL, CSV, Buffer) handle capture creation in start()
+    // Recorded sources (PostgreSQL, CSV, Capture) handle capture creation in start()
     session.source.start().await?;
 
     let current = session.source.state();

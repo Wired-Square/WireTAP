@@ -32,7 +32,7 @@ interface Props {
     available_buses: number[];
   } | null;
 
-  // Speed (for timeline sources)
+  // Speed (for recorded sources)
   speed?: number;
   supportsSpeed?: boolean;
   onOpenSpeedPicker?: () => void;

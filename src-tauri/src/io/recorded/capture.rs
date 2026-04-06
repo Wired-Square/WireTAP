@@ -1,4 +1,4 @@
-// ui/src-tauri/src/io/timeline/capture.rs
+// ui/src-tauri/src/io/recorded/capture.rs
 //
 // Capture Source - streams CAN data from the SQLite-backed capture store.
 // Used for replaying imported CSV files across all apps.
@@ -12,7 +12,7 @@ use std::sync::{
 use std::time::Duration;
 use tauri::AppHandle;
 
-use super::base::{TimelineControl, RecordedSourceState};
+use super::base::{PlaybackControl, RecordedSourceState};
 use crate::io::{emit_session_error, post_session, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, TemporalMode};
 use crate::{capture_db, capture_store};
 
@@ -24,7 +24,7 @@ const NO_SEEK_FRAME: i64 = -1;
 /// Capture Source - streams frames from the SQLite-backed capture store
 pub struct CaptureSource {
     app: AppHandle,
-    /// Common timeline reader state (control, state, session_id, task_handle)
+    /// Common recorded source state (control, state, session_id, task_handle)
     reader_state: RecordedSourceState,
     /// Seek target in microseconds. Set to NO_SEEK when no seek is pending.
     seek_target_us: Arc<AtomicI64>,
@@ -72,7 +72,7 @@ impl CaptureSource {
 #[async_trait]
 impl IOSource for CaptureSource {
     fn capabilities(&self) -> IOCapabilities {
-        IOCapabilities::timeline_can()
+        IOCapabilities::recorded_can()
             .with_temporal_mode(TemporalMode::Buffer)
             .with_seek(true)
             .with_reverse(true)
@@ -280,7 +280,7 @@ pub fn step_frame(
 fn spawn_capture_stream(
     app_handle: AppHandle,
     session_id: String,
-    control: TimelineControl,
+    control: PlaybackControl,
     seek_target_us: Arc<AtomicI64>,
     seek_target_frame: Arc<AtomicI64>,
     completed_flag: Arc<AtomicBool>,
@@ -320,7 +320,7 @@ fn handle_seek(
     total_frames: usize,
     seek_target_frame: &AtomicI64,
     seek_target_us: &AtomicI64,
-    control: &TimelineControl,
+    control: &PlaybackControl,
     chunk: &mut Vec<(i64, FrameMessage)>,
     chunk_idx: &mut usize,
     frame_index: &mut usize,
@@ -436,7 +436,7 @@ fn handle_seek(
 async fn run_capture_stream(
     app_handle: AppHandle,
     session_id: String,
-    control: TimelineControl,
+    control: PlaybackControl,
     seek_target_us: Arc<AtomicI64>,
     seek_target_frame: Arc<AtomicI64>,
     completed_flag: Arc<AtomicBool>,

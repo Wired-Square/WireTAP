@@ -1482,13 +1482,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   suspendSession: async (sessionId) => {
     // Check if the session is a realtime source - if so, switch to buffer replay mode
-    // so timeline controls work. For timeline sources, just stop the reader.
+    // so playback controls work. For recorded sources, just stop the source.
     const session = get().sessions[sessionId];
     const isRealtime = session?.capabilities?.traits.temporal_mode === "realtime";
     const profileName = session?.profileName ?? sessionId;
 
     if (isRealtime) {
-      // Realtime source: switch to BufferReader for timeline playback
+      // Realtime source: switch to CaptureSource for buffer playback
       tlog.info(`[sessionStore] suspendSession: realtime session '${sessionId}' - switching to buffer replay`);
       try {
         const capabilities = await switchSessionToBufferReplay(sessionId, 1.0);
@@ -1542,8 +1542,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         }
       }
     } else {
-      // Timeline source: just stop the reader
-      tlog.info(`[sessionStore] suspendSession: timeline session '${sessionId}' - stopping reader`);
+      // Recorded source: just stop the source
+      tlog.info(`[sessionStore] suspendSession: recorded session '${sessionId}' - stopping source`);
       const confirmedState = await suspendReaderSession(sessionId);
       set((s) => ({
         sessions: {
@@ -1571,7 +1571,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }));
 
     // Try to resume to live first (for realtime sources that were suspended to buffer mode)
-    // This will fail if the session doesn't have stored profile IDs (timeline sources)
+    // This will fail if the session doesn't have stored profile IDs (recorded sources)
     try {
       tlog.info(`[sessionStore] resumeSessionFresh: trying resumeSessionToLive for '${sessionId}'`);
       const capabilities = await resumeSessionToLive(sessionId);
@@ -1588,7 +1588,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         },
       }));
     } catch (e) {
-      // No profile IDs stored (timeline source) - use the existing resume logic
+      // No profile IDs stored (recorded source) - use the existing resume logic
       tlog.info(`[sessionStore] resumeSessionFresh: '${sessionId}' falling back to resumeReaderSessionFresh - ${e}`);
       const confirmedState = await resumeReaderSessionFresh(sessionId);
       set((s) => ({

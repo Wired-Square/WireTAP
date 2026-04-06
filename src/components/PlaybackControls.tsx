@@ -1,6 +1,6 @@
 // src/components/PlaybackControls.tsx
 //
-// Reusable playback controls for timeline readers (Buffer, CSV, PostgreSQL).
+// Reusable playback controls for recorded sources (Buffer, CSV, PostgreSQL).
 // Used by Discovery and Decoder when viewing recorded/buffered data.
 //
 // Renders only transport buttons. Frame counter and speed selector are
@@ -64,7 +64,7 @@ const DEFAULT_SPEED_OPTIONS: PlaybackSpeed[] = [0.125, 0.25, 0.5, 1, 2, 10, 30, 
 const DEFAULT_SKIP_FRAMES = 100;
 
 /**
- * Playback controls for timeline readers.
+ * Playback controls for recorded sources.
  * Renders play/pause/stop buttons with optional seek and speed controls.
  */
 export function PlaybackControls({
@@ -312,7 +312,7 @@ export function PlaybackControls({
         </button>
       )}
 
-      {/* Resume Stream button - resumes PostgreSQL/timeline fetch after pause */}
+      {/* Resume Stream button - resumes PostgreSQL/recorded fetch after pause */}
       {isStreamPaused && onResumeStream && (
         <button
           type="button"

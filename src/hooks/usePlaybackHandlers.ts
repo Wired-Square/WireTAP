@@ -1,7 +1,7 @@
 // src/hooks/usePlaybackHandlers.ts
 //
 // Shared playback handlers for Discovery and Decoder.
-// Handles play/pause/stop/speed/direction control for timeline readers.
+// Handles play/pause/stop/speed/direction control for recorded sources.
 
 import { useCallback } from "react";
 import type { PlaybackSpeed } from "../components/TimeController";

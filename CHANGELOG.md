@@ -6,6 +6,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Changed
 
+- **`temporal_mode: "timeline"` → `"recorded"`**: The `TemporalMode::Timeline` enum variant is now `Recorded`, matching the UI's existing "Recorded Sources" label. Rust module `io/timeline/` renamed to `io/recorded/`. `timeline_can()` → `recorded_can()`, `TimelineControl` → `PlaybackControl`. **Breaking wire change**: the serialised `temporal_mode` field changes from `"timeline"` to `"recorded"` on `InterfaceTraits`. Frontend `TemporalMode` type and all comparisons updated in lockstep.
+
 - **`*Reader` structs → `*Source` rename**: Renamed all IO source structs to match the `IOSource` trait: `ModbusTcpReader` → `ModbusTcpSource`, `ModbusRtuReader` → `ModbusRtuSource`, `MqttReader` → `MqttSource`, `GsUsbReader` → `GsUsbSource`, `SocketCanReader` → `SocketCanSource`, `VirtualDeviceReader` → `VirtualSource`, `CsvReader` → `CsvSource`, `PostgresReader` → `PostgresSource`. Config/options structs follow: `CsvReaderOptions` → `CsvSourceOptions`, `PostgresReaderOptions` → `PostgresSourceOptions`. Shared state struct `TimelineReaderState` → `RecordedSourceState`. No frontend or wire protocol impact — these are internal Rust struct names.
 
 - **MultiSourceReader → IOBroker rename**: Renamed `MultiSourceReader` struct to `IOBroker` and moved the `io/multi_source/` module to `io/broker/`. The broker sits between IO device producers and session consumers, routing frames and transmit requests — the new name reflects this role without implying "multi" or "read-only". Updated all log prefixes (`[MultiSourceReader]` → `[IOBroker]`), the `emit_stream_ended` source tag, and documentation references. `SourceConfig`, `validate_session_traits`, and the `multi_source` trait field are unchanged.
