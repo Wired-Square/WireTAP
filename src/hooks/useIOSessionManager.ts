@@ -680,15 +680,18 @@ export function useIOSessionManager(
       || session.capabilities?.traits.temporal_mode === "buffer";
 
     if (currentIsCaptureMode) {
-      // Already viewing a capture → "second leave" → No Source
+      // Already viewing a capture → "second leave" → No Source.
+      // Reset state BEFORE the async leave so React batches both updates
+      // in the same render — prevents useIOSession from re-creating the
+      // session when it sees effectiveSessionId still set.
       onBeforeWatch?.();
-      await session.leave();
       setMultiBusProfiles([]);
       setMultiSessionId(null);
       setIoProfile(null);
       setSourceProfileId(null);
       setIsWatching(false);
       setIsDetached(false);
+      await session.leave();
     } else {
       // Realtime or Recorded → stop source, switch to capture in-place.
       // session-lifecycle event fires → capabilities update → isCaptureMode flips true.
@@ -701,13 +704,13 @@ export function useIOSessionManager(
         // No capture available (e.g., 0 frames received) — full disconnect
         tlog.info(`[IOSessionManager:${appName}] Leave: no capture, disconnecting: ${e}`);
         onBeforeWatch?.();
-        await session.leave();
         setMultiBusProfiles([]);
         setMultiSessionId(null);
         setIoProfile(null);
         setSourceProfileId(null);
         setIsWatching(false);
         setIsDetached(false);
+        await session.leave();
       }
     }
   }, [session, onBeforeWatch, setMultiBusProfiles, setIoProfile, ioProfile, sourceProfileId, appName]);
