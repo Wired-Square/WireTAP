@@ -337,11 +337,11 @@ fn get_device_config_sync(interface: &Interface) -> Result<GsDeviceConfig, Strin
 }
 
 // ============================================================================
-// GsUsbReader Implementation
+// GsUsbSource Implementation
 // ============================================================================
 
-/// gs_usb reader for Windows/macOS with transmit support
-pub struct GsUsbReader {
+/// gs_usb source for Windows/macOS with transmit support
+pub struct GsUsbSource {
     app: AppHandle,
     session_id: String,
     config: GsUsbConfig,
@@ -352,7 +352,7 @@ pub struct GsUsbReader {
     transmit_tx: Arc<Mutex<Option<TransmitSender>>>,
 }
 
-impl GsUsbReader {
+impl GsUsbSource {
     pub fn new(app: AppHandle, session_id: String, config: GsUsbConfig) -> Self {
         Self {
             app,
@@ -367,7 +367,7 @@ impl GsUsbReader {
 }
 
 #[async_trait]
-impl IOSource for GsUsbReader {
+impl IOSource for GsUsbSource {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::realtime_can()
             .with_tx(!self.config.listen_only, false)
@@ -376,7 +376,7 @@ impl IOSource for GsUsbReader {
 
     async fn start(&mut self) -> Result<(), String> {
         if self.state == IOState::Running {
-            return Err("Reader is already running".to_string());
+            return Err("Source is already running".to_string());
         }
 
         self.state = IOState::Starting;

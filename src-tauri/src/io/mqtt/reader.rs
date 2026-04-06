@@ -1,6 +1,6 @@
 // ui/src-tauri/src/io/mqtt/reader.rs
 //
-// MQTT Reader - streams CAN frames from an MQTT broker.
+// MQTT Source - streams CAN frames from an MQTT broker.
 // Supports SavvyCAN JSON format with optional CAN FD.
 //
 // JSON message format:
@@ -30,7 +30,7 @@ use crate::capture_store::{self, CaptureKind};
 // Configuration
 // ============================================================================
 
-/// MQTT reader configuration
+/// MQTT source configuration
 #[derive(Clone, Debug)]
 pub struct MqttConfig {
     /// MQTT broker hostname
@@ -125,11 +125,11 @@ where
 }
 
 // ============================================================================
-// MQTT Reader
+// MQTT Source
 // ============================================================================
 
-/// MQTT Reader - receives CAN frames from an MQTT broker
-pub struct MqttReader {
+/// MQTT Source - receives CAN frames from an MQTT broker
+pub struct MqttSource {
     app: AppHandle,
     session_id: String,
     config: MqttConfig,
@@ -138,7 +138,7 @@ pub struct MqttReader {
     task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
 }
 
-impl MqttReader {
+impl MqttSource {
     pub fn new(app: AppHandle, session_id: String, config: MqttConfig) -> Self {
         Self {
             app,
@@ -152,7 +152,7 @@ impl MqttReader {
 }
 
 #[async_trait]
-impl IOSource for MqttReader {
+impl IOSource for MqttSource {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::realtime_can()
             .with_protocols(vec![Protocol::Can, Protocol::CanFd])
@@ -161,7 +161,7 @@ impl IOSource for MqttReader {
 
     async fn start(&mut self) -> Result<(), String> {
         if self.state == IOState::Running {
-            return Err("Reader is already running".to_string());
+            return Err("Source is already running".to_string());
         }
 
         self.state = IOState::Starting;

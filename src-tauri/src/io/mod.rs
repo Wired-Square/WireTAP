@@ -35,9 +35,9 @@ mod socketcan;
 pub use timeline::{step_frame, CaptureSource, StepResult};
 pub use timeline::{
     parse_csv_file, parse_csv_with_mapping, preview_csv_file, CsvColumnMapping, CsvPreview,
-    CsvReader, CsvReaderOptions, Delimiter, SequenceGap, TimestampUnit,
+    CsvSource, CsvSourceOptions, Delimiter, SequenceGap, TimestampUnit,
 };
-pub use timeline::{PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType};
+pub use timeline::{PostgresConfig, PostgresSource, PostgresSourceOptions, PostgresSourceType};
 
 // Re-export codec types (platform-specific codecs are conditionally exported from codec.rs)
 #[allow(unused_imports)]
@@ -60,14 +60,14 @@ pub use codec::{SocketCanCodec, SocketCanEncodedFrame};
 pub use gs_usb::GsUsbConfig;
 pub use gvret::{BusMapping, GvretDeviceInfo, probe_gvret_tcp};
 pub use modbus_tcp::{
-    ModbusTcpConfig, ModbusTcpReader, PollGroup,
+    ModbusTcpConfig, ModbusTcpSource, PollGroup,
     ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
 };
 #[cfg(not(target_os = "ios"))]
 pub use gvret::probe_gvret_usb;
 pub use broker::{ModbusRole, IOBroker, SourceConfig};
-pub use mqtt::{MqttConfig, MqttReader};
-pub use virtual_device::{VirtualDeviceConfig, VirtualDeviceReader, VirtualInterfaceConfig, VirtualTrafficType};
+pub use mqtt::{MqttConfig, MqttSource};
+pub use virtual_device::{VirtualDeviceConfig, VirtualSource, VirtualInterfaceConfig, VirtualTrafficType};
 #[cfg(not(target_os = "ios"))]
 #[allow(unused_imports)]
 pub use serial::Parity;

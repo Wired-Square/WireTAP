@@ -1,6 +1,6 @@
 // ui/src-tauri/src/io/timeline/csv.rs
 //
-// CSV File Reader - streams CAN data from CSV files (GVRET/SavvyCAN format)
+// CSV File Source - streams CAN data from CSV files (GVRET/SavvyCAN format)
 // Format: Time Stamp,ID,Extended,Bus,LEN,D1,D2,D3,D4,D5,D6,D7,D8
 
 use async_trait::async_trait;
@@ -10,18 +10,18 @@ use std::io::{BufRead, BufReader};
 use std::time::Duration;
 use tauri::AppHandle;
 
-use super::base::{TimelineControl, TimelineReaderState};
+use super::base::{TimelineControl, RecordedSourceState};
 use crate::io::{emit_session_error, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle};
 use crate::capture_store;
 
-/// CSV reader options for playback control
+/// CSV source options for playback control
 #[derive(Clone, Debug)]
-pub struct CsvReaderOptions {
+pub struct CsvSourceOptions {
     pub file_path: String,
     pub speed: f64, // Playback speed multiplier (0 = no limit, 1.0 = realtime)
 }
 
-impl Default for CsvReaderOptions {
+impl Default for CsvSourceOptions {
     fn default() -> Self {
         Self {
             file_path: String::new(),
@@ -30,27 +30,27 @@ impl Default for CsvReaderOptions {
     }
 }
 
-/// CSV File Reader - streams historical CAN data from a CSV file
-pub struct CsvReader {
+/// CSV File Source - streams historical CAN data from a CSV file
+pub struct CsvSource {
     app: AppHandle,
-    options: CsvReaderOptions,
+    options: CsvSourceOptions,
     /// Common timeline reader state (control, state, session_id, task_handle)
-    reader_state: TimelineReaderState,
+    reader_state: RecordedSourceState,
 }
 
-impl CsvReader {
-    pub fn new(app: AppHandle, session_id: String, options: CsvReaderOptions) -> Self {
+impl CsvSource {
+    pub fn new(app: AppHandle, session_id: String, options: CsvSourceOptions) -> Self {
         let speed = options.speed;
         Self {
             app,
             options,
-            reader_state: TimelineReaderState::new(session_id, speed),
+            reader_state: RecordedSourceState::new(session_id, speed),
         }
     }
 }
 
 #[async_trait]
-impl IOSource for CsvReader {
+impl IOSource for CsvSource {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::timeline_can()
     }
@@ -1446,7 +1446,7 @@ fn suggest_timestamp_unit(
 fn spawn_csv_stream(
     app_handle: AppHandle,
     session_id: String,
-    options: CsvReaderOptions,
+    options: CsvSourceOptions,
     control: TimelineControl,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
@@ -1464,7 +1464,7 @@ fn spawn_csv_stream(
 async fn run_csv_stream(
     _app_handle: AppHandle,
     session_id: String,
-    options: CsvReaderOptions,
+    options: CsvSourceOptions,
     control: TimelineControl,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tlog!(

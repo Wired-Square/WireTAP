@@ -102,11 +102,11 @@ enum LoopbackMessage {
 }
 
 // ============================================================================
-// Virtual Device Reader
+// Virtual Source
 // ============================================================================
 
-/// Virtual device — emits synthetic frames/bytes and optionally echoes transmits
-pub struct VirtualDeviceReader {
+/// Virtual source — emits synthetic frames/bytes and optionally echoes transmits
+pub struct VirtualSource {
     app: AppHandle,
     session_id: String,
     config: VirtualDeviceConfig,
@@ -121,7 +121,7 @@ pub struct VirtualDeviceReader {
     loopback_tx: std::sync::Mutex<Option<UnboundedSender<LoopbackMessage>>>,
 }
 
-impl VirtualDeviceReader {
+impl VirtualSource {
     pub fn new(app: AppHandle, session_id: String, config: VirtualDeviceConfig) -> Self {
         let bus_traffic_flags: Vec<Arc<AtomicBool>> = config
             .interfaces
@@ -151,7 +151,7 @@ impl VirtualDeviceReader {
 }
 
 #[async_trait]
-impl IOSource for VirtualDeviceReader {
+impl IOSource for VirtualSource {
     fn capabilities(&self) -> IOCapabilities {
         let buses: Vec<u8> = self.config.interfaces.iter().map(|i| i.bus).collect();
         let loopback = self.config.loopback;

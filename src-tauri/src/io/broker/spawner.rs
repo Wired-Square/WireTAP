@@ -535,7 +535,7 @@ async fn run_framelink_reader(
 /// Virtual CAN source for multi-source sessions: generates synthetic frames and sends
 /// them via the merge channel (merge task handles emission).
 ///
-/// Parses the same `interfaces` array config as `VirtualDeviceReader` in virtual_device/mod.rs,
+/// Parses the same `interfaces` array config as `VirtualSource` in virtual_device/mod.rs,
 /// spawning one generator task per bus with independent frame rates and patterns.
 async fn run_virtual_reader(
     source_idx: usize,
@@ -938,7 +938,7 @@ fn spawn_bus_generator(
 // ============================================================================
 
 /// Modbus TCP client source: connects to a Modbus TCP server and polls registers.
-/// Extracted from ModbusTcpReader to work within the multi-source framework.
+/// Extracted from ModbusTcpSource to work within the multi-source framework.
 async fn run_modbus_tcp_client(
     source_idx: usize,
     profile: &IOProfile,

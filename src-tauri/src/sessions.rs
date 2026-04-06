@@ -17,14 +17,14 @@ use crate::{
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
         JoinSessionResult, ListenerInfo, RegisterListenerResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
-        CsvReader, CsvReaderOptions,
+        CsvSource, CsvSourceOptions,
         GvretDeviceInfo, probe_gvret_tcp,
-        ModbusTcpConfig, ModbusTcpReader,
+        ModbusTcpConfig, ModbusTcpSource,
         ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
-        MqttConfig, MqttReader,
-        VirtualDeviceConfig, VirtualDeviceReader, VirtualInterfaceConfig, VirtualTrafficType,
+        MqttConfig, MqttSource,
+        VirtualDeviceConfig, VirtualSource, VirtualInterfaceConfig, VirtualTrafficType,
         ModbusRole, IOBroker, SourceConfig,
-        PostgresConfig, PostgresReader, PostgresReaderOptions, PostgresSourceType,
+        PostgresConfig, PostgresSource, PostgresSourceOptions, PostgresSourceType,
         CanTransmitFrame, TransmitResult,
         emit_device_probe, DeviceProbePayload,
         set_wake_settings as io_set_wake_settings,
@@ -593,7 +593,7 @@ pub async fn create_reader_session(
                 .map(PostgresSourceType::from_str)
                 .unwrap_or_default();
 
-            let options = PostgresReaderOptions {
+            let options = PostgresSourceOptions {
                 source_type,
                 start: start_time.or(start_from_profile),
                 end: end_time.or(end_from_profile),
@@ -612,7 +612,7 @@ pub async fn create_reader_session(
                     .unwrap_or(1000) as i32,
             };
 
-            Box::new(PostgresReader::new(
+            Box::new(PostgresSource::new(
                 app.clone(),
                 session_id.clone(),
                 config,
@@ -632,7 +632,7 @@ pub async fn create_reader_session(
                 "CSV file path is required. Please select a file or configure a path in the profile.".to_string()
             })?;
 
-            let options = CsvReaderOptions {
+            let options = CsvSourceOptions {
                 file_path: path,
                 speed: speed.unwrap_or_else(|| {
                     profile
@@ -643,7 +643,7 @@ pub async fn create_reader_session(
                 }),
             };
 
-            Box::new(CsvReader::new(app.clone(), session_id.clone(), options))
+            Box::new(CsvSource::new(app.clone(), session_id.clone(), options))
         }
         "modbus_tcp" => {
             let host = profile
@@ -691,7 +691,7 @@ pub async fn create_reader_session(
                 max_register_errors: settings.modbus_max_register_errors,
             };
 
-            Box::new(ModbusTcpReader::new(app.clone(), session_id.clone(), config))
+            Box::new(ModbusTcpSource::new(app.clone(), session_id.clone(), config))
         }
         "mqtt" => {
             let host = profile
@@ -753,7 +753,7 @@ pub async fn create_reader_session(
                 client_id: None,
             };
 
-            Box::new(MqttReader::new(app.clone(), session_id.clone(), config))
+            Box::new(MqttSource::new(app.clone(), session_id.clone(), config))
         }
         "virtual" => {
             let traffic_type = match profile
@@ -866,7 +866,7 @@ pub async fn create_reader_session(
                 config.traffic_type, loopback, config.interfaces.len()
             );
 
-            Box::new(VirtualDeviceReader::new(app.clone(), session_id.clone(), config))
+            Box::new(VirtualSource::new(app.clone(), session_id.clone(), config))
         }
         kind => {
             return Err(format!(

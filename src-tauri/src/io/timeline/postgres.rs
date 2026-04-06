@@ -1,6 +1,6 @@
 // ui/src-tauri/src/io/timeline/postgres.rs
 //
-// PostgreSQL Reader - streams historical CAN data from a PostgreSQL database.
+// PostgreSQL Source - streams historical CAN data from a PostgreSQL database.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -9,7 +9,7 @@ use std::time::Duration;
 use tauri::AppHandle;
 use tokio_postgres::{NoTls, Row};
 
-use super::base::{TimelineControl, TimelineReaderState};
+use super::base::{TimelineControl, RecordedSourceState};
 use crate::io::{
     emit_session_error, emit_stream_ended, emit_capture_changed, signal_playback_position,
     signal_frames_ready, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition,
@@ -71,9 +71,9 @@ impl PostgresSourceType {
     }
 }
 
-/// PostgreSQL reader options for filtering and pacing
+/// PostgreSQL source options for filtering and pacing
 #[derive(Clone, Debug)]
-pub struct PostgresReaderOptions {
+pub struct PostgresSourceOptions {
     pub source_type: PostgresSourceType, // Which table/schema to query
     pub start: Option<String>,           // ISO-8601 start time
     pub end: Option<String>,             // ISO-8601 end time
@@ -82,7 +82,7 @@ pub struct PostgresReaderOptions {
     pub batch_size: i32,                 // Cursor fetch size
 }
 
-impl Default for PostgresReaderOptions {
+impl Default for PostgresSourceOptions {
     fn default() -> Self {
         Self {
             source_type: PostgresSourceType::CanFrame,
@@ -95,34 +95,34 @@ impl Default for PostgresReaderOptions {
     }
 }
 
-/// PostgreSQL Reader - streams historical CAN data from a PostgreSQL database
-pub struct PostgresReader {
+/// PostgreSQL Source - streams historical CAN data from a PostgreSQL database
+pub struct PostgresSource {
     app: AppHandle,
     config: PostgresConfig,
-    options: PostgresReaderOptions,
+    options: PostgresSourceOptions,
     /// Common timeline reader state (control, state, session_id, task_handle)
-    reader_state: TimelineReaderState,
+    reader_state: RecordedSourceState,
 }
 
-impl PostgresReader {
+impl PostgresSource {
     pub fn new(
         app: AppHandle,
         session_id: String,
         config: PostgresConfig,
-        options: PostgresReaderOptions,
+        options: PostgresSourceOptions,
     ) -> Self {
         let speed = options.speed;
         Self {
             app,
             config,
             options,
-            reader_state: TimelineReaderState::new(session_id, speed),
+            reader_state: RecordedSourceState::new(session_id, speed),
         }
     }
 }
 
 #[async_trait]
-impl IOSource for PostgresReader {
+impl IOSource for PostgresSource {
     fn capabilities(&self) -> IOCapabilities {
         IOCapabilities::timeline_can().with_time_range(true)
     }
@@ -217,12 +217,12 @@ impl IOSource for PostgresReader {
     }
 }
 
-/// Spawn a PostgreSQL reader task with scoped events and pause support.
+/// Spawn a PostgreSQL source task with scoped events and pause support.
 fn spawn_postgres_stream(
     app_handle: AppHandle,
     session_id: String,
     config: PostgresConfig,
-    options: PostgresReaderOptions,
+    options: PostgresSourceOptions,
     control: TimelineControl,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
@@ -244,7 +244,7 @@ async fn run_postgres_stream(
     _app_handle: AppHandle,
     session_id: String,
     config: PostgresConfig,
-    options: PostgresReaderOptions,
+    options: PostgresSourceOptions,
     control: TimelineControl,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture is created synchronously in start() before this task is spawned.
@@ -654,7 +654,7 @@ pub struct RawByteChunk {
     pub data: Vec<u8>,
 }
 
-fn build_where_clause(options: &PostgresReaderOptions) -> String {
+fn build_where_clause(options: &PostgresSourceOptions) -> String {
     let mut clauses = vec!["1=1".to_string()];
 
     if let Some(ref start) = options.start {
@@ -669,7 +669,7 @@ fn build_where_clause(options: &PostgresReaderOptions) -> String {
 }
 
 /// Build SQL query based on source type
-fn build_query(options: &PostgresReaderOptions) -> String {
+fn build_query(options: &PostgresSourceOptions) -> String {
     let where_clause = build_where_clause(options);
     // Always include a LIMIT to help the query planner choose an index scan.
     // Without a LIMIT or with a very large LIMIT, PostgreSQL may plan for a full

@@ -1,6 +1,6 @@
 // io/modbus_tcp/reader.rs
 //
-// Modbus TCP Reader - polls registers from a Modbus TCP server.
+// Modbus TCP Source - polls registers from a Modbus TCP server.
 //
 // Architecture:
 //   - Connects to a Modbus TCP server (PLC, sensor, etc.)
@@ -60,7 +60,7 @@ pub struct PollGroup {
     pub frame_id: u32,
 }
 
-/// Modbus TCP reader configuration
+/// Modbus TCP source configuration
 #[derive(Clone, Debug)]
 pub struct ModbusTcpConfig {
     /// Server hostname or IP
@@ -76,11 +76,11 @@ pub struct ModbusTcpConfig {
 }
 
 // ============================================================================
-// Modbus TCP Reader
+// Modbus TCP Source
 // ============================================================================
 
-/// Modbus TCP Reader - polls registers from a Modbus TCP server
-pub struct ModbusTcpReader {
+/// Modbus TCP Source - polls registers from a Modbus TCP server
+pub struct ModbusTcpSource {
     app: AppHandle,
     session_id: String,
     config: ModbusTcpConfig,
@@ -90,7 +90,7 @@ pub struct ModbusTcpReader {
     task_handles: Vec<tauri::async_runtime::JoinHandle<()>>,
 }
 
-impl ModbusTcpReader {
+impl ModbusTcpSource {
     pub fn new(app: AppHandle, session_id: String, config: ModbusTcpConfig) -> Self {
         Self {
             app,
@@ -105,7 +105,7 @@ impl ModbusTcpReader {
 }
 
 #[async_trait]
-impl IOSource for ModbusTcpReader {
+impl IOSource for ModbusTcpSource {
     fn capabilities(&self) -> IOCapabilities {
         let mut caps = IOCapabilities::realtime_can()
             .with_buses(vec![])
@@ -118,7 +118,7 @@ impl IOSource for ModbusTcpReader {
 
     async fn start(&mut self) -> Result<(), String> {
         if self.state == IOState::Running {
-            return Err("Reader is already running".to_string());
+            return Err("Source is already running".to_string());
         }
 
         if self.config.polls.is_empty() {
@@ -203,7 +203,7 @@ impl IOSource for ModbusTcpReader {
 
     async fn pause(&mut self) -> Result<(), String> {
         if self.state != IOState::Running {
-            return Err("Reader is not running".to_string());
+            return Err("Source is not running".to_string());
         }
         self.pause_flag.store(true, Ordering::Relaxed);
         self.state = IOState::Paused;
@@ -213,7 +213,7 @@ impl IOSource for ModbusTcpReader {
 
     async fn resume(&mut self) -> Result<(), String> {
         if self.state != IOState::Paused {
-            return Err("Reader is not paused".to_string());
+            return Err("Source is not paused".to_string());
         }
         self.pause_flag.store(false, Ordering::Relaxed);
         self.state = IOState::Running;

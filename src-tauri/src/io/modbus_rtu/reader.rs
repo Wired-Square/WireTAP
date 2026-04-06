@@ -1,6 +1,6 @@
 // io/modbus_rtu/reader.rs
 //
-// Modbus RTU Reader - actively polls registers over a serial port.
+// Modbus RTU Source - actively polls registers over a serial port.
 //
 // Architecture:
 //   - Opens a serial port directly (using serialport crate)
@@ -34,7 +34,7 @@ use crate::io::{
 // Configuration
 // ============================================================================
 
-/// Modbus RTU reader configuration
+/// Modbus RTU source configuration
 #[derive(Clone, Debug)]
 pub struct ModbusRtuConfig {
     /// Serial port path (e.g. "/dev/ttyUSB0", "COM3")
@@ -60,10 +60,10 @@ pub struct ModbusRtuConfig {
 }
 
 // ============================================================================
-// Modbus RTU Reader
+// Modbus RTU Source
 // ============================================================================
 
-pub struct ModbusRtuReader {
+pub struct ModbusRtuSource {
     _app: AppHandle,
     session_id: String,
     config: ModbusRtuConfig,
@@ -72,7 +72,7 @@ pub struct ModbusRtuReader {
     task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
 }
 
-impl ModbusRtuReader {
+impl ModbusRtuSource {
     pub fn new(app: AppHandle, session_id: String, config: ModbusRtuConfig) -> Self {
         Self {
             _app: app,
@@ -86,7 +86,7 @@ impl ModbusRtuReader {
 }
 
 #[async_trait]
-impl IOSource for ModbusRtuReader {
+impl IOSource for ModbusRtuSource {
     fn capabilities(&self) -> IOCapabilities {
         let mut caps = IOCapabilities::realtime_can()
             .with_buses(vec![])
@@ -98,7 +98,7 @@ impl IOSource for ModbusRtuReader {
 
     async fn start(&mut self) -> Result<(), String> {
         if self.state == IOState::Running {
-            return Err("Reader is already running".to_string());
+            return Err("Source is already running".to_string());
         }
 
         if self.config.polls.is_empty() {

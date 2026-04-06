@@ -1,6 +1,6 @@
 // ui/src-tauri/src/io/socketcan/reader.rs
 //
-// SocketCAN reader for Linux native CAN interfaces.
+// SocketCAN source for Linux native CAN interfaces.
 // Used with CANable Pro (Candlelight firmware) or native CAN hardware.
 //
 // Requires the interface to be configured first:
@@ -32,7 +32,7 @@ mod linux_impl {
     // Types and Configuration
     // ============================================================================
 
-    /// SocketCAN reader configuration
+    /// SocketCAN source configuration
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct SocketCanConfig {
         /// CAN interface name (e.g., "can0", "vcan0")
@@ -182,17 +182,17 @@ mod linux_impl {
     }
 
     // ============================================================================
-    // Simple SocketCAN Reader (for multi_source.rs)
+    // Simple SocketCAN Source (for multi_source.rs)
     // ============================================================================
 
-    /// Simple SocketCAN reader/writer for use in multi-source mode.
+    /// Simple SocketCAN source for use in multi-source mode.
     /// Wraps a CanFdSocket for both reading and writing frames (supports CAN FD).
-    pub struct SocketCanReader {
+    pub struct SocketCanSource {
         socket: CanFdSocket,
     }
 
-    impl SocketCanReader {
-        /// Create a new SocketCAN reader for the given interface
+    impl SocketCanSource {
+        /// Create a new SocketCAN source for the given interface
         pub fn new(interface: &str) -> Result<Self, String> {
             let device = format!("socketcan({})", interface);
             let socket = CanFdSocket::open(interface)
@@ -532,7 +532,7 @@ mod linux_impl {
 // Re-export for Linux
 #[cfg(target_os = "linux")]
 pub use linux_impl::{
-    encode_frame, run_source, EncodedFrame, SocketCanConfig, SocketCanReader,
+    encode_frame, run_source, EncodedFrame, SocketCanConfig, SocketCanSource,
 };
 
 // ============================================================================

@@ -1,7 +1,7 @@
 // ui/src-tauri/src/io/timeline/base.rs
 //
-// Shared control state for timeline readers (Buffer, CSV, PostgreSQL).
-// These readers share identical pause/resume and speed control patterns.
+// Shared control state for recorded sources (Capture, CSV, PostgreSQL).
+// These sources share identical pause/resume and speed control patterns.
 
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -11,7 +11,7 @@ use std::sync::{
 use crate::io::IOState;
 
 /// Shared control state for timeline playback.
-/// Used by CaptureSource, CsvReader, and PostgresReader.
+/// Used by CaptureSource, CsvSource, and PostgresSource.
 #[derive(Clone)]
 pub struct TimelineControl {
     /// Set to true to cancel the stream
@@ -120,18 +120,18 @@ impl Default for TimelineControl {
     }
 }
 
-/// Reader state management for timeline readers.
+/// State management for recorded sources.
 /// Encapsulates the common state machine (Stopped -> Running <-> Paused -> Stopped)
-/// and reduces boilerplate in CaptureSource, CsvReader, and PostgresReader.
-pub struct TimelineReaderState {
+/// and reduces boilerplate in CaptureSource, CsvSource, and PostgresSource.
+pub struct RecordedSourceState {
     pub control: TimelineControl,
     pub state: IOState,
     pub session_id: String,
     pub task_handle: Option<tauri::async_runtime::JoinHandle<()>>,
 }
 
-impl TimelineReaderState {
-    /// Create a new reader state with the given session ID and initial speed.
+impl RecordedSourceState {
+    /// Create a new source state with the given session ID and initial speed.
     pub fn new(session_id: String, speed: f64) -> Self {
         Self {
             control: TimelineControl::new(speed),
@@ -144,7 +144,7 @@ impl TimelineReaderState {
     /// Check if the reader can start. Returns error if already running.
     pub fn check_can_start(&self) -> Result<(), String> {
         if self.state == IOState::Running || self.state == IOState::Paused {
-            return Err("Reader is already running".to_string());
+            return Err("Source is already running".to_string());
         }
         Ok(())
     }
@@ -173,7 +173,7 @@ impl TimelineReaderState {
     /// Pause playback. Returns error if not running.
     pub fn pause(&mut self) -> Result<(), String> {
         if self.state != IOState::Running {
-            return Err("Reader is not running".to_string());
+            return Err("Source is not running".to_string());
         }
         self.control.pause();
         self.state = IOState::Paused;
@@ -183,7 +183,7 @@ impl TimelineReaderState {
     /// Resume playback. Returns error if not paused.
     pub fn resume(&mut self) -> Result<(), String> {
         if self.state != IOState::Paused {
-            return Err("Reader is not paused".to_string());
+            return Err("Source is not paused".to_string());
         }
         self.control.resume();
         self.state = IOState::Running;

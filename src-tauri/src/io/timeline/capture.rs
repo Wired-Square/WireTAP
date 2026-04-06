@@ -12,7 +12,7 @@ use std::sync::{
 use std::time::Duration;
 use tauri::AppHandle;
 
-use super::base::{TimelineControl, TimelineReaderState};
+use super::base::{TimelineControl, RecordedSourceState};
 use crate::io::{emit_session_error, post_session, signal_frames_ready, signal_playback_position, FrameMessage, IOCapabilities, IOSource, IOState, PlaybackPosition, SignalThrottle, TemporalMode};
 use crate::{capture_db, capture_store};
 
@@ -25,7 +25,7 @@ const NO_SEEK_FRAME: i64 = -1;
 pub struct CaptureSource {
     app: AppHandle,
     /// Common timeline reader state (control, state, session_id, task_handle)
-    reader_state: TimelineReaderState,
+    reader_state: RecordedSourceState,
     /// Seek target in microseconds. Set to NO_SEEK when no seek is pending.
     seek_target_us: Arc<AtomicI64>,
     /// Seek target as frame index. Set to NO_SEEK_FRAME when no seek is pending.
@@ -59,7 +59,7 @@ impl CaptureSource {
 
         Self {
             app,
-            reader_state: TimelineReaderState::new(session_id, speed),
+            reader_state: RecordedSourceState::new(session_id, speed),
             seek_target_us: Arc::new(AtomicI64::new(NO_SEEK)),
             seek_target_frame: Arc::new(AtomicI64::new(NO_SEEK_FRAME)),
             completed_flag: Arc::new(AtomicBool::new(false)),
