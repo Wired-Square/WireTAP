@@ -1,12 +1,5 @@
 @import "tailwindcss";
 
-@import "@fontsource/ubuntu/400.css";
-@import "@fontsource/ubuntu/500.css";
-@import "@fontsource/ubuntu/700.css";
-@import "@fontsource/ubuntu-mono/400.css";
-@import "@fontsource/ubuntu-mono/700.css";
-@import "@fontsource/dseg7/classic-400.css";
-
 /* Use default cursor everywhere; inputs and textareas still show text cursor via browser UA styles */
 * {
   cursor: default;

@@ -16,6 +16,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **Vite build font warnings**: Moved `@fontsource` CSS imports from `WireTAP.css` (`@import`) to `WireTAP.tsx` (JS `import`). Vite's CSS-only `@import` chain lost the base directory context for relative `url(./files/...)` paths inside the fontsource packages, producing ~60 "didn't resolve at build time" warnings on every build.
+
 - **Loading a capture showed no frames in Discovery**: `useIOSession` hard-coded `localState.buffer.id: null` on every state initialisation and its sessionStore sync subscription only watched `capture.name`/`capture.persistent`, so `session.capture.id` never propagated to the hook's derived `captureId`. Discovery's `sessionBufferId` stayed `null`, the buffer-mode effect never fired, and `useBufferFrameView` had no capture to page through. Added a `captureToBuffer()` helper that mirrors all `Session.capture` fields (id/kind/count/available/owningSessionId/startTimeUs/endTimeUs/name/persistent) into `localState.buffer`, and applied it at the three `setLocalState` initialisation sites plus the sync subscription. No new Tauri listeners or Zustand subscriptions — preserves the memory fix from the WebView growth cleanup.
 
 - **Captures stranded after app restart**: On app startup, `hydrate_from_db()` preserved `owning_session_id` from SQLite, but those sessions no longer existed in memory. Captures were stuck in limbo — not in any live session's list and not reported by `list_orphaned_captures()` — so they never appeared in the Data Source picker. `hydrate_from_db()` now clears `owning_session_id` on every capture during hydrate and logs the cleanup.
