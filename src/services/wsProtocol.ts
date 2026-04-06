@@ -246,38 +246,53 @@ export function decodeSessionState(payload: DataView): {
   return { state };
 }
 
+// Wire format (matches Rust encode_stream_ended in ws/protocol.rs):
+//   reason:  u8  (0=complete, 1=disconnected, 2=error, 3=stopped, 4=paused)
+//   flags:   u8  (bit0=capture_available, bit1=has_capture_id, bit2=has_capture_kind, bit3=has_time_range)
+//   count:   u32 LE
+//   optional: capture_id   (length-prefixed string, present if flags bit1)
+//   optional: capture_kind (length-prefixed string, present if flags bit2)
+//   optional: time_range   (two u64 LE, present if flags bit3)
+const STREAM_ENDED_REASONS = ["complete", "disconnected", "error", "stopped", "paused"] as const;
+
 export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
   let offset = 0;
 
-  const [reason, next1] = decodeLengthPrefixedStr(payload, offset);
-  offset = next1;
-
-  const captureAvailable = payload.getUint8(offset) !== 0;
+  const reasonByte = payload.getUint8(offset);
   offset += 1;
+  const reason = STREAM_ENDED_REASONS[reasonByte] ?? `unknown(${reasonByte})`;
 
-  const [captureId, next2] = decodeLengthPrefixedStr(payload, offset);
-  offset = next2;
-
-  const [captureKind, next3] = decodeLengthPrefixedStr(payload, offset);
-  offset = next3;
+  const flags = payload.getUint8(offset);
+  offset += 1;
+  const captureAvailable = (flags & (1 << 0)) !== 0;
+  const hasCaptureId     = (flags & (1 << 1)) !== 0;
+  const hasCaptureKind   = (flags & (1 << 2)) !== 0;
+  const hasTimeRange     = (flags & (1 << 3)) !== 0;
 
   const count = payload.getUint32(offset, true);
   offset += 4;
 
+  let captureId: string | null = null;
+  if (hasCaptureId) {
+    const [id, next] = decodeLengthPrefixedStr(payload, offset);
+    captureId = id.length > 0 ? id : null;
+    offset = next;
+  }
+
+  let captureKind: string | null = null;
+  if (hasCaptureKind) {
+    const [kind, next] = decodeLengthPrefixedStr(payload, offset);
+    captureKind = kind.length > 0 ? kind : null;
+    offset = next;
+  }
+
   let time_range: [number, number] | null = null;
-  if (offset + 16 <= payload.byteLength) {
+  if (hasTimeRange && offset + 16 <= payload.byteLength) {
     const t0 = Number(
-      new DataView(payload.buffer, payload.byteOffset + offset, 8).getBigUint64(
-        0,
-        true
-      )
+      new DataView(payload.buffer, payload.byteOffset + offset, 8).getBigUint64(0, true)
     );
     const t1 = Number(
-      new DataView(
-        payload.buffer,
-        payload.byteOffset + offset + 8,
-        8
-      ).getBigUint64(0, true)
+      new DataView(payload.buffer, payload.byteOffset + offset + 8, 8).getBigUint64(0, true)
     );
     time_range = [t0, t1];
   }
@@ -285,8 +300,8 @@ export function decodeStreamEnded(payload: DataView): StreamEndedInfo {
   return {
     reason,
     capture_available: captureAvailable,
-    capture_id: captureId.length > 0 ? captureId : null,
-    capture_kind: captureKind.length > 0 ? captureKind : null,
+    capture_id: captureId,
+    capture_kind: captureKind,
     count,
     time_range,
   };
