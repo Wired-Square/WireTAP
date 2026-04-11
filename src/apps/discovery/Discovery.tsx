@@ -702,8 +702,11 @@ export default function Discovery() {
       // Capture mode: check capture metadata for bytes type
       newIsSerialMode = captureMetadata?.kind === "bytes" || captureKind === "bytes" || framedCaptureId !== null;
     } else {
-      // Live session: check session traits from capabilities
-      newIsSerialMode = capabilities?.traits?.protocols?.includes("serial") ?? false;
+      // Live session: Serial view is for sessions that emit raw byte streams.
+      // Framelink RS-485 interfaces contribute Protocol::Serial to the trait
+      // union but emit framed messages (not raw bytes), so the authoritative
+      // signal is data_streams.rx_bytes — not protocols.
+      newIsSerialMode = capabilities?.data_streams?.rx_bytes ?? false;
     }
 
     setSerialMode(newIsSerialMode);

@@ -22,6 +22,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **Discovery shows Serial view for Framelink devices with RS-485 interfaces**: Framelink's RS-485 interfaces declare `Protocol::Serial` in their per-interface traits, and the broker unions protocols across all bus mappings — so any Framelink session containing an RS-485 interface reported `protocols: ["can", "canfd", "serial"]`. Discovery used `protocols.includes("serial")` as its Serial-mode signal, which misfired because Framelink always emits pre-framed `FrameMessage` objects (never raw bytes). Switched the heuristic to `data_streams.rx_bytes`, the authoritative signal for raw byte streams.
+
 - **Clear capture stalls frame delivery**: Clearing a capture's data during realtime streaming (bin icon) left the WS frame delivery offset at the old value, so `send_new_frames` never delivered new frames. The offset is now reset when capture data is cleared.
 
 - **Stale Tauri command names**: Frontend API wrappers `registerSessionSubscriber` and `unregisterSessionSubscriber` were still invoking the old `register_session_listener` / `unregister_session_listener` commands (renamed in the Listener → Subscriber sweep). Updated to match the Rust backend.
