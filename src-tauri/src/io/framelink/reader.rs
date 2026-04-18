@@ -19,8 +19,8 @@ use crate::io::types::{SourceMessage, TransmitRequest};
 /// Run a FrameLink source reader for a single interface (or set of interfaces).
 ///
 /// Acquires the shared connection for the device (creating it if this is the
-/// first source), subscribes to the frame broadcast, and forwards frames that
-/// match this source's bus mappings to the merge task.
+/// first source), receives stream frames, and forwards those that match this
+/// source's bus mappings to the merge task.
 pub async fn run_source(
     source_idx: usize,
     host: String,
@@ -50,8 +50,6 @@ pub async fn run_source(
             return;
         }
     };
-
-    let mut frame_rx = conn.session.subscribe_frames();
 
     for mapping in &bus_mappings {
         if mapping.enabled {
@@ -91,9 +89,9 @@ pub async fn run_source(
 
     loop {
         tokio::select! {
-            result = frame_rx.recv() => {
+            result = conn.session.recv_stream_frame() => {
                 match result {
-                    Ok(sf) => {
+                    Some(sf) => {
                         if !my_interfaces.contains(&sf.iface_index) {
                             continue;
                         }
@@ -105,10 +103,7 @@ pub async fn run_source(
                                 .await;
                         }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tlog!("[framelink] Source {} lagged {} frames", source_idx, n);
-                    }
-                    Err(_) => {
+                    None => {
                         let _ = tx
                             .send(SourceMessage::Ended(
                                 source_idx,

@@ -61,14 +61,12 @@ export interface SignalReadResult {
 
 /** Read all device signals for a given interface, enriched with board def metadata. */
 export async function framelinkGetInterfaceSignals(
-  host: string,
-  port: number,
+  deviceId: string,
   ifaceIndex: number,
   timeout?: number,
 ): Promise<SignalDescriptor[]> {
   return invoke("framelink_get_interface_signals", {
-    host,
-    port,
+    device_id: deviceId,
     iface_index: ifaceIndex,
     timeout,
   });
@@ -76,16 +74,14 @@ export async function framelinkGetInterfaceSignals(
 
 /** Write a device signal value, with optional persist. */
 export async function framelinkWriteSignal(
-  host: string,
-  port: number,
+  deviceId: string,
   signalId: number,
   value: number,
   persist: boolean,
   timeout?: number,
 ): Promise<void> {
   return invoke("framelink_write_signal", {
-    host,
-    port,
+    device_id: deviceId,
     signal_id: signalId,
     value,
     persist,
@@ -95,14 +91,12 @@ export async function framelinkWriteSignal(
 
 /** Read a single device signal value. */
 export async function framelinkReadSignal(
-  host: string,
-  port: number,
+  deviceId: string,
   signalId: number,
   timeout?: number,
 ): Promise<SignalReadResult> {
   return invoke("framelink_read_signal", {
-    host,
-    port,
+    device_id: deviceId,
     signal_id: signalId,
     timeout,
   });

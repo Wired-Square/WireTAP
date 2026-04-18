@@ -123,11 +123,10 @@ export default function IOProfileDialog({
 
   const loadFlSignals = useCallback(async () => {
     if (!isProfileKind(profileForm, "framelink")) return;
-    const { host, port: portStr, timeout: timeoutStr, interfaces } = profileForm.connection;
-    const port = Number(portStr) || 120;
+    const { device_id, timeout: timeoutStr, interfaces } = profileForm.connection;
     const timeout = Number(timeoutStr) || 5;
-    if (!host || !interfaces?.length) {
-      setFlError("Host and interfaces are required");
+    if (!device_id || !interfaces?.length) {
+      setFlError("Device ID and interfaces are required");
       return;
     }
     setFlLoading(true);
@@ -135,7 +134,7 @@ export default function IOProfileDialog({
     try {
       const allSignals: SignalDescriptor[] = [];
       for (const iface of interfaces) {
-        const signals = await framelinkGetInterfaceSignals(host, port, iface.index, timeout);
+        const signals = await framelinkGetInterfaceSignals(device_id, iface.index, timeout);
         allSignals.push(...signals);
       }
       setFlSignals(allSignals);
@@ -152,8 +151,8 @@ export default function IOProfileDialog({
   // Auto-fetch signals when dialog opens for a framelink profile with valid connection
   useEffect(() => {
     if (isOpen && isProfileKind(profileForm, "framelink")) {
-      const { host, interfaces } = profileForm.connection;
-      if (host && Array.isArray(interfaces) && interfaces.length > 0) {
+      const { device_id, interfaces } = profileForm.connection;
+      if (device_id && Array.isArray(interfaces) && interfaces.length > 0) {
         loadFlSignals();
       }
     }
@@ -162,11 +161,10 @@ export default function IOProfileDialog({
   const handleFlWriteSignal = useCallback(
     async (signalId: number, value: number) => {
       if (!isProfileKind(profileForm, "framelink")) return;
-      const { host, port: portStr, timeout: timeoutStr } = profileForm.connection;
-      const port = Number(portStr) || 120;
+      const { device_id, timeout: timeoutStr } = profileForm.connection;
       const timeout = Number(timeoutStr) || 5;
-      if (!host) return;
-      await framelinkWriteSignal(host, port, signalId, value, flPersist, timeout);
+      if (!device_id) return;
+      await framelinkWriteSignal(device_id, signalId, value, flPersist, timeout);
       // Update local state to reflect the written value
       setFlSignals((prev) =>
         prev.map((s) =>

@@ -278,6 +278,7 @@ async fn fetch_capabilities(
 
 /// Get or reconnect a managed connection by device_id.
 /// If the connection is dead, reconnects using the last known address.
+/// If the device is not in the pool, discovers it via mDNS and connects.
 pub(crate) async fn get_connection(
     device_id: &str,
     timeout_sec: f64,
@@ -299,10 +300,26 @@ pub(crate) async fn get_connection(
             .cloned()
             .ok_or_else(|| format!("Reconnection to '{}' failed", device_id))
     } else {
-        Err(format!(
-            "Device '{}' not known — use connect_by_address or discovery first",
-            device_id
-        ))
+        drop(pool);
+        // Not in pool — discover via mDNS and connect
+        let timeout = Duration::from_secs_f64(timeout_sec);
+        let devices = framelink::discovery::discover(timeout)
+            .await
+            .map_err(|e| format!("mDNS discovery failed: {}", e))?;
+
+        let device = devices
+            .into_iter()
+            .find(|d| d.name == device_id)
+            .ok_or_else(|| format!("Device '{}' not found via discovery", device_id))?;
+
+        let host = device.addr.ip().to_string();
+        let port = device.addr.port();
+        connect_by_address(&host, port, timeout_sec).await?;
+
+        let pool = POOL.lock().await;
+        pool.get(device_id)
+            .cloned()
+            .ok_or_else(|| format!("Connection to '{}' failed after discovery", device_id))
     }
 }
 
