@@ -11,7 +11,7 @@
     "test:run": "vitest run",
     "test:watch": "vitest",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "bash scripts/tauri-dev.sh",
     "tauri:build": "node scripts/bump-version.js && if [ \"$APPLE_NOTARISE\" = \"true\" ]; then export APPLE_PASSWORD=\"$APPLE_NOTARY_PASSWORD\"; fi && tauri build",
     "tauri:build:debug": "tauri build --debug",
     "ios:init": "tauri ios init",
