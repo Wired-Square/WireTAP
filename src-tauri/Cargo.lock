@@ -7730,7 +7730,7 @@ dependencies = [
 
 [[package]]
 name = "wiretap"
-version = "0.6.3"
+version = "0.6.2"
 dependencies = [
  "async-trait",
  "btleplug",
