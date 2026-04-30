@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Tauri plugin-dialog version mismatch**: Bumped `@tauri-apps/plugin-dialog` from 2.6.0 to 2.7.0 to match the resolved Rust crate `tauri-plugin-dialog 2.7.0`. The Tauri CLI's preflight version check rejected the build with a major/minor mismatch error.
+
 ## [0.6.2] - 2026-04-30
 
 ### Removed
