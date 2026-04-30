@@ -1,15 +1,19 @@
 // BLE WiFi Provisioning module
 //
 // Communicates with Zephyr devices running the Wired Square WiFi provisioning
-// GATT service to configure WiFi credentials over BLE.
+// GATT service to configure WiFi credentials over BLE. Devices are
+// discovered via the FrameLink primary service UUID + capability mfg
+// data (handled in framelink::ble); the WiFi-prov UUID is only used for
+// post-connect GATT verification.
 //
-// Service UUID: 14387800-130c-49e7-b877-2881c89cb258
+// WiFi Prov Service UUID: 14387800-130c-49e7-b877-2881c89cb258
 
 use crate::ble_common;
 use btleplug::api::{
     Central, CharPropFlags, Characteristic, Peripheral as _, ScanFilter, WriteType,
 };
 use btleplug::platform::Peripheral;
+use framelink::ble::parse_peripheral;
 use futures::StreamExt;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -143,7 +147,7 @@ pub async fn ble_scan_start(app: AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| format!("Failed to start BLE scan: {e}"))?;
 
-    tlog!("[ble_provision] Scan started (filtering for WiFi prov UUID {:?})", WIFI_PROV_SERVICE_UUID);
+    tlog!("[ble_provision] Scan started (FrameLink UUID + WiFi prov capability bit)");
 
     // Spawn a task that polls for discovered peripherals periodically
     let app_clone = app.clone();
@@ -179,33 +183,36 @@ pub async fn ble_scan_start(app: AppHandle) -> Result<(), String> {
                         None => continue,
                     };
 
-                    let name = props
-                        .local_name
-                        .clone()
-                        .unwrap_or_else(|| id.clone());
-                    let rssi = props.rssi;
+                    let Some(discovered) = parse_peripheral(id.clone(), &props) else {
+                        continue;
+                    };
 
-                    // Log every named device for diagnostics
-                    if props.local_name.is_some() {
-                        tlog!(
-                            "[ble_provision] Saw: name={}, id={}, services={:?}, service_data_keys={:?}",
-                            name, id, props.services,
-                            props.service_data.keys().collect::<Vec<_>>()
-                        );
-                    }
-
-                    // Match devices that advertise the WiFi provisioning service UUID.
-                    let advertises_service = props.services.contains(&WIFI_PROV_SERVICE_UUID)
-                        || props.service_data.contains_key(&WIFI_PROV_SERVICE_UUID);
-                    if !advertises_service {
+                    // Only show devices that advertise WiFi prov capability.
+                    // Devices without a parsed payload (older firmware) are
+                    // skipped — we'd rather not surface them than promise a
+                    // capability that isn't there.
+                    let advertises_wifi_prov = discovered
+                        .payload
+                        .map(|p| p.capabilities.has_wifi_prov())
+                        .unwrap_or(false);
+                    if !advertises_wifi_prov {
                         continue;
                     }
 
                     seen_ids.insert(id.clone());
 
-                    tlog!("[ble_provision] Matched: {} ({}), RSSI: {:?}", name, id, rssi);
+                    tlog!(
+                        "[ble_provision] Matched: {} ({}), RSSI: {:?}",
+                        discovered.name,
+                        id,
+                        discovered.rssi
+                    );
 
-                    let device = BleDevice { name, id, rssi };
+                    let device = BleDevice {
+                        name: discovered.name,
+                        id,
+                        rssi: discovered.rssi,
+                    };
                     let _ = app_clone.emit("ble-device-discovered", &device);
                 }
             }

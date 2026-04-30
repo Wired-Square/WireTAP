@@ -1,15 +1,18 @@
 // Unified device scan module
 //
-// Discovers BLE devices that advertise either the WiFi provisioning GATT
-// service or the SMP firmware upgrade service (or both), plus mDNS devices
-// advertising _mcumgr._udp or _framelink._tcp.
+// Discovers BLE devices advertising the FrameLink primary service UUID
+// (decoded via framelink::ble) plus mDNS devices advertising
+// _mcumgr._udp or _framelink._tcp. Capability badges (wifi-provision,
+// smp, framelink) are populated from the BLE Manufacturer Data
+// capability bitmask — no per-service UUID adv inspection.
 //
-// Emits `device-discovered` events with a `UnifiedDevice` payload that
-// includes a `capabilities` list so the UI can show one device card with
-// appropriate badges and route to the correct wizard flow.
+// Emits `device-discovered` events with a `UnifiedDevice` payload so the
+// UI can show one device card with appropriate badges and route to the
+// correct wizard flow.
 
 use crate::ble_common;
 use btleplug::api::{Central, Peripheral as _, ScanFilter};
+use framelink::ble::{parse_peripheral, CapabilityFlags};
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -17,23 +20,34 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-/// WiFi provisioning GATT service UUID
-const WIFI_PROV_SERVICE_UUID: Uuid =
-    ble_common::uuid_from_fields(0x14387800, 0x130c, 0x49e7, 0xb877, 0x2881c89cb258);
-
-/// Standard SMP GATT service UUID
-const SMP_SERVICE_UUID: Uuid =
-    ble_common::uuid_from_fields(0x8D53DC1D, 0x1DB7, 0x4CD3, 0x868B, 0x8A527460AA84);
-
 /// mDNS service types to browse
 const MDNS_SERVICE_MCUMGR: &str = "_mcumgr._udp.local.";
 const MDNS_SERVICE_FRAMELINK: &str = "_framelink._tcp.local.";
+
+/// Decode a CapabilityFlags bitmask into the string list the frontend uses
+/// for device badges. Order matches the bit assignments in
+/// `framelink::ble::manufacturer_data` so output is stable.
+fn capabilities_to_strings(caps: CapabilityFlags) -> Vec<String> {
+    let mut out = Vec::new();
+    if caps.has_wifi_prov() {
+        out.push("wifi-provision".to_string());
+    }
+    if caps.has_smp() {
+        out.push("smp".to_string());
+    }
+    if caps.has_framelink_ble() {
+        out.push("framelink-ble".to_string());
+    }
+    if caps.has_caps() {
+        out.push("caps".to_string());
+    }
+    out
+}
 
 // ============================================================================
 // Types
@@ -128,17 +142,13 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
 
     // Unfiltered scan — CoreBluetooth doesn't reliably match 128-bit UUIDs
     // in scan response data, so we discover all devices and filter on the
-    // application side.
+    // application side via framelink::ble::parse_peripheral.
     adapter
         .start_scan(ScanFilter::default())
         .await
         .map_err(|e| format!("Failed to start BLE scan: {e}"))?;
 
-    tlog!(
-        "[device_scan] Scan started (WiFi prov UUID {:?}, SMP UUID {:?})",
-        WIFI_PROV_SERVICE_UUID,
-        SMP_SERVICE_UUID
-    );
+    tlog!("[device_scan] Scan started (FrameLink UUID + capability mfg data)");
 
     // -- BLE scan task --
     let app_ble = app.clone();
@@ -173,51 +183,34 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                         None => continue,
                     };
 
-                    let name = match &props.local_name {
-                        Some(n) => n.clone(),
-                        None => continue, // Skip unnamed BLE devices
-                    };
-                    let rssi = props.rssi;
-
-                    // Build capabilities list from advertised services
-                    let mut capabilities = Vec::new();
-
-                    let has_wifi_prov = props.services.contains(&WIFI_PROV_SERVICE_UUID)
-                        || props.service_data.contains_key(&WIFI_PROV_SERVICE_UUID);
-                    if has_wifi_prov {
-                        capabilities.push("wifi-provision".to_string());
-                    }
-
-                    let has_smp = props.services.contains(&SMP_SERVICE_UUID)
-                        || props.service_data.contains_key(&SMP_SERVICE_UUID);
-                    if has_smp {
-                        capabilities.push("smp".to_string());
-                    }
-
-                    // Skip devices that don't advertise either service
-                    if capabilities.is_empty() {
+                    let Some(discovered) = parse_peripheral(ble_id.clone(), &props) else {
                         continue;
-                    }
+                    };
+
+                    let capabilities = match &discovered.payload {
+                        Some(p) => capabilities_to_strings(p.capabilities),
+                        None => Vec::new(),
+                    };
 
                     seen_ids.insert(ble_id.clone());
 
                     // Prefix with transport so BLE and mDNS stay as separate cards
-                    let id = format!("ble:{}", name);
+                    let id = format!("ble:{}", discovered.name);
 
                     tlog!(
                         "[device_scan] BLE matched: {} (ble_id={}), RSSI: {:?}, caps: {:?}",
-                        name,
+                        discovered.name,
                         ble_id,
-                        rssi,
+                        discovered.rssi,
                         capabilities
                     );
 
                     let device = UnifiedDevice {
-                        name,
+                        name: discovered.name,
                         id,
                         transport: "ble".to_string(),
                         ble_id: Some(ble_id),
-                        rssi,
+                        rssi: discovered.rssi,
                         address: None,
                         port: None,
                         capabilities,

@@ -1763,8 +1763,8 @@ dependencies = [
 [[package]]
 name = "framelink"
 version = "0.1.0"
-source = "git+ssh://git@github.com/Wired-Square/framelink-rs.git?branch=main#c4de13a43997fe4a1b1c9f5b3921d27fd3e9c915"
 dependencies = [
+ "btleplug",
  "flate2",
  "mdns-sd",
  "serde",
@@ -1772,6 +1772,7 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "toml_edit 0.22.27",
+ "uuid",
 ]
 
 [[package]]

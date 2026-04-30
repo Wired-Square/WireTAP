@@ -57,7 +57,7 @@ uuid = "1"
 mcumgr-smp = { version = "0.8", default-features = false, features = ["transport-ble-async", "transport-udp-async", "payload-cbor"] }
 mdns-sd = "0.13"
 sha2 = "0.10"
-framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", branch = "main", features = ["discovery"] }
+framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", branch = "main", features = ["discovery", "ble"] }
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 serialport = "4.3"
@@ -93,3 +93,7 @@ optional = true
 socketcan = "3.3"
 # sync-secret-service uses DBus Secret Service (GNOME Keyring, KWallet)
 keyring = { version = "3", features = ["sync-secret-service"] }
+
+[patch."ssh://git@github.com/Wired-Square/framelink-rs.git"]
+framelink = { path = "../../framelink-rs" }
+

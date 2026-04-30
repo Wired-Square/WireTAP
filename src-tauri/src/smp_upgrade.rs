@@ -10,6 +10,7 @@
 use crate::ble_common;
 use btleplug::api::{Central, Peripheral as _, ScanFilter};
 use btleplug::platform::Peripheral;
+use framelink::ble::parse_peripheral;
 use mcumgr_smp::application_management;
 use mcumgr_smp::os_management;
 use mcumgr_smp::smp::SmpFrame;
@@ -260,10 +261,7 @@ pub async fn smp_scan_start(app: AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| format!("Failed to start BLE scan: {e}"))?;
 
-    tlog!(
-        "[smp_upgrade] Scan started (filtering for SMP UUID {:?})",
-        SMP_SERVICE_UUID
-    );
+    tlog!("[smp_upgrade] Scan started (FrameLink UUID + SMP capability bit)");
 
     // -- BLE scan task --
     let app_ble = app.clone();
@@ -297,13 +295,15 @@ pub async fn smp_scan_start(app: AppHandle) -> Result<(), String> {
                         None => continue,
                     };
 
-                    let name = props.local_name.clone().unwrap_or_else(|| id.clone());
-                    let rssi = props.rssi;
+                    let Some(discovered) = parse_peripheral(id.clone(), &props) else {
+                        continue;
+                    };
 
-                    // Match devices that advertise the SMP service UUID
-                    let advertises_service = props.services.contains(&SMP_SERVICE_UUID)
-                        || props.service_data.contains_key(&SMP_SERVICE_UUID);
-                    if !advertises_service {
+                    let advertises_smp = discovered
+                        .payload
+                        .map(|p| p.capabilities.has_smp())
+                        .unwrap_or(false);
+                    if !advertises_smp {
                         continue;
                     }
 
@@ -311,16 +311,16 @@ pub async fn smp_scan_start(app: AppHandle) -> Result<(), String> {
 
                     tlog!(
                         "[smp_upgrade] BLE matched: {} ({}), RSSI: {:?}",
-                        name,
+                        discovered.name,
                         id,
-                        rssi
+                        discovered.rssi
                     );
 
                     let device = DiscoveredDevice {
-                        name,
+                        name: discovered.name,
                         id,
                         transport: "ble".to_string(),
-                        rssi,
+                        rssi: discovered.rssi,
                         address: None,
                         port: None,
                         service_type: None,
