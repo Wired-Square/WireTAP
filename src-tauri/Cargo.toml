@@ -1,6 +1,6 @@
 [package]
 name = "wiretap"
-version = "0.6.2"
+version = "0.6.3"
 description = "Desktop UI for WireTAP. CAN bus analysis and decoding toolkit."
 authors = ["Alex Ferrara"]
 edition = "2021"
