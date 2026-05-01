@@ -1,0 +1,58 @@
+{
+  "topBar": {
+    "addPanel": "Add panel",
+    "manageLayouts": "Manage layouts",
+    "candidates": "Generate candidate signal panels",
+    "switchToGrid": "Switch to Grid View",
+    "switchToRaw": "Switch to Raw JSON View",
+    "removeAll": "Remove all panels",
+    "deleteLayout": "Delete layout",
+    "differentCatalog": "Different catalog",
+    "framesCount_one": "{{count}} frame",
+    "framesCount_other": "{{count}} frames",
+    "panelsCount": "{{count}}p",
+    "panelTypes": {
+      "lineChart": "Line Chart",
+      "gauge": "Gauge",
+      "list": "List",
+      "flow": "Flow View",
+      "heatmap": "Bit Heatmap",
+      "histogram": "Histogram"
+    },
+    "layouts": {
+      "saveCurrent": "Save Current Layout",
+      "save": "Save",
+      "namePlaceholder": "Layout name",
+      "noLayouts": "No saved layouts"
+    },
+    "candidatesMenu": {
+      "quick": "Quick Candidates",
+      "hypothesis": "Hypothesis Explorer"
+    }
+  },
+  "grid": {
+    "emptyState": "Add a panel using the \"Add Panel\" button above."
+  },
+  "panel": {
+    "actions": "Panel actions",
+    "signalsCount_one": "{{count}} signal",
+    "signalsCount_other": "{{count}} signals",
+    "following": "Following",
+    "followMode": "Follow mode",
+    "hideStats": "Hide stats",
+    "showStats": "Show stats",
+    "resetZoom": "Reset zoom",
+    "exportPng": "Export PNG",
+    "exportSvg": "Export SVG",
+    "exportCsv": "Export CSV",
+    "configure": "Configure",
+    "clone": "Clone",
+    "remove": "Remove"
+  },
+  "import": {
+    "placeholder": "Paste a graph layout JSON here…"
+  },
+  "catalogPicker": {
+    "title": "Select Graph Catalog"
+  }
+}

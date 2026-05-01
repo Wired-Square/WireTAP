@@ -1,6 +1,7 @@
 // ui/src/apps/graph/Graph.tsx
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
 import { useGraphStore, type SignalValueEntry } from "../../stores/graphStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
@@ -34,6 +35,7 @@ import type { FrameMessage } from "../../types/frame";
 import type { MuxDef } from "../../types/decoder";
 
 export default function Graph() {
+  const { t } = useTranslation("graph");
   const { settings } = useSettings();
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
 
@@ -543,7 +545,7 @@ export default function Graph() {
         <CodeView
           content={rawViewContent}
           onChange={setRawViewContent}
-          placeholder="Paste a graph layout JSON here…"
+          placeholder={t("import.placeholder")}
         />
       ) : (
         <GraphGrid
@@ -557,7 +559,7 @@ export default function Graph() {
         catalogs={catalogs}
         selectedPath={catalogPath}
         onSelect={handleCatalogChange}
-        title="Select Graph Catalog"
+        title={t("catalogPicker.title")}
       />
 
       <IoSourcePickerDialog

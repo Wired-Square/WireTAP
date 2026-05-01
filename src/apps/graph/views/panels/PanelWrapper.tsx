@@ -2,6 +2,7 @@
 
 import { type ReactNode, useRef, useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { Trash2, Settings2, Copy, Maximize2, ChevronsRight, BarChart2, Download, EllipsisVertical, Image, FileCode } from "lucide-react";
 import { iconSm } from "../../../../styles/spacing";
 import { iconButtonHover } from "../../../../styles/buttonStyles";
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExportPng, onExportSvg, children }: Props) {
+  const { t } = useTranslation("graph");
   const clonePanel = useGraphStore((s) => s.clonePanel);
   const removePanel = useGraphStore((s) => s.removePanel);
   const triggerZoomReset = useGraphStore((s) => s.triggerZoomReset);
@@ -166,7 +168,7 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
             <button
               ref={buttonRef}
               className={`p-0.5 rounded ${iconButtonHover}`}
-              title="Panel actions"
+              title={t("panel.actions")}
             >
               <EllipsisVertical className={iconSm} />
             </button>
@@ -192,7 +194,7 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
           {/* Signal count */}
           {panel.signals.length > 0 && (
             <div className="px-3 py-1 text-[10px] font-medium text-[color:var(--text-muted)]">
-              {panel.signals.length} signal{panel.signals.length !== 1 ? "s" : ""}
+              {t("panel.signalsCount", { count: panel.signals.length })}
             </div>
           )}
 
@@ -204,18 +206,18 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
                 className={`${menuItem} ${menuToggle(followMode, "blue")}`}
               >
                 <ChevronsRight className={iconSm} />
-                {followMode ? "Following" : "Follow mode"}
+                {followMode ? t("panel.following") : t("panel.followMode")}
               </button>
               <button
                 onClick={() => toggleStats(panel.id)}
                 className={`${menuItem} ${menuToggle(panel.showStats === true, "purple")}`}
               >
                 <BarChart2 className={iconSm} />
-                {panel.showStats ? "Hide stats" : "Show stats"}
+                {panel.showStats ? t("panel.hideStats") : t("panel.showStats")}
               </button>
               <button onClick={triggerZoomReset} className={menuItem}>
                 <Maximize2 className={iconSm} />
-                Reset zoom
+                {t("panel.resetZoom")}
               </button>
               <div className={menuDivider} />
             </>
@@ -227,19 +229,19 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
               {onExportPng && (
                 <button onClick={onExportPng} className={menuItem}>
                   <Image className={iconSm} />
-                  Export PNG
+                  {t("panel.exportPng")}
                 </button>
               )}
               {onExportSvg && (
                 <button onClick={onExportSvg} className={menuItem}>
                   <FileCode className={iconSm} />
-                  Export SVG
+                  {t("panel.exportSvg")}
                 </button>
               )}
               {onExport && (
                 <button onClick={onExport} className={menuItem}>
                   <Download className={iconSm} />
-                  Export CSV
+                  {t("panel.exportCsv")}
                 </button>
               )}
               <div className={menuDivider} />
@@ -249,13 +251,13 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
           {/* Configure */}
           <button onClick={onOpenPanelConfig} className={menuItem}>
             <Settings2 className={iconSm} />
-            Configure
+            {t("panel.configure")}
           </button>
 
           {/* Clone */}
           <button onClick={() => clonePanel(panel.id)} className={menuItem}>
             <Copy className={iconSm} />
-            Clone
+            {t("panel.clone")}
           </button>
 
           <div className={menuDivider} />
@@ -263,7 +265,7 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
           {/* Remove */}
           <button onClick={() => removePanel(panel.id)} className={`${menuItem} text-red-400 hover:bg-red-500/10`}>
             <Trash2 className={iconSm} />
-            Remove
+            {t("panel.remove")}
           </button>
         </div>,
         document.body,

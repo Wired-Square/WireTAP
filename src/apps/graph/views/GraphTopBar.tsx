@@ -1,6 +1,7 @@
 // ui/src/apps/graph/views/GraphTopBar.tsx
 
 import { BarChart3, Plus, LineChart, Gauge, List, Save, Layout, X, AlertTriangle, Glasses, Waves, Grid3X3, BarChart2, Sparkles, FlaskConical, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import AppTopBar from "../../../components/AppTopBar";
 import { iconButtonBase, iconButtonHoverDanger, toggleButtonClass } from "../../../styles/buttonStyles";
 import { inputBase } from "../../../styles/inputStyles";
@@ -93,6 +94,7 @@ export default function GraphTopBar({
   onOpenCandidates,
   onOpenHypothesisExplorer,
 }: Props) {
+  const { t } = useTranslation("graph");
   const addPanel = useGraphStore((s) => s.addPanel);
   const removeAllPanels = useGraphStore((s) => s.removeAllPanels);
   const hasPanels = useGraphStore((s) => s.panels.length > 0);
@@ -179,7 +181,7 @@ export default function GraphTopBar({
       actions={
         isWatching && watchFrameCount > 0 ? (
           <span className={`text-xs ${textSecondary}`}>
-            {watchFrameCount.toLocaleString()} frames
+            {t("topBar.framesCount", { count: watchFrameCount })}
           </span>
         ) : undefined
       }
@@ -189,7 +191,7 @@ export default function GraphTopBar({
         <button
           onClick={() => setAddMenuOpen(!addMenuOpen)}
           className={iconButtonBase}
-          title="Add panel"
+          title={t("topBar.addPanel")}
         >
           <Plus className={iconMd} />
         </button>
@@ -197,28 +199,28 @@ export default function GraphTopBar({
           <div className={menuContainer}>
             <button onClick={() => handleAddPanel('line-chart')} className={menuItem}>
               <LineChart className={iconSm} />
-              Line Chart
+              {t("topBar.panelTypes.lineChart")}
             </button>
             <button onClick={() => handleAddPanel('gauge')} className={menuItem}>
               <Gauge className={iconSm} />
-              Gauge
+              {t("topBar.panelTypes.gauge")}
             </button>
             <button onClick={() => handleAddPanel('list')} className={menuItem}>
               <List className={iconSm} />
-              List
+              {t("topBar.panelTypes.list")}
             </button>
             <div className="my-1 border-t border-[var(--border-default)]" />
             <button onClick={() => handleAddPanel('flow')} className={menuItem}>
               <Waves className={iconSm} />
-              Flow View
+              {t("topBar.panelTypes.flow")}
             </button>
             <button onClick={() => handleAddPanel('heatmap')} className={menuItem}>
               <Grid3X3 className={iconSm} />
-              Bit Heatmap
+              {t("topBar.panelTypes.heatmap")}
             </button>
             <button onClick={() => handleAddPanel('histogram')} className={menuItem}>
               <BarChart2 className={iconSm} />
-              Histogram
+              {t("topBar.panelTypes.histogram")}
             </button>
           </div>
         )}
@@ -233,7 +235,7 @@ export default function GraphTopBar({
             setSaveName("");
           }}
           className={iconButtonBase}
-          title="Manage layouts"
+          title={t("topBar.manageLayouts")}
         >
           <Layout className={iconMd} />
         </button>
@@ -246,7 +248,7 @@ export default function GraphTopBar({
                 className={menuItem}
               >
                 <Save className={iconSm} />
-                Save Current Layout
+                {t("topBar.layouts.saveCurrent")}
               </button>
             ) : (
               <div className="flex items-center gap-1 px-3 py-1.5">
@@ -258,7 +260,7 @@ export default function GraphTopBar({
                     if (e.key === "Enter") handleSaveLayout();
                     if (e.key === "Escape") { setIsSaving(false); setSaveName(""); }
                   }}
-                  placeholder="Layout name"
+                  placeholder={t("topBar.layouts.namePlaceholder")}
                   className={`${inputBase} flex-1 text-xs py-1`}
                   autoFocus
                 />
@@ -267,7 +269,7 @@ export default function GraphTopBar({
                   disabled={!saveName.trim()}
                   className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  Save
+                  {t("topBar.layouts.save")}
                 </button>
               </div>
             )}
@@ -280,7 +282,7 @@ export default function GraphTopBar({
             {/* Saved layouts list */}
             {savedLayouts.length === 0 && (
               <div className={`px-3 py-1.5 text-xs ${textSecondary}`}>
-                No saved layouts
+                {t("topBar.layouts.noLayouts")}
               </div>
             )}
             {savedLayouts.map((layout) => {
@@ -298,19 +300,19 @@ export default function GraphTopBar({
                     className={`${menuItem} flex-1`}
                   >
                     {isMismatch && (
-                      <span title="Different catalog">
+                      <span title={t("topBar.differentCatalog")}>
                         <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
                       </span>
                     )}
                     <span className="truncate flex-1 text-left">{layout.name}</span>
                     <span className="text-[10px] text-[color:var(--text-muted)] shrink-0 tabular-nums">
-                      {layout.panels.length}p
+                      {t("topBar.panelsCount", { count: layout.panels.length })}
                     </span>
                   </button>
                   <button
                     onClick={(e) => handleDeleteLayout(e, layout.id)}
                     className={`${iconButtonHoverDanger} p-1 opacity-0 group-hover:opacity-100 shrink-0 mr-1`}
-                    title="Delete layout"
+                    title={t("topBar.deleteLayout")}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -327,7 +329,7 @@ export default function GraphTopBar({
           <button
             onClick={() => setCandidateMenuOpen(!candidateMenuOpen)}
             className={iconButtonBase}
-            title="Generate candidate signal panels"
+            title={t("topBar.candidates")}
           >
             <Sparkles className={iconMd} />
           </button>
@@ -342,7 +344,7 @@ export default function GraphTopBar({
                   className={menuItem}
                 >
                   <Sparkles className={iconSm} />
-                  Quick Candidates
+                  {t("topBar.candidatesMenu.quick")}
                 </button>
               )}
               {onOpenHypothesisExplorer && (
@@ -354,7 +356,7 @@ export default function GraphTopBar({
                   className={menuItem}
                 >
                   <FlaskConical className={iconSm} />
-                  Hypothesis Explorer
+                  {t("topBar.candidatesMenu.hypothesis")}
                 </button>
               )}
             </div>
@@ -365,7 +367,7 @@ export default function GraphTopBar({
       {/* Raw view toggle */}
       <button
         onClick={onToggleRawView}
-        title={rawViewMode ? "Switch to Grid View" : "Switch to Raw JSON View"}
+        title={rawViewMode ? t("topBar.switchToGrid") : t("topBar.switchToRaw")}
         className={toggleButtonClass(rawViewMode, "purple")}
       >
         <Glasses className={iconMd} fill={rawViewMode ? "currentColor" : "none"} />
@@ -376,7 +378,7 @@ export default function GraphTopBar({
         onClick={removeAllPanels}
         disabled={!hasPanels}
         className={`${iconButtonHoverDanger} disabled:opacity-30 disabled:cursor-not-allowed`}
-        title="Remove all panels"
+        title={t("topBar.removeAll")}
       >
         <Trash2 className={iconMd} />
       </button>

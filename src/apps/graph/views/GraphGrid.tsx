@@ -2,6 +2,7 @@
 
 import { GridLayout, useContainerWidth, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
+import { useTranslation } from "react-i18next";
 import { useGraphStore, type LayoutItem } from "../../../stores/graphStore";
 import PanelWrapper from "./panels/PanelWrapper";
 import LineChartPanel from "./panels/line-chart/LineChartPanel";
@@ -40,6 +41,7 @@ const dragConfig = {
 const BYTE_COLOURS = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7','#06b6d4','#f97316','#ec4899'];
 
 export default function GraphGrid({ onOpenPanelConfig }: Props) {
+  const { t } = useTranslation("graph");
   const panels = useGraphStore((s) => s.panels);
   const layout = useGraphStore((s) => s.layout);
   const updateLayout = useGraphStore((s) => s.updateLayout);
@@ -205,7 +207,7 @@ export default function GraphGrid({ onOpenPanelConfig }: Props) {
     return (
       <div className={emptyStateContainer}>
         <p className={emptyStateText}>
-          Add a panel using the "Add Panel" button above.
+          {t("grid.emptyState")}
         </p>
       </div>
     );
