@@ -5,6 +5,7 @@
 // "provision-complete" step instead of "complete".
 
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, Loader2 } from "lucide-react";
 import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
@@ -20,6 +21,7 @@ import { tlog } from "../../../api/settings";
 import StatusIndicator from "./StatusIndicator";
 
 export default function ProvisioningView() {
+  const { t } = useTranslation("devices");
   const ssid = useProvisioningStore((s) => s.data.ssid);
   const passphrase = useProvisioningStore((s) => s.data.passphrase);
   const security = useProvisioningStore((s) => s.data.security);
@@ -44,7 +46,7 @@ export default function ProvisioningView() {
     const doProvision = async () => {
       tlog.info(`[provision] Starting: ssid="${ssid}", security=${security}, hasPassphrase=${!!passphrase}`);
       setProvisionState("writing");
-      setStatusMessage("Writing credentials to device...");
+      setStatusMessage(t("provisioning.writingCredentials"));
       setProvisionError(null);
 
       try {
@@ -56,7 +58,7 @@ export default function ProvisioningView() {
 
         tlog.info("[provision] Credentials written, waiting for device status...");
         setProvisionState("waiting");
-        setStatusMessage("Waiting for device to connect to WiFi...");
+        setStatusMessage(t("provisioning.waitingForWifi"));
       } catch (e) {
         tlog.info(`[provision] Failed: ${String(e)}`);
         setProvisionState("error");
@@ -82,7 +84,7 @@ export default function ProvisioningView() {
       const current = useProvisioningStore.getState();
       if (current.ui.provisionState === "waiting") {
         setProvisionState("error");
-        setProvisionError("Timed out waiting for device to connect to WiFi");
+        setProvisionError(t("provisioning.timedOut"));
       }
     }, 30_000);
     return () => clearTimeout(timer);
@@ -101,13 +103,13 @@ export default function ProvisioningView() {
   };
 
   const steps = [
-    { label: "Writing SSID", done: provisionState !== "idle" },
+    { label: t("provisioning.steps.writingSsid"), done: provisionState !== "idle" },
     {
-      label: security === SECURITY_OPEN ? "Skipping passphrase (open)" : "Writing passphrase",
+      label: security === SECURITY_OPEN ? t("provisioning.steps.skippingPassphrase") : t("provisioning.steps.writingPassphrase"),
       done: provisionState !== "idle",
     },
-    { label: "Sending connect command", done: provisionState === "waiting" },
-    { label: "Waiting for device", done: false },
+    { label: t("provisioning.steps.sendingConnect"), done: provisionState === "waiting" },
+    { label: t("provisioning.steps.waitingForDevice"), done: false },
   ];
 
   return (
@@ -156,7 +158,7 @@ export default function ProvisioningView() {
       )}
 
       {/* Cancel */}
-      <SecondaryButton onClick={handleCancel}>Cancel</SecondaryButton>
+      <SecondaryButton onClick={handleCancel}>{t("provisioning.cancel")}</SecondaryButton>
     </div>
   );
 }

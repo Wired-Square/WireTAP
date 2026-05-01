@@ -4,6 +4,7 @@
 // to work within the unified Devices wizard.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Wifi, Trash2, WifiOff, Eye, EyeOff, Send } from "lucide-react";
 import { textSecondary, textDanger, alertInfo, alertDanger, iconMd } from "../../../styles";
 import { FormField, Input, Select, PrimaryButton, SecondaryButton, DangerButton } from "../../../components/forms";
@@ -21,6 +22,7 @@ import {
 } from "../../../api/bleProvision";
 
 export default function CredentialsView() {
+  const { t } = useTranslation("devices");
   const ssid = useProvisioningStore((s) => s.data.ssid);
   const passphrase = useProvisioningStore((s) => s.data.passphrase);
   const security = useProvisioningStore((s) => s.data.security);
@@ -94,11 +96,11 @@ export default function CredentialsView() {
 
   const handleProvision = async () => {
     if (!ssid.trim()) {
-      setProvisionError("SSID is required");
+      setProvisionError(t("credentials.errors.ssidRequired"));
       return;
     }
     if (security !== SECURITY_OPEN && !passphrase.trim()) {
-      setProvisionError("Passphrase is required for WPA2-PSK");
+      setProvisionError(t("credentials.errors.passphraseRequired"));
       return;
     }
     setProvisionError(null);
@@ -107,7 +109,7 @@ export default function CredentialsView() {
     try {
       await bleReadDeviceState();
     } catch {
-      setProvisionError("Connection to device was lost. Please go back and reconnect.");
+      setProvisionError(t("credentials.errors.connectionLost"));
       setConnectionState("idle");
       setProvisionConnectionState("idle");
       return;
@@ -124,7 +126,7 @@ export default function CredentialsView() {
       {/* Device WiFi status */}
       {deviceStatus !== undefined && (
         <div className="flex items-center gap-2 py-1.5 text-xs">
-          <span className={textSecondary}>WiFi:</span>
+          <span className={textSecondary}>{t("credentials.wifiLabel")}</span>
           <StatusIndicator statusCode={deviceStatus} />
           {deviceIpAddress && (
             <>
@@ -142,13 +144,13 @@ export default function CredentialsView() {
             <div className="flex items-center gap-2">
               <Wifi className={`${iconMd} text-blue-500`} />
               <span>
-                Current device WiFi: <strong>{deviceSsid}</strong>
+                {t("credentials.currentDeviceWifi")} <strong>{deviceSsid}</strong>
               </span>
             </div>
             <SecondaryButton onClick={handleWifiDisconnect} disabled={disconnectingWifi}>
               <span className="flex items-center gap-1">
                 <WifiOff className={iconMd} />
-                {disconnectingWifi ? "..." : "Disconnect WiFi"}
+                {disconnectingWifi ? "..." : t("credentials.disconnectWifi")}
               </span>
             </SecondaryButton>
           </div>
@@ -163,11 +165,11 @@ export default function CredentialsView() {
       )}
 
       {/* SSID field */}
-      <FormField label="WiFi SSID" required>
+      <FormField label={t("credentials.ssidLabel")} required>
         <Input
           value={ssid}
           onChange={(e) => setSsid(e.target.value)}
-          placeholder="Enter WiFi network name"
+          placeholder={t("credentials.ssidPlaceholder")}
           maxLength={32}
           className="h-10"
         />
@@ -176,13 +178,13 @@ export default function CredentialsView() {
       {/* Passphrase + Security type on same row */}
       <div className="flex gap-3 items-end">
         {!isOpen && (
-          <FormField label="Passphrase" required className="flex-1 min-w-0">
+          <FormField label={t("credentials.passphraseLabel")} required className="flex-1 min-w-0">
             <div className="relative">
               <Input
                 type={showPassphrase ? "text" : "password"}
                 value={passphrase}
                 onChange={(e) => setPassphrase(e.target.value)}
-                placeholder="Enter WiFi passphrase"
+                placeholder={t("credentials.passphrasePlaceholder")}
                 maxLength={64}
                 className="h-10 pr-10"
               />
@@ -197,14 +199,14 @@ export default function CredentialsView() {
             </div>
           </FormField>
         )}
-        <FormField label="Security Type" className="w-44 shrink-0">
+        <FormField label={t("credentials.securityType")} className="w-44 shrink-0">
           <Select
             value={security}
             onChange={(e) => setSecurity(Number(e.target.value))}
             className="h-10"
           >
-            <option value={SECURITY_WPA2_PSK}>WPA2-PSK</option>
-            <option value={SECURITY_OPEN}>Open</option>
+            <option value={SECURITY_WPA2_PSK}>{t("credentials.wpa2Psk")}</option>
+            <option value={SECURITY_OPEN}>{t("credentials.open")}</option>
           </Select>
         </FormField>
       </div>
@@ -214,13 +216,13 @@ export default function CredentialsView() {
         <DangerButton onClick={handleDeleteAllCredentials} disabled={deletingCredentials} className="min-w-[20rem]">
           <span className="flex items-center justify-center gap-1">
             <Trash2 className={iconMd} />
-            {deletingCredentials ? "Deleting..." : "Delete All Credentials"}
+            {deletingCredentials ? t("credentials.deleting") : t("credentials.deleteAll")}
           </span>
         </DangerButton>
         <PrimaryButton onClick={handleProvision} disabled={!canProvision} className="w-44">
           <span className="flex items-center justify-center gap-1.5">
             <Send className={iconMd} />
-            Provision
+            {t("credentials.provision")}
           </span>
         </PrimaryButton>
       </div>
@@ -229,13 +231,13 @@ export default function CredentialsView() {
       {hasSmpCapability && selectedDeviceId && (
         <FirmwareSection
           deviceId={selectedDeviceId}
-          deviceName={selectedDeviceName ?? "Device"}
+          deviceName={selectedDeviceName ?? t("credentials.deviceFallback")}
         />
       )}
 
       {/* Back button pinned to bottom */}
       <div className="mt-auto pt-4">
-        <SecondaryButton onClick={handleBack}>Back</SecondaryButton>
+        <SecondaryButton onClick={handleBack}>{t("credentials.back")}</SecondaryButton>
       </div>
     </div>
   );

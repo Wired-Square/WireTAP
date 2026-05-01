@@ -22,16 +22,26 @@
   },
   "credentials": {
     "title": "WiFi Credentials",
-    "ssid": "Network (SSID)",
-    "password": "Password",
-    "ssidPlaceholder": "MyNetwork",
-    "passwordPlaceholder": "Enter password",
-    "showPassword": "Show password",
-    "hidePassword": "Hide password",
-    "save": "Save",
-    "cancel": "Cancel",
-    "scanWifi": "Scan WiFi",
-    "scanningWifi": "Scanning WiFi…"
+    "wifiLabel": "WiFi:",
+    "currentDeviceWifi": "Current device WiFi:",
+    "disconnectWifi": "Disconnect WiFi",
+    "ssidLabel": "WiFi SSID",
+    "ssidPlaceholder": "Enter WiFi network name",
+    "passphraseLabel": "Passphrase",
+    "passphrasePlaceholder": "Enter WiFi passphrase",
+    "securityType": "Security Type",
+    "wpa2Psk": "WPA2-PSK",
+    "open": "Open",
+    "deleteAll": "Delete All Credentials",
+    "deleting": "Deleting...",
+    "provision": "Provision",
+    "back": "Back",
+    "deviceFallback": "Device",
+    "errors": {
+      "ssidRequired": "SSID is required",
+      "passphraseRequired": "Passphrase is required for WPA2-PSK",
+      "connectionLost": "Connection to device was lost. Please go back and reconnect."
+    }
   },
   "provisioning": {
     "title": "Provisioning",
@@ -41,14 +51,40 @@
     "complete": "Provisioning complete",
     "failed": "Provisioning failed",
     "retry": "Retry",
-    "back": "Back"
+    "back": "Back",
+    "writingCredentials": "Writing credentials to device...",
+    "waitingForWifi": "Waiting for device to connect to WiFi...",
+    "timedOut": "Timed out waiting for device to connect to WiFi",
+    "steps": {
+      "writingSsid": "Writing SSID",
+      "writingPassphrase": "Writing passphrase",
+      "skippingPassphrase": "Skipping passphrase (open)",
+      "sendingConnect": "Sending connect command",
+      "waitingForDevice": "Waiting for device"
+    },
+    "cancel": "Cancel"
   },
   "complete": {
     "successTitle": "Provisioning Complete",
     "successMessage": "Device successfully connected to WiFi.",
     "ipAddressLabel": "IP Address:",
     "rssiLabel": "Signal:",
-    "next": "Done"
+    "next": "Done",
+    "wifiConnected": "WiFi Connected",
+    "deviceLabel": "Device:",
+    "networkLabel": "Network:",
+    "securityLabel": "Security:",
+    "open": "Open",
+    "wpa2Psk": "WPA2-PSK",
+    "securityType": "Type {{n}}",
+    "disconnect": "Disconnect",
+    "provisionAnother": "Provision Another",
+    "firmwareUpgrade": "Firmware Upgrade",
+    "continueToUpgrade": "Continue to Firmware Upgrade",
+    "connecting": "Connecting...",
+    "failedTitle": "Provisioning Failed",
+    "retry": "Retry",
+    "connectionLost": "Connection to device was lost. Please reconnect."
   },
   "inspect": {
     "title": "Device Information",

@@ -6,6 +6,7 @@
 
 import { CheckCircle, XCircle, Bluetooth } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { textPrimary, textSecondary } from "../../../styles";
 import { alertSuccess, alertDanger } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
@@ -24,18 +25,20 @@ import {
   smpListImages,
 } from "../../../api/smpUpgrade";
 
-function securityLabel(security: number): string {
-  switch (security) {
-    case SECURITY_OPEN:
-      return "Open";
-    case SECURITY_WPA2_PSK:
-      return "WPA2-PSK";
-    default:
-      return `Type ${security}`;
-  }
-}
-
 export default function ProvisionCompleteView() {
+  const { t } = useTranslation("devices");
+
+  const securityLabel = (security: number): string => {
+    switch (security) {
+      case SECURITY_OPEN:
+        return t("complete.open");
+      case SECURITY_WPA2_PSK:
+        return t("complete.wpa2Psk");
+      default:
+        return t("complete.securityType", { n: security });
+    }
+  };
+
   const provisionState = useProvisioningStore((s) => s.ui.provisionState);
   const provError = useProvisioningStore((s) => s.ui.error);
   const ssid = useProvisioningStore((s) => s.data.ssid);
@@ -101,7 +104,7 @@ export default function ProvisionCompleteView() {
       setConnectionState("idle");
       useProvisioningStore.getState().reset();
       useDevicesStore.getState().reset();
-      setDevicesError("Connection to device was lost. Please reconnect.");
+      setDevicesError(t("complete.connectionLost"));
     }
   };
 
@@ -146,27 +149,27 @@ export default function ProvisionCompleteView() {
       {isSuccess ? (
         <>
           <CheckCircle className="w-16 h-16 text-green-500" />
-          <div className={`text-lg font-medium ${textPrimary}`}>WiFi Connected</div>
+          <div className={`text-lg font-medium ${textPrimary}`}>{t("complete.wifiConnected")}</div>
 
           <div className={`${alertSuccess} w-full max-w-sm text-sm`}>
             <div className="space-y-1">
               {selectedDeviceName && (
                 <div>
-                  <span className={textSecondary}>Device:</span>{" "}
+                  <span className={textSecondary}>{t("complete.deviceLabel")}</span>{" "}
                   <span className="font-medium">{selectedDeviceName}</span>
                 </div>
               )}
               <div>
-                <span className={textSecondary}>Network:</span>{" "}
+                <span className={textSecondary}>{t("complete.networkLabel")}</span>{" "}
                 <span className="font-medium">{ssid}</span>
               </div>
               <div>
-                <span className={textSecondary}>Security:</span>{" "}
+                <span className={textSecondary}>{t("complete.securityLabel")}</span>{" "}
                 <span className="font-medium">{securityLabel(security)}</span>
               </div>
               {deviceIpAddress && (
                 <div>
-                  <span className={textSecondary}>IP Address:</span>{" "}
+                  <span className={textSecondary}>{t("complete.ipAddressLabel")}</span>{" "}
                   <span className="font-medium">{deviceIpAddress}</span>
                 </div>
               )}
@@ -174,14 +177,14 @@ export default function ProvisionCompleteView() {
           </div>
 
           <div className="flex gap-3 mt-4">
-            <SecondaryButton onClick={handleDisconnect}>Disconnect</SecondaryButton>
-            <PrimaryButton onClick={handleProvisionAnother}>Provision Another</PrimaryButton>
+            <SecondaryButton onClick={handleDisconnect}>{t("complete.disconnect")}</SecondaryButton>
+            <PrimaryButton onClick={handleProvisionAnother}>{t("complete.provisionAnother")}</PrimaryButton>
           </div>
 
           {/* Firmware Upgrade — only shown if device has SMP capability */}
           {hasSmpCapability && (
             <div className="w-full max-w-sm pt-4 border-t border-[color:var(--border-default)]">
-              <div className={`text-sm font-medium mb-3 ${textPrimary}`}>Firmware Upgrade</div>
+              <div className={`text-sm font-medium mb-3 ${textPrimary}`}>{t("complete.firmwareUpgrade")}</div>
               <PrimaryButton
                 onClick={handleContinueToUpgrade}
                 disabled={upgradingTransition}
@@ -189,7 +192,7 @@ export default function ProvisionCompleteView() {
               >
                 <span className="flex items-center justify-center gap-1.5">
                   <Bluetooth className={iconMd} />
-                  {upgradingTransition ? "Connecting..." : "Continue to Firmware Upgrade"}
+                  {upgradingTransition ? t("complete.connecting") : t("complete.continueToUpgrade")}
                 </span>
               </PrimaryButton>
             </div>
@@ -198,7 +201,7 @@ export default function ProvisionCompleteView() {
       ) : (
         <>
           <XCircle className="w-16 h-16 text-red-500" />
-          <div className={`text-lg font-medium ${textPrimary}`}>Provisioning Failed</div>
+          <div className={`text-lg font-medium ${textPrimary}`}>{t("complete.failedTitle")}</div>
 
           {provError && (
             <div className={`${alertDanger} w-full max-w-sm text-sm`}>
@@ -207,8 +210,8 @@ export default function ProvisionCompleteView() {
           )}
 
           <div className="flex gap-3 mt-4">
-            <SecondaryButton onClick={handleDisconnect}>Disconnect</SecondaryButton>
-            <PrimaryButton onClick={handleRetry}>Retry</PrimaryButton>
+            <SecondaryButton onClick={handleDisconnect}>{t("complete.disconnect")}</SecondaryButton>
+            <PrimaryButton onClick={handleRetry}>{t("complete.retry")}</PrimaryButton>
           </div>
         </>
       )}
