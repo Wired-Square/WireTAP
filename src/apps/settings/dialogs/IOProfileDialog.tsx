@@ -1,5 +1,6 @@
 // ui/src/apps/settings/dialogs/IOProfileDialog.tsx
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
 import { iconButtonHover } from "../../../styles/buttonStyles";
@@ -79,6 +80,7 @@ export default function IOProfileDialog({
   onUpdateConnectionField,
   onUpdateMqttFormat,
 }: Props) {
+  const { t } = useTranslation("settings");
   // Catalog list for preferred decoder picker
   const catalogs = useSettingsStore((s) => s.catalogs.list);
 
@@ -264,7 +266,7 @@ export default function IOProfileDialog({
         // Store probed bus count (always update to track device state)
         onUpdateConnectionField("_probed_bus_count", result.busCount);
       } else {
-        setGvretProbeError(result.error || "Probe failed");
+        setGvretProbeError(result.error || t("ioProfileDialog.probeFailed"));
         setGvretProbeState("error");
       }
     } catch (e) {
@@ -443,12 +445,12 @@ export default function IOProfileDialog({
       <div className="max-h-[90vh] overflow-y-auto">
         <div className={`p-6 border-b ${borderDefault} flex items-center justify-between`}>
           <h2 className={h2}>
-            {editingProfileId ? "Edit IO Profile" : "Add IO Profile"}
+            {editingProfileId ? t("ioProfileDialog.edit") : t("ioProfileDialog.add")}
           </h2>
           <button
             onClick={onCancel}
             className={iconButtonHover}
-            title="Go back without saving"
+            title={t("ioProfileDialog.back")}
           >
             <ArrowLeft className={`${iconLg} text-[color:var(--text-muted)]`} />
           </button>
@@ -456,7 +458,7 @@ export default function IOProfileDialog({
 
         <div className="p-6 space-y-4">
           {/* Profile Type - filtered based on platform availability */}
-          <FormField label="Type" variant="default">
+          <FormField label={t("ioProfileDialog.type")} variant="default">
             <Select
               variant="default"
               value={profileForm.kind}
@@ -464,38 +466,38 @@ export default function IOProfileDialog({
                 onUpdateProfileField("kind", e.target.value as IOProfile["kind"])
               }
             >
-              {availableKinds.includes("framelink") && <option value="framelink">FrameLink</option>}
-              {availableKinds.includes("gs_usb") && <option value="gs_usb">gs_usb (candleLight)</option>}
-              {availableKinds.includes("gvret_tcp") && <option value="gvret_tcp">GVRET TCP</option>}
-              {availableKinds.includes("gvret_usb") && <option value="gvret_usb">GVRET USB (Serial)</option>}
-              {availableKinds.includes("modbus_tcp") && <option value="modbus_tcp">Modbus TCP</option>}
-              {availableKinds.includes("mqtt") && <option value="mqtt">MQTT</option>}
-              {availableKinds.includes("postgres") && <option value="postgres">PostgreSQL</option>}
-              {availableKinds.includes("serial") && <option value="serial">Serial Port</option>}
-              {availableKinds.includes("slcan") && <option value="slcan">slcan (CANable, USB-CAN)</option>}
-              {availableKinds.includes("socketcan") && <option value="socketcan">SocketCAN (Linux)</option>}
-              {availableKinds.includes("virtual") && <option value="virtual">Virtual Adapter (Testing)</option>}
+              {availableKinds.includes("framelink") && <option value="framelink">{t("ioProfileDialog.kinds.framelink")}</option>}
+              {availableKinds.includes("gs_usb") && <option value="gs_usb">{t("ioProfileDialog.kinds.gs_usb")}</option>}
+              {availableKinds.includes("gvret_tcp") && <option value="gvret_tcp">{t("ioProfileDialog.kinds.gvret_tcp")}</option>}
+              {availableKinds.includes("gvret_usb") && <option value="gvret_usb">{t("ioProfileDialog.kinds.gvret_usb")}</option>}
+              {availableKinds.includes("modbus_tcp") && <option value="modbus_tcp">{t("ioProfileDialog.kinds.modbus_tcp")}</option>}
+              {availableKinds.includes("mqtt") && <option value="mqtt">{t("ioProfileDialog.kinds.mqtt")}</option>}
+              {availableKinds.includes("postgres") && <option value="postgres">{t("ioProfileDialog.kinds.postgres")}</option>}
+              {availableKinds.includes("serial") && <option value="serial">{t("ioProfileDialog.kinds.serial")}</option>}
+              {availableKinds.includes("slcan") && <option value="slcan">{t("ioProfileDialog.kinds.slcan")}</option>}
+              {availableKinds.includes("socketcan") && <option value="socketcan">{t("ioProfileDialog.kinds.socketcan")}</option>}
+              {availableKinds.includes("virtual") && <option value="virtual">{t("ioProfileDialog.kinds.virtual")}</option>}
             </Select>
           </FormField>
 
           {/* Profile Name */}
-          <FormField label="Profile Name" required variant="default">
+          <FormField label={t("ioProfileDialog.profileName")} required variant="default">
             <Input
               variant="default"
               value={profileForm.name}
               onChange={(e) => onUpdateProfileField("name", e.target.value)}
-              placeholder="My IO Profile"
+              placeholder={t("ioProfileDialog.profileNamePlaceholder")}
             />
           </FormField>
 
           {/* Preferred Decoder */}
-          <FormField label="Preferred Decoder" variant="default">
+          <FormField label={t("ioProfileDialog.preferredDecoder")} variant="default">
             <Select
               variant="default"
               value={profileForm.preferred_catalog || ""}
               onChange={(e) => onUpdateProfileField("preferred_catalog", e.target.value || undefined)}
             >
-              <option value="">None</option>
+              <option value="">{t("ioProfileDialog.none")}</option>
               {catalogs.map((c) => (
                 <option key={c.filename} value={c.filename}>
                   {c.name}
@@ -507,29 +509,29 @@ export default function IOProfileDialog({
           {/* MQTT */}
           {profileForm.kind === "mqtt" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>MQTT Connection</h3>
+              <h3 className={h3}>{t("ioProfileDialog.mqtt.title")}</h3>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Host" variant="default">
+                <FormField label={t("ioProfileDialog.common.host")} variant="default">
                   <Input
                     variant="default"
                     value={profileForm.connection.host || ""}
                     onChange={(e) => onUpdateConnectionField("host", e.target.value)}
-                    placeholder="localhost"
+                    placeholder={t("ioProfileDialog.mqtt.hostPlaceholder")}
                   />
                 </FormField>
-                <FormField label="Port" variant="default">
+                <FormField label={t("ioProfileDialog.common.port")} variant="default">
                   <Input
                     variant="default"
                     type="number"
                     value={profileForm.connection.port || ""}
                     onChange={(e) => onUpdateConnectionField("port", e.target.value)}
-                    placeholder="1883"
+                    placeholder={t("ioProfileDialog.mqtt.portPlaceholder")}
                   />
                 </FormField>
               </div>
 
-              <FormField label="Username (optional)" variant="default">
+              <FormField label={t("ioProfileDialog.common.usernameOptional")} variant="default">
                 <Input
                   variant="default"
                   value={profileForm.connection.username || ""}
@@ -549,7 +551,7 @@ export default function IOProfileDialog({
               {/* MQTT Formats */}
               <div className={`border-t ${borderDefault} pt-4 mt-6`}>
                 <h4 className="text-md font-semibold text-[color:var(--text-primary)] mb-4">
-                  Message Formats
+                  {t("ioProfileDialog.mqtt.messageFormats")}
                 </h4>
 
                 {/* JSON */}
@@ -568,15 +570,15 @@ export default function IOProfileDialog({
                       htmlFor="format-json"
                       className={textMedium}
                     >
-                      JSON Format
+                      {t("ioProfileDialog.mqtt.jsonFormat")}
                     </label>
                   </div>
-                  <FormField label="Base Topic" variant="default">
+                  <FormField label={t("ioProfileDialog.mqtt.baseTopic")} variant="default">
                     <Input
                       variant="default"
                       value={profileForm.connection.formats?.json?.topic || ""}
                       onChange={(e) => onUpdateMqttFormat("json", "topic", e.target.value)}
-                      placeholder="wiretap/json/{bus}/{id_hex}/{signal}"
+                      placeholder={t("ioProfileDialog.mqtt.jsonTopicPlaceholder")}
                     />
                   </FormField>
                 </div>
@@ -597,17 +599,17 @@ export default function IOProfileDialog({
                       htmlFor="format-savvycan"
                       className={textMedium}
                     >
-                      SavvyCAN Format
+                      {t("ioProfileDialog.mqtt.savvycanFormat")}
                     </label>
                   </div>
-                  <FormField label="Base Topic" variant="default">
+                  <FormField label={t("ioProfileDialog.mqtt.baseTopic")} variant="default">
                     <Input
                       variant="default"
                       value={profileForm.connection.formats?.savvycan?.topic || ""}
                       onChange={(e) =>
                         onUpdateMqttFormat("savvycan", "topic", e.target.value)
                       }
-                      placeholder="wiretap-savvycan/{id_dec}"
+                      placeholder={t("ioProfileDialog.mqtt.savvycanTopicPlaceholder")}
                     />
                   </FormField>
                 </div>
@@ -628,15 +630,15 @@ export default function IOProfileDialog({
                       htmlFor="format-decode"
                       className={textMedium}
                     >
-                      Decode Format
+                      {t("ioProfileDialog.mqtt.decodeFormat")}
                     </label>
                   </div>
-                  <FormField label="Base Topic" variant="default">
+                  <FormField label={t("ioProfileDialog.mqtt.baseTopic")} variant="default">
                     <Input
                       variant="default"
                       value={profileForm.connection.formats?.decode?.topic || ""}
                       onChange={(e) => onUpdateMqttFormat("decode", "topic", e.target.value)}
-                      placeholder="wiretap/decode/{signal_name}/{id_hex}/{signal}"
+                      placeholder={t("ioProfileDialog.mqtt.decodeTopicPlaceholder")}
                     />
                   </FormField>
                 </div>
@@ -647,35 +649,35 @@ export default function IOProfileDialog({
           {/* Modbus TCP */}
           {profileForm.kind === "modbus_tcp" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>Modbus TCP Connection</h3>
+              <h3 className={h3}>{t("ioProfileDialog.modbus.title")}</h3>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Host" variant="default">
+                <FormField label={t("ioProfileDialog.common.host")} variant="default">
                   <Input
                     variant="default"
                     value={profileForm.connection.host || ""}
                     onChange={(e) => onUpdateConnectionField("host", e.target.value)}
-                    placeholder="192.168.1.100"
+                    placeholder={t("ioProfileDialog.modbus.hostPlaceholder")}
                   />
                 </FormField>
-                <FormField label="Port" variant="default">
+                <FormField label={t("ioProfileDialog.common.port")} variant="default">
                   <Input
                     variant="default"
                     type="number"
                     value={profileForm.connection.port || ""}
                     onChange={(e) => onUpdateConnectionField("port", e.target.value)}
-                    placeholder="502"
+                    placeholder={t("ioProfileDialog.modbus.portPlaceholder")}
                   />
                 </FormField>
               </div>
 
-              <FormField label="Unit ID (1-247)" variant="default">
+              <FormField label={t("ioProfileDialog.modbus.unitId")} variant="default">
                 <Input
                   variant="default"
                   type="number"
                   value={profileForm.connection.unit_id || ""}
                   onChange={(e) => onUpdateConnectionField("unit_id", e.target.value)}
-                  placeholder="1"
+                  placeholder={t("ioProfileDialog.modbus.unitIdPlaceholder")}
                 />
               </FormField>
             </div>
@@ -684,38 +686,38 @@ export default function IOProfileDialog({
           {/* PostgreSQL */}
           {profileForm.kind === "postgres" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>PostgreSQL Connection</h3>
+              <h3 className={h3}>{t("ioProfileDialog.postgres.title")}</h3>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Host" variant="default">
+                <FormField label={t("ioProfileDialog.common.host")} variant="default">
                   <Input
                     variant="default"
                     value={profileForm.connection.host || ""}
                     onChange={(e) => onUpdateConnectionField("host", e.target.value)}
-                    placeholder="localhost"
+                    placeholder={t("ioProfileDialog.postgres.hostPlaceholder")}
                   />
                 </FormField>
-                <FormField label="Port" variant="default">
+                <FormField label={t("ioProfileDialog.common.port")} variant="default">
                   <Input
                     variant="default"
                     type="number"
                     value={profileForm.connection.port || ""}
                     onChange={(e) => onUpdateConnectionField("port", e.target.value)}
-                    placeholder="5432"
+                    placeholder={t("ioProfileDialog.postgres.portPlaceholder")}
                   />
                 </FormField>
               </div>
 
-              <FormField label="Database" variant="default">
+              <FormField label={t("ioProfileDialog.postgres.database")} variant="default">
                 <Input
                   variant="default"
                   value={profileForm.connection.database || ""}
                   onChange={(e) => onUpdateConnectionField("database", e.target.value)}
-                  placeholder="wiretap"
+                  placeholder={t("ioProfileDialog.postgres.databasePlaceholder")}
                 />
               </FormField>
 
-              <FormField label="Username" variant="default">
+              <FormField label={t("ioProfileDialog.common.username")} variant="default">
                 <Input
                   variant="default"
                   value={profileForm.connection.username || ""}
@@ -731,50 +733,50 @@ export default function IOProfileDialog({
                 onMigrate={onMigratePassword}
               />
 
-              <FormField label="SSL Mode" variant="default">
+              <FormField label={t("ioProfileDialog.postgres.sslMode")} variant="default">
                 <Select
                   variant="default"
                   value={profileForm.connection.sslmode || "prefer"}
                   onChange={(e) => onUpdateConnectionField("sslmode", e.target.value)}
                 >
-                  <option value="disable">Disable</option>
-                  <option value="allow">Allow</option>
-                  <option value="prefer">Prefer</option>
-                  <option value="require">Require</option>
-                  <option value="verify-ca">Verify CA</option>
-                  <option value="verify-full">Verify Full</option>
+                  <option value="disable">{t("ioProfileDialog.postgres.ssl.disable")}</option>
+                  <option value="allow">{t("ioProfileDialog.postgres.ssl.allow")}</option>
+                  <option value="prefer">{t("ioProfileDialog.postgres.ssl.prefer")}</option>
+                  <option value="require">{t("ioProfileDialog.postgres.ssl.require")}</option>
+                  <option value="verify-ca">{t("ioProfileDialog.postgres.ssl.verifyCa")}</option>
+                  <option value="verify-full">{t("ioProfileDialog.postgres.ssl.verifyFull")}</option>
                 </Select>
               </FormField>
 
-              <FormField label="Source Type" variant="default">
+              <FormField label={t("ioProfileDialog.postgres.sourceType")} variant="default">
                 <Select
                   variant="default"
                   value={profileForm.connection.source_type || "can_frame"}
                   onChange={(e) => onUpdateConnectionField("source_type", e.target.value)}
                 >
-                  <option value="can_frame">CAN Frames (public.can_frame)</option>
-                  <option value="modbus_frame">Modbus Frames (public.modbus_frame)</option>
-                  <option value="serial_frame">Serial Frames (public.serial_frame)</option>
-                  <option value="serial_raw">Serial Raw (public.serial_raw)</option>
+                  <option value="can_frame">{t("ioProfileDialog.postgres.sources.canFrame")}</option>
+                  <option value="modbus_frame">{t("ioProfileDialog.postgres.sources.modbusFrame")}</option>
+                  <option value="serial_frame">{t("ioProfileDialog.postgres.sources.serialFrame")}</option>
+                  <option value="serial_raw">{t("ioProfileDialog.postgres.sources.serialRaw")}</option>
                 </Select>
               </FormField>
 
               {/* Note: Framing for serial_raw is handled client-side in Discovery mode */}
 
-              <FormField label="Default Playback Speed" variant="default">
+              <FormField label={t("ioProfileDialog.postgres.defaultSpeed")} variant="default">
                 <Select
                   variant="default"
                   value={profileForm.connection.default_speed || "1"}
                   onChange={(e) => onUpdateConnectionField("default_speed", e.target.value)}
                 >
-                  <option value="0.25">0.25x</option>
-                  <option value="0.5">0.5x</option>
-                  <option value="1">1x (realtime)</option>
-                  <option value="2">2x</option>
-                  <option value="10">10x</option>
-                  <option value="30">30x</option>
-                  <option value="60">60x</option>
-                  <option value="0">No Limit</option>
+                  <option value="0.25">{t("ioProfileDialog.postgres.speeds.025")}</option>
+                  <option value="0.5">{t("ioProfileDialog.postgres.speeds.05")}</option>
+                  <option value="1">{t("ioProfileDialog.postgres.speeds.1")}</option>
+                  <option value="2">{t("ioProfileDialog.postgres.speeds.2")}</option>
+                  <option value="10">{t("ioProfileDialog.postgres.speeds.10")}</option>
+                  <option value="30">{t("ioProfileDialog.postgres.speeds.30")}</option>
+                  <option value="60">{t("ioProfileDialog.postgres.speeds.60")}</option>
+                  <option value="0">{t("ioProfileDialog.postgres.speeds.noLimit")}</option>
                 </Select>
               </FormField>
             </div>
@@ -783,22 +785,22 @@ export default function IOProfileDialog({
           {/* Virtual Adapter */}
           {profileForm.kind === "virtual" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>Virtual Device Settings</h3>
+              <h3 className={h3}>{t("ioProfileDialog.virtual.title")}</h3>
               <p className={caption}>
-                Generates synthetic traffic for testing without real hardware.
+                {t("ioProfileDialog.virtual.description")}
               </p>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Traffic Type" variant="default">
+                <FormField label={t("ioProfileDialog.virtual.trafficType")} variant="default">
                   <Select
                     variant="default"
                     value={profileForm.connection.traffic_type || "can"}
                     onChange={(e) => onUpdateConnectionField("traffic_type", e.target.value)}
                   >
-                    <option value="can">CAN (8-byte frames)</option>
-                    <option value="canfd">CAN-FD (up to 64-byte frames)</option>
-                    <option value="modbus">Modbus (register polling)</option>
-                    <option value="serial">Serial (raw byte stream)</option>
+                    <option value="can">{t("ioProfileDialog.virtual.trafficTypes.can")}</option>
+                    <option value="canfd">{t("ioProfileDialog.virtual.trafficTypes.canfd")}</option>
+                    <option value="modbus">{t("ioProfileDialog.virtual.trafficTypes.modbus")}</option>
+                    <option value="serial">{t("ioProfileDialog.virtual.trafficTypes.serial")}</option>
                   </Select>
                 </FormField>
                 <FormField label="" variant="default">
@@ -808,13 +810,13 @@ export default function IOProfileDialog({
                       checked={profileForm.connection.loopback !== false}
                       onChange={(e) => onUpdateConnectionField("loopback", e.target.checked)}
                     />
-                    <span className={textMedium}>Loopback</span>
+                    <span className={textMedium}>{t("ioProfileDialog.virtual.loopback")}</span>
                   </label>
                 </FormField>
               </div>
 
               {/* Interface count selector */}
-              <FormField label="Interfaces" variant="default">
+              <FormField label={t("ioProfileDialog.virtual.interfaces")} variant="default">
                 <Select
                   variant="default"
                   value={String((profileForm.connection.interfaces as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[] | undefined)?.length || 1)}
@@ -829,18 +831,18 @@ export default function IOProfileDialog({
                     onUpdateConnectionField("interfaces", updated);
                   }}
                 >
-                  <option value="1">1 interface</option>
-                  <option value="2">2 interfaces</option>
-                  <option value="3">3 interfaces</option>
-                  <option value="4">4 interfaces</option>
-                  <option value="8">8 interfaces</option>
+                  <option value="1">{t("ioProfileDialog.virtual.interfacesCount", { count: 1 })}</option>
+                  <option value="2">{t("ioProfileDialog.virtual.interfacesCount", { count: 2 })}</option>
+                  <option value="3">{t("ioProfileDialog.virtual.interfacesCount", { count: 3 })}</option>
+                  <option value="4">{t("ioProfileDialog.virtual.interfacesCount", { count: 4 })}</option>
+                  <option value="8">{t("ioProfileDialog.virtual.interfacesCount", { count: 8 })}</option>
                 </Select>
               </FormField>
 
               {/* Per-interface configuration table */}
               {((profileForm.connection.interfaces || [{ bus: 0, signal_generator: true, frame_rate_hz: 10 }]) as { bus: number; signal_generator: boolean; frame_rate_hz: number | string }[]).map((iface, idx) => (
                 <div key={idx} className={`flex items-center gap-3 py-1.5 ${idx > 0 ? `border-t ${borderDefault}` : ""}`}>
-                  <span className={`${textMedium} w-14 shrink-0`}>Bus {iface.bus}</span>
+                  <span className={`${textMedium} w-14 shrink-0`}>{t("ioProfileDialog.virtual.busLabel", { bus: iface.bus })}</span>
                   <Input
                     variant="default"
                     type="number"
@@ -856,7 +858,7 @@ export default function IOProfileDialog({
                     placeholder="10"
                     className="w-20"
                   />
-                  <span className={`${caption} shrink-0`}>Hz</span>
+                  <span className={`${caption} shrink-0`}>{t("ioProfileDialog.virtual.hz")}</span>
                   <label className="flex items-center gap-1.5 ml-auto shrink-0">
                     <input
                       type="checkbox"
@@ -867,7 +869,7 @@ export default function IOProfileDialog({
                         onUpdateConnectionField("interfaces", interfaces);
                       }}
                     />
-                    <span className={textMedium}>Signal Generator</span>
+                    <span className={textMedium}>{t("ioProfileDialog.virtual.signalGenerator")}</span>
                   </label>
                 </div>
               ))}
@@ -877,35 +879,35 @@ export default function IOProfileDialog({
           {/* GVRET */}
           {profileForm.kind === "gvret_tcp" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>GVRET TCP Connection</h3>
+              <h3 className={h3}>{t("ioProfileDialog.gvret.tcpTitle")}</h3>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Host" variant="default">
+                <FormField label={t("ioProfileDialog.common.host")} variant="default">
                   <Input
                     variant="default"
                     value={profileForm.connection.host || ""}
                     onChange={(e) => onUpdateConnectionField("host", e.target.value)}
-                    placeholder="192.168.1.100"
+                    placeholder={t("ioProfileDialog.gvret.hostPlaceholder")}
                   />
                 </FormField>
-                <FormField label="Port" variant="default">
+                <FormField label={t("ioProfileDialog.common.port")} variant="default">
                   <Input
                     variant="default"
                     type="number"
                     value={profileForm.connection.port || ""}
                     onChange={(e) => onUpdateConnectionField("port", e.target.value)}
-                    placeholder="23"
+                    placeholder={t("ioProfileDialog.gvret.portPlaceholder")}
                   />
                 </FormField>
               </div>
 
-              <FormField label="Connection Timeout (seconds)" variant="default">
+              <FormField label={t("ioProfileDialog.common.connectionTimeout")} variant="default">
                 <Input
                   variant="default"
                   type="number"
                   value={profileForm.connection.timeout || "5"}
                   onChange={(e) => onUpdateConnectionField("timeout", e.target.value)}
-                  placeholder="5"
+                  placeholder={t("ioProfileDialog.gvret.timeoutPlaceholder")}
                 />
               </FormField>
 
@@ -923,7 +925,7 @@ export default function IOProfileDialog({
                   htmlFor="tcp-keepalive"
                   className={textMedium}
                 >
-                  TCP Keepalive
+                  {t("ioProfileDialog.common.tcpKeepalive")}
                 </label>
               </div>
 
@@ -931,10 +933,10 @@ export default function IOProfileDialog({
               <div className={`border-t ${borderDefault} pt-4 mt-4`}>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className={textMedium}>
-                    CAN Interfaces
+                    {t("ioProfileDialog.common.canInterfaces")}
                     {gvretProbeState === "success" && (
                       <span className="ml-2 text-xs text-[color:var(--text-green)]">
-                        (device online)
+                        {t("ioProfileDialog.common.deviceOnline")}
                       </span>
                     )}
                   </h4>
@@ -944,14 +946,14 @@ export default function IOProfileDialog({
                     className="text-xs py-1 px-2"
                   >
                     <RefreshCw className={`${iconXs} mr-1 ${gvretProbeState === "probing" ? "animate-spin" : ""}`} />
-                    {gvretProbeState === "probing" ? "Probing..." : "Probe Device"}
+                    {gvretProbeState === "probing" ? t("ioProfileDialog.common.probing") : t("ioProfileDialog.common.probeDevice")}
                   </SecondaryButton>
                 </div>
 
                 {!editingProfileId && (
                   <div className={alertInfo}>
                     <p className="text-sm text-[color:var(--text-info)]">
-                      Save the profile first to probe the device and configure interfaces.
+                      {t("ioProfileDialog.common.saveFirstHint")}
                     </p>
                   </div>
                 )}
@@ -978,7 +980,7 @@ export default function IOProfileDialog({
 
                 {editingProfileId && getDeviceBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
                   <p className="text-sm text-[color:var(--text-muted)]">
-                    Click "Probe Device" to detect available interfaces.
+                    {t("ioProfileDialog.common.clickProbeHint")}
                   </p>
                 )}
               </div>
@@ -988,10 +990,10 @@ export default function IOProfileDialog({
           {/* GVRET USB */}
           {profileForm.kind === "gvret_usb" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>GVRET USB Connection</h3>
+              <h3 className={h3}>{t("ioProfileDialog.gvret.usbTitle")}</h3>
 
               {/* Port Selection */}
-              <FormField label="Serial Port" variant="default">
+              <FormField label={t("ioProfileDialog.gvret.serialPort")} variant="default">
                 <SerialPortPicker
                   value={profileForm.connection.port || ""}
                   onChange={(port) => onUpdateConnectionField("port", port)}
@@ -999,18 +1001,17 @@ export default function IOProfileDialog({
               </FormField>
 
               {/* Serial Baud Rate */}
-              <FormField label="Serial Baud Rate" variant="default">
+              <FormField label={t("ioProfileDialog.gvret.serialBaudRate")} variant="default">
                 <BaudRateSelect
                   value={profileForm.connection.baud_rate || "115200"}
                   onChange={(v) => onUpdateConnectionField("baud_rate", v)}
-                  defaultLabel="default"
+                  defaultLabel={t("ioProfileDialog.gvret.baudDefault")}
                 />
               </FormField>
 
               <div className={alertInfo}>
                 <p className="text-sm text-[color:var(--text-info)]">
-                  Works with ESP32-RET, M2RET, CANDue, and other GVRET-compatible hardware over USB serial.
-                  Supports multi-bus devices and frame transmission.
+                  {t("ioProfileDialog.gvret.usbHint")}
                 </p>
               </div>
 
@@ -1018,10 +1019,10 @@ export default function IOProfileDialog({
               <div className={`border-t ${borderDefault} pt-4 mt-4`}>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className={textMedium}>
-                    CAN Interfaces
+                    {t("ioProfileDialog.common.canInterfaces")}
                     {gvretProbeState === "success" && (
                       <span className="ml-2 text-xs text-[color:var(--text-green)]">
-                        (device online)
+                        {t("ioProfileDialog.common.deviceOnline")}
                       </span>
                     )}
                   </h4>
@@ -1031,14 +1032,14 @@ export default function IOProfileDialog({
                     className="text-xs py-1 px-2"
                   >
                     <RefreshCw className={`${iconXs} mr-1 ${gvretProbeState === "probing" ? "animate-spin" : ""}`} />
-                    {gvretProbeState === "probing" ? "Probing..." : "Probe Device"}
+                    {gvretProbeState === "probing" ? t("ioProfileDialog.common.probing") : t("ioProfileDialog.common.probeDevice")}
                   </SecondaryButton>
                 </div>
 
                 {!editingProfileId && (
                   <div className={alertInfo}>
                     <p className="text-sm text-[color:var(--text-info)]">
-                      Save the profile first to probe the device and configure interfaces.
+                      {t("ioProfileDialog.common.saveFirstHint")}
                     </p>
                   </div>
                 )}
@@ -1065,7 +1066,7 @@ export default function IOProfileDialog({
 
                 {editingProfileId && getDeviceBusConfig().length === 0 && gvretProbeState !== "probing" && gvretProbeState !== "error" && (
                   <p className="text-sm text-[color:var(--text-muted)]">
-                    Click "Probe Device" to detect available interfaces.
+                    {t("ioProfileDialog.common.clickProbeHint")}
                   </p>
                 )}
               </div>
@@ -1075,29 +1076,29 @@ export default function IOProfileDialog({
           {/* FrameLink (WiredFlexLink) */}
           {profileForm.kind === "framelink" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>FrameLink Connection</h3>
+              <h3 className={h3}>{t("ioProfileDialog.framelink.title")}</h3>
 
               <div className="grid grid-cols-2 gap-4">
-                <FormField label="Host" required variant="default">
+                <FormField label={t("ioProfileDialog.common.host")} required variant="default">
                   <Input
                     variant="default"
                     value={profileForm.connection.host || ""}
                     onChange={(e) => onUpdateConnectionField("host", e.target.value)}
-                    placeholder="192.168.1.100"
+                    placeholder={t("ioProfileDialog.framelink.hostPlaceholder")}
                   />
                 </FormField>
-                <FormField label="Port" variant="default">
+                <FormField label={t("ioProfileDialog.common.port")} variant="default">
                   <Input
                     variant="default"
                     type="number"
                     value={profileForm.connection.port || ""}
                     onChange={(e) => onUpdateConnectionField("port", e.target.value)}
-                    placeholder="120"
+                    placeholder={t("ioProfileDialog.framelink.portPlaceholder")}
                   />
                 </FormField>
               </div>
 
-              <FormField label="Connection Timeout (seconds)" variant="default">
+              <FormField label={t("ioProfileDialog.common.connectionTimeout")} variant="default">
                 <Input
                   variant="default"
                   type="number"
@@ -1111,7 +1112,7 @@ export default function IOProfileDialog({
               {Array.isArray(profileForm.connection.interfaces) && profileForm.connection.interfaces.length > 0 && (
                 <div className={`border-t ${borderDefault} pt-4 mt-4`}>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className={h3}>Interfaces ({(profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string }>).length})</h3>
+                    <h3 className={h3}>{t("ioProfileDialog.framelink.interfacesTitle", { count: (profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string }>).length })}</h3>
                     <SecondaryButton
                       onClick={handleFlReprobe}
                       disabled={flReprobing}
@@ -1119,12 +1120,12 @@ export default function IOProfileDialog({
                       {flReprobing ? (
                         <>
                           <RefreshCw className={`${iconXs} animate-spin`} />
-                          Probing...
+                          {t("ioProfileDialog.framelink.reprobing")}
                         </>
                       ) : (
                         <>
                           <RefreshCw className={iconXs} />
-                          Re-probe
+                          {t("ioProfileDialog.framelink.reprobe")}
                         </>
                       )}
                     </SecondaryButton>
@@ -1133,7 +1134,7 @@ export default function IOProfileDialog({
                     {(profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string; type_name?: string }>).map((iface) => (
                       <div key={iface.index} className="flex items-center justify-between py-1.5 px-2 rounded bg-[var(--bg-primary)]">
                         <span className={textMedium}>{iface.name}</span>
-                        <span className={caption}>{iface.type_name ?? "Unknown"}</span>
+                        <span className={caption}>{iface.type_name ?? t("ioProfileDialog.framelink.interfaceUnknown")}</span>
                       </div>
                     ))}
                   </div>
@@ -1143,7 +1144,7 @@ export default function IOProfileDialog({
               {/* Device Configuration (Signals) */}
               <div className={`border-t ${borderDefault} pt-4 mt-4`}>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className={h3}>Device Configuration</h3>
+                  <h3 className={h3}>{t("ioProfileDialog.framelink.deviceConfig")}</h3>
                   <SecondaryButton
                     onClick={loadFlSignals}
                     disabled={flLoading}
@@ -1151,12 +1152,12 @@ export default function IOProfileDialog({
                     {flLoading ? (
                       <>
                         <RefreshCw className={`${iconXs} animate-spin`} />
-                        Reading...
+                        {t("ioProfileDialog.framelink.reading")}
                       </>
                     ) : (
                       <>
                         <RefreshCw className={iconXs} />
-                        Refresh
+                        {t("ioProfileDialog.framelink.refresh")}
                       </>
                     )}
                   </SecondaryButton>
@@ -1173,7 +1174,7 @@ export default function IOProfileDialog({
                     {/* Group signals by group name */}
                     {Object.entries(
                       flSignals.reduce<Record<string, SignalDescriptor[]>>((acc, sig) => {
-                        const g = sig.group || "Other";
+                        const g = sig.group || t("ioProfileDialog.framelink.groupOther");
                         (acc[g] ??= []).push(sig);
                         return acc;
                       }, {}),
@@ -1201,19 +1202,19 @@ export default function IOProfileDialog({
                           checked={flPersist}
                           onChange={(e) => setFlPersist(e.target.checked)}
                         />
-                        Save changes to device (persist across reboots)
+                        {t("ioProfileDialog.framelink.persistChanges")}
                       </label>
                     )}
                   </div>
                 )}
 
                 {flLoading && flSignals.length === 0 && (
-                  <p className={caption}>Reading configuration from device...</p>
+                  <p className={caption}>{t("ioProfileDialog.framelink.readingConfig")}</p>
                 )}
 
                 {!flLoading && flSignals.length === 0 && !flError && !flFetched && (
                   <p className={caption}>
-                    Configuration will be loaded when the device is reachable.
+                    {t("ioProfileDialog.framelink.configWillLoad")}
                   </p>
                 )}
               </div>
@@ -1223,10 +1224,10 @@ export default function IOProfileDialog({
           {/* Serial Port */}
           {profileForm.kind === "serial" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>Serial Port Connection</h3>
+              <h3 className={h3}>{t("ioProfileDialog.serial.title")}</h3>
 
               {/* Port Selection */}
-              <FormField label="Port" variant="default">
+              <FormField label={t("ioProfileDialog.serial.port")} variant="default">
                 <SerialPortPicker
                   value={profileForm.connection.port || ""}
                   onChange={(port) => onUpdateConnectionField("port", port)}
@@ -1234,7 +1235,7 @@ export default function IOProfileDialog({
               </FormField>
 
               {/* Baud Rate */}
-              <FormField label="Baud Rate" variant="default">
+              <FormField label={t("ioProfileDialog.serial.baudRate")} variant="default">
                 <BaudRateSelect
                   value={profileForm.connection.baud_rate || "115200"}
                   onChange={(v) => onUpdateConnectionField("baud_rate", v)}
@@ -1243,7 +1244,7 @@ export default function IOProfileDialog({
 
               {/* Data Bits, Stop Bits, Parity */}
               <div className="grid grid-cols-3 gap-4">
-                <FormField label="Data Bits" variant="default">
+                <FormField label={t("ioProfileDialog.serial.dataBits")} variant="default">
                   <Select
                     variant="default"
                     value={profileForm.connection.data_bits || "8"}
@@ -1255,7 +1256,7 @@ export default function IOProfileDialog({
                     <option value="5">5</option>
                   </Select>
                 </FormField>
-                <FormField label="Stop Bits" variant="default">
+                <FormField label={t("ioProfileDialog.serial.stopBits")} variant="default">
                   <Select
                     variant="default"
                     value={profileForm.connection.stop_bits || "1"}
@@ -1265,15 +1266,15 @@ export default function IOProfileDialog({
                     <option value="2">2</option>
                   </Select>
                 </FormField>
-                <FormField label="Parity" variant="default">
+                <FormField label={t("ioProfileDialog.serial.parity")} variant="default">
                   <Select
                     variant="default"
                     value={profileForm.connection.parity || "none"}
                     onChange={(e) => onUpdateConnectionField("parity", e.target.value)}
                   >
-                    <option value="none">None</option>
-                    <option value="odd">Odd</option>
-                    <option value="even">Even</option>
+                    <option value="none">{t("ioProfileDialog.serial.parityOptions.none")}</option>
+                    <option value="odd">{t("ioProfileDialog.serial.parityOptions.odd")}</option>
+                    <option value="even">{t("ioProfileDialog.serial.parityOptions.even")}</option>
                   </Select>
                 </FormField>
               </div>
@@ -1285,10 +1286,10 @@ export default function IOProfileDialog({
           {/* slcan (CANable) */}
           {profileForm.kind === "slcan" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>slcan Connection (CANable)</h3>
+              <h3 className={h3}>{t("ioProfileDialog.slcan.title")}</h3>
 
               {/* Port Selection */}
-              <FormField label="Serial Port" variant="default">
+              <FormField label={t("ioProfileDialog.slcan.serialPort")} variant="default">
                 <SerialPortPicker
                   value={profileForm.connection.port || ""}
                   onChange={(port) => onUpdateConnectionField("port", port)}
@@ -1296,11 +1297,11 @@ export default function IOProfileDialog({
               </FormField>
 
               {/* Serial Baud Rate */}
-              <FormField label="Serial Baud Rate" variant="default">
+              <FormField label={t("ioProfileDialog.slcan.serialBaudRate")} variant="default">
                 <BaudRateSelect
                   value={profileForm.connection.baud_rate || "115200"}
                   onChange={(v) => onUpdateConnectionField("baud_rate", v)}
-                  defaultLabel="default for CANable"
+                  defaultLabel={t("ioProfileDialog.slcan.baudDefault")}
                 />
               </FormField>
 
@@ -1309,18 +1310,18 @@ export default function IOProfileDialog({
                 <IODeviceStatus
                   state={slcanProbeState}
                   result={slcanProbeResult}
-                  primaryLabel="Firmware"
-                  secondaryLabel="HW"
+                  primaryLabel={t("ioProfileDialog.slcan.firmwareLabel")}
+                  secondaryLabel={t("ioProfileDialog.slcan.hwLabel")}
                   onRefresh={probeSlcan}
-                  probingText="Testing connection..."
-                  successText="CANable connected"
-                  errorText="CANable not responding"
-                  idleText="Select a port to check device"
+                  probingText={t("ioProfileDialog.slcan.probingText")}
+                  successText={t("ioProfileDialog.slcan.successText")}
+                  errorText={t("ioProfileDialog.slcan.errorText")}
+                  idleText={t("ioProfileDialog.slcan.idleText")}
                 />
               )}
 
               {/* CAN Bus Bitrate */}
-              <FormField label="CAN Bitrate" variant="default">
+              <FormField label={t("ioProfileDialog.slcan.canBitrate")} variant="default">
                 <Select
                   variant="default"
                   value={profileForm.connection.bitrate || "500000"}
@@ -1351,11 +1352,11 @@ export default function IOProfileDialog({
                   htmlFor="silent-mode"
                   className={textMedium}
                 >
-                  Silent mode (no ACK, no transmit)
+                  {t("ioProfileDialog.slcan.silentMode")}
                 </label>
               </div>
               <p className={`${caption} -mt-2`}>
-                Does not participate in bus arbitration. Ideal for passive monitoring.
+                {t("ioProfileDialog.slcan.silentModeHint")}
               </p>
 
               {/* CAN FD Options (ELMUE firmware extension) */}
@@ -1369,23 +1370,22 @@ export default function IOProfileDialog({
                     className={checkboxDefault}
                   />
                   <label htmlFor="slcan_enable_fd" className="text-sm text-[color:var(--text-secondary)]">
-                    Enable CAN FD
+                    {t("ioProfileDialog.slcan.enableFd")}
                   </label>
                   {slcanProbeResult?.supports_fd === true && (
-                    <span className={`text-xs ${textSuccess}`}>(FD capable)</span>
+                    <span className={`text-xs ${textSuccess}`}>{t("ioProfileDialog.slcan.fdCapable")}</span>
                   )}
                   {slcanProbeResult?.supports_fd === false && profileForm.connection.enable_fd && (
-                    <span className={`text-xs ${textWarning}`}>(device does not support FD)</span>
+                    <span className={`text-xs ${textWarning}`}>{t("ioProfileDialog.slcan.fdNotSupported")}</span>
                   )}
                 </div>
                 <p className="text-xs text-[color:var(--text-muted)] mt-1 ml-6">
-                  Enables CAN Flexible Data-rate for higher throughput and larger payloads (up to 64 bytes).
-                  Requires ELMUE CANable firmware with CAN FD support.
+                  {t("ioProfileDialog.slcan.fdHint")}
                 </p>
 
                 {profileForm.connection.enable_fd && (
                   <div className="mt-3 space-y-3 pl-6">
-                    <FormField label="Data Phase Bitrate" variant="default">
+                    <FormField label={t("ioProfileDialog.slcan.dataPhaseBitrate")} variant="default">
                       <Select
                         variant="default"
                         value={profileForm.connection.data_bitrate || "2000000"}
@@ -1415,16 +1415,16 @@ export default function IOProfileDialog({
                   ) : (
                     <ChevronRight className={iconMd} />
                   )}
-                  Advanced Serial Options
+                  {t("ioProfileDialog.slcan.advancedSerial")}
                 </button>
 
                 {slcanAdvancedOpen && (
                   <div className="mt-3 space-y-3 pl-6">
                     <p className={caption}>
-                      Most slcan devices use 8N1 (8 data bits, no parity, 1 stop bit). Only change these if your device requires different settings.
+                      {t("ioProfileDialog.slcan.advancedHint")}
                     </p>
                     <div className="grid grid-cols-3 gap-4">
-                      <FormField label="Data Bits" variant="default">
+                      <FormField label={t("ioProfileDialog.serial.dataBits")} variant="default">
                         <Select
                           variant="default"
                           value={profileForm.connection.data_bits || "8"}
@@ -1436,7 +1436,7 @@ export default function IOProfileDialog({
                           <option value="5">5</option>
                         </Select>
                       </FormField>
-                      <FormField label="Stop Bits" variant="default">
+                      <FormField label={t("ioProfileDialog.serial.stopBits")} variant="default">
                         <Select
                           variant="default"
                           value={profileForm.connection.stop_bits || "1"}
@@ -1446,15 +1446,15 @@ export default function IOProfileDialog({
                           <option value="2">2</option>
                         </Select>
                       </FormField>
-                      <FormField label="Parity" variant="default">
+                      <FormField label={t("ioProfileDialog.serial.parity")} variant="default">
                         <Select
                           variant="default"
                           value={profileForm.connection.parity || "none"}
                           onChange={(e) => onUpdateConnectionField("parity", e.target.value)}
                         >
-                          <option value="none">None</option>
-                          <option value="odd">Odd</option>
-                          <option value="even">Even</option>
+                          <option value="none">{t("ioProfileDialog.serial.parityOptions.none")}</option>
+                          <option value="odd">{t("ioProfileDialog.serial.parityOptions.odd")}</option>
+                          <option value="even">{t("ioProfileDialog.serial.parityOptions.even")}</option>
                         </Select>
                       </FormField>
                     </div>
@@ -1464,8 +1464,7 @@ export default function IOProfileDialog({
 
               <div className={alertInfo}>
                 <p className="text-sm text-[color:var(--text-info)]">
-                  Works with CANable, CANable Pro (slcan firmware), and other USB-CAN adapters
-                  using the Lawicel/slcan ASCII protocol.
+                  {t("ioProfileDialog.slcan.supportHint")}
                 </p>
               </div>
             </div>
@@ -1474,25 +1473,25 @@ export default function IOProfileDialog({
           {/* SocketCAN (Linux) */}
           {profileForm.kind === "socketcan" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>SocketCAN (Linux)</h3>
+              <h3 className={h3}>{t("ioProfileDialog.socketcan.title")}</h3>
 
-              <FormField label="Interface Name" variant="default">
+              <FormField label={t("ioProfileDialog.socketcan.interfaceName")} variant="default">
                 <Input
                   variant="default"
                   value={profileForm.connection.interface || "can0"}
                   onChange={(e) => onUpdateConnectionField("interface", e.target.value)}
-                  placeholder="can0"
+                  placeholder={t("ioProfileDialog.socketcan.interfacePlaceholder")}
                 />
               </FormField>
 
               {/* CAN Bitrate - optional */}
-              <FormField label="CAN Bitrate (optional)" variant="default">
+              <FormField label={t("ioProfileDialog.socketcan.canBitrate")} variant="default">
                 <Select
                   variant="default"
                   value={profileForm.connection.bitrate || ""}
                   onChange={(e) => onUpdateConnectionField("bitrate", e.target.value)}
                 >
-                  <option value="">Use system configuration</option>
+                  <option value="">{t("ioProfileDialog.socketcan.useSystemConfig")}</option>
                   <option value="10000">10 Kbit/s</option>
                   <option value="20000">20 Kbit/s</option>
                   <option value="50000">50 Kbit/s</option>
@@ -1517,16 +1516,16 @@ export default function IOProfileDialog({
                       className={checkboxDefault}
                     />
                     <label htmlFor="socketcan_enable_fd" className="text-sm text-[color:var(--text-secondary)]">
-                      Enable CAN FD
+                      {t("ioProfileDialog.socketcan.enableFd")}
                     </label>
                   </div>
                   <p className="text-xs text-[color:var(--text-muted)] mt-1 ml-6">
-                    Enables CAN Flexible Data-rate. Requires FD-capable hardware.
+                    {t("ioProfileDialog.socketcan.fdHint")}
                   </p>
 
                   {profileForm.connection.enable_fd && (
                     <div className="mt-3 pl-6">
-                      <FormField label="Data Phase Bitrate" variant="default">
+                      <FormField label={t("ioProfileDialog.socketcan.dataPhaseBitrate")} variant="default">
                         <Select
                           variant="default"
                           value={profileForm.connection.data_bitrate || "2000000"}
@@ -1546,13 +1545,12 @@ export default function IOProfileDialog({
 
               <div className={alertInfo}>
                 <p className="text-sm text-[color:var(--text-info)]">
-                  <strong>Linux only.</strong> Works with CANable Pro (Candlelight firmware),
-                  native CAN hardware, or virtual CAN (vcan).
+                  <strong>{t("ioProfileDialog.socketcan.linuxHintBold")}</strong>{t("ioProfileDialog.socketcan.linuxHintRest")}
                 </p>
                 <p className="text-sm text-[color:var(--text-info)] mt-2">
                   {profileForm.connection.bitrate
-                    ? "WireTAP will configure the interface automatically (requires authentication)."
-                    : "Leave bitrate empty to use the interface as already configured by the system."}
+                    ? t("ioProfileDialog.socketcan.configureAuto")
+                    : t("ioProfileDialog.socketcan.configureManual")}
                 </p>
               </div>
             </div>
@@ -1561,10 +1559,10 @@ export default function IOProfileDialog({
           {/* gs_usb (candleLight) */}
           {profileForm.kind === "gs_usb" && (
             <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
-              <h3 className={h3}>gs_usb (candleLight)</h3>
+              <h3 className={h3}>{t("ioProfileDialog.gsUsb.title")}</h3>
 
               {/* Device Selection */}
-              <FormField label="Device" variant="default">
+              <FormField label={t("ioProfileDialog.gsUsb.device")} variant="default">
                 <GsUsbDevicePicker
                   value={profileForm.connection.device_id || ""}
                   onChange={(deviceId, device) => {
@@ -1585,7 +1583,7 @@ export default function IOProfileDialog({
               </FormField>
 
               {/* CAN Bitrate */}
-              <FormField label="CAN Bitrate" variant="default">
+              <FormField label={t("ioProfileDialog.gsUsb.canBitrate")} variant="default">
                 <Select
                   variant="default"
                   value={profileForm.connection.bitrate || "500000"}
@@ -1604,15 +1602,15 @@ export default function IOProfileDialog({
               </FormField>
 
               {/* Sample Point */}
-              <FormField label="Sample Point" variant="default">
+              <FormField label={t("ioProfileDialog.gsUsb.samplePoint")} variant="default">
                 <Select
                   variant="default"
                   value={profileForm.connection.sample_point || "87.5"}
                   onChange={(e) => onUpdateConnectionField("sample_point", e.target.value)}
                 >
-                  <option value="75.0">75.0%</option>
-                  <option value="80.0">80.0%</option>
-                  <option value="87.5">87.5% (recommended)</option>
+                  <option value="75.0">{t("ioProfileDialog.gsUsb.samplePoints.750")}</option>
+                  <option value="80.0">{t("ioProfileDialog.gsUsb.samplePoints.800")}</option>
+                  <option value="87.5">{t("ioProfileDialog.gsUsb.samplePoints.875")}</option>
                 </Select>
               </FormField>
 
@@ -1626,7 +1624,7 @@ export default function IOProfileDialog({
                   className={checkboxDefault}
                 />
                 <label htmlFor="gs_usb_listen_only" className="text-sm text-[color:var(--text-secondary)]">
-                  Listen-only mode (no ACK, no transmit)
+                  {t("ioProfileDialog.gsUsb.listenOnly")}
                 </label>
               </div>
 
@@ -1641,22 +1639,22 @@ export default function IOProfileDialog({
                     className={checkboxDefault}
                   />
                   <label htmlFor="gs_usb_enable_fd" className="text-sm text-[color:var(--text-secondary)]">
-                    Enable CAN FD
+                    {t("ioProfileDialog.gsUsb.enableFd")}
                   </label>
                   {gsUsbProbeResult?.supports_fd === false && (
-                    <span className="text-xs text-[color:var(--text-warning)]">(device does not support FD)</span>
+                    <span className="text-xs text-[color:var(--text-warning)]">{t("ioProfileDialog.gsUsb.fdNotSupported")}</span>
                   )}
                   {gsUsbProbeResult?.supports_fd === true && (
-                    <span className="text-xs text-[color:var(--text-success)]">(FD capable)</span>
+                    <span className="text-xs text-[color:var(--text-success)]">{t("ioProfileDialog.gsUsb.fdCapable")}</span>
                   )}
                 </div>
                 <p className="text-xs text-[color:var(--text-muted)] mt-1 ml-6">
-                  Enables CAN Flexible Data-rate for higher throughput and larger payloads (up to 64 bytes).
+                  {t("ioProfileDialog.gsUsb.fdHint")}
                 </p>
 
                 {profileForm.connection.enable_fd && (
                   <div className="mt-3 space-y-3 pl-6">
-                    <FormField label="Data Phase Bitrate" variant="default">
+                    <FormField label={t("ioProfileDialog.gsUsb.dataPhaseBitrate")} variant="default">
                       <Select
                         variant="default"
                         value={profileForm.connection.data_bitrate || "2000000"}
@@ -1670,16 +1668,16 @@ export default function IOProfileDialog({
                       </Select>
                     </FormField>
 
-                    <FormField label="Data Phase Sample Point" variant="default">
+                    <FormField label={t("ioProfileDialog.gsUsb.dataPhaseSamplePoint")} variant="default">
                       <Select
                         variant="default"
                         value={profileForm.connection.data_sample_point || "75.0"}
                         onChange={(e) => onUpdateConnectionField("data_sample_point", e.target.value)}
                       >
-                        <option value="60.0">60.0%</option>
-                        <option value="70.0">70.0%</option>
-                        <option value="75.0">75.0% (recommended)</option>
-                        <option value="80.0">80.0%</option>
+                        <option value="60.0">{t("ioProfileDialog.gsUsb.dataPhaseSamplePoints.600")}</option>
+                        <option value="70.0">{t("ioProfileDialog.gsUsb.dataPhaseSamplePoints.700")}</option>
+                        <option value="75.0">{t("ioProfileDialog.gsUsb.dataPhaseSamplePoints.750")}</option>
+                        <option value="80.0">{t("ioProfileDialog.gsUsb.dataPhaseSamplePoints.800")}</option>
                       </Select>
                     </FormField>
                   </div>
@@ -1699,21 +1697,21 @@ export default function IOProfileDialog({
                 <IODeviceStatus
                   state={gsUsbProbeState}
                   result={gsUsbProbeResult}
-                  primaryLabel="Channels"
-                  secondaryLabel="Features"
+                  primaryLabel={t("ioProfileDialog.gsUsb.channelsLabel")}
+                  secondaryLabel={t("ioProfileDialog.gsUsb.featuresLabel")}
                   onRefresh={probeGsUsb}
-                  probingText="Checking device..."
-                  successText="Device connected"
-                  errorText="Device not responding"
+                  probingText={t("ioProfileDialog.gsUsb.probingText")}
+                  successText={t("ioProfileDialog.gsUsb.successText")}
+                  errorText={t("ioProfileDialog.gsUsb.errorText")}
                 />
               )}
 
               <div className={alertInfo}>
                 <p className="text-sm text-[color:var(--text-info)]">
-                  Works with CANable, CANable Pro (candleLight firmware), and other gs_usb-compatible devices.
-                  {platformIsWindows && " WinUSB driver should install automatically."}
-                  {platformIsMacos && " macOS allows direct USB access - no driver needed."}
-                  {platformIsLinux && " On Linux, the kernel gs_usb driver exposes devices as SocketCAN interfaces."}
+                  {t("ioProfileDialog.gsUsb.supportHint")}
+                  {platformIsWindows && t("ioProfileDialog.gsUsb.winNote")}
+                  {platformIsMacos && t("ioProfileDialog.gsUsb.macNote")}
+                  {platformIsLinux && t("ioProfileDialog.gsUsb.linuxNote")}
                 </p>
               </div>
             </div>
@@ -1722,9 +1720,9 @@ export default function IOProfileDialog({
 
         {/* Actions */}
         <div className={`p-6 border-t ${borderDefault} flex justify-end gap-3`}>
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+          <SecondaryButton onClick={onCancel}>{t("ioProfileDialog.cancel")}</SecondaryButton>
           <PrimaryButton onClick={onSave}>
-            {editingProfileId ? "Update Profile" : "Add Profile"}
+            {editingProfileId ? t("ioProfileDialog.update") : t("ioProfileDialog.addBtn")}
           </PrimaryButton>
         </div>
       </div>
