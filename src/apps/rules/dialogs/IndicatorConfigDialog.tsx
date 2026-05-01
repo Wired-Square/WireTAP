@@ -6,6 +6,7 @@
 // Threshold (signal above/below → colour).
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
@@ -27,10 +28,10 @@ const COLOUR_WRITE_DEBOUNCE_MS = 150;
 const DEFAULT_CAN_ID_HEX = "100";
 const DEFAULT_DATA_MASK_HEX = "FF00000000000000";
 
-const STATE_OPTIONS = [
-  { value: 0, label: "Off" },
-  { value: 1, label: "On" },
-  { value: 2, label: "Blink" },
+const STATE_KEYS = [
+  { value: 0, key: "off" },
+  { value: 1, key: "on" },
+  { value: 2, key: "blink" },
 ] as const;
 
 export interface LedUpdateValues {
@@ -58,6 +59,7 @@ export default function IndicatorConfigDialog({
   led,
   interfaces,
 }: IndicatorConfigDialogProps) {
+  const { t } = useTranslation("rules");
   const selectableSignals = useRulesStore((s) => s.selectableSignals);
   const [source, setSource] = useState<SourceType>("activity");
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +173,7 @@ export default function IndicatorConfigDialog({
           params.trigger = { type: "FrameMatch", can_id: parseInt(canId, 16) || 0, mask };
         }
       } else if (source === "palette") {
-        if (palSourceSignal == null) { setError("Select a source signal"); setSubmitting(false); return; }
+        if (palSourceSignal == null) { setError(t("indicatorConfigDialog.errors.selectSource")); setSubmitting(false); return; }
         const palSig = selectableSignals.find((s) => s.signal_id === palSourceSignal);
         params.source_frame_def_id = palSig?.frame_def_id ?? null;
         params.source_signal_id = palSourceSignal;
@@ -179,7 +181,7 @@ export default function IndicatorConfigDialog({
         params.signal_max = signalMax;
         if (gateSignalId) params.gate_signal_id = parseInt(gateSignalId);
       } else if (source === "threshold") {
-        if (thrSourceSignal == null) { setError("Select a source signal"); setSubmitting(false); return; }
+        if (thrSourceSignal == null) { setError(t("indicatorConfigDialog.errors.selectSource")); setSubmitting(false); return; }
         const thrSig = selectableSignals.find((s) => s.signal_id === thrSourceSignal);
         params.source_frame_def_id = thrSig?.frame_def_id ?? null;
         params.source_signal_id = thrSourceSignal;
@@ -200,7 +202,7 @@ export default function IndicatorConfigDialog({
   }, [source, led, deviceId, activityInterface, interfaces, triggerMode, canId, dataMask,
       activityColour, palSourceSignal, palettes, selectedPalette, signalMax, gateSignalId,
       thrSourceSignal, threshold, valueAbove, valueBelow, thrGateSignalId,
-      selectableSignals, onConfigured, onClose]);
+      selectableSignals, onConfigured, onClose, t]);
 
   // Note: activityColour is derived from led.colour, included in deps via led
 
@@ -208,7 +210,7 @@ export default function IndicatorConfigDialog({
     <Dialog isOpen={isOpen} onBackdropClick={closeWithValues} maxWidth="max-w-2xl">
       <div className="p-6 max-h-[80vh] overflow-y-auto">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Configure {led.label}
+          {t("indicatorConfigDialog.title", { label: led.label })}
         </h2>
 
         {error && (
@@ -219,9 +221,9 @@ export default function IndicatorConfigDialog({
 
         {/* State */}
         <div className="mb-4">
-          <label className={labelDefault}>State</label>
+          <label className={labelDefault}>{t("indicatorConfigDialog.fields.state")}</label>
           <div className="flex gap-2">
-            {STATE_OPTIONS.map((opt) => (
+            {STATE_KEYS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => writeState(opt.value)}
@@ -231,7 +233,7 @@ export default function IndicatorConfigDialog({
                     : `${textSecondary} hover:bg-white/5`
                 }`}
               >
-                {opt.label}
+                {t(`indicatorConfigDialog.states.${opt.key}`)}
               </button>
             ))}
           </div>
@@ -239,14 +241,14 @@ export default function IndicatorConfigDialog({
 
         {/* Colour */}
         <div className="mb-4">
-          <label className={labelDefault}>Colour</label>
+          <label className={labelDefault}>{t("indicatorConfigDialog.fields.colour")}</label>
           <ColourPicker value={ledColour} onChange={writeColour} />
         </div>
 
         {/* Blink period */}
         {ledState === 2 && led.blink_period_signal_id !== 0 && (
           <div className="mb-4">
-            <label className={labelDefault}>Blink Period</label>
+            <label className={labelDefault}>{t("indicatorConfigDialog.fields.blinkPeriod")}</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -258,18 +260,18 @@ export default function IndicatorConfigDialog({
                 onChange={(e) => setBlinkPeriod(parseInt(e.target.value) || 0)}
                 onBlur={() => writeBlinkPeriod(blinkPeriod)}
               />
-              <span className={`text-xs ${textTertiary}`}>ms</span>
+              <span className={`text-xs ${textTertiary}`}>{t("indicatorConfigDialog.fields.ms")}</span>
             </div>
           </div>
         )}
 
         <div className={`mb-4 pt-4 border-t border-[color:var(--border-default)]`}>
-          <label className={labelDefault}>Trigger</label>
+          <label className={labelDefault}>{t("indicatorConfigDialog.fields.trigger")}</label>
         </div>
 
         {/* Source type selector */}
         <div className="mb-4">
-          <label className={labelDefault}>Indicator Source</label>
+          <label className={labelDefault}>{t("indicatorConfigDialog.fields.indicatorSource")}</label>
           <div className="flex gap-2">
             {(["activity", "palette", "threshold"] as const).map((s) => (
               <button
@@ -281,7 +283,7 @@ export default function IndicatorConfigDialog({
                     : `${textSecondary} hover:bg-white/5`
                 }`}
               >
-                {s === "activity" ? "Activity" : s === "palette" ? "Signal → Colour" : "Signal → Threshold"}
+                {t(`indicatorConfigDialog.sources.${s}`)}
               </button>
             ))}
           </div>
@@ -291,7 +293,7 @@ export default function IndicatorConfigDialog({
         {source === "activity" && (
           <div className="space-y-4">
             <div>
-              <label className={labelDefault}>Interface</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.interface")}</label>
               <select
                 className={inputSimple}
                 value={activityInterface}
@@ -303,20 +305,20 @@ export default function IndicatorConfigDialog({
               </select>
             </div>
             <div>
-              <label className={labelDefault}>Trigger</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.trigger")}</label>
               <select
                 className={inputSimple}
                 value={triggerMode}
                 onChange={(e) => setTriggerMode(e.target.value as "any" | "id" | "match")}
               >
-                <option value="any">Any frame</option>
-                <option value="id">Specific CAN ID</option>
-                <option value="match">Frame match (ID + data mask)</option>
+                <option value="any">{t("indicatorConfigDialog.triggers.any")}</option>
+                <option value="id">{t("indicatorConfigDialog.triggers.id")}</option>
+                <option value="match">{t("indicatorConfigDialog.triggers.match")}</option>
               </select>
             </div>
             {(triggerMode === "id" || triggerMode === "match") && (
               <div>
-                <label className={labelDefault}>CAN ID (hex)</label>
+                <label className={labelDefault}>{t("indicatorConfigDialog.fields.canId")}</label>
                 <input
                   type="text"
                   className={`${inputSimple} font-mono w-32`}
@@ -327,7 +329,7 @@ export default function IndicatorConfigDialog({
             )}
             {triggerMode === "match" && (
               <div>
-                <label className={labelDefault}>Data mask (hex bytes)</label>
+                <label className={labelDefault}>{t("indicatorConfigDialog.fields.dataMask")}</label>
                 <input
                   type="text"
                   className={`${inputSimple} font-mono`}
@@ -344,7 +346,7 @@ export default function IndicatorConfigDialog({
         {source === "palette" && (
           <div className="space-y-4">
             <div>
-              <label className={labelDefault}>Source Signal</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.sourceSignal")}</label>
               <SignalCombobox
                 signals={selectableSignals}
                 value={palSourceSignal}
@@ -352,21 +354,23 @@ export default function IndicatorConfigDialog({
               />
             </div>
             <div>
-              <label className={labelDefault}>Palette</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.palette")}</label>
               <select className={inputSimple} value={selectedPalette} onChange={(e) => setSelectedPalette(parseInt(e.target.value))}>
                 {palettes.map((p, i) => (
-                  <option key={i} value={i}>{p.name}{p.description ? ` — ${p.description}` : ""}</option>
+                  <option key={i} value={i}>
+                    {p.description ? t("indicatorConfigDialog.fields.paletteWithDesc", { name: p.name, description: p.description }) : p.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className={labelDefault}>Signal Max (normalisation denominator)</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.signalMax")}</label>
               <input type="number" className={`${inputSimple} w-32`} value={signalMax} onChange={(e) => setSignalMax(parseInt(e.target.value) || 1000)} />
             </div>
             <div>
-              <label className={labelDefault}>Gate Signal (optional)</label>
-              <input type="text" className={`${inputSimple} font-mono w-32`} value={gateSignalId} onChange={(e) => setGateSignalId(e.target.value)} placeholder="Signal ID" />
-              <span className={`text-[10px] block mt-1 ${textTertiary}`}>Leave empty for no gate</span>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.gateSignal")}</label>
+              <input type="text" className={`${inputSimple} font-mono w-32`} value={gateSignalId} onChange={(e) => setGateSignalId(e.target.value)} placeholder={t("indicatorConfigDialog.fields.gatePlaceholder")} />
+              <span className={`text-[10px] block mt-1 ${textTertiary}`}>{t("indicatorConfigDialog.fields.gateHint")}</span>
             </div>
           </div>
         )}
@@ -375,7 +379,7 @@ export default function IndicatorConfigDialog({
         {source === "threshold" && (
           <div className="space-y-4">
             <div>
-              <label className={labelDefault}>Source Signal</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.sourceSignal")}</label>
               <SignalCombobox
                 signals={selectableSignals}
                 value={thrSourceSignal}
@@ -383,21 +387,21 @@ export default function IndicatorConfigDialog({
               />
             </div>
             <div>
-              <label className={labelDefault}>Threshold Value</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.thresholdValue")}</label>
               <input type="number" className={`${inputSimple} w-32`} value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value) || 0)} />
             </div>
             <div>
-              <label className={labelDefault}>Colour Above Threshold</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.colourAbove")}</label>
               <ColourPicker value={valueAbove} onChange={setValueAbove} />
             </div>
             <div>
-              <label className={labelDefault}>Colour Below Threshold (0 = Off)</label>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.colourBelow")}</label>
               <ColourPicker value={valueBelow} onChange={setValueBelow} />
             </div>
             <div>
-              <label className={labelDefault}>Gate Signal (optional)</label>
-              <input type="text" className={`${inputSimple} font-mono w-32`} value={thrGateSignalId} onChange={(e) => setThrGateSignalId(e.target.value)} placeholder="Signal ID" />
-              <span className={`text-[10px] block mt-1 ${textTertiary}`}>Leave empty for no gate</span>
+              <label className={labelDefault}>{t("indicatorConfigDialog.fields.gateSignal")}</label>
+              <input type="text" className={`${inputSimple} font-mono w-32`} value={thrGateSignalId} onChange={(e) => setThrGateSignalId(e.target.value)} placeholder={t("indicatorConfigDialog.fields.gatePlaceholder")} />
+              <span className={`text-[10px] block mt-1 ${textTertiary}`}>{t("indicatorConfigDialog.fields.gateHint")}</span>
             </div>
           </div>
         )}
@@ -408,18 +412,18 @@ export default function IndicatorConfigDialog({
           onClick={handleClear}
           className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-red-500/20 hover:text-red-400`}
         >
-          Clear Indicator
+          {t("indicatorConfigDialog.clear")}
         </button>
         <div className="flex gap-2">
           <button onClick={closeWithValues} className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}>
-            Close
+            {t("indicatorConfigDialog.close")}
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting}
             className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
           >
-            {submitting ? "Configuring..." : "Apply Trigger"}
+            {submitting ? t("indicatorConfigDialog.configuring") : t("indicatorConfigDialog.apply")}
           </button>
         </div>
       </div>

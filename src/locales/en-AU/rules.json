@@ -129,6 +129,71 @@
     "offset": "Offset",
     "delete": "Delete Signal"
   },
+  "indicatorConfigDialog": {
+    "title": "Configure {{label}}",
+    "fields": {
+      "state": "State",
+      "colour": "Colour",
+      "blinkPeriod": "Blink Period",
+      "ms": "ms",
+      "trigger": "Trigger",
+      "indicatorSource": "Indicator Source",
+      "interface": "Interface",
+      "canId": "CAN ID (hex)",
+      "dataMask": "Data mask (hex bytes)",
+      "sourceSignal": "Source Signal",
+      "palette": "Palette",
+      "paletteWithDesc": "{{name}} — {{description}}",
+      "signalMax": "Signal Max (normalisation denominator)",
+      "gateSignal": "Gate Signal (optional)",
+      "gatePlaceholder": "Signal ID",
+      "gateHint": "Leave empty for no gate",
+      "thresholdValue": "Threshold Value",
+      "colourAbove": "Colour Above Threshold",
+      "colourBelow": "Colour Below Threshold (0 = Off)"
+    },
+    "states": {
+      "off": "Off",
+      "on": "On",
+      "blink": "Blink"
+    },
+    "sources": {
+      "activity": "Activity",
+      "palette": "Signal → Colour",
+      "threshold": "Signal → Threshold"
+    },
+    "triggers": {
+      "any": "Any frame",
+      "id": "Specific CAN ID",
+      "match": "Frame match (ID + data mask)"
+    },
+    "errors": {
+      "selectSource": "Select a source signal"
+    },
+    "clear": "Clear Indicator",
+    "close": "Close",
+    "configuring": "Configuring...",
+    "apply": "Apply Trigger"
+  },
+  "paletteDialog": {
+    "title": "Palette Editor",
+    "loading": "Loading palettes...",
+    "noPalettes": "No palettes defined in board definition",
+    "fields": {
+      "palette": "Palette",
+      "paletteWithDesc": "{{name}} — {{description}}",
+      "preview": "Preview",
+      "colourStops": "Colour Stops ({{count}})",
+      "add": "Add",
+      "stopTitle": "Stop {{index}}",
+      "stopHeading": "Stop {{index}}",
+      "removeStop": "Remove stop",
+      "summary": "Signal start: {{id}} · {{count}} entries"
+    },
+    "cancel": "Cancel",
+    "uploading": "Uploading...",
+    "upload": "Upload to Device"
+  },
   "userSignalDialog": {
     "title": "Add User Signal",
     "fields": {

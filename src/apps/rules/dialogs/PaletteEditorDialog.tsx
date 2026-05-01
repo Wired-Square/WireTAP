@@ -5,6 +5,7 @@
 // stops, and upload entries to the device as user signals.
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
@@ -32,6 +33,7 @@ export default function PaletteEditorDialog({
   onClose,
   deviceId,
 }: PaletteEditorDialogProps) {
+  const { t } = useTranslation("rules");
   const [palettes, setPalettes] = useState<PaletteInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -115,13 +117,13 @@ export default function PaletteEditorDialog({
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
       <div className="p-6">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Palette Editor
+          {t("paletteDialog.title")}
         </h2>
 
         {loading && (
           <div className={`flex items-center justify-center py-8 ${textTertiary}`}>
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="ml-2 text-sm">Loading palettes...</span>
+            <span className="ml-2 text-sm">{t("paletteDialog.loading")}</span>
           </div>
         )}
 
@@ -133,7 +135,7 @@ export default function PaletteEditorDialog({
 
         {!loading && palettes.length === 0 && (
           <p className={`text-sm ${textTertiary} py-4`}>
-            No palettes defined in board definition
+            {t("paletteDialog.noPalettes")}
           </p>
         )}
 
@@ -141,7 +143,7 @@ export default function PaletteEditorDialog({
           <div className="space-y-4">
             {/* Palette selector */}
             <div>
-              <label className={labelDefault}>Palette</label>
+              <label className={labelDefault}>{t("paletteDialog.fields.palette")}</label>
               <select
                 className={inputSimple}
                 value={selectedIdx}
@@ -149,8 +151,9 @@ export default function PaletteEditorDialog({
               >
                 {palettes.map((p, i) => (
                   <option key={i} value={i}>
-                    {p.name}
-                    {p.description ? ` — ${p.description}` : ""}
+                    {p.description
+                      ? t("paletteDialog.fields.paletteWithDesc", { name: p.name, description: p.description })
+                      : p.name}
                   </option>
                 ))}
               </select>
@@ -159,7 +162,7 @@ export default function PaletteEditorDialog({
             {/* Gradient preview */}
             <div>
               <span className={`text-[10px] uppercase tracking-wider ${textTertiary}`}>
-                Preview
+                {t("paletteDialog.fields.preview")}
               </span>
               <div className="mt-1">
                 <PalettePreview entries={entries} height={24} />
@@ -170,13 +173,13 @@ export default function PaletteEditorDialog({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-[10px] uppercase tracking-wider ${textTertiary}`}>
-                  Colour Stops ({entries.length})
+                  {t("paletteDialog.fields.colourStops", { count: entries.length })}
                 </span>
                 <button
                   onClick={addStop}
                   className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
                 >
-                  <Plus className={iconMd} /> Add
+                  <Plus className={iconMd} /> {t("paletteDialog.fields.add")}
                 </button>
               </div>
 
@@ -189,7 +192,7 @@ export default function PaletteEditorDialog({
                       onClick={() =>
                         setEditingStop(editingStop === i ? null : i)
                       }
-                      title={`Stop ${i}`}
+                      title={t("paletteDialog.fields.stopTitle", { index: i })}
                     />
                     <span className={`text-[9px] ${textTertiary}`}>{i}</span>
                   </div>
@@ -201,12 +204,12 @@ export default function PaletteEditorDialog({
                 <div className={`mt-3 p-3 border ${borderDefault} rounded-lg`}>
                   <div className="flex items-center justify-between mb-2">
                     <span className={`text-xs font-medium ${textSecondary}`}>
-                      Stop {editingStop}
+                      {t("paletteDialog.fields.stopHeading", { index: editingStop })}
                     </span>
                     <button
                       onClick={() => removeStop(editingStop)}
                       className={`p-0.5 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-                      title="Remove stop"
+                      title={t("paletteDialog.fields.removeStop")}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -221,8 +224,10 @@ export default function PaletteEditorDialog({
 
             {selectedPalette && (
               <div className={`text-xs ${textTertiary}`}>
-                Signal start: {formatHexId(selectedPalette.signal_start)}
-                {` · ${entries.length} entries`}
+                {t("paletteDialog.fields.summary", {
+                  id: formatHexId(selectedPalette.signal_start),
+                  count: entries.length,
+                })}
               </div>
             )}
           </div>
@@ -234,14 +239,14 @@ export default function PaletteEditorDialog({
           onClick={onClose}
           className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
-          Cancel
+          {t("paletteDialog.cancel")}
         </button>
         <button
           onClick={handleUpload}
           disabled={!selectedPalette || uploading || entries.length === 0}
           className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
         >
-          {uploading ? "Uploading..." : "Upload to Device"}
+          {uploading ? t("paletteDialog.uploading") : t("paletteDialog.upload")}
         </button>
       </div>
     </Dialog>
