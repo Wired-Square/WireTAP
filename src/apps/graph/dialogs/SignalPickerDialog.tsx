@@ -1,6 +1,7 @@
 // ui/src/apps/graph/dialogs/SignalPickerDialog.tsx
 
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronRight, ChevronDown, Check, Search } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
 import { bgSurface, borderDivider, textSecondary, hoverLight, inputSimple, primaryButtonBase } from "../../../styles";
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export default function SignalPickerDialog({ isOpen, onClose, panelId, replacingSignalIndex, onReplaceDone }: Props) {
+  const { t } = useTranslation("graph");
   const frames = useGraphStore((s) => s.frames);
   const panels = useGraphStore((s) => s.panels);
   const addSignalToPanel = useGraphStore((s) => s.addSignalToPanel);
@@ -145,7 +147,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
     return (
       <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
         <div className={`${bgSurface} rounded-xl shadow-xl p-4`}>
-          <p className="text-sm text-[color:var(--text-muted)]">Panel not found.</p>
+          <p className="text-sm text-[color:var(--text-muted)]">{t("signalPicker.panelNotFound")}</p>
         </div>
       </Dialog>
     );
@@ -160,11 +162,11 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
         {/* Header */}
         <div className={`p-4 ${borderDivider}`}>
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {isReplaceMode ? "Replace Signal" : "Select Signals"}
+            {isReplaceMode ? t("signalPicker.titleReplace") : t("signalPicker.titleSelect")}
           </h2>
           {isReplaceMode && replacingSignal && (
             <p className={`text-xs ${textSecondary} mt-0.5`}>
-              Replacing: {replacingSignal.displayName || replacingSignal.signalName}
+              {t("signalPicker.replacing", { name: replacingSignal.displayName || replacingSignal.signalName })}
             </p>
           )}
         </div>
@@ -177,7 +179,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search signals…"
+              placeholder={t("signalPicker.search")}
               className={`${inputSimple} w-full pl-8`}
               autoFocus
             />
@@ -188,7 +190,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
         <div className="max-h-[50vh] overflow-y-auto">
           {sortedFrames.length === 0 ? (
             <div className="p-4 text-sm text-[color:var(--text-muted)]">
-              {needle ? "No matching signals found." : "No catalog loaded. Load a catalog first."}
+              {needle ? t("signalPicker.noMatching") : t("signalPicker.noCatalog")}
             </div>
           ) : (
             <div className="py-1">
@@ -222,11 +224,11 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                         {formatFrameId(frameId, "hex")}
                       </span>
                       <span className={`text-xs ${textSecondary}`}>
-                        {numericSignals.length} signal{numericSignals.length !== 1 ? "s" : ""}
+                        {t("signalPicker.signalsCount", { count: numericSignals.length })}
                       </span>
                       {selectedCount > 0 && !isReplaceMode && (
                         <span className="text-xs text-[color:var(--text-success)] ml-auto">
-                          {selectedCount} selected
+                          {t("signalPicker.selectedCount", { count: selectedCount })}
                         </span>
                       )}
                     </button>
@@ -295,13 +297,13 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
             onClick={onClose}
             className={`px-4 py-2 rounded text-sm font-medium text-[color:var(--text-secondary)] ${hoverLight} transition-colors`}
           >
-            Cancel
+            {t("signalPicker.cancel")}
           </button>
           <button
             onClick={handleOk}
             className={`${primaryButtonBase} px-4`}
           >
-            OK
+            {t("signalPicker.ok")}
           </button>
         </div>
       </div>

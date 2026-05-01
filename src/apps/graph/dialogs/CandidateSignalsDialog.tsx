@@ -1,6 +1,7 @@
 // ui/src/apps/graph/dialogs/CandidateSignalsDialog.tsx
 
 import { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { X, Sparkles, ChevronRight } from "lucide-react";
 import { iconLg, iconSm } from "../../../styles/spacing";
 import { bgSurface, borderDivider, hoverLight, inputSimple, selectSimple, primaryButtonBase } from "../../../styles";
@@ -30,6 +31,7 @@ const SIGNAL_COLOURS = [
 ];
 
 export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
+  const { t } = useTranslation("graph");
   const discoveredFrameIds = useGraphStore((s) => s.discoveredFrameIds);
   const addPanel = useGraphStore((s) => s.addPanel);
   const updatePanel = useGraphStore((s) => s.updatePanel);
@@ -101,14 +103,15 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
           if (bits === 8 && e === "be") continue;
 
           const signalName = `byte_${offset}_${bits}b_${e}`;
-          const endiannessLabel = bits > 8 ? (e === "le" ? " LE" : " BE") : "";
-          const label = `byte ${offset}, ${bits}-bit${endiannessLabel}`;
+          const label = bits > 8
+            ? t("candidates.byteLabelEndian", { offset, bits, endian: e === "le" ? "LE" : "BE" })
+            : t("candidates.byteLabel", { offset, bits });
           result.push({ label, signalName, offset, bits, endianness: e });
         }
       }
     }
     return result;
-  }, [selectedFrameId, startByte, endByte, bitLengths, endianness, useAnalysisHints, analysisResult]);
+  }, [selectedFrameId, startByte, endByte, bitLengths, endianness, useAnalysisHints, analysisResult, t]);
 
   const handleGenerate = useCallback(() => {
     if (candidates.length === 0 || !selectedFrameId) return;
@@ -123,10 +126,10 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
       const panelId = addPanel("line-chart");
 
       // Set a descriptive title
-      const rangeLabel = chunk.length === 1
-        ? chunk[0].label
-        : `${chunk[0].label} … ${chunk[chunk.length - 1].label}`;
-      updatePanel(panelId, { title: `Candidates: ${rangeLabel}` });
+      const title = chunk.length === 1
+        ? t("candidates.panelTitle", { label: chunk[0].label })
+        : t("candidates.panelTitleRange", { from: chunk[0].label, to: chunk[chunk.length - 1].label });
+      updatePanel(panelId, { title });
 
       // Add each candidate signal
       for (const candidate of chunk) {
@@ -155,7 +158,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
           <div className="flex items-center gap-2">
             <Sparkles className={`${iconSm} text-amber-400`} />
             <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-              Candidate Signals
+              {t("candidates.title")}
             </h2>
           </div>
           <button
@@ -172,14 +175,14 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               {/* Frame ID */}
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Frame ID
+                  {t("candidates.fields.frameId")}
                 </label>
                 <select
                   value={selectedFrameId}
                   onChange={(e) => setSelectedFrameId(e.target.value)}
                   className={`${selectSimple} w-full`}
                 >
-                  <option value="">Select a frame ID…</option>
+                  <option value="">{t("candidates.fields.selectFrameId")}</option>
                   {sortedFrameIds.map((id) => (
                     <option key={id} value={String(id)}>
                       {formatFrameId(id)} ({id})
@@ -188,7 +191,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 </select>
                 {sortedFrameIds.length === 0 && (
                   <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
-                    Start a session to discover frame IDs
+                    {t("candidates.fields.noFrames")}
                   </p>
                 )}
               </div>
@@ -196,7 +199,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               {/* Bit lengths */}
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Bit Lengths
+                  {t("candidates.fields.bitLengths")}
                 </label>
                 <div className="flex gap-2">
                   {[8, 16, 32].map((bits) => (
@@ -205,7 +208,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                       onClick={() => toggleBitLength(bits)}
                       className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(bitLengths.has(bits))}`}
                     >
-                      {bits}-bit
+                      {t("candidates.fields.bitLabel", { bits })}
                     </button>
                   ))}
                 </div>
@@ -214,20 +217,20 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               {/* Endianness */}
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Endianness
+                  {t("candidates.fields.endianness")}
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => toggleEndianness("le")}
                     className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(endianness.has("le"))}`}
                   >
-                    Little-endian
+                    {t("candidates.fields.littleEndian")}
                   </button>
                   <button
                     onClick={() => toggleEndianness("be")}
                     className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(endianness.has("be"))}`}
                   >
-                    Big-endian
+                    {t("candidates.fields.bigEndian")}
                   </button>
                 </div>
               </div>
@@ -236,7 +239,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                    Start Byte
+                    {t("candidates.fields.startByte")}
                   </label>
                   <input
                     type="number"
@@ -249,7 +252,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                    End Byte
+                    {t("candidates.fields.endByte")}
                   </label>
                   <input
                     type="number"
@@ -272,7 +275,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                     className="rounded border-gray-500"
                   />
                   <span className="text-xs text-[color:var(--text-secondary)]">
-                    Use analysis hints (skip static/counter bytes)
+                    {t("candidates.fields.useHints")}
                   </span>
                 </label>
               )}
@@ -283,7 +286,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 disabled={!selectedFrameId || bitLengths.size === 0 || endianness.size === 0}
                 className={`${primaryButtonBase} w-full flex items-center justify-center gap-1`}
               >
-                Preview
+                {t("candidates.actions.next")}
                 <ChevronRight className={iconSm} />
               </button>
             </>
@@ -294,7 +297,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
               {/* Preview list */}
               <div>
                 <p className="text-xs text-[color:var(--text-secondary)] mb-2">
-                  {candidates.length} candidate signal{candidates.length !== 1 ? "s" : ""} will be created as line-chart panels (up to 4 per panel):
+                  {t("candidates.preview.summary", { count: candidates.length })}
                 </p>
                 <div className="max-h-48 overflow-y-auto space-y-0.5 text-xs">
                   {candidates.map((c) => (
@@ -317,7 +320,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                 </div>
                 {candidates.length === 0 && (
                   <p className="text-xs text-[color:var(--text-muted)] text-center py-4">
-                    No candidates match the current configuration
+                    {t("candidates.preview.noMatches")}
                   </p>
                 )}
               </div>
@@ -328,7 +331,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                   onClick={() => setStep(1)}
                   className="px-4 py-2 text-sm rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
                 >
-                  Back
+                  {t("candidates.actions.back")}
                 </button>
                 <button
                   onClick={handleGenerate}
@@ -336,7 +339,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                   className={`${primaryButtonBase} flex-1 flex items-center justify-center gap-1`}
                 >
                   <Sparkles className={iconSm} />
-                  Generate {candidates.length} Signal{candidates.length !== 1 ? "s" : ""}
+                  {t("candidates.actions.generate", { count: candidates.length })}
                 </button>
               </div>
             </>

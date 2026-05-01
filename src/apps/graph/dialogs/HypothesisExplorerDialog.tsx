@@ -1,6 +1,7 @@
 // ui/src/apps/graph/dialogs/HypothesisExplorerDialog.tsx
 
 import { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { X, FlaskConical, ChevronRight, ChevronLeft, CheckSquare, Square, ChevronsUp } from "lucide-react";
 import { iconSm, iconLg } from "../../../styles/spacing";
 import {
@@ -33,6 +34,7 @@ const scoreBadgeCls = (score: number) => {
 };
 
 export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
+  const { t } = useTranslation("graph");
   const discoveredFrameIds = useGraphStore((s) => s.discoveredFrameIds);
   const addPanel = useGraphStore((s) => s.addPanel);
   const updatePanel = useGraphStore((s) => s.updatePanel);
@@ -202,7 +204,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
           <div className="flex items-center gap-2">
             <FlaskConical className={`${iconSm} text-purple-400`} />
             <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-              Hypothesis Explorer
+              {t("hypothesis.title")}
             </h2>
           </div>
           <button
@@ -219,20 +221,20 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               {/* Frame ID selection */}
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Frame ID
+                  {t("hypothesis.fields.frameId")}
                 </label>
                 <div className="flex gap-2 mb-2">
                   <button
                     onClick={() => setFrameMode('single')}
                     className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(frameMode === 'single')}`}
                   >
-                    Single
+                    {t("hypothesis.fields.single")}
                   </button>
                   <button
                     onClick={() => setFrameMode('all')}
                     className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(frameMode === 'all')}`}
                   >
-                    All discovered ({sortedFrameIds.length})
+                    {t("hypothesis.fields.allDiscovered", { count: sortedFrameIds.length })}
                   </button>
                 </div>
                 {frameMode === 'single' && (
@@ -241,7 +243,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     onChange={(e) => setSelectedFrameId(e.target.value)}
                     className={`${selectSimple} w-full`}
                   >
-                    <option value="">Select a frame ID…</option>
+                    <option value="">{t("hypothesis.fields.selectFrameId")}</option>
                     {sortedFrameIds.map((id) => (
                       <option key={id} value={String(id)}>
                         {formatFrameId(id)} ({id})
@@ -251,7 +253,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 )}
                 {sortedFrameIds.length === 0 && (
                   <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
-                    Start a session to discover frame IDs
+                    {t("hypothesis.fields.noFrames")}
                   </p>
                 )}
               </div>
@@ -259,7 +261,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               {/* Bit lengths */}
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Bit Lengths
+                  {t("hypothesis.fields.bitLengths")}
                 </label>
                 <div className="flex gap-2 flex-wrap">
                   {BIT_LENGTH_OPTIONS.map((bits) => (
@@ -268,7 +270,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                       onClick={() => toggleBitLength(bits)}
                       className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(bitLengths.has(bits))}`}
                     >
-                      {bits}-bit
+                      {t("hypothesis.fields.bitLabel", { bits })}
                     </button>
                   ))}
                 </div>
@@ -277,20 +279,20 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               {/* Endianness */}
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Endianness
+                  {t("hypothesis.fields.endianness")}
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => toggleEndianness("little")}
                     className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(endianness.has("little"))}`}
                   >
-                    Little-endian
+                    {t("hypothesis.fields.littleEndian")}
                   </button>
                   <button
                     onClick={() => toggleEndianness("big")}
                     className={`px-3 py-1 text-xs font-medium rounded border transition-colors ${toggleCls(endianness.has("big"))}`}
                   >
-                    Big-endian
+                    {t("hypothesis.fields.bigEndian")}
                   </button>
                 </div>
               </div>
@@ -299,7 +301,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-medium text-[color:var(--text-secondary)]">
-                    Bit Range
+                    {t("hypothesis.fields.bitRange")}
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -309,7 +311,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                       className="rounded border-gray-500"
                     />
                     <span className="text-[10px] text-[color:var(--text-muted)]">
-                      Byte-aligned only
+                      {t("hypothesis.fields.byteAligned")}
                     </span>
                   </label>
                 </div>
@@ -323,10 +325,10 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                       value={startBit}
                       onChange={(e) => setStartBit(e.target.value)}
                       className={`${inputSimple} w-full`}
-                      placeholder="Start bit"
+                      placeholder={t("hypothesis.fields.startBit")}
                     />
                   </div>
-                  <span className="text-[color:var(--text-muted)] self-center text-xs">to</span>
+                  <span className="text-[color:var(--text-muted)] self-center text-xs">{t("hypothesis.fields.rangeTo")}</span>
                   <div className="flex-1">
                     <input
                       type="number"
@@ -336,7 +338,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                       value={endBit}
                       onChange={(e) => setEndBit(e.target.value)}
                       className={`${inputSimple} w-full`}
-                      placeholder="End bit"
+                      placeholder={t("hypothesis.fields.endBit")}
                     />
                   </div>
                 </div>
@@ -351,7 +353,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   className="rounded border-gray-500"
                 />
                 <span className="text-xs text-[color:var(--text-secondary)]">
-                  Signed interpretation
+                  {t("hypothesis.fields.signed")}
                 </span>
               </label>
 
@@ -365,7 +367,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     className="rounded border-gray-500"
                   />
                   <span className="text-xs text-[color:var(--text-secondary)]">
-                    Rank using analysis hints
+                    {t("hypothesis.fields.useHints")}
                   </span>
                 </label>
               )}
@@ -376,13 +378,13 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   onClick={() => setShowAdvanced(!showAdvanced)}
                   className={`text-xs ${textSecondary} hover:text-[color:var(--text-primary)] transition-colors`}
                 >
-                  {showAdvanced ? "▾ " : "▸ "}Scale &amp; offset
+                  {showAdvanced ? t("hypothesis.fields.advancedShown") : t("hypothesis.fields.advancedHidden")}
                 </button>
                 {showAdvanced && (
                   <div className="flex gap-3 mt-2">
                     <div className="flex-1">
                       <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
-                        Factor
+                        {t("hypothesis.fields.factor")}
                       </label>
                       <input
                         type="number"
@@ -394,7 +396,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     </div>
                     <div className="flex-1">
                       <label className="block text-[10px] text-[color:var(--text-muted)] mb-0.5">
-                        Offset
+                        {t("hypothesis.fields.offset")}
                       </label>
                       <input
                         type="number"
@@ -411,8 +413,8 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
               {/* Candidate count preview */}
               {canPreview && (
                 <p className="text-[10px] text-[color:var(--text-muted)]">
-                  {candidates.length} candidate{candidates.length !== 1 ? 's' : ''} will be generated
-                  {candidates.length >= 500 && ' (capped at 500)'}
+                  {t("hypothesis.preview.summary", { count: candidates.length })}
+                  {candidates.length >= 500 && t("hypothesis.preview.cap")}
                 </p>
               )}
 
@@ -422,7 +424,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 disabled={!canPreview || candidates.length === 0}
                 className={`${primaryButtonBase} w-full flex items-center justify-center gap-1`}
               >
-                Preview
+                {t("hypothesis.actions.next")}
                 <ChevronRight className={iconSm} />
               </button>
             </>
@@ -437,24 +439,24 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   className="flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
                 >
                   <CheckSquare className="w-3 h-3" />
-                  All
+                  {t("hypothesis.actions.selectAll")}
                 </button>
                 <button
                   onClick={handleDeselectAll}
                   className="flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
                 >
                   <Square className="w-3 h-3" />
-                  None
+                  {t("hypothesis.actions.selectNone")}
                 </button>
                 <button
                   onClick={() => handleSelectTopN(20)}
                   className="flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
                 >
                   <ChevronsUp className="w-3 h-3" />
-                  Top 20
+                  {t("hypothesis.actions.topN", { count: 20 })}
                 </button>
                 <span className={`text-[10px] ${textSecondary} ml-auto`}>
-                  {selectedCount} selected → {estimatedPanels} panel{estimatedPanels !== 1 ? 's' : ''}
+                  {t("hypothesis.actions.selectionSummary", { count: selectedCount, panels: estimatedPanels })}
                 </span>
               </div>
 
@@ -494,7 +496,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                 ))}
                 {candidates.length === 0 && (
                   <p className="text-xs text-[color:var(--text-muted)] text-center py-4">
-                    No candidates match the current configuration
+                    {t("hypothesis.preview.noMatches")}
                   </p>
                 )}
               </div>
@@ -506,7 +508,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   className="flex items-center gap-1 px-4 py-2 text-sm rounded border border-[var(--border-default)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors"
                 >
                   <ChevronLeft className={iconSm} />
-                  Back
+                  {t("hypothesis.actions.back")}
                 </button>
                 <button
                   onClick={handleGenerate}
@@ -514,7 +516,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   className={`${primaryButtonBase} flex-1 flex items-center justify-center gap-1`}
                 >
                   <FlaskConical className={iconSm} />
-                  Generate {selectedCount} Signal{selectedCount !== 1 ? 's' : ''}
+                  {t("hypothesis.actions.generate", { count: selectedCount })}
                 </button>
               </div>
             </>

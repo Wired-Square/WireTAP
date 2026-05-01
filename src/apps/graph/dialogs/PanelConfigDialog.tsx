@@ -1,6 +1,7 @@
 // ui/src/apps/graph/dialogs/PanelConfigDialog.tsx
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { X, GripVertical, ArrowLeftRight, Plus, Trash2 } from "lucide-react";
 import { iconLg, iconSm } from "../../../styles/spacing";
 import { bgSurface, borderDivider, hoverLight, inputSimple, selectSimple, primaryButtonBase } from "../../../styles";
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSignals, onReplaceSignal }: Props) {
+  const { t } = useTranslation("graph");
   const panels = useGraphStore((s) => s.panels);
   const updatePanel = useGraphStore((s) => s.updatePanel);
   const updateSignalColour = useGraphStore((s) => s.updateSignalColour);
@@ -120,7 +122,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
         {/* Header */}
         <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            Configure Panel
+            {t("panelConfig.title")}
           </h2>
           <button
             onClick={onClose}
@@ -135,7 +137,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
           {/* Title */}
           <div>
             <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-              Title
+              {t("panelConfig.fields.title")}
             </label>
             <input
               type="text"
@@ -143,7 +145,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={handleKeyDown}
               className={`${inputSimple} w-full`}
-              placeholder="Panel title"
+              placeholder={t("panelConfig.fields.titlePlaceholder")}
             />
           </div>
 
@@ -152,7 +154,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Min Value
+                  {t("panelConfig.fields.minValue")}
                 </label>
                 <input
                   type="text"
@@ -165,7 +167,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
               </div>
               <div className="flex-1">
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Max Value
+                  {t("panelConfig.fields.maxValue")}
                 </label>
                 <input
                   type="text"
@@ -183,7 +185,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
           {panel.type === "gauge" && panel.signals.length > 1 && (
             <div>
               <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                Primary Display Value
+                {t("panelConfig.fields.primaryDisplay")}
               </label>
               <select
                 value={primarySignalIndex}
@@ -204,14 +206,14 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                  Frame ID
+                  {t("panelConfig.fields.frameId")}
                 </label>
                 <select
                   value={targetFrameId}
                   onChange={(e) => setTargetFrameId(e.target.value)}
                   className={`${selectSimple} w-full`}
                 >
-                  <option value="">Select a frame ID…</option>
+                  <option value="">{t("panelConfig.fields.selectFrameId")}</option>
                   {sortedFrameIds.map((id) => (
                     <option key={id} value={String(id)}>
                       {formatFrameId(id)} ({id})
@@ -220,14 +222,14 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                 </select>
                 {sortedFrameIds.length === 0 && (
                   <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
-                    Start a session to discover frame IDs
+                    {t("panelConfig.fields.noFrames")}
                   </p>
                 )}
               </div>
               {panel.type === "flow" && (
                 <div>
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                    Byte Count (1–8)
+                    {t("panelConfig.fields.byteCount")}
                   </label>
                   <input
                     type="number"
@@ -247,7 +249,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
           {panel.type === "histogram" && (
             <div>
               <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-                Bin Count (5–200)
+                {t("panelConfig.fields.binCount")}
               </label>
               <input
                 type="number"
@@ -265,7 +267,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
           {panel.type !== "flow" && panel.type !== "heatmap" && panel.signals.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-2">
-                Signals
+                {t("panelConfig.fields.signals")}
               </label>
               <div className="space-y-1">
                 {panel.signals.map((signal, index) => (
@@ -297,7 +299,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                         setDragOverIndex(null);
                       }}
                       className="cursor-grab active:cursor-grabbing shrink-0"
-                      title="Drag to reorder"
+                      title={t("panelConfig.actions.dragReorder")}
                     >
                       <GripVertical className={`${iconSm} text-[color:var(--text-muted)]`} />
                     </div>
@@ -322,7 +324,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                               ? 'bg-blue-600 text-white'
                               : 'text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]'
                           }`}
-                          title="Left Y-axis"
+                          title={t("panelConfig.actions.leftAxis")}
                         >
                           L
                         </button>
@@ -333,7 +335,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                               ? 'bg-blue-600 text-white'
                               : 'text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]'
                           }`}
-                          title="Right Y-axis"
+                          title={t("panelConfig.actions.rightAxis")}
                         >
                           R
                         </button>
@@ -353,7 +355,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                       <span
                         className="w-2 h-2 rounded-full shrink-0"
                         style={{ background: getConfidenceColour(signal.confidence, settings) }}
-                        title={`Confidence: ${signal.confidence}`}
+                        title={t("panelConfig.actions.confidence", { level: signal.confidence })}
                       />
                     )}
                     {/* Replace signal source */}
@@ -361,7 +363,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                       <button
                         onClick={() => onReplaceSignal(panel.id, index)}
                         className={`${iconButtonHover} p-1 shrink-0`}
-                        title="Change signal source"
+                        title={t("panelConfig.actions.changeSource")}
                       >
                         <ArrowLeftRight className={iconSm} />
                       </button>
@@ -370,7 +372,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                     <button
                       onClick={() => removeSignalFromPanel(panel.id, signal.frameId, signal.signalName)}
                       className={`${iconButtonDanger} p-1 shrink-0`}
-                      title="Remove signal"
+                      title={t("panelConfig.actions.removeSignal")}
                     >
                       <Trash2 className={iconSm} />
                     </button>
@@ -386,17 +388,17 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
               <button
                 onClick={() => onAddSignals(panel.id)}
                 className={`${iconButtonHover} flex items-center gap-1.5 px-3 py-2 rounded text-sm text-[color:var(--text-secondary)] border border-[var(--border-default)]`}
-                title="Add signals"
+                title={t("panelConfig.actions.addSignals")}
               >
                 <Plus className={iconSm} />
-                Add Signals
+                {t("panelConfig.actions.addSignalsLabel")}
               </button>
             )}
             <button
               onClick={handleSave}
               className={`${primaryButtonBase} flex-1`}
             >
-              Save
+              {t("panelConfig.actions.save")}
             </button>
           </div>
         </div>
