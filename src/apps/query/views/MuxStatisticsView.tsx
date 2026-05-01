@@ -4,6 +4,7 @@
 // byte statistics and optional 16-bit word statistics.
 
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   MuxStatisticsResult,
   MuxCaseStats,
@@ -38,6 +39,7 @@ function distinctColour(distinct: number): string {
 }
 
 export default function MuxStatisticsView({ results, stats, displayName }: Props) {
+  const { t } = useTranslation("query");
   // Collect all byte indices that appear across cases
   const byteIndices = useMemo(() => {
     const indices = new Set<number>();
@@ -78,11 +80,10 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
           {displayName}
         </h2>
         <p className={`text-xs ${textSecondary}`}>
-          {results.cases.length} mux case{results.cases.length !== 1 ? "s" : ""},
-          {" "}{results.total_frames.toLocaleString()} total frames
+          {t("muxStats.summary", { count: results.cases.length, frames: results.total_frames.toLocaleString() })}
           {stats && (
             <span className={textMuted}>
-              {" "}· {stats.rows_scanned.toLocaleString()} rows in {stats.execution_time_ms.toLocaleString()}ms
+              {t("muxStats.rowsScanned", { rows: stats.rows_scanned.toLocaleString(), ms: stats.execution_time_ms.toLocaleString() })}
             </span>
           )}
         </p>
@@ -96,14 +97,14 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
             <thead>
               <tr>
                 <th className={`${monoBody} text-xs ${textMuted} text-left px-2 py-1 sticky left-0 bg-[var(--bg-primary)] z-10`}>
-                  Mux
+                  {t("muxStats.headers.mux")}
                 </th>
                 <th className={`${monoBody} text-xs ${textMuted} text-right px-2 py-1`}>
-                  Frames
+                  {t("muxStats.headers.frames")}
                 </th>
                 {byteIndices.map((idx) => (
                   <th key={idx} className={`${monoBody} text-xs ${textMuted} text-center px-2 py-1 whitespace-nowrap`}>
-                    B{idx}
+                    {t("muxStats.byteHeader", { idx })}
                   </th>
                 ))}
               </tr>
@@ -127,7 +128,7 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
                       <td
                         key={idx}
                         className={`${monoBody} text-xs text-center px-2 py-1.5 whitespace-nowrap`}
-                        title={`avg: ${bs.avg.toFixed(1)}, distinct: ${bs.distinct_count}, samples: ${bs.sample_count}`}
+                        title={t("muxStats.tooltipByte", { avg: bs.avg.toFixed(1), distinct: bs.distinct_count, samples: bs.sample_count })}
                       >
                         <span className={distinctColour(bs.distinct_count)}>
                           {isStatic
@@ -149,17 +150,17 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
         {/* 16-bit Word Statistics */}
         {has16Bit && wordPairs.length > 0 && (
           <div className="mt-6">
-            <h3 className={`text-xs font-semibold ${textSecondary} mb-2`}>16-bit Word Statistics</h3>
+            <h3 className={`text-xs font-semibold ${textSecondary} mb-2`}>{t("muxStats.wordsTitle")}</h3>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
                     <th className={`${monoBody} text-xs ${textMuted} text-left px-2 py-1 sticky left-0 bg-[var(--bg-primary)] z-10`}>
-                      Mux
+                      {t("muxStats.headers.mux")}
                     </th>
                     {wordPairs.map((startByte) => (
                       <th key={startByte} colSpan={2} className={`${monoBody} text-xs ${textMuted} text-center px-2 py-1 whitespace-nowrap`}>
-                        B{startByte}:B{startByte + 1}
+                        {t("muxStats.wordHeader", { start: startByte, next: startByte + 1 })}
                       </th>
                     ))}
                   </tr>
@@ -187,7 +188,7 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
                             {le ? (
                               <div
                                 className={distinctColour(le.distinct_count)}
-                                title={`LE avg: ${le.avg.toFixed(1)}, distinct: ${le.distinct_count}`}
+                                title={t("muxStats.tooltipWordLe", { avg: le.avg.toFixed(1), distinct: le.distinct_count })}
                               >
                                 {le.distinct_count === 1
                                   ? hex16(le.min)
@@ -200,7 +201,7 @@ export default function MuxStatisticsView({ results, stats, displayName }: Props
                             {be ? (
                               <div
                                 className={distinctColour(be.distinct_count)}
-                                title={`BE avg: ${be.avg.toFixed(1)}, distinct: ${be.distinct_count}`}
+                                title={t("muxStats.tooltipWordBe", { avg: be.avg.toFixed(1), distinct: be.distinct_count })}
                               >
                                 {be.distinct_count === 1
                                   ? hex16(be.min)

@@ -26,6 +26,21 @@
     "running": "Running…",
     "loading": "Loading…"
   },
+  "muxStats": {
+    "summary_one": "{{count}} mux case, {{frames}} total frames",
+    "summary_other": "{{count}} mux cases, {{frames}} total frames",
+    "rowsScanned": " · {{rows}} rows in {{ms}}ms",
+    "headers": {
+      "mux": "Mux",
+      "frames": "Frames"
+    },
+    "byteHeader": "B{{idx}}",
+    "wordHeader": "B{{start}}:B{{next}}",
+    "tooltipByte": "avg: {{avg}}, distinct: {{distinct}}, samples: {{samples}}",
+    "tooltipWordLe": "LE avg: {{avg}}, distinct: {{distinct}}",
+    "tooltipWordBe": "BE avg: {{avg}}, distinct: {{distinct}}",
+    "wordsTitle": "16-bit Word Statistics"
+  },
   "stats": {
     "noProfileHeading": "No Database Selected",
     "noProfileDescription": "Select a PostgreSQL profile to view database activity.",
