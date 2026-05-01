@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
+import { useTranslation } from "react-i18next";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers';
@@ -45,6 +46,7 @@ import { useDialogManager } from "../../hooks/useDialogManager";
 import { getFavoritesForProfile } from "../../utils/favorites";
 
 export default function Discovery() {
+  const { t, i18n } = useTranslation("discovery");
   const { settings } = useSettings();
 
 
@@ -304,7 +306,7 @@ export default function Discovery() {
   }, [addSerialBytes, incrementBackendByteCount]);
 
   const handleError = useCallback((error: string) => {
-    showAppError("Stream Error", "An error occurred while streaming CAN data.", error);
+    showAppError(t("errors.streamTitle"), t("errors.streamMessage"), error);
   }, [showAppError]);
 
   const handleTimeUpdate = useCallback((position: PlaybackPosition) => {
@@ -823,7 +825,7 @@ export default function Discovery() {
       const result = await startModbusScan(config, sessionId ?? undefined);
       console.log(`[Discovery] Modbus register scan complete: found ${result.found_count} of ${result.total_scanned} in ${result.duration_ms}ms`);
     } catch (e) {
-      showAppError("Scan Error", "An error occurred during Modbus register scan.", String(e));
+      showAppError(t("errors.scanTitle"), t("errors.modbusRegisterScanMessage"), String(e));
     } finally {
       finishModbusScan();
     }
@@ -842,7 +844,7 @@ export default function Discovery() {
       const result = await startModbusUnitIdScan(config, sessionId ?? undefined);
       console.log(`[Discovery] Modbus unit ID scan complete: found ${result.found_count} of ${result.total_scanned} in ${result.duration_ms}ms`);
     } catch (e) {
-      showAppError("Scan Error", "An error occurred during Modbus unit ID scan.", String(e));
+      showAppError(t("errors.scanTitle"), t("errors.modbusUnitScanMessage"), String(e));
     } finally {
       finishModbusScan();
     }
@@ -1191,10 +1193,13 @@ export default function Discovery() {
         open={dialogs.speedChange.isOpen}
         onCancel={handlers.cancelSpeedChange}
         onConfirm={handlers.confirmSpeedChange}
-        title="Change Speed Mode?"
-        message={`Switching from "No Limit" mode will clear all ${frames.length.toLocaleString()} discovered frames and ${frameInfoMap.size.toLocaleString()} unique frame IDs.`}
-        confirmText="Clear & Switch"
-        cancelText="Keep Frames"
+        title={t("speedChangeDialog.title")}
+        message={t("speedChangeDialog.message", {
+          frames: frames.length.toLocaleString(i18n.language),
+          ids: frameInfoMap.size.toLocaleString(i18n.language),
+        })}
+        confirmText={t("speedChangeDialog.confirm")}
+        cancelText={t("speedChangeDialog.cancel")}
       />
 
       <ExportFramesDialog

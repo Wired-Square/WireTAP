@@ -36,5 +36,34 @@
     "framesUnique": "{{unique}} unique / {{total}} total",
     "filteredCount_one": "{{count}} filtered",
     "filteredCount_other": "{{count}} filtered"
+  },
+  "errors": {
+    "streamTitle": "Stream Error",
+    "streamMessage": "An error occurred while streaming CAN data.",
+    "scanTitle": "Scan Error",
+    "modbusRegisterScanMessage": "An error occurred during Modbus register scan.",
+    "modbusUnitScanMessage": "An error occurred during Modbus unit ID scan."
+  },
+  "speedChangeDialog": {
+    "title": "Change Speed Mode?",
+    "message": "Switching from \"No Limit\" mode will clear all {{frames}} discovered frames and {{ids}} unique frame IDs.",
+    "confirm": "Clear & Switch",
+    "cancel": "Keep Frames"
+  },
+  "framesView": {
+    "timeRange": {
+      "start": "Start",
+      "end": "End",
+      "buffer": "Buffer",
+      "historySize": "History size"
+    },
+    "actions": {
+      "addToTransmit": "Add frames to Transmit queue",
+      "replay": "Replay frames",
+      "freezeDisplay": "Freeze display",
+      "unfreezeDisplay": "Unfreeze display",
+      "refreshLatest": "Refresh to latest frames",
+      "playbackSpeed": "Playback speed"
+    }
   }
 }

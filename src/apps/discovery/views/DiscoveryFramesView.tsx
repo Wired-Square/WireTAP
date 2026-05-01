@@ -1,6 +1,7 @@
 // ui/src/apps/discovery/views/DiscoveryFramesView.tsx
 import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "react";
 import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw, Copy, ClipboardCopy, Target, Send, BarChart3, Bookmark, Search, Play } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
 import { TOOL_TAB_CONFIG } from "../../../stores/discoveryStore";
@@ -148,6 +149,7 @@ function DiscoveryFramesView({
   onCancelScan,
   useLocalTimezone = false,
 }: Props) {
+  const { t } = useTranslation("discovery");
 
   // ── UI store ──
   const renderBuffer = useDiscoveryUIStore((s) => s.renderBuffer);
@@ -960,26 +962,26 @@ function DiscoveryFramesView({
   // Time range inputs for toolbar (optional feature)
   const timeRangeInputs = showTimeRange && onStartTimeChange && onEndTimeChange ? (
     <div className={flexRowGap2}>
-      <label className={`text-xs ${textMuted}`}>Start</label>
+      <label className={`text-xs ${textMuted}`}>{t("framesView.timeRange.start")}</label>
       <input
         type="datetime-local"
         value={startTime || ""}
         onChange={(e) => onStartTimeChange(e.target.value)}
         className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
       />
-      <label className={`text-xs ${textMuted} ml-2`}>End</label>
+      <label className={`text-xs ${textMuted} ml-2`}>{t("framesView.timeRange.end")}</label>
       <input
         type="datetime-local"
         value={endTime || ""}
         onChange={(e) => onEndTimeChange(e.target.value)}
         className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
       />
-      <label className={`text-xs ${textMuted} ml-2`}>Buffer</label>
+      <label className={`text-xs ${textMuted} ml-2`}>{t("framesView.timeRange.buffer")}</label>
       <select
         value={maxBuffer}
         onChange={(e) => onMaxBufferChange(Number(e.target.value))}
         className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
-        title="History size"
+        title={t("framesView.timeRange.historySize")}
       >
         <option value={10000}>10k</option>
         <option value={100000}>100k</option>
@@ -1053,14 +1055,14 @@ function DiscoveryFramesView({
       <button
         onClick={() => setShowBulkAddDialog(true)}
         className={`p-1.5 rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
-        title="Add frames to Transmit queue"
+        title={t("framesView.actions.addToTransmit")}
       >
         <Send className={iconSm} />
       </button>
       <button
         onClick={() => setShowReplayDialog(true)}
         className={`p-1.5 rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
-        title="Replay frames"
+        title={t("framesView.actions.replay")}
       >
         <Play className={iconSm} />
       </button>
@@ -1073,7 +1075,7 @@ function DiscoveryFramesView({
                 ? 'bg-blue-600 text-white hover:bg-blue-500'
                 : `${bgSurface} ${textSecondary} hover:brightness-95`
             }`}
-            title={renderFrozen ? 'Unfreeze display' : 'Freeze display'}
+            title={renderFrozen ? t("framesView.actions.unfreezeDisplay") : t("framesView.actions.freezeDisplay")}
           >
             <Snowflake className={iconSm} />
           </button>
@@ -1081,7 +1083,7 @@ function DiscoveryFramesView({
             <button
               onClick={refreshFrozenView}
               className={`p-1.5 rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
-              title="Refresh to latest frames"
+              title={t("framesView.actions.refreshLatest")}
             >
               <RefreshCw className={iconSm} />
             </button>
@@ -1185,7 +1187,7 @@ function DiscoveryFramesView({
       value={playbackSpeed}
       onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
       className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${textPrimary}`}
-      title="Playback speed"
+      title={t("framesView.actions.playbackSpeed")}
     >
       {DEFAULT_SPEED_OPTIONS.map((s) => (
         <option key={s} value={s}>
