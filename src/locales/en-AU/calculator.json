@@ -1,0 +1,52 @@
+{
+  "tooltips": {
+    "rotationInterval": "Set rotation interval",
+    "byteOrder": "Set byte order",
+    "groupingMode": "Set grouping mode",
+    "hexInput": "Hex input",
+    "numberInput": "Number input",
+    "stringInput": "String input",
+    "addToMemory": "Add to memory",
+    "copyHex": "Copy hex",
+    "paste": "Paste",
+    "calculateScale": "Calculate scale factor",
+    "copyHexValue": "Copy hex value",
+    "copyUnsigned": "Copy unsigned value",
+    "copySignedTwos": "Copy signed (2's complement) value",
+    "copySignedOnes": "Copy signed (1's complement) value",
+    "copySignMag": "Copy sign-magnitude value",
+    "copyText": "Copy text value",
+    "copyBinary": "Copy binary",
+    "copyToClipboard": "Copy to clipboard",
+    "setActive": "Set as active value",
+    "deleteFromMemory": "Delete from memory",
+    "copyAllHistory": "Copy all history items",
+    "copyScaleFactor": "Copy scale factor"
+  },
+  "labels": {
+    "hex": "Hex",
+    "unsigned": "Unsigned",
+    "text": "Text",
+    "binary": "Binary"
+  },
+  "dialogs": {
+    "groupingMode": {
+      "title": "Grouping Mode",
+      "customPlaceholderBits": "8,8,16,2,2",
+      "customPlaceholderBytes": "1,1,2,2"
+    },
+    "memory": {
+      "title": "Memory"
+    },
+    "byteOrder": {
+      "title": "Byte Order"
+    },
+    "rotationInterval": {
+      "title": "Rotation Interval"
+    },
+    "scale": {
+      "title": "Scale Calculator",
+      "valuePlaceholder": "e.g. 92647"
+    }
+  }
+}

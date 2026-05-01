@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { RotateCcw, Copy, ClipboardPaste, Calculator, History, Trash2, ArrowRight, Hash, Type, Binary, CopyPlus, Divide } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useCalculatorStore } from "../../stores/calculatorStore";
 import AppLayout from "../../components/AppLayout";
 import ByteBits from "../../components/ByteBits";
@@ -107,6 +108,7 @@ function ScalingByteBits(props: ScalingByteBitsProps) {
 }
 
 export default function FrameCalculator() {
+  const { t } = useTranslation("calculator");
   const { settings } = useSettings();
   const [endianness, setEndianness] = useState<Endianness>("little");
   const [rotateInterval, setRotateInterval] = useState<number>(1);
@@ -383,7 +385,7 @@ export default function FrameCalculator() {
         <button
           onClick={() => setShowRotateDialog(true)}
           className={buttonBase}
-          title="Set rotation interval"
+          title={t("tooltips.rotationInterval")}
         >
           {rotateInterval}s
         </button>
@@ -392,7 +394,7 @@ export default function FrameCalculator() {
         <button
           onClick={() => setShowEndiannessDialog(true)}
           className={buttonBase}
-          title="Set byte order"
+          title={t("tooltips.byteOrder")}
         >
           {endianness === "little" ? "Little" : endianness === "big" ? "Big" : endianness === "mid-little" ? "Mid-Little" : "Mid-Big"}
         </button>
@@ -404,7 +406,7 @@ export default function FrameCalculator() {
         <button
           onClick={openGroupingDialog}
           className={buttonBase}
-          title="Set grouping mode"
+          title={t("tooltips.groupingMode")}
         >
           {(groupMode === "custom-bits" || groupMode === "custom-bytes") && customLabel
             ? customLabel
@@ -418,21 +420,21 @@ export default function FrameCalculator() {
         <button
           onClick={() => setInputMode("hex")}
           className={groupButtonClass(inputMode === "hex")}
-          title="Hex input"
+          title={t("tooltips.hexInput")}
         >
           <Binary className={iconMd} />
         </button>
         <button
           onClick={() => setInputMode("number")}
           className={groupButtonClass(inputMode === "number")}
-          title="Number input"
+          title={t("tooltips.numberInput")}
         >
           <Hash className={iconMd} />
         </button>
         <button
           onClick={() => setInputMode("string")}
           className={groupButtonClass(inputMode === "string")}
-          title="String input"
+          title={t("tooltips.stringInput")}
         >
           <Type className={iconMd} />
         </button>
@@ -445,7 +447,7 @@ export default function FrameCalculator() {
           onClick={handleMemoryAdd}
           disabled={!rawInput.trim() || history.includes(rawInput.trim())}
           className={buttonBase}
-          title="Add to memory"
+          title={t("tooltips.addToMemory")}
         >
           M+
         </button>
@@ -464,14 +466,14 @@ export default function FrameCalculator() {
         <button
           onClick={handleCopy}
           className={iconButtonBase}
-          title="Copy hex"
+          title={t("tooltips.copyHex")}
         >
           <Copy className={iconMd} />
         </button>
         <button
           onClick={handlePaste}
           className={iconButtonBase}
-          title="Paste"
+          title={t("tooltips.paste")}
         >
           <ClipboardPaste className={iconMd} />
         </button>
@@ -486,7 +488,7 @@ export default function FrameCalculator() {
             setShowScaleDialog(true);
           }}
           className={iconButtonBase}
-          title="Calculate scale factor"
+          title={t("tooltips.calculateScale")}
           disabled={groups.length === 0}
         >
           <Divide className={iconMd} />
@@ -552,26 +554,26 @@ export default function FrameCalculator() {
                     {/* Values with copy buttons */}
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between items-center group">
-                        <span>Hex</span>
+                        <span>{t("labels.hex")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{hexFormatted}</span>
                           <button
                             onClick={() => handleCopyValue(g.hex.replace('0x', ''))}
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
-                            title="Copy hex value"
+                            title={t("tooltips.copyHexValue")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
-                        <span>Unsigned</span>
+                        <span>{t("labels.unsigned")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono">{g.unsigned.toString()}</span>
                           <button
                             onClick={() => handleCopyValue(g.unsigned)}
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
-                            title="Copy unsigned value"
+                            title={t("tooltips.copyUnsigned")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
@@ -584,7 +586,7 @@ export default function FrameCalculator() {
                           <button
                             onClick={() => handleCopyValue(g.signedTwos)}
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
-                            title="Copy signed (2's complement) value"
+                            title={t("tooltips.copySignedTwos")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
@@ -597,7 +599,7 @@ export default function FrameCalculator() {
                           <button
                             onClick={() => handleCopyValue(g.signedOnes)}
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
-                            title="Copy signed (1's complement) value"
+                            title={t("tooltips.copySignedOnes")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
@@ -610,20 +612,20 @@ export default function FrameCalculator() {
                           <button
                             onClick={() => handleCopyValue(g.signedMag)}
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
-                            title="Copy sign-magnitude value"
+                            title={t("tooltips.copySignMag")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
                         </div>
                       </div>
                       <div className="flex justify-between items-center group">
-                        <span>Text</span>
+                        <span>{t("labels.text")}</span>
                         <div className={flexRowGap2}>
                           <span className="font-mono break-all">{g.text}</span>
                           <button
                             onClick={() => handleCopyValue(g.text)}
                             className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
-                            title="Copy text value"
+                            title={t("tooltips.copyText")}
                           >
                             <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                           </button>
@@ -635,11 +637,11 @@ export default function FrameCalculator() {
                   {/* Bottom section: Bit preview - always below values */}
                   <div className="flex-shrink-0 pt-2 border-t border-[color:var(--border-default)] overflow-hidden">
                     <div className="flex justify-between items-center group mb-2">
-                      <span className="text-sm">Binary</span>
+                      <span className="text-sm">{t("labels.binary")}</span>
                       <button
                         onClick={() => handleCopyValue(g.binary)}
                         className={`opacity-0 group-hover:opacity-100 p-1 rounded ${hoverLight} transition-opacity`}
-                        title="Copy binary"
+                        title={t("tooltips.copyBinary")}
                       >
                         <Copy className={`${iconXs} text-[color:var(--text-secondary)]`} />
                       </button>
@@ -668,7 +670,7 @@ export default function FrameCalculator() {
       {/* Grouping Dialog */}
       <Dialog isOpen={showCustomDialog} maxWidth="max-w-sm" onBackdropClick={handleCustomCancel}>
         <div className="p-6">
-          <h2 className={`${h2} mb-4`}>Grouping Mode</h2>
+          <h2 className={`${h2} mb-4`}>{t("dialogs.groupingMode.title")}</h2>
 
           <div className="space-y-4">
             {/* Preset options */}
@@ -727,7 +729,7 @@ export default function FrameCalculator() {
                 value={dialogInput}
                 onChange={(e) => setDialogInput(e.target.value)}
                 className="w-full px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm"
-                placeholder={dialogUnit === "bits" ? "8,8,16,2,2" : "1,1,2,2"}
+                placeholder={dialogUnit === "bits" ? t("dialogs.groupingMode.customPlaceholderBits") : t("dialogs.groupingMode.customPlaceholderBytes")}
               />
               <p className={`${caption} mt-1`}>
                 Comma-separated list of {dialogUnit === "bits" ? "bit" : "byte"} sizes
@@ -736,7 +738,7 @@ export default function FrameCalculator() {
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
-            <SecondaryButton onClick={handleCustomCancel}>Close</SecondaryButton>
+            <SecondaryButton onClick={handleCustomCancel}>{t("common:actions.close")}</SecondaryButton>
             <button
               onClick={handleCustomOk}
               disabled={!dialogInput.trim()}
@@ -755,7 +757,7 @@ export default function FrameCalculator() {
             <div className="p-2 bg-[var(--status-info-bg)] rounded-lg">
               <History className={`${iconLg} text-[color:var(--accent-primary)]`} />
             </div>
-            <h2 className={h2}>Memory</h2>
+            <h2 className={h2}>{t("dialogs.memory.title")}</h2>
           </div>
 
           <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -780,21 +782,21 @@ export default function FrameCalculator() {
                     <button
                       onClick={() => handleHistoryCopyToClipboard(item)}
                       className={iconButtonBase}
-                      title="Copy to clipboard"
+                      title={t("tooltips.copyToClipboard")}
                     >
                       <Copy className={iconSm} />
                     </button>
                     <button
                       onClick={() => handleHistorySetActive(item)}
                       className={`${iconButtonBase} text-[color:var(--accent-primary)]`}
-                      title="Set as active value"
+                      title={t("tooltips.setActive")}
                     >
                       <ArrowRight className={iconSm} />
                     </button>
                     <button
                       onClick={() => handleHistoryDelete(index)}
                       className={`${iconButtonBase} text-[color:var(--status-danger-text)]`}
-                      title="Delete from memory"
+                      title={t("tooltips.deleteFromMemory")}
                     >
                       <Trash2 className={iconSm} />
                     </button>
@@ -808,12 +810,12 @@ export default function FrameCalculator() {
             <button
               onClick={handleHistoryCopyAll}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--status-info-bg)] text-[color:var(--accent-primary)] hover:brightness-95 transition-colors"
-              title="Copy all history items"
+              title={t("tooltips.copyAllHistory")}
             >
               <CopyPlus className={iconMd} />
               Copy All
             </button>
-            <SecondaryButton onClick={handleHistoryDialogClose}>Close</SecondaryButton>
+            <SecondaryButton onClick={handleHistoryDialogClose}>{t("common:actions.close")}</SecondaryButton>
           </div>
         </div>
       </Dialog>
@@ -821,7 +823,7 @@ export default function FrameCalculator() {
       {/* Endianness Dialog */}
       <Dialog isOpen={showEndiannessDialog} maxWidth="max-w-sm" onBackdropClick={() => setShowEndiannessDialog(false)}>
         <div className="p-6">
-          <h2 className={`${h2} mb-4`}>Byte Order</h2>
+          <h2 className={`${h2} mb-4`}>{t("dialogs.byteOrder.title")}</h2>
           <div className="grid grid-cols-2 gap-2">
             {([
               { value: "little", label: "Little" },
@@ -842,7 +844,7 @@ export default function FrameCalculator() {
             ))}
           </div>
           <div className="flex justify-end mt-4">
-            <SecondaryButton onClick={() => setShowEndiannessDialog(false)}>Close</SecondaryButton>
+            <SecondaryButton onClick={() => setShowEndiannessDialog(false)}>{t("common:actions.close")}</SecondaryButton>
           </div>
         </div>
       </Dialog>
@@ -850,7 +852,7 @@ export default function FrameCalculator() {
       {/* Rotate Interval Dialog */}
       <Dialog isOpen={showRotateDialog} maxWidth="max-w-sm" onBackdropClick={() => setShowRotateDialog(false)}>
         <div className="p-6">
-          <h2 className={`${h2} mb-4`}>Rotation Interval</h2>
+          <h2 className={`${h2} mb-4`}>{t("dialogs.rotationInterval.title")}</h2>
           <div className="grid grid-cols-3 gap-2">
             {[1, 2, 3, 5, 10, 15].map((interval) => (
               <button
@@ -866,7 +868,7 @@ export default function FrameCalculator() {
             ))}
           </div>
           <div className="flex justify-end mt-4">
-            <SecondaryButton onClick={() => setShowRotateDialog(false)}>Close</SecondaryButton>
+            <SecondaryButton onClick={() => setShowRotateDialog(false)}>{t("common:actions.close")}</SecondaryButton>
           </div>
         </div>
       </Dialog>
@@ -878,7 +880,7 @@ export default function FrameCalculator() {
             <div className="p-2 bg-[var(--status-info-bg)] rounded-lg">
               <Divide className={`${iconLg} text-[color:var(--accent-primary)]`} />
             </div>
-            <h2 className={h2}>Scale Calculator</h2>
+            <h2 className={h2}>{t("dialogs.scale.title")}</h2>
           </div>
 
           <div className="space-y-4">
@@ -902,7 +904,7 @@ export default function FrameCalculator() {
                 value={targetValueInput}
                 onChange={(e) => setTargetValueInput(e.target.value)}
                 className="w-full px-3 py-2 rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] font-mono text-sm"
-                placeholder="e.g. 92647"
+                placeholder={t("dialogs.scale.valuePlaceholder")}
                 autoFocus
               />
             </div>
@@ -937,7 +939,7 @@ export default function FrameCalculator() {
                     <button
                       onClick={() => handleCopyValue(scale.toPrecision(6))}
                       className="p-1.5 rounded hover:brightness-95 transition-colors"
-                      title="Copy scale factor"
+                      title={t("tooltips.copyScaleFactor")}
                     >
                       <Copy className={`${iconMd} text-[color:var(--accent-primary)]`} />
                     </button>
@@ -954,7 +956,7 @@ export default function FrameCalculator() {
           </div>
 
           <div className="flex justify-end mt-6">
-            <SecondaryButton onClick={() => setShowScaleDialog(false)}>Close</SecondaryButton>
+            <SecondaryButton onClick={() => setShowScaleDialog(false)}>{t("common:actions.close")}</SecondaryButton>
           </div>
         </div>
       </Dialog>
