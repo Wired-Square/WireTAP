@@ -4,6 +4,7 @@
 // click-to-ingest functionality. Supports grouped results by query.
 
 import { useCallback, useState, useMemo, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { PlayCircle, Download, AlertCircle, Database, Bookmark, FileDown } from "lucide-react";
 import {
   QUERY_TYPE_INFO,
@@ -44,6 +45,7 @@ export default function ResultsPanel({
   onExport,
   onBookmark,
 }: Props) {
+  const { t } = useTranslation("query");
   const timezone = useSettingsStore((s) => s.display.timezone);
 
   // Pagination state
@@ -148,9 +150,9 @@ export default function ResultsPanel({
       <div className={`h-full ${emptyStateContainer}`}>
         <Database className={`${iconXl} ${textMuted} mb-4`} />
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>No Query Selected</p>
+          <p className={emptyStateHeading}>{t("results.noQueryHeading")}</p>
           <p className={emptyStateDescription}>
-            Select a completed query from the Queue tab to view its results.
+            {t("results.noQueryDescription")}
           </p>
         </div>
       </div>
@@ -163,9 +165,9 @@ export default function ResultsPanel({
       <div className={`h-full ${emptyStateContainer}`}>
         <Database className={`${iconXl} ${textMuted} mb-4`} />
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>No Results</p>
+          <p className={emptyStateHeading}>{t("results.noResultsHeading")}</p>
           <p className={emptyStateDescription}>
-            This query has not been run yet or returned no data.
+            {t("results.noResultsDescription")}
           </p>
         </div>
       </div>
@@ -178,9 +180,9 @@ export default function ResultsPanel({
       <div className={`h-full ${emptyStateContainer}`}>
         <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-4" />
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>Running Query</p>
+          <p className={emptyStateHeading}>{t("results.runningHeading")}</p>
           <p className={emptyStateDescription}>
-            Searching for {queryInfo.label.toLowerCase()}...
+            {t("results.runningDescription", { label: queryInfo.label.toLowerCase() })}
           </p>
         </div>
       </div>
@@ -193,7 +195,7 @@ export default function ResultsPanel({
       <div className={`h-full ${emptyStateContainer}`}>
         <AlertCircle className={`${iconXl} ${textDanger} mb-4`} />
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>Query Failed</p>
+          <p className={emptyStateHeading}>{t("results.errorHeading")}</p>
           <p className={`${emptyStateDescription} ${textDanger}`}>{error}</p>
         </div>
       </div>
@@ -206,14 +208,13 @@ export default function ResultsPanel({
       <div className={`h-full ${emptyStateContainer}`}>
         <Database className={`${iconXl} ${textMuted} mb-4`} />
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>No Matches Found</p>
+          <p className={emptyStateHeading}>{t("results.noMatchesHeading")}</p>
           <p className={`${emptyStateDescription} mb-3`}>
-            No {queryInfo.label.toLowerCase()} were found matching your criteria.
-            Try adjusting the frame ID or time range.
+            {t("results.noMatchesDescription", { label: queryInfo.label.toLowerCase() })}
           </p>
           {lastQueryStats && (
             <p className={`text-xs ${textMuted}`}>
-              Scanned {lastQueryStats.rows_scanned.toLocaleString()} rows in {lastQueryStats.execution_time_ms.toLocaleString()}ms
+              {t("results.scannedRows", { rows: lastQueryStats.rows_scanned.toLocaleString(), ms: lastQueryStats.execution_time_ms.toLocaleString() })}
             </p>
           )}
         </div>
@@ -246,16 +247,16 @@ export default function ResultsPanel({
               {selectedQuery.displayName}
             </h2>
             <p className={`text-xs ${textSecondary}`}>
-              {fl.total_count.toLocaleString()} total frames
+              {t("results.totalFrames", { count: fl.total_count.toLocaleString() })}
               {lastQueryStats && (
                 <span className={textMuted}>
-                  {" "}· {lastQueryStats.rows_scanned.toLocaleString()} rows in {lastQueryStats.execution_time_ms.toLocaleString()}ms
+                  {t("results.rowsScanned", { rows: lastQueryStats.rows_scanned.toLocaleString(), ms: lastQueryStats.execution_time_ms.toLocaleString() })}
                 </span>
               )}
             </p>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={onExport} className={iconButtonBase} title="Export results to CSV">
+            <button onClick={onExport} className={iconButtonBase} title={t("results.exportTooltip")}>
               <FileDown className={iconMd} />
             </button>
           </div>
@@ -263,7 +264,7 @@ export default function ResultsPanel({
         <div className="flex-1 overflow-auto p-4 space-y-3">
           {/* First occurrence */}
           <div className={`${bgSurface} ${borderDefault} rounded-lg p-3`}>
-            <div className={`text-xs font-medium ${textSecondary} mb-1`}>First Occurrence</div>
+            <div className={`text-xs font-medium ${textSecondary} mb-1`}>{t("results.firstOccurrence")}</div>
             <div className={`${monoBody} text-xs`}>
               <span className={textDataAmber} title={formatTimestampFull(fl.first_timestamp_us)}>
                 {formatTimestamp(fl.first_timestamp_us)}
@@ -275,15 +276,15 @@ export default function ResultsPanel({
             <button
               onClick={() => onIngestEvent(fl.first_timestamp_us)}
               className={`${buttonBase} mt-2`}
-              title="Ingest frames around first occurrence"
+              title={t("results.ingestAroundFirst")}
             >
               <PlayCircle className={iconSm} />
-              <span className="text-xs">Ingest</span>
+              <span className="text-xs">{t("results.ingest")}</span>
             </button>
           </div>
           {/* Last occurrence */}
           <div className={`${bgSurface} ${borderDefault} rounded-lg p-3`}>
-            <div className={`text-xs font-medium ${textSecondary} mb-1`}>Last Occurrence</div>
+            <div className={`text-xs font-medium ${textSecondary} mb-1`}>{t("results.lastOccurrence")}</div>
             <div className={`${monoBody} text-xs`}>
               <span className={textDataAmber} title={formatTimestampFull(fl.last_timestamp_us)}>
                 {formatTimestamp(fl.last_timestamp_us)}
@@ -295,10 +296,10 @@ export default function ResultsPanel({
             <button
               onClick={() => onIngestEvent(fl.last_timestamp_us)}
               className={`${buttonBase} mt-2`}
-              title="Ingest frames around last occurrence"
+              title={t("results.ingestAroundLast")}
             >
               <PlayCircle className={iconSm} />
-              <span className="text-xs">Ingest</span>
+              <span className="text-xs">{t("results.ingest")}</span>
             </button>
           </div>
         </div>
@@ -316,10 +317,10 @@ export default function ResultsPanel({
             {selectedQuery.displayName}
           </h2>
           <p className={`text-xs ${textSecondary}`}>
-            {resultCount.toLocaleString()} {queryInfo.label.toLowerCase()} found
+            {t("results.foundCount", { count: resultCount.toLocaleString(), label: queryInfo.label.toLowerCase() })}
             {lastQueryStats && (
               <span className={textMuted}>
-                {" "}· {lastQueryStats.rows_scanned.toLocaleString()} rows in {lastQueryStats.execution_time_ms.toLocaleString()}ms
+                {t("results.rowsScanned", { rows: lastQueryStats.rows_scanned.toLocaleString(), ms: lastQueryStats.execution_time_ms.toLocaleString() })}
               </span>
             )}
           </p>
@@ -328,16 +329,16 @@ export default function ResultsPanel({
           <button
             onClick={onIngestAll}
             className={`${buttonBase} text-xs`}
-            title="Ingest all results"
+            title={t("results.ingestAllTooltip")}
             disabled={resultCount === 0}
           >
             <Download className={iconSm} />
-            <span>Ingest All</span>
+            <span>{t("results.ingestAll")}</span>
           </button>
           <button
             onClick={onBookmark}
             className={iconButtonBase}
-            title="Bookmark time range"
+            title={t("results.bookmarkTooltip")}
             disabled={resultCount === 0}
           >
             <Bookmark className={`${iconMd} ${textDataAmber}`} />
@@ -345,7 +346,7 @@ export default function ResultsPanel({
           <button
             onClick={onExport}
             className={iconButtonBase}
-            title="Export results to CSV"
+            title={t("results.exportTooltip")}
             disabled={resultCount === 0}
           >
             <FileDown className={iconMd} />
@@ -406,6 +407,7 @@ function ResultRow({
   formatByte,
   onIngest,
 }: ResultRowProps) {
+  const { t } = useTranslation("query");
   // Get the primary timestamp for ingest (use mirror_timestamp_us for mirror validation)
   const primaryTimestamp = queryType === "mirror_validation"
     ? (result as MirrorValidationResult).mirror_timestamp_us
@@ -439,10 +441,10 @@ function ResultRow({
         <button
           onClick={handleIngestClick}
           className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
-          title="Ingest frames around this event"
+          title={t("results.ingestAroundEvent")}
         >
           <PlayCircle className={iconSm} />
-          <span className="text-xs">Ingest</span>
+          <span className="text-xs">{t("results.ingest")}</span>
         </button>
       </div>
     );
@@ -477,22 +479,22 @@ function ResultRow({
             {formatTimestamp(mirrorResult.mirror_timestamp_us)}
           </span>
           <span className={`text-xs ${textMuted}`}>
-            Δ {timeDeltaMs.toFixed(1)}ms
+            {t("results.delta", { ms: timeDeltaMs.toFixed(1) })}
           </span>
         </div>
 
         {/* Payload comparison */}
         <div className="flex-1 min-w-0">
           <div className={`${monoBody} text-xs`}>
-            <span className={textSecondary}>mirror: </span>
+            <span className={textSecondary}>{t("results.mirror")}</span>
             {formatPayloadWithMismatches(mirrorResult.mirror_payload, mirrorResult.mismatch_indices)}
           </div>
           <div className={`${monoBody} text-xs`}>
-            <span className={textSecondary}>source: </span>
+            <span className={textSecondary}>{t("results.source")}</span>
             {formatPayloadWithMismatches(mirrorResult.source_payload, mirrorResult.mismatch_indices)}
           </div>
           <span className={`text-xs ${textMuted}`}>
-            {mirrorResult.mismatch_indices.length} byte{mirrorResult.mismatch_indices.length !== 1 ? "s" : ""} differ
+            {t("results.bytesDiffer", { count: mirrorResult.mismatch_indices.length })}
             {mirrorResult.mismatch_indices.length <= 4 && `: ${mirrorResult.mismatch_indices.join(", ")}`}
           </span>
         </div>
@@ -501,10 +503,10 @@ function ResultRow({
         <button
           onClick={handleIngestClick}
           className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`}
-          title="Ingest frames around this event"
+          title={t("results.ingestAroundEvent")}
         >
           <PlayCircle className={iconSm} />
-          <span className="text-xs">Ingest</span>
+          <span className="text-xs">{t("results.ingest")}</span>
         </button>
       </div>
     );
@@ -525,8 +527,8 @@ function ResultRow({
           {bucket.frame_count}
         </span>
         <span className={`${monoBody} text-xs ${textSecondary} flex-1`}>
-          interval: {(bucket.min_interval_us / 1000).toFixed(1)}–{(bucket.max_interval_us / 1000).toFixed(1)}ms
-          <span className={textMuted}> avg {(bucket.avg_interval_us / 1000).toFixed(1)}ms</span>
+          {t("results.intervalRange", { min: (bucket.min_interval_us / 1000).toFixed(1), max: (bucket.max_interval_us / 1000).toFixed(1) })}
+          <span className={textMuted}>{t("results.intervalAvg", { avg: (bucket.avg_interval_us / 1000).toFixed(1) })}</span>
         </span>
       </div>
     );
@@ -570,8 +572,8 @@ function ResultRow({
           {formatTimestamp(gap.gap_start_us)}
         </span>
         <span className={`${monoBody} text-xs ${textSecondary} flex-1`}>
-          <span className={textDanger}>{gap.duration_ms.toFixed(1)}ms</span>
-          <span className={textMuted}> gap → </span>
+          <span className={textDanger}>{t("results.gapDuration", { ms: gap.duration_ms.toFixed(1) })}</span>
+          <span className={textMuted}>{t("results.gapTo")}</span>
           <span title={formatTimestampFull(gap.gap_end_us)}>
             {formatTimestamp(gap.gap_end_us)}
           </span>
@@ -579,10 +581,10 @@ function ResultRow({
         <button
           onClick={() => onIngest(gap.gap_start_us)}
           className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
-          title="Ingest frames around this gap"
+          title={t("results.ingestAroundGap")}
         >
           <PlayCircle className={iconSm} />
-          <span className="text-xs">Ingest</span>
+          <span className="text-xs">{t("results.ingest")}</span>
         </button>
       </div>
     );
@@ -621,10 +623,10 @@ function ResultRow({
         <button
           onClick={() => onIngest(pat.timestamp_us)}
           className={`${buttonBase} opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0`}
-          title="Ingest frames around this match"
+          title={t("results.ingestAroundMatch")}
         >
           <PlayCircle className={iconSm} />
-          <span className="text-xs">Ingest</span>
+          <span className="text-xs">{t("results.ingest")}</span>
         </button>
       </div>
     );
@@ -635,12 +637,12 @@ function ResultRow({
 
   // Format changed byte indices - show up to 4, then "+N more"
   const formatChangedIndices = (indices: number[]) => {
-    if (indices.length === 0) return "no bytes changed";
+    if (indices.length === 0) return t("results.noBytesChanged");
     if (indices.length <= 4) {
-      return `byte${indices.length > 1 ? "s" : ""} ${indices.join(", ")}`;
+      return t("results.byteIndices", { count: indices.length, indices: indices.join(", ") });
     }
     const shown = indices.slice(0, 4).join(", ");
-    return `bytes ${shown}, +${indices.length - 4} more`;
+    return t("results.moreBytes", { indices: shown, count: indices.length - 4 });
   };
 
   return (
@@ -656,7 +658,7 @@ function ResultRow({
       {/* Changed byte indices */}
       <span
         className={`${monoBody} text-xs ${textSecondary} flex-1`}
-        title={`Changed: ${frameResult.changed_indices.join(", ")}`}
+        title={t("results.changedTitle", { indices: frameResult.changed_indices.join(", ") })}
       >
         {formatChangedIndices(frameResult.changed_indices)}
       </span>
