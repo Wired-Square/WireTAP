@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
 import { textPrimary, textSecondary } from "../../../styles";
@@ -32,6 +33,7 @@ export default function FrameDefDialog({
   interfaces,
   usedIds,
 }: FrameDefDialogProps) {
+  const { t } = useTranslation("rules");
   const [frameDefId, setFrameDefId] = useState(() => nextAvailableId(usedIds));
   const [validationError, setValidationError] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -55,7 +57,7 @@ export default function FrameDefDialog({
 
   const handleSubmit = () => {
     if (usedIds.has(frameDefId)) {
-      setValidationError(`Frame Def ID ${formatHexId(frameDefId)} is already in use.`);
+      setValidationError(t("frameDefDialog.errors.idInUse", { id: formatHexId(frameDefId) }));
       return;
     }
     setValidationError(null);
@@ -84,7 +86,7 @@ export default function FrameDefDialog({
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
       <div className="p-6">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Add Frame Definition
+          {t("frameDefDialog.title")}
         </h2>
 
         {validationError && (
@@ -93,28 +95,28 @@ export default function FrameDefDialog({
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Name</label>
+            <label className={labelDefault}>{t("frameDefDialog.fields.name")}</label>
             <input
               className={inputSimple}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Optional"
+              placeholder={t("frameDefDialog.fields.namePlaceholder")}
             />
           </div>
           <div>
-            <label className={labelDefault}>Description</label>
+            <label className={labelDefault}>{t("frameDefDialog.fields.description")}</label>
             <input
               className={inputSimple}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional"
+              placeholder={t("frameDefDialog.fields.namePlaceholder")}
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Frame Def ID</label>
+            <label className={labelDefault}>{t("frameDefDialog.fields.frameDefId")}</label>
             <input
               type="number"
               className={inputSimple}
@@ -123,7 +125,7 @@ export default function FrameDefDialog({
             />
           </div>
           <div>
-            <label className={labelDefault}>Interface Type</label>
+            <label className={labelDefault}>{t("frameDefDialog.fields.interfaceType")}</label>
             <select
               className={inputSimple}
               value={interfaceType}
@@ -141,17 +143,17 @@ export default function FrameDefDialog({
         {isCan && (
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div>
-              <label className={labelDefault}>CAN ID (hex)</label>
+              <label className={labelDefault}>{t("frameDefDialog.fields.canId")}</label>
               <input
                 type="text"
                 className={`${inputSimple} font-mono`}
                 value={canId}
                 onChange={(e) => setCanId(e.target.value)}
-                placeholder="1A0"
+                placeholder={t("frameDefDialog.fields.canIdPlaceholder")}
               />
             </div>
             <div>
-              <label className={labelDefault}>DLC</label>
+              <label className={labelDefault}>{t("frameDefDialog.fields.dlc")}</label>
               <input
                 type="number"
                 className={inputSimple}
@@ -168,7 +170,7 @@ export default function FrameDefDialog({
                   checked={extended}
                   onChange={(e) => setExtended(e.target.checked)}
                 />
-                Extended ID
+                {t("frameDefDialog.fields.extended")}
               </label>
             </div>
           </div>
@@ -177,7 +179,7 @@ export default function FrameDefDialog({
         {!isCan && (
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className={labelDefault}>Payload Length (bytes)</label>
+              <label className={labelDefault}>{t("frameDefDialog.fields.payloadLength")}</label>
               <input
                 type="number"
                 className={inputSimple}
@@ -196,13 +198,13 @@ export default function FrameDefDialog({
           onClick={onClose}
           className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
-          Cancel
+          {t("frameDefDialog.cancel")}
         </button>
         <button
           onClick={handleSubmit}
           className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          Add Frame Definition
+          {t("frameDefDialog.submit")}
         </button>
       </div>
     </Dialog>

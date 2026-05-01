@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
@@ -31,6 +32,7 @@ export default function BridgeDialog({
   interfaces,
   usedIds,
 }: BridgeDialogProps) {
+  const { t } = useTranslation("rules");
   const [bridgeId, setBridgeId] = useState(() => nextAvailableId(usedIds));
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -65,11 +67,11 @@ export default function BridgeDialog({
 
   const handleSubmit = () => {
     if (usedIds.has(bridgeId)) {
-      setValidationError(`Bridge ID ${formatHexId(bridgeId)} is already in use.`);
+      setValidationError(t("bridgeDialog.errors.idInUse", { id: formatHexId(bridgeId) }));
       return;
     }
     if (bidirectional && usedIds.has(bridgeId + 1)) {
-      setValidationError(`Bridge ID ${formatHexId(bridgeId + 1)} (reverse) is already in use.`);
+      setValidationError(t("bridgeDialog.errors.reverseInUse", { id: formatHexId(bridgeId + 1) }));
       return;
     }
     setValidationError(null);
@@ -109,7 +111,7 @@ export default function BridgeDialog({
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-lg">
       <div className="p-6">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Add Bridge
+          {t("bridgeDialog.title")}
         </h2>
 
         {validationError && (
@@ -118,7 +120,7 @@ export default function BridgeDialog({
 
         <div className="space-y-4">
           <div>
-            <label className={labelDefault}>Bridge ID</label>
+            <label className={labelDefault}>{t("bridgeDialog.fields.bridgeId")}</label>
             <input
               type="number"
               className={inputSimple}
@@ -129,7 +131,7 @@ export default function BridgeDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelDefault}>Source Interface</label>
+              <label className={labelDefault}>{t("bridgeDialog.fields.sourceInterface")}</label>
               <select
                 className={inputSimple}
                 value={sourceInterface}
@@ -143,7 +145,7 @@ export default function BridgeDialog({
               </select>
             </div>
             <div>
-              <label className={labelDefault}>Destination Interface</label>
+              <label className={labelDefault}>{t("bridgeDialog.fields.destInterface")}</label>
               <select
                 className={inputSimple}
                 value={destInterface}
@@ -164,18 +166,18 @@ export default function BridgeDialog({
               checked={bidirectional}
               onChange={(e) => setBidirectional(e.target.checked)}
             />
-            Bidirectional (creates A→B and B→A)
+            {t("bridgeDialog.fields.bidirectional")}
           </label>
 
           {/* Filters */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className={labelDefault}>CAN ID Filters (optional)</label>
+              <label className={labelDefault}>{t("bridgeDialog.fields.filters")}</label>
               <button
                 onClick={addFilter}
                 className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
               >
-                <Plus className={iconMd} /> Add Filter
+                <Plus className={iconMd} /> {t("bridgeDialog.fields.addFilter")}
               </button>
             </div>
 
@@ -188,14 +190,14 @@ export default function BridgeDialog({
                       className={`${inputSimple} font-mono flex-1`}
                       value={f.can_id}
                       onChange={(e) => updateFilter(idx, "can_id", e.target.value)}
-                      placeholder="CAN ID (hex)"
+                      placeholder={t("bridgeDialog.fields.canIdHex")}
                     />
                     <input
                       type="text"
                       className={`${inputSimple} font-mono flex-1`}
                       value={f.mask}
                       onChange={(e) => updateFilter(idx, "mask", e.target.value)}
-                      placeholder="Mask (hex)"
+                      placeholder={t("bridgeDialog.fields.maskHex")}
                     />
                     <button
                       onClick={() => removeFilter(idx)}
@@ -216,13 +218,13 @@ export default function BridgeDialog({
           onClick={onClose}
           className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
-          Cancel
+          {t("bridgeDialog.cancel")}
         </button>
         <button
           onClick={handleSubmit}
           className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          {bidirectional ? "Add Bridges" : "Add Bridge"}
+          {bidirectional ? t("bridgeDialog.submitTwo") : t("bridgeDialog.submitOne")}
         </button>
       </div>
     </Dialog>

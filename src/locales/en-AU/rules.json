@@ -129,6 +129,46 @@
     "offset": "Offset",
     "delete": "Delete Signal"
   },
+  "bridgeDialog": {
+    "title": "Add Bridge",
+    "fields": {
+      "bridgeId": "Bridge ID",
+      "sourceInterface": "Source Interface",
+      "destInterface": "Destination Interface",
+      "bidirectional": "Bidirectional (creates A→B and B→A)",
+      "filters": "CAN ID Filters (optional)",
+      "addFilter": "Add Filter",
+      "canIdHex": "CAN ID (hex)",
+      "maskHex": "Mask (hex)"
+    },
+    "errors": {
+      "idInUse": "Bridge ID {{id}} is already in use.",
+      "reverseInUse": "Bridge ID {{id}} (reverse) is already in use."
+    },
+    "cancel": "Cancel",
+    "submitOne": "Add Bridge",
+    "submitTwo": "Add Bridges"
+  },
+  "frameDefDialog": {
+    "title": "Add Frame Definition",
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "Optional",
+      "description": "Description",
+      "frameDefId": "Frame Def ID",
+      "interfaceType": "Interface Type",
+      "canId": "CAN ID (hex)",
+      "canIdPlaceholder": "1A0",
+      "dlc": "DLC",
+      "extended": "Extended ID",
+      "payloadLength": "Payload Length (bytes)"
+    },
+    "errors": {
+      "idInUse": "Frame Def ID {{id}} is already in use."
+    },
+    "cancel": "Cancel",
+    "submit": "Add Frame Definition"
+  },
   "frameDefEditor": {
     "back": "Back to frame definitions",
     "title": "Frame Def {{id}}",
