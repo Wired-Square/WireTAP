@@ -1,6 +1,7 @@
 // ui/src/apps/discovery/views/DiscoveryTopBar.tsx
 
 import { Search, ChevronRight, Save, Info, Wrench, Download, Undo2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { IOProfile } from "../../../types/common";
 import type { CaptureMetadata } from "../../../api/capture";
 import type { BusSourceInfo } from "../../../utils/busFormat";
@@ -138,6 +139,7 @@ export default function DiscoveryTopBar({
   onInfo,
   onOpenToolbox,
 }: Props) {
+  const { t } = useTranslation("discovery");
   // In serial mode, tools are available with raw bytes even without framed data
   const hasFrames = isSerialMode ? (frameCount > 0 || serialBytesCount > 0) : frameCount > 0;
 
@@ -180,7 +182,7 @@ export default function DiscoveryTopBar({
         selectedCount: selectedFrameCount,
         onOpen: onOpenFramePicker,
         disabled: isSerialMode && !framingAccepted,
-        disabledTitle: "Accept framing first to select frames",
+        disabledTitle: t("topBar.framePickerDisabled"),
       }}
       actions={
         <>
@@ -188,7 +190,7 @@ export default function DiscoveryTopBar({
             onClick={onSave}
             disabled={!hasFrames}
             className={iconButtonBase}
-            title={isSerialMode ? "Save bytes to decoder" : "Save frames to decoder"}
+            title={isSerialMode ? t("topBar.saveBytes") : t("topBar.saveFrames")}
           >
             <Save className={iconMd} />
           </button>
@@ -197,7 +199,7 @@ export default function DiscoveryTopBar({
             onClick={onExport}
             disabled={!hasFrames}
             className={iconButtonBase}
-            title={isSerialMode && serialActiveTab === 'raw' ? "Export bytes to file" : "Export frames to file"}
+            title={isSerialMode && serialActiveTab === 'raw' ? t("topBar.exportBytes") : t("topBar.exportFrames")}
           >
             <Download className={iconMd} />
           </button>
@@ -206,7 +208,7 @@ export default function DiscoveryTopBar({
             onClick={onInfo}
             disabled={!hasFrames}
             className={`${iconButtonBase} ${hasFrames ? "text-[color:var(--text-purple)]" : ""}`}
-            title="View decoder knowledge"
+            title={t("topBar.decoderKnowledge")}
           >
             <Info className={iconMd} />
           </button>
@@ -218,7 +220,7 @@ export default function DiscoveryTopBar({
         <button
           onClick={onUndoFraming}
           className={iconButtonBase}
-          title="Undo framing acceptance"
+          title={t("topBar.undoFraming")}
         >
           <Undo2 className={iconMd} />
         </button>
@@ -232,10 +234,10 @@ export default function DiscoveryTopBar({
         onClick={onOpenToolbox}
         disabled={!hasFrames && !isModbusProfile}
         className={buttonBase}
-        title={isModbusProfile ? "Scanning & analysis tools" : "Analysis tools"}
+        title={isModbusProfile ? t("topBar.scanningTools") : t("topBar.analysisTools")}
       >
         <Wrench className={`${iconSm} flex-shrink-0`} />
-        <span>Tools</span>
+        <span>{t("topBar.toolsLabel")}</span>
       </button>
     </AppTopBar>
   );

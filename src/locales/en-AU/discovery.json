@@ -1,0 +1,40 @@
+{
+  "topBar": {
+    "framePickerDisabled": "Accept framing first to select frames",
+    "saveBytes": "Save bytes to decoder",
+    "saveFrames": "Save frames to decoder",
+    "exportBytes": "Export bytes to file",
+    "exportFrames": "Export frames to file",
+    "decoderKnowledge": "View decoder knowledge",
+    "undoFraming": "Undo framing acceptance",
+    "scanningTools": "Scanning & analysis tools",
+    "analysisTools": "Analysis tools",
+    "toolsLabel": "Tools"
+  },
+  "tabs": {
+    "frames": "Frames",
+    "filtered": "Filtered",
+    "byteStream": "Byte Stream",
+    "framedData": "Framed Data",
+    "framingAnalysis": "Framing",
+    "payloadAnalysis": "Payload",
+    "checksumDiscovery": "Checksum",
+    "modbusScan": "Register Scan",
+    "modbusUnitScan": "Unit ID Scan",
+    "frameOrder": "Frame Order",
+    "payloadChanges": "Payload Changes"
+  },
+  "states": {
+    "noProfile": "No source connected",
+    "selectProfile": "Select an IO profile to start discovering frames.",
+    "noFrames": "No frames received yet.",
+    "noBytes": "No bytes received yet.",
+    "loading": "Loading…",
+    "captureMode": "Capture Mode"
+  },
+  "frameCounters": {
+    "framesUnique": "{{unique}} unique / {{total}} total",
+    "filteredCount_one": "{{count}} filtered",
+    "filteredCount_other": "{{count}} filtered"
+  }
+}

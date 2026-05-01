@@ -10,6 +10,7 @@ import enAUMenus from './en-AU/menus.json';
 import enAUDialogs from './en-AU/dialogs.json';
 import enAUCalculator from './en-AU/calculator.json';
 import enAUTransmit from './en-AU/transmit.json';
+import enAUDiscovery from './en-AU/discovery.json';
 
 export const FALLBACK_LANGUAGE = 'en-AU';
 
@@ -17,7 +18,7 @@ export const SUPPORTED_LANGUAGES = ['en-AU'] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
-export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit'] as const;
+export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit', 'discovery'] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
 export const resources = {
@@ -28,5 +29,6 @@ export const resources = {
     dialogs: enAUDialogs,
     calculator: enAUCalculator,
     transmit: enAUTransmit,
+    discovery: enAUDiscovery,
   },
 } as const;
