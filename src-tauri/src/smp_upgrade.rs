@@ -14,6 +14,10 @@ use mcumgr_smp::application_management;
 use mcumgr_smp::os_management;
 use mcumgr_smp::smp::SmpFrame;
 use async_trait::async_trait;
+// mcumgr_smp 0.8 still pins btleplug 0.11; WireTAP is on 0.12 for the
+// Windows scan fix. BLE SMP transport is stubbed out (see create_transport
+// below) until mcumgr-smp ships a btleplug-0.12-compatible release.
+#[allow(unused_imports)]
 use mcumgr_smp::transport::ble::BleTransport;
 use mcumgr_smp::transport::error::Error as SmpError;
 use mcumgr_smp::transport::smp::SmpTransportAsync;
@@ -190,13 +194,15 @@ async fn next_seq() -> u8 {
 async fn create_transport() -> Result<Box<dyn SmpTransportAsync + Send>, String> {
     let state = SMP_STATE.lock().await;
     match &state.connection {
-        Some(SmpConnection::Ble(peripheral)) => {
-            let peripheral = peripheral.clone();
+        Some(SmpConnection::Ble(_peripheral)) => {
             drop(state);
-            let transport = BleTransport::from_peripheral(peripheral)
-                .await
-                .map_err(|e| format!("Failed to create BLE transport: {e}"))?;
-            Ok(Box::new(transport))
+            // TEMP: BleTransport::from_peripheral takes a btleplug 0.11
+            // Peripheral; WireTAP is on btleplug 0.12. Re-enable once
+            // mcumgr-smp is updated to btleplug 0.12.
+            Err(
+                "BLE SMP transport temporarily disabled (pending mcumgr-smp upgrade to btleplug 0.12)"
+                    .to_string(),
+            )
         }
         Some(SmpConnection::Udp(addr)) => {
             let addr = *addr;

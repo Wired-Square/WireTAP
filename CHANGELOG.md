@@ -2,6 +2,24 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Windows 11 BLE peripheral discovery**: Bumped `btleplug 0.11 → 0.12` across the workspace. The 0.11 WinRT backend used passive scanning without extended-advertisement support, so SCAN_RSP data — where Zephyr-based devices like WiredFlexLink carry their 128-bit service UUIDs and full local name — never arrived (deviceplug/btleplug#370, #267). 0.12 enables `ScanningMode::Active` and `AllowExtendedAdvertisements(true)`, and adds a separate `advertisement_name` on `PeripheralProperties` (the only name available pre-connect on extended advertisements). Affects both the main app's WiFi provisioning / device scan flows and the `bt_scan_cli` diagnostic.
+
+### Changed
+
+- **bt_scan_cli refactored to BLE-only on btleplug 0.12**: Removed Classic Bluetooth — deleted `tools/bt_scan_cli/classic.rs`, dropped the `bluer` dep, and trimmed `Win32_Devices_Bluetooth` from `windows-sys` features. FrameLink matching now has three tiers: full `parse_peripheral` (service UUID + local_name + parseable manufacturer payload), BLE service UUID present but `parse_peripheral` declined (Win11 extended-adv case where the name lives in `advertisement_name`), and name-pattern fallback (`WiredFlexLink-*`).
+
+- **bt_scan_cli `--tui` mode** ([tools/bt_scan_cli/tui.rs](tools/bt_scan_cli/tui.rs)): Live BLE TUI via ratatui + crossterm. Peripherals table sorted FrameLink-first then by RSSI; stale rows dim after 10 s, FrameLink rows render bold green. Detail pane (`d` to toggle, `Tab` to focus) shows the full advertisement (services, service_data, manufacturer_data hex), both name fields (`advertisement_name`, `local_name`), the full `ManufacturerPayload` (schema, capability flags + raw u16, hw_rev, fw_version), and the explicit match reason. `Enter` runs an async GATT enumeration without blocking the UI; result persists across advertisement updates. `[i]` opens a centred Bluetooth Environment popup with host info + adapter list. Detail pane scrolls with ↑/↓, PgUp/PgDn, Home when focused.
+
+- **bt_scan_cli `--filter <SUBSTRING>`**: Case-insensitive substring filter on the advertised name (matches `advertisement_name` or `local_name`). Sets the initial filter for `--tui`; usable in text mode too.
+
+### Removed
+
+- **BLE firmware upgrade path temporarily disabled**: `mcumgr-smp 0.8` still pins btleplug 0.11, so [src-tauri/src/smp_upgrade.rs](src-tauri/src/smp_upgrade.rs) `BleTransport::from_peripheral` is stubbed pending an upstream bump. UDP SMP path is unaffected.
+
 ## [0.6.3] - 2026-04-30
 
 ### Fixed
