@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Globe, ChevronDown, ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
 import { PrimaryButton, SecondaryButton, Input, Select } from "../../../components/forms";
@@ -29,6 +30,7 @@ import {
 import { framelinkProbeDevice } from "../../../api/framelink";
 
 export default function DevicesScanView() {
+  const { t } = useTranslation("devices");
   const devices = useDevicesStore((s) => s.data.devices);
   const isScanning = useDevicesStore((s) => s.ui.isScanning);
   const error = useDevicesStore((s) => s.ui.error);
@@ -312,15 +314,15 @@ export default function DevicesScanView() {
       <div className="flex items-center justify-between">
         <div className={`text-sm ${textSecondary}`}>
           {isScanning
-            ? "Scanning for devices..."
+            ? t("scan.scanning")
             : devices.length > 0
-              ? `Found ${devices.length} device${devices.length !== 1 ? "s" : ""}`
-              : "No devices found"}
+              ? t("scan.foundDevices", { count: devices.length })
+              : t("scan.noDevices")}
         </div>
         <SecondaryButton onClick={handleRescan} disabled={isScanning} className="w-32 mr-3">
           <span className="flex items-center justify-center gap-1.5">
             <RefreshCw className={iconMd} />
-            Rescan
+            {t("scan.rescan")}
           </span>
         </SecondaryButton>
       </div>
@@ -362,13 +364,13 @@ export default function DevicesScanView() {
           ) : (
             <ChevronRight className={iconMd} />
           )}
-          Manual IP Address
+          {t("scan.manualIp")}
         </button>
 
         {showManualIp && (
           <div className="flex items-end gap-2 mt-2">
             <div className="w-32">
-              <label className={`text-xs ${textSecondary} mb-1 block`}>Type</label>
+              <label className={`text-xs ${textSecondary} mb-1 block`}>{t("scan.manualType")}</label>
               <Select
                 value={manualProtocol}
                 onChange={(e) => {
@@ -383,16 +385,16 @@ export default function DevicesScanView() {
               </Select>
             </div>
             <div className="flex-1">
-              <label className={`text-xs ${textSecondary} mb-1 block`}>IP Address</label>
+              <label className={`text-xs ${textSecondary} mb-1 block`}>{t("scan.manualIpAddress")}</label>
               <Input
                 value={manualAddress}
                 onChange={(e) => setManualAddress(e.target.value)}
-                placeholder="192.168.1.100"
+                placeholder={t("scan.manualIpPlaceholder")}
                 disabled={connecting}
               />
             </div>
             <div className="w-20">
-              <label className={`text-xs ${textSecondary} mb-1 block`}>Port</label>
+              <label className={`text-xs ${textSecondary} mb-1 block`}>{t("scan.manualPort")}</label>
               <Input
                 value={manualPort}
                 onChange={(e) => setManualPort(e.target.value)}
@@ -403,7 +405,7 @@ export default function DevicesScanView() {
             <PrimaryButton onClick={handleManualConnect} disabled={connecting}>
               <span className="flex items-center gap-1.5">
                 <Globe className={`${iconMd} ${connecting ? "animate-pulse" : ""}`} />
-                {connecting ? "..." : "Connect"}
+                {connecting ? t("scan.connecting") : t("scan.connect")}
               </span>
             </PrimaryButton>
           </div>

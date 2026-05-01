@@ -1,5 +1,6 @@
 // ui/src/apps/devices/components/StatusIndicator.tsx
 
+import { useTranslation } from "react-i18next";
 import { badgeSuccess, badgeDanger, badgeInfo, badgeNeutral } from "../../../styles";
 import {
   STATUS_DISCONNECTED,
@@ -12,14 +13,15 @@ interface StatusIndicatorProps {
   statusCode: number;
 }
 
-const statusConfig: Record<number, { label: string; badge: string }> = {
-  [STATUS_DISCONNECTED]: { label: "Disconnected", badge: badgeNeutral },
-  [STATUS_CONNECTING]: { label: "Connecting", badge: badgeInfo },
-  [STATUS_CONNECTED]: { label: "Connected", badge: badgeSuccess },
-  [STATUS_ERROR]: { label: "Error", badge: badgeDanger },
+const statusConfig: Record<number, { i18nKey: string; badge: string }> = {
+  [STATUS_DISCONNECTED]: { i18nKey: "disconnected", badge: badgeNeutral },
+  [STATUS_CONNECTING]: { i18nKey: "connecting", badge: badgeInfo },
+  [STATUS_CONNECTED]: { i18nKey: "connected", badge: badgeSuccess },
+  [STATUS_ERROR]: { i18nKey: "error", badge: badgeDanger },
 };
 
 export default function StatusIndicator({ statusCode }: StatusIndicatorProps) {
-  const config = statusConfig[statusCode] ?? { label: "Unknown", badge: badgeNeutral };
-  return <span className={config.badge}>{config.label}</span>;
+  const { t } = useTranslation("devices");
+  const config = statusConfig[statusCode] ?? { i18nKey: "unknown", badge: badgeNeutral };
+  return <span className={config.badge}>{t(`status.${config.i18nKey}`)}</span>;
 }

@@ -1,0 +1,103 @@
+{
+  "status": {
+    "disconnected": "Disconnected",
+    "connecting": "Connecting",
+    "connected": "Connected",
+    "error": "Error",
+    "unknown": "Unknown"
+  },
+  "scan": {
+    "scanning": "Scanning for devices…",
+    "noDevices": "No devices found",
+    "foundDevices_one": "Found {{count}} device",
+    "foundDevices_other": "Found {{count}} devices",
+    "rescan": "Rescan",
+    "manualIp": "Manual IP Address",
+    "manualType": "Type",
+    "manualIpAddress": "IP Address",
+    "manualPort": "Port",
+    "manualIpPlaceholder": "192.168.1.100",
+    "connect": "Connect",
+    "connecting": "..."
+  },
+  "credentials": {
+    "title": "WiFi Credentials",
+    "ssid": "Network (SSID)",
+    "password": "Password",
+    "ssidPlaceholder": "MyNetwork",
+    "passwordPlaceholder": "Enter password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "save": "Save",
+    "cancel": "Cancel",
+    "scanWifi": "Scan WiFi",
+    "scanningWifi": "Scanning WiFi…"
+  },
+  "provisioning": {
+    "title": "Provisioning",
+    "connecting": "Connecting to device…",
+    "sending": "Sending credentials…",
+    "configuring": "Configuring WiFi…",
+    "complete": "Provisioning complete",
+    "failed": "Provisioning failed",
+    "retry": "Retry",
+    "back": "Back"
+  },
+  "complete": {
+    "successTitle": "Provisioning Complete",
+    "successMessage": "Device successfully connected to WiFi.",
+    "ipAddressLabel": "IP Address:",
+    "rssiLabel": "Signal:",
+    "next": "Done"
+  },
+  "inspect": {
+    "title": "Device Information",
+    "deviceName": "Device Name",
+    "firmwareVersion": "Firmware",
+    "hardwareVersion": "Hardware",
+    "macAddress": "MAC Address",
+    "uptime": "Uptime",
+    "memory": "Memory",
+    "noData": "No information available"
+  },
+  "firmware": {
+    "title": "Firmware",
+    "currentVersion": "Current version: {{version}}",
+    "checkUpdates": "Check for Updates",
+    "checkingUpdates": "Checking…",
+    "updateAvailable": "Update available: {{version}}",
+    "upToDate": "Up to date",
+    "selectFile": "Select firmware file…",
+    "uploadFirmware": "Upload Firmware"
+  },
+  "upload": {
+    "title": "Upload Firmware",
+    "selectFile": "Select File",
+    "uploading": "Uploading…",
+    "verifying": "Verifying…",
+    "rebooting": "Rebooting…",
+    "complete": "Upload complete",
+    "failed": "Upload failed",
+    "progressFmt": "{{current}} / {{total}} bytes",
+    "speedFmt": "{{kbps}} kB/s",
+    "retry": "Retry",
+    "cancel": "Cancel"
+  },
+  "upgradeComplete": {
+    "title": "Upgrade Complete",
+    "message": "Device successfully upgraded.",
+    "version": "New version: {{version}}",
+    "done": "Done"
+  },
+  "frameLink": {
+    "title": "FrameLink Setup",
+    "scanInterfaces": "Scan Interfaces",
+    "scanning": "Scanning interfaces…",
+    "interfaceLabel": "Interface",
+    "noInterfaces": "No FrameLink interfaces detected",
+    "configureBuses": "Configure Buses",
+    "save": "Save Configuration",
+    "saving": "Saving…",
+    "cancel": "Cancel"
+  }
+}
