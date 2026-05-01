@@ -6,6 +6,7 @@
 // and device signals.
 
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useRulesStore, type RulesTab } from "../stores/rulesStore";
 import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
@@ -13,6 +14,7 @@ import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { formatHexId } from "../utils/formatHex";
 
 export default function DeviceOverview() {
+  const { t } = useTranslation("rules");
   const { frameDefs, bridges, transformers, generators, device, temporaryRules, setActiveTab, selectItem } =
     useRulesStore(
       useShallow((s) => ({
@@ -41,13 +43,13 @@ export default function DeviceOverview() {
     <div className="space-y-4">
       {/* Resource summary bar */}
       <div className={`${cardDefault} ${cardPadding.sm} flex items-center gap-4 text-xs`}>
-        <ResourceCount label="Interfaces" count={interfaces.length} />
-        <ResourceCount label="Frame Defs" count={frameDefs.length} />
-        <ResourceCount label="Bridges" count={bridges.length} />
-        <ResourceCount label="Transformers" count={transformers.length} />
-        <ResourceCount label="Generators" count={generators.length} />
+        <ResourceCount label={t("overview.summary.interfaces")} count={interfaces.length} />
+        <ResourceCount label={t("overview.summary.frameDefs")} count={frameDefs.length} />
+        <ResourceCount label={t("overview.summary.bridges")} count={bridges.length} />
+        <ResourceCount label={t("overview.summary.transformers")} count={transformers.length} />
+        <ResourceCount label={t("overview.summary.generators")} count={generators.length} />
         <span className={`ml-auto text-xs ${textTertiary}`}>
-          {temporaryRules.size} temporary rule{temporaryRules.size !== 1 ? "s" : ""}
+          {t("overview.summary.temporaryCount", { count: temporaryRules.size })}
         </span>
       </div>
 
@@ -55,12 +57,12 @@ export default function DeviceOverview() {
       <div className="relative min-h-[300px]">
         <div className="flex items-start gap-6 overflow-x-auto p-4">
           {/* Interfaces column */}
-          <Column title="Interfaces">
+          <Column title={t("overview.columns.interfaces")}>
             {interfaces.map((iface) => (
               <FlowCard
                 key={iface.index}
                 label={iface.name}
-                sublabel={`Index ${iface.index}`}
+                sublabel={t("overview.card.indexLabel", { index: iface.index })}
                 borderClass="border-blue-500/40"
               />
             ))}
@@ -70,7 +72,7 @@ export default function DeviceOverview() {
           <Arrow />
 
           {/* Frame Defs column */}
-          <Column title="Frame Defs">
+          <Column title={t("overview.columns.frameDefs")}>
             {frameDefs.map((fd) => {
               const isTemp = temporaryRules.has(`framedef:${fd.frame_def_id}`);
               return (
@@ -87,20 +89,20 @@ export default function DeviceOverview() {
                 />
               );
             })}
-            {frameDefs.length === 0 && <EmptyCard />}
+            {frameDefs.length === 0 && <EmptyCard label={t("overview.card.none")} />}
           </Column>
 
           {/* Arrow */}
           <Arrow />
 
           {/* Processing column */}
-          <Column title="Processing">
+          <Column title={t("overview.columns.processing")}>
             {bridges.map((b) => {
               const isTemp = temporaryRules.has(`bridge:${b.bridge_id}`);
               return (
                 <FlowCard
                   key={`b-${b.bridge_id}`}
-                  label={`Bridge ${formatHexId(b.bridge_id)}`}
+                  label={t("overview.card.bridge", { id: formatHexId(b.bridge_id) })}
                   sublabel={`${b.source_interface_name}→${b.dest_interface_name}`}
                   borderClass={
                     !b.enabled
@@ -113,21 +115,21 @@ export default function DeviceOverview() {
                 />
               );
             })}
-            {transformers.map((t) => {
-              const isTemp = temporaryRules.has(`xform:${t.transformer_id}`);
+            {transformers.map((xf) => {
+              const isTemp = temporaryRules.has(`xform:${xf.transformer_id}`);
               return (
                 <FlowCard
-                  key={`x-${t.transformer_id}`}
-                  label={`Xform ${formatHexId(t.transformer_id)}`}
-                  sublabel={`${t.source_frame_def_name}→${t.dest_frame_def_name}`}
+                  key={`x-${xf.transformer_id}`}
+                  label={t("overview.card.xform", { id: formatHexId(xf.transformer_id) })}
+                  sublabel={`${xf.source_frame_def_name}→${xf.dest_frame_def_name}`}
                   borderClass={
-                    !t.enabled
+                    !xf.enabled
                       ? "border-neutral-500/30 opacity-50"
                       : isTemp
                         ? "border-amber-500/40 border-dashed"
                         : "border-green-500/40"
                   }
-                  onClick={() => navigateTo("transformers", `xform:${t.transformer_id}`)}
+                  onClick={() => navigateTo("transformers", `xform:${xf.transformer_id}`)}
                 />
               );
             })}
@@ -136,7 +138,7 @@ export default function DeviceOverview() {
               return (
                 <FlowCard
                   key={`g-${g.generator_id}`}
-                  label={`Gen ${formatHexId(g.generator_id)}`}
+                  label={t("overview.card.gen", { id: formatHexId(g.generator_id) })}
                   sublabel={`${g.frame_def_name}→${g.interface_name}`}
                   borderClass={
                     !g.enabled
@@ -150,7 +152,7 @@ export default function DeviceOverview() {
               );
             })}
             {bridges.length === 0 && transformers.length === 0 && generators.length === 0 && (
-              <EmptyCard />
+              <EmptyCard label={t("overview.card.none")} />
             )}
           </Column>
 
@@ -158,18 +160,18 @@ export default function DeviceOverview() {
           <Arrow />
 
           {/* Output column */}
-          <Column title="Outputs">
+          <Column title={t("overview.columns.outputs")}>
             {interfaces.map((iface) => (
               <FlowCard
                 key={`out-${iface.index}`}
                 label={iface.name}
-                sublabel="Output"
+                sublabel={t("overview.card.outputLabel")}
                 borderClass="border-purple-500/40"
               />
             ))}
             <FlowCard
-              label="Device Signals"
-              sublabel="Signal store"
+              label={t("overview.card.deviceSignals")}
+              sublabel={t("overview.card.signalStore")}
               borderClass="border-cyan-500/40"
             />
           </Column>
@@ -222,10 +224,10 @@ function Arrow() {
   );
 }
 
-function EmptyCard() {
+function EmptyCard({ label }: { label: string }) {
   return (
     <div className={`px-3 py-2 rounded-lg border border-dashed ${borderDefault} text-center`}>
-      <span className={`text-[10px] ${textTertiary}`}>None</span>
+      <span className={`text-[10px] ${textTertiary}`}>{label}</span>
     </div>
   );
 }

@@ -77,6 +77,33 @@
     "empty": "No user signals added",
     "remove": "Remove user signal"
   },
+  "overview": {
+    "summary": {
+      "interfaces": "Interfaces",
+      "frameDefs": "Frame Defs",
+      "bridges": "Bridges",
+      "transformers": "Transformers",
+      "generators": "Generators",
+      "temporaryCount_one": "{{count}} temporary rule",
+      "temporaryCount_other": "{{count}} temporary rules"
+    },
+    "columns": {
+      "interfaces": "Interfaces",
+      "frameDefs": "Frame Defs",
+      "processing": "Processing",
+      "outputs": "Outputs"
+    },
+    "card": {
+      "indexLabel": "Index {{index}}",
+      "outputLabel": "Output",
+      "deviceSignals": "Device Signals",
+      "signalStore": "Signal store",
+      "bridge": "Bridge {{id}}",
+      "xform": "Xform {{id}}",
+      "gen": "Gen {{id}}",
+      "none": "None"
+    }
+  },
   "frameDefs": {
     "loading": "Loading frame definitions...",
     "add": "Add Frame Def",
@@ -85,5 +112,29 @@
     "canIdLabel": "CAN ID: {{id}}",
     "canIdExt": " (ext)",
     "dlcLabel": "DLC: {{dlc}}"
+  },
+  "signalProperties": {
+    "emptyHint": "Click two bits in the grid to define a signal range, or click a byte label to select a whole byte.",
+    "name": "Name",
+    "namePlaceholder": "Signal name",
+    "nameRequired": "Signal name required",
+    "position": "Position",
+    "positionFmt_one": "Bit {{startBit}}, {{count}} bit",
+    "positionFmt_other": "Bit {{startBit}}, {{count}} bits",
+    "byteOrder": "Byte Order",
+    "littleEndian": "Little Endian",
+    "bigEndian": "Big Endian",
+    "valueType": "Value Type",
+    "scale": "Scale",
+    "offset": "Offset",
+    "delete": "Delete Signal"
+  },
+  "frameDefEditor": {
+    "back": "Back to frame definitions",
+    "title": "Frame Def {{id}}",
+    "headerCanFmt": "{{id}}{{ext}} | DLC {{dlc}}",
+    "headerSerialFmt": "Framing {{mode}}",
+    "interfaceTypeFmt": "Type {{type}}",
+    "save": "Save"
   }
 }

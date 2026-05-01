@@ -6,6 +6,7 @@
 // machine for signal placement and editing.
 
 import { useReducer, useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import type { SignalDefDescriptor } from "../../../api/framelinkRules";
 import { textPrimary, textSecondary } from "../../../styles";
@@ -157,6 +158,7 @@ export default function FrameDefEditor({
   onSave,
   onCancel,
 }: FrameDefEditorProps) {
+  const { t } = useTranslation("rules");
   const [state, dispatch] = useReducer(editorReducer, existingSignals, (signals) => {
     const colours = getSignalColours();
     const mapped: PlacedSignal[] = signals.map((sd, i) => ({
@@ -325,11 +327,15 @@ export default function FrameDefEditor({
   }, [scrollToByte]);
 
   // --- Header info ---
-  const interfaceTypeName = INTERFACE_TYPE_NAMES[interfaceType] ?? `Type ${interfaceType}`;
+  const interfaceTypeName = INTERFACE_TYPE_NAMES[interfaceType] ?? t("frameDefEditor.interfaceTypeFmt", { type: interfaceType });
   const headerInfo =
     header.type === "can"
-      ? `0x${header.canId.toString(16).toUpperCase()}${header.extended ? " (ext)" : ""} | DLC ${header.dlc}`
-      : `Framing ${header.framingMode}`;
+      ? t("frameDefEditor.headerCanFmt", {
+          id: "0x" + header.canId.toString(16).toUpperCase(),
+          ext: header.extended ? " (ext)" : "",
+          dlc: header.dlc,
+        })
+      : t("frameDefEditor.headerSerialFmt", { mode: header.framingMode });
 
   const saveDisabled = !canSave(state.signals) || hasAnyValidationError;
 
@@ -344,13 +350,13 @@ export default function FrameDefEditor({
           <button
             onClick={handleCancel}
             className={`p-1.5 rounded hover:bg-[var(--hover-bg)] transition-colors ${textSecondary}`}
-            title="Back to frame definitions"
+            title={t("frameDefEditor.back")}
           >
             <ArrowLeft className={iconMd} />
           </button>
           <div>
             <div className={`text-sm font-medium ${textPrimary}`}>
-              Frame Def {formatHexId(frameDefId)}
+              {t("frameDefEditor.title", { id: formatHexId(frameDefId) })}
             </div>
             <div className={`text-xs ${textSecondary}`}>
               {interfaceTypeName} | {headerInfo}
@@ -362,7 +368,7 @@ export default function FrameDefEditor({
           disabled={saveDisabled}
           className="px-4 py-1.5 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Save
+          {t("frameDefEditor.save")}
         </button>
       </div>
 
