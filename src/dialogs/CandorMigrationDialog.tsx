@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { ArrowRightLeft, Trash2, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import Dialog from "../components/Dialog";
 import { PrimaryButton, SecondaryButton, DangerButton } from "../components/forms";
 import type { CandorMigrationInfo } from "../api/settings";
@@ -27,6 +28,7 @@ type Props = {
 };
 
 export default function CandorMigrationDialog({ open, info, onComplete }: Props) {
+  const { t } = useTranslation("dialogs");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,17 +60,14 @@ export default function CandorMigrationDialog({ open, info, onComplete }: Props)
   return (
     <Dialog isOpen={open}>
       <div className={`${paddingDialog} border ${borderDefault} ${roundedDefault}`}>
-        <h3 className={`${h3} mb-3`}>CANdor Data Found</h3>
+        <h3 className={`${h3} mb-3`}>{t("candorMigration.title")}</h3>
 
-        <p className={`${bodyDefault} mb-4`}>
-          Configuration from the previous CANdor installation was found. Would you like to
-          migrate it to WireTAP?
-        </p>
+        <p className={`${bodyDefault} mb-4`}>{t("candorMigration.intro")}</p>
 
         {info.io_profile_count > 0 && (
           <div className={`mb-4 px-3 py-2 rounded border ${borderDefault} text-xs`}>
             <p className={`font-medium mb-1 ${textMuted}`}>
-              {info.io_profile_count} IO profile{info.io_profile_count !== 1 ? "s" : ""}
+              {t("candorMigration.ioProfileCount", { count: info.io_profile_count })}
             </p>
             <ul className={`${textMuted} space-y-0.5 ml-3 list-disc`}>
               {info.io_profile_names.map((name) => (
@@ -79,9 +78,7 @@ export default function CandorMigrationDialog({ open, info, onComplete }: Props)
         )}
 
         {info.has_ui_state && (
-          <p className={`text-xs ${textMuted} mb-4`}>
-            Includes saved layouts, selection sets, and favourites.
-          </p>
+          <p className={`text-xs ${textMuted} mb-4`}>{t("candorMigration.uiState")}</p>
         )}
 
         {error && (
@@ -92,19 +89,19 @@ export default function CandorMigrationDialog({ open, info, onComplete }: Props)
           <SecondaryButton onClick={onComplete} disabled={busy}>
             <span className="flex items-center gap-1.5">
               <X className={iconMd} />
-              Skip
+              {t("candorMigration.skip")}
             </span>
           </SecondaryButton>
           <DangerButton onClick={handleDelete} disabled={busy}>
             <span className="flex items-center gap-1.5">
               <Trash2 className={iconMd} />
-              Delete
+              {t("common:actions.delete")}
             </span>
           </DangerButton>
           <PrimaryButton onClick={handleMigrate} disabled={busy}>
             <span className="flex items-center gap-1.5">
               <ArrowRightLeft className={iconMd} />
-              {busy ? "Migrating..." : "Migrate"}
+              {busy ? t("candorMigration.migrating") : t("candorMigration.migrate")}
             </span>
           </PrimaryButton>
         </div>

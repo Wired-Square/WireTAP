@@ -4,6 +4,7 @@
 // different preferred decoders. Lets the user pick which one to use.
 
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconLg } from "../styles/spacing";
 import { textMedium, caption, borderDivider, hoverLight, bgSurface } from "../styles";
 import Dialog from "../components/Dialog";
@@ -30,12 +31,14 @@ export default function DecoderConflictDialog({
   onSelect,
   onSkip,
 }: Props) {
+  const { t } = useTranslation("dialogs");
+
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
         <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            Choose Decoder
+            {t("decoderConflict.title")}
           </h2>
           <button
             onClick={onClose}
@@ -45,9 +48,7 @@ export default function DecoderConflictDialog({
           </button>
         </div>
         <div className="px-4 py-2">
-          <p className={`${caption}`}>
-            Multiple sources have different preferred decoders. Choose one for this session:
-          </p>
+          <p className={`${caption}`}>{t("decoderConflict.intro")}</p>
         </div>
         <div className="py-1">
           {options.map((opt) => (
@@ -64,7 +65,7 @@ export default function DecoderConflictDialog({
                   {opt.filename}
                 </span>
                 <div className={`${caption} truncate`}>
-                  Used by: {opt.profileNames.join(", ")}
+                  {t("decoderConflict.usedBy", { profiles: opt.profileNames.join(", ") })}
                 </div>
               </div>
             </button>
@@ -77,7 +78,7 @@ export default function DecoderConflictDialog({
             className={`w-full px-4 py-2.5 text-left ${hoverLight} transition-colors`}
           >
             <span className={`${textMedium} text-[color:var(--text-muted)]`}>
-              None
+              {t("decoderConflict.none")}
             </span>
           </button>
         </div>

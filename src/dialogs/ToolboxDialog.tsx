@@ -1,6 +1,8 @@
 // ui/src/dialogs/ToolboxDialog.tsx
 
 import { X, ListOrdered, GitCompare, Play, Loader2, Radio, Binary, ShieldCheck, Radar, Network } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { iconMd, iconLg } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import { useDiscoveryStore, TOOL_TAB_CONFIG, type ToolboxView } from "../stores/discoveryStore";
@@ -25,8 +27,8 @@ import type { ModbusScanConfig, UnitIdScanConfig } from "../api/io";
 
 type ToolConfig = {
   id: ToolboxView;
-  label: string;
-  description: string;
+  /** Translation key suffix under `toolbox.tools.*` */
+  i18nKey: string;
   icon: React.ComponentType<{ className?: string }>;
   /** For serial tools: 'bytes' requires raw bytes, 'frames' requires framed data */
   serialRequires?: 'bytes' | 'frames';
@@ -35,52 +37,13 @@ type ToolConfig = {
 };
 
 const tools: ToolConfig[] = [
-  {
-    id: "message-order",
-    label: "Frame Order Analysis",
-    description: "Analyse frame timing patterns and message order",
-    icon: ListOrdered,
-  },
-  {
-    id: "changes",
-    label: "Payload Change Analysis",
-    description: "Detect payload variations and potential mux patterns",
-    icon: GitCompare,
-  },
-  {
-    id: "checksum-discovery",
-    label: "Checksum Discovery",
-    description: "Detect checksum algorithms and CRC parameters per frame ID",
-    icon: ShieldCheck,
-  },
-  {
-    id: "serial-framing",
-    label: "Serial Framing Analysis",
-    description: "Detect framing protocol (SLIP, Modbus RTU, delimiters)",
-    icon: Binary,
-    serialRequires: 'bytes',
-  },
-  {
-    id: "serial-payload",
-    label: "Serial Payload Analysis",
-    description: "Identify ID bytes and checksum positions in framed data",
-    icon: Radio,
-    serialRequires: 'frames',
-  },
-  {
-    id: "modbus-register-scan",
-    label: "Register Scan",
-    description: "Discover registers on a Modbus TCP device",
-    icon: Radar,
-    modbusRequires: true,
-  },
-  {
-    id: "modbus-unit-scan",
-    label: "Unit ID Scan",
-    description: "Find active Modbus devices on the network",
-    icon: Network,
-    modbusRequires: true,
-  },
+  { id: "message-order", i18nKey: "messageOrder", icon: ListOrdered },
+  { id: "changes", i18nKey: "changes", icon: GitCompare },
+  { id: "checksum-discovery", i18nKey: "checksumDiscovery", icon: ShieldCheck },
+  { id: "serial-framing", i18nKey: "serialFraming", icon: Binary, serialRequires: 'bytes' },
+  { id: "serial-payload", i18nKey: "serialPayload", icon: Radio, serialRequires: 'frames' },
+  { id: "modbus-register-scan", i18nKey: "modbusRegisterScan", icon: Radar, modbusRequires: true },
+  { id: "modbus-unit-scan", i18nKey: "modbusUnitScan", icon: Network, modbusRequires: true },
 ];
 
 /** Check if a tool is a modbus scan tool (these produce data, not analyse it) */
@@ -111,6 +74,26 @@ type Props = {
   onStartModbusUnitIdScan?: (config: UnitIdScanConfig) => void;
 };
 
+function getSelectionText(
+  t: TFunction,
+  activeTool: ToolboxView | null,
+  count: number,
+  isSerialMode: boolean,
+  isFilteredView: boolean,
+): string {
+  if (activeTool === "serial-framing") {
+    return t("toolbox.selection.bytes", { count });
+  }
+  if (isSerialMode) {
+    return isFilteredView
+      ? t("toolbox.selection.framesFilteredAvailable", { count })
+      : t("toolbox.selection.framesAvailable", { count });
+  }
+  return isFilteredView
+    ? t("toolbox.selection.framesFilteredSelected", { count })
+    : t("toolbox.selection.framesSelected", { count });
+}
+
 export default function ToolboxDialog({
   isOpen,
   onClose,
@@ -125,6 +108,7 @@ export default function ToolboxDialog({
   onStartModbusScan,
   onStartModbusUnitIdScan,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   const activeView = useDiscoveryStore((s) => s.toolbox.activeView);
   const isRunning = useDiscoveryStore((s) => s.toolbox.isRunning);
   const setActiveView = useDiscoveryStore((s) => s.setActiveView);
@@ -133,72 +117,46 @@ export default function ToolboxDialog({
 
   const activeTool = activeView !== "frames" ? activeView : null;
 
-  // Filter tools based on mode:
-  // - Serial mode: show serial tools only
-  // - Modbus profile: show modbus tools + standard CAN tools
-  // - Default (CAN): show standard CAN tools only
+  // Filter tools based on mode
   const availableTools = isSerialMode
     ? tools.filter((t) => t.serialRequires !== undefined)
     : isModbusProfile
       ? tools.filter((t) => t.modbusRequires === true || (!t.serialRequires && !t.modbusRequires))
       : tools.filter((t) => !t.serialRequires && !t.modbusRequires);
 
-  // Check if a specific tool is available based on its requirements
   const isToolAvailable = (tool: ToolConfig): boolean => {
-    if (tool.modbusRequires) {
-      // Modbus scan tools are always available when profile matches
-      return isModbusProfile;
-    }
-    if (!isSerialMode) {
-      return frameCount > 0;
-    }
-    // Serial mode: check specific requirements
-    if (tool.serialRequires === 'bytes') {
-      return serialBytesCount > 0;
-    }
-    if (tool.serialRequires === 'frames') {
-      return serialFrameCount > 0;
-    }
+    if (tool.modbusRequires) return isModbusProfile;
+    if (!isSerialMode) return frameCount > 0;
+    if (tool.serialRequires === 'bytes') return serialBytesCount > 0;
+    if (tool.serialRequires === 'frames') return serialFrameCount > 0;
     return false;
   };
 
-  // Get the count to show for the active tool
   const getEffectiveCount = (): number => {
     if (!activeTool) return 0;
     const tool = tools.find(t => t.id === activeTool);
     if (!tool) return 0;
-
-    // Modbus scan tools don't need a count — they produce data
     if (tool.modbusRequires) return 0;
-
-    if (!isSerialMode) {
-      return selectedCount;
-    }
-    // Serial mode: show appropriate count
-    if (tool.serialRequires === 'bytes') {
-      return serialBytesCount;
-    }
-    if (tool.serialRequires === 'frames') {
-      return serialFrameCount;
-    }
+    if (!isSerialMode) return selectedCount;
+    if (tool.serialRequires === 'bytes') return serialBytesCount;
+    if (tool.serialRequires === 'frames') return serialFrameCount;
     return 0;
   };
 
   const effectiveSelectedCount = getEffectiveCount();
 
-  // Get the disabled reason for a tool
   const getDisabledReason = (tool: ToolConfig): string | null => {
     if (tool.modbusRequires) {
-      return isModbusProfile ? null : "Requires a Modbus TCP profile";
+      return isModbusProfile ? null : t("toolbox.disabledReasons.modbusProfile");
     }
     if (!isSerialMode) {
-      return frameCount === 0 ? "No frames discovered" : null;
+      return frameCount === 0 ? t("toolbox.disabledReasons.noFrames") : null;
     }
     if (tool.serialRequires === 'bytes' && serialBytesCount === 0) {
-      return "No raw bytes captured";
+      return t("toolbox.disabledReasons.noBytes");
     }
     if (tool.serialRequires === 'frames' && serialFrameCount === 0) {
-      return "Apply framing first to get frames";
+      return t("toolbox.disabledReasons.needFraming");
     }
     return null;
   };
@@ -207,7 +165,6 @@ export default function ToolboxDialog({
     const tool = tools.find(t => t.id === toolId);
     if (!tool || !isToolAvailable(tool)) return;
     if (activeView === toolId) {
-      // Toggle off - go back to frames view
       setActiveView("frames");
     } else {
       setActiveView(toolId);
@@ -217,9 +174,7 @@ export default function ToolboxDialog({
   const handleRunAnalysis = async () => {
     if (effectiveSelectedCount === 0 || isRunning || !activeTool) return;
     await runAnalysis();
-    // Close dialog - results will appear in tool-specific tabs within Discovery
     onClose();
-    // For serial analysis, switch to the tool-specific tab within the Serial Discovery view
     if (activeTool === "serial-framing" || activeTool === "serial-payload") {
       const config = TOOL_TAB_CONFIG[activeTool];
       if (config) {
@@ -246,7 +201,7 @@ export default function ToolboxDialog({
         {/* Header */}
         <div className={`${paddingCard} flex items-center justify-between border-b ${borderDefault}`}>
           <h2 className={h3}>
-            {isModbusProfile ? "Analysis & Scanning Tools" : "Analysis Tools"}
+            {isModbusProfile ? t("toolbox.titleAnalysisAndScanning") : t("toolbox.titleAnalysis")}
           </h2>
           <button
             onClick={onClose}
@@ -265,6 +220,8 @@ export default function ToolboxDialog({
               const isActive = activeTool === tool.id;
               const isDisabled = !isToolAvailable(tool);
               const disabledReason = getDisabledReason(tool);
+              const label = t(`toolbox.tools.${tool.i18nKey}.label`);
+              const description = t(`toolbox.tools.${tool.i18nKey}.description`);
 
               return (
                 <button
@@ -279,13 +236,13 @@ export default function ToolboxDialog({
                         ? "bg-purple-100 text-[color:var(--text-purple)] ring-2 ring-purple-500"
                         : "bg-[var(--bg-surface)] text-[color:var(--text-secondary)] ring-1 ring-[color:var(--border-default)] hover:ring-2 hover:ring-purple-400"
                   }`}
-                  title={disabledReason ?? tool.label}
+                  title={disabledReason ?? label}
                 >
                   <Icon className={`${iconLg} mt-0.5 flex-shrink-0 ${isActive ? "text-[color:var(--text-purple)]" : ""}`} />
                   <div>
-                    <div className="font-medium text-sm">{tool.label}</div>
+                    <div className="font-medium text-sm">{label}</div>
                     <div className={`text-xs mt-0.5 ${isActive ? "text-[color:var(--text-purple)] opacity-70" : "text-[color:var(--text-muted)]"}`}>
-                      {tool.description}
+                      {description}
                     </div>
                   </div>
                 </button>
@@ -320,9 +277,7 @@ export default function ToolboxDialog({
           {activeTool && !isActiveModbusScan && (
             <div className={`border-t ${borderDefault} pt-3 ${spaceYSmall}`}>
               <div className={`text-sm ${textTertiary}`}>
-                {activeTool === "serial-framing"
-                  ? `${effectiveSelectedCount.toLocaleString()} byte${effectiveSelectedCount !== 1 ? "s" : ""} available for analysis`
-                  : `${effectiveSelectedCount.toLocaleString()} ${isFilteredView ? "filtered" : ""} frame${effectiveSelectedCount !== 1 ? "s" : ""} ${isSerialMode ? "available" : "selected"} for analysis`}
+                {getSelectionText(t, activeTool, effectiveSelectedCount, isSerialMode, isFilteredView)}
               </div>
               <button
                 type="button"
@@ -339,7 +294,7 @@ export default function ToolboxDialog({
                 ) : (
                   <Play className={iconMd} />
                 )}
-                {isRunning ? "Running..." : "Run Analysis"}
+                {isRunning ? t("toolbox.running") : t("toolbox.runAnalysis")}
               </button>
             </div>
           )}
@@ -347,16 +302,14 @@ export default function ToolboxDialog({
           {/* Help text when no tool selected */}
           {!activeTool && availableTools.some(t => isToolAvailable(t)) && (
             <div className={`text-xs ${textTertiary} text-center py-2`}>
-              Select a tool above to configure and run
+              {t("toolbox.selectTool")}
             </div>
           )}
 
           {/* Help text when no data */}
           {!availableTools.some(t => isToolAvailable(t)) && (
             <div className={`text-xs ${textTertiary} text-center py-2`}>
-              {isSerialMode
-                ? "Import serial data to enable analysis tools"
-                : "Start streaming to discover frames for analysis"}
+              {isSerialMode ? t("toolbox.noDataSerial") : t("toolbox.noDataDefault")}
             </div>
           )}
         </div>

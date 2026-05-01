@@ -121,13 +121,6 @@
       "csvBytes": "CSV with timestamp and byte value columns"
     }
   },
-  "exportAnalysis": {
-    "title": "Export Analysis",
-    "save": "Save"
-  },
-  "exportReport": {
-    "title": "Export Report"
-  },
   "bulkAddToTransmit": {
     "title": "Add to Transmit Queue",
     "targetSession": "Target session",
@@ -219,18 +212,144 @@
     }
   },
   "decoderInfo": {
-    "title": "Decoder Info"
+    "title": "Decoder Knowledge",
+    "subtitle": "Accumulated information about discovered frames",
+    "stats": {
+      "frames": "frames",
+      "mux": "mux",
+      "burst": "burst",
+      "multiBus": "multi-bus",
+      "analysisRun": "✓ Analysis run",
+      "runAnalysis": "Run analysis for more info"
+    },
+    "meta": {
+      "title": "Meta (for [meta] section)",
+      "notDetermined": "not determined",
+      "basedOnGroup": "Based on largest repetition period group ({{count}} frames)"
+    },
+    "frames": {
+      "title": "Frames",
+      "titleWithCount": "Frames ({{count}})",
+      "empty": "No frames discovered yet.",
+      "bytesLabel": "{{count}} bytes",
+      "extBadge": "EXT",
+      "busLabel": "Bus {{bus}}",
+      "muxBadge": "Mux",
+      "muxBadgeTwoByte": "2D Mux",
+      "burstBadge": "Burst",
+      "multiBusBadge": "Multi-bus",
+      "burstDetails": "Burst: ~{{count}} frames, {{period}} cycle",
+      "seenOnBuses": "Seen on buses:",
+      "signalsTitle": "Signals",
+      "defaultSuffix": " (hex)",
+      "notesTitle": "Notes"
+    },
+    "mux": {
+      "selectorOneByte": "Mux selector:",
+      "selectorTwoByte": "Two-byte mux selector:",
+      "casesLabel": "Cases:",
+      "more": "+{{count}} more"
+    }
   },
   "decoderConflict": {
-    "title": "Decoder Conflict"
+    "title": "Choose Decoder",
+    "intro": "Multiple sources have different preferred decoders. Choose one for this session:",
+    "usedBy": "Used by: {{profiles}}",
+    "none": "None"
   },
   "csvFileOrder": {
-    "title": "CSV File Order"
+    "title": "Confirm File Order",
+    "summary": "{{count}} files selected. Files will be imported sequentially into a single buffer.",
+    "columns": {
+      "file": "File",
+      "header": "Header"
+    },
+    "anomalies": {
+      "columnCount": "Expected {{expected}} columns, found {{found}}",
+      "headerDiffers": "Header differs from first file"
+    },
+    "dragTooltip": "Drag to reorder",
+    "headerTooltip": "First row is a header",
+    "noHeaderTooltip": "No header row",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "detectingHeaders": "Detecting headers…",
+    "removeFromList": "Remove from list",
+    "next": "Next: Map Columns"
   },
   "candorMigration": {
-    "title": "CANdor Data Detected"
+    "title": "CANdor Data Found",
+    "intro": "Configuration from the previous CANdor installation was found. Would you like to migrate it to WireTAP?",
+    "ioProfileCount_one": "{{count}} IO profile",
+    "ioProfileCount_other": "{{count}} IO profiles",
+    "uiState": "Includes saved layouts, selection sets, and favourites.",
+    "skip": "Skip",
+    "migrate": "Migrate",
+    "migrating": "Migrating…"
   },
   "toolbox": {
-    "title": "Toolbox"
+    "titleAnalysis": "Analysis Tools",
+    "titleAnalysisAndScanning": "Analysis & Scanning Tools",
+    "tools": {
+      "messageOrder": {
+        "label": "Frame Order Analysis",
+        "description": "Analyse frame timing patterns and message order"
+      },
+      "changes": {
+        "label": "Payload Change Analysis",
+        "description": "Detect payload variations and potential mux patterns"
+      },
+      "checksumDiscovery": {
+        "label": "Checksum Discovery",
+        "description": "Detect checksum algorithms and CRC parameters per frame ID"
+      },
+      "serialFraming": {
+        "label": "Serial Framing Analysis",
+        "description": "Detect framing protocol (SLIP, Modbus RTU, delimiters)"
+      },
+      "serialPayload": {
+        "label": "Serial Payload Analysis",
+        "description": "Identify ID bytes and checksum positions in framed data"
+      },
+      "modbusRegisterScan": {
+        "label": "Register Scan",
+        "description": "Discover registers on a Modbus TCP device"
+      },
+      "modbusUnitScan": {
+        "label": "Unit ID Scan",
+        "description": "Find active Modbus devices on the network"
+      }
+    },
+    "disabledReasons": {
+      "modbusProfile": "Requires a Modbus TCP profile",
+      "noFrames": "No frames discovered",
+      "noBytes": "No raw bytes captured",
+      "needFraming": "Apply framing first to get frames"
+    },
+    "selection": {
+      "bytes_one": "{{count}} byte available for analysis",
+      "bytes_other": "{{count}} bytes available for analysis",
+      "framesSelected_one": "{{count}} frame selected for analysis",
+      "framesSelected_other": "{{count}} frames selected for analysis",
+      "framesFilteredSelected_one": "{{count}} filtered frame selected for analysis",
+      "framesFilteredSelected_other": "{{count}} filtered frames selected for analysis",
+      "framesAvailable_one": "{{count}} frame available for analysis",
+      "framesAvailable_other": "{{count}} frames available for analysis",
+      "framesFilteredAvailable_one": "{{count}} filtered frame available for analysis",
+      "framesFilteredAvailable_other": "{{count}} filtered frames available for analysis"
+    },
+    "running": "Running…",
+    "runAnalysis": "Run Analysis",
+    "selectTool": "Select a tool above to configure and run",
+    "noDataSerial": "Import serial data to enable analysis tools",
+    "noDataDefault": "Start streaming to discover frames for analysis"
+  },
+  "exportAnalysis": {
+    "title": "Export Analysis Results",
+    "description": "Export analysis of {{frameIds}} frame IDs ({{samples}} samples)"
+  },
+  "exportReport": {
+    "title": "Export Report",
+    "filename": "Filename"
   }
 }
