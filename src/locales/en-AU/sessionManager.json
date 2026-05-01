@@ -1,0 +1,141 @@
+{
+  "title": "Sessions",
+  "tabs": {
+    "log": "Log",
+    "visual": "Visual"
+  },
+  "topBar": {
+    "activeCount": "{{count}} active",
+    "autoRefreshOn": "Disable auto-refresh",
+    "autoRefreshOff": "Enable auto-refresh",
+    "auto": "Auto",
+    "refresh": "Refresh sessions"
+  },
+  "addSource": {
+    "title": "Add Source to Session",
+    "noProfiles": "No available realtime profiles to add.",
+    "cancel": "Cancel"
+  },
+  "detail": {
+    "emptyPrompt": "Select a node or edge to view details",
+    "headerSuffix": "Details",
+    "connectionHeader": "Connection",
+    "sessionNotFound": "Session not found",
+    "profileNotFound": "Profile not found",
+    "appNotFound": "App not found",
+    "edgeNotFound": "Edge not found",
+    "labels": {
+      "sessionId": "Session ID",
+      "state": "State",
+      "deviceType": "Device Type",
+      "sources": "Sources",
+      "apps": "Apps",
+      "decoder": "Decoder",
+      "buffer": "Buffer",
+      "streaming": "Streaming",
+      "capabilities": "Capabilities",
+      "actions": "Actions",
+      "connectApp": "Connect App",
+      "connectToSession": "Connect to Session",
+      "profileName": "Profile Name",
+      "profileId": "Profile ID",
+      "preferredDecoder": "Preferred Decoder",
+      "busMappings": "Bus Mappings",
+      "busMapping": "Bus Mapping",
+      "signalGenerator": "Signal Generator",
+      "app": "App",
+      "appId": "App ID",
+      "status": "Status",
+      "type": "Type",
+      "session": "Session",
+      "device": "Device",
+      "registered": "Registered"
+    },
+    "values": {
+      "yes": "Yes",
+      "no": "No",
+      "none": "None",
+      "active": "Active",
+      "inactive": "Inactive",
+      "realtime": "realtime",
+      "transmit": "transmit",
+      "pause": "pause",
+      "timeRange": "time-range",
+      "framesCount": "{{count}} frames",
+      "notConnected": "Not connected to any session",
+      "sessionToApp": "Session → App",
+      "deviceToSession": "Device → Session"
+    },
+    "actions": {
+      "start": "Start",
+      "stop": "Stop",
+      "pause": "Pause",
+      "resume": "Resume",
+      "addSource": "Add Source",
+      "destroy": "Destroy",
+      "saveToProfile": "Save to Profile",
+      "disconnect": "Disconnect",
+      "remove": "Remove",
+      "removeFrom": "Remove from {{sessionId}}"
+    },
+    "signalGen": {
+      "addBus": "Add bus",
+      "removeBus": "Remove bus {{bus}}",
+      "removeMapping": "Remove bus{{bus}} mapping",
+      "busLabel": "Bus {{bus}}",
+      "hz": "Hz"
+    },
+    "uptime": {
+      "secondsAgo": "{{count}}s ago",
+      "minutesAgo": "{{count}}m ago",
+      "hoursMinutesAgo": "{{hours}}h {{minutes}}m ago"
+    }
+  },
+  "node": {
+    "session": {
+      "states": {
+        "running": "Running",
+        "stopped": "Stopped",
+        "paused": "Paused",
+        "error": "Error"
+      },
+      "appsCount_one": "{{count}} app",
+      "appsCount_other": "{{count}} apps",
+      "framesBuffered": "{{count}} frames buffered"
+    }
+  },
+  "log": {
+    "filter": {
+      "events": "Events",
+      "showAll": "Show All",
+      "groups": {
+        "lifecycle": "Lifecycle",
+        "stream": "Stream",
+        "status": "Status"
+      }
+    },
+    "allSessions": "All sessions",
+    "search": "Search...",
+    "hideProfileColumn": "Hide profile column",
+    "showProfileColumn": "Show profile column",
+    "scrollToBottom": "Scroll to bottom",
+    "copyLog": "Copy log to clipboard",
+    "clearLog": "Clear log",
+    "entries_one": "{{count}} entry",
+    "entries_other": "{{count}} entries",
+    "entriesFiltered_one": "{{filtered}} / {{total}} entry",
+    "entriesFiltered_other": "{{filtered}} / {{total}} entries",
+    "empty": {
+      "heading": "No log entries",
+      "description": "Session events will appear here"
+    },
+    "headers": {
+      "time": "Time",
+      "event": "Event",
+      "session": "Session",
+      "profile": "Profile",
+      "details": "Details"
+    },
+    "profileTitle": "Profile: {{name}}"
+  }
+}

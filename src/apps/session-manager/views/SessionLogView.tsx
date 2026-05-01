@@ -4,6 +4,7 @@
 // Features filter bar, scrollable table, and auto-scroll.
 
 import { useEffect, useRef, useMemo, useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Trash2,
   Filter,
@@ -58,6 +59,7 @@ function truncateSessionId(sessionId: string | null, maxLen = 16): string {
 }
 
 export default function SessionLogView() {
+  const { t } = useTranslation("sessionManager");
   const entries = useFilteredEntries();
   const uniqueSessionIds = useUniqueSessionIds();
   const filter = useSessionLogStore((s) => s.filter);
@@ -160,7 +162,7 @@ export default function SessionLogView() {
   const eventTypeGroups = useMemo(
     () => [
       {
-        label: "Lifecycle",
+        label: t("log.filter.groups.lifecycle"),
         types: [
           "session-created",
           "session-joined",
@@ -169,7 +171,7 @@ export default function SessionLogView() {
         ] as SessionLogEventType[],
       },
       {
-        label: "Stream",
+        label: t("log.filter.groups.stream"),
         types: [
           "state-change",
           "stream-ended",
@@ -180,7 +182,7 @@ export default function SessionLogView() {
         ] as SessionLogEventType[],
       },
       {
-        label: "Status",
+        label: t("log.filter.groups.status"),
         types: [
           "session-reconfigured",
           "session-stats",
@@ -191,7 +193,7 @@ export default function SessionLogView() {
         ] as SessionLogEventType[],
       },
     ],
-    []
+    [t]
   );
 
   return (
@@ -206,7 +208,7 @@ export default function SessionLogView() {
             className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textSecondary} ${hoverBg}`}
           >
             <Filter className="w-3 h-3" />
-            <span>Events</span>
+            <span>{t("log.filter.events")}</span>
             {filter.eventTypes && (
               <span className="px-1 bg-blue-500/20 text-blue-400 rounded text-[10px]">
                 {filter.eventTypes.size}
@@ -242,7 +244,7 @@ export default function SessionLogView() {
               onClick={() => setFilter({ eventTypes: null })}
               className={`w-full mt-2 px-2 py-1 text-[10px] rounded border ${borderDefault} ${textSecondary} ${hoverBg}`}
             >
-              Show All
+              {t("log.filter.showAll")}
             </button>
           </div>
         </div>
@@ -255,7 +257,7 @@ export default function SessionLogView() {
           }
           className={`text-xs px-2 py-1 rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
         >
-          <option value="">All sessions</option>
+          <option value="">{t("log.allSessions")}</option>
           {uniqueSessionIds.map((sessionId) => (
             <option key={sessionId} value={sessionId}>
               {truncateSessionId(sessionId, 24)}
@@ -268,7 +270,7 @@ export default function SessionLogView() {
           <Search className={`absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 ${textMuted}`} />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder={t("log.search")}
             value={filter.searchText}
             onChange={(e) => setFilter({ searchText: e.target.value })}
             className={`w-full text-xs pl-7 pr-2 py-1 rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textPrimary} placeholder:${textMuted} ${focusRingThin}`}
@@ -284,7 +286,7 @@ export default function SessionLogView() {
           className={`p-1 rounded ${hoverBg} ${
             showProfileColumn ? "text-blue-400" : textMuted
           }`}
-          title={showProfileColumn ? "Hide profile column" : "Show profile column"}
+          title={showProfileColumn ? t("log.hideProfileColumn") : t("log.showProfileColumn")}
         >
           <User className="w-4 h-4" />
         </button>
@@ -292,8 +294,12 @@ export default function SessionLogView() {
         {/* Entry Count */}
         <span className={`text-xs ${textMuted}`}>
           {entries.length === totalCount
-            ? `${totalCount} entries`
-            : `${entries.length} / ${totalCount} entries`}
+            ? t("log.entries", { count: totalCount })
+            : t("log.entriesFiltered", {
+                count: totalCount,
+                filtered: entries.length,
+                total: totalCount,
+              })}
         </span>
 
         {/* Auto-scroll Toggle */}
@@ -308,7 +314,7 @@ export default function SessionLogView() {
           className={`p-1 rounded ${hoverBg} ${
             autoScroll ? "text-blue-400" : textMuted
           }`}
-          title="Scroll to bottom"
+          title={t("log.scrollToBottom")}
         >
           <ArrowDownToLine className="w-4 h-4" />
         </button>
@@ -317,7 +323,7 @@ export default function SessionLogView() {
         <button
           onClick={handleCopy}
           className={`p-1 rounded ${hoverBg} ${copied ? "text-green-400" : textMuted}`}
-          title="Copy log to clipboard"
+          title={t("log.copyLog")}
         >
           {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
         </button>
@@ -326,7 +332,7 @@ export default function SessionLogView() {
         <button
           onClick={clearEntries}
           className={`p-1 rounded ${hoverBg} ${textMuted} hover:text-red-400`}
-          title="Clear log"
+          title={t("log.clearLog")}
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -341,8 +347,8 @@ export default function SessionLogView() {
         {entries.length === 0 ? (
           <div className={emptyStateContainer}>
             <div className={emptyStateText}>
-              <p className={emptyStateHeading}>No log entries</p>
-              <p className={emptyStateDescription}>Session events will appear here</p>
+              <p className={emptyStateHeading}>{t("log.empty.heading")}</p>
+              <p className={emptyStateDescription}>{t("log.empty.description")}</p>
             </div>
           </div>
         ) : (
@@ -350,21 +356,21 @@ export default function SessionLogView() {
             <thead className={`sticky top-0 ${bgSurface}`}>
               <tr className={`border-b ${borderDefault}`}>
                 <th className={`px-2 py-1.5 text-left font-medium ${textMuted} w-[100px]`}>
-                  Time
+                  {t("log.headers.time")}
                 </th>
                 <th className={`px-2 py-1.5 text-left font-medium ${textMuted} w-[90px]`}>
-                  Event
+                  {t("log.headers.event")}
                 </th>
                 <th className={`px-2 py-1.5 text-left font-medium ${textMuted} w-[120px]`}>
-                  Session
+                  {t("log.headers.session")}
                 </th>
                 {showProfileColumn && (
                   <th className={`px-2 py-1.5 text-left font-medium ${textMuted} w-[140px]`}>
-                    Profile
+                    {t("log.headers.profile")}
                   </th>
                 )}
                 <th className={`px-2 py-1.5 text-left font-medium ${textMuted}`}>
-                  Details
+                  {t("log.headers.details")}
                 </th>
               </tr>
             </thead>
@@ -384,7 +390,7 @@ export default function SessionLogView() {
                   </td>
                   <td
                     className={`px-2 py-1 font-mono ${textSecondary} cursor-default`}
-                    title={entry.profileName ? `Profile: ${entry.profileName}` : undefined}
+                    title={entry.profileName ? t("log.profileTitle", { name: entry.profileName }) : undefined}
                   >
                     {truncateSessionId(entry.sessionId)}
                   </td>

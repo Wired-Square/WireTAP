@@ -1,6 +1,7 @@
 // src/apps/session-manager/nodes/SessionNode.tsx
 
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { Handle, Position } from "@xyflow/react";
 import { Radio, Pause, Square, AlertCircle, Users, Database } from "lucide-react";
 import type { ActiveSessionInfo } from "../../../api/io";
@@ -24,6 +25,7 @@ interface SessionNodeProps {
 }
 
 function SessionNode({ data, selected }: SessionNodeProps) {
+  const { t } = useTranslation("sessionManager");
   const { session, label, inputBuses, disabledInputBuses, connectedSubscriberIds } = data;
 
   // Build input bus list: enabled + disabled + one extra empty handle
@@ -79,13 +81,13 @@ function SessionNode({ data, selected }: SessionNodeProps) {
   ) : null;
 
   const stateLabel = isRunning
-    ? "Running"
+    ? t("node.session.states.running")
     : isStopped
-    ? "Stopped"
+    ? t("node.session.states.stopped")
     : isPaused
-    ? "Paused"
+    ? t("node.session.states.paused")
     : isError
-    ? "Error"
+    ? t("node.session.states.error")
     : session.state;
 
   const totalOutputHandles = outputCount + 1; // connected + one empty slot
@@ -172,12 +174,12 @@ function SessionNode({ data, selected }: SessionNodeProps) {
             <div className="flex items-center gap-1">
               <Users className={iconXs} />
               <span>
-                {session.subscriberCount} app{session.subscriberCount !== 1 ? "s" : ""}
+                {t("node.session.appsCount", { count: session.subscriberCount })}
               </span>
             </div>
             {session.captureFrameCount !== null && session.captureFrameCount > 0 && (
               <div>
-                {session.captureFrameCount.toLocaleString()} frames buffered
+                {t("node.session.framesBuffered", { count: session.captureFrameCount })}
               </div>
             )}
             <div className="text-[10px] opacity-70">{session.sourceType === "capture" ? "sqlite" : session.sourceType}</div>

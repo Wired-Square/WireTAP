@@ -4,6 +4,7 @@
 // sources, and listeners as interconnected nodes.
 
 import { useCallback, useEffect, useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ReactFlowProvider } from "@xyflow/react";
 import {
   listActiveSessions,
@@ -33,6 +34,7 @@ import SessionDetailPanel from "./views/SessionDetailPanel";
 import SessionLogView from "./views/SessionLogView";
 
 export default function SessionManager() {
+  const { t } = useTranslation("sessionManager");
   const [sessions, setSessions] = useState<ActiveSessionInfo[]>([]);
   const [activeTab, setActiveTab] = useState<string>("log");
   const autoRefresh = useSessionManagerStore((s) => s.autoRefresh);
@@ -56,13 +58,13 @@ export default function SessionManager() {
     () => [
       {
         id: "log",
-        label: "Log",
+        label: t("tabs.log"),
         count: logEntryCount > 0 ? logEntryCount : undefined,
         countColor: "gray" as const,
       },
-      { id: "visual", label: "Visual" },
+      { id: "visual", label: t("tabs.visual") },
     ],
-    [logEntryCount]
+    [logEntryCount, t]
   );
 
   // Fetch sessions
@@ -272,7 +274,7 @@ export default function SessionManager() {
         tabs={tabs}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        protocolLabel="Sessions"
+        protocolLabel={t("title")}
         contentArea={{ wrap: false }}
       >
         {activeTab === "visual" && (
@@ -321,11 +323,11 @@ export default function SessionManager() {
       >
         <div className="p-4">
           <h3 className="text-sm font-medium text-[color:var(--text-primary)] mb-3">
-            Add Source to Session
+            {t("addSource.title")}
           </h3>
           {availableProfiles.length === 0 ? (
             <p className="text-sm text-[color:var(--text-muted)]">
-              No available realtime profiles to add.
+              {t("addSource.noProfiles")}
             </p>
           ) : (
             <div className="space-y-1">
@@ -348,7 +350,7 @@ export default function SessionManager() {
               onClick={() => setAddSourceSessionId(null)}
               className="px-3 py-1 rounded text-xs text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]"
             >
-              Cancel
+              {t("addSource.cancel")}
             </button>
           </div>
         </div>

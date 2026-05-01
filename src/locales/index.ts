@@ -19,6 +19,8 @@ import enAUDevices from './en-AU/devices.json';
 import enAUQuery from './en-AU/query.json';
 import enAURules from './en-AU/rules.json';
 import enAUCatalog from './en-AU/catalog.json';
+import enAUGraph from './en-AU/graph.json';
+import enAUSessionManager from './en-AU/sessionManager.json';
 
 export const FALLBACK_LANGUAGE = 'en-AU';
 
@@ -26,7 +28,7 @@ export const SUPPORTED_LANGUAGES = ['en-AU'] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
-export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit', 'discovery', 'modbus', 'decoder', 'testPattern', 'analysis', 'devices', 'query', 'rules', 'catalog'] as const;
+export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit', 'discovery', 'modbus', 'decoder', 'testPattern', 'analysis', 'devices', 'query', 'rules', 'catalog', 'graph', 'sessionManager'] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
 export const resources = {
@@ -46,5 +48,7 @@ export const resources = {
     query: enAUQuery,
     rules: enAURules,
     catalog: enAUCatalog,
+    graph: enAUGraph,
+    sessionManager: enAUSessionManager,
   },
 } as const;

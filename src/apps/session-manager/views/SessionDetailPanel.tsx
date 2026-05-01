@@ -1,6 +1,7 @@
 // src/apps/session-manager/views/SessionDetailPanel.tsx
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Play, Pause, Square, Trash2, UserMinus, Plus, X, Save, Unplug, Plug } from "lucide-react";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
@@ -43,6 +44,7 @@ export default function SessionDetailPanel({
   onDisableBusMapping,
   onConnectAppToSession,
 }: SessionDetailPanelProps) {
+  const { t } = useTranslation("sessionManager");
   const selectedNode = useSessionManagerStore((s) => s.selectedNode);
   const setSelectedNode = useSessionManagerStore((s) => s.setSelectedNode);
 
@@ -50,7 +52,7 @@ export default function SessionDetailPanel({
     return (
       <div className="w-64 border-l border-[color:var(--border-default)] bg-[var(--bg-surface)] p-4">
         <p className={emptyStateText}>
-          Select a node or edge to view details
+          {t("detail.emptyPrompt")}
         </p>
       </div>
     );
@@ -61,7 +63,7 @@ export default function SessionDetailPanel({
     if (selectedNode.type === "session") {
       const sessionId = selectedNode.id.replace("session-", "");
       const session = sessions.find((s) => s.sessionId === sessionId);
-      if (!session) return <p className="text-sm text-[color:var(--text-muted)]">Session not found</p>;
+      if (!session) return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.sessionNotFound")}</p>;
 
       return <SessionDetails session={session} profiles={profiles} openPanelIds={openPanelIds} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} onDisableBusMapping={onDisableBusMapping} onConnectApp={onConnectAppToSession} />;
     }
@@ -69,7 +71,7 @@ export default function SessionDetailPanel({
     if (selectedNode.type === "source") {
       const profileId = selectedNode.id.replace("source-", "");
       const profile = profiles.find((p) => p.id === profileId);
-      if (!profile) return <p className="text-sm text-[color:var(--text-muted)]">Profile not found</p>;
+      if (!profile) return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.profileNotFound")}</p>;
 
       return <SourceDetails profile={profile} sessions={sessions} onRemoveSource={onRemoveSource} onDisableBusMapping={onDisableBusMapping} />;
     }
@@ -96,7 +98,7 @@ export default function SessionDetailPanel({
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--border-default)]">
         <span className="text-sm font-medium text-[color:var(--text-primary)] capitalize">
-          {selectedNode.type === "edge" ? "Connection" : selectedNode.type} Details
+          {selectedNode.type === "edge" ? t("detail.connectionHeader") : selectedNode.type} {t("detail.headerSuffix")}
         </span>
         <button
           onClick={() => setSelectedNode(null)}
@@ -166,6 +168,7 @@ function SessionDetails({
   onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
   onConnectApp?: (sessionId: string, appName: string) => void;
 }) {
+  const { t } = useTranslation("sessionManager");
   const isRunning = session.state === "running";
   const isStopped = session.state === "stopped";
   const isPaused = session.state === "paused";
@@ -176,7 +179,7 @@ function SessionDetails({
       {/* Session ID */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Session ID
+          {t("detail.labels.sessionId")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
           {session.sessionId}
@@ -186,7 +189,7 @@ function SessionDetails({
       {/* State */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          State
+          {t("detail.labels.state")}
         </label>
         <p className={`text-sm font-medium ${
           isRunning ? "text-green-400" :
@@ -201,7 +204,7 @@ function SessionDetails({
       {/* Device Type */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Device Type
+          {t("detail.labels.deviceType")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
           {session.sourceType}
@@ -212,7 +215,7 @@ function SessionDetails({
       {session.sourceProfileIds.length > 0 && (
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-            Sources
+            {t("detail.labels.sources")}
           </label>
           <div className="mt-1 space-y-1.5">
             {session.sourceProfileIds.map((id) => {
@@ -240,7 +243,7 @@ function SessionDetails({
                               <button
                                 onClick={() => onDisableBusMapping(session.sessionId, id, m.deviceBus)}
                                 className={`p-0.5 rounded ${iconButtonHoverDanger}`}
-                                title={`Remove bus${m.deviceBus} mapping`}
+                                title={t("detail.signalGen.removeMapping", { bus: m.deviceBus })}
                               >
                                 <Trash2 size={10} />
                               </button>
@@ -260,7 +263,7 @@ function SessionDetails({
       {/* Apps */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Apps
+          {t("detail.labels.apps")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
           {session.subscriberCount}
@@ -274,10 +277,10 @@ function SessionDetails({
       {session.captureId && (
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-            Buffer
+            {t("detail.labels.buffer")}
           </label>
           <p className="text-sm text-[color:var(--text-primary)]">
-            {session.captureFrameCount?.toLocaleString() ?? 0} frames
+            {t("detail.values.framesCount", { count: session.captureFrameCount ?? 0 })}
           </p>
         </div>
       )}
@@ -285,17 +288,17 @@ function SessionDetails({
       {/* Streaming */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Streaming
+          {t("detail.labels.streaming")}
         </label>
         <p className={`text-sm ${session.isStreaming ? "text-green-400" : "text-[color:var(--text-muted)]"}`}>
-          {session.isStreaming ? "Yes" : "No"}
+          {session.isStreaming ? t("detail.values.yes") : t("detail.values.no")}
         </p>
       </div>
 
       {/* Capabilities */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Capabilities
+          {t("detail.labels.capabilities")}
         </label>
         <div className="flex flex-wrap gap-1 mt-1">
           {session.capabilities.traits.protocols.map((protocol) => (
@@ -305,22 +308,22 @@ function SessionDetails({
           ))}
           {session.capabilities.traits.temporal_mode === "realtime" && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-amber-500/20 text-amber-400">
-              realtime
+              {t("detail.values.realtime")}
             </span>
           )}
           {session.capabilities.traits.tx_frames && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400">
-              transmit
+              {t("detail.values.transmit")}
             </span>
           )}
           {session.capabilities.can_pause && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-purple-500/20 text-purple-400">
-              pause
+              {t("detail.values.pause")}
             </span>
           )}
           {session.capabilities.supports_time_range && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-green-500/20 text-green-400">
-              time-range
+              {t("detail.values.timeRange")}
             </span>
           )}
         </div>
@@ -329,7 +332,7 @@ function SessionDetails({
       {/* Actions */}
       <div className="pt-2 border-t border-[color:var(--border-default)]">
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
-          Actions
+          {t("detail.labels.actions")}
         </label>
         <div className="flex flex-wrap gap-2">
           {isStopped && (
@@ -338,7 +341,7 @@ function SessionDetails({
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-green-400`}
             >
               <Play className={iconSm} />
-              Start
+              {t("detail.actions.start")}
             </button>
           )}
           {isRunning && (
@@ -347,7 +350,7 @@ function SessionDetails({
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-amber-400`}
             >
               <Square className={iconSm} />
-              Stop
+              {t("detail.actions.stop")}
             </button>
           )}
           {isRunning && canPause && (
@@ -356,7 +359,7 @@ function SessionDetails({
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-blue-400`}
             >
               <Pause className={iconSm} />
-              Pause
+              {t("detail.actions.pause")}
             </button>
           )}
           {isPaused && (
@@ -365,7 +368,7 @@ function SessionDetails({
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-green-400`}
             >
               <Play className={iconSm} />
-              Resume
+              {t("detail.actions.resume")}
             </button>
           )}
           {session.sourceType === "realtime" && (
@@ -374,7 +377,7 @@ function SessionDetails({
               className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-purple-400`}
             >
               <Plus className={iconSm} />
-              Add Source
+              {t("detail.actions.addSource")}
             </button>
           )}
           <button
@@ -382,7 +385,7 @@ function SessionDetails({
             className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
           >
             <Trash2 className={iconSm} />
-            Destroy
+            {t("detail.actions.destroy")}
           </button>
         </div>
       </div>
@@ -398,7 +401,7 @@ function SessionDetails({
         return (
           <div className="pt-2 border-t border-[color:var(--border-default)]">
             <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
-              Connect App
+              {t("detail.labels.connectApp")}
             </label>
             <div className="space-y-1">
               {unconnected.map((appName) => (
@@ -426,6 +429,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
   onRemoveSource: (sessionId: string, profileId: string) => void;
   onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
 }) {
+  const { t } = useTranslation("sessionManager");
   // Find sessions that use this profile as a source
   const usingSessions = sessions.filter((s) => s.sourceProfileIds.includes(profile.id));
 
@@ -433,7 +437,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
     <div className="space-y-4">
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Profile Name
+          {t("detail.labels.profileName")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
           {profile.name}
@@ -442,7 +446,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
 
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Profile ID
+          {t("detail.labels.profileId")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
           {profile.id}
@@ -451,7 +455,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
 
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Device Type
+          {t("detail.labels.deviceType")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
           {profile.kind}
@@ -461,10 +465,10 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
       {/* Preferred Decoder */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Preferred Decoder
+          {t("detail.labels.preferredDecoder")}
         </label>
         <p className={`text-sm ${profile.preferred_catalog ? "text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}>
-          {profile.preferred_catalog ?? "None"}
+          {profile.preferred_catalog ?? t("detail.values.none")}
         </p>
       </div>
 
@@ -475,7 +479,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
       }) && (
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-            Bus Mappings
+            {t("detail.labels.busMappings")}
           </label>
           {usingSessions.map((s) => {
             const config = s.brokerConfigs?.find((c) => c.profileId === profile.id);
@@ -499,7 +503,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
                           <button
                             onClick={() => onDisableBusMapping(s.sessionId, profile.id, m.deviceBus)}
                             className={`p-0.5 rounded ${iconButtonHoverDanger}`}
-                            title={`Remove bus${m.deviceBus} mapping`}
+                            title={t("detail.signalGen.removeMapping", { bus: m.deviceBus })}
                           >
                             <Trash2 size={10} />
                           </button>
@@ -527,7 +531,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
       {usingSessions.some((s) => s.sourceProfileIds.length > 1) && (
         <div className="pt-2 border-t border-[color:var(--border-default)]">
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
-            Actions
+            {t("detail.labels.actions")}
           </label>
           {usingSessions.map((s) =>
             s.sourceProfileIds.length > 1 ? (
@@ -537,7 +541,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
               >
                 <Trash2 className={iconSm} />
-                Remove from {s.sessionId}
+                {t("detail.actions.removeFrom", { sessionId: s.sessionId })}
               </button>
             ) : null
           )}
@@ -549,6 +553,7 @@ function SourceDetails({ profile, sessions, onRemoveSource, onDisableBusMapping 
 
 // Signal generator runtime controls for virtual device sources
 function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profile: IOProfile; sessionId: string; sessionState: IOStateType }) {
+  const { t } = useTranslation("sessionManager");
   const [busStates, setBusStates] = useState<VirtualBusState[]>([]);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
@@ -664,13 +669,13 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
     <div className="pt-2 border-t border-[color:var(--border-default)]">
       <div className="flex items-center justify-between mb-2">
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Signal Generator
+          {t("detail.labels.signalGenerator")}
         </label>
         {busStates.length < 8 && (
           <button
             onClick={handleAddBus}
             className={`flex items-center gap-0.5 px-1 py-0.5 rounded text-xs ${iconButtonHover}`}
-            title="Add bus"
+            title={t("detail.signalGen.addBus")}
           >
             <Plus className={iconSm} />
           </button>
@@ -686,7 +691,7 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
                 onChange={(e) => handleToggle(bs.bus, e.target.checked)}
                 className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
               />
-              <span className="text-xs text-[color:var(--text-primary)] w-10">Bus {bs.bus}</span>
+              <span className="text-xs text-[color:var(--text-primary)] w-10">{t("detail.signalGen.busLabel", { bus: bs.bus })}</span>
             </label>
             <input
               type="number"
@@ -698,12 +703,12 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
               disabled={!bs.enabled}
               className="w-16 px-1.5 py-0.5 text-xs rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] disabled:opacity-40"
             />
-            <span className="text-xs text-[color:var(--text-muted)]">Hz</span>
+            <span className="text-xs text-[color:var(--text-muted)]">{t("detail.signalGen.hz")}</span>
             {busStates.length > 1 && (
               <button
                 onClick={() => handleRemoveBus(bs.bus)}
                 className={`p-0.5 rounded ${iconButtonHoverDanger}`}
-                title={`Remove bus ${bs.bus}`}
+                title={t("detail.signalGen.removeBus", { bus: bs.bus })}
               >
                 <Trash2 size={12} />
               </button>
@@ -717,7 +722,7 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
           className={`mt-2 flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover}`}
         >
           <Save className={iconSm} />
-          Save to Profile
+          {t("detail.actions.saveToProfile")}
         </button>
       )}
     </div>
@@ -727,6 +732,7 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
 // Decoder picker for a session — reads/writes the session-level catalogPath from sessionStore.
 // Apps sharing the session will see the change via their cross-app sync effects.
 function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
+  const { t } = useTranslation("sessionManager");
   const catalogs = useSettingsStore((s) => s.catalogs.list);
   const sessionCatalogPath = useSessionStore(
     (s) => s.sessions[session.sessionId]?.catalogPath ?? null
@@ -754,14 +760,14 @@ function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
   return (
     <div>
       <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-        Decoder
+        {t("detail.labels.decoder")}
       </label>
       <select
         className="mt-1 w-full px-2 py-1 text-sm rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)]"
         value={currentFilename}
         onChange={(e) => handleChange(e.target.value)}
       >
-        <option value="">None</option>
+        <option value="">{t("detail.values.none")}</option>
         {catalogs.map((c) => (
           <option key={c.filename} value={c.filename}>
             {c.name}
@@ -782,11 +788,12 @@ function UnconnectedAppDetails({
   sessions: ActiveSessionInfo[];
   onConnectApp?: (sessionId: string, appName: string) => void;
 }) {
+  const { t } = useTranslation("sessionManager");
   return (
     <div className="space-y-4">
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          App
+          {t("detail.labels.app")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)] capitalize">
           {appName}
@@ -795,10 +802,10 @@ function UnconnectedAppDetails({
 
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Status
+          {t("detail.labels.status")}
         </label>
         <p className="text-sm text-[color:var(--text-muted)]">
-          Not connected to any session
+          {t("detail.values.notConnected")}
         </p>
       </div>
 
@@ -806,7 +813,7 @@ function UnconnectedAppDetails({
       {onConnectApp && sessions.length > 0 && (
         <div className="pt-2 border-t border-[color:var(--border-default)]">
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
-            Connect to Session
+            {t("detail.labels.connectToSession")}
           </label>
           <div className="space-y-1">
             {sessions.map((s) => (
@@ -840,6 +847,7 @@ function EdgeDetails({
   onDisableBusMapping: (sessionId: string, profileId: string, deviceBus: number) => void;
   onEvictSubscriber: (sessionId: string, subscriberId: string) => void;
 }) {
+  const { t } = useTranslation("sessionManager");
   // Parse edge ID to determine type
   // Source→Session: "edge-{profileId}-{sessionId}-b{deviceBus}-b{outputBus}"
   // Session→Listener: "edge-{sessionId}::{subscriberId}"
@@ -847,7 +855,7 @@ function EdgeDetails({
   if (edgeId.includes("::")) {
     // Session → Listener edge
     const match = edgeId.match(/^edge-(.+?)::(.+)$/);
-    if (!match) return <p className="text-sm text-[color:var(--text-muted)]">Edge not found</p>;
+    if (!match) return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.edgeNotFound")}</p>;
     const [, sessionId, subscriberId] = match;
     const session = sessions.find((s) => s.sessionId === sessionId);
     const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
@@ -856,16 +864,16 @@ function EdgeDetails({
       <div className="space-y-4">
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-            Type
+            {t("detail.labels.type")}
           </label>
           <p className="text-sm text-[color:var(--text-primary)]">
-            Session → App
+            {t("detail.values.sessionToApp")}
           </p>
         </div>
 
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-            Session
+            {t("detail.labels.session")}
           </label>
           <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
             {sessionId}
@@ -874,7 +882,7 @@ function EdgeDetails({
 
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-            App
+            {t("detail.labels.app")}
           </label>
           <p className="text-sm text-[color:var(--text-primary)] font-mono">
             {subscriberId}
@@ -892,7 +900,7 @@ function EdgeDetails({
             className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
           >
             <Unplug className={iconSm} />
-            Disconnect
+            {t("detail.actions.disconnect")}
           </button>
         </div>
       </div>
@@ -907,10 +915,10 @@ function EdgeDetails({
       <div className="space-y-4">
         <div>
           <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-            Type
+            {t("detail.labels.type")}
           </label>
           <p className="text-sm text-[color:var(--text-primary)]">
-            Device → Session
+            {t("detail.values.deviceToSession")}
           </p>
         </div>
       </div>
@@ -946,16 +954,16 @@ function EdgeDetails({
     <div className="space-y-4">
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Type
+          {t("detail.labels.type")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
-          Device → Session
+          {t("detail.values.deviceToSession")}
         </p>
       </div>
 
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Device
+          {t("detail.labels.device")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
           {profile?.name ?? profileId}
@@ -964,7 +972,7 @@ function EdgeDetails({
 
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Bus Mapping
+          {t("detail.labels.busMapping")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono">
           bus{deviceBus} → bus{outputBus}
@@ -973,7 +981,7 @@ function EdgeDetails({
 
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Session
+          {t("detail.labels.session")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
           {sessionId}
@@ -987,7 +995,7 @@ function EdgeDetails({
             className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
           >
             <Unplug className={iconSm} />
-            Disconnect
+            {t("detail.actions.disconnect")}
           </button>
         </div>
       )}
@@ -997,6 +1005,7 @@ function EdgeDetails({
 
 // Connected app details sub-component
 function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: ActiveSessionInfo[]; onEvict: (sessionId: string, subscriberId: string) => void }) {
+  const { t } = useTranslation("sessionManager");
   // Parse "app::${sessionId}::${subscriberId}"
   const parts = nodeId.split("::");
   const sessionId = parts[1];
@@ -1006,13 +1015,16 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
   const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
 
   if (!listener) {
-    return <p className="text-sm text-[color:var(--text-muted)]">App not found</p>;
+    return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.appNotFound")}</p>;
   }
 
   const formatUptime = (seconds: number): string => {
-    if (seconds < 60) return `${seconds}s ago`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m ago`;
+    if (seconds < 60) return t("detail.uptime.secondsAgo", { count: seconds });
+    if (seconds < 3600) return t("detail.uptime.minutesAgo", { count: Math.floor(seconds / 60) });
+    return t("detail.uptime.hoursMinutesAgo", {
+      hours: Math.floor(seconds / 3600),
+      minutes: Math.floor((seconds % 3600) / 60),
+    });
   };
 
   return (
@@ -1020,7 +1032,7 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
       {/* App ID */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          App ID
+          {t("detail.labels.appId")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono">
           {listener.subscriber_id}
@@ -1030,7 +1042,7 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
       {/* Session */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Session
+          {t("detail.labels.session")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono break-all">
           {sessionId}
@@ -1040,12 +1052,12 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
       {/* Active status */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Status
+          {t("detail.labels.status")}
         </label>
         <div className="flex items-center gap-2">
           <span className={`inline-block w-2 h-2 rounded-full ${listener.is_active ? "bg-green-400" : "bg-gray-500"}`} />
           <p className={`text-sm ${listener.is_active ? "text-green-400" : "text-[color:var(--text-muted)]"}`}>
-            {listener.is_active ? "Active" : "Inactive"}
+            {listener.is_active ? t("detail.values.active") : t("detail.values.inactive")}
           </p>
         </div>
       </div>
@@ -1053,7 +1065,7 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
       {/* Registration time */}
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
-          Registered
+          {t("detail.labels.registered")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)]">
           {formatUptime(listener.registered_seconds_ago)}
@@ -1063,14 +1075,14 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
       {/* Actions */}
       <div className="pt-2 border-t border-[color:var(--border-default)]">
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide mb-2 block">
-          Actions
+          {t("detail.labels.actions")}
         </label>
         <button
           onClick={() => onEvict(sessionId, subscriberId)}
           className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHoverDanger}`}
         >
           <UserMinus className={iconSm} />
-          Remove
+          {t("detail.actions.remove")}
         </button>
       </div>
     </div>
