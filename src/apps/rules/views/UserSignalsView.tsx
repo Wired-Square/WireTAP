@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
@@ -13,6 +14,7 @@ import UserSignalDialog from "../dialogs/UserSignalDialog";
 import type { UserSignalMetadata } from "../dialogs/UserSignalDialog";
 
 export default function UserSignalsView() {
+  const { t } = useTranslation("rules");
   const { selectableSignals, frameDefs, temporaryRules, addUserSignal, removeUserSignal } =
     useRulesStore(
       useShallow((s) => ({
@@ -64,13 +66,13 @@ export default function UserSignalsView() {
           onClick={() => setDialogOpen(true)}
           className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          <Plus className={iconMd} /> Add User Signal
+          <Plus className={iconMd} /> {t("userSignals.add")}
         </button>
       </div>
 
       {userSignals.length === 0 && (
         <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
-          <p className="text-sm">No user signals added</p>
+          <p className="text-sm">{t("userSignals.empty")}</p>
         </div>
       )}
 
@@ -91,14 +93,14 @@ export default function UserSignalsView() {
               </span>
               {isTemporary && (
                 <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                  Temporary
+                  {t("common.temporary")}
                 </span>
               )}
             </div>
             <button
               onClick={() => removeUserSignal(signal.signal_id)}
               className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-              title="Remove user signal"
+              title={t("userSignals.remove")}
             >
               <Trash2 className={iconMd} />
             </button>

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
@@ -13,6 +14,7 @@ import BridgeDialog from "../dialogs/BridgeDialog";
 import { formatHexId } from "../utils/formatHex";
 
 export default function BridgesView() {
+  const { t } = useTranslation("rules");
   const { bridges, loading, temporaryRules, device, removeBridge, enableBridge, addBridge } =
     useRulesStore(
       useShallow((s) => ({
@@ -47,7 +49,7 @@ export default function BridgesView() {
     return (
       <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
         <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="ml-2 text-sm">Loading bridges...</span>
+        <span className="ml-2 text-sm">{t("bridges.loading")}</span>
       </div>
     );
   }
@@ -59,13 +61,13 @@ export default function BridgesView() {
           onClick={() => setDialogOpen(true)}
           className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          <Plus className={iconMd} /> Add Bridge
+          <Plus className={iconMd} /> {t("bridges.add")}
         </button>
       </div>
 
       {bridges.length === 0 && (
         <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
-          <p className="text-sm">No bridges on device</p>
+          <p className="text-sm">{t("bridges.empty")}</p>
         </div>
       )}
 
@@ -85,26 +87,26 @@ export default function BridgesView() {
                 <span
                   className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
                 >
-                  {isTemp ? "Temporary" : "Existing"}
+                  {isTemp ? t("common.temporary") : t("common.existing")}
                 </span>
                 <span
                   className={`text-xs px-1.5 py-0.5 rounded ${b.enabled ? "bg-blue-500/20 text-blue-300" : "bg-neutral-500/20 text-neutral-400"}`}
                 >
-                  {b.enabled ? "Enabled" : "Disabled"}
+                  {b.enabled ? t("common.enabled") : t("common.disabled")}
                 </span>
               </div>
               <div className={`mt-1 text-xs ${textSecondary}`}>
                 {b.source_interface_name} → {b.dest_interface_name}
                 {` | ${b.interface_type_name}`}
                 {b.filters.length > 0 &&
-                  ` | ${b.filters.length} filter${b.filters.length !== 1 ? "s" : ""}`}
+                  ` | ${t("common.filtersCount", { count: b.filters.length })}`}
               </div>
             </div>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => enableBridge(b.bridge_id, !b.enabled)}
                 className={`p-1 rounded hover:bg-white/10 ${textSecondary}`}
-                title={b.enabled ? "Disable" : "Enable"}
+                title={b.enabled ? t("common.disable") : t("common.enable")}
               >
                 {b.enabled ? (
                   <ToggleRight className={`${iconMd} text-blue-400`} />
@@ -115,7 +117,7 @@ export default function BridgesView() {
               <button
                 onClick={() => removeBridge(b.bridge_id)}
                 className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-                title="Remove bridge"
+                title={t("bridges.remove")}
               >
                 <Trash2 className={iconMd} />
               </button>

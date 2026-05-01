@@ -6,6 +6,7 @@
 // to change colour, state, and blink period.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, RefreshCw, Palette } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
@@ -18,13 +19,10 @@ import type { DiscoveredLed } from "../../../api/framelinkRules";
 import PaletteEditorDialog from "../dialogs/PaletteEditorDialog";
 import IndicatorConfigDialog, { type LedUpdateValues } from "../dialogs/IndicatorConfigDialog";
 
-const STATE_OPTIONS = [
-  { value: 0, label: "Off" },
-  { value: 1, label: "On" },
-  { value: 2, label: "Blink" },
-] as const;
+const STATE_KEYS = ["off", "on", "blink"] as const;
 
 export default function IndicatorsView() {
+  const { t } = useTranslation("rules");
   const { deviceId, deviceInterfaces, indicators, loading, refreshIndicators } = useRulesStore(
     useShallow((s) => ({
       deviceId: s.device?.deviceId ?? null,
@@ -42,7 +40,7 @@ export default function IndicatorsView() {
     return (
       <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
         <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="ml-2 text-sm">Discovering indicators...</span>
+        <span className="ml-2 text-sm">{t("indicators.loading")}</span>
       </div>
     );
   }
@@ -50,7 +48,7 @@ export default function IndicatorsView() {
   if (indicators.length === 0 && !loading) {
     return (
       <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
-        <p className="text-sm">No LED indicators found on device</p>
+        <p className="text-sm">{t("indicators.empty")}</p>
       </div>
     );
   }
@@ -63,12 +61,12 @@ export default function IndicatorsView() {
           onClick={() => setPaletteOpen(true)}
           className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          <Palette className={iconMd} /> Palette Editor
+          <Palette className={iconMd} /> {t("indicators.paletteEditor")}
         </button>
         <button
           onClick={refreshIndicators}
           className={`p-1 rounded hover:bg-white/10 ${textSecondary}`}
-          title="Refresh indicators"
+          title={t("indicators.refresh")}
         >
           <RefreshCw className={iconMd} />
         </button>
@@ -96,9 +94,11 @@ export default function IndicatorsView() {
                   {led.label}
                 </div>
                 <div className={`text-xs ${textSecondary}`}>
-                  {STATE_OPTIONS[led.state]?.label ?? "Unknown"}
+                  {STATE_KEYS[led.state]
+                    ? t(`indicators.states.${STATE_KEYS[led.state]}`)
+                    : t("indicators.states.unknown")}
                   {led.state === 2 && led.blink_period > 0
-                    ? ` · ${led.blink_period}ms`
+                    ? t("indicators.blinkPeriod", { period: led.blink_period })
                     : ""}
                 </div>
               </div>

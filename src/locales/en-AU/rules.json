@@ -24,5 +24,66 @@
     "noDevices": "No FrameLink devices configured",
     "selectDevice": "Select a FrameLink device to manage rules",
     "ready": "Ready"
+  },
+  "common": {
+    "temporary": "Temporary",
+    "existing": "Existing",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "enable": "Enable",
+    "disable": "Disable",
+    "addDescription": "Add description",
+    "mappingsCount_one": "{{count}} mapping",
+    "mappingsCount_other": "{{count}} mappings",
+    "filtersCount_one": "{{count}} filter",
+    "filtersCount_other": "{{count}} filters",
+    "signalsCount_one": "{{count}} signal",
+    "signalsCount_other": "{{count}} signals"
+  },
+  "bridges": {
+    "loading": "Loading bridges...",
+    "add": "Add Bridge",
+    "empty": "No bridges on device",
+    "remove": "Remove bridge"
+  },
+  "transformers": {
+    "loading": "Loading transformers...",
+    "add": "Add Transformer",
+    "empty": "No transformers on device",
+    "remove": "Remove transformer"
+  },
+  "generators": {
+    "loading": "Loading generators...",
+    "add": "Add Generator",
+    "empty": "No generators on device",
+    "remove": "Remove generator",
+    "details": "{{period}}ms {{trigger}}"
+  },
+  "indicators": {
+    "loading": "Discovering indicators...",
+    "empty": "No LED indicators found on device",
+    "paletteEditor": "Palette Editor",
+    "refresh": "Refresh indicators",
+    "states": {
+      "off": "Off",
+      "on": "On",
+      "blink": "Blink",
+      "unknown": "Unknown"
+    },
+    "blinkPeriod": " · {{period}}ms"
+  },
+  "userSignals": {
+    "add": "Add User Signal",
+    "empty": "No user signals added",
+    "remove": "Remove user signal"
+  },
+  "frameDefs": {
+    "loading": "Loading frame definitions...",
+    "add": "Add Frame Def",
+    "empty": "No frame definitions on device",
+    "remove": "Remove frame definition",
+    "canIdLabel": "CAN ID: {{id}}",
+    "canIdExt": " (ext)",
+    "dlcLabel": "DLC: {{dlc}}"
   }
 }

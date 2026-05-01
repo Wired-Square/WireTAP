@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
@@ -16,6 +17,7 @@ import type { FrameHeader, FrameDefPayload } from "../utils/bitGrid";
 import { formatHexId } from "../utils/formatHex";
 
 export default function FrameDefsView() {
+  const { t } = useTranslation("rules");
   const { frameDefs, loading, temporaryRules, device, removeFrameDef, addFrameDef, setLabel } =
     useRulesStore(
       useShallow((s) => ({
@@ -120,7 +122,7 @@ export default function FrameDefsView() {
     return (
       <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
         <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="ml-2 text-sm">Loading frame definitions...</span>
+        <span className="ml-2 text-sm">{t("frameDefs.loading")}</span>
       </div>
     );
   }
@@ -132,13 +134,13 @@ export default function FrameDefsView() {
           onClick={() => setDialogOpen(true)}
           className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          <Plus className={iconMd} /> Add Frame Def
+          <Plus className={iconMd} /> {t("frameDefs.add")}
         </button>
       </div>
 
       {frameDefs.length === 0 && (
         <div className={`flex items-center justify-center py-12 ${textTertiary}`}>
-          <p className="text-sm">No frame definitions on device</p>
+          <p className="text-sm">{t("frameDefs.empty")}</p>
         </div>
       )}
 
@@ -167,7 +169,7 @@ export default function FrameDefsView() {
                 <span
                   className={`text-xs px-1.5 py-0.5 rounded ${isTemp ? "bg-amber-500/20 text-amber-300" : "bg-green-500/20 text-green-300"}`}
                 >
-                  {isTemp ? "Temporary" : "Existing"}
+                  {isTemp ? t("common.temporary") : t("common.existing")}
                 </span>
                 <span className={`text-xs ${textSecondary}`}>
                   {fd.interface_type_name}
@@ -175,21 +177,19 @@ export default function FrameDefsView() {
               </div>
               {fd.can_id != null && (
                 <div className={`mt-1 text-xs ${textSecondary}`}>
-                  CAN ID: 0x
-                  {fd.can_id
-                    .toString(16)
-                    .toUpperCase()
-                    .padStart(fd.extended ? 8 : 3, "0")}
-                  {fd.extended ? " (ext)" : ""}
-                  {fd.dlc != null ? ` | DLC: ${fd.dlc}` : ""}
-                  {` | ${fd.signals.length} signal${fd.signals.length !== 1 ? "s" : ""}`}
+                  {t("frameDefs.canIdLabel", {
+                    id: "0x" + fd.can_id.toString(16).toUpperCase().padStart(fd.extended ? 8 : 3, "0"),
+                  })}
+                  {fd.extended ? t("frameDefs.canIdExt") : ""}
+                  {fd.dlc != null ? ` | ${t("frameDefs.dlcLabel", { dlc: fd.dlc })}` : ""}
+                  {` | ${t("common.signalsCount", { count: fd.signals.length })}`}
                 </div>
               )}
               {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
               <div className="mt-1" onClick={(e) => e.stopPropagation()}>
                 <InlineEdit
                   value={fd.description ?? ""}
-                  placeholder="Add description"
+                  placeholder={t("common.addDescription")}
                   variant="secondary"
                   onCommit={(newDesc) => setLabel("frame_def", fd.frame_def_id, null, newDesc || null)}
                 />
@@ -198,7 +198,7 @@ export default function FrameDefsView() {
             <button
               onClick={(e) => { e.stopPropagation(); removeFrameDef(fd.frame_def_id); }}
               className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-              title="Remove frame definition"
+              title={t("frameDefs.remove")}
             >
               <Trash2 className={iconMd} />
             </button>
