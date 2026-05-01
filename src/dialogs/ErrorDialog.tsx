@@ -1,6 +1,7 @@
 // ui/src/dialogs/ErrorDialog.tsx
 
 import { AlertTriangle, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconLg, iconXl } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import { SecondaryButton } from "../components/forms/DialogButtons";
@@ -27,11 +28,14 @@ export interface ErrorDialogProps {
 
 export default function ErrorDialog({
   isOpen,
-  title = "Error",
+  title,
   message,
   details,
   onClose,
 }: ErrorDialogProps) {
+  const { t } = useTranslation("dialogs");
+  const headingTitle = title ?? t("error.defaultTitle");
+
   return (
     <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
       <div className={paddingDialog}>
@@ -42,7 +46,7 @@ export default function ErrorDialog({
               <AlertTriangle className={`${iconXl} ${textDanger}`} />
             </div>
             <div>
-              <h2 className={h2}>{title}</h2>
+              <h2 className={h2}>{headingTitle}</h2>
             </div>
           </div>
           <button
@@ -61,7 +65,7 @@ export default function ErrorDialog({
         {/* Details (if provided) */}
         {details && (
           <div className="mb-4">
-            <div className={`${labelSmall} mb-2`}>Technical Details:</div>
+            <div className={`${labelSmall} mb-2`}>{t("error.technicalDetails")}</div>
             <div className={detailBox}>
               <pre className="text-xs text-[color:var(--text-primary)] font-mono whitespace-pre-wrap break-words">
                 {details}
@@ -72,7 +76,7 @@ export default function ErrorDialog({
 
         {/* Actions */}
         <div className={`flex justify-end ${gapSmall}`}>
-          <SecondaryButton onClick={onClose}>Close</SecondaryButton>
+          <SecondaryButton onClick={onClose}>{t("common:actions.close")}</SecondaryButton>
         </div>
       </div>
     </Dialog>

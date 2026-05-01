@@ -1,6 +1,7 @@
 // ui/src/dialogs/SaveSelectionSetDialog.tsx
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog from "../components/Dialog";
 import Input from "../components/forms/Input";
 import { DialogFooter } from "../components/forms/DialogFooter";
@@ -19,14 +20,15 @@ export default function SaveSelectionSetDialog({
   onClose,
   onSave,
 }: Props) {
+  const { t, i18n } = useTranslation("dialogs");
   const [name, setName] = useState("");
 
   // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
-      setName(`Selection Set ${new Date().toLocaleDateString()}`);
+      setName(t("saveSelectionSet.defaultName", { date: new Date().toLocaleDateString(i18n.language) }));
     }
-  }, [isOpen]);
+  }, [isOpen, t, i18n.language]);
 
   const handleSave = () => {
     if (!name.trim()) return;
@@ -38,19 +40,19 @@ export default function SaveSelectionSetDialog({
     <Dialog isOpen={isOpen} maxWidth="max-w-md">
       <div className="p-6 space-y-4">
         <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          Save Selection Set
+          {t("saveSelectionSet.title")}
         </h2>
 
         <div className="space-y-3">
           {/* Name input */}
           <div className="space-y-1">
-            <label className={labelSmall}>Name</label>
+            <label className={labelSmall}>{t("saveSelectionSet.name")}</label>
             <Input
               variant="simple"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Selection set name"
+              placeholder={t("saveSelectionSet.namePlaceholder")}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && name.trim()) {
                   handleSave();
@@ -60,15 +62,13 @@ export default function SaveSelectionSetDialog({
             />
           </div>
 
-          <p className={helpText}>
-            {frameCount} frame{frameCount !== 1 ? "s" : ""} will be saved
-          </p>
+          <p className={helpText}>{t("saveSelectionSet.frameCount", { count: frameCount })}</p>
         </div>
 
         <DialogFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel="Save"
+          confirmLabel={t("common:actions.save")}
           confirmDisabled={!name.trim()}
         />
       </div>

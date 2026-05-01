@@ -1,6 +1,7 @@
 // ui/src/dialogs/SpeedPickerDialog.tsx
 
 import { Check, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, iconLg } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import type { PlaybackSpeed } from "../components/TimeController";
@@ -20,6 +21,7 @@ export default function SpeedPickerDialog({
   speed,
   onSpeedChange,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   const handleSelect = (newSpeed: PlaybackSpeed) => {
     onSpeedChange(newSpeed);
     onClose();
@@ -29,9 +31,7 @@ export default function SpeedPickerDialog({
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
       <div className={`${cardElevated} shadow-xl overflow-hidden`}>
         <div className={`${paddingCard} border-b ${borderDefault} flex items-center justify-between`}>
-          <h2 className={h2}>
-            Playback Speed
-          </h2>
+          <h2 className={h2}>{t("speedPicker.title")}</h2>
           <button
             onClick={onClose}
             className={`p-1 ${roundedDefault} ${hoverLight} transition-colors`}

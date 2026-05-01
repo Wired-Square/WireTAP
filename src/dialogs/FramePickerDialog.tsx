@@ -1,6 +1,7 @@
 // ui/src/dialogs/FramePickerDialog.tsx
 
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconLg } from "../styles/spacing";
 import { borderDivider, hoverLight, bgSurface } from "../styles";
 import Dialog from "../components/Dialog";
@@ -45,12 +46,14 @@ export default function FramePickerDialog({
   onClearSelectionSet,
   onSaveAsNewSelectionSet,
 }: Props) {
+  const { t } = useTranslation("dialogs");
+
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
         <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            Select Frames
+            {t("framePicker.title")}
           </h2>
           <button
             onClick={onClose}

@@ -6,6 +6,7 @@
 // Duplicate frame IDs are preserved — each capture entry is replayed as-is.
 
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog from "../components/Dialog";
 import { DialogFooter } from "../components/forms/DialogFooter";
 import { focusRingThin, helpText, inputSimple, labelSmall } from "../styles";
@@ -43,6 +44,7 @@ interface Props {
 }
 
 export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
+  const { t, i18n } = useTranslation("dialogs");
   const startReplay = useTransmitStore((s) => s.startReplay);
   const captureMode = useDiscoveryFrameStore((s) => s.captureMode);
   const sessions = useSessionStore((s) => s.sessions);
@@ -107,13 +109,13 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
 
   const rangeError =
     startIdx === null || endIdx === null
-      ? "Enter a valid frame number"
+      ? t("replay.errors.invalidNumber")
       : startIdx < 1
-      ? "Start must be ≥ 1"
+      ? t("replay.errors.startMin")
       : endIdx > bufferLength
-      ? `End must be ≤ ${bufferLength}`
+      ? t("replay.errors.endMax", { max: bufferLength })
       : startIdx > endIdx
-      ? "Start must be ≤ End"
+      ? t("replay.errors.startEnd")
       : null;
 
   // Slice capture by 1-based index range; preserves order and duplicate frame IDs
@@ -209,23 +211,21 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
       <div className="p-6 space-y-4">
         <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          Replay Frames
+          {t("replay.title")}
         </h2>
 
         {/* No transmit session warning */}
         {noSession ? (
           <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-            <p className="text-sm text-amber-300 font-medium">No transmit session active</p>
-            <p className="text-xs text-amber-300/80 mt-0.5">
-              Open the Transmit panel and connect to a session first.
-            </p>
+            <p className="text-sm text-amber-300 font-medium">{t("replay.noSessionTitle")}</p>
+            <p className="text-xs text-amber-300/80 mt-0.5">{t("replay.noSessionBody")}</p>
           </div>
         ) : (
           <>
             {/* Frame index range */}
             <div className="space-y-2">
               <label className={labelSmall}>
-                Frame range (of {bufferLength.toLocaleString()} in capture)
+                {t("replay.frameRangeLabel", { total: bufferLength.toLocaleString(i18n.language) })}
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -234,7 +234,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                   max={bufferLength}
                   value={startRaw}
                   onChange={(e) => setStartRaw(e.target.value)}
-                  placeholder="Start"
+                  placeholder={t("replay.startPlaceholder")}
                   className={`${inputSimple} flex-1 font-mono text-sm`}
                 />
                 <span className="text-[color:var(--text-secondary)] text-sm">–</span>
@@ -244,30 +244,32 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                   max={bufferLength}
                   value={endRaw}
                   onChange={(e) => setEndRaw(e.target.value)}
-                  placeholder="End"
+                  placeholder={t("replay.endPlaceholder")}
                   className={`${inputSimple} flex-1 font-mono text-sm`}
                 />
                 <button
                   onClick={() => { setStartRaw("1"); setEndRaw(String(bufferLength)); }}
                   className="px-2.5 py-1.5 text-xs rounded border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95 transition-colors whitespace-nowrap"
                 >
-                  All
+                  {t("replay.all")}
                 </button>
               </div>
               {rangeError && bufferLength > 0 ? (
                 <p className="text-xs text-[color:var(--status-danger-text)]">{rangeError}</p>
               ) : bufferLength === 0 ? (
-                <p className={helpText}>No frames in capture.</p>
+                <p className={helpText}>{t("replay.noFrames")}</p>
               ) : captureMode.enabled ? (
                 <p className={helpText}>
-                  {expectedCount.toLocaleString()} frame{expectedCount !== 1 ? "s" : ""} selected
+                  {t("replay.selectedSummary", { count: expectedCount })}
                 </p>
               ) : (
                 <p className={helpText}>
-                  {frameCount.toLocaleString()} frame{frameCount !== 1 ? "s" : ""} spanning{" "}
-                  {spanUs > 0 ? formatDuration(spanUs) : "—"}
+                  {t("replay.spanSummary", {
+                    count: frameCount,
+                    span: spanUs > 0 ? formatDuration(spanUs) : "—",
+                  })}
                   {effectiveSpanUs !== spanUs && effectiveSpanUs > 0 && speed !== 1
-                    ? ` · ${formatDuration(effectiveSpanUs)} at ${speed}×`
+                    ? t("replay.spanAtSpeed", { adjusted: formatDuration(effectiveSpanUs), speed })
                     : ""}
                 </p>
               )}
@@ -276,7 +278,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
             {/* Transmit session — shown only when multiple options exist */}
             {transmitSessions.length > 1 && (
               <div className="space-y-1">
-                <label className={labelSmall}>Transmit session</label>
+                <label className={labelSmall}>{t("replay.transmitSession")}</label>
                 <select
                   value={selectedSessionId ?? ""}
                   onChange={(e) => setSelectedSessionId(e.target.value)}
@@ -293,7 +295,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
 
             {/* Bus picker */}
             <div className="space-y-1">
-              <label className={labelSmall}>Target bus</label>
+              <label className={labelSmall}>{t("replay.targetBus")}</label>
               <div className="flex gap-1 flex-wrap">
                 <button
                   onClick={() => setTargetBus("original")}
@@ -303,7 +305,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                       : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95"
                   }`}
                 >
-                  Per frame
+                  {t("replay.perFrame")}
                 </button>
                 {BUS_OPTIONS.map((b) => (
                   <button
@@ -315,20 +317,20 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                         : "border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95"
                     }`}
                   >
-                    Bus {b}
+                    {t("replay.busLabel", { bus: b })}
                   </button>
                 ))}
               </div>
               <p className={helpText}>
                 {targetBus === "original"
-                  ? "Each frame is sent on its original bus."
-                  : `All frames will be sent on bus ${targetBus}.`}
+                  ? t("replay.perFrameHelp")
+                  : t("replay.fixedBusHelp", { bus: targetBus })}
               </p>
             </div>
 
             {/* Speed */}
             <div className="space-y-2">
-              <label className={labelSmall}>Speed</label>
+              <label className={labelSmall}>{t("replay.speed")}</label>
               <div className="flex gap-1 flex-wrap">
                 {SPEED_PRESETS.map((p) => (
                   <button
@@ -362,7 +364,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                 onChange={(e) => setLoop(e.target.checked)}
                 className="rounded"
               />
-              <span className="text-sm text-[color:var(--text-secondary)]">Loop indefinitely</span>
+              <span className="text-sm text-[color:var(--text-secondary)]">{t("replay.loopLabel")}</span>
             </label>
           </>
         )}
@@ -370,7 +372,13 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
         <DialogFooter
           onCancel={onClose}
           onConfirm={handleConfirm}
-          confirmLabel={isStarting ? "Starting…" : `Replay ${expectedCount > 0 ? expectedCount.toLocaleString() + " " : ""}Frames`}
+          confirmLabel={
+            isStarting
+              ? t("replay.starting")
+              : expectedCount > 0
+                ? t("replay.replayFrames", { count: expectedCount.toLocaleString(i18n.language) })
+                : t("replay.replayFramesEmpty")
+          }
           confirmDisabled={!canConfirm}
         />
       </div>

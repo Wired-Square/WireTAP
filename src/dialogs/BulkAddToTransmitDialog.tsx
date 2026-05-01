@@ -5,6 +5,7 @@
 // The user selects a frame ID range, output bus (if multi-bus), and repeat interval.
 
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog from "../components/Dialog";
 import { DialogFooter } from "../components/forms/DialogFooter";
 import { helpText, labelSmall, inputSimple } from "../styles";
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
+  const { t } = useTranslation("dialogs");
   const addCanFramesBulk = useTransmitStore((s) => s.addCanFramesBulk);
   const getGroupNames = useTransmitStore((s) => s.getGroupNames);
   const defaultIntervalMs = useTransmitStore((s) => s.queueRepeatIntervalMs);
@@ -74,9 +76,9 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
 
   const rangeError =
     (minIdRaw.trim() && minId === null) || (maxIdRaw.trim() && maxId === null)
-      ? "Invalid hex value"
+      ? t("bulkAddToTransmit.errors.invalidHex")
       : minId !== null && maxId !== null && minId > maxId
-      ? "Min must be ≤ Max"
+      ? t("bulkAddToTransmit.errors.minMax")
       : null;
 
   const canConfirm = !!transmitSession && matchingIds.length > 0 && !rangeError;
@@ -131,19 +133,19 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-sm">
       <div className="p-6 space-y-4">
         <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          Add to Transmit Queue
+          {t("bulkAddToTransmit.title")}
         </h2>
 
         {/* Session info */}
         <div className="space-y-1">
-          <label className={labelSmall}>Target session</label>
+          <label className={labelSmall}>{t("bulkAddToTransmit.targetSession")}</label>
           {transmitSession ? (
             <p className="text-sm text-[color:var(--text-primary)] font-medium">
               {transmitSession.profileName}
             </p>
           ) : (
             <p className="text-sm text-[color:var(--status-danger-text)]">
-              Transmit is not connected. Connect a session in the Transmit panel first.
+              {t("bulkAddToTransmit.noSession")}
             </p>
           )}
         </div>
@@ -151,7 +153,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
         {/* Bus picker — only shown for multi-bus sessions */}
         {availableBuses.length > 1 && (
           <div className="space-y-1">
-            <label className={labelSmall}>Output bus</label>
+            <label className={labelSmall}>{t("bulkAddToTransmit.outputBus")}</label>
             <select
               value={bus}
               onChange={(e) => setBus(Number(e.target.value))}
@@ -159,7 +161,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
             >
               {availableBuses.map((b) => (
                 <option key={b} value={b}>
-                  Bus {b}
+                  {t("bulkAddToTransmit.busLabel", { bus: b })}
                 </option>
               ))}
             </select>
@@ -168,13 +170,13 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
 
         {/* Frame ID range */}
         <div className="space-y-2">
-          <label className={labelSmall}>Frame ID range (hex)</label>
+          <label className={labelSmall}>{t("bulkAddToTransmit.frameIdRange")}</label>
           <div className="flex items-center gap-2">
             <input
               type="text"
               value={minIdRaw}
               onChange={(e) => setMinIdRaw(e.target.value.toUpperCase())}
-              placeholder="Min (e.g. 100)"
+              placeholder={t("bulkAddToTransmit.minPlaceholder")}
               className={`${inputSimple} flex-1 font-mono text-sm`}
               maxLength={8}
             />
@@ -183,7 +185,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
               type="text"
               value={maxIdRaw}
               onChange={(e) => setMaxIdRaw(e.target.value.toUpperCase())}
-              placeholder="Max (e.g. 7FF)"
+              placeholder={t("bulkAddToTransmit.maxPlaceholder")}
               className={`${inputSimple} flex-1 font-mono text-sm`}
               maxLength={8}
             />
@@ -191,7 +193,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
               onClick={() => { setMinIdRaw(""); setMaxIdRaw(""); }}
               className="px-2.5 py-1.5 text-xs rounded border border-[color:var(--border-default)] text-[color:var(--text-secondary)] hover:brightness-95 transition-colors whitespace-nowrap"
             >
-              All
+              {t("bulkAddToTransmit.all")}
             </button>
           </div>
           {rangeError ? (
@@ -199,16 +201,16 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
           ) : (
             <p className={helpText}>
               {matchingIds.length > 0
-                ? `${matchingIds.length} of ${totalKnown} frame ID${totalKnown !== 1 ? "s" : ""} selected`
+                ? t("bulkAddToTransmit.selectedSummary", { count: matchingIds.length, total: totalKnown })
                 : totalKnown > 0
-                ? "No frame IDs match this range"
-                : "No frames captured yet"}
+                ? t("bulkAddToTransmit.noMatches")
+                : t("bulkAddToTransmit.noCaptured")}
             </p>
           )}
         </div>
 
         <div className="space-y-1">
-          <label className={labelSmall}>Repeat interval (ms)</label>
+          <label className={labelSmall}>{t("bulkAddToTransmit.repeatInterval")}</label>
           <input
             type="number"
             min={10}
@@ -218,17 +220,17 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
             onChange={(e) => setIntervalMs(Math.max(10, Number(e.target.value)))}
             className={inputSimple}
           />
-          <p className={helpText}>Used when you start repeat on a queue item.</p>
+          <p className={helpText}>{t("bulkAddToTransmit.repeatHelp")}</p>
         </div>
 
         <div className="space-y-1">
-          <label className={labelSmall}>Group (optional)</label>
+          <label className={labelSmall}>{t("bulkAddToTransmit.groupLabel")}</label>
           <input
             type="text"
             list="bulk-add-groups"
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
-            placeholder="e.g. Diagnostics"
+            placeholder={t("bulkAddToTransmit.groupPlaceholder")}
             className={inputSimple}
           />
           <datalist id="bulk-add-groups">
@@ -236,7 +238,7 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
               <option key={g} value={g} />
             ))}
           </datalist>
-          <p className={helpText}>Assign all frames to a group for sequence repeat.</p>
+          <p className={helpText}>{t("bulkAddToTransmit.groupHelp")}</p>
         </div>
 
         <DialogFooter
@@ -244,8 +246,8 @@ export default function BulkAddToTransmitDialog({ isOpen, onClose }: Props) {
           onConfirm={handleConfirm}
           confirmLabel={
             matchingIds.length > 0
-              ? `Add ${matchingIds.length} to Queue`
-              : "Add to Queue"
+              ? t("bulkAddToTransmit.addNToQueue", { count: matchingIds.length })
+              : t("bulkAddToTransmit.addToQueue")
           }
           confirmDisabled={!canConfirm}
         />

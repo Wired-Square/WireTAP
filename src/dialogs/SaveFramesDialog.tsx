@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { iconXs, flexRowGap2 } from '../styles/spacing';
 import Dialog from '../components/Dialog';
 import { Input, Select, FormField } from '../components/forms';
@@ -40,6 +41,7 @@ export type SaveFramesDialogProps = {
  * Used in both Discovery and Decoder apps.
  */
 export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInterval, knowledgeEndianness, onChange, onCancel, onSave }: SaveFramesDialogProps) {
+  const { t } = useTranslation('dialogs');
   const [existingFiles, setExistingFiles] = useState<Set<string>>(new Set());
   const [filenameError, setFilenameError] = useState<string | null>(null);
 
@@ -64,11 +66,11 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
       : `${normalizedFilename}.toml`;
 
     if (normalizedFilename && existingFiles.has(filenameWithExt)) {
-      setFilenameError('A file with this name already exists');
+      setFilenameError(t('saveFrames.filenameExists'));
     } else {
       setFilenameError(null);
     }
-  }, [meta.filename, existingFiles]);
+  }, [meta.filename, existingFiles, t]);
 
   // Determine the interval to display - use knowledge interval if available
   const displayInterval = knowledgeInterval ?? meta.default_interval;
@@ -76,10 +78,10 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
   return (
     <Dialog isOpen={open} maxWidth="max-w-lg">
       <div className={`${paddingDialog} ${spaceYDefault}`}>
-        <div className={h3}>Export Boilerplate Decoder</div>
+        <div className={h3}>{t('saveFrames.title')}</div>
 
         <div className={`grid grid-cols-1 ${gapSmall}`}>
-          <FormField label="Name" variant="simple">
+          <FormField label={t('saveFrames.name')} variant="simple">
             <Input
               variant="simple"
               value={meta.name}
@@ -87,7 +89,7 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
             />
           </FormField>
 
-          <FormField label="Version" variant="simple">
+          <FormField label={t('saveFrames.version')} variant="simple">
             <Input
               variant="simple"
               type="number"
@@ -97,7 +99,7 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
             />
           </FormField>
 
-          <FormField label="Default byte order" variant="simple">
+          <FormField label={t('saveFrames.byteOrder')} variant="simple">
             <div className={flexRowGap2}>
               <Select
                 variant="simple"
@@ -110,20 +112,20 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
                 }
                 className="flex-1"
               >
-                <option value="little">Little</option>
-                <option value="big">Big</option>
+                <option value="little">{t('saveFrames.byteOrderLittle')}</option>
+                <option value="big">{t('saveFrames.byteOrderBig')}</option>
               </Select>
               <span className={`text-xs whitespace-nowrap ${
                 knowledgeEndianness !== null && knowledgeEndianness !== undefined
                   ? textSuccess
                   : textMuted
               }`}>
-                {knowledgeEndianness !== null && knowledgeEndianness !== undefined ? 'from analysis' : 'default'}
+                {knowledgeEndianness !== null && knowledgeEndianness !== undefined ? t('saveFrames.fromAnalysis') : t('saveFrames.default')}
               </span>
             </div>
           </FormField>
 
-          <FormField label="Default interval (ms)" variant="simple">
+          <FormField label={t('saveFrames.interval')} variant="simple">
             <div className={flexRowGap2}>
               <Input
                 variant="simple"
@@ -138,18 +140,18 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
                   ? textSuccess
                   : textMuted
               }`}>
-                {knowledgeInterval !== null && knowledgeInterval !== undefined ? 'from analysis' : 'default'}
+                {knowledgeInterval !== null && knowledgeInterval !== undefined ? t('saveFrames.fromAnalysis') : t('saveFrames.default')}
               </span>
             </div>
           </FormField>
 
-          <FormField label="Filename" variant="simple">
+          <FormField label={t('saveFrames.filename')} variant="simple">
             <div className="space-y-1">
               <Input
                 variant="simple"
                 value={meta.filename}
                 onChange={(e) => onChange({ ...meta, filename: e.target.value })}
-                placeholder="my-decoder.toml"
+                placeholder={t('saveFrames.filenamePlaceholder')}
                 className={filenameError ? 'border-[color:var(--text-amber)]' : ''}
               />
               {filenameError && (
@@ -163,12 +165,12 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
         </div>
 
         <div className={`flex justify-end ${gapSmall} pt-2`}>
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+          <SecondaryButton onClick={onCancel}>{t('common:actions.cancel')}</SecondaryButton>
           <button
             onClick={onSave}
             className="px-4 py-2 rounded-lg text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
           >
-            Save
+            {t('common:actions.save')}
           </button>
         </div>
       </div>

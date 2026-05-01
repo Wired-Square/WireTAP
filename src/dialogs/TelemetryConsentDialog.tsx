@@ -1,6 +1,7 @@
 // ui/src/dialogs/TelemetryConsentDialog.tsx
 
 import { Shield } from "lucide-react";
+import { Trans, useTranslation } from "react-i18next";
 import { iconXl } from "../styles/spacing";
 import Dialog from "../components/Dialog";
 import { PrimaryButton, SecondaryButton } from "../components/forms/DialogButtons";
@@ -26,6 +27,8 @@ export default function TelemetryConsentDialog({
   onAccept,
   onDecline,
 }: TelemetryConsentDialogProps) {
+  const { t } = useTranslation("dialogs");
+
   return (
     <Dialog isOpen={isOpen}>
       <div className={paddingDialog}>
@@ -34,28 +37,24 @@ export default function TelemetryConsentDialog({
           <div className={`w-12 h-12 ${bgInfo} ${roundedDefault} flex items-center justify-center`}>
             <Shield className={`${iconXl} ${textInfo}`} />
           </div>
-          <h2 className={h2}>Help improve WireTAP</h2>
+          <h2 className={h2}>{t("telemetryConsent.title")}</h2>
         </div>
 
         {/* Message */}
         <div className={`${textSecondary} space-y-3 mb-6`}>
+          <p>{t("telemetryConsent.intro")}</p>
           <p>
-            Hey! I'm building WireTAP mostly on my own, and when something breaks
-            in the field I often have no idea what happened. If you're happy to
-            share anonymous crash reports it'd be a huge help — it means I can
-            find and fix problems faster, even the ones nobody thinks to report.
-          </p>
-          <p>
-            No personal data, no CAN bus data, no usage tracking — just error
-            stack traces so I know what blew up and where. You can change your
-            mind any time in <strong>Settings → Privacy</strong>.
+            <Trans
+              i18nKey="dialogs:telemetryConsent.details"
+              components={{ strong: <strong /> }}
+            />
           </p>
         </div>
 
         {/* Actions */}
         <div className={`flex justify-end ${gapSmall}`}>
-          <SecondaryButton onClick={onDecline}>No thanks</SecondaryButton>
-          <PrimaryButton onClick={onAccept}>Yes, help improve WireTAP</PrimaryButton>
+          <SecondaryButton onClick={onDecline}>{t("telemetryConsent.decline")}</SecondaryButton>
+          <PrimaryButton onClick={onAccept}>{t("telemetryConsent.accept")}</PrimaryButton>
         </div>
       </div>
     </Dialog>

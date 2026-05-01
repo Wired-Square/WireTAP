@@ -1,6 +1,7 @@
 // ui/src/dialogs/CatalogPickerDialog.tsx
 
 import { Check, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, iconLg } from "../styles/spacing";
 import { caption, textMedium, borderDivider, hoverLight, bgSurface, emptyStateText } from "../styles";
 import Dialog from "../components/Dialog";
@@ -21,8 +22,11 @@ export default function CatalogPickerDialog({
   catalogs,
   selectedPath,
   onSelect,
-  title = "Select Catalog",
+  title,
 }: Props) {
+  const { t } = useTranslation("dialogs");
+  const headingTitle = title ?? t("catalogPicker.title");
+
   const handleSelect = (path: string) => {
     onSelect(path);
     onClose();
@@ -33,7 +37,7 @@ export default function CatalogPickerDialog({
       <div className={`${bgSurface} rounded-xl shadow-xl overflow-hidden`}>
         <div className={`p-4 ${borderDivider} flex items-center justify-between`}>
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {title}
+            {headingTitle}
           </h2>
           <button
             onClick={onClose}
@@ -44,9 +48,7 @@ export default function CatalogPickerDialog({
         </div>
         <div className="max-h-[50vh] overflow-y-auto">
           {catalogs.length === 0 ? (
-            <div className={`p-4 ${emptyStateText}`}>
-              No catalogs found. Add TOML catalog files to your decoder directory.
-            </div>
+            <div className={`p-4 ${emptyStateText}`}>{t("catalogPicker.empty")}</div>
           ) : (
             <div className="py-1">
               {catalogs.map((catalog) => {

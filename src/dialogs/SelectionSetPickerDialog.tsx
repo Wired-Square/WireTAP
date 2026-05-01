@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Trash2, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
 import { labelSmall, captionMuted, sectionHeaderText } from "../styles/typography";
 import { borderDivider, bgSecondary, hoverLight } from "../styles";
@@ -32,6 +33,7 @@ export default function SelectionSetPickerDialog({
   onClear,
   onSelectionSetsChanged,
 }: Props) {
+  const { t, i18n } = useTranslation("dialogs");
   const [selectionSets, setSelectionSets] = useState<SelectionSet[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
@@ -63,7 +65,7 @@ export default function SelectionSetPickerDialog({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Failed to load selection sets:", err);
-      showAppError("Load Error", "Failed to load selection sets.", msg);
+      showAppError(t("selectionSetPicker.errors.loadTitle"), t("selectionSetPicker.errors.loadMessage"), msg);
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +91,7 @@ export default function SelectionSetPickerDialog({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Failed to save selection set:", err);
-      showAppError("Save Error", "Failed to save selection set.", msg);
+      showAppError(t("selectionSetPicker.errors.saveTitle"), t("selectionSetPicker.errors.saveMessage"), msg);
     } finally {
       setIsSaving(false);
     }
@@ -107,7 +109,7 @@ export default function SelectionSetPickerDialog({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Failed to delete selection set:", err);
-      showAppError("Delete Error", "Failed to delete selection set.", msg);
+      showAppError(t("selectionSetPicker.errors.deleteTitle"), t("selectionSetPicker.errors.deleteMessage"), msg);
     }
   };
 
@@ -127,7 +129,7 @@ export default function SelectionSetPickerDialog({
   const selectedSet = selectionSets.find((s) => s.id === selectedId);
 
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString(undefined, {
+    return new Date(timestamp).toLocaleDateString(i18n.language, {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -140,7 +142,7 @@ export default function SelectionSetPickerDialog({
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-3 ${borderDivider}`}>
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            Selection Sets
+            {t("selectionSetPicker.title")}
           </h2>
           <button
             type="button"
@@ -156,10 +158,10 @@ export default function SelectionSetPickerDialog({
           {/* Left: Selection Set List */}
           <div className="w-1/2 border-r border-[color:var(--border-default)] overflow-y-auto">
             {isLoading ? (
-              <div className="p-4 text-sm text-[color:var(--text-muted)]">Loading...</div>
+              <div className="p-4 text-sm text-[color:var(--text-muted)]">{t("selectionSetPicker.loading")}</div>
             ) : selectionSets.length === 0 ? (
               <div className="p-4 text-sm text-[color:var(--text-muted)]">
-                No selection sets saved yet.
+                {t("selectionSetPicker.empty")}
               </div>
             ) : (
               <div className="divide-y divide-[color:var(--border-default)]">
@@ -178,7 +180,10 @@ export default function SelectionSetPickerDialog({
                       {set.name}
                     </div>
                     <div className={`${captionMuted} mt-0.5`}>
-                      {set.selectedIds?.length ?? set.frameIds.length}/{set.frameIds.length} selected
+                      {t("selectionSetPicker.selectedSummary", {
+                        selected: set.selectedIds?.length ?? set.frameIds.length,
+                        total: set.frameIds.length,
+                      })}
                     </div>
                   </button>
                 ))}
@@ -191,9 +196,7 @@ export default function SelectionSetPickerDialog({
             {selectedSet ? (
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <label className={labelSmall}>
-                    Name
-                  </label>
+                  <label className={labelSmall}>{t("selectionSetPicker.name")}</label>
                   <input
                     type="text"
                     value={editForm.name}
@@ -205,18 +208,17 @@ export default function SelectionSetPickerDialog({
                 </div>
 
                 <div className="space-y-1">
-                  <label className={labelSmall}>
-                    Frames
-                  </label>
+                  <label className={labelSmall}>{t("selectionSetPicker.frames")}</label>
                   <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
-                    {selectedSet.selectedIds?.length ?? selectedSet.frameIds.length}/{selectedSet.frameIds.length} selected
+                    {t("selectionSetPicker.selectedSummary", {
+                      selected: selectedSet.selectedIds?.length ?? selectedSet.frameIds.length,
+                      total: selectedSet.frameIds.length,
+                    })}
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className={labelSmall}>
-                    Created
-                  </label>
+                  <label className={labelSmall}>{t("selectionSetPicker.created")}</label>
                   <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
                     {formatDate(selectedSet.createdAt)}
                   </div>
@@ -224,9 +226,7 @@ export default function SelectionSetPickerDialog({
 
                 {selectedSet.lastUsedAt && (
                   <div className="space-y-1">
-                    <label className={labelSmall}>
-                      Last Used
-                    </label>
+                    <label className={labelSmall}>{t("selectionSetPicker.lastUsed")}</label>
                     <div className={`px-3 py-2 text-sm rounded border border-[color:var(--border-default)] ${bgSecondary} text-[color:var(--text-secondary)]`}>
                       {formatDate(selectedSet.lastUsedAt)}
                     </div>
@@ -240,7 +240,7 @@ export default function SelectionSetPickerDialog({
                     className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded text-[color:var(--status-danger-text)] hover:bg-[var(--status-danger-bg)]"
                   >
                     <Trash2 className={iconMd} />
-                    Delete
+                    {t("common:actions.delete")}
                   </button>
                   <div className={flexRowGap2}>
                     <button
@@ -249,21 +249,21 @@ export default function SelectionSetPickerDialog({
                       disabled={isSaving}
                       className={`px-4 py-1.5 text-sm font-medium rounded border border-[color:var(--border-default)] text-[color:var(--text-primary)] ${hoverLight} disabled:opacity-50`}
                     >
-                      {isSaving ? "Saving..." : "Save"}
+                      {isSaving ? t("selectionSetPicker.saving") : t("common:actions.save")}
                     </button>
                     <button
                       type="button"
                       onClick={handleLoad}
                       className="px-4 py-1.5 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
                     >
-                      Load
+                      {t("selectionSetPicker.load")}
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-sm text-[color:var(--text-muted)]">
-                Select a set to edit or load
+                {t("selectionSetPicker.selectPrompt")}
               </div>
             )}
           </div>
@@ -277,7 +277,7 @@ export default function SelectionSetPickerDialog({
               onClick={handleClear}
               className={`px-4 py-1.5 text-sm font-medium rounded border border-[color:var(--border-default)] text-[color:var(--text-primary)] ${hoverLight}`}
             >
-              Clear Selection Set
+              {t("selectionSetPicker.clear")}
             </button>
           </div>
         )}

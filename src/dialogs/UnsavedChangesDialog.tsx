@@ -1,5 +1,6 @@
 // ui/src/dialogs/UnsavedChangesDialog.tsx
 
+import { useTranslation } from "react-i18next";
 import Dialog from '../components/Dialog';
 import { SecondaryButton, DangerButton } from '../components/forms';
 import { h2, bodyDefault, paddingDialog, gapDefault } from '../styles';
@@ -15,16 +16,16 @@ export type UnsavedChangesDialogProps = {
  * Shared across Settings and Catalog Editor.
  */
 export default function UnsavedChangesDialog({ isOpen, onCancel, onConfirmLeave }: UnsavedChangesDialogProps) {
+  const { t } = useTranslation("dialogs");
+
   return (
     <Dialog isOpen={isOpen}>
       <div className={paddingDialog}>
-        <h2 className={`${h2} mb-4`}>Unsaved Changes</h2>
-        <p className={`${bodyDefault} mb-6`}>
-          You have unsaved changes. Are you sure you want to leave without saving?
-        </p>
+        <h2 className={`${h2} mb-4`}>{t("unsavedChanges.title")}</h2>
+        <p className={`${bodyDefault} mb-6`}>{t("unsavedChanges.message")}</p>
         <div className={`flex justify-end ${gapDefault}`}>
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-          <DangerButton onClick={onConfirmLeave}>Leave Without Saving</DangerButton>
+          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+          <DangerButton onClick={onConfirmLeave}>{t("unsavedChanges.leaveWithoutSaving")}</DangerButton>
         </div>
       </div>
     </Dialog>

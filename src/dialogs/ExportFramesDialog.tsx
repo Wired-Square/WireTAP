@@ -1,6 +1,7 @@
 // ui/src/dialogs/ExportFramesDialog.tsx
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog from "../components/Dialog";
 import { Select, FormField, PrimaryButton, SecondaryButton } from "../components/forms";
 import { h3, bodyDefault, caption } from "../styles";
@@ -34,18 +35,6 @@ const BYTES_FORMAT_EXTENSIONS: Record<string, string> = {
   csv: ".csv",
 };
 
-const FRAME_FORMAT_DESCRIPTIONS: Record<string, string> = {
-  csv: "GVRET/SavvyCAN compatible CSV format",
-  json: "JSON array of frame objects with all fields",
-  candump: "Linux can-utils candump format (timestamp interface frame#data)",
-};
-
-const BYTES_FORMAT_DESCRIPTIONS: Record<string, string> = {
-  hex: "Hex dump with timestamps",
-  bin: "Raw binary bytes (no timestamps)",
-  csv: "CSV with timestamp and byte value columns",
-};
-
 export default function ExportFramesDialog({
   open,
   itemCount,
@@ -54,6 +43,7 @@ export default function ExportFramesDialog({
   onCancel,
   onExport,
 }: ExportFramesDialogProps) {
+  const { t } = useTranslation("dialogs");
   const [format, setFormat] = useState<ExportFormat>(dataMode === "bytes" ? "hex" : "csv");
 
   // Update format when dataMode changes
@@ -66,10 +56,21 @@ export default function ExportFramesDialog({
   }, [dataMode]);
 
   const formatExtensions = dataMode === "bytes" ? BYTES_FORMAT_EXTENSIONS : FRAME_FORMAT_EXTENSIONS;
-  const formatDescriptions = dataMode === "bytes" ? BYTES_FORMAT_DESCRIPTIONS : FRAME_FORMAT_DESCRIPTIONS;
   const formatOptions = dataMode === "bytes"
-    ? [{ value: "hex", label: "Hex dump" }, { value: "bin", label: "Binary" }, { value: "csv", label: "CSV" }]
-    : [{ value: "csv", label: "CSV" }, { value: "json", label: "JSON" }, { value: "candump", label: "candump log" }];
+    ? [
+        { value: "hex" as const, label: t("exportFrames.formats.hex") },
+        { value: "bin" as const, label: t("exportFrames.formats.bin") },
+        { value: "csv" as const, label: t("exportFrames.formats.csv") },
+      ]
+    : [
+        { value: "csv" as const, label: t("exportFrames.formats.csv") },
+        { value: "json" as const, label: t("exportFrames.formats.json") },
+        { value: "candump" as const, label: t("exportFrames.formats.candump") },
+      ];
+
+  const formatDescription = dataMode === "bytes"
+    ? format === "csv" ? t("exportFrames.descriptions.csvBytes") : t(`exportFrames.descriptions.${format}`)
+    : t(`exportFrames.descriptions.${format}`);
 
   const handleExport = () => {
     const ext = formatExtensions[format] || ".txt";
@@ -78,18 +79,16 @@ export default function ExportFramesDialog({
     onExport(format, fullFilename);
   };
 
-  const itemLabel = dataMode === "bytes" ? "bytes" : "frames";
-  const title = dataMode === "bytes" ? "Export Bytes" : "Export Frames";
+  const title = dataMode === "bytes" ? t("exportFrames.titleBytes") : t("exportFrames.titleFrames");
+  const summaryKey = dataMode === "bytes" ? "exportFrames.summary_bytes" : "exportFrames.summary_frames";
 
   return (
     <Dialog isOpen={open} maxWidth="max-w-sm">
       <div className="p-6 space-y-4">
         <div className={h3}>{title}</div>
-        <div className={bodyDefault}>
-          Export {itemCount.toLocaleString()} {itemLabel} to file
-        </div>
+        <div className={bodyDefault}>{t(summaryKey, { count: itemCount })}</div>
 
-        <FormField label="Format" variant="simple">
+        <FormField label={t("exportFrames.format")} variant="simple">
           <Select
             variant="simple"
             value={format}
@@ -101,13 +100,11 @@ export default function ExportFramesDialog({
           </Select>
         </FormField>
 
-        <div className={caption}>
-          {formatDescriptions[format]}
-        </div>
+        <div className={caption}>{formatDescription}</div>
 
         <div className="flex justify-end gap-3 pt-4">
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={handleExport}>Export</PrimaryButton>
+          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+          <PrimaryButton onClick={handleExport}>{t("common:actions.export")}</PrimaryButton>
         </div>
       </div>
     </Dialog>

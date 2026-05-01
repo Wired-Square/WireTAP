@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Play, Plus, Trash2, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { IOProfile } from "../apps/settings/stores/settingsStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { iconMd, iconLg, flexRowGap2 } from "../styles/spacing";
@@ -47,6 +48,7 @@ export default function BookmarkEditorDialog({
   availableProfiles,
   onCreateBookmark,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   const [bookmarks, setBookmarks] = useState<TimeRangeFavorite[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -114,7 +116,7 @@ export default function BookmarkEditorDialog({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Failed to load bookmarks:", err);
-      showAppError("Load Error", "Failed to load bookmarks.", msg);
+      showAppError(t("bookmarkEditor.errors.loadTitle"), t("bookmarkEditor.errors.loadMessage"), msg);
     } finally {
       setIsLoading(false);
     }
@@ -156,7 +158,7 @@ export default function BookmarkEditorDialog({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Failed to save bookmark:", err);
-      showAppError("Save Error", "Failed to save bookmark.", msg);
+      showAppError(t("bookmarkEditor.errors.saveTitle"), t("bookmarkEditor.errors.saveMessage"), msg);
     } finally {
       setIsSaving(false);
     }
@@ -175,7 +177,7 @@ export default function BookmarkEditorDialog({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Failed to delete bookmark:", err);
-      showAppError("Delete Error", "Failed to delete bookmark.", msg);
+      showAppError(t("bookmarkEditor.errors.deleteTitle"), t("bookmarkEditor.errors.deleteMessage"), msg);
     }
   };
 
@@ -227,7 +229,7 @@ export default function BookmarkEditorDialog({
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("Failed to create bookmark:", err);
-      showAppError("Create Error", "Failed to create bookmark.", msg);
+      showAppError(t("bookmarkEditor.errors.createTitle"), t("bookmarkEditor.errors.createMessage"), msg);
     } finally {
       setIsCreatingBookmark(false);
     }
@@ -261,13 +263,13 @@ export default function BookmarkEditorDialog({
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-3 border-b ${borderDefault}`}>
           <div className={flexRowGap2}>
-            <h2 className={h2}>Bookmarks</h2>
+            <h2 className={h2}>{t("bookmarkEditor.title")}</h2>
             {canCreate && (
               <button
                 type="button"
                 onClick={handleStartCreate}
                 className={`p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--status-info-text)] ${hoverLight}`}
-                title="New bookmark"
+                title={t("bookmarkEditor.newTooltip")}
               >
                 <Plus className={iconMd} />
               </button>
@@ -287,11 +289,9 @@ export default function BookmarkEditorDialog({
           {/* Left: Bookmark List */}
           <div className={`w-1/2 border-r ${borderDefault} overflow-y-auto`}>
             {isLoading ? (
-              <div className={`p-4 ${emptyStateText}`}>Loading...</div>
+              <div className={`p-4 ${emptyStateText}`}>{t("bookmarkEditor.loading")}</div>
             ) : bookmarks.length === 0 ? (
-              <div className={`p-4 ${emptyStateText}`}>
-                No bookmarks saved yet.
-              </div>
+              <div className={`p-4 ${emptyStateText}`}>{t("bookmarkEditor.empty")}</div>
             ) : (
               <div className="divide-y divide-[color:var(--border-default)]">
                 {Object.entries(bookmarksByProfile).map(([pid, profileBookmarks]) => (
@@ -330,7 +330,7 @@ export default function BookmarkEditorDialog({
                               onLoad(bookmark);
                               onClose();
                             }}
-                            title="Load bookmark"
+                            title={t("bookmarkEditor.loadTooltip")}
                             className="p-2 mr-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--status-info-text)] hover:bg-[var(--status-info-bg)]"
                           >
                             <Play className={iconMd} />
@@ -350,7 +350,7 @@ export default function BookmarkEditorDialog({
               /* Create Form */
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <label className={labelSmall}>Profile</label>
+                  <label className={labelSmall}>{t("bookmarkEditor.profile")}</label>
                   <select
                     value={createProfileId}
                     onChange={(e) => setCreateProfileId(e.target.value)}
@@ -365,11 +365,11 @@ export default function BookmarkEditorDialog({
                 </div>
 
                 <div className="space-y-1">
-                  <label className={labelSmall}>Name</label>
+                  <label className={labelSmall}>{t("bookmarkEditor.name")}</label>
                   <Input
                     variant="simple"
                     type="text"
-                    placeholder="Bookmark name"
+                    placeholder={t("bookmarkEditor.namePlaceholder")}
                     value={createName}
                     onChange={(e) => setCreateName(e.target.value)}
                   />
@@ -383,13 +383,13 @@ export default function BookmarkEditorDialog({
 
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <SecondaryButton onClick={handleCancelCreate}>
-                    Cancel
+                    {t("common:actions.cancel")}
                   </SecondaryButton>
                   <PrimaryButton
                     onClick={handleCreate}
                     disabled={isCreatingBookmark || !createName.trim() || !createTimeBounds.startTime}
                   >
-                    {isCreatingBookmark ? "Creating..." : "Create"}
+                    {isCreatingBookmark ? t("bookmarkEditor.creating") : t("common:actions.create")}
                   </PrimaryButton>
                 </div>
               </div>
@@ -397,7 +397,7 @@ export default function BookmarkEditorDialog({
               /* Edit Form */
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <label className={labelSmall}>Name</label>
+                  <label className={labelSmall}>{t("bookmarkEditor.name")}</label>
                   <Input
                     variant="simple"
                     type="text"
@@ -414,7 +414,7 @@ export default function BookmarkEditorDialog({
 
                 {!profileId && (
                   <div className="space-y-1">
-                    <label className={labelSmall}>Profile</label>
+                    <label className={labelSmall}>{t("bookmarkEditor.profile")}</label>
                     <div className={`px-3 py-2 text-sm rounded border ${borderDefault} ${bgSecondary} text-[color:var(--text-secondary)]`}>
                       {selectedBookmark.profileId}
                     </div>
@@ -424,14 +424,14 @@ export default function BookmarkEditorDialog({
                 <div className="flex items-center justify-between pt-2">
                   <DangerButton onClick={handleDelete}>
                     <Trash2 className={iconMd} />
-                    Delete
+                    {t("common:actions.delete")}
                   </DangerButton>
                   <div className={flexRowGap2}>
                     <SecondaryButton onClick={handleSave} disabled={isSaving}>
-                      {isSaving ? "Saving..." : "Save"}
+                      {isSaving ? t("bookmarkEditor.saving") : t("common:actions.save")}
                     </SecondaryButton>
                     {onLoad && (
-                      <PrimaryButton onClick={handleLoad}>Load</PrimaryButton>
+                      <PrimaryButton onClick={handleLoad}>{t("bookmarkEditor.load")}</PrimaryButton>
                     )}
                   </div>
                 </div>
@@ -439,7 +439,7 @@ export default function BookmarkEditorDialog({
             ) : (
               /* Empty state */
               <div className="flex items-center justify-center h-full text-sm text-slate-400">
-                {canCreate ? "Select a bookmark or click + to create one" : "Select a bookmark to edit or load"}
+                {canCreate ? t("bookmarkEditor.selectPromptCanCreate") : t("bookmarkEditor.selectPromptReadOnly")}
               </div>
             )}
           </div>

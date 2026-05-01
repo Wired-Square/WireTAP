@@ -1,6 +1,7 @@
 // ui/src/dialogs/AddBookmarkDialog.tsx
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import Dialog from "../components/Dialog";
 import Input from "../components/forms/Input";
 import { DialogFooter } from "../components/forms/DialogFooter";
@@ -22,6 +23,7 @@ export default function AddBookmarkDialog({
   onClose,
   onSave,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   const [name, setName] = useState("");
   const [timeBounds, setTimeBounds] = useState<TimeBounds>({
     startTime: "",
@@ -33,7 +35,7 @@ export default function AddBookmarkDialog({
   // Reset form when dialog opens with new frame
   useEffect(() => {
     if (isOpen) {
-      setName(`Frame 0x${frameId.toString(16).toUpperCase()}`);
+      setName(t("addBookmark.defaultName", { frameId: `0x${frameId.toString(16).toUpperCase()}` }));
       setTimeBounds({
         startTime: frameTime,
         endTime: "",
@@ -41,7 +43,7 @@ export default function AddBookmarkDialog({
         timezoneMode: "local",
       });
     }
-  }, [isOpen, frameId, frameTime]);
+  }, [isOpen, frameId, frameTime, t]);
 
   const handleTimeBoundsChange = useCallback((bounds: TimeBounds) => {
     setTimeBounds(bounds);
@@ -57,19 +59,19 @@ export default function AddBookmarkDialog({
     <Dialog isOpen={isOpen} maxWidth="max-w-md">
       <div className="p-6 space-y-4">
         <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          Add Bookmark
+          {t("addBookmark.title")}
         </h2>
 
         <div className="space-y-3">
           {/* Name input */}
           <div className="space-y-1">
-            <label className={labelSmall}>Name</label>
+            <label className={labelSmall}>{t("addBookmark.name")}</label>
             <Input
               variant="simple"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Bookmark name"
+              placeholder={t("addBookmark.namePlaceholder")}
             />
           </div>
 
@@ -84,7 +86,7 @@ export default function AddBookmarkDialog({
         <DialogFooter
           onCancel={onClose}
           onConfirm={handleSave}
-          confirmLabel="Save Bookmark"
+          confirmLabel={t("addBookmark.save")}
           confirmDisabled={!name.trim() || !timeBounds.startTime}
         />
       </div>

@@ -1,0 +1,236 @@
+{
+  "error": {
+    "defaultTitle": "Error",
+    "technicalDetails": "Technical Details:"
+  },
+  "confirmDelete": {
+    "defaultTitle": "Confirm Delete",
+    "defaultMessage": "Delete this item?"
+  },
+  "unsavedChanges": {
+    "title": "Unsaved Changes",
+    "message": "You have unsaved changes. Are you sure you want to leave without saving?",
+    "leaveWithoutSaving": "Leave Without Saving"
+  },
+  "telemetryConsent": {
+    "title": "Help improve WireTAP",
+    "intro": "Hey! I'm building WireTAP mostly on my own, and when something breaks in the field I often have no idea what happened. If you're happy to share anonymous crash reports it'd be a huge help — it means I can find and fix problems faster, even the ones nobody thinks to report.",
+    "details": "No personal data, no CAN bus data, no usage tracking — just error stack traces so I know what blew up and where. You can change your mind any time in <strong>Settings → Privacy</strong>.",
+    "accept": "Yes, help improve WireTAP",
+    "decline": "No thanks"
+  },
+  "about": {
+    "title": "About WireTAP",
+    "loading": "Loading…",
+    "unknown": "Unknown",
+    "by": "by Wired Square",
+    "version": "Version {{version}}",
+    "tagline": "the artist formerly known as CANdor",
+    "summary": "A cross-platform toolkit for analyzing, decoding, and discovering CAN (Controller Area Network) bus messages, with a focus on reverse-engineering energy storage and vehicle communication protocols.",
+    "featuresTitle": "Features",
+    "features": {
+      "canAnalysis": "CAN bus analysis, decoding, and discovery",
+      "modbus": "Modbus TCP client/server polling",
+      "serial": "Serial device communication",
+      "mqttPostgres": "MQTT and PostgreSQL integration",
+      "multiSource": "Multi-source I/O with real-time streaming",
+      "catalogue": "Signal catalogue editor",
+      "transmission": "Frame transmission and playback",
+      "graphing": "Graphing and data visualisation"
+    },
+    "licenseLabel": "License:",
+    "licenseValue": "MIT License",
+    "copyrightLabel": "Copyright:",
+    "copyrightValue": "© 2026 Wired Square"
+  },
+  "bookmarkEditor": {
+    "title": "Bookmarks",
+    "newTooltip": "New bookmark",
+    "loading": "Loading…",
+    "empty": "No bookmarks saved yet.",
+    "loadTooltip": "Load bookmark",
+    "profile": "Profile",
+    "name": "Name",
+    "namePlaceholder": "Bookmark name",
+    "creating": "Creating…",
+    "saving": "Saving…",
+    "load": "Load",
+    "selectPromptCanCreate": "Select a bookmark or click + to create one",
+    "selectPromptReadOnly": "Select a bookmark to edit or load",
+    "errors": {
+      "loadTitle": "Load Error",
+      "loadMessage": "Failed to load bookmarks.",
+      "saveTitle": "Save Error",
+      "saveMessage": "Failed to save bookmark.",
+      "deleteTitle": "Delete Error",
+      "deleteMessage": "Failed to delete bookmark.",
+      "createTitle": "Create Error",
+      "createMessage": "Failed to create bookmark."
+    }
+  },
+  "addBookmark": {
+    "title": "Add Bookmark",
+    "name": "Name",
+    "namePlaceholder": "Bookmark name",
+    "defaultName": "Frame {{frameId}}",
+    "save": "Save Bookmark"
+  },
+  "saveFrames": {
+    "title": "Export Boilerplate Decoder",
+    "name": "Name",
+    "version": "Version",
+    "byteOrder": "Default byte order",
+    "byteOrderLittle": "Little",
+    "byteOrderBig": "Big",
+    "interval": "Default interval (ms)",
+    "filename": "Filename",
+    "filenamePlaceholder": "my-decoder.toml",
+    "fromAnalysis": "from analysis",
+    "default": "default",
+    "filenameExists": "A file with this name already exists"
+  },
+  "saveSelectionSet": {
+    "title": "Save Selection Set",
+    "name": "Name",
+    "namePlaceholder": "Selection set name",
+    "defaultName": "Selection Set {{date}}",
+    "frameCount_one": "{{count}} frame will be saved",
+    "frameCount_other": "{{count}} frames will be saved"
+  },
+  "exportFrames": {
+    "titleFrames": "Export Frames",
+    "titleBytes": "Export Bytes",
+    "summary_frames_one": "Export {{count}} frame to file",
+    "summary_frames_other": "Export {{count}} frames to file",
+    "summary_bytes_one": "Export {{count}} byte to file",
+    "summary_bytes_other": "Export {{count}} bytes to file",
+    "format": "Format",
+    "formats": {
+      "csv": "CSV",
+      "json": "JSON",
+      "candump": "candump log",
+      "hex": "Hex dump",
+      "bin": "Binary"
+    },
+    "descriptions": {
+      "csv": "GVRET/SavvyCAN compatible CSV format",
+      "json": "JSON array of frame objects with all fields",
+      "candump": "Linux can-utils candump format (timestamp interface frame#data)",
+      "hex": "Hex dump with timestamps",
+      "bin": "Raw binary bytes (no timestamps)",
+      "csvBytes": "CSV with timestamp and byte value columns"
+    }
+  },
+  "exportAnalysis": {
+    "title": "Export Analysis",
+    "save": "Save"
+  },
+  "exportReport": {
+    "title": "Export Report"
+  },
+  "bulkAddToTransmit": {
+    "title": "Add to Transmit Queue",
+    "targetSession": "Target session",
+    "noSession": "Transmit is not connected. Connect a session in the Transmit panel first.",
+    "outputBus": "Output bus",
+    "busLabel": "Bus {{bus}}",
+    "frameIdRange": "Frame ID range (hex)",
+    "minPlaceholder": "Min (e.g. 100)",
+    "maxPlaceholder": "Max (e.g. 7FF)",
+    "all": "All",
+    "errors": {
+      "invalidHex": "Invalid hex value",
+      "minMax": "Min must be ≤ Max"
+    },
+    "selectedSummary_one": "{{count}} of {{total}} frame ID selected",
+    "selectedSummary_other": "{{count}} of {{total}} frame IDs selected",
+    "noMatches": "No frame IDs match this range",
+    "noCaptured": "No frames captured yet",
+    "repeatInterval": "Repeat interval (ms)",
+    "repeatHelp": "Used when you start repeat on a queue item.",
+    "groupLabel": "Group (optional)",
+    "groupPlaceholder": "e.g. Diagnostics",
+    "groupHelp": "Assign all frames to a group for sequence repeat.",
+    "addToQueue": "Add to Queue",
+    "addNToQueue": "Add {{count}} to Queue"
+  },
+  "replay": {
+    "title": "Replay Frames",
+    "noSessionTitle": "No transmit session active",
+    "noSessionBody": "Open the Transmit panel and connect to a session first.",
+    "frameRangeLabel": "Frame range (of {{total}} in capture)",
+    "startPlaceholder": "Start",
+    "endPlaceholder": "End",
+    "all": "All",
+    "errors": {
+      "invalidNumber": "Enter a valid frame number",
+      "startMin": "Start must be ≥ 1",
+      "endMax": "End must be ≤ {{max}}",
+      "startEnd": "Start must be ≤ End"
+    },
+    "noFrames": "No frames in capture.",
+    "selectedSummary_one": "{{count}} frame selected",
+    "selectedSummary_other": "{{count}} frames selected",
+    "spanSummary_one": "{{count}} frame spanning {{span}}",
+    "spanSummary_other": "{{count}} frames spanning {{span}}",
+    "spanAtSpeed": " · {{adjusted}} at {{speed}}×",
+    "transmitSession": "Transmit session",
+    "targetBus": "Target bus",
+    "perFrame": "Per frame",
+    "busLabel": "Bus {{bus}}",
+    "perFrameHelp": "Each frame is sent on its original bus.",
+    "fixedBusHelp": "All frames will be sent on bus {{bus}}.",
+    "speed": "Speed",
+    "loopLabel": "Loop indefinitely",
+    "starting": "Starting…",
+    "replayFrames": "Replay {{count}} Frames",
+    "replayFramesEmpty": "Replay Frames"
+  },
+  "speedPicker": {
+    "title": "Playback Speed"
+  },
+  "catalogPicker": {
+    "title": "Select Catalog",
+    "empty": "No catalogs found. Add TOML catalog files to your decoder directory."
+  },
+  "framePicker": {
+    "title": "Select Frames"
+  },
+  "selectionSetPicker": {
+    "title": "Selection Sets",
+    "loading": "Loading…",
+    "empty": "No selection sets saved yet.",
+    "selectedSummary": "{{selected}}/{{total}} selected",
+    "name": "Name",
+    "frames": "Frames",
+    "created": "Created",
+    "lastUsed": "Last Used",
+    "saving": "Saving…",
+    "load": "Load",
+    "selectPrompt": "Select a set to edit or load",
+    "clear": "Clear Selection Set",
+    "errors": {
+      "loadTitle": "Load Error",
+      "loadMessage": "Failed to load selection sets.",
+      "saveTitle": "Save Error",
+      "saveMessage": "Failed to save selection set.",
+      "deleteTitle": "Delete Error",
+      "deleteMessage": "Failed to delete selection set."
+    }
+  },
+  "decoderInfo": {
+    "title": "Decoder Info"
+  },
+  "decoderConflict": {
+    "title": "Decoder Conflict"
+  },
+  "csvFileOrder": {
+    "title": "CSV File Order"
+  },
+  "candorMigration": {
+    "title": "CANdor Data Detected"
+  },
+  "toolbox": {
+    "title": "Toolbox"
+  }
+}
