@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useCallback } from "react";
 import { useState } from "react";
 import { Workflow, Save, RefreshCw, Loader2, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
@@ -20,14 +21,14 @@ import IndicatorsView from "./views/IndicatorsView";
 import DeviceOverview from "./views/DeviceOverview";
 import type { IOProfile } from "../../hooks/useSettings";
 
-const TABS: { id: RulesTab; label: string }[] = [
-  { id: "frame-defs", label: "Frame Defs" },
-  { id: "bridges", label: "Bridges" },
-  { id: "transformers", label: "Transformers" },
-  { id: "generators", label: "Generators" },
-  { id: "indicators", label: "Indicators" },
-  { id: "user-signals", label: "User Signals" },
-  { id: "overview", label: "Overview" },
+const TAB_KEYS: { id: RulesTab; i18nKey: string }[] = [
+  { id: "frame-defs", i18nKey: "frameDefs" },
+  { id: "bridges", i18nKey: "bridges" },
+  { id: "transformers", i18nKey: "transformers" },
+  { id: "generators", i18nKey: "generators" },
+  { id: "indicators", i18nKey: "indicators" },
+  { id: "user-signals", i18nKey: "userSignals" },
+  { id: "overview", i18nKey: "overview" },
 ];
 
 interface FramelinkDevice {
@@ -54,6 +55,7 @@ function deriveDevices(profiles: IOProfile[]): FramelinkDevice[] {
 }
 
 export default function Rules() {
+  const { t } = useTranslation("rules");
   const ioProfiles = useSettingsStore((s) => s.ioProfiles.profiles);
 
   const framelinkDevices = useMemo(
@@ -147,7 +149,7 @@ export default function Rules() {
     <AppTopBar
       icon={Workflow}
       iconColour="text-indigo-400"
-      title="Rules"
+      title={t("title")}
       actions={
         <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">
@@ -158,7 +160,7 @@ export default function Rules() {
               onChange={(e) => handleDeviceChange(e.target.value)}
               value={device?.deviceId ?? ""}
             >
-              <option value="">Select device...</option>
+              <option value="">{t("topBar.selectDevice")}</option>
               {framelinkDevices.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
                   {d.label}
@@ -175,8 +177,8 @@ export default function Rules() {
               {device.connected
                 ? device.label
                 : device.connecting
-                  ? "Connecting..."
-                  : "Disconnected"}
+                  ? t("topBar.connecting")
+                  : t("topBar.disconnected")}
             </span>
           )}
 
@@ -185,7 +187,7 @@ export default function Rules() {
             <button
               onClick={() => refreshTab()}
               className={`p-1 rounded hover:bg-white/10 ${textSecondary}`}
-              title="Refresh"
+              title={t("topBar.refresh")}
               disabled={isAnyLoading}
             >
               <RefreshCw className={`${iconMd} ${isAnyLoading ? "animate-spin" : ""}`} />
@@ -197,10 +199,10 @@ export default function Rules() {
             <button
               onClick={handlePersist}
               className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-green-600 hover:bg-green-500 text-white"
-              title="Persist all rules to device NVS"
+              title={t("topBar.persistTooltip")}
             >
               <Save className={iconMd} />
-              Make Permanent
+              {t("topBar.makePermanent")}
             </button>
           )}
         </div>
@@ -213,10 +215,10 @@ export default function Rules() {
                   ? "bg-red-600 hover:bg-red-500 text-white"
                   : "bg-red-500/10 hover:bg-red-500/20 text-red-400"
               }`}
-              title="Clear all persisted configuration from device flash"
+              title={t("topBar.clearConfigTooltip")}
             >
               <Trash2 className={iconMd} />
-              {confirmClear ? "Confirm Clear" : "Clear Config"}
+              {confirmClear ? t("topBar.confirmClear") : t("topBar.clearConfig")}
             </button>
           )}
         </div>
@@ -241,7 +243,7 @@ export default function Rules() {
         <div className={`flex-1 flex items-center justify-center ${textTertiary}`}>
           <div className="text-center">
             <Workflow className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No FrameLink devices configured</p>
+            <p className="text-sm">{t("states.noDevices")}</p>
             <p className="text-xs mt-1 opacity-60">
               Add a FrameLink profile in the Devices app
             </p>
@@ -262,7 +264,7 @@ export default function Rules() {
         <div className={`flex-1 flex items-center justify-center ${textTertiary}`}>
           <div className="text-center">
             <Workflow className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Select a FrameLink device to manage rules</p>
+            <p className="text-sm">{t("states.selectDevice")}</p>
             {framelinkDevices.length > 0 && (
               <div className="mt-4 flex flex-col items-center gap-2">
                 {framelinkDevices.map((d) => (
@@ -300,7 +302,7 @@ export default function Rules() {
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Tab bar */}
           <div className={`flex items-center gap-1 px-2 py-1 border-b ${borderDefault}`}>
-            {TABS.map((tab) => (
+            {TAB_KEYS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -310,7 +312,7 @@ export default function Rules() {
                     : `${textSecondary} hover:bg-white/5`
                 }`}
               >
-                {tab.label}
+                {t(`tabs.${tab.i18nKey}`)}
               </button>
             ))}
           </div>
@@ -347,7 +349,7 @@ export default function Rules() {
                 </span>
               </>
             ) : (
-              <span className={textTertiary}>Ready</span>
+              <span className={textTertiary}>{t("states.ready")}</span>
             )}
           </div>
         </div>

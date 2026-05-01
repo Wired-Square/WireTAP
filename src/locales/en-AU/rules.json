@@ -1,0 +1,28 @@
+{
+  "title": "Rules",
+  "tabs": {
+    "frameDefs": "Frame Defs",
+    "bridges": "Bridges",
+    "transformers": "Transformers",
+    "generators": "Generators",
+    "indicators": "Indicators",
+    "userSignals": "User Signals",
+    "overview": "Overview"
+  },
+  "topBar": {
+    "selectDevice": "Select device…",
+    "connecting": "Connecting…",
+    "disconnected": "Disconnected",
+    "refresh": "Refresh",
+    "makePermanent": "Make Permanent",
+    "persistTooltip": "Persist all rules to device NVS",
+    "clearConfig": "Clear Config",
+    "confirmClear": "Confirm Clear",
+    "clearConfigTooltip": "Clear all persisted configuration from device flash"
+  },
+  "states": {
+    "noDevices": "No FrameLink devices configured",
+    "selectDevice": "Select a FrameLink device to manage rules",
+    "ready": "Ready"
+  }
+}

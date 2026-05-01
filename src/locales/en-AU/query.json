@@ -1,0 +1,29 @@
+{
+  "tabs": {
+    "query": "Query",
+    "queue": "Queue",
+    "results": "Results",
+    "stats": "Stats"
+  },
+  "protocols": {
+    "capture": "Capture",
+    "postgres": "PostgreSQL"
+  },
+  "errors": {
+    "queryTitle": "Query Error",
+    "generic": "An error occurred"
+  },
+  "topBar": {
+    "noProfile": "No PostgreSQL profile selected",
+    "selectProfile": "Select a PostgreSQL profile to query frames.",
+    "captureMode": "Capture Mode",
+    "newQuery": "New Query"
+  },
+  "states": {
+    "noResults": "No results yet",
+    "noQuery": "Build a query and run it to see results.",
+    "noQueue": "Query queue is empty",
+    "running": "Running…",
+    "loading": "Loading…"
+  }
+}

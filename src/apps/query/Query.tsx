@@ -5,6 +5,7 @@
 // session to visualise discovered timeslices.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
@@ -38,6 +39,7 @@ import CatalogPickerDialog from "../../dialogs/CatalogPickerDialog";
 import AddBookmarkDialog from "../../dialogs/AddBookmarkDialog";
 
 export default function Query() {
+  const { t } = useTranslation("query");
   const { settings } = useSettings();
 
   // Tab state
@@ -357,28 +359,28 @@ export default function Query() {
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(
     () => [
-      { id: "query", label: "Query" },
+      { id: "query", label: t("tabs.query") },
       {
         id: "queue",
-        label: "Queue",
+        label: t("tabs.queue"),
         count: queueCount > 0 ? queueCount : undefined,
         countColor: pendingCount > 0 ? ("orange" as const) : ("green" as const),
       },
       {
         id: "results",
-        label: "Results",
+        label: t("tabs.results"),
         count: selectedQueryResultCount > 0 ? selectedQueryResultCount : undefined,
         countColor: "green" as const,
       },
-      { id: "stats", label: "Stats" },
+      { id: "stats", label: t("tabs.stats") },
     ],
     [queueCount, pendingCount, selectedQueryResultCount]
   );
 
   // Protocol badge for data source
   const protocolBadges: ProtocolBadge[] = useMemo(() => {
-    if (selectedCaptureId) return [{ label: "Capture", color: "amber" as const }];
-    if (sourceProfileId) return [{ label: "PostgreSQL", color: "blue" as const }];
+    if (selectedCaptureId) return [{ label: t("protocols.capture"), color: "amber" as const }];
+    if (sourceProfileId) return [{ label: t("protocols.postgres"), color: "blue" as const }];
     return [];
   }, [sourceProfileId, selectedCaptureId]);
 
@@ -468,8 +470,8 @@ export default function Query() {
       {/* Error Dialog */}
       <ErrorDialog
         isOpen={dialogs.error.isOpen || error !== null}
-        title="Query Error"
-        message={error || "An error occurred"}
+        title={t("errors.queryTitle")}
+        message={error || t("errors.generic")}
         onClose={handlers.handleCloseError}
       />
 
