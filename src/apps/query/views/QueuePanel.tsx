@@ -4,6 +4,7 @@
 // Allows selection of completed queries to view results.
 
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Clock, Loader2, CheckCircle2, XCircle, Trash2, ListX } from "lucide-react";
 import { useQueryStore, type QueuedQuery, type QueryStatus } from "../stores/queryStore";
 import { iconButtonBase } from "../../../styles/buttonStyles";
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function QueuePanel({ onSelectQuery, onRemoveQuery }: Props) {
+  const { t } = useTranslation("query");
   const queue = useQueryStore((s) => s.queue);
   const selectedQueryId = useQueryStore((s) => s.selectedQueryId);
 
@@ -42,9 +44,9 @@ export default function QueuePanel({ onSelectQuery, onRemoveQuery }: Props) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 text-center">
         <ListX className={`${iconXl} ${textMuted} mb-4`} />
-        <h3 className={`text-sm font-medium ${textPrimary} mb-2`}>No Queries in Queue</h3>
+        <h3 className={`text-sm font-medium ${textPrimary} mb-2`}>{t("queue.emptyHeading")}</h3>
         <p className={`text-xs ${textSecondary} max-w-xs`}>
-          Configure a query in the Query tab and click "Add to Queue" to run it.
+          {t("queue.emptyDescription")}
         </p>
       </div>
     );
@@ -55,12 +57,12 @@ export default function QueuePanel({ onSelectQuery, onRemoveQuery }: Props) {
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-2 ${borderDivider}`}>
         <div>
-          <h2 className={`text-sm font-semibold ${textPrimary}`}>Query Queue</h2>
+          <h2 className={`text-sm font-semibold ${textPrimary}`}>{t("queue.title")}</h2>
           <p className={`text-xs ${textSecondary}`}>
-            {queue.length} {queue.length === 1 ? "query" : "queries"}
+            {t("queue.summary", { count: queue.length })}
             {queue.filter((q) => q.status === "pending").length > 0 && (
               <span className={textMuted}>
-                {" "}· {queue.filter((q) => q.status === "pending").length} pending
+                {t("queue.pendingSuffix", { count: queue.filter((q) => q.status === "pending").length })}
               </span>
             )}
           </p>
@@ -110,6 +112,7 @@ interface QueueItemProps {
 }
 
 function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueItemProps) {
+  const { t } = useTranslation("query");
   const handleClick = useCallback(() => {
     onSelect(query.id);
   }, [query.id, onSelect]);
@@ -146,20 +149,20 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
         </div>
         <div className={`text-xs ${textMuted} mt-0.5`}>
           {query.status === "completed" && (
-            <span className={textDataGreen}>{resultCount} results</span>
+            <span className={textDataGreen}>{t("queue.results", { count: resultCount })}</span>
           )}
           {query.status === "error" && (
             <span className="text-red-400 truncate">{query.errorMessage}</span>
           )}
-          {query.status === "running" && <span className={textDataAmber}>Running...</span>}
-          {query.status === "pending" && <span>Queued at {formatTime(query.submittedAt)}</span>}
+          {query.status === "running" && <span className={textDataAmber}>{t("queue.running")}</span>}
+          {query.status === "pending" && <span>{t("queue.queuedAt", { time: formatTime(query.submittedAt) })}</span>}
           {query.stats && query.status === "completed" && (
-            <span className={textMuted}> · {query.stats.execution_time_ms.toLocaleString()}ms</span>
+            <span className={textMuted}>{t("queue.executionMs", { ms: query.stats.execution_time_ms.toLocaleString() })}</span>
           )}
         </div>
         {query.timeBounds && (
           <div className={`text-xs ${textMuted} mt-0.5 truncate`}>
-            Bounded: {query.timeBounds.favouriteName}
+            {t("queue.boundedBy", { name: query.timeBounds.favouriteName })}
           </div>
         )}
       </div>
@@ -168,7 +171,7 @@ function QueueItem({ query, isSelected, onSelect, onRemove, formatTime }: QueueI
       <button
         onClick={handleRemove}
         className={`${iconButtonBase} opacity-0 group-hover:opacity-100 transition-opacity`}
-        title={isRunning ? "Cancel and remove query" : "Remove from queue"}
+        title={isRunning ? t("queue.cancelTooltip") : t("queue.removeTooltip")}
       >
         <Trash2 className={iconMd} />
       </button>

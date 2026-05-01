@@ -25,5 +25,59 @@
     "noQueue": "Query queue is empty",
     "running": "Running…",
     "loading": "Loading…"
+  },
+  "stats": {
+    "noProfileHeading": "No Database Selected",
+    "noProfileDescription": "Select a PostgreSQL profile to view database activity.",
+    "title": "Database Activity",
+    "queries_one": "{{count}} running query",
+    "queries_other": "{{count}} running queries",
+    "sessions_one": "{{count}} session",
+    "sessions_other": "{{count}} sessions",
+    "summarySeparator": " · ",
+    "lastRefreshed": " · Last refreshed {{time}}",
+    "manual": "Manual",
+    "refresh": "Refresh",
+    "refreshTooltip": "Refresh activity",
+    "runningQueries": "Running Queries",
+    "noRunning": "No active queries running",
+    "connectedSessions": "Connected Sessions",
+    "noSessions": "No other sessions connected",
+    "headers": {
+      "pid": "PID",
+      "user": "User",
+      "duration": "Duration",
+      "query": "Query",
+      "actions": "Actions",
+      "application": "Application",
+      "state": "State",
+      "client": "Client"
+    },
+    "values": {
+      "lessThanSecond": "<1s",
+      "seconds": "{{secs}}s",
+      "minutesSeconds": "{{minutes}}m {{seconds}}s",
+      "hoursMinutes": "{{hours}}h {{minutes}}m",
+      "local": "local"
+    },
+    "cancelQuery": "Cancel query",
+    "terminateSession": "Terminate session",
+    "terminateConfirm": "Terminate this session? This will close the connection."
+  },
+  "queue": {
+    "emptyHeading": "No Queries in Queue",
+    "emptyDescription": "Configure a query in the Query tab and click \"Add to Queue\" to run it.",
+    "title": "Query Queue",
+    "summary_one": "{{count}} query",
+    "summary_other": "{{count}} queries",
+    "pendingSuffix": " · {{count}} pending",
+    "results_one": "{{count}} result",
+    "results_other": "{{count}} results",
+    "running": "Running...",
+    "queuedAt": "Queued at {{time}}",
+    "executionMs": " · {{ms}}ms",
+    "boundedBy": "Bounded: {{name}}",
+    "cancelTooltip": "Cancel and remove query",
+    "removeTooltip": "Remove from queue"
   }
 }

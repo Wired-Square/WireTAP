@@ -4,6 +4,7 @@
 // Allows cancelling queries and terminating sessions.
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   RefreshCw,
   XCircle,
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export default function StatsPanel({ profileId }: Props) {
+  const { t } = useTranslation("query");
   const activity = useQueryStore((s) => s.activity);
   const refreshActivity = useQueryStore((s) => s.refreshActivity);
   const cancelRunningQuery = useQueryStore((s) => s.cancelRunningQuery);
@@ -82,7 +84,7 @@ export default function StatsPanel({ profileId }: Props) {
   // Handle terminate session
   const handleTerminateSession = useCallback(
     async (pid: number) => {
-      if (profileId && confirm("Terminate this session? This will close the connection.")) {
+      if (profileId && confirm(t("stats.terminateConfirm"))) {
         await terminateSession(profileId, pid);
       }
     },
@@ -92,11 +94,11 @@ export default function StatsPanel({ profileId }: Props) {
   // Format duration
   const formatDuration = useCallback((secs: number | null) => {
     if (secs === null) return "-";
-    if (secs < 1) return "<1s";
-    if (secs < 60) return `${Math.round(secs)}s`;
-    if (secs < 3600) return `${Math.floor(secs / 60)}m ${Math.round(secs % 60)}s`;
-    return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
-  }, []);
+    if (secs < 1) return t("stats.values.lessThanSecond");
+    if (secs < 60) return t("stats.values.seconds", { secs: Math.round(secs) });
+    if (secs < 3600) return t("stats.values.minutesSeconds", { minutes: Math.floor(secs / 60), seconds: Math.round(secs % 60) });
+    return t("stats.values.hoursMinutes", { hours: Math.floor(secs / 3600), minutes: Math.floor((secs % 3600) / 60) });
+  }, [t]);
 
   // Render empty state if no profile
   if (!profileId) {
@@ -104,9 +106,9 @@ export default function StatsPanel({ profileId }: Props) {
       <div className={`h-full ${emptyStateContainer}`}>
         <Database className={`${iconXl} ${textMuted} mb-4`} />
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>No Database Selected</p>
+          <p className={emptyStateHeading}>{t("stats.noProfileHeading")}</p>
           <p className={emptyStateDescription}>
-            Select a PostgreSQL profile to view database activity.
+            {t("stats.noProfileDescription")}
           </p>
         </div>
       </div>
@@ -118,14 +120,14 @@ export default function StatsPanel({ profileId }: Props) {
       {/* Header with refresh controls */}
       <div className={`flex items-center justify-between px-4 py-2 ${borderDivider}`}>
         <div>
-          <h2 className={`text-sm font-semibold ${textPrimary}`}>Database Activity</h2>
+          <h2 className={`text-sm font-semibold ${textPrimary}`}>{t("stats.title")}</h2>
           <p className={`text-xs ${textSecondary}`}>
-            {activity.queries.length} running {activity.queries.length === 1 ? "query" : "queries"}
-            {" · "}
-            {activity.sessions.length} {activity.sessions.length === 1 ? "session" : "sessions"}
+            {t("stats.queries", { count: activity.queries.length })}
+            {t("stats.summarySeparator")}
+            {t("stats.sessions", { count: activity.sessions.length })}
             {activity.lastRefresh && (
               <span className={textMuted}>
-                {" · "}Last refreshed {new Date(activity.lastRefresh).toLocaleTimeString()}
+                {t("stats.lastRefreshed", { time: new Date(activity.lastRefresh).toLocaleTimeString() })}
               </span>
             )}
           </p>
@@ -139,7 +141,7 @@ export default function StatsPanel({ profileId }: Props) {
             }
             className={`text-xs px-2 py-1 rounded border border-[var(--border-default)] ${bgSurface} ${textPrimary}`}
           >
-            <option value="">Manual</option>
+            <option value="">{t("stats.manual")}</option>
             <option value="5">5s</option>
             <option value="10">10s</option>
             <option value="30">30s</option>
@@ -149,10 +151,10 @@ export default function StatsPanel({ profileId }: Props) {
             onClick={handleRefresh}
             disabled={activity.isLoading}
             className={buttonBase}
-            title="Refresh activity"
+            title={t("stats.refreshTooltip")}
           >
             <RefreshCw className={`${iconSm} ${activity.isLoading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <span>{t("stats.refresh")}</span>
           </button>
         </div>
       </div>
@@ -171,22 +173,22 @@ export default function StatsPanel({ profileId }: Props) {
         <section>
           <h3 className={`text-sm font-medium ${textPrimary} mb-2 flex items-center gap-2`}>
             <Activity className={iconSm} />
-            Running Queries
+            {t("stats.runningQueries")}
           </h3>
           {activity.queries.length === 0 ? (
             <div className={`text-xs ${textMuted} p-4 text-center ${bgSurface} rounded`}>
-              No active queries running
+              {t("stats.noRunning")}
             </div>
           ) : (
             <div className={`border border-[var(--border-default)] rounded overflow-hidden`}>
               <table className="w-full text-xs">
                 <thead className={`${bgSurface} ${textSecondary}`}>
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">PID</th>
-                    <th className="px-3 py-2 text-left font-medium">User</th>
-                    <th className="px-3 py-2 text-left font-medium">Duration</th>
-                    <th className="px-3 py-2 text-left font-medium">Query</th>
-                    <th className="px-3 py-2 text-right font-medium">Actions</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.pid")}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.user")}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.duration")}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.query")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("stats.headers.actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-default)]">
@@ -208,23 +210,23 @@ export default function StatsPanel({ profileId }: Props) {
         <section>
           <h3 className={`text-sm font-medium ${textPrimary} mb-2 flex items-center gap-2`}>
             <User className={iconSm} />
-            Connected Sessions
+            {t("stats.connectedSessions")}
           </h3>
           {activity.sessions.length === 0 ? (
             <div className={`text-xs ${textMuted} p-4 text-center ${bgSurface} rounded`}>
-              No other sessions connected
+              {t("stats.noSessions")}
             </div>
           ) : (
             <div className={`border border-[var(--border-default)] rounded overflow-hidden`}>
               <table className="w-full text-xs">
                 <thead className={`${bgSurface} ${textSecondary}`}>
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium">PID</th>
-                    <th className="px-3 py-2 text-left font-medium">User</th>
-                    <th className="px-3 py-2 text-left font-medium">Application</th>
-                    <th className="px-3 py-2 text-left font-medium">State</th>
-                    <th className="px-3 py-2 text-left font-medium">Client</th>
-                    <th className="px-3 py-2 text-right font-medium">Actions</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.pid")}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.user")}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.application")}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.state")}</th>
+                    <th className="px-3 py-2 text-left font-medium">{t("stats.headers.client")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t("stats.headers.actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-default)]">
@@ -253,6 +255,7 @@ interface QueryRowProps {
 }
 
 function QueryRow({ query, onCancel, formatDuration }: QueryRowProps) {
+  const { t } = useTranslation("query");
   const [isCancelling, setIsCancelling] = useState(false);
 
   const handleCancel = async () => {
@@ -285,7 +288,7 @@ function QueryRow({ query, onCancel, formatDuration }: QueryRowProps) {
             onClick={handleCancel}
             disabled={isCancelling}
             className={`${iconButtonBase} ${textDanger}`}
-            title="Cancel query"
+            title={t("stats.cancelQuery")}
           >
             {isCancelling ? (
               <Loader2 className={`${iconMd} animate-spin`} />
@@ -306,6 +309,7 @@ interface SessionRowProps {
 }
 
 function SessionRow({ session, onTerminate }: SessionRowProps) {
+  const { t } = useTranslation("query");
   const [isTerminating, setIsTerminating] = useState(false);
 
   const handleTerminate = async () => {
@@ -336,13 +340,13 @@ function SessionRow({ session, onTerminate }: SessionRowProps) {
         </span>
       </td>
       <td className={`px-3 py-2 ${stateColour}`}>{session.state ?? "-"}</td>
-      <td className={`px-3 py-2 ${monoBody} ${textMuted}`}>{session.client_addr ?? "local"}</td>
+      <td className={`px-3 py-2 ${monoBody} ${textMuted}`}>{session.client_addr ?? t("stats.values.local")}</td>
       <td className="px-3 py-2 text-right">
         <button
           onClick={handleTerminate}
           disabled={isTerminating}
           className={`${iconButtonBase} ${textDanger} opacity-50 hover:opacity-100`}
-          title="Terminate session"
+          title={t("stats.terminateSession")}
         >
           {isTerminating ? (
             <Loader2 className={`${iconMd} animate-spin`} />
