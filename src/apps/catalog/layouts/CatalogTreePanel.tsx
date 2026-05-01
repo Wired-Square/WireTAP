@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Cable, Filter, Network, Plus, Server, UserPlus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, iconXs } from "../../../styles/spacing";
 import { emptyStateText, emptyStateHeading } from "../../../styles/typography";
 import { iconActionButton } from "../../../styles/buttonStyles";
@@ -64,6 +65,7 @@ export default function CatalogTreePanel({
   onAddFrame,
   onEditConfig,
 }: CatalogTreePanelProps) {
+  const { t } = useTranslation("catalog");
   // Use generic handler if available, otherwise fall back to CAN-only
   const handleAddFrame = onAddFrame ?? onAddCanFrame;
   if (!visible) return null;
@@ -81,14 +83,14 @@ export default function CatalogTreePanel({
       <button
         onClick={onAddNode}
         className={iconActionButton('purple')}
-        title="Add new node"
+        title={t("tree.addNode")}
       >
         <UserPlus className={iconMd} />
       </button>
       <button
         onClick={() => handleAddFrame?.()}
         className={iconActionButton('blue')}
-        title="Add new frame"
+        title={t("tree.addFrame")}
       >
         <Plus className={iconMd} />
       </button>
@@ -113,7 +115,7 @@ export default function CatalogTreePanel({
               <button
                 onClick={onEditConfig}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-success-bg)] text-[color:var(--text-green)] hover:bg-[var(--status-success-bg-hover)] transition-colors cursor-pointer"
-                title={canConfig ? `CAN config: ${canConfig.default_endianness}${canConfig.frame_id_mask !== undefined ? ', masked' : ''}` : "Configure CAN settings"}
+                title={canConfig ? `CAN config: ${canConfig.default_endianness}${canConfig.frame_id_mask !== undefined ? ', masked' : ''}` : t("tree.configureCan")}
               >
                 <Network className={iconXs} />
                 CAN
@@ -124,7 +126,7 @@ export default function CatalogTreePanel({
               <button
                 onClick={onEditConfig}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-warning-bg)] text-[color:var(--text-amber)] hover:bg-[var(--status-warning-bg-hover)] transition-colors cursor-pointer"
-                title={modbusConfig ? `Modbus config: Addr ${modbusConfig.device_address}, Base ${modbusConfig.register_base}` : "Configure Modbus settings"}
+                title={modbusConfig ? `Modbus config: Addr ${modbusConfig.device_address}, Base ${modbusConfig.register_base}` : t("tree.configureModbus")}
               >
                 <Server className={iconXs} />
                 Modbus
@@ -135,7 +137,7 @@ export default function CatalogTreePanel({
               <button
                 onClick={onEditConfig}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] hover:bg-[var(--status-purple-bg-hover)] transition-colors cursor-pointer"
-                title={serialConfig ? `Serial encoding: ${serialConfig.encoding.toUpperCase()}` : "Configure Serial settings"}
+                title={serialConfig ? `Serial encoding: ${serialConfig.encoding.toUpperCase()}` : t("tree.configureSerial")}
               >
                 <Cable className={iconXs} />
                 Serial
@@ -151,20 +153,20 @@ export default function CatalogTreePanel({
             <button
               onClick={onAddNode}
               className={iconActionButton('purple')}
-              title="Add new node"
+              title={t("tree.addNode")}
             >
               <UserPlus className={iconMd} />
             </button>
             <button
               onClick={() => handleAddFrame?.()}
               className={iconActionButton('blue')}
-              title="Add new frame"
+              title={t("tree.addFrame")}
             >
               <Plus className={iconMd} />
             </button>
             <button
               onClick={() => setFilterByNode(filterByNode !== null ? null : "")}
-              title={filterByNode !== null ? "Clear filter" : "Filter by transmitting node"}
+              title={filterByNode !== null ? t("tree.clearFilter") : t("tree.filterByNode")}
               style={{
                 backgroundColor: filterByNode !== null ? "#2563eb" : undefined,
                 color: filterByNode !== null ? "white" : undefined,
@@ -184,8 +186,8 @@ export default function CatalogTreePanel({
               onChange={(e) => setFilterByNode(e.target.value || null)}
               className="w-full px-3 py-2 text-sm bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="">All nodes</option>
-              <option value="__unknown__">Unknown</option>
+              <option value="">{t("tree.allNodes")}</option>
+              <option value="__unknown__">{t("tree.unknownNode")}</option>
               {availablePeers.map((peer) => (
                 <option key={peer} value={peer}>
                   {peer}
@@ -203,9 +205,9 @@ export default function CatalogTreePanel({
         onScroll={onScroll ? (e) => onScroll((e.target as HTMLDivElement).scrollTop) : undefined}
       >
         {!catalogPath ? (
-          <p className={`${emptyStateText} ${emptyStateHeading}`}>Open a catalog file to view its structure</p>
+          <p className={`${emptyStateText} ${emptyStateHeading}`}>{t("tree.openCatalogPrompt")}</p>
         ) : parsedTree.length === 0 ? (
-          <p className={`${emptyStateText} ${emptyStateHeading}`}>No structure to display</p>
+          <p className={`${emptyStateText} ${emptyStateHeading}`}>{t("tree.emptyStructure")}</p>
         ) : (
           <div className="space-y-1">{parsedTree.map((node) => renderTreeNode(node, 0))}</div>
         )}

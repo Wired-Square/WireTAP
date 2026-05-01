@@ -1,0 +1,43 @@
+{
+  "toolbar": {
+    "noCatalog": "No catalog",
+    "configuration": "Catalog configuration",
+    "selectCatalog": "Select catalog",
+    "save": "Save",
+    "saveUnsaved": "Save changes (unsaved)",
+    "reload": "Reload from disk",
+    "validate": "Validate catalog",
+    "validateValid": "Valid - Click to re-validate",
+    "validateInvalid": "Invalid - Click to see errors",
+    "export": "Export catalog",
+    "switchToText": "Switch to Text Mode",
+    "switchToGui": "Switch to GUI Mode"
+  },
+  "tree": {
+    "addNode": "Add new node",
+    "addFrame": "Add new frame",
+    "configureCan": "Configure CAN settings",
+    "configureModbus": "Configure Modbus settings",
+    "configureSerial": "Configure Serial settings",
+    "filterByNode": "Filter by transmitting node",
+    "clearFilter": "Clear filter",
+    "allNodes": "All nodes",
+    "unknownNode": "Unknown",
+    "openCatalogPrompt": "Open a catalog file to view its structure",
+    "emptyStructure": "No structure to display"
+  },
+  "editor": {
+    "openCatalogPlaceholder": "Open a catalog file to edit…",
+    "openCatalogUiPrompt": "Open a catalog file to view in UI mode",
+    "editFrameTitle": "Edit Frame",
+    "addFrameTitle": "Add New Frame",
+    "editFrameDescription": "Modify frame definition",
+    "addFrameDescription": "Create a new frame definition",
+    "editCanFrameTitle": "Edit CAN Frame",
+    "addCanFrameTitle": "Add New CAN Frame",
+    "editCanFrameDescription": "Modify CAN message definition",
+    "addCanFrameDescription": "Create a new CAN message definition",
+    "saveChanges": "Save Changes",
+    "addFrameButton": "Add Frame"
+  }
+}

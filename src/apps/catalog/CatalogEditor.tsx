@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { useTranslation } from "react-i18next";
 import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
 import { useFocusStore } from "../../stores/focusStore";
@@ -32,6 +33,7 @@ import { useCatalogForms, useCatalogHandlers } from "./hooks";
 import { openCatalogAtPath } from "./io";
 
 export default function CatalogEditor() {
+  const { t } = useTranslation("catalog");
   // Zustand store selectors
   const catalogPath = useCatalogEditorStore((s) => s.file.path);
   const catalogContent = useCatalogEditorStore((s) => s.content.toml);
@@ -455,7 +457,7 @@ export default function CatalogEditor() {
                 ref={textareaRef}
                 toml={catalogContent}
                 onChangeToml={setToml}
-                placeholder="Open a catalog file to edit..."
+                placeholder={t("editor.openCatalogPlaceholder")}
                 isDisabled={!catalogPath}
               />
             </>
@@ -465,16 +467,16 @@ export default function CatalogEditor() {
                 <div className={emptyStateContainer}>
                   <div className={emptyStateText}>
                     <Eye className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className={emptyStateHeading}>Open a catalog file to view in UI mode</p>
+                    <p className={emptyStateHeading}>{t("editor.openCatalogUiPrompt")}</p>
                   </div>
                 </div>
               ) : forms.editingFrame && !selectedNode ? (
                 <FrameEditView
-                  title={forms.editingFrameOriginalKey ? "Edit Frame" : "Add New Frame"}
+                  title={forms.editingFrameOriginalKey ? t("editor.editFrameTitle") : t("editor.addFrameTitle")}
                   subtitle={
                     forms.editingFrameOriginalKey
-                      ? "Modify frame definition"
-                      : "Create a new frame definition"
+                      ? t("editor.editFrameDescription")
+                      : t("editor.addFrameDescription")
                   }
                   fields={forms.frameFields}
                   setFields={forms.setFrameFields}
@@ -483,16 +485,16 @@ export default function CatalogEditor() {
                   defaults={catalogDefaults}
                   onCancel={handlers.handleCancelFrameEdit}
                   onSave={handlers.handleSaveFrame}
-                  primaryActionLabel={forms.editingFrameOriginalKey ? "Save Changes" : "Add Frame"}
+                  primaryActionLabel={forms.editingFrameOriginalKey ? t("editor.saveChanges") : t("editor.addFrameButton")}
                   disableSave={!isFrameFieldsValid(forms.frameFields)}
                 />
               ) : forms.editingId && !selectedNode ? (
                 <CANFrameEditView
-                  title={forms.editingFrameId ? "Edit CAN Frame" : "Add New CAN Frame"}
+                  title={forms.editingFrameId ? t("editor.editCanFrameTitle") : t("editor.addCanFrameTitle")}
                   subtitle={
                     forms.editingFrameId
-                      ? "Modify CAN message definition"
-                      : "Create a new CAN message definition"
+                      ? t("editor.editCanFrameDescription")
+                      : t("editor.addCanFrameDescription")
                   }
                   idFields={idFields}
                   setIdFields={setIdFields}
@@ -502,7 +504,7 @@ export default function CatalogEditor() {
                     forms.setEditingFrameId(null);
                   }}
                   onSave={handlers.handleSaveId}
-                  primaryActionLabel={forms.editingFrameId ? "Save Changes" : "Add Frame"}
+                  primaryActionLabel={forms.editingFrameId ? t("editor.saveChanges") : t("editor.addFrameButton")}
                   disableSave={!idFields.id}
                 />
               ) : !selectedNode ? (

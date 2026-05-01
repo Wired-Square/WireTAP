@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/layout/CatalogToolbar.tsx
 
 import { Check, ChevronDown, Download, FileText, Glasses, RotateCcw, Save, Settings, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { disabledState } from "../../../styles";
 import { buttonBase, iconButtonBase, toggleButtonClass } from "../../../styles/buttonStyles";
@@ -40,12 +41,13 @@ export default function CatalogToolbar({
   onToggleMode,
   onEditConfig,
 }: CatalogToolbarProps) {
+  const { t } = useTranslation("catalog");
   // Get catalog display info
   // Normalise path separators for cross-platform comparison (Windows uses backslashes)
   const normalisePath = (p: string) => p.replace(/\\/g, '/');
   const normalisedCatalogPath = catalogPath ? normalisePath(catalogPath) : null;
   const selectedCatalog = catalogs.find((c) => normalisePath(c.path) === normalisedCatalogPath);
-  const catalogName = selectedCatalog?.name || catalogPath?.split("/").pop() || "No catalog";
+  const catalogName = selectedCatalog?.name || catalogPath?.split("/").pop() || t("toolbar.noCatalog");
 
   // Validation button styling
   const validationButtonClass =
@@ -70,7 +72,7 @@ export default function CatalogToolbar({
           <button
             onClick={onEditConfig}
             disabled={!catalogPath}
-            title="Catalog configuration"
+            title={t("toolbar.configuration")}
             className={iconButtonBase}
           >
             <Settings className={iconMd} />
@@ -82,7 +84,7 @@ export default function CatalogToolbar({
       <button
         onClick={onOpenPicker}
         className={buttonBase}
-        title="Select catalog"
+        title={t("toolbar.selectCatalog")}
       >
         <span className="max-w-40 truncate">{catalogName}</span>
         <ChevronDown className={`${iconSm} flex-shrink-0 text-slate-400`} />
@@ -92,7 +94,7 @@ export default function CatalogToolbar({
       <button
         onClick={onSave}
         disabled={!catalogPath}
-        title={hasUnsavedChanges ? "Save changes (unsaved)" : "Save"}
+        title={hasUnsavedChanges ? t("toolbar.saveUnsaved") : t("toolbar.save")}
         className={saveButtonClass}
       >
         <Save className={`${iconMd} ${hasUnsavedChanges ? "animate-pulse" : ""}`} />
@@ -102,7 +104,7 @@ export default function CatalogToolbar({
       <button
         onClick={onReload}
         disabled={!catalogPath}
-        title="Reload from disk"
+        title={t("toolbar.reload")}
         className={iconButtonBase}
       >
         <RotateCcw className={iconMd} />
@@ -114,10 +116,10 @@ export default function CatalogToolbar({
         disabled={!catalogPath}
         title={
           validationState === true
-            ? "Valid - Click to re-validate"
+            ? t("toolbar.validateValid")
             : validationState === false
-              ? "Invalid - Click to see errors"
-              : "Validate catalog"
+              ? t("toolbar.validateInvalid")
+              : t("toolbar.validate")
         }
         className={validationButtonClass}
       >
@@ -132,7 +134,7 @@ export default function CatalogToolbar({
       <button
         onClick={onExport}
         disabled={!catalogPath}
-        title="Export catalog"
+        title={t("toolbar.export")}
         className={iconButtonBase}
       >
         <Download className={iconMd} />
@@ -142,7 +144,7 @@ export default function CatalogToolbar({
       <button
         onClick={onToggleMode}
         disabled={!catalogPath}
-        title={editMode === "ui" ? "Switch to Text Mode" : "Switch to GUI Mode"}
+        title={editMode === "ui" ? t("toolbar.switchToText") : t("toolbar.switchToGui")}
         className={toggleButtonClass(editMode === "text", "purple")}
       >
         <Glasses className={iconMd} fill={editMode === "text" ? "currentColor" : "none"} />
