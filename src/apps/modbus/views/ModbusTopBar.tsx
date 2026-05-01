@@ -1,6 +1,7 @@
 // ui/src/apps/modbus/views/ModbusTopBar.tsx
 
 import { Server, Wifi, Cable } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { flexRowGap2 } from "../../../styles/spacing";
 import type { IOProfile } from "../../../types/common";
 import AppTopBar from "../../../components/AppTopBar";
@@ -70,6 +71,7 @@ export default function ModbusTopBar({
   selectedFrameCount,
   onOpenFramePicker,
 }: Props) {
+  const { t } = useTranslation("modbus");
   return (
     <AppTopBar
       icon={Server}
@@ -96,7 +98,7 @@ export default function ModbusTopBar({
         selectedCount: selectedFrameCount,
         onOpen: onOpenFramePicker,
         disabled: frameCount === 0,
-        disabledTitle: "No registers loaded",
+        disabledTitle: t("topBar.noRegisters"),
       }}
       catalog={{
         catalogs,

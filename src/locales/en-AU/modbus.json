@@ -1,0 +1,33 @@
+{
+  "topBar": {
+    "noRegisters": "No registers loaded"
+  },
+  "polling": {
+    "pause": "Pause polling",
+    "resume": "Resume polling",
+    "start": "Start polling",
+    "switchToSeconds": "Switch to seconds",
+    "switchToHuman": "Switch to human-readable"
+  },
+  "config": {
+    "transportMode": "Transport Mode",
+    "rtuSettings": "RTU Settings",
+    "validateCrc": "Validate CRC",
+    "catalogue": "Catalogue Configuration",
+    "deviceAddress": "Device Address",
+    "registerBase": "Register Base",
+    "defaultInterval": "Default Interval",
+    "byteOrder": "Byte Order",
+    "wordOrder": "Word Order"
+  },
+  "registers": {
+    "columns": {
+      "register": "Register",
+      "type": "Type",
+      "raw": "Raw",
+      "signals": "Signals",
+      "interval": "Interval",
+      "lastUpdate": "Last Update"
+    }
+  }
+}

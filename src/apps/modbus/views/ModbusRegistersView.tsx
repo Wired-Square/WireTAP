@@ -4,6 +4,7 @@
 // Filtered by selectedFrames (from FramePicker).
 
 import { useMemo, useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { formatFrameId } from "../../../utils/frameIds";
 import { parseFrameKey } from "../../../utils/frameKey";
 import { bgDataView, textPrimary, textMuted, textSecondary, borderDefault } from "../../../styles";
@@ -69,6 +70,7 @@ export default function ModbusRegistersView({
   displayFrameIdFormat,
   timeFormat,
 }: Props) {
+  const { t } = useTranslation("modbus");
   // Tick every second to update relative timestamps
   const [nowMs, setNowMs] = useState(Date.now);
   useEffect(() => {
@@ -133,12 +135,12 @@ export default function ModbusRegistersView({
       <table className="w-full text-xs">
         <thead className="sticky top-0 z-10">
           <tr className={`${bgDataView} border-b ${borderDefault}`}>
-            <th className={`px-3 py-1.5 text-left font-medium ${textSecondary}`}>Register</th>
-            <th className={`px-3 py-1.5 text-left font-medium ${textSecondary}`}>Type</th>
-            <th className={`px-3 py-1.5 text-left font-medium ${textSecondary}`}>Raw</th>
-            <th className={`px-3 py-1.5 text-left font-medium ${textSecondary}`}>Signals</th>
-            <th className={`px-3 py-1.5 text-right font-medium ${textSecondary}`}>Interval</th>
-            <th className={`px-3 py-1.5 text-right font-medium ${textSecondary}`}>Last Update</th>
+            <th className={`px-3 py-1.5 text-left font-medium ${textSecondary}`}>{t("registers.columns.register")}</th>
+            <th className={`px-3 py-1.5 text-left font-medium ${textSecondary}`}>{t("registers.columns.type")}</th>
+            <th className={`px-3 py-1.5 text-left font-medium ${textSecondary}`}>{t("registers.columns.raw")}</th>
+            <th className={`px-3 py-1.5 text-left font-medium ${textSecondary}`}>{t("registers.columns.signals")}</th>
+            <th className={`px-3 py-1.5 text-right font-medium ${textSecondary}`}>{t("registers.columns.interval")}</th>
+            <th className={`px-3 py-1.5 text-right font-medium ${textSecondary}`}>{t("registers.columns.lastUpdate")}</th>
           </tr>
         </thead>
         <tbody>

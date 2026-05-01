@@ -3,6 +3,7 @@
 // Configuration panel for Modbus transport mode and RTU settings.
 
 import { Wifi, Cable } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { inputSimple, labelSmall, helpText, bgDataView, textPrimary, textMuted, borderDefault } from "../../../styles";
 import type { ModbusTransportMode, ModbusRtuConfig } from "../stores/modbusStore";
 import type { ModbusProtocolConfig } from "../../../utils/catalogParser";
@@ -22,11 +23,12 @@ export default function ModbusConfigView({
   onSetTransportMode,
   onSetRtuConfig,
 }: Props) {
+  const { t } = useTranslation("modbus");
   return (
     <div className={`h-full overflow-auto p-4 space-y-6 ${bgDataView}`}>
       {/* Transport mode */}
       <section className="space-y-2">
-        <h3 className={labelSmall}>Transport Mode</h3>
+        <h3 className={labelSmall}>{t("config.transportMode")}</h3>
         <div className="flex gap-2">
           <button
             onClick={() => onSetTransportMode('tcp')}
@@ -56,7 +58,7 @@ export default function ModbusConfigView({
       {/* RTU settings (only shown when RTU mode is selected) */}
       {transportMode === 'rtu' && (
         <section className="space-y-3">
-          <h3 className={labelSmall}>RTU Settings</h3>
+          <h3 className={labelSmall}>{t("config.rtuSettings")}</h3>
           <div className="grid grid-cols-2 gap-3 max-w-md">
             <div>
               <label className={`block mb-1 ${helpText}`}>Device Address (1-247)</label>
@@ -99,7 +101,7 @@ export default function ModbusConfigView({
                   onChange={(e) => onSetRtuConfig({ validateCrc: e.target.checked })}
                   className="w-3 h-3"
                 />
-                <span className={textPrimary}>Validate CRC</span>
+                <span className={textPrimary}>{t("config.validateCrc")}</span>
               </label>
             </div>
           </div>
@@ -109,35 +111,35 @@ export default function ModbusConfigView({
       {/* Catalogue info */}
       {modbusConfig && (
         <section className={`space-y-2 p-3 rounded-lg border ${borderDefault}`}>
-          <h3 className={labelSmall}>Catalogue Configuration</h3>
+          <h3 className={labelSmall}>{t("config.catalogue")}</h3>
           <div className={`grid grid-cols-2 gap-2 text-xs ${textMuted}`}>
             {modbusConfig.device_address !== undefined && (
               <>
-                <span>Device Address</span>
+                <span>{t("config.deviceAddress")}</span>
                 <span className={textPrimary}>{modbusConfig.device_address}</span>
               </>
             )}
             {modbusConfig.register_base !== undefined && (
               <>
-                <span>Register Base</span>
+                <span>{t("config.registerBase")}</span>
                 <span className={textPrimary}>{modbusConfig.register_base === 0 ? '0 (IEC)' : '1 (Traditional)'}</span>
               </>
             )}
             {modbusConfig.default_interval !== undefined && (
               <>
-                <span>Default Interval</span>
+                <span>{t("config.defaultInterval")}</span>
                 <span className={textPrimary}>{(modbusConfig.default_interval / 1000).toFixed(1)}s</span>
               </>
             )}
             {modbusConfig.default_byte_order && (
               <>
-                <span>Byte Order</span>
+                <span>{t("config.byteOrder")}</span>
                 <span className={textPrimary}>{modbusConfig.default_byte_order}</span>
               </>
             )}
             {modbusConfig.default_word_order && (
               <>
-                <span>Word Order</span>
+                <span>{t("config.wordOrder")}</span>
                 <span className={textPrimary}>{modbusConfig.default_word_order}</span>
               </>
             )}

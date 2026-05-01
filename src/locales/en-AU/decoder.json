@@ -1,0 +1,19 @@
+{
+  "topBar": {
+    "showRawBytes": "Show raw bytes",
+    "hideRawBytes": "Hide raw bytes",
+    "clearDecoded": "Clear decoded values",
+    "showAsciiColumn": "Show ASCII column",
+    "hideAsciiColumn": "Hide ASCII column"
+  },
+  "filterDialog": {
+    "title": "Frame Filters",
+    "frameIdsLabel": "Frame IDs (hex)",
+    "frameIdsPlaceholder": "e.g., 0x100-0x109, 0x151",
+    "frameIdsHelp": "Frames with matching IDs will be moved to the Filtered tab. Supports comma-separated values and ranges (e.g., 0x100-0x109, 0x151).",
+    "minLengthLabel": "Minimum frame length (bytes)",
+    "minLengthHelp": "Frames shorter than this will be filtered out and shown in the Filtered tab. Set to 0 to disable length filtering.",
+    "apply": "Apply",
+    "clearAll": "Clear All"
+  }
+}

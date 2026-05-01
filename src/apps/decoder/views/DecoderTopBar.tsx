@@ -1,6 +1,7 @@
 // ui/src/apps/decoder/views/DecoderTopBar.tsx
 
 import { Activity, Glasses, Trash2, Users, User, Filter, Eye, EyeOff, Type } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconSm, iconMd } from "../../../styles/spacing";
 import type { CatalogMetadata } from "../../../api/catalog";
 import type { IOProfile } from "../../../types/common";
@@ -155,6 +156,7 @@ export default function DecoderTopBar({
   onToggleAsciiGutter,
   frameIdFilter = '',
 }: Props) {
+  const { t } = useTranslation("decoder");
   // Filter button state
   const hasFilters = minFrameLength > 0 || frameIdFilter.trim() !== '';
   const filterParts: string[] = [];
@@ -211,7 +213,7 @@ export default function DecoderTopBar({
         <button
           onClick={onToggleRawBytes}
           className={toggleButtonClass(showRawBytes, "purple")}
-          title={showRawBytes ? "Hide raw bytes" : "Show raw bytes"}
+          title={showRawBytes ? t("topBar.hideRawBytes") : t("topBar.showRawBytes")}
         >
           <Glasses className={iconSm} />
         </button>
@@ -222,7 +224,7 @@ export default function DecoderTopBar({
         <button
           onClick={onClear}
           className={buttonBase}
-          title="Clear decoded values"
+          title={t("topBar.clearDecoded")}
         >
           <Trash2 className={iconSm} />
         </button>
@@ -278,7 +280,7 @@ export default function DecoderTopBar({
               ? "!bg-yellow-600 !text-white hover:!bg-yellow-500"
               : ""
           }`}
-          title={showAsciiGutter ? "Hide ASCII column" : "Show ASCII column"}
+          title={showAsciiGutter ? t("topBar.hideAsciiColumn") : t("topBar.showAsciiColumn")}
         >
           <Type className={iconMd} />
         </button>

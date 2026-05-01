@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Server, Settings as SettingsIcon, Play, Square, Clock, Timer } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { dataViewContainer } from "../../styles";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
@@ -26,6 +27,7 @@ import ModbusConfigView from "./views/ModbusConfigView";
 import type { FrameMessage } from "../../types/frame";
 
 export default function Modbus() {
+  const { t } = useTranslation("modbus");
   const { settings } = useSettings();
   const displayFrameIdFormat = getDisplayFrameIdFormat();
   const decoderDir = settings?.decoder_dir ?? null;
@@ -299,7 +301,7 @@ export default function Modbus() {
                     .catch((e: unknown) => tlog.info(`[Modbus] Pause failed: ${e}`));
                 }}
                 className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
-                title="Pause polling"
+                title={t("polling.pause")}
               >
                 <Square size={10} fill="currentColor" />
                 Pause
@@ -312,7 +314,7 @@ export default function Modbus() {
                     .catch((e: unknown) => tlog.info(`[Modbus] Resume failed: ${e}`));
                 }}
                 className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors"
-                title="Resume polling"
+                title={t("polling.resume")}
               >
                 <Play size={10} fill="currentColor" />
                 Poll
@@ -321,7 +323,7 @@ export default function Modbus() {
               <button
                 onClick={reconnectWithPolls}
                 className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-green-600/20 text-green-400 hover:bg-green-600/30 transition-colors"
-                title="Start polling"
+                title={t("polling.start")}
               >
                 <Play size={10} fill="currentColor" />
                 Poll
@@ -332,7 +334,7 @@ export default function Modbus() {
             <button
               onClick={() => setTimeFormat(f => f === "human" ? "seconds" : "human")}
               className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-              title={timeFormat === "human" ? "Switch to seconds" : "Switch to human-readable"}
+              title={timeFormat === "human" ? t("polling.switchToSeconds") : t("polling.switchToHuman")}
             >
               {timeFormat === "human" ? <Timer size={14} /> : <Clock size={14} />}
             </button>
