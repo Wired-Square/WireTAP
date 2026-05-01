@@ -1,6 +1,7 @@
 // ui/src/apps/settings/views/GraphLayoutsView.tsx
 
 import { LayoutGrid, Edit2, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
 import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
@@ -12,28 +13,31 @@ type GraphLayoutsViewProps = {
   onDeleteGraphLayout: (layout: GraphLayout) => void;
 };
 
-const formatDate = (timestamp: number) => {
-  return new Date(timestamp).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
-
 export default function GraphLayoutsView({
   graphLayouts,
   onEditGraphLayout,
   onDeleteGraphLayout,
 }: GraphLayoutsViewProps) {
+  const { t, i18n } = useTranslation("settings");
+
+  const formatDate = (timestamp: number) =>
+    new Date(timestamp).toLocaleDateString(i18n.language, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Graph Layouts</h2>
+      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+        {t("graphLayouts.title")}
+      </h2>
 
       {graphLayouts.length === 0 ? (
         <div className="text-center py-12 text-[color:var(--text-muted)]">
           <LayoutGrid className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No graph layouts saved yet</p>
-          <p className="text-sm mt-2">Save layouts from the Graph app</p>
+          <p>{t("graphLayouts.empty.heading")}</p>
+          <p className="text-sm mt-2">{t("graphLayouts.empty.description")}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -47,25 +51,25 @@ export default function GraphLayoutsView({
                   <h4 className="font-medium text-[color:var(--text-primary)]">{layout.name}</h4>
                 </div>
                 <div className="mt-1 text-sm text-[color:var(--text-muted)]">
-                  {layout.panels.length} {layout.panels.length === 1 ? 'panel' : 'panels'}
+                  {t("graphLayouts.panelCount", { count: layout.panels.length })}
                   {layout.catalogFilename && ` · ${layout.catalogFilename}`}
                   {" · "}
-                  Created {formatDate(layout.createdAt)}
-                  {layout.updatedAt !== layout.createdAt && ` · Updated ${formatDate(layout.updatedAt)}`}
+                  {t("graphLayouts.createdAt", { date: formatDate(layout.createdAt) })}
+                  {layout.updatedAt !== layout.createdAt && ` · ${t("graphLayouts.updatedAt", { date: formatDate(layout.updatedAt) })}`}
                 </div>
               </div>
               <div className={flexRowGap2}>
                 <button
                   onClick={() => onEditGraphLayout(layout)}
                   className={iconButtonHover}
-                  title="Edit graph layout"
+                  title={t("graphLayouts.actions.edit")}
                 >
                   <Edit2 className={`${iconMd} text-[color:var(--text-muted)]`} />
                 </button>
                 <button
                   onClick={() => onDeleteGraphLayout(layout)}
                   className={iconButtonHoverDanger}
-                  title="Delete graph layout"
+                  title={t("graphLayouts.actions.delete")}
                 >
                   <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                 </button>

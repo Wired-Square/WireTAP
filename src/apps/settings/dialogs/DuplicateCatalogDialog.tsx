@@ -1,4 +1,5 @@
 // ui/src/apps/settings/dialogs/DuplicateCatalogDialog.tsx
+import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { Input, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h2 } from "../../../styles";
@@ -22,34 +23,36 @@ export default function DuplicateCatalogDialog({
   onCancel,
   onDuplicate,
 }: Props) {
+  const { t } = useTranslation("settings");
+
   return (
     <Dialog isOpen={isOpen} maxWidth="max-w-md">
       <div className="p-6">
-        <h2 className={`${h2} mb-6`}>Duplicate Catalog</h2>
+        <h2 className={`${h2} mb-6`}>{t("dialogs.duplicateCatalog.title")}</h2>
 
         <div className="space-y-4">
-          <FormField label="New Name" variant="default">
+          <FormField label={t("dialogs.duplicateCatalog.newName")} variant="default">
             <Input
               variant="default"
               value={name}
               onChange={(e) => onChangeName(e.target.value)}
-              placeholder="Catalog name"
+              placeholder={t("dialogs.duplicateCatalog.namePlaceholder")}
             />
           </FormField>
 
-          <FormField label="New Filename" variant="default">
+          <FormField label={t("dialogs.duplicateCatalog.newFilename")} variant="default">
             <Input
               variant="default"
               value={filename}
               onChange={(e) => onChangeFilename(e.target.value)}
-              placeholder="filename.toml"
+              placeholder={t("dialogs.duplicateCatalog.filenamePlaceholder")}
             />
           </FormField>
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={onDuplicate}>Duplicate</PrimaryButton>
+          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+          <PrimaryButton onClick={onDuplicate}>{t("common:actions.duplicate")}</PrimaryButton>
         </div>
       </div>
     </Dialog>

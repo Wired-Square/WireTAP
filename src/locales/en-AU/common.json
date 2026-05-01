@@ -8,6 +8,7 @@
     "edit": "Edit",
     "add": "Add",
     "remove": "Remove",
+    "create": "Create",
     "duplicate": "Duplicate",
     "browse": "Browse",
     "import": "Import",
@@ -15,7 +16,8 @@
     "apply": "Apply",
     "reset": "Reset",
     "confirm": "Confirm",
-    "discard": "Discard"
+    "discard": "Discard",
+    "ingest": "Ingest"
   },
   "states": {
     "loading": "Loading…",

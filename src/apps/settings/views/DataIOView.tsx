@@ -2,6 +2,8 @@
 
 import React from "react";
 import { Cable, Plus, Copy, Edit2, Trash2, Star } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { iconMd } from "../../../styles/spacing";
 import type { IOProfile } from "../stores/settingsStore";
 import { getReaderProtocols, isReaderRealtime } from "../../../hooks/useSettings";
@@ -79,8 +81,9 @@ const SummaryBadge = ({ label, value }: { label: string; value: React.ReactNode 
   </span>
 );
 
-const renderConnectionSummary = (profile: IOProfile) => {
+const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
   const c: any = profile.connection || {};
+  const s = (key: string) => t(`dataIO.summary.${key}`);
 
   if (profile.kind === "mqtt") {
     const host = c.host || "localhost";
@@ -93,12 +96,12 @@ const renderConnectionSummary = (profile: IOProfile) => {
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="host" value={host} />
-        <SummaryBadge label="port" value={port} />
+        <SummaryBadge label={s("host")} value={host} />
+        <SummaryBadge label={s("port")} value={port} />
         {enabledFormats.length > 0 ? (
-          <SummaryBadge label="formats" value={enabledFormats.join(",")} />
+          <SummaryBadge label={s("formats")} value={enabledFormats.join(",")} />
         ) : (
-          <SummaryBadge label="formats" value="none" />
+          <SummaryBadge label={s("formats")} value={s("formatsNone")} />
         )}
       </div>
     );
@@ -109,24 +112,16 @@ const renderConnectionSummary = (profile: IOProfile) => {
     const port = c.port || "5432";
     const db = c.database || "wiretap";
     const sourceType = (c.source_type || "can_frame") as string;
-
-    // Friendly labels for source types
-    const sourceTypeLabels: Record<string, string> = {
-      can_frame: "CAN",
-      modbus_frame: "Modbus",
-      serial_frame: "Serial",
-      serial_raw: "Raw",
-    };
-    const sourceTypeLabel = sourceTypeLabels[sourceType] || sourceType;
+    const sourceTypeLabel = t(`dataIO.sourceTypes.${sourceType}`, sourceType);
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="host" value={host} />
-        <SummaryBadge label="port" value={port} />
-        <SummaryBadge label="db" value={db} />
-        <SummaryBadge label="source" value={sourceTypeLabel} />
+        <SummaryBadge label={s("host")} value={host} />
+        <SummaryBadge label={s("port")} value={port} />
+        <SummaryBadge label={s("db")} value={db} />
+        <SummaryBadge label={s("source")} value={sourceTypeLabel} />
         {sourceType === "serial_raw" && c.framing_mode && (
-          <SummaryBadge label="framing" value={c.framing_mode} />
+          <SummaryBadge label={s("framing")} value={c.framing_mode} />
         )}
       </div>
     );
@@ -139,29 +134,29 @@ const renderConnectionSummary = (profile: IOProfile) => {
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="host" value={host} />
-        <SummaryBadge label="port" value={port} />
-        <SummaryBadge label="timeout" value={`${timeout}s`} />
+        <SummaryBadge label={s("host")} value={host} />
+        <SummaryBadge label={s("port")} value={port} />
+        <SummaryBadge label={s("timeout")} value={`${timeout}s`} />
       </div>
     );
   }
 
   if (profile.kind === "serial") {
-    const port = c.port || "(not set)";
+    const port = c.port || s("notSet");
     const baud = c.baud_rate || "115200";
     const framing = c.framing_mode || "raw";
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="port" value={port} />
-        <SummaryBadge label="baud" value={baud} />
-        <SummaryBadge label="framing" value={framing} />
+        <SummaryBadge label={s("port")} value={port} />
+        <SummaryBadge label={s("baud")} value={baud} />
+        <SummaryBadge label={s("framing")} value={framing} />
       </div>
     );
   }
 
   if (profile.kind === "slcan") {
-    const port = c.port || "(not set)";
+    const port = c.port || s("notSet");
     const baudRate = c.baud_rate || 115200;
     const bitrate = c.bitrate || 500000;
     const bitrateLabel = bitrate >= 1000000 ? `${bitrate / 1000000}M` : `${bitrate / 1000}k`;
@@ -169,10 +164,10 @@ const renderConnectionSummary = (profile: IOProfile) => {
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="port" value={port} />
-        {baudRate !== 115200 && <SummaryBadge label="baud" value={baudRate} />}
-        <SummaryBadge label="bitrate" value={bitrateLabel} />
-        <SummaryBadge label="mode" value={silent ? "silent" : "active"} />
+        <SummaryBadge label={s("port")} value={port} />
+        {baudRate !== 115200 && <SummaryBadge label={s("baud")} value={baudRate} />}
+        <SummaryBadge label={s("bitrate")} value={bitrateLabel} />
+        <SummaryBadge label={s("mode")} value={silent ? s("modeSilent") : s("modeActive")} />
       </div>
     );
   }
@@ -186,39 +181,39 @@ const renderConnectionSummary = (profile: IOProfile) => {
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="interface" value={iface} />
+        <SummaryBadge label={s("interface")} value={iface} />
         {bitrateLabel ? (
-          <SummaryBadge label="bitrate" value={bitrateLabel} />
+          <SummaryBadge label={s("bitrate")} value={bitrateLabel} />
         ) : (
-          <SummaryBadge label="config" value="system" />
+          <SummaryBadge label={s("config")} value={s("configSystem")} />
         )}
       </div>
     );
   }
 
   if (profile.kind === "gs_usb") {
-    const deviceId = c.device_id || "(not set)";
+    const deviceId = c.device_id || s("notSet");
     const bitrate = c.bitrate || 500000;
     const bitrateLabel = bitrate >= 1000000 ? `${bitrate / 1000000}M` : `${bitrate / 1000}k`;
     const listenOnly = c.listen_only ?? true;
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="device" value={deviceId} />
-        <SummaryBadge label="bitrate" value={bitrateLabel} />
-        <SummaryBadge label="mode" value={listenOnly ? "listen" : "active"} />
+        <SummaryBadge label={s("device")} value={deviceId} />
+        <SummaryBadge label={s("bitrate")} value={bitrateLabel} />
+        <SummaryBadge label={s("mode")} value={listenOnly ? s("modeListen") : s("modeActive")} />
       </div>
     );
   }
 
   if (profile.kind === "gvret_usb") {
-    const port = c.port || "(not set)";
+    const port = c.port || s("notSet");
     const baudRate = c.baud_rate || "115200";
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="port" value={port} />
-        <SummaryBadge label="baud" value={baudRate} />
+        <SummaryBadge label={s("port")} value={port} />
+        <SummaryBadge label={s("baud")} value={baudRate} />
       </div>
     );
   }
@@ -230,9 +225,9 @@ const renderConnectionSummary = (profile: IOProfile) => {
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="host" value={host} />
-        <SummaryBadge label="port" value={port} />
-        <SummaryBadge label="unit" value={unitId} />
+        <SummaryBadge label={s("host")} value={host} />
+        <SummaryBadge label={s("port")} value={port} />
+        <SummaryBadge label={s("unit")} value={unitId} />
       </div>
     );
   }
@@ -244,10 +239,10 @@ const renderConnectionSummary = (profile: IOProfile) => {
     const interfaces = c.interfaces as Array<{ name: string; iface_type: number }> | undefined;
     return (
       <div className="flex flex-wrap gap-2">
-        {deviceId && <SummaryBadge label="device" value={deviceId} />}
-        {host && <SummaryBadge label="host" value={host} />}
-        <SummaryBadge label="port" value={port} />
-        {interfaces && <SummaryBadge label="interfaces" value={interfaces.length} />}
+        {deviceId && <SummaryBadge label={s("device")} value={deviceId} />}
+        {host && <SummaryBadge label={s("host")} value={host} />}
+        <SummaryBadge label={s("port")} value={port} />
+        {interfaces && <SummaryBadge label={s("interfaces")} value={interfaces.length} />}
       </div>
     );
   }
@@ -261,19 +256,19 @@ const renderConnectionSummary = (profile: IOProfile) => {
 
     return (
       <div className="flex flex-wrap gap-2">
-        <SummaryBadge label="buses" value={busCount} />
-        <SummaryBadge label="loopback" value={loopback ? "on" : "off"} />
+        <SummaryBadge label={s("buses")} value={busCount} />
+        <SummaryBadge label={s("loopback")} value={loopback ? s("loopbackOn") : s("loopbackOff")} />
         <SummaryBadge
-          label="signal gen"
-          value={sigGenCount === busCount ? "all" : sigGenCount === 0 ? "off" : `${sigGenCount}/${busCount}`}
+          label={s("signalGen")}
+          value={sigGenCount === busCount ? s("signalGenAll") : sigGenCount === 0 ? s("signalGenOff") : `${sigGenCount}/${busCount}`}
         />
         {sigGenCount > 0 && (
           <SummaryBadge
-            label="rate"
+            label={s("rate")}
             value={
               new Set(interfaces.filter((i) => i.signal_generator !== false).map((i) => String(i.frame_rate_hz || 10))).size === 1
                 ? `${interfaces.find((i) => i.signal_generator !== false)?.frame_rate_hz || 10} Hz`
-                : "mixed"
+                : s("rateMixed")
             }
           />
         )}
@@ -300,21 +295,23 @@ export default function DataIOView({
   defaultReadProfile,
   onToggleDefaultRead,
 }: DataIOViewProps) {
+  const { t } = useTranslation("settings");
+
   return (
     <div className={spaceYLarge}>
       <div className="flex items-center justify-between">
-        <h2 className={h2}>Data IO Profiles</h2>
+        <h2 className={h2}>{t("dataIO.title")}</h2>
         <PrimaryButton onClick={onAddProfile} className="flex items-center gap-1">
           <Plus className={iconMd} />
-          Profile
+          {t("dataIO.addProfile")}
         </PrimaryButton>
       </div>
 
       {ioProfiles.length === 0 ? (
         <div className={`text-center py-12 ${textTertiary}`}>
           <Cable className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>No IO profiles configured</p>
-          <p className="text-sm mt-2">Click "Add Profile" to create your first IO profile</p>
+          <p>{t("dataIO.empty.heading")}</p>
+          <p className="text-sm mt-2">{t("dataIO.empty.description")}</p>
         </div>
       ) : (
         <div className={spaceYSmall}>
@@ -343,14 +340,14 @@ export default function DataIOView({
                   {/* Realtime indicator */}
                   {!isReaderRealtime(profile.kind) && (
                     <span className={badgeDanger}>
-                      Recorded
+                      {t("dataIO.badges.recorded")}
                     </span>
                   )}
                 </div>
 
                 {/* Connection summary */}
                 <div className="mt-2">
-                  {renderConnectionSummary(profile)}
+                  {renderConnectionSummary(profile, t)}
                 </div>
               </div>
 
@@ -360,8 +357,8 @@ export default function DataIOView({
                   className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title={
                     defaultReadProfile === profile.id
-                      ? "Unset as default"
-                      : "Set as default"
+                      ? t("dataIO.actions.unsetDefault")
+                      : t("dataIO.actions.setDefault")
                   }
                 >
                   <Star
@@ -376,21 +373,21 @@ export default function DataIOView({
                 <button
                   onClick={() => onDuplicateProfile(profile)}
                   className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
-                  title="Duplicate profile"
+                  title={t("dataIO.actions.duplicate")}
                 >
                   <Copy className={`${iconMd} ${textSecondary}`} />
                 </button>
                 <button
                   onClick={() => onEditProfile(profile)}
                   className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
-                  title="Edit profile"
+                  title={t("dataIO.actions.edit")}
                 >
                   <Edit2 className={`${iconMd} ${textSecondary}`} />
                 </button>
                 <button
                   onClick={() => onDeleteProfile(profile.id)}
                   className={iconButtonHoverDanger}
-                  title="Delete profile"
+                  title={t("dataIO.actions.delete")}
                 >
                   <Trash2 className={`${iconMd} text-red-600`} />
                 </button>

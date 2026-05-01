@@ -1,5 +1,6 @@
 // ui/src/apps/settings/views/BookmarksView.tsx
 import { Bookmark, Edit2, Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, iconSm, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
 import { emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
@@ -31,6 +32,8 @@ export default function BookmarksView({
   onDeleteBookmark,
   onNewBookmark,
 }: BookmarksViewProps) {
+  const { t } = useTranslation("settings");
+
   // Group bookmarks by profile
   const bookmarksByProfile = bookmarks.reduce(
     (acc, b) => {
@@ -54,11 +57,13 @@ export default function BookmarksView({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Time Range Bookmarks</h2>
+        <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+          {t("bookmarks.title")}
+        </h2>
         {canCreate && (
           <PrimaryButton onClick={onNewBookmark}>
             <Plus className={iconSm} />
-            New Bookmark
+            {t("bookmarks.newBookmark")}
           </PrimaryButton>
         )}
       </div>
@@ -66,8 +71,8 @@ export default function BookmarksView({
       {bookmarks.length === 0 ? (
         <div className={`text-center py-12 ${emptyStateText}`}>
           <Bookmark className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className={emptyStateHeading}>No bookmarks saved yet</p>
-          <p className={emptyStateDescription}>Create bookmarks from the Decoder or Discovery apps</p>
+          <p className={emptyStateHeading}>{t("bookmarks.empty.heading")}</p>
+          <p className={emptyStateDescription}>{t("bookmarks.empty.description")}</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -94,14 +99,14 @@ export default function BookmarksView({
                       <button
                         onClick={() => onEditBookmark(bookmark)}
                         className={iconButtonHover}
-                        title="Edit bookmark"
+                        title={t("bookmarks.actions.edit")}
                       >
                         <Edit2 className={`${iconMd} text-[color:var(--text-muted)]`} />
                       </button>
                       <button
                         onClick={() => onDeleteBookmark(bookmark)}
                         className={iconButtonHoverDanger}
-                        title="Delete bookmark"
+                        title={t("bookmarks.actions.delete")}
                       >
                         <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                       </button>

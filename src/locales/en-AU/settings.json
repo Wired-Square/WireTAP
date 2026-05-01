@@ -59,12 +59,42 @@
   },
   "display": {
     "title": "Display",
-    "frameIdFormat": {
-      "label": "Frame ID Format",
-      "help": "How CAN frame IDs are displayed in tables and exports",
+    "appearance": {
+      "label": "Appearance",
+      "help": "Choose light or dark theme, or follow your system preference.",
       "options": {
-        "hex": "Hexadecimal (0x123)",
-        "decimal": "Decimal (291)"
+        "auto": "System",
+        "light": "Light",
+        "dark": "Dark"
+      }
+    },
+    "themeColours": {
+      "title": "Theme Colours",
+      "help": "Customise the app's colour scheme.",
+      "resetAll": "Reset All",
+      "lightMode": "Light Mode",
+      "darkMode": "Dark Mode",
+      "accentTitle": "Accent Colours",
+      "labels": {
+        "background": "Background",
+        "surface": "Surface",
+        "text": "Text",
+        "secondaryText": "Secondary Text",
+        "border": "Border",
+        "dataBackground": "Data Background",
+        "dataText": "Data Text",
+        "primary": "Primary",
+        "success": "Success",
+        "danger": "Danger",
+        "warning": "Warning"
+      }
+    },
+    "frameIdFormat": {
+      "label": "Display Frame ID as",
+      "help": "Choose how CAN frame IDs are shown in the editor.",
+      "options": {
+        "hex": "Hex",
+        "decimal": "Decimal"
       }
     },
     "saveFrameIdFormat": {
@@ -72,20 +102,46 @@
       "help": "Format used when saving frames to file"
     },
     "timeFormat": {
-      "label": "Time Format",
+      "label": "Display time as",
+      "help": "Controls how timestamps are rendered in discovery and other views.",
       "options": {
-        "delta-last": "Delta (since last frame)",
-        "delta-start": "Delta (since session start)",
+        "human": "Human friendly",
         "timestamp": "Timestamp",
-        "human": "Human readable"
+        "delta-start": "Delta since start",
+        "delta-last": "Delta since last message"
       }
     },
     "timezone": {
-      "label": "Timezone",
+      "label": "Default timezone",
+      "help": "Default timezone for clock displays. Click the timezone badge in views to temporarily override.",
       "options": {
-        "local": "Local",
+        "local": "Local timezone",
         "utc": "UTC"
       }
+    },
+    "signals": {
+      "title": "Signals",
+      "help": "Configure colours for signal confidence indicators.",
+      "levels": {
+        "none": "No confidence",
+        "low": "Low confidence",
+        "medium": "Medium confidence",
+        "high": "High confidence"
+      },
+      "resetTooltip": "Reset to default"
+    },
+    "binary": {
+      "title": "Binary Display",
+      "help": "Configure colours for binary bits in the Frame Calculator and bit previews.",
+      "oneLabel": "Binary 1 colour",
+      "zeroLabel": "Binary 0 colour",
+      "unusedLabel": "Unused bits colour"
+    },
+    "frameEditor": {
+      "title": "Frame Editor",
+      "resetAll": "Reset All",
+      "help": "Colours for signal slots in the frame definition bit grid editor.",
+      "signalLabel": "Signal {{index}}"
     }
   },
   "locations": {
@@ -196,12 +252,138 @@
     }
   },
   "bookmarks": {
-    "title": "Bookmarks"
+    "title": "Time Range Bookmarks",
+    "newBookmark": "New Bookmark",
+    "empty": {
+      "heading": "No bookmarks saved yet",
+      "description": "Create bookmarks from the Decoder or Discovery apps"
+    },
+    "actions": {
+      "edit": "Edit bookmark",
+      "delete": "Delete bookmark"
+    }
   },
   "selectionSets": {
-    "title": "Selection Sets"
+    "title": "Selection Sets",
+    "empty": {
+      "heading": "No selection sets saved yet",
+      "description": "Create selection sets from the Decoder or Discovery apps"
+    },
+    "frameSummary_one": "{{selected}}/{{total}} frame selected",
+    "frameSummary_other": "{{selected}}/{{total}} frames selected",
+    "createdAt": "Created {{date}}",
+    "lastUsed": "Last used {{date}}",
+    "actions": {
+      "edit": "Edit selection set",
+      "delete": "Delete selection set"
+    }
+  },
+  "dataIO": {
+    "title": "Data IO Profiles",
+    "addProfile": "Profile",
+    "empty": {
+      "heading": "No IO profiles configured",
+      "description": "Click \"Add Profile\" to create your first IO profile"
+    },
+    "actions": {
+      "setDefault": "Set as default",
+      "unsetDefault": "Unset as default",
+      "duplicate": "Duplicate profile",
+      "edit": "Edit profile",
+      "delete": "Delete profile"
+    },
+    "badges": {
+      "recorded": "Recorded"
+    },
+    "summary": {
+      "host": "host",
+      "port": "port",
+      "formats": "formats",
+      "formatsNone": "none",
+      "db": "db",
+      "source": "source",
+      "framing": "framing",
+      "timeout": "timeout",
+      "baud": "baud",
+      "bitrate": "bitrate",
+      "mode": "mode",
+      "modeSilent": "silent",
+      "modeActive": "active",
+      "modeListen": "listen",
+      "interface": "interface",
+      "configSystem": "system",
+      "device": "device",
+      "interfaces": "interfaces",
+      "buses": "buses",
+      "loopback": "loopback",
+      "loopbackOn": "on",
+      "loopbackOff": "off",
+      "signalGen": "signal gen",
+      "signalGenAll": "all",
+      "signalGenOff": "off",
+      "rate": "rate",
+      "rateMixed": "mixed",
+      "unit": "unit",
+      "config": "config",
+      "notSet": "(not set)"
+    },
+    "sourceTypes": {
+      "can_frame": "CAN",
+      "modbus_frame": "Modbus",
+      "serial_frame": "Serial",
+      "serial_raw": "Raw"
+    }
+  },
+  "dialogs": {
+    "duplicateCatalog": {
+      "title": "Duplicate Catalog",
+      "newName": "New Name",
+      "newFilename": "New Filename",
+      "namePlaceholder": "Catalog name",
+      "filenamePlaceholder": "filename.toml"
+    },
+    "editCatalog": {
+      "title": "Edit Catalog",
+      "name": "Name",
+      "filename": "Filename",
+      "namePlaceholder": "Catalog name",
+      "filenamePlaceholder": "filename.toml"
+    },
+    "editBookmark": {
+      "title": "Edit Bookmark",
+      "name": "Name",
+      "namePlaceholder": "Bookmark name"
+    },
+    "createBookmark": {
+      "title": "New Bookmark",
+      "profile": "Profile",
+      "name": "Name",
+      "namePlaceholder": "Bookmark name"
+    },
+    "editGraphLayout": {
+      "title": "Edit Graph Layout",
+      "name": "Name",
+      "namePlaceholder": "Graph layout name"
+    },
+    "editSelectionSet": {
+      "title": "Edit Selection Set",
+      "name": "Name",
+      "namePlaceholder": "Selection set name"
+    }
   },
   "graphLayouts": {
-    "title": "Graph Layouts"
+    "title": "Graph Layouts",
+    "empty": {
+      "heading": "No graph layouts saved yet",
+      "description": "Save layouts from the Graph app"
+    },
+    "panelCount_one": "{{count}} panel",
+    "panelCount_other": "{{count}} panels",
+    "createdAt": "Created {{date}}",
+    "updatedAt": "Updated {{date}}",
+    "actions": {
+      "edit": "Edit graph layout",
+      "delete": "Delete graph layout"
+    }
   }
 }

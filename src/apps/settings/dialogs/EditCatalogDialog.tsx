@@ -1,4 +1,5 @@
 // ui/src/apps/settings/dialogs/EditCatalogDialog.tsx
+import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { Input, FormField, PrimaryButton, SecondaryButton } from "../../../components/forms";
 import { h2 } from "../../../styles";
@@ -22,34 +23,36 @@ export default function EditCatalogDialog({
   onCancel,
   onSave,
 }: Props) {
+  const { t } = useTranslation("settings");
+
   return (
     <Dialog isOpen={isOpen} maxWidth="max-w-md">
       <div className="p-6">
-        <h2 className={`${h2} mb-4`}>Edit Catalog</h2>
+        <h2 className={`${h2} mb-4`}>{t("dialogs.editCatalog.title")}</h2>
 
         <div className="space-y-4">
-          <FormField label="Name" variant="default">
+          <FormField label={t("dialogs.editCatalog.name")} variant="default">
             <Input
               variant="default"
               value={name}
               onChange={(e) => onChangeName(e.target.value)}
-              placeholder="Catalog name"
+              placeholder={t("dialogs.editCatalog.namePlaceholder")}
             />
           </FormField>
 
-          <FormField label="Filename" variant="default">
+          <FormField label={t("dialogs.editCatalog.filename")} variant="default">
             <Input
               variant="default"
               value={filename}
               onChange={(e) => onChangeFilename(e.target.value)}
-              placeholder="filename.toml"
+              placeholder={t("dialogs.editCatalog.filenamePlaceholder")}
             />
           </FormField>
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={onSave}>Save</PrimaryButton>
+          <SecondaryButton onClick={onCancel}>{t("common:actions.cancel")}</SecondaryButton>
+          <PrimaryButton onClick={onSave}>{t("common:actions.save")}</PrimaryButton>
         </div>
       </div>
     </Dialog>

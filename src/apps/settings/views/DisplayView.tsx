@@ -1,5 +1,6 @@
 // ui/src/apps/settings/views/DisplayView.tsx
 
+import { useTranslation } from "react-i18next";
 import ColourPicker from "../../../components/ColourPicker";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { textMedium } from "../../../styles";
@@ -76,93 +77,88 @@ export default function DisplayView({
   onChangeThemeColour,
   onResetThemeColours,
 }: DisplayViewProps) {
+  const { t } = useTranslation("settings");
+  const resetTooltip = t("display.signals.resetTooltip");
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className={`text-xl font-semibold ${textPrimary}`}>Display</h2>
+        <h2 className={`text-xl font-semibold ${textPrimary}`}>{t("display.title")}</h2>
       </div>
 
       {/* Appearance Section */}
       <div className="space-y-2">
-        <label className={`block ${textMedium}`}>
-          Appearance
-        </label>
+        <label className={`block ${textMedium}`}>{t("display.appearance.label")}</label>
         <div className="flex gap-3">
-          {[
-            { value: "auto", label: "System" },
-            { value: "light", label: "Light" },
-            { value: "dark", label: "Dark" },
-          ].map((opt) => (
-            <label key={opt.value} className={`${flexRowGap2} text-sm ${textPrimary}`}>
+          {(["auto", "light", "dark"] as const).map((value) => (
+            <label key={value} className={`${flexRowGap2} text-sm ${textPrimary}`}>
               <input
                 type="radio"
                 name="theme-mode"
-                value={opt.value}
-                checked={themeMode === opt.value}
-                onChange={() => onChangeThemeMode(opt.value as ThemeMode)}
+                value={value}
+                checked={themeMode === value}
+                onChange={() => onChangeThemeMode(value as ThemeMode)}
               />
-              {opt.label}
+              {t(`display.appearance.options.${value}`)}
             </label>
           ))}
         </div>
-        <p className={`text-sm ${textTertiary}`}>
-          Choose light or dark theme, or follow your system preference.
-        </p>
+        <p className={`text-sm ${textTertiary}`}>{t("display.appearance.help")}</p>
       </div>
 
       {/* Theme Colours Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className={`text-sm font-semibold ${textPrimary}`}>Theme Colours</h3>
+          <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.themeColours.title")}</h3>
           <button
             type="button"
             onClick={onResetThemeColours}
             className={`text-xs px-2 py-1 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
           >
-            Reset All
+            {t("display.themeColours.resetAll")}
           </button>
         </div>
-        <p className={`text-sm ${textTertiary}`}>
-          Customise the app's colour scheme.
-        </p>
+        <p className={`text-sm ${textTertiary}`}>{t("display.themeColours.help")}</p>
 
         <div className="grid grid-cols-2 gap-6">
           {/* Light Mode Colours */}
           <div className="space-y-2">
-            <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Light Mode</h4>
+            <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>
+              {t("display.themeColours.lightMode")}
+            </h4>
             <div className="space-y-1.5">
               <ColourPicker
-                label="Background"
+                label={t("display.themeColours.labels.background")}
                 value={themeColours.bgPrimaryLight}
                 onChange={(val) => onChangeThemeColour("bgPrimaryLight", val)}
               />
               <ColourPicker
-                label="Surface"
+                label={t("display.themeColours.labels.surface")}
                 value={themeColours.bgSurfaceLight}
                 onChange={(val) => onChangeThemeColour("bgSurfaceLight", val)}
               />
               <ColourPicker
-                label="Text"
+                label={t("display.themeColours.labels.text")}
                 value={themeColours.textPrimaryLight}
                 onChange={(val) => onChangeThemeColour("textPrimaryLight", val)}
               />
               <ColourPicker
-                label="Secondary Text"
+                label={t("display.themeColours.labels.secondaryText")}
                 value={themeColours.textSecondaryLight}
                 onChange={(val) => onChangeThemeColour("textSecondaryLight", val)}
               />
               <ColourPicker
-                label="Border"
+                label={t("display.themeColours.labels.border")}
                 value={themeColours.borderDefaultLight}
                 onChange={(val) => onChangeThemeColour("borderDefaultLight", val)}
               />
               <ColourPicker
-                label="Data Background"
+                label={t("display.themeColours.labels.dataBackground")}
                 value={themeColours.dataBgLight}
                 onChange={(val) => onChangeThemeColour("dataBgLight", val)}
               />
               <ColourPicker
-                label="Data Text"
+                label={t("display.themeColours.labels.dataText")}
                 value={themeColours.dataTextPrimaryLight}
                 onChange={(val) => onChangeThemeColour("dataTextPrimaryLight", val)}
               />
@@ -171,40 +167,42 @@ export default function DisplayView({
 
           {/* Dark Mode Colours */}
           <div className="space-y-2">
-            <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Dark Mode</h4>
+            <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>
+              {t("display.themeColours.darkMode")}
+            </h4>
             <div className="space-y-1.5">
               <ColourPicker
-                label="Background"
+                label={t("display.themeColours.labels.background")}
                 value={themeColours.bgPrimaryDark}
                 onChange={(val) => onChangeThemeColour("bgPrimaryDark", val)}
               />
               <ColourPicker
-                label="Surface"
+                label={t("display.themeColours.labels.surface")}
                 value={themeColours.bgSurfaceDark}
                 onChange={(val) => onChangeThemeColour("bgSurfaceDark", val)}
               />
               <ColourPicker
-                label="Text"
+                label={t("display.themeColours.labels.text")}
                 value={themeColours.textPrimaryDark}
                 onChange={(val) => onChangeThemeColour("textPrimaryDark", val)}
               />
               <ColourPicker
-                label="Secondary Text"
+                label={t("display.themeColours.labels.secondaryText")}
                 value={themeColours.textSecondaryDark}
                 onChange={(val) => onChangeThemeColour("textSecondaryDark", val)}
               />
               <ColourPicker
-                label="Border"
+                label={t("display.themeColours.labels.border")}
                 value={themeColours.borderDefaultDark}
                 onChange={(val) => onChangeThemeColour("borderDefaultDark", val)}
               />
               <ColourPicker
-                label="Data Background"
+                label={t("display.themeColours.labels.dataBackground")}
                 value={themeColours.dataBgDark}
                 onChange={(val) => onChangeThemeColour("dataBgDark", val)}
               />
               <ColourPicker
-                label="Data Text"
+                label={t("display.themeColours.labels.dataText")}
                 value={themeColours.dataTextPrimaryDark}
                 onChange={(val) => onChangeThemeColour("dataTextPrimaryDark", val)}
               />
@@ -214,25 +212,27 @@ export default function DisplayView({
 
         {/* Accent Colours */}
         <div className="space-y-2 pt-2">
-          <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>Accent Colours</h4>
+          <h4 className={`text-xs font-medium ${textSecondary} uppercase tracking-wide`}>
+            {t("display.themeColours.accentTitle")}
+          </h4>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
             <ColourPicker
-              label="Primary"
+              label={t("display.themeColours.labels.primary")}
               value={themeColours.accentPrimary}
               onChange={(val) => onChangeThemeColour("accentPrimary", val)}
             />
             <ColourPicker
-              label="Success"
+              label={t("display.themeColours.labels.success")}
               value={themeColours.accentSuccess}
               onChange={(val) => onChangeThemeColour("accentSuccess", val)}
             />
             <ColourPicker
-              label="Danger"
+              label={t("display.themeColours.labels.danger")}
               value={themeColours.accentDanger}
               onChange={(val) => onChangeThemeColour("accentDanger", val)}
             />
             <ColourPicker
-              label="Warning"
+              label={t("display.themeColours.labels.warning")}
               value={themeColours.accentWarning}
               onChange={(val) => onChangeThemeColour("accentWarning", val)}
             />
@@ -241,113 +241,78 @@ export default function DisplayView({
       </div>
 
       <div className="space-y-2">
-        <label className={`block ${textMedium}`}>
-          Display Frame ID as
-        </label>
+        <label className={`block ${textMedium}`}>{t("display.frameIdFormat.label")}</label>
         <div className="flex gap-3">
-          <label className={`${flexRowGap2} text-sm ${textPrimary}`}>
-            <input
-              type="radio"
-              name="frame-id-format"
-              value="hex"
-              checked={displayFrameIdFormat === "hex"}
-              onChange={() => onChangeFormat("hex")}
-            />
-            Hex
-          </label>
-          <label className={`${flexRowGap2} text-sm ${textPrimary}`}>
-            <input
-              type="radio"
-              name="frame-id-format"
-              value="decimal"
-              checked={displayFrameIdFormat === "decimal"}
-              onChange={() => onChangeFormat("decimal")}
-            />
-            Decimal
-          </label>
+          {(["hex", "decimal"] as const).map((value) => (
+            <label key={value} className={`${flexRowGap2} text-sm ${textPrimary}`}>
+              <input
+                type="radio"
+                name="frame-id-format"
+                value={value}
+                checked={displayFrameIdFormat === value}
+                onChange={() => onChangeFormat(value)}
+              />
+              {t(`display.frameIdFormat.options.${value}`)}
+            </label>
+          ))}
         </div>
-        <p className={`text-sm ${textTertiary}`}>
-          Choose how CAN frame IDs are shown in the editor.
-        </p>
+        <p className={`text-sm ${textTertiary}`}>{t("display.frameIdFormat.help")}</p>
       </div>
 
       <div className="space-y-2">
-        <label className={`block ${textMedium}`}>
-          Display time as
-        </label>
+        <label className={`block ${textMedium}`}>{t("display.timeFormat.label")}</label>
         <div className="flex flex-wrap gap-3">
-          {[
-            { value: "human", label: "Human friendly" },
-            { value: "timestamp", label: "Timestamp" },
-            { value: "delta-start", label: "Delta since start" },
-            { value: "delta-last", label: "Delta since last message" },
-          ].map((opt) => (
-            <label key={opt.value} className={`flex items-center gap-2 text-sm ${textPrimary}`}>
+          {(["human", "timestamp", "delta-start", "delta-last"] as const).map((value) => (
+            <label key={value} className={`flex items-center gap-2 text-sm ${textPrimary}`}>
               <input
                 type="radio"
                 name="time-format"
-                value={opt.value}
-                checked={displayTimeFormat === opt.value}
-                onChange={() => onChangeTimeFormat(opt.value as DisplayViewProps["displayTimeFormat"])}
+                value={value}
+                checked={displayTimeFormat === value}
+                onChange={() => onChangeTimeFormat(value)}
               />
-              {opt.label}
+              {t(`display.timeFormat.options.${value}`)}
             </label>
           ))}
         </div>
-        <p className={`text-sm ${textTertiary}`}>
-          Controls how timestamps are rendered in discovery and other views.
-        </p>
+        <p className={`text-sm ${textTertiary}`}>{t("display.timeFormat.help")}</p>
       </div>
 
       <div className="space-y-2">
-        <label className={`block ${textMedium}`}>
-          Default timezone
-        </label>
+        <label className={`block ${textMedium}`}>{t("display.timezone.label")}</label>
         <div className="flex gap-3">
-          {[
-            { value: "local", label: "Local timezone" },
-            { value: "utc", label: "UTC" },
-          ].map((opt) => (
-            <label key={opt.value} className={`flex items-center gap-2 text-sm ${textPrimary}`}>
+          {(["local", "utc"] as const).map((value) => (
+            <label key={value} className={`flex items-center gap-2 text-sm ${textPrimary}`}>
               <input
                 type="radio"
                 name="timezone"
-                value={opt.value}
-                checked={timezone === opt.value}
-                onChange={() => onChangeTimezone(opt.value as "local" | "utc")}
+                value={value}
+                checked={timezone === value}
+                onChange={() => onChangeTimezone(value)}
               />
-              {opt.label}
+              {t(`display.timezone.options.${value}`)}
             </label>
           ))}
         </div>
-        <p className={`text-sm ${textTertiary}`}>
-          Default timezone for clock displays. Click the timezone badge in views to temporarily override.
-        </p>
+        <p className={`text-sm ${textTertiary}`}>{t("display.timezone.help")}</p>
       </div>
 
       <div className="space-y-3">
-        <h3 className={`text-sm font-semibold ${textPrimary}`}>Signals</h3>
-        <p className={`text-sm ${textTertiary}`}>
-          Configure colors for signal confidence indicators.
-        </p>
+        <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.signals.title")}</h3>
+        <p className={`text-sm ${textTertiary}`}>{t("display.signals.help")}</p>
         <div className="space-y-2">
-          {([
-            { key: "none", label: "No confidence", defaultVal: "#94a3b8" },
-            { key: "low", label: "Low confidence", defaultVal: "#f59e0b" },
-            { key: "medium", label: "Medium confidence", defaultVal: "#3b82f6" },
-            { key: "high", label: "High confidence", defaultVal: "#22c55e" },
-          ] as const).map((cfg) => (
-            <div key={cfg.key} className={flexRowGap2}>
+          {(["none", "low", "medium", "high"] as const).map((key) => (
+            <div key={key} className={flexRowGap2}>
               <ColourPicker
-                label={cfg.label}
-                value={signalColours[cfg.key]}
-                onChange={(val) => onChangeSignalColour(cfg.key, val)}
+                label={t(`display.signals.levels.${key}`)}
+                value={signalColours[key]}
+                onChange={(val) => onChangeSignalColour(key, val)}
               />
               <button
                 type="button"
-                onClick={() => onResetSignalColour(cfg.key)}
+                onClick={() => onResetSignalColour(key)}
                 className={`p-2 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
-                title="Reset to default"
+                title={resetTooltip}
               >
                 ↺
               </button>
@@ -357,14 +322,12 @@ export default function DisplayView({
       </div>
 
       <div className="space-y-3">
-        <h3 className={`text-sm font-semibold ${textPrimary}`}>Binary Display</h3>
-        <p className={`text-sm ${textTertiary}`}>
-          Configure colors for binary bits in the Frame Calculator and bit previews.
-        </p>
+        <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.binary.title")}</h3>
+        <p className={`text-sm ${textTertiary}`}>{t("display.binary.help")}</p>
         <div className="space-y-2">
           <div className={flexRowGap2}>
             <ColourPicker
-              label="Binary 1 colour"
+              label={t("display.binary.oneLabel")}
               value={binaryOneColour}
               onChange={onChangeBinaryOneColour}
             />
@@ -372,14 +335,14 @@ export default function DisplayView({
               type="button"
               onClick={onResetBinaryOneColour}
               className={`p-2 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
-              title="Reset to default"
+              title={resetTooltip}
             >
               ↺
             </button>
           </div>
           <div className={flexRowGap2}>
             <ColourPicker
-              label="Binary 0 colour"
+              label={t("display.binary.zeroLabel")}
               value={binaryZeroColour}
               onChange={onChangeBinaryZeroColour}
             />
@@ -387,14 +350,14 @@ export default function DisplayView({
               type="button"
               onClick={onResetBinaryZeroColour}
               className={`p-2 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
-              title="Reset to default"
+              title={resetTooltip}
             >
               ↺
             </button>
           </div>
           <div className={flexRowGap2}>
             <ColourPicker
-              label="Unused bits colour"
+              label={t("display.binary.unusedLabel")}
               value={binaryUnusedColour}
               onChange={onChangeBinaryUnusedColour}
             />
@@ -402,7 +365,7 @@ export default function DisplayView({
               type="button"
               onClick={onResetBinaryUnusedColour}
               className={`p-2 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
-              title="Reset to default"
+              title={resetTooltip}
             >
               ↺
             </button>
@@ -412,23 +375,21 @@ export default function DisplayView({
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className={`text-sm font-semibold ${textPrimary}`}>Frame Editor</h3>
+          <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.frameEditor.title")}</h3>
           <button
             type="button"
             onClick={onResetFrameEditorColours}
             className={`text-xs px-2 py-1 rounded ${bgMuted} ${textSecondary} ${hoverSubtle}`}
           >
-            Reset All
+            {t("display.frameEditor.resetAll")}
           </button>
         </div>
-        <p className={`text-sm ${textTertiary}`}>
-          Colours for signal slots in the frame definition bit grid editor.
-        </p>
+        <p className={`text-sm ${textTertiary}`}>{t("display.frameEditor.help")}</p>
         <div className="space-y-2">
           {frameEditorColours.map((colour, i) => (
             <div key={i} className={flexRowGap2}>
               <ColourPicker
-                label={`Signal ${i + 1}`}
+                label={t("display.frameEditor.signalLabel", { index: i + 1 })}
                 value={colour}
                 onChange={(val) => onChangeFrameEditorColour(i, val)}
               />
