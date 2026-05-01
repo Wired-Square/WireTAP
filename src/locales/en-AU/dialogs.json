@@ -352,6 +352,86 @@
     "title": "Export Report",
     "filename": "Filename"
   },
+  "csvColumnMapperPreview": {
+    "roles": {
+      "ignore": "Ignore",
+      "frame_id": "Frame ID",
+      "frame_id_data": "ID#Data (candump)",
+      "timestamp": "Timestamp",
+      "data_bytes": "Data (hex string)",
+      "data_byte": "Data Byte",
+      "dlc": "DLC / Length",
+      "extended": "Extended Flag",
+      "bus": "Bus",
+      "direction": "Direction",
+      "sequence": "Sequence"
+    },
+    "offset": "Offset"
+  },
+  "csvColumnMapper": {
+    "title": "Map Columns",
+    "previewingFirst": "Previewing first file · {{count}} files selected",
+    "rowsCount": " · {{count}} rows",
+    "delimiter": "Delimiter",
+    "delimiterOptions": {
+      "comma": "Comma",
+      "tab": "Tab",
+      "space": "Space",
+      "semicolon": "Semicolon"
+    },
+    "firstRowHeader": "First row is a header",
+    "loadingPreview": "Loading preview...",
+    "raw": "Raw",
+    "preview": "Preview",
+    "timestampUnit": "Timestamp unit",
+    "tsUnits": {
+      "seconds": "Seconds",
+      "milliseconds": "Milliseconds",
+      "microseconds": "Microseconds",
+      "nanoseconds": "Nanoseconds"
+    },
+    "estimatedDuration": "≈ {{duration}} estimated duration",
+    "negateTimestamps": "Negate timestamps",
+    "duration": {
+      "ms": "{{ms}} ms",
+      "s": "{{s}} s",
+      "min": "{{min}} min",
+      "h": "{{h}} h",
+      "d": "{{d}} d"
+    },
+    "validation": {
+      "needFrameId": "Assign a Frame ID column to continue",
+      "noDataColumns": "No data columns assigned — frames will be imported with empty payloads"
+    },
+    "importingFile": "Importing file {{current}} of {{total}}: {{filename}}",
+    "importing": "Importing...",
+    "import": "Import",
+    "importN": "Import {{count}} Files",
+    "complete": "Import Complete",
+    "completeWithGaps": "Import Complete — Sequence Gaps Detected",
+    "copyTooltip": "Copy summary to clipboard",
+    "copied": "Copied",
+    "copy": "Copy",
+    "summaryFrames": "{{count}} frames imported",
+    "summaryFromFiles": " from {{count}} files",
+    "summaryGaps_one": " · {{count}} gap detected",
+    "summaryGaps_other": " · {{count}} gaps detected",
+    "summaryDropped": " · ~{{count}} dropped",
+    "summaryWraps": "Sequence wraps at: {{values}}",
+    "gapLineFile": "{{filename}} line {{line}}:",
+    "gapLine": "line {{line}}:",
+    "gapTransition": "seq {{from}} → {{to}}",
+    "gapDropped": "({{count}} dropped)",
+    "summaryHeading": "Import Summary",
+    "summaryFromFilesPlain": " from {{count}} files",
+    "summaryFramesImported": "Frames imported: {{count}}",
+    "summaryGapsLine": "Sequence gaps: {{count}}",
+    "summaryEstimatedDropped": "Estimated dropped frames: {{count}}",
+    "summaryWraparound": "Sequence wraparound at: {{values}}",
+    "summaryGapsTitle": "Gaps:",
+    "summaryGapEntry": "  {{loc}}: seq {{from}} → {{to}} ({{dropped}} dropped)",
+    "done": "Done"
+  },
   "ioSourcePicker": {
     "title": "Data Source",
     "filter": "Filter",

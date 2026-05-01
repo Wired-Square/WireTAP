@@ -6,6 +6,7 @@
 // Shows scroll-edge shadows when content overflows horizontally.
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type {
   CsvColumnRole,
   CsvColumnMapping,
@@ -23,18 +24,18 @@ import {
   textDataAmber,
 } from "../../styles";
 
-const ROLE_OPTIONS: { value: CsvColumnRole; label: string }[] = [
-  { value: "ignore", label: "Ignore" },
-  { value: "frame_id", label: "Frame ID" },
-  { value: "frame_id_data", label: "ID#Data (candump)" },
-  { value: "timestamp", label: "Timestamp" },
-  { value: "data_bytes", label: "Data (hex string)" },
-  { value: "data_byte", label: "Data Byte" },
-  { value: "dlc", label: "DLC / Length" },
-  { value: "extended", label: "Extended Flag" },
-  { value: "bus", label: "Bus" },
-  { value: "direction", label: "Direction" },
-  { value: "sequence", label: "Sequence" },
+const ROLE_KEYS: CsvColumnRole[] = [
+  "ignore",
+  "frame_id",
+  "frame_id_data",
+  "timestamp",
+  "data_bytes",
+  "data_byte",
+  "dlc",
+  "extended",
+  "bus",
+  "direction",
+  "sequence",
 ];
 
 /** Map column role to a text colour class */
@@ -110,6 +111,7 @@ export default function PreviewTable({
   negateTimestamps,
   showImportedTs,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   const numColumns = mappings.length;
   const visibleRows = rows.slice(0, MAX_VISIBLE_ROWS);
 
@@ -203,9 +205,9 @@ export default function PreviewTable({
                       }
                       className={`w-full min-w-24 px-1.5 py-1 text-xs rounded border ${borderDefault} ${bgSurface} ${textSecondary}`}
                     >
-                      {ROLE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
+                      {ROLE_KEYS.map((roleKey) => (
+                        <option key={roleKey} value={roleKey}>
+                          {t(`csvColumnMapperPreview.roles.${roleKey}`)}
                         </option>
                       ))}
                     </select>

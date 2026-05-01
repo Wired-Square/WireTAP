@@ -4,6 +4,7 @@
 // Shows a preview of the CSV data with dropdown selectors per column.
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Copy, Check } from "lucide-react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import Dialog from "../../components/Dialog";
@@ -36,31 +37,36 @@ import {
 import { iconMd, iconSm } from "../../styles/spacing";
 
 /** Format import summary as plain text for copying */
-function formatImportSummary(result: CsvImportResult, fileCount: number, hasSequence: boolean): string {
+function formatImportSummary(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  result: CsvImportResult,
+  fileCount: number,
+  hasSequence: boolean,
+): string {
   const lines: string[] = [];
-  lines.push(`Import Summary`);
-  const filePart = fileCount > 1 ? ` from ${fileCount} files` : "";
-  lines.push(`Frames imported: ${result.metadata.count.toLocaleString()}${filePart}`);
+  lines.push(t("csvColumnMapper.summaryHeading"));
+  const filePart = fileCount > 1 ? t("csvColumnMapper.summaryFromFilesPlain", { count: fileCount }) : "";
+  lines.push(t("csvColumnMapper.summaryFramesImported", { count: `${result.metadata.count.toLocaleString()}${filePart}` }));
 
   if (hasSequence) {
-    lines.push(`Sequence gaps: ${result.sequence_gaps.length}`);
+    lines.push(t("csvColumnMapper.summaryGapsLine", { count: result.sequence_gaps.length }));
     if (result.sequence_gaps.length > 0) {
-      lines.push(`Estimated dropped frames: ${result.total_dropped.toLocaleString()}`);
+      lines.push(t("csvColumnMapper.summaryEstimatedDropped", { count: result.total_dropped.toLocaleString() }));
     }
     if (result.wrap_points.length > 0) {
       lines.push(
-        `Sequence wraparound at: ${result.wrap_points.map((v) => v.toLocaleString()).join(", ")}`
+        t("csvColumnMapper.summaryWraparound", { values: result.wrap_points.map((v) => v.toLocaleString()).join(", ") }),
       );
     }
     if (result.sequence_gaps.length > 0) {
       lines.push("");
-      lines.push("Gaps:");
+      lines.push(t("csvColumnMapper.summaryGapsTitle"));
       for (const gap of result.sequence_gaps) {
         const loc = gap.filename
           ? `${gap.filename} line ${gap.line}`
           : `line ${gap.line}`;
         lines.push(
-          `  ${loc}: seq ${gap.from_seq} → ${gap.to_seq} (${gap.dropped} dropped)`
+          t("csvColumnMapper.summaryGapEntry", { loc, from: gap.from_seq, to: gap.to_seq, dropped: gap.dropped }),
         );
       }
     }
@@ -92,6 +98,7 @@ export default function CsvColumnMapperDialog({
   onCancel,
   onImportComplete,
 }: CsvColumnMapperDialogProps) {
+  const { t } = useTranslation("dialogs");
   const [preview, setPreview] = useState<CsvPreview | null>(null);
   const [mappings, setMappings] = useState<CsvColumnMapping[]>([]);
   const [hasHeader, setHasHeader] = useState(true);
@@ -255,7 +262,11 @@ export default function CsvColumnMapperDialog({
           "csv-import-progress",
           (event) => {
             setImportProgress(
-              `Importing file ${event.payload.file_index + 1} of ${event.payload.total_files}: ${event.payload.filename}`
+              t("csvColumnMapper.importingFile", {
+                current: event.payload.file_index + 1,
+                total: event.payload.total_files,
+                filename: event.payload.filename,
+              })
             );
           }
         );
@@ -325,12 +336,12 @@ export default function CsvColumnMapperDialog({
         break;
     }
 
-    if (durationSecs < 1) return `${Math.round(durationSecs * 1000)} ms`;
-    if (durationSecs < 60) return `${durationSecs.toFixed(1)} s`;
-    if (durationSecs < 3600) return `${(durationSecs / 60).toFixed(1)} min`;
-    if (durationSecs < 86400) return `${(durationSecs / 3600).toFixed(1)} h`;
-    return `${(durationSecs / 86400).toFixed(1)} d`;
-  }, [hasTimestamp, preview, mappings, timestampUnit]);
+    if (durationSecs < 1) return t("csvColumnMapper.duration.ms", { ms: Math.round(durationSecs * 1000) });
+    if (durationSecs < 60) return t("csvColumnMapper.duration.s", { s: durationSecs.toFixed(1) });
+    if (durationSecs < 3600) return t("csvColumnMapper.duration.min", { min: (durationSecs / 60).toFixed(1) });
+    if (durationSecs < 86400) return t("csvColumnMapper.duration.h", { h: (durationSecs / 3600).toFixed(1) });
+    return t("csvColumnMapper.duration.d", { d: (durationSecs / 86400).toFixed(1) });
+  }, [hasTimestamp, preview, mappings, timestampUnit, t]);
 
   return (
     <Dialog isOpen={isOpen} onBackdropClick={onCancel} maxWidth="max-w-4xl">
@@ -338,18 +349,16 @@ export default function CsvColumnMapperDialog({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h3 className={h3}>Map Columns</h3>
+            <h3 className={h3}>{t("csvColumnMapper.title")}</h3>
             <div className={caption}>
               {isMultiFile ? (
-                <>
-                  Previewing first file · {fileCount} files selected
-                </>
+                <>{t("csvColumnMapper.previewingFirst", { count: fileCount })}</>
               ) : (
                 filename
               )}
               {preview && (
                 <span className={`ml-2 ${textMuted}`}>
-                  · {preview.total_rows.toLocaleString()} rows
+                  {t("csvColumnMapper.rowsCount", { count: preview.total_rows.toLocaleString() })}
                 </span>
               )}
             </div>
@@ -359,17 +368,17 @@ export default function CsvColumnMapperDialog({
         {/* Delimiter + header toggle */}
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <label className={`text-xs ${textSecondary} whitespace-nowrap`}>Delimiter</label>
+            <label className={`text-xs ${textSecondary} whitespace-nowrap`}>{t("csvColumnMapper.delimiter")}</label>
             <select
               value={delimiter}
               onChange={(e) => handleDelimiterChange(e.target.value as Delimiter)}
               disabled={isLoading}
               className={`text-xs px-2 py-1 rounded border ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
             >
-              <option value="comma">Comma</option>
-              <option value="tab">Tab</option>
-              <option value="space">Space</option>
-              <option value="semicolon">Semicolon</option>
+              <option value="comma">{t("csvColumnMapper.delimiterOptions.comma")}</option>
+              <option value="tab">{t("csvColumnMapper.delimiterOptions.tab")}</option>
+              <option value="space">{t("csvColumnMapper.delimiterOptions.space")}</option>
+              <option value="semicolon">{t("csvColumnMapper.delimiterOptions.semicolon")}</option>
             </select>
           </div>
           <label className={`flex items-center gap-2 ${caption} cursor-pointer select-none`}>
@@ -380,7 +389,7 @@ export default function CsvColumnMapperDialog({
               disabled={isLoading}
               className="accent-blue-500"
             />
-            <span>First row is a header</span>
+            <span>{t("csvColumnMapper.firstRowHeader")}</span>
           </label>
         </div>
 
@@ -388,7 +397,7 @@ export default function CsvColumnMapperDialog({
         {isLoading ? (
           <div className="flex items-center justify-center py-8 gap-2">
             <Loader2 className={`${iconMd} animate-spin ${textMuted}`} />
-            <span className={textMuted}>Loading preview...</span>
+            <span className={textMuted}>{t("csvColumnMapper.loadingPreview")}</span>
           </div>
         ) : preview ? (
           <>
@@ -411,24 +420,24 @@ export default function CsvColumnMapperDialog({
                   onClick={() => setShowImportedTs((v) => !v)}
                   className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${showImportedTs ? textDataPurple : textMuted} hover:brightness-90 transition-colors`}
                 >
-                  {showImportedTs ? "Raw" : "Preview"}
+                  {showImportedTs ? t("csvColumnMapper.raw") : t("csvColumnMapper.preview")}
                 </button>
                 <label className={`text-xs ${textSecondary} whitespace-nowrap`}>
-                  Timestamp unit
+                  {t("csvColumnMapper.timestampUnit")}
                 </label>
                 <select
                   value={timestampUnit}
                   onChange={(e) => setTimestampUnit(e.target.value as TimestampUnit)}
                   className={`text-xs px-2 py-1 rounded border ${borderDefault} ${bgSurface} ${textSecondary} focus:outline-none`}
                 >
-                  <option value="seconds">Seconds</option>
-                  <option value="milliseconds">Milliseconds</option>
-                  <option value="microseconds">Microseconds</option>
-                  <option value="nanoseconds">Nanoseconds</option>
+                  <option value="seconds">{t("csvColumnMapper.tsUnits.seconds")}</option>
+                  <option value="milliseconds">{t("csvColumnMapper.tsUnits.milliseconds")}</option>
+                  <option value="microseconds">{t("csvColumnMapper.tsUnits.microseconds")}</option>
+                  <option value="nanoseconds">{t("csvColumnMapper.tsUnits.nanoseconds")}</option>
                 </select>
                 {estimatedDuration && (
                   <span className={`text-xs ${textMuted}`}>
-                    ≈ {estimatedDuration} estimated duration
+                    {t("csvColumnMapper.estimatedDuration", { duration: estimatedDuration })}
                   </span>
                 )}
                 <label className={`flex items-center gap-1.5 text-xs ${textSecondary} cursor-pointer select-none ml-auto`}>
@@ -438,7 +447,7 @@ export default function CsvColumnMapperDialog({
                     onChange={(e) => setNegateTimestamps(e.target.checked)}
                     className="accent-blue-500"
                   />
-                  <span>Negate timestamps</span>
+                  <span>{t("csvColumnMapper.negateTimestamps")}</span>
                 </label>
               </div>
             )}
@@ -446,12 +455,12 @@ export default function CsvColumnMapperDialog({
             {/* Validation hints */}
             {!hasFrameId && (
               <div className={`text-xs text-amber-600 ${bgSurface} border ${borderDefault} rounded px-3 py-2`}>
-                Assign a <strong>Frame ID</strong> column to continue
+                {t("csvColumnMapper.validation.needFrameId")}
               </div>
             )}
             {hasFrameId && !hasData && (
               <div className={`text-xs ${textSecondary} ${bgSurface} border ${borderDefault} rounded px-3 py-2`}>
-                No data columns assigned — frames will be imported with empty payloads
+                {t("csvColumnMapper.validation.noDataColumns")}
               </div>
             )}
           </>
@@ -475,10 +484,10 @@ export default function CsvColumnMapperDialog({
             onConfirm={handleImport}
             confirmLabel={
               isImporting
-                ? "Importing..."
+                ? t("csvColumnMapper.importing")
                 : isMultiFile
-                  ? `Import ${fileCount} Files`
-                  : "Import"
+                  ? t("csvColumnMapper.importN", { count: fileCount })
+                  : t("csvColumnMapper.import")
             }
             confirmDisabled={!canImport}
           />
@@ -491,46 +500,45 @@ export default function CsvColumnMapperDialog({
               <div className="flex items-center justify-between mb-2">
                 <h4 className={`text-sm font-medium ${textSecondary}`}>
                   {importSummary.sequence_gaps.length > 0
-                    ? "Import Complete — Sequence Gaps Detected"
-                    : "Import Complete"}
+                    ? t("csvColumnMapper.completeWithGaps")
+                    : t("csvColumnMapper.complete")}
                 </h4>
                 <button
                   type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      formatImportSummary(importSummary, fileCount, hasSequence)
+                      formatImportSummary(t, importSummary, fileCount, hasSequence)
                     );
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
                   className={`flex items-center gap-1 px-2 py-1 text-xs rounded border ${borderDefault} ${bgSurface} ${textMuted} hover:brightness-90 transition-colors`}
-                  title="Copy summary to clipboard"
+                  title={t("csvColumnMapper.copyTooltip")}
                 >
                   {copied ? (
                     <Check className={iconSm} />
                   ) : (
                     <Copy className={iconSm} />
                   )}
-                  {copied ? "Copied" : "Copy"}
+                  {copied ? t("csvColumnMapper.copied") : t("csvColumnMapper.copy")}
                 </button>
               </div>
               <div className={`text-xs ${textSecondary} space-y-1`}>
                 <p>
-                  {importSummary.metadata.count.toLocaleString()} frames imported
-                  {fileCount > 1 && ` from ${fileCount} files`}
+                  {t("csvColumnMapper.summaryFrames", { count: importSummary.metadata.count.toLocaleString() })}
+                  {fileCount > 1 && t("csvColumnMapper.summaryFromFiles", { count: fileCount })}
                   {hasSequence && (
                     <>
-                      {" · "}{importSummary.sequence_gaps.length} gap{importSummary.sequence_gaps.length !== 1 ? "s" : ""} detected
-                      {importSummary.total_dropped > 0 && (
-                        <>{" · ~"}{importSummary.total_dropped.toLocaleString()} dropped</>
-                      )}
+                      {t("csvColumnMapper.summaryGaps", { count: importSummary.sequence_gaps.length })}
+                      {importSummary.total_dropped > 0 && t("csvColumnMapper.summaryDropped", { count: importSummary.total_dropped.toLocaleString() })}
                     </>
                   )}
                 </p>
                 {hasSequence && importSummary.wrap_points.length > 0 && (
                   <p className={textMuted}>
-                    Sequence wraps at:{" "}
-                    {importSummary.wrap_points.map((v) => v.toLocaleString()).join(", ")}
+                    {t("csvColumnMapper.summaryWraps", {
+                      values: importSummary.wrap_points.map((v) => v.toLocaleString()).join(", "),
+                    })}
                   </p>
                 )}
               </div>
@@ -541,10 +549,12 @@ export default function CsvColumnMapperDialog({
                 >
                   {importSummary.sequence_gaps.map((gap, i) => (
                     <div key={i} className="py-0.5">
-                      {gap.filename ? `${gap.filename} ` : ""}line {gap.line}:{" "}
-                      seq {gap.from_seq} → {gap.to_seq}{" "}
+                      {gap.filename
+                        ? t("csvColumnMapper.gapLineFile", { filename: gap.filename, line: gap.line })
+                        : t("csvColumnMapper.gapLine", { line: gap.line })}
+                      {" "}{t("csvColumnMapper.gapTransition", { from: gap.from_seq, to: gap.to_seq })}{" "}
                       <span className="text-amber-500">
-                        ({gap.dropped} dropped)
+                        {t("csvColumnMapper.gapDropped", { count: gap.dropped })}
                       </span>
                     </div>
                   ))}
@@ -553,7 +563,7 @@ export default function CsvColumnMapperDialog({
             </div>
             <DialogFooter
               onConfirm={() => onImportComplete(importSummary.metadata)}
-              confirmLabel="Done"
+              confirmLabel={t("csvColumnMapper.done")}
             />
           </div>
         )}
