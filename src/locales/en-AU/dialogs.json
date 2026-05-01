@@ -353,6 +353,7 @@
     "filename": "Filename"
   },
   "ioSourcePicker": {
+    "title": "Data Source",
     "filter": "Filter",
     "framing": "Framing",
     "options": "Options",
@@ -398,6 +399,46 @@
       "framesCount": "{{count}} frames",
       "busLabel": "Bus {{bus}}",
       "configLocked": "Config locked (in use by multiple sessions)"
+    },
+    "singleBusConfig": {
+      "deviceNotResponding": "Device not responding",
+      "online": "Online",
+      "deviceOnline": "Device Online",
+      "bus": "Bus:",
+      "outputBus": "Output Bus:",
+      "framing": "Framing:",
+      "duplicate": "⚠ Duplicate",
+      "delimiter": "Delimiter:",
+      "delimiterHex": "Delimiter (hex):",
+      "delimiterPlaceholder": "0A",
+      "max": "Max:",
+      "maxLength": "Max length:",
+      "validateCrc": "Validate CRC-16",
+      "captureRawBytes": "Capture raw bytes",
+      "framingOptions": {
+        "raw": "None (Raw)",
+        "delimiter": "Delimiter",
+        "slip": "SLIP",
+        "modbus_rtu": "Modbus RTU"
+      },
+      "configLockedHint": "Configuration locked — this source is in use by multiple sessions.",
+      "configureSerial": "Configure bus number and framing for this serial device.",
+      "tagBus": "Frames from this device will be tagged with the selected bus number."
+    },
+    "busConfig": {
+      "probing": "Probing...",
+      "probingNamed": "Probing {{name}}...",
+      "duplicateBusTooltip": "Another source uses this bus number",
+      "configLockedTooltip": "Config locked - source in use by multiple sessions",
+      "duplicateWarning": "Duplicate bus numbers may cause confusion",
+      "canBuses": "CAN Buses ({{enabled}}/{{total}} enabled)",
+      "namedCanBuses": "{{name}} - CAN Buses ({{enabled}}/{{total}} enabled)",
+      "protocol": "Protocol:",
+      "output": "→ Output:",
+      "configLocked": "Configuration locked — this source is in use by multiple sessions.",
+      "noBusesEnabled": "No buses enabled. Enable at least one bus to capture frames.",
+      "duplicateOutputs": "Warning: Some output bus numbers conflict with other sources",
+      "busLabel": "Bus {{bus}}"
     },
     "captures": {
       "title": "Captures",

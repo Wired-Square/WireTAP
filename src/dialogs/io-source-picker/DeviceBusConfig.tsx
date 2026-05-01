@@ -4,6 +4,7 @@
 // Shows available buses with toggles to enable/disable and optional bus remapping.
 // Also supports protocol selection when used in profile settings.
 
+import { useTranslation } from "react-i18next";
 import { Loader2, AlertCircle, Bus, Lock } from "lucide-react";
 import { iconMd, iconXs } from "../../styles/spacing";
 import { caption, sectionHeaderText } from "../../styles/typography";
@@ -62,6 +63,7 @@ export default function DeviceBusConfig({
   showProtocol = false,
   configLocked = false,
 }: DeviceBusConfigProps) {
+  const { t } = useTranslation("dialogs");
   // Toggle a bus enabled/disabled
   const toggleBus = (deviceBus: number) => {
     const newConfig = busConfig.map((mapping) =>
@@ -103,7 +105,7 @@ export default function DeviceBusConfig({
       <div className={wrapperClass}>
         <div className={`flex items-center gap-2 ${caption}`}>
           <Loader2 className={`${iconXs} animate-spin`} />
-          <span>Probing{profileName ? ` ${profileName}` : ""}...</span>
+          <span>{profileName ? t("ioSourcePicker.busConfig.probingNamed", { name: profileName }) : t("ioSourcePicker.busConfig.probing")}</span>
         </div>
       </div>
     );
@@ -127,7 +129,7 @@ export default function DeviceBusConfig({
       <div className={wrapperClass}>
         <div className={`flex items-center gap-2 ${caption}`}>
           <Loader2 className={`${iconXs} animate-spin`} />
-          <span>Probing{profileName ? ` ${profileName}` : ""}...</span>
+          <span>{profileName ? t("ioSourcePicker.busConfig.probingNamed", { name: profileName }) : t("ioSourcePicker.busConfig.probing")}</span>
         </div>
       </div>
     );
@@ -163,7 +165,7 @@ export default function DeviceBusConfig({
                     className="w-3 h-3 rounded border-[color:var(--border-default)] text-[color:var(--text-cyan)] focus:ring-cyan-500 bg-[var(--bg-primary)] disabled:cursor-not-allowed"
                   />
                   <span className={configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-secondary)]"}>
-                    {BUS_NAMES[mapping.deviceBus] || `Bus ${mapping.deviceBus}`}
+                    {BUS_NAMES[mapping.deviceBus] || t("ioSourcePicker.busConfig.busLabel", { bus: mapping.deviceBus })}
                   </span>
                 </label>
 
@@ -206,15 +208,15 @@ export default function DeviceBusConfig({
                     >
                       {Array.from({ length: 8 }, (_, i) => (
                         <option key={i} value={i}>
-                          Bus {i}
+                          {t("ioSourcePicker.busConfig.busLabel", { bus: i })}
                         </option>
                       ))}
                     </select>
                     {isDuplicate && !configLocked && (
-                      <span className="text-amber-500" title="Another source uses this bus number">⚠</span>
+                      <span className="text-amber-500" title={t("ioSourcePicker.busConfig.duplicateBusTooltip")}>⚠</span>
                     )}
                     {configLocked && (
-                      <span className="text-[color:var(--text-amber)]" title="Config locked - source in use by multiple sessions">
+                      <span className="text-[color:var(--text-amber)]" title={t("ioSourcePicker.busConfig.configLockedTooltip")}>
                         <Lock className={iconXs} />
                       </span>
                     )}
@@ -226,7 +228,7 @@ export default function DeviceBusConfig({
         </div>
         {hasDuplicates && (
           <p className="text-[10px] text-[color:var(--text-amber)] mt-1">
-            Duplicate bus numbers may cause confusion
+            {t("ioSourcePicker.busConfig.duplicateWarning")}
           </p>
         )}
       </div>
@@ -239,7 +241,9 @@ export default function DeviceBusConfig({
       <div className="flex items-center gap-2 mb-2">
         <Bus className={`${iconMd} text-cyan-500`} />
         <span className="text-xs font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-          {profileName ? `${profileName} - ` : ""}CAN Buses ({enabledCount}/{deviceInfo.bus_count} enabled)
+          {profileName
+            ? t("ioSourcePicker.busConfig.namedCanBuses", { name: profileName, enabled: enabledCount, total: deviceInfo.bus_count })
+            : t("ioSourcePicker.busConfig.canBuses", { enabled: enabledCount, total: deviceInfo.bus_count })}
         </span>
       </div>
 
@@ -272,7 +276,7 @@ export default function DeviceBusConfig({
               {/* Protocol selector (only show if enabled and showProtocol is true) */}
               {mapping.enabled && showProtocol && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className={configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-muted)]"}>Protocol:</span>
+                  <span className={configLocked ? "text-[color:var(--text-muted)]" : "text-[color:var(--text-muted)]"}>{t("ioSourcePicker.busConfig.protocol")}</span>
                   <select
                     value={mapping.protocol || 'can'}
                     onChange={(e) =>
@@ -294,7 +298,7 @@ export default function DeviceBusConfig({
               {/* Output bus selector (only show if enabled and showOutputBus is true) */}
               {mapping.enabled && showOutputBus && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  <span className="text-[color:var(--text-muted)]">→ Output:</span>
+                  <span className="text-[color:var(--text-muted)]">{t("ioSourcePicker.busConfig.output")}</span>
                   <select
                     value={mapping.outputBus}
                     onChange={(e) =>
@@ -332,17 +336,17 @@ export default function DeviceBusConfig({
 
       {configLocked && (
         <p className="text-xs text-[color:var(--text-amber)] mt-2">
-          Configuration locked — this source is in use by multiple sessions.
+          {t("ioSourcePicker.busConfig.configLocked")}
         </p>
       )}
       {enabledCount === 0 && !configLocked && (
         <p className="text-xs text-[color:var(--text-amber)] mt-2">
-          No buses enabled. Enable at least one bus to capture frames.
+          {t("ioSourcePicker.busConfig.noBusesEnabled")}
         </p>
       )}
       {hasDuplicates && !configLocked && (
         <p className="text-xs text-[color:var(--text-amber)] mt-2">
-          Warning: Some output bus numbers conflict with other sources
+          {t("ioSourcePicker.busConfig.duplicateOutputs")}
         </p>
       )}
     </div>

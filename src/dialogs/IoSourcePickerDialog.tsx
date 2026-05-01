@@ -1,6 +1,7 @@
 // ui/src/dialogs/IoSourcePickerDialog.tsx
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import { iconLg } from "../styles/spacing";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -205,6 +206,7 @@ export default function IoSourcePickerDialog({
   autoImport,
   onAutoImportConsumed,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   // Use stable empty array when selectedIds is not provided (avoids re-renders)
   const selectedIds = selectedIdsProp ?? EMPTY_SELECTED_IDS;
 
@@ -1491,7 +1493,7 @@ export default function IoSourcePickerDialog({
       <div className={`${cardElevated} shadow-xl overflow-hidden`}>
         {/* Header */}
         <div className={`${paddingCard} border-b ${borderDefault} flex items-center justify-between`}>
-          <h2 className={h3}>Data Source</h2>
+          <h2 className={h3}>{t("ioSourcePicker.title")}</h2>
           <button
             onClick={onClose}
             className={`p-1 ${roundedDefault} ${hoverLight} transition-colors`}
