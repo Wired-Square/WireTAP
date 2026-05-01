@@ -13,6 +13,8 @@ import enAUTransmit from './en-AU/transmit.json';
 import enAUDiscovery from './en-AU/discovery.json';
 import enAUModbus from './en-AU/modbus.json';
 import enAUDecoder from './en-AU/decoder.json';
+import enAUTestPattern from './en-AU/testPattern.json';
+import enAUAnalysis from './en-AU/analysis.json';
 
 export const FALLBACK_LANGUAGE = 'en-AU';
 
@@ -20,7 +22,7 @@ export const SUPPORTED_LANGUAGES = ['en-AU'] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
-export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit', 'discovery', 'modbus', 'decoder'] as const;
+export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit', 'discovery', 'modbus', 'decoder', 'testPattern', 'analysis'] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
 export const resources = {
@@ -34,5 +36,7 @@ export const resources = {
     discovery: enAUDiscovery,
     modbus: enAUModbus,
     decoder: enAUDecoder,
+    testPattern: enAUTestPattern,
+    analysis: enAUAnalysis,
   },
 } as const;

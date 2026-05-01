@@ -1,0 +1,10 @@
+{
+  "frameOrder": {
+    "emptyHeading": "No Frame Order Analysis Results",
+    "emptyDescription": "Run the Frame Order Analysis tool from Discovery to see results here."
+  },
+  "payload": {
+    "emptyHeading": "No Payload Analysis Results",
+    "emptyDescription": "Run the Payload Change Analysis tool from Discovery to see results here."
+  }
+}

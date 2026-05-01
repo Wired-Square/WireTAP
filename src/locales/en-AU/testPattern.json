@@ -1,0 +1,89 @@
+{
+  "modes": {
+    "echo": "Echo",
+    "throughput": "Throughput",
+    "latency": "Latency",
+    "reliability": "Reliability",
+    "auto": "Auto"
+  },
+  "roles": {
+    "initiator": "Initiator",
+    "responder": "Responder"
+  },
+  "topBar": {
+    "role": "Role",
+    "testMode": "Test mode",
+    "rate": "Rate",
+    "duration": "Dur",
+    "bus": "Bus",
+    "framesPerSecond": "Frames per second",
+    "durationSeconds": "Duration in seconds",
+    "busNumber": "Bus number",
+    "fdMode": "CAN FD mode",
+    "extendedIds": "Extended (29-bit) IDs"
+  },
+  "states": {
+    "noSession": "No Session Connected",
+    "noSessionHelp": "Select a transmit-capable IO profile to start testing.",
+    "notTransmitInterface": "Not a transmit interface",
+    "selectMode": "Choose a role and mode in the toolbar, then click Start."
+  },
+  "actions": {
+    "start": "Start",
+    "stop": "Stop",
+    "clear": "Clear",
+    "clearResults": "Clear results"
+  },
+  "results": {
+    "pass": "PASS",
+    "fail": "FAIL",
+    "allPass": "ALL PASS",
+    "failuresDetected": "FAILURES DETECTED",
+    "gauges": {
+      "busRate": "Bus Rate",
+      "queueRate": "Queue Rate",
+      "throughput": "Throughput",
+      "delivered": "Delivered",
+      "queued": "Queued",
+      "transmitted": "Transmitted",
+      "drops": "Drops",
+      "latencyMean": "Latency (mean)",
+      "received": "Received"
+    },
+    "stats": {
+      "tx": "TX",
+      "rx": "RX",
+      "rate": "Rate",
+      "drops": "Drops",
+      "duplicates": "Duplicates",
+      "outOfOrder": "Out-of-order",
+      "delivered": "Delivered",
+      "busRate": "Bus Rate"
+    },
+    "latencyTitle": "Latency (μs)",
+    "latencyMin": "min",
+    "latencyMax": "max",
+    "latencyMean": "mean",
+    "latencyP50": "p50",
+    "latencyP95": "p95",
+    "latencyP99": "p99",
+    "sequenceGapsTitle": "Sequence gaps",
+    "remoteEndpointTitle": "Remote Endpoint",
+    "errorsTitle": "Errors",
+    "expectedGotFmt": "expected {{expected}}, got {{got}}",
+    "andMoreFmt": "... and {{count}} more"
+  },
+  "auto": {
+    "phaseColumns": {
+      "phase": "Phase",
+      "result": "Result",
+      "tx": "TX",
+      "rx": "RX",
+      "drops": "Drops",
+      "rate": "Rate",
+      "latency": "Latency",
+      "time": "Time"
+    },
+    "remoteFromPhase": "Remote Endpoint (from {{phase}})"
+  }
+}

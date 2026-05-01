@@ -6,6 +6,7 @@
 import { useState, useCallback } from "react";
 import { FlaskConical } from "lucide-react";
 import { ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconSm } from "../../../styles/spacing";
 import { bgSurface, borderDefault, textPrimary, textSecondary } from "../../../styles";
 import { badgeColorClass } from "../../../styles/buttonStyles";
@@ -13,17 +14,17 @@ import type { IOProfile } from "../../../types/common";
 import type { TestMode, TestRole } from "../../../api/testPattern";
 import AppTopBar from "../../../components/AppTopBar";
 
-const TEST_MODES: { value: TestMode; label: string }[] = [
-  { value: "auto", label: "Auto (Full Suite)" },
-  { value: "echo", label: "Echo" },
-  { value: "throughput", label: "Throughput" },
-  { value: "latency", label: "Latency" },
-  { value: "reliability", label: "Reliability" },
+const TEST_MODE_KEYS: { value: TestMode; i18nKey: string }[] = [
+  { value: "auto", i18nKey: "auto" },
+  { value: "echo", i18nKey: "echo" },
+  { value: "throughput", i18nKey: "throughput" },
+  { value: "latency", i18nKey: "latency" },
+  { value: "reliability", i18nKey: "reliability" },
 ];
 
-const ROLES: { value: TestRole; label: string }[] = [
-  { value: "initiator", label: "Initiator" },
-  { value: "responder", label: "Responder" },
+const ROLE_KEYS: { value: TestRole; i18nKey: string }[] = [
+  { value: "initiator", i18nKey: "initiator" },
+  { value: "responder", i18nKey: "responder" },
 ];
 
 interface Props {
@@ -102,6 +103,7 @@ export default function TestPatternTopBar({
   onExtendedChange,
   error = null,
 }: Props) {
+  const { t } = useTranslation("testPattern");
   const selectClass = `h-7 rounded border px-1.5 text-xs ${bgSurface} ${textPrimary} ${borderDefault}`;
   const inputClass = `h-7 w-16 rounded border px-1.5 text-xs ${bgSurface} ${textPrimary} ${borderDefault}`;
 
@@ -148,10 +150,10 @@ export default function TestPatternTopBar({
               value={role}
               onChange={(e) => onRoleChange(e.target.value as TestRole)}
               disabled={isRunning}
-              title="Role"
+              title={t("topBar.role")}
             >
-              {ROLES.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
+              {ROLE_KEYS.map((r) => (
+                <option key={r.value} value={r.value}>{t(`roles.${r.i18nKey}`)}</option>
               ))}
             </select>
           )}
@@ -162,17 +164,17 @@ export default function TestPatternTopBar({
             value={mode}
             onChange={(e) => onModeChange(e.target.value as TestMode)}
             disabled={isRunning}
-            title="Test mode"
+            title={t("topBar.testMode")}
           >
-            {TEST_MODES.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
+            {TEST_MODE_KEYS.map((m) => (
+              <option key={m.value} value={m.value}>{m.value === "auto" ? `${t("modes.auto")} (Full Suite)` : t(`modes.${m.i18nKey}`)}</option>
             ))}
           </select>
 
           {/* Rate (only for non-throughput initiator, hidden for auto) */}
           {role === "initiator" && mode !== "throughput" && mode !== "auto" && (
             <div className="flex items-center gap-1">
-              <span className={`text-xs ${textSecondary}`}>Rate</span>
+              <span className={`text-xs ${textSecondary}`}>{t("topBar.rate")}</span>
               <NumericInput
                 className={inputClass}
                 value={rateHz}
@@ -180,7 +182,7 @@ export default function TestPatternTopBar({
                 disabled={isRunning}
                 min={1}
                 max={10000}
-                title="Frames per second"
+                title={t("topBar.framesPerSecond")}
               />
             </div>
           )}
@@ -189,7 +191,7 @@ export default function TestPatternTopBar({
           {mode !== "auto" && (
             <>
               <div className="flex items-center gap-1">
-                <span className={`text-xs ${textSecondary}`}>Dur</span>
+                <span className={`text-xs ${textSecondary}`}>{t("topBar.duration")}</span>
                 <NumericInput
                   className={inputClass}
                   value={durationSec}
@@ -197,11 +199,11 @@ export default function TestPatternTopBar({
                   disabled={isRunning}
                   min={1}
                   max={86400}
-                  title="Duration in seconds"
+                  title={t("topBar.durationSeconds")}
                 />
               </div>
               <div className="flex items-center gap-1">
-                <span className={`text-xs ${textSecondary}`}>Bus</span>
+                <span className={`text-xs ${textSecondary}`}>{t("topBar.bus")}</span>
                 <NumericInput
                   className={`${inputClass} w-10`}
                   value={bus}
@@ -209,7 +211,7 @@ export default function TestPatternTopBar({
                   disabled={isRunning}
                   min={0}
                   max={7}
-                  title="Bus number"
+                  title={t("topBar.busNumber")}
                 />
               </div>
               <button
@@ -220,7 +222,7 @@ export default function TestPatternTopBar({
                 }`}
                 onClick={() => onFdChange(!useFd)}
                 disabled={isRunning}
-                title="CAN FD mode"
+                title={t("topBar.fdMode")}
               >
                 FD
               </button>
@@ -232,7 +234,7 @@ export default function TestPatternTopBar({
                 }`}
                 onClick={() => onExtendedChange(!useExtended)}
                 disabled={isRunning}
-                title="Extended (29-bit) IDs"
+                title={t("topBar.extendedIds")}
               >
                 Ext
               </button>

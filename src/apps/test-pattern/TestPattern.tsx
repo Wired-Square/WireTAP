@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlaskConical, Play, Square, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   textPrimary,
   textSecondary,
@@ -49,6 +50,7 @@ function generateTestId(): string {
 // ============================================================================
 
 export default function TestPattern() {
+  const { t } = useTranslation("testPattern");
   const { settings } = useSettings();
   const ioProfiles = settings?.io_profiles ?? [];
 
@@ -271,10 +273,8 @@ export default function TestPattern() {
           <div className={emptyStateContainer}>
             <FlaskConical size={48} className={textDataSecondary} />
             <div className={emptyStateText}>
-              <p className={emptyStateHeading}>No Session Connected</p>
-              <p className={emptyStateDescription}>
-                Select a transmit-capable IO profile to start testing.
-              </p>
+              <p className={emptyStateHeading}>{t("states.noSession")}</p>
+              <p className={emptyStateDescription}>{t("states.noSessionHelp")}</p>
             </div>
           </div>
         ) : (
@@ -288,12 +288,12 @@ export default function TestPattern() {
                 {isRunning ? (
                   <>
                     <Square className={`${iconSm} text-red-400`} />
-                    <span>Stop</span>
+                    <span>{t("actions.stop")}</span>
                   </>
                 ) : (
                   <>
                     <Play className={`${iconSm} text-emerald-400`} />
-                    <span>Start</span>
+                    <span>{t("actions.start")}</span>
                   </>
                 )}
               </button>
@@ -301,10 +301,10 @@ export default function TestPattern() {
                 <button
                   className={`${buttonBase} gap-1.5`}
                   onClick={() => { clearTestState(); setError(null); }}
-                  title="Clear results"
+                  title={t("actions.clearResults")}
                 >
                   <Trash2 className={`${iconSm} text-[color:var(--text-muted)]`} />
-                  <span>Clear</span>
+                  <span>{t("actions.clear")}</span>
                 </button>
               )}
               {error && (
@@ -317,7 +317,7 @@ export default function TestPattern() {
               <TestResults state={testState} />
             ) : (
               <div className={`flex-1 flex items-center justify-center ${textSecondary} text-sm`}>
-                Choose a role and mode in the toolbar, then click Start.
+                {t("states.selectMode")}
               </div>
             )}
           </div>
