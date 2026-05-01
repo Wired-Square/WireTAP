@@ -6,6 +6,7 @@
 // data, and provides a "Select Firmware" button to start the upload flow.
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { RefreshCw, Upload, Copy, Check as CheckIcon } from "lucide-react";
 import {
   textPrimary,
@@ -37,6 +38,7 @@ interface FirmwareSectionProps {
 }
 
 export default function FirmwareSection({ deviceId, deviceName }: FirmwareSectionProps) {
+  const { t } = useTranslation("devices");
   const images = useUpgradeStore((s) => s.data.images);
   const setImages = useUpgradeStore((s) => s.setImages);
   const setSelectedFile = useUpgradeStore((s) => s.setSelectedFile);
@@ -124,12 +126,12 @@ export default function FirmwareSection({ deviceId, deviceName }: FirmwareSectio
     <div className="mt-3 pt-5 border-t border-[color:var(--border-default)]">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className={`text-sm font-medium ${textPrimary}`}>Firmware Upgrade</div>
+        <div className={`text-sm font-medium ${textPrimary}`}>{t("firmware.sectionTitle")}</div>
         {!loading && images.length > 0 && (
           <SecondaryButton onClick={handleRefresh} disabled={refreshing} className="w-44">
             <span className="flex items-center gap-1.5">
               <RefreshCw className={`${iconMd} ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
+              {t("firmware.refresh")}
             </span>
           </SecondaryButton>
         )}
@@ -152,7 +154,7 @@ export default function FirmwareSection({ deviceId, deviceName }: FirmwareSectio
       {/* Image slots */}
       {!loading && images.length === 0 && !error && (
         <div className={`text-sm ${textSecondary} text-center py-4`}>
-          No image slot information available
+          {t("firmware.noSlots")}
         </div>
       )}
 
@@ -162,36 +164,38 @@ export default function FirmwareSection({ deviceId, deviceName }: FirmwareSectio
             <div key={idx} className={`${cardDefault} p-3`}>
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-sm font-medium ${textPrimary}`}>
-                  Slot {img.slot}{img.image !== null ? ` (Image ${img.image})` : ""}
+                  {img.image !== null
+                    ? t("inspect.slotLabelWithImage", { slot: img.slot, image: img.image })
+                    : t("inspect.slotLabel", { slot: img.slot })}
                 </span>
                 <div className="flex gap-1">
-                  {img.active && <SlotBadge label="Active" active />}
-                  {img.confirmed && <SlotBadge label="Confirmed" active={false} />}
-                  {img.pending && <SlotBadge label="Pending" active={false} />}
-                  {img.bootable && <SlotBadge label="Bootable" active={false} />}
-                  {img.permanent && <SlotBadge label="Permanent" active={false} />}
+                  {img.active && <SlotBadge label={t("inspect.active")} active />}
+                  {img.confirmed && <SlotBadge label={t("inspect.confirmed")} active={false} />}
+                  {img.pending && <SlotBadge label={t("inspect.pending")} active={false} />}
+                  {img.bootable && <SlotBadge label={t("inspect.bootable")} active={false} />}
+                  {img.permanent && <SlotBadge label={t("inspect.permanent")} active={false} />}
                 </div>
               </div>
               <div className={`text-xs ${textSecondary} space-y-0.5`}>
                 <div>
-                  Version:{" "}
+                  {t("inspect.version")}{" "}
                   <span className={`font-mono ${textPrimary}`}>{img.version || "\u2014"}</span>
                 </div>
                 <div className="font-mono flex items-center gap-1.5">
-                  <span className="font-sans">Hash:</span>{" "}
+                  <span className="font-sans">{t("inspect.hash")}</span>{" "}
                   {img.hash ? (
                     <>
                       <button
                         onClick={() => handleCopyHash(img.hash)}
                         className={`${textPrimary} cursor-pointer hover:underline text-left break-all`}
-                        title="Click to copy hash"
+                        title={t("inspect.copyHashTooltip")}
                       >
                         {img.hash}
                       </button>
                       <button
                         onClick={() => handleCopyHash(img.hash)}
                         className="shrink-0 cursor-pointer text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
-                        title="Copy hash"
+                        title={t("inspect.copyHash")}
                       >
                         {copiedHash === img.hash ? (
                           <CheckIcon className="w-3.5 h-3.5 text-green-500" />
@@ -216,7 +220,7 @@ export default function FirmwareSection({ deviceId, deviceName }: FirmwareSectio
           <PrimaryButton onClick={handleSelectFirmware} className="min-w-[10rem]">
             <span className="flex items-center justify-center gap-1.5">
               <Upload className={iconMd} />
-              Select Firmware
+              {t("firmware.selectFirmware")}
             </span>
           </PrimaryButton>
         </div>

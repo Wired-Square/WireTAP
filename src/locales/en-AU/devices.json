@@ -94,7 +94,25 @@
     "macAddress": "MAC Address",
     "uptime": "Uptime",
     "memory": "Memory",
-    "noData": "No information available"
+    "noData": "No information available",
+    "disconnect": "Disconnect",
+    "refresh": "Refresh",
+    "noSlots": "No image slot information available",
+    "slotLabel": "Slot {{slot}}",
+    "slotLabelWithImage": "Slot {{slot}} (Image {{image}})",
+    "filter": "Firmware",
+    "active": "Active",
+    "confirmed": "Confirmed",
+    "pending": "Pending",
+    "bootable": "Bootable",
+    "permanent": "Permanent",
+    "version": "Version:",
+    "hash": "Hash:",
+    "copyHashTooltip": "Click to copy hash",
+    "copyHash": "Copy hash",
+    "selectedLabel": "Selected:",
+    "selectedSize": "({{kb}} KB)",
+    "selectFirmware": "Select Firmware"
   },
   "firmware": {
     "title": "Firmware",
@@ -104,7 +122,11 @@
     "updateAvailable": "Update available: {{version}}",
     "upToDate": "Up to date",
     "selectFile": "Select firmware file…",
-    "uploadFirmware": "Upload Firmware"
+    "uploadFirmware": "Upload Firmware",
+    "sectionTitle": "Firmware Upgrade",
+    "refresh": "Refresh",
+    "noSlots": "No image slot information available",
+    "selectFirmware": "Select Firmware"
   },
   "upload": {
     "title": "Upload Firmware",

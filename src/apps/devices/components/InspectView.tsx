@@ -4,6 +4,7 @@
 // to work within the unified Devices wizard.
 
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { RefreshCw, Upload, ArrowLeft, Copy, Check as CheckIcon } from "lucide-react";
 import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
@@ -30,6 +31,7 @@ function SlotBadge({ label, active }: { label: string; active: boolean }) {
 }
 
 export default function InspectView() {
+  const { t } = useTranslation("devices");
   const images = useUpgradeStore((s) => s.data.images);
   const selectedFileName = useUpgradeStore((s) => s.data.selectedFileName);
   const selectedFileSize = useUpgradeStore((s) => s.data.selectedFileSize);
@@ -104,13 +106,13 @@ export default function InspectView() {
         <SecondaryButton onClick={handleDisconnect}>
           <span className="flex items-center gap-1.5">
             <ArrowLeft className={iconMd} />
-            Disconnect
+            {t("inspect.disconnect")}
           </span>
         </SecondaryButton>
         <SecondaryButton onClick={handleRefresh} disabled={refreshing}>
           <span className="flex items-center gap-1.5">
             <RefreshCw className={`${iconMd} ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
+            {t("inspect.refresh")}
           </span>
         </SecondaryButton>
       </div>
@@ -125,7 +127,7 @@ export default function InspectView() {
       {/* Image slots */}
       {images.length === 0 ? (
         <div className={`text-sm ${textSecondary} text-center py-8`}>
-          No image slot information available
+          {t("inspect.noSlots")}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -133,36 +135,38 @@ export default function InspectView() {
             <div key={idx} className={`${cardDefault} p-3`}>
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-sm font-medium ${textPrimary}`}>
-                  Slot {img.slot}{img.image !== null ? ` (Image ${img.image})` : ""}
+                  {img.image !== null
+                    ? t("inspect.slotLabelWithImage", { slot: img.slot, image: img.image })
+                    : t("inspect.slotLabel", { slot: img.slot })}
                 </span>
                 <div className="flex gap-1">
-                  {img.active && <SlotBadge label="Active" active />}
-                  {img.confirmed && <SlotBadge label="Confirmed" active={false} />}
-                  {img.pending && <SlotBadge label="Pending" active={false} />}
-                  {img.bootable && <SlotBadge label="Bootable" active={false} />}
-                  {img.permanent && <SlotBadge label="Permanent" active={false} />}
+                  {img.active && <SlotBadge label={t("inspect.active")} active />}
+                  {img.confirmed && <SlotBadge label={t("inspect.confirmed")} active={false} />}
+                  {img.pending && <SlotBadge label={t("inspect.pending")} active={false} />}
+                  {img.bootable && <SlotBadge label={t("inspect.bootable")} active={false} />}
+                  {img.permanent && <SlotBadge label={t("inspect.permanent")} active={false} />}
                 </div>
               </div>
               <div className={`text-xs ${textSecondary} space-y-0.5`}>
                 <div>
-                  Version:{" "}
+                  {t("inspect.version")}{" "}
                   <span className={`font-mono ${textPrimary}`}>{img.version || "—"}</span>
                 </div>
                 <div className="font-mono flex items-center gap-1.5">
-                  <span className="font-sans">Hash:</span>{" "}
+                  <span className="font-sans">{t("inspect.hash")}</span>{" "}
                   {img.hash ? (
                     <>
                       <button
                         onClick={() => handleCopyHash(img.hash)}
                         className={`${textPrimary} cursor-pointer hover:underline text-left break-all`}
-                        title="Click to copy hash"
+                        title={t("inspect.copyHashTooltip")}
                       >
                         {img.hash}
                       </button>
                       <button
                         onClick={() => handleCopyHash(img.hash)}
                         className="shrink-0 cursor-pointer text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
-                        title="Copy hash"
+                        title={t("inspect.copyHash")}
                       >
                         {copiedHash === img.hash ? (
                           <CheckIcon className="w-3.5 h-3.5 text-green-500" />
@@ -184,8 +188,8 @@ export default function InspectView() {
       {/* Selected file indicator */}
       {selectedFileName && (
         <div className={`text-xs ${textSecondary}`}>
-          Selected: <span className={textPrimary}>{selectedFileName}</span>
-          {selectedFileSize !== null && ` (${(selectedFileSize / 1024).toFixed(1)} KB)`}
+          {t("inspect.selectedLabel")} <span className={textPrimary}>{selectedFileName}</span>
+          {selectedFileSize !== null && ` ${t("inspect.selectedSize", { kb: (selectedFileSize / 1024).toFixed(1) })}`}
         </div>
       )}
 
@@ -194,7 +198,7 @@ export default function InspectView() {
         <PrimaryButton onClick={handleSelectFirmware} className="min-w-[10rem]">
           <span className="flex items-center justify-center gap-1.5">
             <Upload className={iconMd} />
-            Select Firmware
+            {t("inspect.selectFirmware")}
           </span>
         </PrimaryButton>
       </div>
