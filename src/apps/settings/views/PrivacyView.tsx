@@ -1,5 +1,6 @@
 // ui/src/apps/settings/views/PrivacyView.tsx
 
+import { useTranslation } from "react-i18next";
 import { labelDefault, helpText } from "../../../styles";
 
 type PrivacyViewProps = {
@@ -11,9 +12,13 @@ export default function PrivacyView({
   telemetryEnabled,
   onChangeTelemetryEnabled,
 }: PrivacyViewProps) {
+  const { t } = useTranslation("settings");
+
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Privacy</h2>
+      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+        {t("privacy.title")}
+      </h2>
 
       {/* Telemetry */}
       <div className="space-y-2">
@@ -25,12 +30,8 @@ export default function PrivacyView({
             className="mt-1"
           />
           <div>
-            <span className={labelDefault}>Send anonymous crash reports</span>
-            <p className={helpText}>
-              Help improve WireTAP by sending anonymous crash and error reports
-              via Sentry. No personal data, CAN bus data, or usage analytics are
-              collected — only error stack traces.
-            </p>
+            <span className={labelDefault}>{t("privacy.telemetry.label")}</span>
+            <p className={helpText}>{t("privacy.telemetry.help")}</p>
           </div>
         </label>
       </div>

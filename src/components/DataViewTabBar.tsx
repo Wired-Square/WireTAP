@@ -13,6 +13,7 @@ import {
   borderDataView,
 } from '../styles';
 import { iconXs } from '../styles/spacing';
+import { textDataPrimary, textDataSecondary } from '../styles/colourTokens';
 import {
   dataViewTabClass,
   badgeColorClass,
@@ -145,13 +146,13 @@ export default function DataViewTabBar({
 
       {/* Frame index display (for debugging/playback position) */}
       {frameIndex != null && (
-        <div className="flex items-center gap-1 ml-2 px-1.5 py-0.5 bg-gray-700/50 rounded text-xs font-mono text-gray-400">
+        <div className={`flex items-center gap-1 ml-2 px-1.5 py-0.5 bg-gray-700/50 rounded text-xs font-mono ${textDataSecondary}`}>
           <span>Frame</span>
           <span className="text-gray-200">{(frameIndex + 1).toLocaleString()}</span>
           {totalFrames != null && (
             <>
               <span>/</span>
-              <span className="text-gray-300">{totalFrames.toLocaleString()}</span>
+              <span className={textDataPrimary}>{totalFrames.toLocaleString()}</span>
             </>
           )}
         </div>

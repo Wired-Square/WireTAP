@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { Settings } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
-import { disabledState, bgSurface, secondaryButton } from "../../../styles";
+import { bgSurface, primaryButtonBase, secondaryButton } from "../../../styles";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import {
   MetadataSection,
@@ -287,7 +287,7 @@ export default function UnifiedConfigDialog({
           <button
             onClick={() => onSave({ can: canEnabled, serial: serialEnabled, modbus: modbusEnabled })}
             disabled={!isValid}
-            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${disabledState}`}
+            className={primaryButtonBase}
           >
             Save Changes
           </button>

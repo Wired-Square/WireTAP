@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { caption, captionMuted } from "../styles/typography";
-import { bgSurface } from "../styles";
+import { bgSurface, textDataMuted, textDataSecondary } from "../styles";
 
 /** Filter configuration */
 export interface FilterConfig {
@@ -53,7 +53,7 @@ export default function FilterOptionsPanel({
     return (
       <div className="space-y-3">
         <label className="block text-sm">
-          <span className="text-gray-300">Minimum frame length:</span>
+          <span className={textDataSecondary}>Minimum frame length:</span>
           <input
             type="number"
             value={minLength}
@@ -62,7 +62,7 @@ export default function FilterOptionsPanel({
             className="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white disabled:opacity-50"
             min={0}
           />
-          <span className="text-xs text-gray-500 mt-1 block">
+          <span className={`text-xs mt-1 block ${textDataMuted}`}>
             {minLength === 0 ? "No filter - all frames accepted" : "Frames shorter than this will be discarded"}
           </span>
         </label>

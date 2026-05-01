@@ -10,7 +10,7 @@ import type { BusSourceInfo } from "../../../stores/sessionStore";
 import { useSettings } from "../../../hooks/useSettings";
 import { textDataSecondary, textDataGreen } from "../../../styles/colourTokens";
 import { textDanger } from "../../../styles";
-import { buttonBase } from "../../../styles/buttonStyles";
+import { badgeColorClass, buttonBase } from "../../../styles/buttonStyles";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -206,8 +206,8 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
                   onClick={() => setIsLive(!isLive)}
                   className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded ${
                     isLive
-                      ? "bg-green-600/30 text-green-400"
-                      : "bg-amber-600/30 text-amber-400"
+                      ? badgeColorClass('green')
+                      : badgeColorClass('amber')
                   }`}
                   title={isLive ? "Showing latest frames (click to browse)" : "Browsing history (click for live)"}
                 >

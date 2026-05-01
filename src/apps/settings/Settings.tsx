@@ -161,6 +161,8 @@ export default function Settings() {
   const setLogLevel = useSettingsStore((s) => s.setLogLevel);
   const smpPort = useSettingsStore((s) => s.general.smpPort);
   const setSmpPort = useSettingsStore((s) => s.setSmpPort);
+  const language = useSettingsStore((s) => s.general.language);
+  const setLanguage = useSettingsStore((s) => s.setLanguage);
 
   // Privacy
   const telemetryEnabled = useSettingsStore((s) => s.general.telemetryEnabled);
@@ -337,6 +339,8 @@ export default function Settings() {
               onChangeLogLevel={setLogLevel}
               smpPort={smpPort}
               onChangeSmpPort={setSmpPort}
+              language={language}
+              onChangeLanguage={setLanguage}
               isIOS={isIOSPlatform}
             />
           )}

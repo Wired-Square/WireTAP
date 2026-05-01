@@ -1,9 +1,11 @@
 // ui/src/apps/settings/views/GeneralView.tsx
 
+import { useTranslation } from "react-i18next";
 import Input from "../../../components/forms/Input";
 import Select from "../../../components/forms/Select";
 import { labelDefault, helpText } from "../../../styles";
 import { textPrimary } from "../../../styles/colourTokens";
+import { SUPPORTED_LANGUAGES } from "../../../locales";
 
 type DefaultFrameType = "can" | "modbus" | "serial";
 
@@ -20,6 +22,8 @@ type GeneralViewProps = {
   onChangeLogLevel: (value: string) => void;
   smpPort: number;
   onChangeSmpPort: (value: number) => void;
+  language: string;
+  onChangeLanguage: (value: string) => void;
   isIOS?: boolean;
 };
 
@@ -36,42 +40,63 @@ export default function GeneralView({
   onChangeLogLevel,
   smpPort,
   onChangeSmpPort,
+  language,
+  onChangeLanguage,
   isIOS = false,
 }: GeneralViewProps) {
+  const { t } = useTranslation("settings");
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
-        General
+        {t("general.title")}
       </h2>
 
       <div className="space-y-2">
-        <label className={labelDefault}>Default Frame Type</label>
-        <p className={helpText}>
-          Protocol type used when adding new frames (can be overridden per
-          catalog)
-        </p>
+        <label className={labelDefault}>{t("general.defaultFrameType.label")}</label>
+        <p className={helpText}>{t("general.defaultFrameType.help")}</p>
         <Select
           value={defaultFrameType}
           onChange={(e) =>
             onChangeDefaultFrameType(e.target.value as DefaultFrameType)
           }
         >
-          <option value="can">CAN</option>
-          <option value="modbus">Modbus</option>
-          <option value="serial">Serial</option>
+          <option value="can">{t("general.defaultFrameType.options.can")}</option>
+          <option value="modbus">{t("general.defaultFrameType.options.modbus")}</option>
+          <option value="serial">{t("general.defaultFrameType.options.serial")}</option>
         </Select>
+      </div>
+
+      {/* Language Section */}
+      <div className="pt-4 border-t border-[color:var(--border-default)]">
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>
+          {t("general.language.title")}
+        </h3>
+        <div className="space-y-2">
+          <label className={labelDefault}>{t("general.language.label")}</label>
+          <p className={helpText}>{t("general.language.help")}</p>
+          <Select
+            value={language}
+            onChange={(e) => onChangeLanguage(e.target.value)}
+          >
+            {SUPPORTED_LANGUAGES.map((code) => (
+              <option key={code} value={code}>
+                {t(`general.language.options.${code}`, code)}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
 
       {/* Modbus Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Modbus</h3>
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>{t("general.modbus.title")}</h3>
         <div className="space-y-2">
           <label className={labelDefault}>
-            Max Consecutive Register Errors
+            {t("general.modbus.maxRegisterErrors.label")}
           </label>
           <p className={helpText}>
-            Stop polling a register group after this many consecutive read
-            errors. Set to 0 to retry indefinitely.
+            {t("general.modbus.maxRegisterErrors.help")}
           </p>
           <Input
             type="number"
@@ -90,7 +115,7 @@ export default function GeneralView({
       {/* Power Management Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
         <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>
-          Power Management
+          {t("general.power.title")}
         </h3>
         <div className="space-y-4">
           {/* Prevent idle sleep: desktop only (uses keepawake crate) */}
@@ -104,11 +129,10 @@ export default function GeneralView({
               />
               <div>
                 <span className={labelDefault}>
-                  Prevent idle sleep during active sessions
+                  {t("general.power.preventIdleSleep.label")}
                 </span>
                 <p className={helpText}>
-                  Keep the system awake while a session is actively streaming
-                  data
+                  {t("general.power.preventIdleSleep.help")}
                 </p>
               </div>
             </label>
@@ -124,10 +148,10 @@ export default function GeneralView({
             />
             <div>
               <span className={labelDefault}>
-                Keep display awake during active sessions
+                {t("general.power.keepDisplayAwake.label")}
               </span>
               <p className={helpText}>
-                Prevent the display from turning off while a session is active
+                {t("general.power.keepDisplayAwake.help")}
               </p>
             </div>
           </label>
@@ -137,22 +161,21 @@ export default function GeneralView({
       {/* Diagnostics Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
         <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>
-          Diagnostics
+          {t("general.diagnostics.title")}
         </h3>
         <div className="space-y-2">
-          <label className={labelDefault}>Log Level</label>
+          <label className={labelDefault}>{t("general.diagnostics.logLevel.label")}</label>
           <p className={helpText}>
-            Diagnostic log verbosity. Logs are written to
-            ~/Documents/WireTAP/Reports/
+            {t("general.diagnostics.logLevel.help")}
           </p>
           <Select
             value={logLevel}
             onChange={(e) => onChangeLogLevel(e.target.value)}
           >
-            <option value="off">Off</option>
-            <option value="info">Info</option>
-            <option value="debug">Debug</option>
-            <option value="verbose">Verbose</option>
+            <option value="off">{t("general.diagnostics.logLevel.options.off")}</option>
+            <option value="info">{t("general.diagnostics.logLevel.options.info")}</option>
+            <option value="debug">{t("general.diagnostics.logLevel.options.debug")}</option>
+            <option value="verbose">{t("general.diagnostics.logLevel.options.verbose")}</option>
           </Select>
         </div>
       </div>
@@ -160,12 +183,12 @@ export default function GeneralView({
       {/* Networking Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
         <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>
-          Networking
+          {t("general.networking.title")}
         </h3>
         <div className="space-y-2">
-          <label className={labelDefault}>SMP UDP Port</label>
+          <label className={labelDefault}>{t("general.networking.smpPort.label")}</label>
           <p className={helpText}>
-            Default port for SMP firmware upgrade over UDP
+            {t("general.networking.smpPort.help")}
           </p>
           <Input
             type="number"

@@ -19,6 +19,7 @@ import {
 } from './serialTypes';
 import { byteToHex } from '../../../../utils/byteUtils';
 import { bgSurface, bgDataView, textPrimary, textSecondary, textMuted, borderDefault, hoverBg } from '../../../../styles';
+import { byteHighlight } from '../../../../styles/buttonStyles';
 
 const DEFAULT_CHECKSUM_CONFIG: ChecksumConfig = {
   startByte: -2,
@@ -177,13 +178,9 @@ export default function ChecksumExtractionDialog({
                     return (
                       <span
                         key={byteIdx}
-                        className={`px-1 py-0.5 rounded text-xs ${
-                          isChecksum
-                            ? 'bg-amber-900/50 text-amber-400 ring-1 ring-amber-500'
-                            : isCalcData
-                            ? 'bg-blue-900/30 text-blue-400'
-                            : 'text-gray-400'
-                        }`}
+                        className={byteHighlight(
+                          isChecksum ? 'checksum' : isCalcData ? 'calcData' : 'default'
+                        )}
                       >
                         {byteToHex(byte)}
                       </span>

@@ -86,7 +86,7 @@ export default function ProtocolBadge({
       title={isRecorded ? "Recorded data source" : "Live data source"}
     >
       <StatusLight status={effectiveStatus} />
-      <span className="text-xs font-medium text-gray-300">{effectiveLabel}</span>
+      <span className={`text-xs font-medium ${textDataSecondary}`}>{effectiveLabel}</span>
       {isRecorded && <History className={`${iconXs} ${textDataSecondary}`} />}
     </button>
   );

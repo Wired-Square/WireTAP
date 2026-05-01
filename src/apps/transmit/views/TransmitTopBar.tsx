@@ -5,6 +5,7 @@
 
 import { Send, GitMerge } from "lucide-react";
 import { flexRowGap2 } from "../../../styles/spacing";
+import { badgeColorClass } from "../../../styles/buttonStyles";
 import type { IOProfile } from "../../../types/common";
 import AppTopBar from "../../../components/AppTopBar";
 import { textDataSecondary } from "../../../styles/colourTokens";
@@ -131,18 +132,18 @@ export default function TransmitTopBar({
       {capabilities && (
         <div className={flexRowGap2}>
           {showAsMultiBus && (
-            <span className="text-xs px-2 py-0.5 rounded bg-purple-600/30 text-purple-400 flex items-center gap-1">
+            <span className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${badgeColorClass('purple')}`}>
               <GitMerge size={10} />
               Multi-Source
             </span>
           )}
           {capabilities.protocols.includes("canfd") && (
-            <span className="text-xs px-2 py-0.5 rounded bg-green-600/30 text-green-400">
+            <span className={`text-xs px-2 py-0.5 rounded ${badgeColorClass('green')}`}>
               FD
             </span>
           )}
           {capabilities.available_buses.length > 1 && (
-            <span className="text-xs px-2 py-0.5 rounded bg-amber-600/30 text-amber-400">
+            <span className={`text-xs px-2 py-0.5 rounded ${badgeColorClass('amber')}`}>
               Multi-Bus
             </span>
           )}

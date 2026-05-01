@@ -197,7 +197,7 @@ export default function FramingOptionsPanel({
         </button>
         {currentMode === "modbus_rtu" && (
           <div className="ml-4 pl-4 border-l-2 border-blue-600 py-2">
-            <label className="flex items-center gap-2 text-sm text-gray-300">
+            <label className={`flex items-center gap-2 text-sm ${textDataSecondary}`}>
               <input
                 type="checkbox"
                 checked={validateCrc}
@@ -212,7 +212,7 @@ export default function FramingOptionsPanel({
 
         {/* Emit raw bytes toggle */}
         {showEmitRawBytes && currentMode !== "raw" && (
-          <label className="flex items-center gap-2 text-sm text-gray-300 mt-3 cursor-pointer">
+          <label className={`flex items-center gap-2 text-sm mt-3 cursor-pointer ${textDataSecondary}`}>
             <input
               type="checkbox"
               checked={emitRawBytes}

@@ -10,12 +10,15 @@ import { useActiveSession, useSessionStore, type BusSourceInfo } from "../../../
 import {
   bgDataToolbar,
   borderDataView,
+  textDataMuted,
   textDataPrimary,
   bgDataInput,
   textDataSecondary,
   hoverDataRow,
+  focusBorder,
 } from "../../../styles/colourTokens";
 import {
+  badgeColorClass,
   buttonBase,
   dangerButtonBase,
   playButtonCompact,
@@ -294,7 +297,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         )
                       ) : (
                         // Not first in group: show indicator only
-                        <span className="text-gray-600" title="Controlled by group">
+                        <span className={textDataMuted} title="Controlled by group">
                           <Users size={12} />
                         </span>
                       )
@@ -365,8 +368,8 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                     <span
                       className={`text-xs px-1.5 py-0.5 rounded ${
                         formatted.type === "CAN"
-                          ? "bg-blue-600/30 text-blue-400"
-                          : "bg-purple-600/30 text-purple-400"
+                          ? badgeColorClass('blue')
+                          : badgeColorClass('purple')
                       }`}
                     >
                       {formatted.type}
@@ -381,7 +384,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           {formatted.id}
                         </code>
                       )}
-                      <code className="font-mono text-gray-400 text-xs">
+                      <code className={`font-mono text-xs ${textDataSecondary}`}>
                         {formatted.details}
                       </code>
                       {formatted.flags.map((flag) => (
@@ -406,7 +409,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         }
                         disabled={item.isRepeating || isGroupRepeating}
                         min={1}
-                        className={`w-16 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} focus:outline-none focus:border-blue-500 disabled:opacity-50`}
+                        className={`w-16 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} ${focusBorder} disabled:opacity-50`}
                       />
                       <span className={`${textDataSecondary} text-xs`}>ms</span>
                     </div>
@@ -420,7 +423,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       onChange={(e) => handleGroupChange(item.id, e.target.value)}
                       disabled={item.isRepeating || isGroupRepeating}
                       placeholder="—"
-                      className={`w-20 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} focus:outline-none focus:border-blue-500 disabled:opacity-50 placeholder:text-gray-600`}
+                      className={`w-20 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} ${focusBorder} disabled:opacity-50 placeholder:text-gray-600`}
                       title="Group name (items with same group transmit together)"
                     />
                   </td>

@@ -77,7 +77,7 @@ export default function ModbusConfigSection({
                 type="checkbox"
                 checked={isDeviceAddressInherited ?? false}
                 onChange={(e) => onDeviceAddressInheritedChange(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-blue-500"
+                className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
               />
               Use default ({defaultDeviceAddress})
             </label>

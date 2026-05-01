@@ -684,7 +684,7 @@ function VirtualSignalGenControls({ profile, sessionId, sessionState }: { profil
                 type="checkbox"
                 checked={bs.enabled}
                 onChange={(e) => handleToggle(bs.bus, e.target.checked)}
-                className="w-3.5 h-3.5 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
               />
               <span className="text-xs text-[color:var(--text-primary)] w-10">Bus {bs.bus}</span>
             </label>

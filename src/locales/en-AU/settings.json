@@ -1,0 +1,207 @@
+{
+  "general": {
+    "title": "General",
+    "defaultFrameType": {
+      "label": "Default Frame Type",
+      "help": "Protocol type used when adding new frames (can be overridden per catalog)",
+      "options": {
+        "can": "CAN",
+        "modbus": "Modbus",
+        "serial": "Serial"
+      }
+    },
+    "modbus": {
+      "title": "Modbus",
+      "maxRegisterErrors": {
+        "label": "Max Consecutive Register Errors",
+        "help": "Stop polling a register group after this many consecutive read errors. Set to 0 to retry indefinitely."
+      }
+    },
+    "power": {
+      "title": "Power Management",
+      "preventIdleSleep": {
+        "label": "Prevent idle sleep during active sessions",
+        "help": "Keep the system awake while a session is actively streaming data"
+      },
+      "keepDisplayAwake": {
+        "label": "Keep display awake during active sessions",
+        "help": "Prevent the display from turning off while a session is active"
+      }
+    },
+    "diagnostics": {
+      "title": "Diagnostics",
+      "logLevel": {
+        "label": "Log Level",
+        "help": "Diagnostic log verbosity. Logs are written to ~/Documents/WireTAP/Reports/",
+        "options": {
+          "off": "Off",
+          "info": "Info",
+          "debug": "Debug",
+          "verbose": "Verbose"
+        }
+      }
+    },
+    "networking": {
+      "title": "Networking",
+      "smpPort": {
+        "label": "SMP UDP Port",
+        "help": "Default port for SMP firmware upgrade over UDP"
+      }
+    },
+    "language": {
+      "title": "Language",
+      "label": "Display Language",
+      "help": "Language used throughout the WireTAP interface. Additional locales will appear here as they become available.",
+      "options": {
+        "en-AU": "English (Australian)"
+      }
+    }
+  },
+  "display": {
+    "title": "Display",
+    "frameIdFormat": {
+      "label": "Frame ID Format",
+      "help": "How CAN frame IDs are displayed in tables and exports",
+      "options": {
+        "hex": "Hexadecimal (0x123)",
+        "decimal": "Decimal (291)"
+      }
+    },
+    "saveFrameIdFormat": {
+      "label": "Save Frame ID Format",
+      "help": "Format used when saving frames to file"
+    },
+    "timeFormat": {
+      "label": "Time Format",
+      "options": {
+        "delta-last": "Delta (since last frame)",
+        "delta-start": "Delta (since session start)",
+        "timestamp": "Timestamp",
+        "human": "Human readable"
+      }
+    },
+    "timezone": {
+      "label": "Timezone",
+      "options": {
+        "local": "Local",
+        "utc": "UTC"
+      }
+    }
+  },
+  "locations": {
+    "title": "Storage",
+    "filesTitle": "Files",
+    "directoryPlaceholder": "Click folder icon to select…",
+    "browseTooltip": "Browse for directory",
+    "decoderDir": {
+      "label": "Decoder Directory",
+      "help": "Directory where decoder catalog files (.toml) are stored"
+    },
+    "dumpDir": {
+      "label": "Dump Directory",
+      "help": "Directory where CAN bus dump files are stored"
+    },
+    "reportDir": {
+      "label": "Report Directory",
+      "help": "Default directory for exported analysis reports"
+    },
+    "saveFrameIdFormat": {
+      "label": "Save frame ID format",
+      "help": "Controls default decoder file names when saving/creating catalogs.",
+      "options": {
+        "hex": "Hex",
+        "decimal": "Decimal"
+      }
+    },
+    "validation": {
+      "notExist": "Directory does not exist",
+      "notWritable": "Directory is not writable",
+      "ok": "OK"
+    }
+  },
+  "captures": {
+    "title": "Captures",
+    "storage": {
+      "title": "Storage",
+      "label": "Capture Storage",
+      "help": "Storage backend for captured frame data and imported captures.",
+      "options": {
+        "sqlite": "SQLite"
+      }
+    },
+    "clearOnStart": {
+      "label": "Clear captures on start",
+      "help": "Delete all captured frame and byte data when the app launches. Disable to preserve capture data across sessions (uses disk space)."
+    },
+    "buffers": {
+      "title": "Buffer Sizes",
+      "discoveryHistory": {
+        "label": "Discovery History Buffer",
+        "help": "Maximum number of frames to keep in memory during CAN Discovery"
+      },
+      "queryResultLimit": {
+        "label": "Query Result Limit",
+        "help": "Maximum number of results returned by database queries in the Query app"
+      },
+      "graphBuffer": {
+        "label": "Graph Buffer Size",
+        "help": "Samples per signal in graph ring buffers. Higher values show more history but use more memory."
+      }
+    },
+    "decoderLimits": {
+      "title": "Decoder Limits",
+      "maxUnmatched": {
+        "label": "Max Unmatched Frames",
+        "help": "Maximum frames kept in the unmatched (no catalog match) list"
+      },
+      "maxFiltered": {
+        "label": "Max Filtered Frames",
+        "help": "Maximum frames kept in the filtered (excluded by selection set) list"
+      },
+      "maxDecoded": {
+        "label": "Max Decoded Frames",
+        "help": "Maximum decoded frames displayed in the Decoder view"
+      },
+      "maxDecodedPerSource": {
+        "label": "Max Decoded Per Source",
+        "help": "Maximum decoded frames cached per unique source address. Higher values keep more history but use more memory."
+      }
+    },
+    "transmit": {
+      "title": "Transmit",
+      "maxHistory": {
+        "label": "Max History Items",
+        "help": "Maximum number of transmitted frames to keep in the Transmit history log"
+      }
+    }
+  },
+  "privacy": {
+    "title": "Privacy",
+    "telemetry": {
+      "label": "Send anonymous crash reports",
+      "help": "Help improve WireTAP by sending anonymous crash and error reports via Sentry. No personal data, CAN bus data, or usage analytics are collected — only error stack traces."
+    }
+  },
+  "catalogs": {
+    "title": "Decoder Catalogs",
+    "empty": {
+      "heading": "No catalogs found in decoder directory",
+      "description": "Add .toml catalog files to {{path}}",
+      "fallbackPath": "the decoder directory"
+    },
+    "actions": {
+      "duplicate": "Duplicate catalog",
+      "edit": "Edit catalog name/filename",
+      "delete": "Delete catalog"
+    }
+  },
+  "bookmarks": {
+    "title": "Bookmarks"
+  },
+  "selectionSets": {
+    "title": "Selection Sets"
+  },
+  "graphLayouts": {
+    "title": "Graph Layouts"
+  }
+}

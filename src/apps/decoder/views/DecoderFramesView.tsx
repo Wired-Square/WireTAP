@@ -8,7 +8,7 @@ import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult
 import { badgeDarkPanelInfo, badgeDarkPanelSuccess, badgeDarkPanelDanger, badgeDarkPanelPurple, badgeDarkPanelCyan } from "../../../styles/badgeStyles";
 import { parseCanId } from "../../../utils/catalogParser";
 import { frameKey } from "../../../utils/frameKey";
-import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault, hoverBg, textSecondary } from "../../../styles";
+import { caption, emptyStateContainer, emptyStateText, bgSurface, bgDataView, textPrimary, textMuted, textDataPrimary, textDataSecondary, textDataPurple, textDataCyan, textDataYellow, textDataOrange, textDataAmber, borderDefault, hoverBg, textSecondary } from "../../../styles";
 import type { PlaybackState, PlaybackSpeed } from "../../../components/TimeController";
 import type { IOCapabilities } from '../../../api/io';
 import { formatFrameId } from "../../../utils/frameIds";
@@ -1390,7 +1390,7 @@ export default function DecoderFramesView({
     const maxChars = totalStr.length * 2 + 4;
     return (
       <span
-        className="px-1.5 text-xs font-mono text-gray-400 tabular-nums text-center"
+        className={`px-1.5 text-xs font-mono tabular-nums text-center ${textDataSecondary}`}
         style={{ minWidth: `${maxChars}ch` }}
       >
         {currentStr} of {totalStr}
@@ -1403,7 +1403,7 @@ export default function DecoderFramesView({
     <select
       value={playbackSpeed}
       onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
-      className="px-2 py-0.5 text-xs rounded border border-gray-600 bg-gray-700 text-gray-200"
+      className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${textPrimary}`}
       title="Playback speed"
     >
       {([0.125, 0.25, 0.5, 1, 2, 10, 30, 60] as PlaybackSpeed[]).map((s) => (

@@ -5,7 +5,7 @@
 
 import { Bluetooth, Globe, Wifi, HardDriveDownload, Plug, Cable } from "lucide-react";
 import { cardDefault } from "../styles/cardStyles";
-import { textPrimary, badgeInfo, badgeWarning, badgeSuccess } from "../styles";
+import { textPrimary, textSecondary, badgeInfo, badgeWarning, badgeSuccess } from "../styles";
 import { iconMd, gapSmall } from "../styles/spacing";
 import { PrimaryButton } from "./forms";
 
@@ -59,11 +59,10 @@ function SignalBars({ rssi }: { rssi: number | null | undefined }) {
 
 const SummaryBadge = ({ label, value }: { label: string; value: string }) => (
   <span
-    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-[var(--bg-primary)]"
-    style={{ color: 'var(--text-secondary)' }}
+    className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-[var(--bg-primary)] ${textSecondary}`}
   >
     <span className="opacity-70">{label}:</span>
-    <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{value}</span>
+    <span className={`font-mono ${textPrimary}`}>{value}</span>
   </span>
 );
 

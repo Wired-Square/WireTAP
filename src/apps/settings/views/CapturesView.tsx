@@ -1,5 +1,6 @@
 // ui/src/apps/settings/views/CapturesView.tsx
 
+import { useTranslation } from "react-i18next";
 import Input from "../../../components/forms/Input";
 import Select from "../../../components/forms/Select";
 import { labelDefault, helpText } from "../../../styles";
@@ -50,24 +51,26 @@ export default function CapturesView({
   transmitMaxHistory,
   onChangeTransmitMaxHistory,
 }: CapturesViewProps) {
+  const { t } = useTranslation("settings");
+
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Captures</h2>
+      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+        {t("captures.title")}
+      </h2>
 
       {/* Storage Section */}
       <div className="space-y-4">
-        <h3 className={`text-lg font-medium ${textPrimary}`}>Storage</h3>
+        <h3 className={`text-lg font-medium ${textPrimary}`}>{t("captures.storage.title")}</h3>
 
         <div className="space-y-2">
-          <label className={labelDefault}>Capture Storage</label>
-          <p className={helpText}>
-            Storage backend for captured frame data and imported captures.
-          </p>
+          <label className={labelDefault}>{t("captures.storage.label")}</label>
+          <p className={helpText}>{t("captures.storage.help")}</p>
           <Select
             value={captureStorage}
             onChange={(e) => onChangeCaptureStorage(e.target.value)}
           >
-            <option value="sqlite">SQLite</option>
+            <option value="sqlite">{t("captures.storage.options.sqlite")}</option>
           </Select>
         </div>
 
@@ -79,26 +82,19 @@ export default function CapturesView({
             className="mt-1"
           />
           <div>
-            <span className={labelDefault}>
-              Clear captures on start
-            </span>
-            <p className={helpText}>
-              Delete all captured frame and byte data when the app launches.
-              Disable to preserve capture data across sessions (uses disk space).
-            </p>
+            <span className={labelDefault}>{t("captures.clearOnStart.label")}</span>
+            <p className={helpText}>{t("captures.clearOnStart.help")}</p>
           </div>
         </label>
       </div>
 
       {/* Buffer Sizes Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Buffer Sizes</h3>
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>{t("captures.buffers.title")}</h3>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className={labelDefault}>Discovery History Buffer</label>
-            <p className={helpText}>
-              Maximum number of frames to keep in memory during CAN Discovery
-            </p>
+            <label className={labelDefault}>{t("captures.buffers.discoveryHistory.label")}</label>
+            <p className={helpText}>{t("captures.buffers.discoveryHistory.help")}</p>
             <Input
               type="number"
               min={1000}
@@ -115,10 +111,8 @@ export default function CapturesView({
           </div>
 
           <div className="space-y-2">
-            <label className={labelDefault}>Query Result Limit</label>
-            <p className={helpText}>
-              Maximum number of results returned by database queries in the Query app
-            </p>
+            <label className={labelDefault}>{t("captures.buffers.queryResultLimit.label")}</label>
+            <p className={helpText}>{t("captures.buffers.queryResultLimit.help")}</p>
             <Input
               type="number"
               min={100}
@@ -135,10 +129,8 @@ export default function CapturesView({
           </div>
 
           <div className="space-y-2">
-            <label className={labelDefault}>Graph Buffer Size</label>
-            <p className={helpText}>
-              Samples per signal in graph ring buffers. Higher values show more history but use more memory.
-            </p>
+            <label className={labelDefault}>{t("captures.buffers.graphBuffer.label")}</label>
+            <p className={helpText}>{t("captures.buffers.graphBuffer.help")}</p>
             <Input
               type="number"
               min={1000}
@@ -158,13 +150,11 @@ export default function CapturesView({
 
       {/* Decoder Limits Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Decoder Limits</h3>
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>{t("captures.decoderLimits.title")}</h3>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className={labelDefault}>Max Unmatched Frames</label>
-            <p className={helpText}>
-              Maximum frames kept in the unmatched (no catalog match) list
-            </p>
+            <label className={labelDefault}>{t("captures.decoderLimits.maxUnmatched.label")}</label>
+            <p className={helpText}>{t("captures.decoderLimits.maxUnmatched.help")}</p>
             <Input
               type="number"
               min={100}
@@ -181,10 +171,8 @@ export default function CapturesView({
           </div>
 
           <div className="space-y-2">
-            <label className={labelDefault}>Max Filtered Frames</label>
-            <p className={helpText}>
-              Maximum frames kept in the filtered (excluded by selection set) list
-            </p>
+            <label className={labelDefault}>{t("captures.decoderLimits.maxFiltered.label")}</label>
+            <p className={helpText}>{t("captures.decoderLimits.maxFiltered.help")}</p>
             <Input
               type="number"
               min={100}
@@ -201,10 +189,8 @@ export default function CapturesView({
           </div>
 
           <div className="space-y-2">
-            <label className={labelDefault}>Max Decoded Frames</label>
-            <p className={helpText}>
-              Maximum decoded frames displayed in the Decoder view
-            </p>
+            <label className={labelDefault}>{t("captures.decoderLimits.maxDecoded.label")}</label>
+            <p className={helpText}>{t("captures.decoderLimits.maxDecoded.help")}</p>
             <Input
               type="number"
               min={100}
@@ -221,10 +207,8 @@ export default function CapturesView({
           </div>
 
           <div className="space-y-2">
-            <label className={labelDefault}>Max Decoded Per Source</label>
-            <p className={helpText}>
-              Maximum decoded frames cached per unique source address. Higher values keep more history but use more memory.
-            </p>
+            <label className={labelDefault}>{t("captures.decoderLimits.maxDecodedPerSource.label")}</label>
+            <p className={helpText}>{t("captures.decoderLimits.maxDecodedPerSource.help")}</p>
             <Input
               type="number"
               min={500}
@@ -244,13 +228,11 @@ export default function CapturesView({
 
       {/* Transmit Section */}
       <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>Transmit</h3>
+        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>{t("captures.transmit.title")}</h3>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className={labelDefault}>Max History Items</label>
-            <p className={helpText}>
-              Maximum number of transmitted frames to keep in the Transmit history log
-            </p>
+            <label className={labelDefault}>{t("captures.transmit.maxHistory.label")}</label>
+            <p className={helpText}>{t("captures.transmit.maxHistory.help")}</p>
             <Input
               type="number"
               min={100}

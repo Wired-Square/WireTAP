@@ -1,5 +1,6 @@
 // ui/src/apps/settings/views/LocationsView.tsx
 import { FolderOpen, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, textMedium, focusRing, folderPickerButton } from "../../../styles";
 import type { DirectoryValidation } from "../stores/settingsStore";
@@ -37,15 +38,21 @@ export default function LocationsView({
   onPickDumpDir,
   onPickReportDir,
 }: LocationsViewProps) {
+  const { t } = useTranslation("settings");
+  const placeholder = t("locations.directoryPlaceholder");
+  const browseTooltip = t("locations.browseTooltip");
+
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-4">Storage</h2>
+        <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-4">
+          {t("locations.title")}
+        </h2>
 
         {/* Decoder Directory */}
         <div className="mb-6">
           <label className={`block ${textMedium} mb-2`}>
-            Decoder Directory
+            {t("locations.decoderDir.label")}
           </label>
           <div className="flex gap-2">
             <input
@@ -53,12 +60,12 @@ export default function LocationsView({
               value={decoderDir}
               onChange={(e) => onChangeDecoderDir(e.target.value)}
               className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-              placeholder="Click folder icon to select..."
+              placeholder={placeholder}
             />
             <button
               onClick={onPickDecoderDir}
               className={folderPickerButton}
-              title="Browse for directory"
+              title={browseTooltip}
             >
               <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
             </button>
@@ -70,14 +77,14 @@ export default function LocationsView({
             </div>
           )}
           <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-            Directory where decoder catalog files (.toml) are stored
+            {t("locations.decoderDir.help")}
           </p>
         </div>
 
         {/* Dump Directory */}
         <div className="mb-6">
           <label className={`block ${textMedium} mb-2`}>
-            Dump Directory
+            {t("locations.dumpDir.label")}
           </label>
           <div className="flex gap-2">
             <input
@@ -85,12 +92,12 @@ export default function LocationsView({
               value={dumpDir}
               onChange={(e) => onChangeDumpDir(e.target.value)}
               className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-              placeholder="Click folder icon to select..."
+              placeholder={placeholder}
             />
             <button
               onClick={onPickDumpDir}
               className={folderPickerButton}
-              title="Browse for directory"
+              title={browseTooltip}
             >
               <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
             </button>
@@ -102,14 +109,14 @@ export default function LocationsView({
             </div>
           )}
           <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-            Directory where CAN bus dump files are stored
+            {t("locations.dumpDir.help")}
           </p>
         </div>
 
         {/* Report Directory */}
         <div className="mb-6">
           <label className={`block ${textMedium} mb-2`}>
-            Report Directory
+            {t("locations.reportDir.label")}
           </label>
           <div className="flex gap-2">
             <input
@@ -117,12 +124,12 @@ export default function LocationsView({
               value={reportDir}
               onChange={(e) => onChangeReportDir(e.target.value)}
               className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-              placeholder="Click folder icon to select..."
+              placeholder={placeholder}
             />
             <button
               onClick={onPickReportDir}
               className={folderPickerButton}
-              title="Browse for directory"
+              title={browseTooltip}
             >
               <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
             </button>
@@ -134,15 +141,17 @@ export default function LocationsView({
             </div>
           )}
           <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-            Default directory for exported analysis reports
+            {t("locations.reportDir.help")}
           </p>
         </div>
 
         {/* Files */}
         <div>
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)] mb-3">Files</h2>
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)] mb-3">
+            {t("locations.filesTitle")}
+          </h2>
           <div className="space-y-2">
-            <div className={textMedium}>Save frame ID format</div>
+            <div className={textMedium}>{t("locations.saveFrameIdFormat.label")}</div>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
                 <input
@@ -153,7 +162,7 @@ export default function LocationsView({
                   onChange={() => onChangeSaveFrameIdFormat("hex")}
                   className="accent-blue-600"
                 />
-                Hex
+                {t("locations.saveFrameIdFormat.options.hex")}
               </label>
               <label className="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
                 <input
@@ -164,12 +173,10 @@ export default function LocationsView({
                   onChange={() => onChangeSaveFrameIdFormat("decimal")}
                   className="accent-blue-600"
                 />
-                Decimal
+                {t("locations.saveFrameIdFormat.options.decimal")}
               </label>
             </div>
-            <p className={caption}>
-              Controls default decoder file names when saving/creating catalogs.
-            </p>
+            <p className={caption}>{t("locations.saveFrameIdFormat.help")}</p>
           </div>
         </div>
       </div>

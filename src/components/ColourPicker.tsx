@@ -1,5 +1,7 @@
 // ui/src/components/ColourPicker.tsx
 
+import { textPrimary, textSecondary } from "../styles";
+
 type ColourPickerProps = {
   label: string;
   value: string;
@@ -8,10 +10,7 @@ type ColourPickerProps = {
 
 export default function ColourPicker({ label, value, onChange }: ColourPickerProps) {
   return (
-    <label
-      className="flex items-center gap-3 text-sm"
-      style={{ color: 'var(--text-primary)' }}
-    >
+    <label className={`flex items-center gap-3 text-sm ${textPrimary}`}>
       <span className="w-28">{label}</span>
       <input
         type="color"
@@ -19,12 +18,7 @@ export default function ColourPicker({ label, value, onChange }: ColourPickerPro
         onChange={(e) => onChange(e.target.value)}
         className="h-8 w-12 cursor-pointer bg-transparent border border-[color:var(--border-default)] rounded"
       />
-      <span
-        className="text-xs font-mono"
-        style={{ color: 'var(--text-secondary)' }}
-      >
-        {value}
-      </span>
+      <span className={`text-xs font-mono ${textSecondary}`}>{value}</span>
     </label>
   );
 }

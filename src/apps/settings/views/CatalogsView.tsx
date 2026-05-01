@@ -1,5 +1,6 @@
 // ui/src/apps/settings/views/CatalogsView.tsx
 import { BookOpen, Copy, Edit2, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { cardDefault } from "../../../styles/cardStyles";
 import { emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../styles/typography";
@@ -22,17 +23,25 @@ export default function CatalogsView({
   onEditCatalog,
   onDeleteCatalog,
 }: CatalogsViewProps) {
+  const { t } = useTranslation("settings");
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">Decoder Catalogs</h2>
+        <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
+          {t("catalogs.title")}
+        </h2>
       </div>
 
       {catalogs.length === 0 ? (
         <div className={`text-center py-12 ${emptyStateText}`}>
           <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className={emptyStateHeading}>No catalogs found in decoder directory</p>
-          <p className={emptyStateDescription}>Add .toml catalog files to {decoderDir || "the decoder directory"}</p>
+          <p className={emptyStateHeading}>{t("catalogs.empty.heading")}</p>
+          <p className={emptyStateDescription}>
+            {t("catalogs.empty.description", {
+              path: decoderDir || t("catalogs.empty.fallbackPath"),
+            })}
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -53,21 +62,21 @@ export default function CatalogsView({
                 <button
                   onClick={() => onDuplicateCatalog(catalog)}
                   className={iconButtonHover}
-                  title="Duplicate catalog"
+                  title={t("catalogs.actions.duplicate")}
                 >
                   <Copy className={`${iconMd} text-[color:var(--text-secondary)]`} />
                 </button>
                 <button
                   onClick={() => onEditCatalog(catalog)}
                   className={iconButtonHover}
-                  title="Edit catalog name/filename"
+                  title={t("catalogs.actions.edit")}
                 >
                   <Edit2 className={`${iconMd} text-[color:var(--text-secondary)]`} />
                 </button>
                 <button
                   onClick={() => onDeleteCatalog(catalog)}
                   className={iconButtonHoverDanger}
-                  title="Delete catalog"
+                  title={t("catalogs.actions.delete")}
                 >
                   <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                 </button>

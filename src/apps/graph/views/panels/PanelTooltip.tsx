@@ -7,6 +7,7 @@ import { useState, useRef, useCallback, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { getSignalLabel, getConfidenceColour, type SignalRef } from "../../../../stores/graphStore";
 import { formatValue } from "../../utils/graphFormat";
+import { textSecondary, textMuted } from "../../../../styles";
 import type { AppSettings } from "../../../../hooks/useSettings";
 
 interface PanelTooltipProps {
@@ -84,7 +85,7 @@ export default function PanelTooltip({
                 {showColourDot && (
                   <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: sig.colour, flexShrink: 0 }} />
                 )}
-                <span style={{ color: "var(--text-secondary)" }}>{displayName}</span>
+                <span className={textSecondary}>{displayName}</span>
                 {sig.confidence && (
                   <span
                     style={{
@@ -100,7 +101,7 @@ export default function PanelTooltip({
                 <span style={{ marginLeft: "auto", paddingLeft: 8, fontFamily: "ui-monospace, monospace", fontWeight: 500 }}>
                   {formatValue(values[i] ?? 0)}
                 </span>
-                {sig.unit && <span style={{ color: "var(--text-muted)", fontSize: 10 }}>{sig.unit}</span>}
+                {sig.unit && <span className={textMuted} style={{ fontSize: 10 }}>{sig.unit}</span>}
               </div>
             );
           })}

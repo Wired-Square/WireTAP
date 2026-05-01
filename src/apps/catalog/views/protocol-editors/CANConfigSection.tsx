@@ -2,7 +2,7 @@
 
 import type { CANConfig } from "../../types";
 import { flexRowGap2 } from "../../../../styles/spacing";
-import { caption, textMedium, focusRing } from "../../../../styles";
+import { caption, textMedium, focusRing, checkboxDefault } from "../../../../styles";
 
 export type CANConfigSectionProps = {
   config: CANConfig;
@@ -41,7 +41,7 @@ export default function CANConfigSection({
           id="extended"
           checked={config.extended ?? false}
           onChange={(e) => onChange({ ...config, extended: e.target.checked || undefined })}
-          className="w-4 h-4 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-blue-500"
+          className={checkboxDefault}
         />
         <label htmlFor="extended" className="text-sm text-[color:var(--text-secondary)]">
           Extended ID (29-bit)

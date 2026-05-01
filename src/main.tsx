@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import WireTAP from "./WireTAP";
 import { isIOS } from "./utils/platform";
+import "./i18n";
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,

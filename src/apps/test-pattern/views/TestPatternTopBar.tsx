@@ -8,6 +8,7 @@ import { FlaskConical } from "lucide-react";
 import { ChevronRight } from "lucide-react";
 import { iconSm } from "../../../styles/spacing";
 import { bgSurface, borderDefault, textPrimary, textSecondary } from "../../../styles";
+import { badgeColorClass } from "../../../styles/buttonStyles";
 import type { IOProfile } from "../../../types/common";
 import type { TestMode, TestRole } from "../../../api/testPattern";
 import AppTopBar from "../../../components/AppTopBar";
@@ -214,7 +215,7 @@ export default function TestPatternTopBar({
               <button
                 className={`text-xs px-2 py-0.5 rounded ${
                   useFd
-                    ? "bg-green-600/30 text-green-400"
+                    ? badgeColorClass('green')
                     : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-[color:var(--border-default)]"
                 }`}
                 onClick={() => onFdChange(!useFd)}
@@ -226,7 +227,7 @@ export default function TestPatternTopBar({
               <button
                 className={`text-xs px-2 py-0.5 rounded ${
                   useExtended
-                    ? "bg-amber-600/30 text-amber-400"
+                    ? badgeColorClass('amber')
                     : "bg-[var(--bg-surface)] text-[color:var(--text-muted)] border border-[color:var(--border-default)]"
                 }`}
                 onClick={() => onExtendedChange(!useExtended)}

@@ -35,6 +35,7 @@ import {
   emptyStateText,
   emptyStateHeading,
   emptyStateDescription,
+  focusRingThin,
 } from "../../../styles";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 import { toolbarElementHeight } from "../../../styles/inputStyles";
@@ -270,7 +271,7 @@ export default function SessionLogView() {
             placeholder="Search..."
             value={filter.searchText}
             onChange={(e) => setFilter({ searchText: e.target.value })}
-            className={`w-full text-xs pl-7 pr-2 py-1 rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textPrimary} placeholder:${textMuted} focus:outline-none focus:ring-1 focus:ring-blue-500`}
+            className={`w-full text-xs pl-7 pr-2 py-1 rounded border ${toolbarElementHeight} ${borderDefault} ${bgSurface} ${textPrimary} placeholder:${textMuted} ${focusRingThin}`}
           />
         </div>
 

@@ -34,6 +34,7 @@ import {
   textMedium,
   textSuccess,
   textWarning,
+  checkboxDefault,
 } from "../../../styles";
 import { probeSlcanDevice } from "../../../api/serial";
 import { probeGsUsbDevice } from "../../../api/gs_usb";
@@ -561,7 +562,7 @@ export default function IOProfileDialog({
                       onChange={(e) =>
                         onUpdateMqttFormat("json", "enabled", e.target.checked)
                       }
-                      className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                      className={checkboxDefault}
                     />
                     <label
                       htmlFor="format-json"
@@ -590,7 +591,7 @@ export default function IOProfileDialog({
                       onChange={(e) =>
                         onUpdateMqttFormat("savvycan", "enabled", e.target.checked)
                       }
-                      className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                      className={checkboxDefault}
                     />
                     <label
                       htmlFor="format-savvycan"
@@ -621,7 +622,7 @@ export default function IOProfileDialog({
                       onChange={(e) =>
                         onUpdateMqttFormat("decode", "enabled", e.target.checked)
                       }
-                      className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                      className={checkboxDefault}
                     />
                     <label
                       htmlFor="format-decode"
@@ -916,7 +917,7 @@ export default function IOProfileDialog({
                   onChange={(e) =>
                     onUpdateConnectionField("tcp_keepalive", e.target.checked)
                   }
-                  className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                  className={checkboxDefault}
                 />
                 <label
                   htmlFor="tcp-keepalive"
@@ -1344,7 +1345,7 @@ export default function IOProfileDialog({
                   id="silent-mode"
                   checked={profileForm.connection.silent_mode !== false}
                   onChange={(e) => onUpdateConnectionField("silent_mode", e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                  className={checkboxDefault}
                 />
                 <label
                   htmlFor="silent-mode"
@@ -1365,7 +1366,7 @@ export default function IOProfileDialog({
                     id="slcan_enable_fd"
                     checked={profileForm.connection.enable_fd === true}
                     onChange={(e) => onUpdateConnectionField("enable_fd", e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                    className={checkboxDefault}
                   />
                   <label htmlFor="slcan_enable_fd" className="text-sm text-[color:var(--text-secondary)]">
                     Enable CAN FD
@@ -1513,7 +1514,7 @@ export default function IOProfileDialog({
                       id="socketcan_enable_fd"
                       checked={profileForm.connection.enable_fd === true}
                       onChange={(e) => onUpdateConnectionField("enable_fd", e.target.checked)}
-                      className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                      className={checkboxDefault}
                     />
                     <label htmlFor="socketcan_enable_fd" className="text-sm text-[color:var(--text-secondary)]">
                       Enable CAN FD
@@ -1622,7 +1623,7 @@ export default function IOProfileDialog({
                   id="gs_usb_listen_only"
                   checked={profileForm.connection.listen_only !== false}
                   onChange={(e) => onUpdateConnectionField("listen_only", e.target.checked)}
-                  className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                  className={checkboxDefault}
                 />
                 <label htmlFor="gs_usb_listen_only" className="text-sm text-[color:var(--text-secondary)]">
                   Listen-only mode (no ACK, no transmit)
@@ -1637,7 +1638,7 @@ export default function IOProfileDialog({
                     id="gs_usb_enable_fd"
                     checked={profileForm.connection.enable_fd === true}
                     onChange={(e) => onUpdateConnectionField("enable_fd", e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-[var(--bg-primary)] border-[color:var(--border-default)] rounded focus:ring-blue-500"
+                    className={checkboxDefault}
                   />
                   <label htmlFor="gs_usb_enable_fd" className="text-sm text-[color:var(--text-secondary)]">
                     Enable CAN FD

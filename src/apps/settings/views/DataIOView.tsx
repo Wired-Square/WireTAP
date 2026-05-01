@@ -12,6 +12,7 @@ import {
   textTertiary,
   cardDefault,
   textPrimary,
+  textSecondary,
   hoverSubtle,
   roundedDefault,
   spaceYLarge,
@@ -71,11 +72,10 @@ const getProtocolLabel = (protocol: string) => {
 
 const SummaryBadge = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <span
-    className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-[var(--bg-primary)]"
-    style={{ color: 'var(--text-secondary)' }}
+    className={`inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded bg-[var(--bg-primary)] ${textSecondary}`}
   >
     <span className="opacity-70">{label}:</span>
-    <span className="font-mono" style={{ color: 'var(--text-primary)' }}>{value}</span>
+    <span className={`font-mono ${textPrimary}`}>{value}</span>
   </span>
 );
 
@@ -285,7 +285,7 @@ const renderConnectionSummary = (profile: IOProfile) => {
   const _exhaustive: never = profile;
   const raw = JSON.stringify((_exhaustive as IOProfile).connection ?? {}, null, 0);
   return (
-    <div className="text-xs font-mono break-all" style={{ color: 'var(--text-secondary)' }}>
+    <div className={`text-xs font-mono break-all ${textSecondary}`}>
       {raw.length > 120 ? raw.slice(0, 120) + "…" : raw}
     </div>
   );
@@ -378,14 +378,14 @@ export default function DataIOView({
                   className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title="Duplicate profile"
                 >
-                  <Copy className={iconMd} style={{ color: 'var(--text-secondary)' }} />
+                  <Copy className={`${iconMd} ${textSecondary}`} />
                 </button>
                 <button
                   onClick={() => onEditProfile(profile)}
                   className={`p-2 ${hoverSubtle} ${roundedDefault} transition-colors`}
                   title="Edit profile"
                 >
-                  <Edit2 className={iconMd} style={{ color: 'var(--text-secondary)' }} />
+                  <Edit2 className={`${iconMd} ${textSecondary}`} />
                 </button>
                 <button
                   onClick={() => onDeleteProfile(profile.id)}

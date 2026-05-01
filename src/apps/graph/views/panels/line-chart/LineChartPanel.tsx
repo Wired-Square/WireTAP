@@ -6,6 +6,7 @@ import "uplot/dist/uPlot.min.css";
 import { useGraphStore, buildAlignedData, getSignalLabel, type GraphPanel } from "../../../../../stores/graphStore";
 import { useSettings } from "../../../../../hooks/useSettings";
 import { emptyStateText } from "../../../../../styles/typography";
+import { textMuted } from "../../../../../styles";
 import { formatValue } from "../../../utils/graphFormat";
 import { tooltipPlugin, wheelZoomPlugin, panPlugin, measurementPlugin, type ConfidenceColours } from "./chartPlugins";
 
@@ -313,7 +314,7 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
             return (
               <div key={key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: sig.colour, flexShrink: 0 }} />
-                <span style={{ color: "var(--text-muted)", fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>
+                <span className={textMuted} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>
                   {formatValue(series?.min === Infinity ? null : series?.min)}
                   {" / "}
                   {formatValue(avg)}
@@ -323,7 +324,7 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
               </div>
             );
           })}
-          <div style={{ color: "var(--text-muted)", fontSize: 9, textAlign: "center", marginTop: 1 }}>
+          <div className={textMuted} style={{ fontSize: 9, textAlign: "center", marginTop: 1 }}>
             min / avg / max
           </div>
         </div>

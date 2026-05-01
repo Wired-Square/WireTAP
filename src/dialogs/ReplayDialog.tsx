@@ -8,7 +8,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Dialog from "../components/Dialog";
 import { DialogFooter } from "../components/forms/DialogFooter";
-import { helpText, inputSimple, labelSmall } from "../styles";
+import { focusRingThin, helpText, inputSimple, labelSmall } from "../styles";
 import { useTransmitStore } from "../stores/transmitStore";
 import { getDiscoveryFrameBuffer, useDiscoveryFrameStore } from "../stores/discoveryFrameStore";
 import { openPanel } from "../utils/windowCommunication";
@@ -349,7 +349,7 @@ export default function ReplayDialog({ isOpen, onClose, captureId }: Props) {
                   step={0.25}
                   value={customSpeed}
                   onChange={(e) => handleCustomSpeedChange(e.target.value)}
-                  className="w-16 text-xs px-2 py-1 rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className={`w-16 text-xs px-2 py-1 rounded border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRingThin}`}
                   placeholder="1.0"
                 />
               </div>

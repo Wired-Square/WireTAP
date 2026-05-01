@@ -4,7 +4,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { Cable, Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
-import { disabledState, caption, textMedium, focusRing, bgSurface, expandableRowContainer } from "../../../../styles";
+import { disabledState, caption, textMedium, focusRing, focusRingThin, bgSurface, expandableRowContainer } from "../../../../styles";
 import type { SerialHeaderFieldEntry } from "../../../../stores/catalogEditorStore";
 import type { SerialEncoding, HeaderFieldFormat, SerialChecksumConfig, ChecksumAlgorithm } from "../../types";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
@@ -428,7 +428,7 @@ export default function SerialConfigSection({
                       <select
                         value={field.endianness}
                         onChange={(e) => handleUpdateField(index, { endianness: e.target.value as "big" | "little" })}
-                        className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                        className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] ${focusRingThin}`}
                         title="Byte order"
                       >
                         <option value="big">BE</option>
@@ -439,7 +439,7 @@ export default function SerialConfigSection({
                       <select
                         value={field.format}
                         onChange={(e) => handleUpdateField(index, { format: e.target.value as HeaderFieldFormat })}
-                        className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                        className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] ${focusRingThin}`}
                       >
                         <option value="hex">Hex</option>
                         <option value="decimal">Dec</option>
@@ -480,7 +480,7 @@ export default function SerialConfigSection({
                   <select
                     value={newFieldType}
                     onChange={(e) => setNewFieldType(e.target.value as FieldType)}
-                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                   >
                     {availableFieldTypes.map((opt) => (
                       <option key={opt.value} value={opt.value} disabled={opt.disabled}>
@@ -495,7 +495,7 @@ export default function SerialConfigSection({
                       type="text"
                       value={newFieldCustomName}
                       onChange={(e) => setNewFieldCustomName(e.target.value)}
-                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                       placeholder="Field name"
                       autoFocus
                     />
@@ -505,7 +505,7 @@ export default function SerialConfigSection({
                   <select
                     value={newFieldEndianness}
                     onChange={(e) => setNewFieldEndianness(e.target.value as "big" | "little")}
-                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] ${focusRingThin}`}
                     title="Byte order"
                   >
                     <option value="big">BE</option>
@@ -516,7 +516,7 @@ export default function SerialConfigSection({
                   <select
                     value={newFieldFormat}
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
-                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-xs text-[color:var(--text-primary)] ${focusRingThin}`}
                   >
                     <option value="hex">Hex</option>
                     <option value="decimal">Dec</option>
@@ -597,7 +597,7 @@ export default function SerialConfigSection({
                   <select
                     value={checksum.algorithm}
                     onChange={(e) => handleUpdateChecksum({ algorithm: e.target.value as ChecksumAlgorithm })}
-                    className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                   >
                     {CHECKSUM_ALGORITHMS.map((alg) => (
                       <option key={alg.id} value={alg.id}>
@@ -620,7 +620,7 @@ export default function SerialConfigSection({
                       type="number"
                       value={checksum.start_byte}
                       onChange={(e) => handleUpdateChecksum({ start_byte: parseInt(e.target.value) || 0 })}
-                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                       title="Byte position where checksum is stored (-1 = last byte)"
                     />
                     <p className={`mt-0.5 ${caption}`}>
@@ -634,7 +634,7 @@ export default function SerialConfigSection({
                     <select
                       value={checksum.byte_length}
                       onChange={(e) => handleUpdateChecksum({ byte_length: parseInt(e.target.value) })}
-                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                     >
                       <option value={1}>1 byte</option>
                       <option value={2}>2 bytes</option>
@@ -652,7 +652,7 @@ export default function SerialConfigSection({
                       type="number"
                       value={checksum.calc_start_byte}
                       onChange={(e) => handleUpdateChecksum({ calc_start_byte: parseInt(e.target.value) || 0 })}
-                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                       title="First byte included in calculation"
                     />
                   </div>
@@ -664,7 +664,7 @@ export default function SerialConfigSection({
                       type="number"
                       value={checksum.calc_end_byte}
                       onChange={(e) => handleUpdateChecksum({ calc_end_byte: parseInt(e.target.value) || 0 })}
-                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`w-full px-3 py-1.5 ${bgSurface} border border-[color:var(--border-default)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                       title="Last byte (exclusive) included in calculation (-1 = up to checksum)"
                     />
                     <p className={`mt-0.5 ${caption}`}>

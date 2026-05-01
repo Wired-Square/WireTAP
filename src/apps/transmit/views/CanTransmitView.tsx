@@ -117,7 +117,7 @@ export default function CanTransmitView() {
             <code className="font-mono text-sm text-blue-400">
               [{framePreview.dlc}]
             </code>
-            <code className="font-mono text-sm text-gray-300">
+            <code className={`font-mono text-sm ${textDataSecondary}`}>
               {framePreview.data}
             </code>
             {framePreview.flags && (

@@ -4,6 +4,7 @@ import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { Wifi, Database, Radio, Pin } from "lucide-react";
 import { iconSm, iconXs } from "../../../styles/spacing";
+import { textDataPurple, textDataDisabled } from "../../../styles/colourTokens";
 
 export interface SourceNodeData {
   profileId: string;
@@ -87,7 +88,7 @@ function SourceNode({ data, selected }: SourceNodeProps) {
             <div key={bus} className="flex items-center justify-end gap-1.5 relative">
               <span
                 className={`text-[10px] font-mono ${
-                  enabled ? "text-purple-400" : "text-gray-500 opacity-50"
+                  enabled ? textDataPurple : textDataDisabled
                 }`}
               >
                 bus{bus}

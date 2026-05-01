@@ -147,6 +147,10 @@ pub struct AppSettings {
     /// SMP UDP port for firmware upgrades over the network
     #[serde(default = "default_smp_port")]
     pub smp_port: u16,
+
+    /// UI language code (BCP 47, e.g. "en-AU"). Drives i18next translations.
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -294,6 +298,9 @@ fn default_capture_storage() -> String {
 fn default_smp_port() -> u16 {
     1337
 }
+fn default_language() -> String {
+    "en-AU".to_string()
+}
 
 // Decoder buffer limit defaults
 fn default_decoder_max_unmatched_frames() -> u32 {
@@ -393,6 +400,7 @@ impl Default for AppSettings {
             // Modbus
             modbus_max_register_errors: default_modbus_max_register_errors(),
             smp_port: default_smp_port(),
+            language: default_language(),
         }
     }
 }
@@ -474,6 +482,7 @@ impl AppSettings {
             // Modbus
             modbus_max_register_errors: default_modbus_max_register_errors(),
             smp_port: default_smp_port(),
+            language: default_language(),
         })
     }
 }

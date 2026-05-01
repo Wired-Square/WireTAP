@@ -123,6 +123,7 @@ interface AppSettings {
   decoder_max_decoded_per_source?: number;
   transmit_max_history?: number;
   smp_port?: number;
+  language?: string;
   // Theme settings
   theme_mode?: ThemeMode;
   theme_bg_primary_light?: string;
@@ -336,6 +337,7 @@ interface SettingsState {
     telemetryConsentGiven: boolean;
     modbusMaxRegisterErrors: number;
     smpPort: number;
+    language: string;
   };
 
   // UI state
@@ -427,6 +429,7 @@ interface SettingsState {
   setTelemetryConsentGiven: (value: boolean) => void;
   setModbusMaxRegisterErrors: (value: number) => void;
   setSmpPort: (port: number) => void;
+  setLanguage: (lang: string) => void;
 }
 
 // Auto-save debounce
@@ -575,6 +578,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     telemetryConsentGiven: false,
     modbusMaxRegisterErrors: DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
     smpPort: 1337,
+    language: "en-AU",
   },
 
   ui: {
@@ -696,6 +700,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         modbus_max_register_errors: settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
         // Networking
         smp_port: settings.smp_port ?? 1337,
+        // Localisation
+        language: settings.language ?? "en-AU",
       };
 
       set({
@@ -779,6 +785,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
           modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
           smpPort: normalized.smp_port ?? 1337,
+          language: normalized.language ?? "en-AU",
         },
         // When migration occurred, use pre-migration profiles as original so hasUnsavedChanges() detects the diff
         originalSettings: migration.removedIds.size > 0
@@ -922,6 +929,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         theme_accent_warning: display.themeColours.accentWarning,
         // Networking
         smp_port: general.smpPort,
+        // Localisation
+        language: general.language,
       };
 
       await saveSettingsApi(settings);
@@ -1005,6 +1014,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       theme_accent_warning: display.themeColours.accentWarning,
       // Networking
       smp_port: general.smpPort,
+      // Localisation
+      language: general.language,
     };
 
     return stableStringify(currentSettings) !== stableStringify(originalSettings);
@@ -1435,6 +1446,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setSmpPort: (port) => {
     set((state) => ({
       general: { ...state.general, smpPort: port },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setLanguage: (lang) => {
+    set((state) => ({
+      general: { ...state.general, language: lang },
     }));
     scheduleSave(get().saveSettings);
   },

@@ -6,7 +6,7 @@
 // to anchor selection and complete ranges for placing signals.
 
 import { useState, useMemo, useRef, useEffect, useCallback, forwardRef } from "react";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, focusRingThin } from "../../../styles";
 import { type PlacedSignal, buildBitOwnerMap } from "../utils/bitGrid";
 
 // Column indices 0..7 display bits 7..0 (MSB first)
@@ -105,7 +105,7 @@ export default function BitGrid({
             onChange={(e) => setJumpInput(e.target.value)}
             onKeyDown={handleJumpKeyDown}
             placeholder="Go to"
-            className="w-16 h-5 text-[10px] font-mono px-1 rounded border bg-[var(--bg-primary)] border-[color:var(--border-default)] text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`w-16 h-5 text-[10px] font-mono px-1 rounded border bg-[var(--bg-primary)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${focusRingThin}`}
           />
           <button
             onClick={handleJump}

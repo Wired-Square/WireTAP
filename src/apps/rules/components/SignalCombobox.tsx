@@ -10,6 +10,7 @@ import {
   bgSurface,
   borderDefault,
   hoverBg,
+  focusRing,
 } from "../../../styles";
 import { formatHexId } from "../utils/formatHex";
 import type { SelectableSignal } from "../../../api/framelinkRules";
@@ -225,7 +226,7 @@ export default function SignalCombobox({
       <input
         ref={inputRef}
         type="text"
-        className={`w-full text-xs py-1 px-2 border rounded ${bgPrimary} ${textPrimary} ${borderDefault} focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
+        className={`w-full text-xs py-1 px-2 border rounded ${bgPrimary} ${textPrimary} ${borderDefault} ${focusRing} transition-colors`}
         placeholder={placeholder}
         value={displayText}
         onFocus={open}

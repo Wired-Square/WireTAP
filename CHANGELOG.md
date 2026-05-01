@@ -4,6 +4,24 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Localisation foundation**: Wired `react-i18next` into the app with English (Australian) as the source/fallback locale. Translation files live under [src/locales/en-AU/](src/locales/en-AU/) split by namespace (`common`, `settings`, `menus`); registry in [src/locales/index.ts](src/locales/index.ts), bootstrap in [src/i18n.ts](src/i18n.ts) imported once from [src/main.tsx](src/main.tsx). New `language` setting threaded through Rust (`AppSettings`), TypeScript (`useSettings`), the settings store, and a Language picker in `GeneralView` — `WireTAP.tsx` calls `i18n.changeLanguage()` whenever the setting changes. Adding a new locale only requires dropping a folder alongside `en-AU/` and registering it. Five Settings views — `GeneralView`, `PrivacyView`, `LocationsView`, `CapturesView`, `CatalogsView` — are migrated to `t(…)` as the pilot; the remaining views, dialogs, and apps are documented in the style guide backlog for incremental migration.
+
+- **Frontend style guide** at [docs/style_guide.md](docs/style_guide.md): Token reference tables for every export in `src/styles/`, composition recipes (toolbar buttons, dialogs, form fields, status badges, empty states, data-view containers), localisation conventions (folder layout, key naming, interpolation/plurals, when not to translate), don'ts table with replacements, "adding a new app" checklist (panel registry → logo menu → dashboard watermark → native Tauri menu → locales → style; with the session-aware grouping rule), and a refactor backlog of remaining inline patterns.
+
+- **New style tokens** in [src/styles/](src/styles/): `focusRingThin` (compact ring-1 variant), `focusBorder` (themed border-on-focus for inputs that highlight via border rather than ring), `textDataDisabled` (paired with themed accent for inactive state), `checkboxDefault` and `radioDefault` (themed checkbox/radio styling).
+
+- **New style helpers** in [buttonStyles.ts](src/styles/buttonStyles.ts): `playbackIconButton` and `playbackStepButton(canStep)` (themed playback-toolbar buttons), `iconActionButton(colour)` (coloured icon-only "create" button — blue/purple), `actionChip(colour)` (inline pill action button — blue/red/green/amber, themed via status CSS vars), `byteHighlight(state)` (tri-state byte highlight for frame previews — checksum/calcData/default).
+
+### Changed
+
+- **`focusRing` token now uses `--accent-primary` CSS variable** (was hardcoded `focus:ring-blue-500`): every `Input`, `Select`, `Textarea`, and form using the token now tracks the user's accent colour and works correctly on Windows WebView. Same fix applied to the four constants in [inputStyles.ts](src/styles/inputStyles.ts) (`inputDefault` / `inputSimple` / `selectDefault` / `selectSimple`) which had been bypassing the `focusRing` token entirely — every input/select using these constants now themes correctly.
+
+- **`badgeColorClass` migrated to status CSS variables** (was hardcoded Tailwind `bg-{colour}-600/30 text-{colour}-400`): existing callsites automatically benefit. Added a `'red'` variant mapped to `--status-danger-*`.
+
+- **Frontend style sweep — ~150 sites across 40+ files**: ad-hoc `focus:ring-blue-500` → `focusRing` / `focusRingThin` (37 sites in 11 files); ad-hoc checkbox patterns → `checkboxDefault` (10 sites); status chips `bg-{colour}-600/30 text-{colour}-400` → `badgeColorClass(...)` (16 sites); inline `style={{ color: 'var(--…)' }}` → className tokens (15 sites); hardcoded `text-gray-{n}` → `textData{Secondary,Tertiary,Muted,Disabled}` (18 sites); `focus:border-blue-500` → `focusBorder` (8 sites); dark-toolbar buttons in [PlaybackControls.tsx](src/components/PlaybackControls.tsx) → `playbackIconButton` / `playbackStepButton` (9 sites); catalog purple/blue add buttons → `iconActionButton(colour)` (5 sites); active/disabled colour pairs in session-manager nodes → `textData{Cyan,Purple} : textDataDisabled` (2 sites); themed action chips in `TransmitReplayView` → `actionChip(colour)` (3 sites); tri-state byte highlights in `ChecksumExtractionDialog` → `byteHighlight(state)` (1 site). All sites verified via typecheck, tests, and production build.
+
 ### Fixed
 
 - **Windows 11 BLE peripheral discovery**: Bumped `btleplug 0.11 → 0.12` across the workspace. The 0.11 WinRT backend used passive scanning without extended-advertisement support, so SCAN_RSP data — where Zephyr-based devices like WiredFlexLink carry their 128-bit service UUIDs and full local name — never arrived (deviceplug/btleplug#370, #267). 0.12 enables `ScanningMode::Active` and `AllowExtendedAdvertisements(true)`, and adds a separate `advertisement_name` on `PeripheralProperties` (the only name available pre-connect on extended advertisements). Affects both the main app's WiFi provisioning / device scan flows and the `bt_scan_cli` diagnostic.

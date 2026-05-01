@@ -1,0 +1,23 @@
+{
+  "panels": {
+    "discovery": "Discovery",
+    "decoder": "Decoder",
+    "transmit": "Transmit",
+    "modbus": "Modbus",
+    "graph": "Graph",
+    "calculator": "Calculator",
+    "catalog": "Catalog Editor",
+    "devices": "Devices",
+    "settings": "Settings",
+    "provisioning": "Provisioning",
+    "upgrade": "Firmware Upgrade",
+    "query": "Query",
+    "rules": "Rules",
+    "analysis": "Analysis",
+    "testPattern": "Test Pattern",
+    "sessionManager": "Session Manager"
+  },
+  "logo": {
+    "tooltip": "Open the WireTAP app launcher"
+  }
+}

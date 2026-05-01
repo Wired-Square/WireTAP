@@ -165,6 +165,76 @@ export const paginationButtonDark =
   "p-1 rounded text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] disabled:opacity-30 disabled:cursor-not-allowed";
 
 /**
+ * Neutral icon button for playback toolbars (skip, rewind, fast-forward).
+ * Themed text + hover bg + brightness so it works cross-platform.
+ */
+export const playbackIconButton =
+  "p-1 rounded transition-colors text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:brightness-110";
+
+/**
+ * Step button for playback (single-frame stepping). Distinct enabled and
+ * disabled states.
+ * @param canStep - Whether stepping is currently possible
+ */
+export function playbackStepButton(canStep: boolean): string {
+  const base = "p-1 rounded transition-colors";
+  return canStep
+    ? `${base} text-[color:var(--text-primary)] hover:bg-[var(--hover-bg)] hover:brightness-110`
+    : `${base} text-[color:var(--text-muted)] cursor-not-allowed`;
+}
+
+/**
+ * Coloured icon-only action button (p-2). Use where two distinct "create"
+ * operations need to be visually separable (e.g. add-node vs add-frame in the
+ * catalog editor). For text actions, use `primaryButtonBase` instead.
+ * @param colour - Visual identity for the action
+ */
+export function iconActionButton(colour: 'blue' | 'purple'): string {
+  const base = "p-2 rounded-lg transition-colors text-white";
+  const colourMap = {
+    blue: "bg-blue-600 hover:bg-blue-700",
+    purple: "bg-purple-600 hover:bg-purple-700",
+  };
+  return `${base} ${colourMap[colour]}`;
+}
+
+/**
+ * Highlight for individual bytes inside a frame preview (e.g., the checksum
+ * extraction dialog showing checksum / calc-data / default bytes). Themed via
+ * status CSS variables; `checksum` adds a ring for extra emphasis.
+ * @param state - Which highlight to apply
+ */
+export function byteHighlight(state: 'checksum' | 'calcData' | 'default'): string {
+  const base = "px-1 py-0.5 rounded text-xs";
+  switch (state) {
+    case 'checksum':
+      return `${base} bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)] ring-1 ring-[color:var(--status-warning-border)]`;
+    case 'calcData':
+      return `${base} bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]`;
+    case 'default':
+      return `${base} text-[color:var(--text-secondary)]`;
+  }
+}
+
+/**
+ * Inline pill-shaped action chip used next to text rows (e.g., restart/stop
+ * buttons in the Replay log). Smaller than `iconActionButton` — uses subtle
+ * tinted background that brightens on hover. Backed by status CSS variables
+ * so it tracks the active theme.
+ * @param colour - Visual identity for the action
+ */
+export function actionChip(colour: 'blue' | 'red' | 'green' | 'amber'): string {
+  const base = "shrink-0 flex items-center gap-1 px-2 py-0.5 text-xs rounded border transition-colors hover:brightness-110";
+  const colourMap = {
+    blue: "border-[color:var(--status-info-border)] bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]",
+    red: "border-[color:var(--status-danger-border)] bg-[var(--status-danger-bg)] text-[color:var(--status-danger-text)]",
+    green: "border-[color:var(--status-success-border)] bg-[var(--status-success-bg)] text-[color:var(--status-success-text)]",
+    amber: "border-[color:var(--status-warning-border)] bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)]",
+  };
+  return `${base} ${colourMap[colour]}`;
+}
+
+/**
  * Tab button for data views
  * @param isActive - Whether the tab is currently active
  * @param hasIndicator - Whether to show purple indicator (for tabs with new data)
@@ -181,17 +251,20 @@ export function dataViewTabClass(isActive: boolean, hasIndicator = false): strin
 }
 
 /**
- * Get badge color classes for protocol badges (dark theme)
+ * Get badge color classes for protocol badges. Uses status CSS variables so
+ * badges respect the active theme on Windows WebView (where Tailwind `dark:`
+ * variants don't get generated inside string constants).
  * @param color - Badge color variant
  */
-export function badgeColorClass(color: 'green' | 'blue' | 'purple' | 'gray' | 'amber' | 'cyan'): string {
+export function badgeColorClass(color: 'green' | 'blue' | 'purple' | 'gray' | 'amber' | 'cyan' | 'red'): string {
   const colorMap = {
-    green: 'bg-green-600/30 text-green-400',
-    blue: 'bg-blue-600/30 text-blue-400',
-    purple: 'bg-purple-600/30 text-purple-400',
-    gray: 'bg-gray-600/30 text-gray-400',
-    amber: 'bg-amber-600/30 text-amber-400',
-    cyan: 'bg-cyan-600/30 text-cyan-400',
+    green: 'bg-[var(--status-success-bg)] text-[color:var(--status-success-text)]',
+    blue: 'bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]',
+    purple: 'bg-[var(--status-purple-bg)] text-[color:var(--status-purple-text)]',
+    gray: 'bg-[var(--bg-surface)] text-[color:var(--text-secondary)]',
+    amber: 'bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)]',
+    cyan: 'bg-[var(--status-cyan-bg)] text-[color:var(--status-cyan-text)]',
+    red: 'bg-[var(--status-danger-bg)] text-[color:var(--status-danger-text)]',
   };
   return colorMap[color];
 }

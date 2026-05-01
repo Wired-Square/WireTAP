@@ -4,7 +4,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { Network, Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, Check } from "lucide-react";
 import { iconMd, iconXs, flexRowGap2 } from "../../../../styles/spacing";
-import { disabledState, caption, textMedium, focusRing, bgSurface, expandableRowContainer } from "../../../../styles";
+import { disabledState, caption, textMedium, focusRing, focusRingThin, bgSurface, expandableRowContainer } from "../../../../styles";
 import type { CanHeaderFieldEntry } from "../../../../stores/catalogEditorStore";
 import type { HeaderFieldFormat } from "../../types";
 import MaskBitPicker from "../../../../components/MaskBitPicker";
@@ -448,7 +448,7 @@ export default function CanConfigSection({
                           type="text"
                           value={field.mask}
                           onChange={(e) => handleUpdateField(index, { mask: e.target.value })}
-                          className="w-28 px-2 py-0.5 bg-[var(--bg-tertiary)] border border-[color:var(--border-input)] rounded text-xs font-mono text-[color:var(--text-secondary)] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="w-28 px-2 py-0.5 bg-[var(--bg-tertiary)] border border-[color:var(--border-input)] rounded text-xs font-mono text-[color:var(--text-secondary)] ${focusRingThin}"
                           title="Mask (hex)"
                         />
 
@@ -461,7 +461,7 @@ export default function CanConfigSection({
                             max={31}
                             value={fieldShift}
                             onChange={(e) => handleUpdateField(index, { shift: parseInt(e.target.value) || 0 })}
-                            className={`w-12 px-1 py-0.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs font-mono text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500 text-center`}
+                            className={`w-12 px-1 py-0.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs font-mono text-[color:var(--text-primary)] ${focusRingThin} text-center`}
                             title="Right shift (bits)"
                           />
                         </div>
@@ -478,7 +478,7 @@ export default function CanConfigSection({
                         <select
                           value={field.format}
                           onChange={(e) => handleUpdateField(index, { format: e.target.value as HeaderFieldFormat })}
-                          className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                          className={`w-16 px-1 py-1 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs text-[color:var(--text-primary)] ${focusRingThin}`}
                         >
                           <option value="hex">Hex</option>
                           <option value="decimal">Dec</option>
@@ -521,7 +521,7 @@ export default function CanConfigSection({
                   <select
                     value={newFieldType}
                     onChange={(e) => setNewFieldType(e.target.value as CanFieldType)}
-                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-40 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                   >
                     {availableFieldTypes.map((opt) => (
                       <option key={opt.value} value={opt.value} disabled={opt.disabled}>
@@ -536,7 +536,7 @@ export default function CanConfigSection({
                       type="text"
                       value={newFieldCustomName}
                       onChange={(e) => setNewFieldCustomName(e.target.value)}
-                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-sm text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                      className={`flex-1 px-2 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-sm text-[color:var(--text-primary)] ${focusRingThin}`}
                       placeholder="Field name"
                       autoFocus
                     />
@@ -546,7 +546,7 @@ export default function CanConfigSection({
                   <select
                     value={newFieldFormat}
                     onChange={(e) => setNewFieldFormat(e.target.value as HeaderFieldFormat)}
-                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs text-[color:var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    className={`w-16 px-1 py-1.5 ${bgSurface} border border-[color:var(--border-input)] rounded text-xs text-[color:var(--text-primary)] ${focusRingThin}`}
                   >
                     <option value="hex">Hex</option>
                     <option value="decimal">Dec</option>

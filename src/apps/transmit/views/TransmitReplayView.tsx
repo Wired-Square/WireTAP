@@ -12,7 +12,7 @@ import {
   textDataSecondary,
   hoverDataRow,
 } from "../../../styles/colourTokens";
-import { buttonBase } from "../../../styles/buttonStyles";
+import { actionChip, badgeColorClass, buttonBase } from "../../../styles/buttonStyles";
 import {
   emptyStateContainer,
   emptyStateText,
@@ -78,7 +78,7 @@ export default function TransmitReplayView() {
                 </div>
                 <button
                   onClick={() => restartReplay(replayId)}
-                  className="shrink-0 flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-blue-500/40 bg-blue-600/15 text-blue-400 hover:bg-blue-600/25 transition-colors"
+                  className={actionChip('blue')}
                   title="Restart from the beginning"
                 >
                   <RefreshCw size={11} />
@@ -86,7 +86,7 @@ export default function TransmitReplayView() {
                 </button>
                 <button
                   onClick={() => stopReplay(replayId)}
-                  className="shrink-0 flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-red-500/40 bg-red-600/15 text-red-400 hover:bg-red-600/25 transition-colors"
+                  className={actionChip('red')}
                   title="Stop this replay"
                 >
                   <StopCircle size={11} />
@@ -195,10 +195,10 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
 
   const kindBadge =
     kind === "started" ? <span className="text-xs px-1.5 py-0.5 rounded bg-teal-600/30 text-teal-400">Started</span> :
-    kind === "completed" ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-600/30 text-green-400">Completed</span> :
-    kind === "loopRestarted" ? <span className="text-xs px-1.5 py-0.5 rounded bg-blue-600/30 text-blue-400">Loop</span> :
-    kind === "stoppedByUser" ? <span className="text-xs px-1.5 py-0.5 rounded bg-amber-600/30 text-amber-400">Stopped</span> :
-    <span className="text-xs px-1.5 py-0.5 rounded bg-red-600/30 text-red-400">Error</span>;
+    kind === "completed" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('green')}`}>Completed</span> :
+    kind === "loopRestarted" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('blue')}`}>Loop</span> :
+    kind === "stoppedByUser" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('amber')}`}>Stopped</span> :
+    <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('red')}`}>Error</span>;
 
   let details: string;
   if (kind === "started") {
@@ -219,7 +219,7 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
     <tr className={`border-b ${borderDataView} ${hoverDataRow}`}>
       <td className="px-4 py-2">{icon}</td>
       <td className="px-4 py-2">
-        <span className="font-mono text-gray-400 text-xs">
+        <span className={`font-mono text-xs ${textDataSecondary}`}>
           {formatHumanUs(timestamp * 1000)}
         </span>
       </td>
@@ -230,13 +230,13 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
       </td>
       <td className="px-4 py-2">{kindBadge}</td>
       <td className="px-4 py-2">
-        <span className="font-mono text-gray-400 text-xs">{details}</span>
+        <span className={`font-mono text-xs ${textDataSecondary}`}>{details}</span>
       </td>
       <td className="px-4 py-2">
         {onRestart && (
           <button
             onClick={onRestart}
-            className="flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-blue-500/40 bg-blue-600/15 text-blue-400 hover:bg-blue-600/25 transition-colors"
+            className={actionChip('blue')}
             title="Restart this replay"
           >
             <RefreshCw size={11} />

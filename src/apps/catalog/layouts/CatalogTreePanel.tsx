@@ -4,6 +4,7 @@ import React from "react";
 import { Cable, Filter, Network, Plus, Server, UserPlus } from "lucide-react";
 import { iconMd, iconXs } from "../../../styles/spacing";
 import { emptyStateText, emptyStateHeading } from "../../../styles/typography";
+import { iconActionButton } from "../../../styles/buttonStyles";
 import ResizableSidebar from "../../../components/ResizableSidebar";
 import type { TomlNode, ProtocolType, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig } from "../types";
 
@@ -79,14 +80,14 @@ export default function CatalogTreePanel({
     <>
       <button
         onClick={onAddNode}
-        className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        className={iconActionButton('purple')}
         title="Add new node"
       >
         <UserPlus className={iconMd} />
       </button>
       <button
         onClick={() => handleAddFrame?.()}
-        className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        className={iconActionButton('blue')}
         title="Add new frame"
       >
         <Plus className={iconMd} />
@@ -149,14 +150,14 @@ export default function CatalogTreePanel({
           <div className="flex gap-2 mb-4">
             <button
               onClick={onAddNode}
-              className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              className={iconActionButton('purple')}
               title="Add new node"
             >
               <UserPlus className={iconMd} />
             </button>
             <button
               onClick={() => handleAddFrame?.()}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className={iconActionButton('blue')}
               title="Add new frame"
             >
               <Plus className={iconMd} />

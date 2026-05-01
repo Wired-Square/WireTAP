@@ -3,6 +3,7 @@
 import * as Sentry from "@sentry/react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import i18n from "./i18n";
 import "@fontsource/ubuntu/400.css";
 import "@fontsource/ubuntu/500.css";
 import "@fontsource/ubuntu/700.css";
@@ -68,6 +69,7 @@ export default function WireTAP() {
 
   // Telemetry consent state
   const settingsLoaded = useSettingsStore((s) => s.originalSettings !== null);
+  const language = useSettingsStore((s) => s.general.language);
   const telemetryEnabled = useSettingsStore((s) => s.general.telemetryEnabled);
   const telemetryConsentGiven = useSettingsStore((s) => s.general.telemetryConsentGiven);
   const setTelemetryEnabled = useSettingsStore((s) => s.setTelemetryEnabled);
@@ -75,6 +77,14 @@ export default function WireTAP() {
 
   // Apply global theme (dark/light mode + CSS variables)
   useTheme();
+
+  // Sync the active i18n language with the user's setting. Runs whenever the
+  // language preference changes (and on initial settings load).
+  useEffect(() => {
+    if (language && language !== i18n.language) {
+      void i18n.changeLanguage(language);
+    }
+  }, [language]);
 
   // Check for updates on launch
   useEffect(() => {

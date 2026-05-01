@@ -10,6 +10,7 @@ import {
   textDataPrimary,
   bgDataInput,
   textDataSecondary,
+  focusBorder,
 } from "../../../styles/colourTokens";
 import { toggleChipClass } from "../../../styles/buttonStyles";
 
@@ -139,7 +140,7 @@ export default function CanFrameEditor() {
               onFocus={() => setFocusedByteIndex(i)}
               onBlur={() => setFocusedByteIndex(null)}
               maxLength={2}
-              className={`w-8 h-8 ${bgDataInput} ${textDataPrimary} text-center font-mono text-sm rounded border ${borderDataView} focus:outline-none focus:border-blue-500 uppercase`}
+              className={`w-8 h-8 ${bgDataInput} ${textDataPrimary} text-center font-mono text-sm rounded border ${borderDataView} ${focusBorder} uppercase`}
             />
           </div>
         );
@@ -177,7 +178,7 @@ export default function CanFrameEditor() {
               onChange={handleFrameIdChange}
               maxLength={canEditor.isExtended ? 8 : 3}
               placeholder={canEditor.isExtended ? "12345678" : "123"}
-              className={`w-24 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} focus:outline-none focus:border-blue-500 uppercase`}
+              className={`w-24 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder} uppercase`}
             />
           </div>
         </div>
@@ -188,7 +189,7 @@ export default function CanFrameEditor() {
           <select
             value={canEditor.dlc}
             onChange={handleDlcChange}
-            className={`w-20 ${bgDataInput} ${textDataPrimary} text-sm rounded px-2 py-1.5 border ${borderDataView} focus:outline-none focus:border-blue-500`}
+            className={`w-20 ${bgDataInput} ${textDataPrimary} text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder}`}
           >
             {dlcValues.map((dlc) => (
               <option key={dlc} value={dlc}>
@@ -205,7 +206,7 @@ export default function CanFrameEditor() {
             <select
               value={canEditor.bus}
               onChange={handleBusChange}
-              className={`w-24 ${bgDataInput} ${textDataPrimary} text-sm rounded px-2 py-1.5 border ${borderDataView} focus:outline-none focus:border-blue-500`}
+              className={`w-24 ${bgDataInput} ${textDataPrimary} text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder}`}
             >
               {availableBuses.map((bus) => (
                 <option key={bus} value={bus}>

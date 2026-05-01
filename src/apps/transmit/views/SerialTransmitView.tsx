@@ -14,6 +14,8 @@ import {
   textDataPrimary,
   bgDataInput,
   textDataSecondary,
+  textDataTertiary,
+  focusBorder,
 } from "../../../styles/colourTokens";
 import { buttonBase, toggleChipClass } from "../../../styles/buttonStyles";
 import { flexRowGap2 } from "../../../styles/spacing";
@@ -169,7 +171,7 @@ export default function SerialTransmitView() {
               onChange={handleHexInputChange}
               placeholder="AA BB CC DD EE FF..."
               rows={4}
-              className={`w-full ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-3 py-2 border ${borderDataView} focus:outline-none focus:border-blue-500 uppercase resize-none`}
+              className={`w-full ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-3 py-2 border ${borderDataView} ${focusBorder} uppercase resize-none`}
             />
           </div>
 
@@ -211,7 +213,7 @@ export default function SerialTransmitView() {
                 value={serialEditor.delimiter.map(byteToHex).join(" ")}
                 onChange={handleDelimiterChange}
                 placeholder="0D 0A"
-                className={`w-32 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} focus:outline-none focus:border-blue-500 uppercase`}
+                className={`w-32 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder} uppercase`}
               />
               <p className={`${textDataSecondary} text-xs mt-1`}>
                 Default: 0D 0A (CRLF)
@@ -232,13 +234,13 @@ export default function SerialTransmitView() {
               </span>
             </div>
             <div className="flex items-start gap-4">
-              <code className="font-mono text-sm text-gray-300 flex-1 break-all">
+              <code className={`font-mono text-sm flex-1 break-all ${textDataSecondary}`}>
                 {preview.hex}
               </code>
             </div>
             <div className={flexRowGap2}>
               <span className={`${textDataSecondary} text-xs`}>ASCII:</span>
-              <code className="font-mono text-xs text-gray-500">
+              <code className={`font-mono text-xs ${textDataTertiary}`}>
                 {preview.ascii}
               </code>
             </div>

@@ -1,0 +1,39 @@
+{
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "close": "Close",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "remove": "Remove",
+    "duplicate": "Duplicate",
+    "browse": "Browse",
+    "import": "Import",
+    "export": "Export",
+    "apply": "Apply",
+    "reset": "Reset",
+    "confirm": "Confirm",
+    "discard": "Discard"
+  },
+  "states": {
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "noData": "No data",
+    "notConnected": "Not connected",
+    "empty": "Empty"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "loadFailed": "Failed to load",
+    "saveFailed": "Failed to save",
+    "validationFailed": "Validation failed"
+  },
+  "units": {
+    "seconds": "seconds",
+    "milliseconds": "ms",
+    "bytes": "bytes",
+    "frames": "frames"
+  }
+}

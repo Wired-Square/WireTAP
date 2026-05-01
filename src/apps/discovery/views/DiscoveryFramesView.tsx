@@ -18,7 +18,7 @@ import MessageOrderResultView from "./tools/MessageOrderResultView";
 import ChecksumDiscoveryResultView from "./tools/ChecksumDiscoveryResultView";
 import ModbusScanResultView from "./tools/ModbusScanResultView";
 import FilteredTabContent from "./FilteredTabContent";
-import { bgDataView, bgSurface, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
+import { bgDataView, bgSurface, textDataSecondary, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import { keyOf, parseFrameKey } from "../../../utils/frameKey";
 import type { IOCapabilities } from "../../../api/io";
@@ -1158,7 +1158,7 @@ function DiscoveryFramesView({
       const maxChars = totalStr.length * 2 + 4;
       return (
         <span
-          className="px-1.5 text-xs font-mono text-gray-400 tabular-nums text-center"
+          className={`px-1.5 text-xs font-mono tabular-nums text-center ${textDataSecondary}`}
           style={{ minWidth: `${maxChars}ch` }}
         >
           {currentStr} of {totalStr}
@@ -1170,7 +1170,7 @@ function DiscoveryFramesView({
       const count = useCaptureFirstMode ? captureFrameView.totalCount : frames.length;
       if (count > 0) {
         return (
-          <span className="px-1.5 text-xs font-mono text-gray-400 tabular-nums text-center">
+          <span className={`px-1.5 text-xs font-mono tabular-nums text-center ${textDataSecondary}`}>
             {count.toLocaleString()}
           </span>
         );
@@ -1184,7 +1184,7 @@ function DiscoveryFramesView({
     <select
       value={playbackSpeed}
       onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
-      className="px-2 py-0.5 text-xs rounded border border-gray-600 bg-gray-700 text-gray-200"
+      className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${textPrimary}`}
       title="Playback speed"
     >
       {DEFAULT_SPEED_OPTIONS.map((s) => (

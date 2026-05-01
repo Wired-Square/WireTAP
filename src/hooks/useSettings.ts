@@ -334,6 +334,8 @@ export interface AppSettings {
   modbus_max_register_errors?: number;
   /** SMP UDP port for firmware upgrades (default 1337) */
   smp_port?: number;
+  /** UI language code (BCP 47, e.g. "en-AU"). Drives i18next translations. */
+  language?: string;
 }
 
 /**
@@ -399,6 +401,8 @@ function normalizeSettings(
     transmit_max_history: settings.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
     // Modbus settings
     modbus_max_register_errors: settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
+    // Localisation
+    language: settings.language || "en-AU",
   };
 }
 
