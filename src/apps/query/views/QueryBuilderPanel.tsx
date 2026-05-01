@@ -4,6 +4,7 @@
 // and context window settings. Supports favourite-based time bounds.
 
 import { useCallback, useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ListPlus, HardDrive } from "lucide-react";
 import {
   useQueryStore,
@@ -44,6 +45,7 @@ export default function QueryBuilderPanel({
   captures = [],
   onSelectCapture,
 }: Props) {
+  const { t } = useTranslation("query");
   // Store selectors
   const queryType = useQueryStore((s) => s.queryType);
   const queryParams = useQueryStore((s) => s.queryParams);
@@ -696,7 +698,7 @@ LIMIT ${limitOverride.toLocaleString()}
         {/* Buffer Source Selector (shown when captures are available) */}
         {captures.length > 0 && (
           <div>
-            <label className={labelSmallMuted}>Capture Source</label>
+            <label className={labelSmallMuted}>{t("builder.captureSource")}</label>
             <div className={`${flexRowGap2} mt-1`}>
               <HardDrive className={`${iconSm} ${textSecondary} flex-shrink-0`} />
               <select
@@ -704,10 +706,10 @@ LIMIT ${limitOverride.toLocaleString()}
                 onChange={(e) => onSelectCapture?.(e.target.value || null)}
                 className={`${inputBase} flex-1`}
               >
-                <option value="">{profileId ? "Using PostgreSQL profile" : "— Select capture —"}</option>
+                <option value="">{profileId ? t("builder.usingPostgres") : t("builder.selectCapture")}</option>
                 {captures.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.name} ({b.count.toLocaleString()} frames)
+                    {t("builder.captureOption", { name: b.name, count: b.count.toLocaleString() })}
                   </option>
                 ))}
               </select>
@@ -717,7 +719,7 @@ LIMIT ${limitOverride.toLocaleString()}
 
         {/* Query Type */}
         <div>
-          <label className={labelSmallMuted}>Query Type</label>
+          <label className={labelSmallMuted}>{t("builder.queryType")}</label>
           <select
             value={queryType}
             onChange={handleQueryTypeChange}
@@ -740,14 +742,14 @@ LIMIT ${limitOverride.toLocaleString()}
             {mirrorFrames.length > 0 ? (
               <>
                 <div>
-                  <label className={labelSmallMuted}>Mirror Frame</label>
+                  <label className={labelSmallMuted}>{t("builder.mirrorFrame")}</label>
                   <select
                     value={queryParams.mirrorFrameId}
                     onChange={handleCatalogMirrorFrameChange}
                     disabled={disabled}
                     className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    <option value={0}>— Select mirror frame —</option>
+                    <option value={0}>{t("builder.selectMirror")}</option>
                     {mirrorFrames.map(({ id, frame }) => {
                       // Resolve source frame info for display
                       const sourceId = frame.mirrorOf ? getMirrorSourceId(frame.mirrorOf) : null;
@@ -766,7 +768,7 @@ LIMIT ${limitOverride.toLocaleString()}
                   </select>
                   {queryParams.mirrorFrameId > 0 && (
                     <p className={`text-xs ${textMuted} mt-1`}>
-                      mirrors → 0x{queryParams.sourceFrameId.toString(16).toUpperCase().padStart(3, "0")}
+                      {t("builder.mirrorsTo", { id: queryParams.sourceFrameId.toString(16).toUpperCase().padStart(3, "0") })}
                     </p>
                   )}
                 </div>
@@ -775,14 +777,14 @@ LIMIT ${limitOverride.toLocaleString()}
               <>
                 {/* Manual mirror frame ID inputs */}
                 <div>
-                  <label className={labelSmallMuted}>Mirror Frame ID</label>
+                  <label className={labelSmallMuted}>{t("builder.mirrorFrameId")}</label>
                   <div className={`${flexRowGap2} mt-1`}>
                     <input
                       type="text"
                       value={mirrorFrameIdText}
                       onChange={handleMirrorFrameIdChange}
                       disabled={disabled}
-                      placeholder="0x123"
+                      placeholder={t("builder.mirrorPlaceholder")}
                       className={`${inputBase} flex-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                     />
                     <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
@@ -793,18 +795,18 @@ LIMIT ${limitOverride.toLocaleString()}
                         disabled={disabled}
                         className="disabled:cursor-not-allowed"
                       />
-                      Extended
+                      {t("builder.extended")}
                     </label>
                   </div>
                 </div>
                 <div>
-                  <label className={labelSmallMuted}>Source Frame ID</label>
+                  <label className={labelSmallMuted}>{t("builder.sourceFrameId")}</label>
                   <input
                     type="text"
                     value={sourceFrameIdText}
                     onChange={handleSourceFrameIdChange}
                     disabled={disabled}
-                    placeholder="0x456"
+                    placeholder={t("builder.sourcePlaceholder")}
                     className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                   />
                 </div>
@@ -812,7 +814,7 @@ LIMIT ${limitOverride.toLocaleString()}
             )}
             {/* Tolerance */}
             <div>
-              <label className={labelSmallMuted}>Tolerance</label>
+              <label className={labelSmallMuted}>{t("builder.tolerance")}</label>
               <div className={`${flexRowGap2} mt-1`}>
                 <input
                   type="number"
@@ -823,7 +825,7 @@ LIMIT ${limitOverride.toLocaleString()}
                   disabled={disabled}
                   className={`${inputBase} w-20 disabled:opacity-50 disabled:cursor-not-allowed`}
                 />
-                <span className={`text-xs ${textMuted}`}>ms — how close timestamps must be</span>
+                <span className={`text-xs ${textMuted}`}>{t("builder.toleranceHint")}</span>
               </div>
             </div>
           </div>
@@ -831,19 +833,19 @@ LIMIT ${limitOverride.toLocaleString()}
           /* Pattern Search — no frame ID, just a hex pattern input */
           <div className="space-y-2">
             <div>
-              <label className={labelSmallMuted}>Byte Pattern (hex, ?? = wildcard)</label>
+              <label className={labelSmallMuted}>{t("builder.bytePattern")}</label>
               <input
                 type="text"
                 value={patternText}
                 onChange={handlePatternTextChange}
                 disabled={disabled}
-                placeholder="AA ?? BB CC"
+                placeholder={t("builder.patternPlaceholder")}
                 className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed font-mono`}
               />
               <p className={`text-xs ${textMuted} mt-1`}>
                 {queryParams.pattern.length > 0
-                  ? `${queryParams.pattern.length} bytes, ${queryParams.patternMask.filter((m) => m === 0).length} wildcards`
-                  : "Enter hex bytes separated by spaces"}
+                  ? t("builder.patternStats", { bytes: queryParams.pattern.length, wildcards: queryParams.patternMask.filter((m) => m === 0).length })
+                  : t("builder.patternHint")}
               </p>
             </div>
           </div>
@@ -853,7 +855,7 @@ LIMIT ${limitOverride.toLocaleString()}
             <div className="space-y-2">
               {/* Catalog Frame Picker */}
               <div>
-                <label className={labelSmallMuted}>Frame</label>
+                <label className={labelSmallMuted}>{t("builder.frame")}</label>
                 <select
                   value={queryParams.frameId}
                   onChange={handleCatalogFrameChange}
@@ -872,28 +874,27 @@ LIMIT ${limitOverride.toLocaleString()}
               {/* Signal Picker (for byte_changes / distribution) */}
               {showByteIndex && currentFrameSignals.length > 0 && (
                 <div>
-                  <label className={labelSmallMuted}>Signal</label>
+                  <label className={labelSmallMuted}>{t("builder.signal")}</label>
                   <select
                     value={selectedSignal?.signalName ?? ""}
                     onChange={handleCatalogSignalChange}
                     disabled={disabled}
                     className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    <option value="">— Select signal or use byte index below —</option>
+                    <option value="">{t("builder.selectSignalOrByte")}</option>
                     {currentFrameSignals
                       .filter((s) => s.name && s.start_bit !== undefined)
                       .map((signal) => (
                         <option key={signal.name} value={signal.name}>
                           {signal.name}
                           {signal.unit ? ` (${signal.unit})` : ""}
-                          {` — byte ${Math.floor((signal.start_bit ?? 0) / 8)}`}
+                          {t("builder.signalOption", { byte: Math.floor((signal.start_bit ?? 0) / 8) })}
                         </option>
                       ))}
                   </select>
                   {selectedSignal && (
                     <p className={`text-xs ${textMuted} mt-1`}>
-                      start_bit: {selectedSignal.startBit}, bit_length: {selectedSignal.bitLength}
-                      {" → "} byte {selectedSignal.byteIndex}
+                      {t("builder.signalPosition", { startBit: selectedSignal.startBit, bitLength: selectedSignal.bitLength, byteIndex: selectedSignal.byteIndex })}
                     </p>
                   )}
                 </div>
@@ -903,7 +904,7 @@ LIMIT ${limitOverride.toLocaleString()}
               {showByteIndex && (
                 <div>
                   <label className={labelSmallMuted}>
-                    Byte Index {selectedSignal ? "(from signal)" : ""}
+                    {selectedSignal ? t("builder.byteIndexFromSignal") : t("builder.byteIndex")}
                   </label>
                   <input
                     type="number"
@@ -921,7 +922,7 @@ LIMIT ${limitOverride.toLocaleString()}
               {showMuxStatistics && (
                 <div className="space-y-2">
                   <div>
-                    <label className={labelSmallMuted}>Mux Selector Byte</label>
+                    <label className={labelSmallMuted}>{t("builder.muxSelectorByte")}</label>
                     <input
                       type="number"
                       min={0}
@@ -936,7 +937,7 @@ LIMIT ${limitOverride.toLocaleString()}
                     />
                   </div>
                   <div>
-                    <label className={labelSmallMuted}>Payload Length (bytes)</label>
+                    <label className={labelSmallMuted}>{t("builder.payloadLength")}</label>
                     <input
                       type="number"
                       min={1}
@@ -958,7 +959,7 @@ LIMIT ${limitOverride.toLocaleString()}
                       disabled={disabled}
                       className="disabled:cursor-not-allowed"
                     />
-                    Include 16-bit word statistics (LE &amp; BE)
+                    {t("builder.include16Bit")}
                   </label>
                 </div>
               )}
@@ -966,7 +967,7 @@ LIMIT ${limitOverride.toLocaleString()}
               {/* Gap Analysis Parameters */}
               {showGapAnalysis && (
                 <div>
-                  <label className={labelSmallMuted}>Gap Threshold</label>
+                  <label className={labelSmallMuted}>{t("builder.gapThreshold")}</label>
                   <div className={`${flexRowGap2} mt-1`}>
                     <input
                       type="number"
@@ -980,7 +981,7 @@ LIMIT ${limitOverride.toLocaleString()}
                       disabled={disabled}
                       className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
                     />
-                    <span className={`text-xs ${textMuted}`}>ms — minimum gap duration to report</span>
+                    <span className={`text-xs ${textMuted}`}>{t("builder.gapHint")}</span>
                   </div>
                 </div>
               )}
@@ -988,7 +989,7 @@ LIMIT ${limitOverride.toLocaleString()}
               {/* Frequency Parameters */}
               {showFrequency && (
                 <div>
-                  <label className={labelSmallMuted}>Bucket Size</label>
+                  <label className={labelSmallMuted}>{t("builder.bucketSize")}</label>
                   <div className={`${flexRowGap2} mt-1`}>
                     <input
                       type="number"
@@ -1003,7 +1004,7 @@ LIMIT ${limitOverride.toLocaleString()}
                       disabled={disabled}
                       className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
                     />
-                    <span className={`text-xs ${textMuted}`}>ms — time bucket width</span>
+                    <span className={`text-xs ${textMuted}`}>{t("builder.bucketHint")}</span>
                   </div>
                 </div>
               )}
@@ -1013,14 +1014,14 @@ LIMIT ${limitOverride.toLocaleString()}
               {/* Manual Frame ID Input */}
               {!hideFrameId && (
               <div>
-                <label className={labelSmallMuted}>Frame ID (hex or decimal)</label>
+                <label className={labelSmallMuted}>{t("builder.frameIdManual")}</label>
                 <div className={`${flexRowGap2} mt-1`}>
                   <input
                     type="text"
                     value={frameIdText}
                     onChange={handleFrameIdChange}
                     disabled={disabled}
-                    placeholder="0x123 or 291"
+                    placeholder={t("builder.frameIdPlaceholder")}
                     className={`${inputBase} flex-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                   />
                   <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
@@ -1031,7 +1032,7 @@ LIMIT ${limitOverride.toLocaleString()}
                       disabled={disabled}
                       className="disabled:cursor-not-allowed"
                     />
-                    Extended
+                    {t("builder.extended")}
                   </label>
                 </div>
               </div>
@@ -1040,7 +1041,7 @@ LIMIT ${limitOverride.toLocaleString()}
               {/* Byte Index (for byte_changes / distribution) */}
               {showByteIndex && (
                 <div>
-                  <label className={labelSmallMuted}>Byte Index</label>
+                  <label className={labelSmallMuted}>{t("builder.byteIndex")}</label>
                   <input
                     type="number"
                     min={0}
@@ -1057,7 +1058,7 @@ LIMIT ${limitOverride.toLocaleString()}
               {showMuxStatistics && (
                 <div className="space-y-2">
                   <div>
-                    <label className={labelSmallMuted}>Mux Selector Byte</label>
+                    <label className={labelSmallMuted}>{t("builder.muxSelectorByte")}</label>
                     <input
                       type="number"
                       min={0}
@@ -1072,7 +1073,7 @@ LIMIT ${limitOverride.toLocaleString()}
                     />
                   </div>
                   <div>
-                    <label className={labelSmallMuted}>Payload Length (bytes)</label>
+                    <label className={labelSmallMuted}>{t("builder.payloadLength")}</label>
                     <input
                       type="number"
                       min={1}
@@ -1094,7 +1095,7 @@ LIMIT ${limitOverride.toLocaleString()}
                       disabled={disabled}
                       className="disabled:cursor-not-allowed"
                     />
-                    Include 16-bit word statistics (LE &amp; BE)
+                    {t("builder.include16Bit")}
                   </label>
                 </div>
               )}
@@ -1102,7 +1103,7 @@ LIMIT ${limitOverride.toLocaleString()}
               {/* Gap Analysis Parameters */}
               {showGapAnalysis && (
                 <div>
-                  <label className={labelSmallMuted}>Gap Threshold</label>
+                  <label className={labelSmallMuted}>{t("builder.gapThreshold")}</label>
                   <div className={`${flexRowGap2} mt-1`}>
                     <input
                       type="number"
@@ -1116,7 +1117,7 @@ LIMIT ${limitOverride.toLocaleString()}
                       disabled={disabled}
                       className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
                     />
-                    <span className={`text-xs ${textMuted}`}>ms — minimum gap duration to report</span>
+                    <span className={`text-xs ${textMuted}`}>{t("builder.gapHint")}</span>
                   </div>
                 </div>
               )}
@@ -1124,7 +1125,7 @@ LIMIT ${limitOverride.toLocaleString()}
               {/* Frequency Parameters */}
               {showFrequency && (
                 <div>
-                  <label className={labelSmallMuted}>Bucket Size</label>
+                  <label className={labelSmallMuted}>{t("builder.bucketSize")}</label>
                   <div className={`${flexRowGap2} mt-1`}>
                     <input
                       type="number"
@@ -1139,7 +1140,7 @@ LIMIT ${limitOverride.toLocaleString()}
                       disabled={disabled}
                       className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
                     />
-                    <span className={`text-xs ${textMuted}`}>ms — time bucket width</span>
+                    <span className={`text-xs ${textMuted}`}>{t("builder.bucketHint")}</span>
                   </div>
                 </div>
               )}
@@ -1150,8 +1151,8 @@ LIMIT ${limitOverride.toLocaleString()}
         {/* Context Window */}
         <div className={`${bgSurface} ${borderDefault} rounded-lg p-2`}>
           <div className={`${flexRowGap2} mb-1`}>
-            <label className={`text-xs font-medium ${textSecondary}`}>Context Window</label>
-            <span className={`text-xs ${textMuted}`}>— data to ingest around each event</span>
+            <label className={`text-xs font-medium ${textSecondary}`}>{t("builder.contextWindow")}</label>
+            <span className={`text-xs ${textMuted}`}>{t("builder.contextHint")}</span>
           </div>
 
           {/* Presets + Custom inputs in responsive layout */}
@@ -1175,7 +1176,7 @@ LIMIT ${limitOverride.toLocaleString()}
             </div>
             <div className="flex gap-2 flex-1 min-w-[180px]">
               <div className="flex-1">
-                <label className={`text-xs ${textMuted}`}>Before</label>
+                <label className={`text-xs ${textMuted}`}>{t("builder.before")}</label>
                 <div className={flexRowGap2}>
                   <input
                     type="number"
@@ -1185,11 +1186,11 @@ LIMIT ${limitOverride.toLocaleString()}
                     disabled={disabled}
                     className={`${inputBase} w-full text-xs disabled:opacity-50 disabled:cursor-not-allowed`}
                   />
-                  <span className={`text-xs ${textMuted}`}>ms</span>
+                  <span className={`text-xs ${textMuted}`}>{t("builder.ms")}</span>
                 </div>
               </div>
               <div className="flex-1">
-                <label className={`text-xs ${textMuted}`}>After</label>
+                <label className={`text-xs ${textMuted}`}>{t("builder.after")}</label>
                 <div className={flexRowGap2}>
                   <input
                     type="number"
@@ -1199,7 +1200,7 @@ LIMIT ${limitOverride.toLocaleString()}
                     disabled={disabled}
                     className={`${inputBase} w-full text-xs disabled:opacity-50 disabled:cursor-not-allowed`}
                   />
-                  <span className={`text-xs ${textMuted}`}>ms</span>
+                  <span className={`text-xs ${textMuted}`}>{t("builder.ms")}</span>
                 </div>
               </div>
             </div>
@@ -1208,7 +1209,7 @@ LIMIT ${limitOverride.toLocaleString()}
 
         {/* Time Bounds */}
         <div className={`${bgSurface} ${borderDefault} rounded-lg p-2`}>
-          <label className={`text-xs font-medium ${textSecondary} mb-2 block`}>Time Bounds</label>
+          <label className={`text-xs font-medium ${textSecondary} mb-2 block`}>{t("builder.timeBounds")}</label>
           <TimeBoundsInput
             value={timeBounds}
             onChange={onTimeBoundsChange}
@@ -1220,7 +1221,7 @@ LIMIT ${limitOverride.toLocaleString()}
 
         {/* SQL Query Preview */}
         <div className={`${bgSurface} ${borderDefault} rounded-lg p-2`}>
-          <label className={`text-xs font-medium ${textSecondary} mb-1 block`}>SQL Query Preview</label>
+          <label className={`text-xs font-medium ${textSecondary} mb-1 block`}>{t("builder.sqlPreview")}</label>
           <textarea
             readOnly
             value={sqlPreview}
@@ -1235,7 +1236,7 @@ LIMIT ${limitOverride.toLocaleString()}
       <div className="flex-shrink-0 p-4 pt-0 space-y-2">
         {/* Result limit input */}
         <div className="flex items-center justify-center gap-2">
-          <label className={`text-xs ${textMuted}`}>{showMuxStatistics ? "Scan up to" : "Limit results to"}</label>
+          <label className={`text-xs ${textMuted}`}>{showMuxStatistics ? t("builder.scanUpTo") : t("builder.limitResults")}</label>
           <input
             type="number"
             min={100}
@@ -1246,7 +1247,7 @@ LIMIT ${limitOverride.toLocaleString()}
             disabled={disabled}
             className={`${inputBase} ${showMuxStatistics ? "w-32" : "w-24"} text-xs text-center disabled:opacity-50 disabled:cursor-not-allowed`}
           />
-          <span className={`text-xs ${textMuted}`}>rows</span>
+          <span className={`text-xs ${textMuted}`}>{t("builder.rows")}</span>
         </div>
 
         <button
@@ -1255,7 +1256,7 @@ LIMIT ${limitOverride.toLocaleString()}
           className={`${primaryButtonBase} w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <ListPlus className={iconSm} />
-          Add to Queue
+          {t("builder.addToQueue")}
         </button>
       </div>
     </div>
