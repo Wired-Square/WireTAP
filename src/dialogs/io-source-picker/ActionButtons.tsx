@@ -1,5 +1,6 @@
 // ui/src/dialogs/io-source-picker/ActionButtons.tsx
 
+import { useTranslation } from "react-i18next";
 import { Download, Loader2, Upload, Check, Plug, Play, GitMerge, Unplug, RotateCcw } from "lucide-react";
 import type { IOProfile } from "../../hooks/useSettings";
 import { CSV_EXTERNAL_ID, isRealtimeProfile } from "./utils";
@@ -82,6 +83,7 @@ export default function ActionButtons({
   onConnectOnlyClick,
   onCaptureConnectClick,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   const isCsvSelected = checkedSourceId === CSV_EXTERNAL_ID;
   const isCheckedRealtime = checkedProfile ? isRealtimeProfile(checkedProfile) : false;
 
@@ -94,10 +96,10 @@ export default function ActionButtons({
     <button
       onClick={onRelease}
       className={`${dangerButtonBase} gap-1.5`}
-      title="Leave session and reset selection"
+      title={t("ioSourcePicker.actions.leaveTooltip")}
     >
       <Unplug className={iconSm} />
-      <span>Leave</span>
+      <span>{t("ioSourcePicker.actions.leave")}</span>
     </button>
   ) : null;
 
@@ -106,7 +108,7 @@ export default function ActionButtons({
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 text-sm text-[color:var(--text-muted)]">
           <Loader2 className={`${iconMd} animate-spin`} />
-          <span>Loading from {loadProfileId}...</span>
+          <span>{t("ioSourcePicker.actions.loadingFrom", { profile: loadProfileId })}</span>
         </div>
       ) : multiSelectMode ? (
         // Multi-select mode - show Multi-Bus Watch/Restart buttons
@@ -117,22 +119,22 @@ export default function ActionButtons({
               className={`flex-1 ${successButtonBase}`}
             >
               <GitMerge className={iconMd} />
-              <span>Connect</span>
+              <span>{t("ioSourcePicker.actions.connect")}</span>
             </button>
             {isMultiSourceLive && onMultiRestartClick && (
               <button
                 onClick={onMultiRestartClick}
                 className={`flex-1 ${primaryButtonBase}`}
-                title="Restart session with updated configuration"
+                title={t("ioSourcePicker.actions.restartTooltip")}
               >
                 <RotateCcw className={iconMd} />
-                <span>Restart</span>
+                <span>{t("ioSourcePicker.actions.restart")}</span>
               </button>
             )}
           </div>
         ) : (
           <div className="text-center text-sm text-[color:var(--text-muted)] py-1">
-            Select real-time sources to connect
+            {t("ioSourcePicker.actions.selectRealtime")}
           </div>
         )
       ) : isCsvSelected ? (
@@ -147,12 +149,12 @@ export default function ActionButtons({
               {isImporting ? (
                 <>
                   <Loader2 className={`${iconMd} animate-spin`} />
-                  <span>Importing...</span>
+                  <span>{t("ioSourcePicker.actions.importing")}</span>
                 </>
               ) : (
                 <>
                   <Upload className={iconMd} />
-                  <span>Import</span>
+                  <span>{t("ioSourcePicker.actions.import")}</span>
                 </>
               )}
             </button>
@@ -173,7 +175,7 @@ export default function ActionButtons({
             className={`flex-1 ${successButtonBase}`}
           >
             <Plug className={iconMd} />
-            <span>Connect</span>
+            <span>{t("ioSourcePicker.actions.connect")}</span>
           </button>
           {releaseButton}
         </div>
@@ -185,7 +187,7 @@ export default function ActionButtons({
             className={`flex-1 ${successButtonBase}`}
           >
             <Plug className={iconMd} />
-            <span>Connect</span>
+            <span>{t("ioSourcePicker.actions.connect")}</span>
           </button>
           {releaseButton}
         </div>
@@ -199,16 +201,16 @@ export default function ActionButtons({
               className={`flex-1 ${successButtonBase}`}
             >
               <Plug className={iconMd} />
-              <span>Join</span>
+              <span>{t("ioSourcePicker.actions.join")}</span>
             </button>
             {onRestartClick && (
               <button
                 onClick={onRestartClick}
                 className={`flex-1 ${primaryButtonBase}`}
-                title="Restart session with updated configuration"
+                title={t("ioSourcePicker.actions.restartTooltip")}
               >
                 <RotateCcw className={iconMd} />
-                <span>Restart</span>
+                <span>{t("ioSourcePicker.actions.restart")}</span>
               </button>
             )}
           </div>
@@ -222,7 +224,7 @@ export default function ActionButtons({
                 className={`flex-1 ${successButtonBase}`}
               >
                 <Play className={iconMd} />
-                <span>Resume and Join</span>
+                <span>{t("ioSourcePicker.actions.resumeJoin")}</span>
               </button>
               {releaseButton}
             </div>
@@ -234,7 +236,7 @@ export default function ActionButtons({
                   className={`flex-1 ${primaryButtonBase}`}
                 >
                   <Download className={iconMd} />
-                  <span>Load</span>
+                  <span>{t("ioSourcePicker.actions.load")}</span>
                 </button>
               )}
               <button
@@ -242,7 +244,7 @@ export default function ActionButtons({
                 className={`flex-1 ${primaryButtonBase}`}
               >
                 <Plug className={iconMd} />
-                <span>Connect</span>
+                <span>{t("ioSourcePicker.actions.connect")}</span>
               </button>
             </div>
           </div>
@@ -255,7 +257,7 @@ export default function ActionButtons({
                 className={`flex-1 ${successButtonBase}`}
               >
                 <Download className={iconMd} />
-                <span>Load</span>
+                <span>{t("ioSourcePicker.actions.load")}</span>
               </button>
             )}
             <button
@@ -263,7 +265,7 @@ export default function ActionButtons({
               className={`flex-1 ${primaryButtonBase}`}
             >
               <Plug className={iconMd} />
-              <span>Connect</span>
+              <span>{t("ioSourcePicker.actions.connect")}</span>
             </button>
             {releaseButton}
           </div>
@@ -276,7 +278,7 @@ export default function ActionButtons({
             className={`flex-1 ${onCaptureConnectClick ? successButtonBase : primaryButtonBase}`}
           >
             {onCaptureConnectClick ? <Plug className={iconMd} /> : <Check className={iconMd} />}
-            <span>{onCaptureConnectClick ? "Connect" : "OK"}</span>
+            <span>{onCaptureConnectClick ? t("ioSourcePicker.actions.connect") : t("ioSourcePicker.actions.ok")}</span>
           </button>
           {releaseButton}
         </div>
@@ -286,11 +288,11 @@ export default function ActionButtons({
           onClick={onSkip}
           className={`w-full ${primaryButtonBase}`}
         >
-          <span>Continue Without Source</span>
+          <span>{t("ioSourcePicker.actions.continueWithoutSource")}</span>
         </button>
       ) : (
         <div className="text-center text-sm text-[color:var(--text-muted)] py-1">
-          {mode === "connect" ? "Select a database to connect" : "Select a source to continue"}
+          {mode === "connect" ? t("ioSourcePicker.actions.selectDatabase") : t("ioSourcePicker.actions.selectSource")}
         </div>
       )}
     </div>

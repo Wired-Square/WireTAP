@@ -4,6 +4,7 @@
 // Allows filtering frames during capture based on minimum length.
 // Uses the shared FilterOptionsPanel component.
 
+import { useTranslation } from "react-i18next";
 import type { IOProfile } from "../../hooks/useSettings";
 import FilterOptionsPanel, { type FilterConfig } from "../../components/FilterOptionsPanel";
 import { sectionHeader } from "../../styles/typography";
@@ -48,6 +49,7 @@ export default function FilterOptions({
   onMinFrameLengthChange,
   isBytesCaptureSelected = false,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   // Check if any selected profile in multi-bus mode supports filtering
   const anyMultiBusProfileSupportsFiltering = checkedSourceIds.some((id) => {
     const profile = ioProfiles.find((p) => p.id === id);
@@ -73,7 +75,7 @@ export default function FilterOptions({
   return (
     <div className={borderDivider}>
       <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
-        Filter
+        {t("ioSourcePicker.filter")}
       </div>
       <div className="p-3">
         <FilterOptionsPanel

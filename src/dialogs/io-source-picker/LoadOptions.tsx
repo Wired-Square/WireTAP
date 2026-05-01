@@ -1,5 +1,6 @@
 // ui/src/dialogs/io-source-picker/LoadOptions.tsx
 
+import { useTranslation } from "react-i18next";
 import { sectionHeader, caption, captionMuted } from "../../styles/typography";
 import { borderDivider, bgSurface } from "../../styles";
 import type { IOProfile } from "../../hooks/useSettings";
@@ -31,6 +32,7 @@ export default function LoadOptions({
   onSpeedChange,
   profileBookmarks,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   // Don't show options if no source is checked, CSV is selected, or loading
   if (!checkedSourceId || checkedSourceId === CSV_EXTERNAL_ID || isLoading) {
     return null;
@@ -41,7 +43,7 @@ export default function LoadOptions({
   return (
     <div className={borderDivider}>
       <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
-        Options
+        {t("ioSourcePicker.options")}
       </div>
       <div className="p-3 space-y-3">
         {/* Time bounds (for recorded sources only) */}
@@ -58,7 +60,7 @@ export default function LoadOptions({
         {!isCheckedRealtime && (
           <div>
             <label className={`block ${caption} mb-1`}>
-              Playback Speed
+              {t("ioSourcePicker.playbackSpeed")}
             </label>
             <select
               value={selectedSpeed}
@@ -72,7 +74,7 @@ export default function LoadOptions({
               ))}
             </select>
             <div className={`${captionMuted} mt-1`}>
-              Loading always runs at max speed
+              {t("ioSourcePicker.loadingMaxSpeed")}
             </div>
           </div>
         )}

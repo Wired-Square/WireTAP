@@ -4,6 +4,7 @@
 // Allows capturing both raw bytes and framed data simultaneously.
 // Uses the shared FramingOptionsPanel component.
 
+import { useTranslation } from "react-i18next";
 import type { IOProfile } from "../../hooks/useSettings";
 import type { FramingEncoding } from '../../api/io';
 import FramingOptionsPanel, {
@@ -95,6 +96,7 @@ export default function FramingOptions({
   onFramingConfigChange,
   isBytesCaptureSelected = false,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   // Check if any selected profile in multi-bus mode supports framing
   const anyMultiBusProfileSupportsFraming = checkedSourceIds.some((id) => {
     const profile = ioProfiles.find((p) => p.id === id);
@@ -120,7 +122,7 @@ export default function FramingOptions({
   return (
     <div className={borderDivider}>
       <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
-        Framing
+        {t("ioSourcePicker.framing")}
       </div>
       <div className="p-3">
         <FramingOptionsPanel

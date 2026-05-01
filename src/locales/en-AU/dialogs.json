@@ -351,5 +351,32 @@
   "exportReport": {
     "title": "Export Report",
     "filename": "Filename"
+  },
+  "ioSourcePicker": {
+    "filter": "Filter",
+    "framing": "Framing",
+    "options": "Options",
+    "playbackSpeed": "Playback Speed",
+    "loadingMaxSpeed": "Loading always runs at max speed",
+    "loadingFrames": "Loading: {{count}} frames",
+    "stop": "Stop",
+    "actions": {
+      "leave": "Leave",
+      "leaveTooltip": "Leave session and reset selection",
+      "loadingFrom": "Loading from {{profile}}...",
+      "connect": "Connect",
+      "restart": "Restart",
+      "restartTooltip": "Restart session with updated configuration",
+      "selectRealtime": "Select real-time sources to connect",
+      "importing": "Importing...",
+      "import": "Import",
+      "join": "Join",
+      "resumeJoin": "Resume and Join",
+      "load": "Load",
+      "ok": "OK",
+      "continueWithoutSource": "Continue Without Source",
+      "selectDatabase": "Select a database to connect",
+      "selectSource": "Select a source to continue"
+    }
   }
 }

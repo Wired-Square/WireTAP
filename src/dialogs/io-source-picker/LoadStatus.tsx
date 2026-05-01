@@ -1,5 +1,6 @@
 // ui/src/dialogs/io-source-picker/LoadStatus.tsx
 
+import { useTranslation } from "react-i18next";
 import { Loader2, Square } from "lucide-react";
 import { iconMd, iconXs } from "../../styles/spacing";
 import {
@@ -26,6 +27,7 @@ export default function LoadStatus({
   loadError,
   onStopLoad,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   return (
     <>
       {/* Load Status (when active) */}
@@ -34,7 +36,7 @@ export default function LoadStatus({
           <div className={`flex items-center ${gapSmall}`}>
             <Loader2 className={`${iconMd} animate-spin ${textSuccess}`} />
             <span className={`text-sm ${textSuccess}`}>
-              Loading: {loadFrameCount.toLocaleString()} frames
+              {t("ioSourcePicker.loadingFrames", { count: loadFrameCount.toLocaleString() })}
             </span>
           </div>
           <button
@@ -42,7 +44,7 @@ export default function LoadStatus({
             className={`px-2 py-1 flex items-center ${gapTight} text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors`}
           >
             <Square className={iconXs} />
-            <span>Stop</span>
+            <span>{t("ioSourcePicker.stop")}</span>
           </button>
         </div>
       )}
