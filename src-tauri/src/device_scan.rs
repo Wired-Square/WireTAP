@@ -145,7 +145,12 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
     // -- BLE scan task --
     let app_ble = app.clone();
     tokio::spawn(async move {
-        let mut seen_ids = HashSet::new();
+        // Per-peripheral last-emitted (name, capabilities). Used to suppress
+        // unchanged re-emits while still letting late-arriving advertisements
+        // upgrade an existing card (e.g. MAC → "WiredFlexLink-4CD4" once the
+        // SCAN_RSP / manufacturer data lands on a later poll).
+        let mut last_emitted: std::collections::HashMap<String, (String, Vec<String>)> =
+            std::collections::HashMap::new();
 
         for _ in 0..20 {
             // Poll every 500ms for 10 seconds total
@@ -166,9 +171,6 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
             if let Ok(peripherals) = adapter.peripherals().await {
                 for peripheral in peripherals {
                     let ble_id = peripheral.id().to_string();
-                    if seen_ids.contains(&ble_id) {
-                        continue;
-                    }
 
                     let props = match peripheral.properties().await.ok().flatten() {
                         Some(p) => p,
@@ -225,12 +227,13 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                         continue;
                     }
 
-                    // Resolve a display name now that the device is matched.
-                    // Prefer the parse_peripheral name (stable, derived from
-                    // manufacturer data — works on Windows 11 even when the
-                    // OS doesn't surface local_name); fall back through the
-                    // btleplug 0.12 advertisement_name, then post-connect
-                    // local_name, then the BLE id so the card always appears.
+                    // Resolve a display name. Prefer the parse_peripheral
+                    // name (stable, derived from manufacturer data — works on
+                    // Windows 11 even when the OS doesn't surface local_name);
+                    // fall back through the btleplug 0.12 advertisement_name,
+                    // then post-connect local_name, then the BLE id so the
+                    // card appears immediately and gets upgraded later when
+                    // the full advert lands.
                     let name = parsed
                         .as_ref()
                         .map(|d| d.name.clone())
@@ -238,10 +241,24 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                         .or_else(|| props.local_name.clone())
                         .unwrap_or_else(|| ble_id.clone());
 
-                    seen_ids.insert(ble_id.clone());
+                    // Suppress unchanged re-emits; emit the first time we see
+                    // a peripheral and again whenever its name or capability
+                    // set changes (so the frontend's addDevice merge replaces
+                    // a MAC-only placeholder with the real name).
+                    match last_emitted.get(&ble_id) {
+                        Some((prev_name, prev_caps))
+                            if prev_name == &name && prev_caps == &capabilities =>
+                        {
+                            continue;
+                        }
+                        _ => {}
+                    }
+                    last_emitted.insert(ble_id.clone(), (name.clone(), capabilities.clone()));
 
-                    // Prefix with transport so BLE and mDNS stay as separate cards
-                    let id = format!("ble:{}", name);
+                    // id is keyed off the BLE peripheral id (MAC on Windows /
+                    // Linux, opaque UUID on macOS) so it stays stable across
+                    // re-emits as the name/caps progressively resolve.
+                    let id = format!("ble:{}", ble_id);
 
                     tlog!(
                         "[device_scan] BLE matched: {} (ble_id={}, parsed={}, adv_name={:?}, local_name={:?}), RSSI: {:?}, caps: {:?}",
