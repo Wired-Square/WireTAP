@@ -4,6 +4,7 @@
 // to reset to scan step instead of navigating sections.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
@@ -21,6 +22,7 @@ import {
 } from "../../../api/smpUpgrade";
 
 export default function UpgradeCompleteView() {
+  const { t } = useTranslation("devices");
   const uploadState = useUpgradeStore((s) => s.ui.uploadState);
   const error = useUpgradeStore((s) => s.ui.error);
   const selectedDeviceId = useUpgradeStore((s) => s.data.selectedDeviceId);
@@ -63,7 +65,7 @@ export default function UpgradeCompleteView() {
         if (device?.address && device?.port) {
           await smpConnectUdp(device.address, device.port);
         } else {
-          throw new Error("No address available for UDP reconnection");
+          throw new Error(t("upgradeFlow.noUdpAddress"));
         }
       } else {
         // BLE reconnect — selectedDeviceId is the BLE peripheral ID
@@ -105,22 +107,22 @@ export default function UpgradeCompleteView() {
       {isSuccess ? (
         <>
           <CheckCircle className="w-16 h-16 text-green-500" />
-          <div className={`text-lg font-medium ${textPrimary}`}>Firmware Uploaded</div>
+          <div className={`text-lg font-medium ${textPrimary}`}>{t("upgradeFlow.uploaded")}</div>
 
           <div className={`${alertSuccess} w-full max-w-sm text-sm`}>
             <div className="space-y-1">
               {selectedDeviceName && (
                 <div>
-                  <span className={textSecondary}>Device:</span>{" "}
+                  <span className={textSecondary}>{t("upgradeFlow.deviceLabel")}</span>{" "}
                   <span className="font-medium">{selectedDeviceName}</span>
                 </div>
               )}
               <div>
-                <span className={textSecondary}>Status:</span>{" "}
+                <span className={textSecondary}>{t("upgradeFlow.statusLabel")}</span>{" "}
                 <span className="font-medium">
                   {uploadState === "confirming"
-                    ? "Image confirmed"
-                    : "Device rebooting into new firmware"}
+                    ? t("upgradeFlow.imageConfirmed")
+                    : t("upgradeFlow.rebootingIntoNew")}
                 </span>
               </div>
             </div>
@@ -128,18 +130,17 @@ export default function UpgradeCompleteView() {
 
           {uploadState !== "confirming" && (
             <div className={`text-xs ${textSecondary} max-w-sm text-center`}>
-              The device is rebooting into the new firmware as a test. Reconnect
-              and confirm to make it permanent, or it will revert on next reboot.
+              {t("upgradeFlow.rebootHint")}
             </div>
           )}
 
           <div className="flex gap-3 mt-4">
-            <SecondaryButton onClick={handleDone}>Done</SecondaryButton>
+            <SecondaryButton onClick={handleDone}>{t("upgradeFlow.done")}</SecondaryButton>
             {uploadState !== "confirming" && (
               <PrimaryButton onClick={handleReconnectAndConfirm} disabled={confirming}>
                 <span className="flex items-center gap-1.5">
                   <RefreshCw className={`${iconMd} ${confirming ? "animate-spin" : ""}`} />
-                  {confirming ? "Confirming..." : "Reconnect & Confirm"}
+                  {confirming ? t("upgradeFlow.confirming") : t("upgradeFlow.reconnectConfirm")}
                 </span>
               </PrimaryButton>
             )}
@@ -148,7 +149,7 @@ export default function UpgradeCompleteView() {
       ) : (
         <>
           <XCircle className="w-16 h-16 text-red-500" />
-          <div className={`text-lg font-medium ${textPrimary}`}>Upgrade Failed</div>
+          <div className={`text-lg font-medium ${textPrimary}`}>{t("upgradeFlow.failedTitle")}</div>
 
           {error && (
             <div className={`${alertDanger} w-full max-w-sm text-sm`}>
@@ -157,8 +158,8 @@ export default function UpgradeCompleteView() {
           )}
 
           <div className="flex gap-3 mt-4">
-            <SecondaryButton onClick={handleDone}>Done</SecondaryButton>
-            <PrimaryButton onClick={handleRetry}>Retry</PrimaryButton>
+            <SecondaryButton onClick={handleDone}>{t("upgradeFlow.done")}</SecondaryButton>
+            <PrimaryButton onClick={handleRetry}>{t("upgradeFlow.retry")}</PrimaryButton>
           </div>
         </>
       )}

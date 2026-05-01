@@ -139,13 +139,46 @@
     "progressFmt": "{{current}} / {{total}} bytes",
     "speedFmt": "{{kbps}} kB/s",
     "retry": "Retry",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "back": "Back",
+    "kbSize": "{{kb}} KB",
+    "browse": "Browse",
+    "noFile": "No firmware file selected",
+    "flash": "Flash",
+    "readingFirmware": "Reading firmware file...",
+    "uploadingFirmware": "Uploading firmware...",
+    "markingTest": "Marking image for test boot...",
+    "resetting": "Resetting device...",
+    "uploadCancelled": "Upload cancelled",
+    "steps": {
+      "reading": "Reading firmware file",
+      "readingWithSize": "Reading firmware file ({{kb}} KB)",
+      "uploading": "Uploading firmware",
+      "uploadingPercent": "Uploading firmware {{percent}}%",
+      "marking": "Marking image for test",
+      "resetting": "Resetting device"
+    },
+    "uploadProgress": "{{sent}} / {{total}} KB"
   },
   "upgradeComplete": {
     "title": "Upgrade Complete",
     "message": "Device successfully upgraded.",
     "version": "New version: {{version}}",
     "done": "Done"
+  },
+  "upgradeFlow": {
+    "uploaded": "Firmware Uploaded",
+    "deviceLabel": "Device:",
+    "statusLabel": "Status:",
+    "imageConfirmed": "Image confirmed",
+    "rebootingIntoNew": "Device rebooting into new firmware",
+    "rebootHint": "The device is rebooting into the new firmware as a test. Reconnect and confirm to make it permanent, or it will revert on next reboot.",
+    "done": "Done",
+    "confirming": "Confirming...",
+    "reconnectConfirm": "Reconnect & Confirm",
+    "noUdpAddress": "No address available for UDP reconnection",
+    "failedTitle": "Upgrade Failed",
+    "retry": "Retry"
   },
   "frameLink": {
     "title": "FrameLink Setup",
@@ -156,6 +189,16 @@
     "configureBuses": "Configure Buses",
     "save": "Save Configuration",
     "saving": "Saving…",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "fallbackName": "FrameLink",
+    "noAddress": "No device address available",
+    "probing": "Probing device...",
+    "boardLabel": "Board: {{name}}",
+    "boardRevision": " rev {{revision}}",
+    "interfacesHeading": "Interfaces ({{count}})",
+    "interfaceIndex": "Index {{index}}",
+    "addToDataIo": "Add Device to Data I/O",
+    "addedSuccess_one": "Device added to Data I/O with {{count}} interface. You can configure it in Settings.",
+    "addedSuccess_other": "Device added to Data I/O with {{count}} interfaces. You can configure it in Settings."
   }
 }

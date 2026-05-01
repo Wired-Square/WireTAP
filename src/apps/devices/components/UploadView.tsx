@@ -4,6 +4,7 @@
 // to route to "upgrade-complete" step.
 
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, Loader2, Upload, FolderOpen, ArrowLeft } from "lucide-react";
 import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
@@ -24,6 +25,7 @@ function formatKB(bytes: number): string {
 }
 
 export default function UploadView() {
+  const { t } = useTranslation("devices");
   const selectedFilePath = useUpgradeStore((s) => s.data.selectedFilePath);
   const selectedFileName = useUpgradeStore((s) => s.data.selectedFileName);
   const selectedFileSize = useUpgradeStore((s) => s.data.selectedFileSize);
@@ -67,18 +69,18 @@ export default function UploadView() {
     try {
       // Step 1: Reading firmware file
       setUploadState("reading");
-      setStatusMessage("Reading firmware file...");
+      setStatusMessage(t("upload.readingFirmware"));
 
       // Step 2: Uploading firmware
       setUploadState("uploading");
-      setStatusMessage("Uploading firmware...");
+      setStatusMessage(t("upload.uploadingFirmware"));
       await smpUploadFirmware(selectedFilePath);
 
       const { ui } = useUpgradeStore.getState();
       if (ui.uploadState === "error") return;
 
       setUploadState("testing");
-      setStatusMessage("Marking image for test boot...");
+      setStatusMessage(t("upload.markingTest"));
 
       // Re-read slots to find the pending image in slot 1
       const images = await smpListImages();
@@ -94,7 +96,7 @@ export default function UploadView() {
 
       // Step 4: Reset device
       setUploadState("resetting");
-      setStatusMessage("Resetting device...");
+      setStatusMessage(t("upload.resetting"));
       await smpResetDevice();
 
       // Device will reboot — transition to upgrade-complete
@@ -115,7 +117,7 @@ export default function UploadView() {
       // Ignore
     }
     setUploadState("error");
-    setUpgradeError("Upload cancelled");
+    setUpgradeError(t("upload.uploadCancelled"));
     setStatusMessage(null);
     flashingRef.current = false;
   };
@@ -130,22 +132,26 @@ export default function UploadView() {
   // Progress step definitions
   const steps = [
     {
-      label: `Reading firmware file${selectedFileSize !== null ? ` (${formatKB(selectedFileSize)} KB)` : ""}`,
+      label: selectedFileSize !== null
+        ? t("upload.steps.readingWithSize", { kb: formatKB(selectedFileSize) })
+        : t("upload.steps.reading"),
       done: uploadState !== "idle" && uploadState !== "reading",
       active: uploadState === "reading",
     },
     {
-      label: `Uploading firmware${uploadProgress ? ` ${Math.round(uploadProgress.percent)}%` : ""}`,
+      label: uploadProgress
+        ? t("upload.steps.uploadingPercent", { percent: Math.round(uploadProgress.percent) })
+        : t("upload.steps.uploading"),
       done: uploadState !== "idle" && uploadState !== "reading" && uploadState !== "uploading",
       active: uploadState === "uploading",
     },
     {
-      label: "Marking image for test",
+      label: t("upload.steps.marking"),
       done: uploadState === "resetting" || uploadState === "confirming",
       active: uploadState === "testing",
     },
     {
-      label: "Resetting device",
+      label: t("upload.steps.resetting"),
       done: false,
       active: uploadState === "resetting",
     },
@@ -158,7 +164,7 @@ export default function UploadView() {
         <SecondaryButton onClick={handleBack}>
           <span className="flex items-center gap-1.5">
             <ArrowLeft className={iconMd} />
-            Back
+            {t("upload.back")}
           </span>
         </SecondaryButton>
 
@@ -169,23 +175,23 @@ export default function UploadView() {
             <div className="flex-1 min-w-0">
               <div className={`text-sm font-medium ${textPrimary} truncate`}>{selectedFileName}</div>
               {selectedFileSize !== null && (
-                <div className={`text-xs ${textSecondary}`}>{formatKB(selectedFileSize)} KB</div>
+                <div className={`text-xs ${textSecondary}`}>{t("upload.kbSize", { kb: formatKB(selectedFileSize) })}</div>
               )}
             </div>
             <SecondaryButton onClick={handleBrowse}>
               <span className="flex items-center gap-1.5">
                 <FolderOpen className={iconMd} />
-                Browse
+                {t("upload.browse")}
               </span>
             </SecondaryButton>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-8 gap-3">
-            <div className={`text-sm ${textSecondary}`}>No firmware file selected</div>
+            <div className={`text-sm ${textSecondary}`}>{t("upload.noFile")}</div>
             <PrimaryButton onClick={handleBrowse}>
               <span className="flex items-center gap-1.5">
                 <FolderOpen className={iconMd} />
-                Browse
+                {t("upload.browse")}
               </span>
             </PrimaryButton>
           </div>
@@ -207,7 +213,7 @@ export default function UploadView() {
           >
             <span className="flex items-center justify-center gap-1.5">
               <Upload className={iconMd} />
-              Flash
+              {t("upload.flash")}
             </span>
           </PrimaryButton>
         </div>
@@ -248,7 +254,7 @@ export default function UploadView() {
                   />
                 </div>
                 <div className={`text-xs ${textSecondary}`}>
-                  {formatKB(uploadProgress.bytes_sent)} / {formatKB(uploadProgress.total_bytes)} KB
+                  {t("upload.uploadProgress", { sent: formatKB(uploadProgress.bytes_sent), total: formatKB(uploadProgress.total_bytes) })}
                 </div>
               </div>
             )}
@@ -265,7 +271,7 @@ export default function UploadView() {
 
       {/* Cancel button — visible during upload only */}
       {uploadState === "uploading" && (
-        <DangerButton onClick={handleCancel}>Cancel</DangerButton>
+        <DangerButton onClick={handleCancel}>{t("upload.cancel")}</DangerButton>
       )}
     </div>
   );

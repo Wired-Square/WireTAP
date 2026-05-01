@@ -4,6 +4,7 @@
 // and creates a single grouped IO profile with all interfaces.
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Plus, Check, Loader2 } from "lucide-react";
 import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
@@ -19,6 +20,7 @@ import {
 import type { IOProfile } from "../../../hooks/useSettings";
 
 export default function FrameLinkSetupView() {
+  const { t } = useTranslation("devices");
   const selectedDeviceName = useDevicesStore((s) => s.data.selectedDeviceName);
   const selectedDeviceId = useDevicesStore((s) => s.data.selectedDeviceId);
   const devices = useDevicesStore((s) => s.data.devices);
@@ -39,7 +41,7 @@ export default function FrameLinkSetupView() {
   // Probe on mount
   useEffect(() => {
     if (!host) {
-      setProbeError("No device address available");
+      setProbeError(t("frameLink.noAddress"));
       setProbing(false);
       return;
     }
@@ -69,7 +71,7 @@ export default function FrameLinkSetupView() {
   };
 
   // Use device_id from capabilities as the canonical label (e.g. "WiredFlexLink-9D04")
-  const deviceLabel = probeResult?.device_id ?? selectedDeviceName ?? "FrameLink";
+  const deviceLabel = probeResult?.device_id ?? selectedDeviceName ?? t("frameLink.fallbackName");
 
   const handleAddProfile = () => {
     if (!probeResult) return;
@@ -117,7 +119,7 @@ export default function FrameLinkSetupView() {
       {probing && (
         <div className="flex items-center justify-center py-12 gap-3">
           <Loader2 className={`${iconMd} animate-spin text-sky-400`} />
-          <span className={`text-sm ${textSecondary}`}>Probing device...</span>
+          <span className={`text-sm ${textSecondary}`}>{t("frameLink.probing")}</span>
         </div>
       )}
 
@@ -133,14 +135,14 @@ export default function FrameLinkSetupView() {
         <>
           {probeResult.board_name && (
             <div className={`text-xs ${textSecondary}`}>
-              Board: {probeResult.board_name}
-              {probeResult.board_revision && ` rev ${probeResult.board_revision}`}
+              {t("frameLink.boardLabel", { name: probeResult.board_name })}
+              {probeResult.board_revision && t("frameLink.boardRevision", { revision: probeResult.board_revision })}
             </div>
           )}
 
           <div className="flex flex-col gap-2">
             <h3 className={`text-sm font-medium ${textPrimary}`}>
-              Interfaces ({probeResult.interfaces.length})
+              {t("frameLink.interfacesHeading", { count: probeResult.interfaces.length })}
             </h3>
             {probeResult.interfaces.map((iface: ProbeInterface) => (
               <div key={iface.index} className={`${cardDefault} p-3 flex items-center justify-between`}>
@@ -148,7 +150,7 @@ export default function FrameLinkSetupView() {
                   <span className={`text-sm font-medium ${textPrimary}`}>{iface.name}</span>
                   <span className={`text-xs ${textSecondary} ml-2`}>{iface.type_name}</span>
                 </div>
-                <span className={`text-xs ${textSecondary}`}>Index {iface.index}</span>
+                <span className={`text-xs ${textSecondary}`}>{t("frameLink.interfaceIndex", { index: iface.index })}</span>
               </div>
             ))}
           </div>
@@ -157,13 +159,13 @@ export default function FrameLinkSetupView() {
             <PrimaryButton onClick={handleAddProfile} className="mt-2">
               <span className="flex items-center justify-center gap-1.5">
                 <Plus className={iconMd} />
-                Add Device to Data I/O
+                {t("frameLink.addToDataIo")}
               </span>
             </PrimaryButton>
           ) : (
             <div className="flex items-center gap-2 p-3 text-sm text-green-700 bg-green-50 rounded-lg border border-green-200">
               <Check className={iconMd} />
-              Device added to Data I/O with {probeResult.interfaces.length} interface{probeResult.interfaces.length !== 1 ? "s" : ""}. You can configure it in Settings.
+              {t("frameLink.addedSuccess", { count: probeResult.interfaces.length })}
             </div>
           )}
         </>
