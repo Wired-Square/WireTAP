@@ -10,6 +10,7 @@
 
 use crate::ble_common;
 use btleplug::api::{Central, Peripheral as _, ScanFilter};
+use framelink::ble::{parse_peripheral, FRAMELINK_BLE_SERVICE_UUID};
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -135,9 +136,10 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to start BLE scan: {e}"))?;
 
     tlog!(
-        "[device_scan] Scan started (WiFi prov UUID {:?}, SMP UUID {:?})",
+        "[device_scan] Scan started (WiFi prov {:?}, SMP {:?}, FrameLink {:?})",
         WIFI_PROV_SERVICE_UUID,
-        SMP_SERVICE_UUID
+        SMP_SERVICE_UUID,
+        FRAMELINK_BLE_SERVICE_UUID
     );
 
     // -- BLE scan task --
@@ -172,32 +174,69 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                         Some(p) => p,
                         None => continue,
                     };
-
-                    let name = match &props.local_name {
-                        Some(n) => n.clone(),
-                        None => continue, // Skip unnamed BLE devices
-                    };
                     let rssi = props.rssi;
 
-                    // Build capabilities list from advertised services
-                    let mut capabilities = Vec::new();
+                    // Decode FrameLink primary service + manufacturer-data
+                    // capability bitmask. This is the canonical match for any
+                    // FrameLink device — including ones whose local_name is
+                    // None on Windows 11 pre-connect.
+                    let parsed = parse_peripheral(ble_id.clone(), &props);
+                    let mut capabilities: Vec<String> = Vec::new();
 
+                    if let Some(d) = &parsed {
+                        if let Some(p) = &d.payload {
+                            let caps = p.capabilities;
+                            if caps.has_wifi_prov() {
+                                capabilities.push("wifi-provision".into());
+                            }
+                            if caps.has_smp() {
+                                capabilities.push("smp".into());
+                            }
+                            if caps.has_framelink_ble() {
+                                capabilities.push("framelink".into());
+                            }
+                        }
+                    }
+
+                    // UUID-only fallback: a device may advertise wifi-prov or
+                    // SMP via the GATT service UUID but not be decodable by
+                    // parse_peripheral (legacy firmware, non-FrameLink hosts
+                    // that just expose those services).
                     let has_wifi_prov = props.services.contains(&WIFI_PROV_SERVICE_UUID)
                         || props.service_data.contains_key(&WIFI_PROV_SERVICE_UUID);
-                    if has_wifi_prov {
-                        capabilities.push("wifi-provision".to_string());
+                    if has_wifi_prov && !capabilities.iter().any(|c| c == "wifi-provision") {
+                        capabilities.push("wifi-provision".into());
                     }
-
                     let has_smp = props.services.contains(&SMP_SERVICE_UUID)
                         || props.service_data.contains_key(&SMP_SERVICE_UUID);
-                    if has_smp {
-                        capabilities.push("smp".to_string());
+                    if has_smp && !capabilities.iter().any(|c| c == "smp") {
+                        capabilities.push("smp".into());
+                    }
+                    let has_framelink_uuid = props.services.contains(&FRAMELINK_BLE_SERVICE_UUID)
+                        || props
+                            .service_data
+                            .contains_key(&FRAMELINK_BLE_SERVICE_UUID);
+                    if has_framelink_uuid && !capabilities.iter().any(|c| c == "framelink") {
+                        capabilities.push("framelink".into());
                     }
 
-                    // Skip devices that don't advertise either service
+                    // Drop non-FrameLink-family peripherals quietly.
                     if capabilities.is_empty() {
                         continue;
                     }
+
+                    // Resolve a display name now that the device is matched.
+                    // Prefer the parse_peripheral name (stable, derived from
+                    // manufacturer data — works on Windows 11 even when the
+                    // OS doesn't surface local_name); fall back through the
+                    // btleplug 0.12 advertisement_name, then post-connect
+                    // local_name, then the BLE id so the card always appears.
+                    let name = parsed
+                        .as_ref()
+                        .map(|d| d.name.clone())
+                        .or_else(|| props.advertisement_name.clone())
+                        .or_else(|| props.local_name.clone())
+                        .unwrap_or_else(|| ble_id.clone());
 
                     seen_ids.insert(ble_id.clone());
 
@@ -205,9 +244,12 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                     let id = format!("ble:{}", name);
 
                     tlog!(
-                        "[device_scan] BLE matched: {} (ble_id={}), RSSI: {:?}, caps: {:?}",
+                        "[device_scan] BLE matched: {} (ble_id={}, parsed={}, adv_name={:?}, local_name={:?}), RSSI: {:?}, caps: {:?}",
                         name,
                         ble_id,
+                        parsed.is_some(),
+                        props.advertisement_name,
+                        props.local_name,
                         rssi,
                         capabilities
                     );
@@ -336,6 +378,10 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                                     cap
                                 );
 
+                                // Reaching us via mDNS implies the device is
+                                // already provisioned onto the network, so
+                                // the wifi chip lights up on every mDNS card
+                                // alongside the service-specific capability.
                                 let device = UnifiedDevice {
                                     name,
                                     id,
@@ -344,7 +390,10 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                                     rssi: None,
                                     address: Some(addr.to_string()),
                                     port: Some(port),
-                                    capabilities: vec![cap.to_string()],
+                                    capabilities: vec![
+                                        "wifi-provision".to_string(),
+                                        cap.to_string(),
+                                    ],
                                 };
                                 let _ = app_handle.emit("device-discovered", &device);
                             }
