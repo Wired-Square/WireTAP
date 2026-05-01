@@ -3,6 +3,7 @@
 // Shows captures available for replay (from completed sessions or CSV imports).
 
 import React, { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, FileText, Trash2, Archive, Pencil, Database, Pin, PinOff } from "lucide-react";
 import { iconMd, iconSm, iconXs } from "../../styles/spacing";
 import { badgeSmallInfo } from "../../styles/badgeStyles";
@@ -54,6 +55,7 @@ export default function CaptureList({
   isProbing = false,
   probeError = null,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -109,7 +111,7 @@ export default function CaptureList({
         <div className="flex items-center gap-1.5">
           <Archive className={`${iconXs} text-[color:var(--text-muted)]`} />
           <span className={sectionHeader}>
-            Captures
+            {t("ioSourcePicker.captures.title")}
           </span>
           <span className={captionMuted}>({captures.length})</span>
         </div>
@@ -118,7 +120,7 @@ export default function CaptureList({
             onClick={onClearAllCaptures}
             className="text-xs text-[color:var(--status-danger-text)] hover:brightness-110"
           >
-            Clear All
+            {t("ioSourcePicker.captures.clearAll")}
           </button>
         )}
       </div>
@@ -178,14 +180,14 @@ export default function CaptureList({
                     {capture.id}
                   </span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--hover-bg)]">
-                    {capture.count.toLocaleString()} {capture.kind}
+                    {t("ioSourcePicker.captures.kindCount", { count: capture.count.toLocaleString(), kind: capture.kind })}
                   </span>
                   {isInSession && (
                     <span className={badgeSmallInfo}>{sessionId}</span>
                   )}
                   {capture.persistent && (
                     <span className="px-1.5 py-0.5 rounded text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--status-warning-text)]">
-                      pinned
+                      {t("ioSourcePicker.captures.pinned")}
                     </span>
                   )}
                 </div>
@@ -199,7 +201,7 @@ export default function CaptureList({
                   startRename(capture);
                 }}
                 className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-                title="Rename buffer"
+                title={t("ioSourcePicker.captures.rename")}
               >
                 <Pencil className={iconSm} />
               </button>
@@ -210,7 +212,7 @@ export default function CaptureList({
                     ? "text-[color:var(--status-warning-text)]"
                     : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
                 }`}
-                title={capture.persistent ? "Unpin capture (will be cleared on restart)" : "Pin capture (survives restart)"}
+                title={capture.persistent ? t("ioSourcePicker.captures.unpinTooltip") : t("ioSourcePicker.captures.pinTooltip")}
               >
                 {capture.persistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
               </button>
@@ -221,7 +223,7 @@ export default function CaptureList({
                     onDeleteCapture(capture.id);
                   }}
                   className="p-1 rounded transition-colors hover:bg-[var(--status-danger-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--status-danger-text)]"
-                  title="Delete capture"
+                  title={t("ioSourcePicker.captures.delete")}
                 >
                   <Trash2 className={iconSm} />
                 </button>

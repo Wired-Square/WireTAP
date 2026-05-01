@@ -1,5 +1,6 @@
 // ui/src/dialogs/io-source-picker/SourceList.tsx
 
+import { useTranslation } from "react-i18next";
 import { Bookmark, Wifi, Database, FolderOpen, GitMerge, Radio, Play, Lock } from "lucide-react";
 import type { IOProfile } from "../../hooks/useSettings";
 import type { Session } from "../../stores/sessionStore";
@@ -89,6 +90,7 @@ export default function SourceList({
   renderAfterSessions,
   captureNames,
 }: Props) {
+  const { t } = useTranslation("dialogs");
   // All profiles are read profiles now (mode field removed), separate by type
   const readProfiles = ioProfiles;
   const realtimeProfiles = readProfiles.filter(isRealtimeProfile);
@@ -134,8 +136,8 @@ export default function SourceList({
     const isMultiSource = checkedMultiSourceSession?.sourceType === "realtime";
 
     if (isCsvSelected) {
-      displayName = "CSV, CAN Dump";
-      subtitle = "Import from file";
+      displayName = t("ioSourcePicker.sources.csv");
+      subtitle = t("ioSourcePicker.sources.csvImport");
     } else if (isCaptureSession && checkedMultiSourceSession) {
       // Buffer session — show buffer ID + source name from buffer metadata
       displayName = checkedMultiSourceSession.sessionId;
@@ -177,7 +179,7 @@ export default function SourceList({
       displayName = checkedProfile.name;
       subtitle = checkedProfile.kind;
     } else {
-      displayName = "Unknown";
+      displayName = t("ioSourcePicker.sources.unknown");
       subtitle = checkedSourceId;
     }
 
@@ -214,7 +216,7 @@ export default function SourceList({
     return (
       <div className={borderDivider}>
         <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
-          Source
+          {t("ioSourcePicker.sources.source")}
         </div>
         <div className="px-3 py-2">
           <button
@@ -234,7 +236,7 @@ export default function SourceList({
                 {subtitle}
               </div>
             </div>
-            <span className={`text-xs ${changeClass}`}>Change</span>
+            <span className={`text-xs ${changeClass}`}>{t("ioSourcePicker.sources.change")}</span>
           </button>
         </div>
       </div>
@@ -328,7 +330,7 @@ export default function SourceList({
         <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <Play className={iconXs} />
-            <span>Active Sessions</span>
+            <span>{t("ioSourcePicker.sources.activeSessions")}</span>
             <span className={badgeSmallSuccess}>{joinableSessions.length}</span>
           </div>
           <div className="px-3 pb-2 space-y-1">
@@ -362,13 +364,13 @@ export default function SourceList({
                     </div>
                     <div className={`${caption} flex items-center gap-2`}>
                       {session.state === "stopped" ? (
-                        <span className={badgeSmallWarning}>Stopped</span>
+                        <span className={badgeSmallWarning}>{t("ioSourcePicker.sources.stopped")}</span>
                       ) : session.state === "paused" && session.sourceType === "capture" ? (
-                        <span className={badgeSmallInfo}>Paused</span>
+                        <span className={badgeSmallInfo}>{t("ioSourcePicker.sources.paused")}</span>
                       ) : session.sourceType === "capture" ? (
-                        <span className={badgeSmallInfo}>Playing</span>
+                        <span className={badgeSmallInfo}>{t("ioSourcePicker.sources.playing")}</span>
                       ) : (
-                        <span className={badgeSmallSuccess}>Live</span>
+                        <span className={badgeSmallSuccess}>{t("ioSourcePicker.sources.live")}</span>
                       )}
                       <span>{info.subtitle}</span>
                       {/* Show buffer info if available */}
@@ -376,7 +378,7 @@ export default function SourceList({
                         <>
                           <span className="text-[color:var(--text-muted)]">·</span>
                           <span className="text-[color:var(--text-cyan)]">
-                            {session.captureFrameCount?.toLocaleString() ?? "?"} frames
+                            {t("ioSourcePicker.sources.framesCount", { count: session.captureFrameCount?.toLocaleString() ?? "?" })}
                           </span>
                         </>
                       )}
@@ -403,7 +405,7 @@ export default function SourceList({
         <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <FolderOpen className={iconXs} />
-            <span>External</span>
+            <span>{t("ioSourcePicker.sources.external")}</span>
           </div>
           <div className="px-3 pb-2 space-y-1">
             <button
@@ -425,8 +427,8 @@ export default function SourceList({
                 {isCsvSelected && <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />}
               </div>
               <div className="flex-1 min-w-0">
-                <span className={textMedium}>CSV, CAN Dump</span>
-                <div className={caption}>Import from file</div>
+                <span className={textMedium}>{t("ioSourcePicker.sources.csv")}</span>
+                <div className={caption}>{t("ioSourcePicker.sources.csvImport")}</div>
               </div>
             </button>
           </div>
@@ -438,7 +440,7 @@ export default function SourceList({
         <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
             <Database className={iconXs} />
-            <span>Recorded</span>
+            <span>{t("ioSourcePicker.sources.recorded")}</span>
           </div>
           <div className="px-3 pb-2 space-y-1">
             {recordedProfiles.map((profile) => (
@@ -465,11 +467,11 @@ export default function SourceList({
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center justify-between`}>
             <div className="flex items-center gap-1.5">
               <Wifi className={iconXs} />
-              <span>Real-time</span>
+              <span>{t("ioSourcePicker.sources.realtime")}</span>
               {isMultiBusMode && (
                 <span className={badgeSmallPurple}>
                   <GitMerge className={`${iconXs} inline mr-1`} />
-                  {checkedSourceIds.length} buses
+                  {t("ioSourcePicker.sources.busesCount", { count: checkedSourceIds.length })}
                 </span>
               )}
             </div>
@@ -528,7 +530,7 @@ export default function SourceList({
 
       {readProfiles.length === 0 && !isCsvSelected && (
         <div className="p-4 text-sm text-[color:var(--text-muted)]">
-          No sources configured. Add one in Settings.
+          {t("ioSourcePicker.sources.noSources")}
         </div>
       )}
     </div>
@@ -565,6 +567,7 @@ function SourceButton({
   usageInfo?: ProfileUsageInfo;
   isRealtime?: boolean;
 }) {
+  const { t } = useTranslation("dialogs");
   // Determine badge text and colors based on session state
   const isStopped = sessionState === "stopped";
   const isRunning = isLive && sessionState === "running";
@@ -643,16 +646,16 @@ function SourceButton({
           </span>
           {busNumber !== undefined && (
             <span className={badgeSmallNeutral}>
-              Bus {busNumber}
+              {t("ioSourcePicker.sources.busLabel", { bus: busNumber })}
             </span>
           )}
           {isLive && !isDisabled && (
             isStopped ? (
-              <span className={badgeSmallWarning}>Stopped</span>
+              <span className={badgeSmallWarning}>{t("ioSourcePicker.sources.stopped")}</span>
             ) : isRunning ? (
-              <span className={badgeSmallSuccess}>Live</span>
+              <span className={badgeSmallSuccess}>{t("ioSourcePicker.sources.live")}</span>
             ) : (
-              <span className={badgeSmallSuccess}>Active</span>
+              <span className={badgeSmallSuccess}>{t("ioSourcePicker.sources.active")}</span>
             )
           )}
         </div>
@@ -663,7 +666,7 @@ function SourceButton({
             <span className="flex items-center gap-1.5">
               <span>{profile.kind}</span>
               {usageInfo.configLocked && (
-                <span title="Config locked (in use by multiple sessions)">
+                <span title={t("ioSourcePicker.sources.configLocked")}>
                   <Lock className={`${iconXs} text-[color:var(--text-amber)]`} />
                 </span>
               )}

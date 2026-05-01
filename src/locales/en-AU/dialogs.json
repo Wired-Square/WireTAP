@@ -377,6 +377,37 @@
       "continueWithoutSource": "Continue Without Source",
       "selectDatabase": "Select a database to connect",
       "selectSource": "Select a source to continue"
+    },
+    "sources": {
+      "unknown": "Unknown",
+      "source": "Source",
+      "change": "Change",
+      "activeSessions": "Active Sessions",
+      "external": "External",
+      "csv": "CSV, CAN Dump",
+      "csvImport": "Import from file",
+      "recorded": "Recorded",
+      "realtime": "Real-time",
+      "busesCount": "{{count}} buses",
+      "noSources": "No sources configured. Add one in Settings.",
+      "stopped": "Stopped",
+      "paused": "Paused",
+      "playing": "Playing",
+      "live": "Live",
+      "active": "Active",
+      "framesCount": "{{count}} frames",
+      "busLabel": "Bus {{bus}}",
+      "configLocked": "Config locked (in use by multiple sessions)"
+    },
+    "captures": {
+      "title": "Captures",
+      "clearAll": "Clear All",
+      "kindCount": "{{count}} {{kind}}",
+      "pinned": "pinned",
+      "rename": "Rename buffer",
+      "unpinTooltip": "Unpin capture (will be cleared on restart)",
+      "pinTooltip": "Pin capture (survives restart)",
+      "delete": "Delete capture"
     }
   }
 }
