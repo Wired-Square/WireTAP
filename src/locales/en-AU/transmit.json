@@ -1,0 +1,86 @@
+{
+  "tabs": {
+    "queue": "Queue",
+    "history": "History",
+    "replay": "Replay"
+  },
+  "topBar": {
+    "title": "Transmit",
+    "noProfile": "No profile selected",
+    "newFrame": "New Frame",
+    "fdLabel": "FD",
+    "extendedLabel": "Multi-Bus",
+    "multiSourceLabel": "Multi-Source"
+  },
+  "canEditor": {
+    "frameId": "Frame ID",
+    "frameIdPlaceholder": "0x123",
+    "extended": "Ext",
+    "fd": "FD",
+    "brs": "BRS",
+    "rtr": "RTR",
+    "bus": "Bus",
+    "data": "Data",
+    "preview": "Preview:",
+    "send": "Send",
+    "addToQueue": "Add to Queue",
+    "transmitting": "Transmitting…"
+  },
+  "serialEditor": {
+    "title": "Serial Transmit",
+    "input": "Hex Input",
+    "send": "Send",
+    "preview": "Preview:",
+    "framing": "Framing"
+  },
+  "queue": {
+    "empty": "Queue is empty. Add frames from Discovery or with the New Frame button.",
+    "actions": {
+      "playAll": "Play all",
+      "stopAll": "Stop all",
+      "clearAll": "Clear all",
+      "play": "Play",
+      "stop": "Stop",
+      "remove": "Remove",
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "groupPlay": "Play group",
+      "groupStop": "Stop group",
+      "groupRemove": "Remove group"
+    },
+    "columns": {
+      "id": "ID",
+      "type": "Type",
+      "data": "Data",
+      "interval": "Interval",
+      "count": "Count",
+      "lastSent": "Last Sent",
+      "actions": "Actions"
+    },
+    "intervalPlaceholder": "ms",
+    "controlledByGroup": "Controlled by group"
+  },
+  "history": {
+    "empty": "No transmitted frames yet.",
+    "live": "Live",
+    "browsing": "Browsing",
+    "liveTooltip": "Showing latest frames (click to browse)",
+    "browsingTooltip": "Browsing history (click for live)",
+    "frameSummary_one": "{{count}} frame",
+    "frameSummary_other": "{{count}} frames"
+  },
+  "replay": {
+    "noActiveReplays": "No active replays",
+    "logEmpty": "Replay log is empty.",
+    "kindCompleted": "Completed",
+    "kindLoop": "Loop",
+    "kindStopped": "Stopped",
+    "kindError": "Error",
+    "kindStarted": "Started",
+    "restart": "Restart",
+    "restartTooltip": "Restart from the beginning",
+    "stop": "Stop",
+    "stopTooltip": "Stop this replay",
+    "restartTooltipPast": "Restart this replay"
+  }
+}

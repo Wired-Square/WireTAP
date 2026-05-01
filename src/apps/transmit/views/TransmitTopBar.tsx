@@ -4,6 +4,7 @@
 // Uses shared AppTopBar component for consistent layout.
 
 import { Send, GitMerge } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { flexRowGap2 } from "../../../styles/spacing";
 import { badgeColorClass } from "../../../styles/buttonStyles";
 import type { IOProfile } from "../../../types/common";
@@ -83,6 +84,7 @@ export default function TransmitTopBar({
   isLoading = false,
   error = null,
 }: Props) {
+  const { t } = useTranslation("transmit");
   // Show as multi-bus when multiBusProfiles has entries
   const showAsMultiBus = multiBusProfiles.length > 0;
 
@@ -116,7 +118,7 @@ export default function TransmitTopBar({
         <>
           {/* Loading indicator */}
           {isLoading && (
-            <span className={`text-xs ${textDataSecondary}`}>Loading...</span>
+            <span className={`text-xs ${textDataSecondary}`}>{t("common:states.loading")}</span>
           )}
 
           {/* Connection error */}
@@ -134,17 +136,17 @@ export default function TransmitTopBar({
           {showAsMultiBus && (
             <span className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${badgeColorClass('purple')}`}>
               <GitMerge size={10} />
-              Multi-Source
+              {t("topBar.multiSourceLabel")}
             </span>
           )}
           {capabilities.protocols.includes("canfd") && (
             <span className={`text-xs px-2 py-0.5 rounded ${badgeColorClass('green')}`}>
-              FD
+              {t("topBar.fdLabel")}
             </span>
           )}
           {capabilities.available_buses.length > 1 && (
             <span className={`text-xs px-2 py-0.5 rounded ${badgeColorClass('amber')}`}>
-              Multi-Bus
+              {t("topBar.extendedLabel")}
             </span>
           )}
         </div>

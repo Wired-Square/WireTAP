@@ -5,6 +5,7 @@
 
 import { type ReactNode } from "react";
 import { ChevronRight, ListFilter, type LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { IOSessionControls, type IOSessionControlsProps } from "./SessionControls";
 import CatalogButton from "./CatalogButton";
 import FlexSeparator from "./FlexSeparator";
@@ -122,6 +123,7 @@ export default function AppTopBar({
   children,
   actions,
 }: AppTopBarProps) {
+  const { t } = useTranslation("common");
   const hasActions = !!actions;
 
   return (
@@ -185,7 +187,7 @@ export default function AppTopBar({
               title={
                 framePicker.disabled && framePicker.disabledTitle
                   ? framePicker.disabledTitle
-                  : "Select frames"
+                  : t("tooltips.selectFrames")
               }
             >
               <ListFilter className={`${iconSm} flex-shrink-0`} />

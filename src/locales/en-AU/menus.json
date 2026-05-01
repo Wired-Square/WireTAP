@@ -5,19 +5,25 @@
     "transmit": "Transmit",
     "modbus": "Modbus",
     "graph": "Graph",
-    "calculator": "Calculator",
-    "catalog": "Catalog Editor",
+    "frameCalculator": "Calculator",
+    "catalogEditor": "Catalog Editor",
     "devices": "Devices",
     "settings": "Settings",
     "provisioning": "Provisioning",
     "upgrade": "Firmware Upgrade",
     "query": "Query",
     "rules": "Rules",
-    "analysis": "Analysis",
+    "payloadAnalysis": "Payload Analysis",
+    "frameOrderAnalysis": "Frame Order Analysis",
     "testPattern": "Test Pattern",
-    "sessionManager": "Session Manager"
+    "sessionManager": "Sessions"
   },
   "logo": {
-    "tooltip": "Open the WireTAP app launcher"
+    "tooltip": "Open app menu",
+    "updateAvailable": "Update available: {{version}}",
+    "updateLabel": "Update"
+  },
+  "watermark": {
+    "tagline": "Open an app to begin"
   }
 }

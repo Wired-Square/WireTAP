@@ -37,5 +37,8 @@
     "milliseconds": "ms",
     "bytes": "bytes",
     "frames": "frames"
+  },
+  "tooltips": {
+    "selectFrames": "Select frames"
   }
 }

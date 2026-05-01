@@ -1,6 +1,8 @@
 // ui/src/components/MainLayout.tsx
 
 import React, { useRef, useState, useCallback, useEffect, lazy, Suspense } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -197,6 +199,7 @@ const components = {
 
 // Watermark component shown when no panels are open
 function Watermark(_props: IWatermarkPanelProps) {
+  const { t } = useTranslation("menus");
   const [version, setVersion] = useState<string>("");
 
   useEffect(() => {
@@ -234,77 +237,77 @@ function Watermark(_props: IWatermarkPanelProps) {
         <div className={`${launcherGrid} mt-8`}>
           <WatermarkAppButton
             icon={Search}
-            label="Discovery"
+            label={t("panels.discovery")}
             color="text-purple-400"
             bgColor="bg-purple-500/10 hover:bg-purple-500/20"
             onClick={() => openPanel("discovery")}
           />
           <WatermarkAppButton
             icon={Activity}
-            label="Decoder"
+            label={t("panels.decoder")}
             color="text-green-400"
             bgColor="bg-green-500/10 hover:bg-green-500/20"
             onClick={() => openPanel("decoder")}
           />
           <WatermarkAppButton
             icon={Send}
-            label="Transmit"
+            label={t("panels.transmit")}
             color="text-red-400"
             bgColor="bg-red-500/10 hover:bg-red-500/20"
             onClick={() => openPanel("transmit")}
           />
           <WatermarkAppButton
             icon={Server}
-            label="Modbus"
+            label={t("panels.modbus")}
             color="text-amber-400"
             bgColor="bg-amber-500/10 hover:bg-amber-500/20"
             onClick={() => openPanel("modbus")}
           />
           <WatermarkAppButton
             icon={FileText}
-            label="Catalog"
+            label={t("panels.catalogEditor")}
             color="text-blue-400"
             bgColor="bg-blue-500/10 hover:bg-blue-500/20"
             onClick={() => openPanel("catalog-editor")}
           />
           <WatermarkAppButton
             icon={Calculator}
-            label="Calculator"
+            label={t("panels.frameCalculator")}
             color="text-teal-400"
             bgColor="bg-teal-500/10 hover:bg-teal-500/20"
             onClick={() => openPanel("frame-calculator")}
           />
           <WatermarkAppButton
             icon={DatabaseZap}
-            label="Query"
+            label={t("panels.query")}
             color="text-amber-400"
             bgColor="bg-amber-500/10 hover:bg-amber-500/20"
             onClick={() => openPanel("query")}
           />
           <WatermarkAppButton
             icon={Network}
-            label="Sessions"
+            label={t("panels.sessionManager")}
             color="text-cyan-400"
             bgColor="bg-cyan-500/10 hover:bg-cyan-500/20"
             onClick={() => openPanel("session-manager")}
           />
           <WatermarkAppButton
             icon={BarChart3}
-            label="Graph"
+            label={t("panels.graph")}
             color="text-pink-400"
             bgColor="bg-pink-500/10 hover:bg-pink-500/20"
             onClick={() => openPanel("graph")}
           />
           <WatermarkAppButton
             icon={FlaskConical}
-            label="Test Pattern"
+            label={t("panels.testPattern")}
             color="text-emerald-400"
             bgColor="bg-emerald-500/10 hover:bg-emerald-500/20"
             onClick={() => openPanel("test-pattern")}
           />
           <WatermarkAppButton
             icon={SettingsIcon}
-            label="Settings"
+            label={t("panels.settings")}
             color="text-orange-400"
             bgColor="bg-orange-500/10 hover:bg-orange-500/20"
             onClick={() => openPanel("settings")}
@@ -336,25 +339,31 @@ function WatermarkAppButton({ icon: Icon, label, color, bgColor, onClick }: Wate
   );
 }
 
-// Panel titles for display
-const panelTitles: Record<PanelId, string> = {
-  discovery: "Discovery",
-  decoder: "Decoder",
-  transmit: "Transmit",
-  modbus: "Modbus",
-  "catalog-editor": "Catalog Editor",
-  "frame-calculator": "Calculator",
-  "payload-analysis": "Payload Analysis",
-  "frame-order-analysis": "Frame Order",
-  query: "Query",
-  "session-manager": "Sessions",
-  graph: "Graph",
-  rules: "Rules",
-  "test-pattern": "Test Pattern",
-  settings: "Settings",
+// Panel ID → menus.json key
+const panelI18nKeys: Record<PanelId, string> = {
+  discovery: "discovery",
+  decoder: "decoder",
+  transmit: "transmit",
+  modbus: "modbus",
+  "catalog-editor": "catalogEditor",
+  "frame-calculator": "frameCalculator",
+  "payload-analysis": "payloadAnalysis",
+  "frame-order-analysis": "frameOrderAnalysis",
+  query: "query",
+  "session-manager": "sessionManager",
+  graph: "graph",
+  rules: "rules",
+  "test-pattern": "testPattern",
+  settings: "settings",
 };
 
+function getPanelTitle(t: TFunction, panelId: PanelId): string {
+  const key = panelI18nKeys[panelId];
+  return key ? t(`panels.${key}`) : panelId;
+}
+
 export default function MainLayout() {
+  const { t } = useTranslation("menus");
   const apiRef = useRef<DockviewApi | null>(null);
   const saveTimeoutRef = useRef<number | null>(null);
   const [savedLayout, setSavedLayout] = useState<SerializedDockview | null>(null);
@@ -514,7 +523,7 @@ export default function MainLayout() {
         event.api.addPanel({
           id: "discovery",
           component: "discovery",
-          title: panelTitles.discovery,
+          title: getPanelTitle(t, "discovery"),
         });
       }
 
@@ -541,7 +550,7 @@ export default function MainLayout() {
       apiRef.current.addPanel({
         id: panelId,
         component: panelId,
-        title: panelTitles[panelId as PanelId] || panelId,
+        title: getPanelTitle(t, panelId as PanelId),
       });
     }
   }, []);

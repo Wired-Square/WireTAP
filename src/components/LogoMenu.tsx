@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Search, Activity, FileText, Calculator, Settings, Send, Server, ArrowUpCircle, DatabaseZap, Network, BarChart3, Workflow, FlaskConical } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconMd, marginAppContent } from "../styles/spacing";
 import { bgSurface, borderDefault, textPrimary } from "../styles";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -18,7 +19,8 @@ interface LogoMenuProps {
 interface MenuItem {
   id: PanelId;
   icon: typeof Search;
-  label: string;
+  /** Translation key under `menus:panels.*` */
+  i18nKey: string;
   color: string;
   bgColor: string;
 }
@@ -26,93 +28,22 @@ interface MenuItem {
 // Order and grouping matches the native Apps menu:
 // Session-aware apps (1-5), then tools (6-8), then Settings
 const menuItems: MenuItem[] = [
-  {
-    id: "discovery",
-    icon: Search,
-    label: "Discovery",
-    color: "text-purple-400",
-    bgColor: "hover:bg-purple-500/10",
-  },
-  {
-    id: "decoder",
-    icon: Activity,
-    label: "Decoder",
-    color: "text-green-400",
-    bgColor: "hover:bg-green-500/10",
-  },
-  {
-    id: "transmit",
-    icon: Send,
-    label: "Transmit",
-    color: "text-red-400",
-    bgColor: "hover:bg-red-500/10",
-  },
-  {
-    id: "modbus",
-    icon: Server,
-    label: "Modbus",
-    color: "text-amber-400",
-    bgColor: "hover:bg-amber-500/10",
-  },
-  {
-    id: "query",
-    icon: DatabaseZap,
-    label: "Query",
-    color: "text-yellow-400",
-    bgColor: "hover:bg-yellow-500/10",
-  },
-  {
-    id: "graph",
-    icon: BarChart3,
-    label: "Graph",
-    color: "text-pink-400",
-    bgColor: "hover:bg-pink-500/10",
-  },
-  {
-    id: "rules",
-    icon: Workflow,
-    label: "Rules",
-    color: "text-indigo-400",
-    bgColor: "hover:bg-indigo-500/10",
-  },
-  {
-    id: "catalog-editor",
-    icon: FileText,
-    label: "Catalog Editor",
-    color: "text-blue-400",
-    bgColor: "hover:bg-blue-500/10",
-  },
-  {
-    id: "frame-calculator",
-    icon: Calculator,
-    label: "Calculator",
-    color: "text-teal-400",
-    bgColor: "hover:bg-teal-500/10",
-  },
-  {
-    id: "test-pattern",
-    icon: FlaskConical,
-    label: "Test Pattern",
-    color: "text-emerald-400",
-    bgColor: "hover:bg-emerald-500/10",
-  },
-  {
-    id: "session-manager",
-    icon: Network,
-    label: "Sessions",
-    color: "text-cyan-400",
-    bgColor: "hover:bg-cyan-500/10",
-  },
-  {
-    id: "settings",
-    icon: Settings,
-    label: "Settings",
-    color: "text-orange-400",
-    bgColor: "hover:bg-orange-500/10",
-  },
+  { id: "discovery", icon: Search, i18nKey: "discovery", color: "text-purple-400", bgColor: "hover:bg-purple-500/10" },
+  { id: "decoder", icon: Activity, i18nKey: "decoder", color: "text-green-400", bgColor: "hover:bg-green-500/10" },
+  { id: "transmit", icon: Send, i18nKey: "transmit", color: "text-red-400", bgColor: "hover:bg-red-500/10" },
+  { id: "modbus", icon: Server, i18nKey: "modbus", color: "text-amber-400", bgColor: "hover:bg-amber-500/10" },
+  { id: "query", icon: DatabaseZap, i18nKey: "query", color: "text-yellow-400", bgColor: "hover:bg-yellow-500/10" },
+  { id: "graph", icon: BarChart3, i18nKey: "graph", color: "text-pink-400", bgColor: "hover:bg-pink-500/10" },
+  { id: "rules", icon: Workflow, i18nKey: "rules", color: "text-indigo-400", bgColor: "hover:bg-indigo-500/10" },
+  { id: "catalog-editor", icon: FileText, i18nKey: "catalogEditor", color: "text-blue-400", bgColor: "hover:bg-blue-500/10" },
+  { id: "frame-calculator", icon: Calculator, i18nKey: "frameCalculator", color: "text-teal-400", bgColor: "hover:bg-teal-500/10" },
+  { id: "test-pattern", icon: FlaskConical, i18nKey: "testPattern", color: "text-emerald-400", bgColor: "hover:bg-emerald-500/10" },
+  { id: "session-manager", icon: Network, i18nKey: "sessionManager", color: "text-cyan-400", bgColor: "hover:bg-cyan-500/10" },
+  { id: "settings", icon: Settings, i18nKey: "settings", color: "text-orange-400", bgColor: "hover:bg-orange-500/10" },
 ];
 
 export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
+  const { t } = useTranslation("menus");
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const availableUpdate = useUpdateStore((s) => s.availableUpdate);
@@ -167,7 +98,7 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-center hover:shadow transition-all"
-        title="Open app menu"
+        title={t("logo.tooltip")}
       >
         <img
           src={logo}
@@ -182,10 +113,10 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
           onClick={handleUpdateClick}
           className="flex items-center gap-1 transition-colors"
           style={{ backgroundColor: '#2563eb', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 500 }}
-          title={`Update available: ${availableUpdate.version}`}
+          title={t("logo.updateAvailable", { version: availableUpdate.version })}
         >
           <ArrowUpCircle className={iconMd} />
-          <span>Update</span>
+          <span>{t("logo.updateLabel")}</span>
         </button>
       )}
 
@@ -207,7 +138,7 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
                   `}
                 >
                   <Icon className={`${iconMd} ${item.color} shrink-0`} />
-                  <span className="text-sm ml-2">{item.label}</span>
+                  <span className="text-sm ml-2">{t(`panels.${item.i18nKey}`)}</span>
                 </button>
               </div>
             );
