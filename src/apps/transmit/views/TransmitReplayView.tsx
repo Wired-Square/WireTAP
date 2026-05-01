@@ -4,6 +4,7 @@
 
 import { useMemo } from "react";
 import { Check, X, Play, StopCircle, Trash2, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import type { ReplayLogEntry } from "../../../stores/transmitStore";
 import {
@@ -26,6 +27,7 @@ import { formatHumanUs } from "../../../utils/timeFormat";
 // ============================================================================
 
 export default function TransmitReplayView() {
+  const { t } = useTranslation("transmit");
   const replayProgress = useTransmitStore((s) => s.replayProgress);
   const replayLog = useTransmitStore((s) => s.replayLog);
   const activeReplays = useTransmitStore((s) => s.activeReplays);
@@ -79,18 +81,18 @@ export default function TransmitReplayView() {
                 <button
                   onClick={() => restartReplay(replayId)}
                   className={actionChip('blue')}
-                  title="Restart from the beginning"
+                  title={t("replay.restartTooltip")}
                 >
                   <RefreshCw size={11} />
-                  Restart
+                  {t("replay.restart")}
                 </button>
                 <button
                   onClick={() => stopReplay(replayId)}
                   className={actionChip('red')}
-                  title="Stop this replay"
+                  title={t("replay.stopTooltip")}
                 >
                   <StopCircle size={11} />
-                  Stop
+                  {t("replay.stop")}
                 </button>
               </div>
             );
@@ -102,10 +104,8 @@ export default function TransmitReplayView() {
       {isEmpty && (
         <div className={emptyStateContainer}>
           <div className={emptyStateText}>
-            <p className={emptyStateHeading}>No Replay Activity</p>
-            <p className={emptyStateDescription}>
-              Start a replay from Discovery to see progress here.
-            </p>
+            <p className={emptyStateHeading}>{t("replay.emptyHeading")}</p>
+            <p className={emptyStateDescription}>{t("replay.emptyDescription")}</p>
           </div>
         </div>
       )}
@@ -117,7 +117,7 @@ export default function TransmitReplayView() {
             className={`flex items-center gap-3 px-4 py-2 ${bgDataToolbar} border-b ${borderDataView}`}
           >
             <span className={`${textDataSecondary} text-sm`}>
-              {replayLog.length} event{replayLog.length !== 1 ? "s" : ""}
+              {t("replay.eventSummary", { count: replayLog.length })}
             </span>
 
             <div className="flex-1" />
@@ -126,20 +126,22 @@ export default function TransmitReplayView() {
               <button
                 onClick={() => activeReplays.forEach((id) => stopReplay(id))}
                 className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded border border-red-500/50 bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
-                title="Stop all active replays"
+                title={t("replay.stopAllTooltip")}
               >
                 <StopCircle size={13} />
-                Stop Replay{activeReplays.size > 1 ? `s (${activeReplays.size})` : ""}
+                {activeReplays.size > 1
+                  ? t("replay.stopReplaysLabel", { count: activeReplays.size })
+                  : t("replay.stopReplayLabel")}
               </button>
             )}
 
             <button
               onClick={clearReplayLog}
               className={buttonBase}
-              title="Clear replay log"
+              title={t("replay.clearLogTooltip")}
             >
               <Trash2 size={14} />
-              <span className="text-sm ml-1">Clear</span>
+              <span className="text-sm ml-1">{t("replay.clearLabel")}</span>
             </button>
           </div>
 
@@ -151,10 +153,10 @@ export default function TransmitReplayView() {
               >
                 <tr>
                   <th className="text-left px-4 py-2 w-10"></th>
-                  <th className="text-left px-4 py-2">Time</th>
-                  <th className="text-left px-4 py-2">Session</th>
-                  <th className="text-left px-4 py-2">Event</th>
-                  <th className="text-left px-4 py-2">Details</th>
+                  <th className="text-left px-4 py-2">{t("replay.columns.time")}</th>
+                  <th className="text-left px-4 py-2">{t("replay.columns.session")}</th>
+                  <th className="text-left px-4 py-2">{t("replay.columns.event")}</th>
+                  <th className="text-left px-4 py-2">{t("replay.columns.details")}</th>
                   <th className="px-4 py-2"></th>
                 </tr>
               </thead>
@@ -184,6 +186,7 @@ export default function TransmitReplayView() {
 // ============================================================================
 
 function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?: () => void }) {
+  const { t, i18n } = useTranslation("transmit");
   const { kind, profileName, totalFrames, speed, loopReplay, framesSent, errorMessage, timestamp, pass } = entry;
 
   const icon =
@@ -194,25 +197,27 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
     <X size={14} className="text-red-400" />;
 
   const kindBadge =
-    kind === "started" ? <span className="text-xs px-1.5 py-0.5 rounded bg-teal-600/30 text-teal-400">Started</span> :
-    kind === "completed" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('green')}`}>Completed</span> :
-    kind === "loopRestarted" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('blue')}`}>Loop</span> :
-    kind === "stoppedByUser" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('amber')}`}>Stopped</span> :
-    <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('red')}`}>Error</span>;
+    kind === "started" ? <span className="text-xs px-1.5 py-0.5 rounded bg-teal-600/30 text-teal-400">{t("replay.kindStarted")}</span> :
+    kind === "completed" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('green')}`}>{t("replay.kindCompleted")}</span> :
+    kind === "loopRestarted" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('blue')}`}>{t("replay.kindLoop")}</span> :
+    kind === "stoppedByUser" ? <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('amber')}`}>{t("replay.kindStopped")}</span> :
+    <span className={`text-xs px-1.5 py-0.5 rounded ${badgeColorClass('red')}`}>{t("replay.kindError")}</span>;
+
+  const fmt = (n: number) => n.toLocaleString(i18n.language);
 
   let details: string;
   if (kind === "started") {
     details = loopReplay
-      ? `${totalFrames.toLocaleString()} frames/pass · ${speed}× · Loop`
-      : `${totalFrames.toLocaleString()} frames · ${speed}×`;
+      ? t("replay.details.startedLoop", { frames: fmt(totalFrames), speed })
+      : t("replay.details.started", { frames: fmt(totalFrames), speed });
   } else if (kind === "completed") {
-    details = `${totalFrames.toLocaleString()} frames · ${speed}×`;
+    details = t("replay.details.completed", { frames: fmt(totalFrames), speed });
   } else if (kind === "loopRestarted") {
-    details = `Pass ${pass} complete · ${(framesSent ?? 0).toLocaleString()} cumulative · ${speed}×`;
+    details = t("replay.details.loopRestarted", { pass, framesSent: fmt(framesSent ?? 0), speed });
   } else if (kind === "stoppedByUser") {
-    details = `${(framesSent ?? 0).toLocaleString()} / ${totalFrames.toLocaleString()} frames · ${speed}×`;
+    details = t("replay.details.stoppedByUser", { framesSent: fmt(framesSent ?? 0), frames: fmt(totalFrames), speed });
   } else {
-    details = errorMessage ?? "Device error";
+    details = errorMessage ?? t("replay.details.deviceError");
   }
 
   return (
@@ -237,10 +242,10 @@ function ReplayLogRow({ entry, onRestart }: { entry: ReplayLogEntry; onRestart?:
           <button
             onClick={onRestart}
             className={actionChip('blue')}
-            title="Restart this replay"
+            title={t("replay.restartTooltipPast")}
           >
             <RefreshCw size={11} />
-            Restart
+            {t("replay.restart")}
           </button>
         )}
       </td>

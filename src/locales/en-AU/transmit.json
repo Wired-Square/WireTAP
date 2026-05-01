@@ -1,8 +1,19 @@
 {
   "tabs": {
+    "frame": "Frame",
+    "bytes": "Bytes",
     "queue": "Queue",
     "history": "History",
     "replay": "Replay"
+  },
+  "main": {
+    "loading": "Loading profiles…",
+    "noProfilesHeading": "No Transmit-Capable Profiles",
+    "noProfilesDescription": "Add an IO profile (slcan, GVRET TCP, SocketCAN, or Serial) in Settings to enable transmission.",
+    "noProfilesHint": "Note: slcan profiles in silent mode (M1) cannot transmit.",
+    "notTransmitInterface": "Not a transmit interface",
+    "protocolCAN": "CAN",
+    "protocolSerial": "Serial"
   },
   "topBar": {
     "title": "Transmit",
@@ -34,53 +45,77 @@
     "framing": "Framing"
   },
   "queue": {
-    "empty": "Queue is empty. Add frames from Discovery or with the New Frame button.",
+    "emptyHeading": "Queue Empty",
+    "stopAllTooltip": "Stop all repeats",
+    "stopAllLabel": "Stop All",
+    "clearTooltip": "Clear queue",
+    "clearLabel": "Clear",
     "actions": {
-      "playAll": "Play all",
-      "stopAll": "Stop all",
-      "clearAll": "Clear all",
-      "play": "Play",
-      "stop": "Stop",
-      "remove": "Remove",
-      "edit": "Edit",
-      "duplicate": "Duplicate",
-      "groupPlay": "Play group",
-      "groupStop": "Stop group",
-      "groupRemove": "Remove group"
+      "stopRepeatTooltip": "Stop repeat",
+      "startRepeatTooltip": "Start repeat",
+      "controlledByGroup": "Controlled by group",
+      "sessionDisconnected": "Session disconnected",
+      "disableItem": "Disable item",
+      "enableItem": "Enable item",
+      "removeFromQueue": "Remove from queue"
     },
     "columns": {
-      "id": "ID",
+      "bus": "Bus",
       "type": "Type",
-      "data": "Data",
       "interval": "Interval",
-      "count": "Count",
-      "lastSent": "Last Sent",
+      "group": "Group",
       "actions": "Actions"
     },
-    "intervalPlaceholder": "ms",
-    "controlledByGroup": "Controlled by group"
+    "groupPlaceholder": "—",
+    "groupTooltip": "Group name (items with same group transmit together)",
+    "typeCAN": "CAN",
+    "typeSerial": "Serial"
   },
   "history": {
-    "empty": "No transmitted frames yet.",
+    "emptyHeading": "No History",
+    "exportCsvTooltip": "Export as CSV",
+    "clearHistoryTooltip": "Clear history",
+    "clearLabel": "Clear",
     "live": "Live",
     "browsing": "Browsing",
     "liveTooltip": "Showing latest frames (click to browse)",
     "browsingTooltip": "Browsing history (click for live)",
-    "frameSummary_one": "{{count}} frame",
-    "frameSummary_other": "{{count}} frames"
+    "frameSummary_one": "{{formatted}} frame",
+    "frameSummary_other": "{{formatted}} frames"
   },
   "replay": {
-    "noActiveReplays": "No active replays",
-    "logEmpty": "Replay log is empty.",
+    "emptyHeading": "No Replay Activity",
+    "emptyDescription": "Start a replay from Discovery to see progress here.",
+    "eventSummary_one": "{{count}} event",
+    "eventSummary_other": "{{count}} events",
+    "stopAllTooltip": "Stop all active replays",
+    "stopReplayLabel": "Stop Replay",
+    "stopReplaysLabel": "Stop Replays ({{count}})",
+    "clearLogTooltip": "Clear replay log",
+    "clearLabel": "Clear",
     "kindCompleted": "Completed",
     "kindLoop": "Loop",
     "kindStopped": "Stopped",
     "kindError": "Error",
     "kindStarted": "Started",
     "restart": "Restart",
-    "restartTooltip": "Restart from the beginning",
     "stop": "Stop",
+    "restartTooltip": "Restart from the beginning",
     "stopTooltip": "Stop this replay",
-    "restartTooltipPast": "Restart this replay"
+    "restartTooltipPast": "Restart this replay",
+    "details": {
+      "startedLoop": "{{frames}} frames/pass · {{speed}}× · Loop",
+      "started": "{{frames}} frames · {{speed}}×",
+      "completed": "{{frames}} frames · {{speed}}×",
+      "loopRestarted": "Pass {{pass}} complete · {{framesSent}} cumulative · {{speed}}×",
+      "stoppedByUser": "{{framesSent}} / {{frames}} frames · {{speed}}×",
+      "deviceError": "Device error"
+    },
+    "columns": {
+      "time": "Time",
+      "session": "Session",
+      "event": "Event",
+      "details": "Details"
+    }
   }
 }

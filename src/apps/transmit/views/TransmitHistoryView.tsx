@@ -5,6 +5,7 @@
 
 import React, { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Trash2, Download, Radio, Check, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import type { BusSourceInfo } from "../../../stores/sessionStore";
 import { useSettings } from "../../../hooks/useSettings";
@@ -45,6 +46,7 @@ function historyRowToFrameRow(row: TransmitHistoryRow): FrameRow {
 }
 
 export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewProps) {
+  const { t, i18n } = useTranslation("transmit");
   const { settings } = useSettings();
   const [pageSize, setPageSize] = useState(20);
   const {
@@ -177,7 +179,7 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
       {totalCount === 0 && !isLoading && (
         <div className={emptyStateContainer}>
           <div className={emptyStateText}>
-            <p className={emptyStateHeading}>No History</p>
+            <p className={emptyStateHeading}>{t("history.emptyHeading")}</p>
             <p className={emptyStateDescription}>
               Transmitted frames will appear here.
             </p>
@@ -200,7 +202,7 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
             leftContent={
               <div className="flex items-center gap-3">
                 <span className={`${textDataSecondary} text-sm`}>
-                  {totalCount.toLocaleString()} frame{totalCount !== 1 ? "s" : ""}
+                  {t("history.frameSummary", { count: totalCount, formatted: totalCount.toLocaleString(i18n.language) })}
                 </span>
                 <button
                   onClick={() => setIsLive(!isLive)}
@@ -209,10 +211,10 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
                       ? badgeColorClass('green')
                       : badgeColorClass('amber')
                   }`}
-                  title={isLive ? "Showing latest frames (click to browse)" : "Browsing history (click for live)"}
+                  title={isLive ? t("history.liveTooltip") : t("history.browsingTooltip")}
                 >
                   <Radio size={10} />
-                  {isLive ? "Live" : "Browsing"}
+                  {isLive ? t("history.live") : t("history.browsing")}
                 </button>
               </div>
             }
@@ -222,7 +224,7 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
                   onClick={handleExport}
                   disabled={isExporting}
                   className={buttonBase}
-                  title="Export as CSV"
+                  title={t("history.exportCsvTooltip")}
                 >
                   <Download size={14} />
                   <span className="text-sm ml-1">{isExporting ? "Exporting…" : "Export"}</span>
@@ -230,10 +232,10 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
                 <button
                   onClick={clear}
                   className={buttonBase}
-                  title="Clear history"
+                  title={t("history.clearHistoryTooltip")}
                 >
                   <Trash2 size={14} />
-                  <span className="text-sm ml-1">Clear</span>
+                  <span className="text-sm ml-1">{t("history.clearLabel")}</span>
                 </button>
               </div>
             }

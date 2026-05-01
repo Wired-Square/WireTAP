@@ -5,6 +5,7 @@
 
 import { useCallback, useMemo } from "react";
 import { Play, Square, Trash2, StopCircle, Users, AlertCircle, Link } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useTransmitStore, GVRET_BUSES } from "../../../stores/transmitStore";
 import { useActiveSession, useSessionStore, type BusSourceInfo } from "../../../stores/sessionStore";
 import {
@@ -37,6 +38,7 @@ interface TransmitQueueViewProps {
 }
 
 export default function TransmitQueueView({ outputBusToSource }: TransmitQueueViewProps) {
+  const { t } = useTranslation("transmit");
   // Store selectors
   const queue = useTransmitStore((s) => s.queue);
   const activeSession = useActiveSession();
@@ -179,7 +181,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
     return (
       <div className={emptyStateContainer}>
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>Queue Empty</p>
+          <p className={emptyStateHeading}>{t("queue.emptyHeading")}</p>
           <p className={emptyStateDescription}>
             Add frames from the CAN or Serial tab to build a transmit queue.
           </p>
@@ -207,20 +209,20 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
           <button
             onClick={handleStopAll}
             className={dangerButtonBase}
-            title="Stop all repeats"
+            title={t("queue.stopAllTooltip")}
           >
             <StopCircle size={14} />
-            <span className="text-sm ml-1">Stop All</span>
+            <span className="text-sm ml-1">{t("queue.stopAllLabel")}</span>
           </button>
         )}
 
         <button
           onClick={handleClearQueue}
           className={buttonBase}
-          title="Clear queue"
+          title={t("queue.clearTooltip")}
         >
           <Trash2 size={14} />
-          <span className="text-sm ml-1">Clear</span>
+          <span className="text-sm ml-1">{t("queue.clearLabel")}</span>
         </button>
       </div>
 
@@ -232,12 +234,12 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
           >
             <tr>
               <th className="text-left px-4 py-2 w-12"></th>
-              <th className="text-left px-4 py-2 w-28">Bus</th>
-              <th className="text-left px-4 py-2 w-16">Type</th>
+              <th className="text-left px-4 py-2 w-28">{t("queue.columns.bus")}</th>
+              <th className="text-left px-4 py-2 w-16">{t("queue.columns.type")}</th>
               <th className="text-left px-4 py-2">Frame / Data</th>
-              <th className="text-left px-4 py-2 w-24">Interval</th>
-              <th className="text-left px-4 py-2 w-28">Group</th>
-              <th className="text-left px-4 py-2 w-24">Actions</th>
+              <th className="text-left px-4 py-2 w-24">{t("queue.columns.interval")}</th>
+              <th className="text-left px-4 py-2 w-28">{t("queue.columns.group")}</th>
+              <th className="text-left px-4 py-2 w-24">{t("queue.columns.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -297,7 +299,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         )
                       ) : (
                         // Not first in group: show indicator only
-                        <span className={textDataMuted} title="Controlled by group">
+                        <span className={textDataMuted} title={t("queue.actions.controlledByGroup")}>
                           <Users size={12} />
                         </span>
                       )
@@ -307,7 +309,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         <button
                           onClick={() => handleToggleRepeat(item.id, true)}
                           className={stopButtonCompact}
-                          title="Stop repeat"
+                          title={t("queue.actions.stopRepeatTooltip")}
                         >
                           <Square size={12} fill="currentColor" />
                         </button>
@@ -319,7 +321,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                           title={
                             !hasIOSession
                               ? "Requires an IO session (connect via the CAN tab)"
-                              : "Start repeat"
+                              : t("queue.actions.startRepeatTooltip")
                           }
                         >
                           <Play size={12} fill="currentColor" />
@@ -333,7 +335,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-1.5">
                         {isOrphaned && (
-                          <span className="text-amber-500" title="Session disconnected">
+                          <span className="text-amber-500" title={t("queue.actions.sessionDisconnected")}>
                             <AlertCircle size={12} />
                           </span>
                         )}
@@ -422,9 +424,9 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       value={item.groupName ?? ""}
                       onChange={(e) => handleGroupChange(item.id, e.target.value)}
                       disabled={item.isRepeating || isGroupRepeating}
-                      placeholder="—"
+                      placeholder={t("queue.groupPlaceholder")}
                       className={`w-20 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} ${focusBorder} disabled:opacity-50 placeholder:text-gray-600`}
-                      title="Group name (items with same group transmit together)"
+                      title={t("queue.groupTooltip")}
                     />
                   </td>
 
@@ -437,7 +439,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         onChange={() => toggleQueueEnabled(item.id)}
                         disabled={item.isRepeating || isGroupRepeating}
                         className="h-3.5 w-3.5 rounded border-gray-600 bg-transparent accent-blue-500 cursor-pointer disabled:cursor-not-allowed"
-                        title={item.enabled ? "Disable item" : "Enable item"}
+                        title={item.enabled ? t("queue.actions.disableItem") : t("queue.actions.enableItem")}
                       />
                       {isOrphaned && activeSession && (
                         <button
@@ -458,7 +460,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         onClick={() => handleRemove(item.id)}
                         disabled={item.isRepeating}
                         className={`${paginationButtonDark} hover:text-red-400`}
-                        title="Remove from queue"
+                        title={t("queue.actions.removeFromQueue")}
                       >
                         <Trash2 size={14} />
                       </button>

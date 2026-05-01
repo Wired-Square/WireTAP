@@ -5,6 +5,7 @@
 
 import { useEffect, useCallback, useMemo } from "react";
 import { Send, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useTransmitStore } from "../../stores/transmitStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
@@ -71,7 +72,7 @@ function getTransmitStatus(p: IOProfile): { canTransmit: boolean; reason?: strin
   if (p.kind === "framelink") {
     return { canTransmit: true };
   }
-  return { canTransmit: false, reason: "Not a transmit interface" };
+  return { canTransmit: false, reason: "Not a transmit interface" }; // surfaced via translation in views
 }
 
 // ============================================================================
@@ -79,6 +80,7 @@ function getTransmitStatus(p: IOProfile): { canTransmit: boolean; reason?: strin
 // ============================================================================
 
 export default function Transmit() {
+  const { t } = useTranslation("transmit");
   // Settings for IO profiles
   const { settings } = useSettings();
   const ioProfiles = settings?.io_profiles ?? [];
@@ -319,7 +321,7 @@ export default function Transmit() {
       {/* Loading / No Profiles State */}
       {isLoading && profiles.length === 0 && (
         <div className={emptyStateContainer}>
-          <p className={emptyStateText}>Loading profiles...</p>
+          <p className={emptyStateText}>{t("main.loading")}</p>
         </div>
       )}
 
@@ -327,14 +329,9 @@ export default function Transmit() {
         <div className={emptyStateContainer}>
           <Send size={48} className={textDataSecondary} />
           <div className={emptyStateText}>
-            <p className={emptyStateHeading}>No Transmit-Capable Profiles</p>
-            <p className={emptyStateDescription}>
-              Add an IO profile (slcan, GVRET TCP, SocketCAN, or Serial) in
-              Settings to enable transmission.
-            </p>
-            <p className={emptyStateHint}>
-              Note: slcan profiles in silent mode (M1) cannot transmit.
-            </p>
+            <p className={emptyStateHeading}>{t("main.noProfilesHeading")}</p>
+            <p className={emptyStateDescription}>{t("main.noProfilesDescription")}</p>
+            <p className={emptyStateHint}>{t("main.noProfilesHint")}</p>
           </div>
         </div>
       )}
@@ -349,7 +346,7 @@ export default function Transmit() {
             {/* Protocol badge with status light */}
             <div className="ml-1">
               <ProtocolBadge
-                label={isSerialProtocol && !isCanProtocol ? "Serial" : "CAN"}
+                label={isSerialProtocol && !isCanProtocol ? t("main.protocolSerial") : t("main.protocolCAN")}
                 isStreaming={isStreaming}
               />
             </div>
@@ -360,13 +357,13 @@ export default function Transmit() {
               className={dataViewTabClass(activeTab === "frame")}
             >
               {/* Show "Bytes" for serial protocol, "Frame" for CAN */}
-              {isSerialProtocol && !isCanProtocol ? "Bytes" : "Frame"}
+              {isSerialProtocol && !isCanProtocol ? t("tabs.bytes") : t("tabs.frame")}
             </button>
             <button
               onClick={() => handlers.handleTabClick("queue")}
               className={dataViewTabClass(activeTab === "queue", activeRepeats > 0)}
             >
-              Queue
+              {t("tabs.queue")}
               {queue.length > 0 && (
                 <span
                   className={`ml-1.5 text-xs ${
@@ -383,7 +380,7 @@ export default function Transmit() {
               onClick={() => handlers.handleTabClick("replay")}
               className={dataViewTabClass(activeTab === "replay", activeReplays.size > 0)}
             >
-              Replay
+              {t("tabs.replay")}
               {activeReplays.size > 0 && (
                 <span className={`ml-1.5 text-xs ${tabCountColorClass("green")}`}>
                   ({activeReplays.size})
@@ -394,7 +391,7 @@ export default function Transmit() {
               onClick={() => handlers.handleTabClick("history")}
               className={dataViewTabClass(activeTab === "history")}
             >
-              History
+              {t("tabs.history")}
               {historyDbCount > 0 && (
                 <span className={`ml-1.5 text-xs ${tabCountColorClass("gray")}`}>
                   ({historyDbCount.toLocaleString()})
