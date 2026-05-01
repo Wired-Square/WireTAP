@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
@@ -40,6 +41,7 @@ export default function TransformerDialog({
   frameDefs,
   usedIds,
 }: TransformerDialogProps) {
+  const { t } = useTranslation("rules");
   const selectableSignals = useRulesStore((s) => s.selectableSignals);
 
   const [transformerId, setTransformerId] = useState(() => nextAvailableId(usedIds));
@@ -95,7 +97,7 @@ export default function TransformerDialog({
 
   const handleSubmit = () => {
     if (usedIds.has(transformerId)) {
-      setValidationError(`Transformer ID ${formatHexId(transformerId)} is already in use.`);
+      setValidationError(t("transformerDialog.errors.idInUse", { id: formatHexId(transformerId) }));
       return;
     }
     setValidationError(null);
@@ -123,7 +125,7 @@ export default function TransformerDialog({
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
       <div className="p-6">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Add Transformer
+          {t("transformerDialog.title")}
         </h2>
 
         {validationError && (
@@ -132,28 +134,28 @@ export default function TransformerDialog({
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Name</label>
+            <label className={labelDefault}>{t("transformerDialog.fields.name")}</label>
             <input
               className={inputSimple}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Optional"
+              placeholder={t("transformerDialog.fields.namePlaceholder")}
             />
           </div>
           <div>
-            <label className={labelDefault}>Description</label>
+            <label className={labelDefault}>{t("transformerDialog.fields.description")}</label>
             <input
               className={inputSimple}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional"
+              placeholder={t("transformerDialog.fields.namePlaceholder")}
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Transformer ID</label>
+            <label className={labelDefault}>{t("transformerDialog.fields.transformerId")}</label>
             <input
               type="number"
               className={inputSimple}
@@ -165,7 +167,7 @@ export default function TransformerDialog({
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Source Frame Def</label>
+            <label className={labelDefault}>{t("transformerDialog.fields.sourceFrameDef")}</label>
             <select
               className={inputSimple}
               value={sourceFrameDefId}
@@ -179,7 +181,7 @@ export default function TransformerDialog({
             </select>
           </div>
           <div>
-            <label className={labelDefault}>Source Interface</label>
+            <label className={labelDefault}>{t("transformerDialog.fields.sourceInterface")}</label>
             <select
               className={inputSimple}
               value={sourceInterface}
@@ -196,13 +198,13 @@ export default function TransformerDialog({
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Destination</label>
+            <label className={labelDefault}>{t("transformerDialog.fields.destination")}</label>
             <select
               className={inputSimple}
               value={destFrameDefId}
               onChange={(e) => setDestFrameDefId(parseInt(e.target.value))}
             >
-              <option value={FRAME_DEF_ID_DEVICE}>Device Signals</option>
+              <option value={FRAME_DEF_ID_DEVICE}>{t("transformerDialog.fields.deviceSignals")}</option>
               {frameDefs.map((fd) => (
                 <option key={fd.frame_def_id} value={fd.frame_def_id}>
                   {fd.name}
@@ -212,7 +214,7 @@ export default function TransformerDialog({
           </div>
           {destFrameDefId !== FRAME_DEF_ID_DEVICE && (
             <div>
-              <label className={labelDefault}>Dest Interface</label>
+              <label className={labelDefault}>{t("transformerDialog.fields.destInterface")}</label>
               <select
                 className={inputSimple}
                 value={destInterface}
@@ -231,12 +233,12 @@ export default function TransformerDialog({
         {/* Mappings */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <label className={labelDefault}>Signal Mappings</label>
+            <label className={labelDefault}>{t("transformerDialog.fields.mappings")}</label>
             <button
               onClick={addMapping}
               className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
             >
-              <Plus className={iconMd} /> Add Mapping
+              <Plus className={iconMd} /> {t("transformerDialog.fields.addMapping")}
             </button>
           </div>
           <div className="space-y-2">
@@ -247,22 +249,22 @@ export default function TransformerDialog({
                 <div className="flex items-start gap-3">
                   {/* Source → Dest vertical flow */}
                   <div className="flex-1 space-y-1">
-                    <label className={`text-xs ${textTertiary}`}>Source Signal</label>
+                    <label className={`text-xs ${textTertiary}`}>{t("transformerDialog.fields.sourceSignal")}</label>
                     <SignalCombobox
                       signals={selectableSignals}
                       value={m.source_signal_id || null}
                       onChange={(id) => updateMapping(idx, "source_signal_id", id)}
-                      placeholder="Source signal"
+                      placeholder={t("transformerDialog.fields.sourcePlaceholder")}
                     />
                     <div className={`flex justify-center ${textTertiary}`}>
                       <ArrowDown className={iconSm} />
                     </div>
-                    <label className={`text-xs ${textTertiary}`}>Destination Signal</label>
+                    <label className={`text-xs ${textTertiary}`}>{t("transformerDialog.fields.destSignal")}</label>
                     <SignalCombobox
                       signals={selectableSignals}
                       value={m.dest_signal_id || null}
                       onChange={(id) => updateMapping(idx, "dest_signal_id", id)}
-                      placeholder="Dest signal"
+                      placeholder={t("transformerDialog.fields.destPlaceholder")}
                       minBitLength={srcSignal?.bit_length}
                     />
                   </div>
@@ -275,10 +277,10 @@ export default function TransformerDialog({
                         updateMapping(idx, "transform_type", e.target.value)
                       }
                     >
-                      <option value="direct">Direct</option>
-                      <option value="scale">Scale</option>
-                      <option value="invert">Invert</option>
-                      <option value="mask">Mask</option>
+                      <option value="direct">{t("transformerDialog.transforms.direct")}</option>
+                      <option value="scale">{t("transformerDialog.transforms.scale")}</option>
+                      <option value="invert">{t("transformerDialog.transforms.invert")}</option>
+                      <option value="mask">{t("transformerDialog.transforms.mask")}</option>
                     </select>
                     {m.transform_type === "scale" && (
                       <div className="flex gap-2">
@@ -287,7 +289,7 @@ export default function TransformerDialog({
                           step="0.1"
                           className={inputSimple}
                           value={m.scale}
-                          placeholder="Scale"
+                          placeholder={t("transformerDialog.fields.scale")}
                           onChange={(e) =>
                             updateMapping(idx, "scale", parseFloat(e.target.value) || 1)
                           }
@@ -297,7 +299,7 @@ export default function TransformerDialog({
                           step="0.1"
                           className={inputSimple}
                           value={m.offset}
-                          placeholder="Offset"
+                          placeholder={t("transformerDialog.fields.offset")}
                           onChange={(e) =>
                             updateMapping(idx, "offset", parseFloat(e.target.value) || 0)
                           }
@@ -317,7 +319,7 @@ export default function TransformerDialog({
                     <button
                       onClick={() => removeMapping(idx)}
                       className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-                      title="Remove mapping"
+                      title={t("transformerDialog.fields.removeMapping")}
                     >
                       <Trash2 className={iconSm} />
                     </button>
@@ -334,13 +336,13 @@ export default function TransformerDialog({
           onClick={onClose}
           className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
-          Cancel
+          {t("transformerDialog.cancel")}
         </button>
         <button
           onClick={handleSubmit}
           className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          Add Transformer
+          {t("transformerDialog.submit")}
         </button>
       </div>
     </Dialog>

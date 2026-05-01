@@ -129,6 +129,108 @@
     "offset": "Offset",
     "delete": "Delete Signal"
   },
+  "userSignalDialog": {
+    "title": "Add User Signal",
+    "fields": {
+      "signalId": "Signal ID (hex)",
+      "signalIdPlaceholder": "e.g. A001",
+      "name": "Name",
+      "namePlaceholder": "e.g. Cabin Temperature",
+      "group": "Group",
+      "format": "Format",
+      "unit": "Unit (optional)",
+      "unitPlaceholder": "e.g. °C, V, rpm",
+      "enumValues": "Enum Values",
+      "addValue": "Add Value",
+      "valuePlaceholder": "Value",
+      "labelPlaceholder": "Label",
+      "noEnums": "No enum values defined. Click \"Add Value\" to define mappings."
+    },
+    "formats": {
+      "number": "Number",
+      "bool": "Boolean",
+      "enum": "Enum",
+      "color_brgb": "Colour (BRGB)",
+      "temperature": "Temperature (0.1°)"
+    },
+    "errors": {
+      "invalidId": "Signal ID must be a valid hex value (0x0001–0xFCFF). IDs 0xFD00+ are reserved.",
+      "idInUse": "Signal ID 0x{{id}} is already in use.",
+      "nameRequired": "Name is required."
+    },
+    "cancel": "Cancel",
+    "submit": "Add Signal"
+  },
+  "transformerDialog": {
+    "title": "Add Transformer",
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "Optional",
+      "description": "Description",
+      "transformerId": "Transformer ID",
+      "sourceFrameDef": "Source Frame Def",
+      "sourceInterface": "Source Interface",
+      "destination": "Destination",
+      "deviceSignals": "Device Signals",
+      "destInterface": "Dest Interface",
+      "mappings": "Signal Mappings",
+      "addMapping": "Add Mapping",
+      "sourceSignal": "Source Signal",
+      "destSignal": "Destination Signal",
+      "sourcePlaceholder": "Source signal",
+      "destPlaceholder": "Dest signal",
+      "scale": "Scale",
+      "offset": "Offset",
+      "removeMapping": "Remove mapping"
+    },
+    "transforms": {
+      "direct": "Direct",
+      "scale": "Scale",
+      "invert": "Invert",
+      "mask": "Mask"
+    },
+    "errors": {
+      "idInUse": "Transformer ID {{id}} is already in use."
+    },
+    "cancel": "Cancel",
+    "submit": "Add Transformer"
+  },
+  "generatorDialog": {
+    "title": "Add Generator",
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "Optional",
+      "description": "Description",
+      "generatorId": "Generator ID",
+      "frameDef": "Frame Definition",
+      "outputInterface": "Output Interface",
+      "periodMs": "Period (ms)",
+      "trigger": "Trigger",
+      "mappings": "Signal Mappings",
+      "addMapping": "Add Mapping",
+      "sourceSignal": "Source Signal",
+      "destSignal": "Destination Signal",
+      "sourcePlaceholder": "Source signal",
+      "destPlaceholder": "Dest signal",
+      "removeMapping": "Remove mapping"
+    },
+    "triggers": {
+      "periodic": "Periodic",
+      "onChange": "On Change",
+      "oneShot": "One Shot"
+    },
+    "transforms": {
+      "direct": "Direct",
+      "scale": "Scale",
+      "invert": "Invert",
+      "mask": "Mask"
+    },
+    "errors": {
+      "idInUse": "Generator ID {{id}} is already in use."
+    },
+    "cancel": "Cancel",
+    "submit": "Add Generator"
+  },
   "bridgeDialog": {
     "title": "Add Bridge",
     "fields": {

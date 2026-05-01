@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
@@ -17,12 +18,12 @@ import { RESERVED_SIGNAL_ID_START } from "../utils/framelinkConstants";
 /** User signals must use IDs below the reserved range */
 const MAX_USER_SIGNAL_ID = RESERVED_SIGNAL_ID_START - 1;
 
-const FORMAT_OPTIONS = [
-  { value: "number", label: "Number" },
-  { value: "bool", label: "Boolean" },
-  { value: "enum", label: "Enum" },
-  { value: "color_brgb", label: "Colour (BRGB)" },
-  { value: "temperature_0.1", label: "Temperature (0.1\u00B0)" },
+const FORMAT_KEYS = [
+  { value: "number", key: "number" },
+  { value: "bool", key: "bool" },
+  { value: "enum", key: "enum" },
+  { value: "color_brgb", key: "color_brgb" },
+  { value: "temperature_0.1", key: "temperature" },
 ] as const;
 
 const DEFAULT_GROUP = "User";
@@ -85,6 +86,7 @@ export default function UserSignalDialog({
   onAdd,
   usedSignalIds,
 }: UserSignalDialogProps) {
+  const { t } = useTranslation("rules");
   const [signalIdHex, setSignalIdHex] = useState(() => nextAvailableId(usedSignalIds));
   const [name, setName] = useState("");
   const [group, setGroup] = useState(DEFAULT_GROUP);
@@ -129,18 +131,20 @@ export default function UserSignalDialog({
     // Validate signal ID
     const parsedId = parseHexSignalId(signalIdHex);
     if (parsedId === null) {
-      setValidationError("Signal ID must be a valid hex value (0x0001–0xFCFF). IDs 0xFD00+ are reserved.");
+      setValidationError(t("userSignalDialog.errors.invalidId"));
       return;
     }
     if (usedSignalIds.has(parsedId)) {
-      setValidationError(`Signal ID 0x${parsedId.toString(16).toUpperCase().padStart(4, "0")} is already in use.`);
+      setValidationError(t("userSignalDialog.errors.idInUse", {
+        id: parsedId.toString(16).toUpperCase().padStart(4, "0"),
+      }));
       return;
     }
 
     // Validate name
     const trimmedName = name.trim();
     if (trimmedName.length === 0) {
-      setValidationError("Name is required.");
+      setValidationError(t("userSignalDialog.errors.nameRequired"));
       return;
     }
 
@@ -170,44 +174,44 @@ export default function UserSignalDialog({
     setValidationError(null);
     onAdd(parsedId, metadata);
     resetForm();
-  }, [signalIdHex, name, group, format, unit, enumRows, onAdd, resetForm]);
+  }, [signalIdHex, name, group, format, unit, enumRows, onAdd, resetForm, t, usedSignalIds]);
 
   return (
     <Dialog isOpen={isOpen} onBackdropClick={handleClose} maxWidth="max-w-lg">
       <div className="p-6">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Add User Signal
+          {t("userSignalDialog.title")}
         </h2>
 
         <div className="space-y-4">
           {/* Signal ID */}
           <div>
-            <label className={labelDefault}>Signal ID (hex)</label>
+            <label className={labelDefault}>{t("userSignalDialog.fields.signalId")}</label>
             <input
               type="text"
               className={`${inputSimple} font-mono`}
               value={signalIdHex}
               onChange={(e) => setSignalIdHex(e.target.value)}
-              placeholder="e.g. A001"
+              placeholder={t("userSignalDialog.fields.signalIdPlaceholder")}
             />
           </div>
 
           {/* Name */}
           <div>
-            <label className={labelDefault}>Name</label>
+            <label className={labelDefault}>{t("userSignalDialog.fields.name")}</label>
             <input
               type="text"
               className={inputSimple}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Cabin Temperature"
+              placeholder={t("userSignalDialog.fields.namePlaceholder")}
             />
           </div>
 
           {/* Group + Format side by side */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelDefault}>Group</label>
+              <label className={labelDefault}>{t("userSignalDialog.fields.group")}</label>
               <input
                 type="text"
                 className={inputSimple}
@@ -217,15 +221,15 @@ export default function UserSignalDialog({
               />
             </div>
             <div>
-              <label className={labelDefault}>Format</label>
+              <label className={labelDefault}>{t("userSignalDialog.fields.format")}</label>
               <select
                 className={inputSimple}
                 value={format}
                 onChange={(e) => setFormat(e.target.value)}
               >
-                {FORMAT_OPTIONS.map((opt) => (
+                {FORMAT_KEYS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                    {t(`userSignalDialog.formats.${opt.key}`)}
                   </option>
                 ))}
               </select>
@@ -234,13 +238,13 @@ export default function UserSignalDialog({
 
           {/* Unit */}
           <div>
-            <label className={labelDefault}>Unit (optional)</label>
+            <label className={labelDefault}>{t("userSignalDialog.fields.unit")}</label>
             <input
               type="text"
               className={inputSimple}
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              placeholder="e.g. °C, V, rpm"
+              placeholder={t("userSignalDialog.fields.unitPlaceholder")}
             />
           </div>
 
@@ -248,12 +252,12 @@ export default function UserSignalDialog({
           {format === "enum" && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className={labelDefault}>Enum Values</label>
+                <label className={labelDefault}>{t("userSignalDialog.fields.enumValues")}</label>
                 <button
                   onClick={addEnumRow}
                   className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
                 >
-                  <Plus className={iconMd} /> Add Value
+                  <Plus className={iconMd} /> {t("userSignalDialog.fields.addValue")}
                 </button>
               </div>
 
@@ -268,7 +272,7 @@ export default function UserSignalDialog({
                         onChange={(e) =>
                           updateEnumRow(idx, "value", e.target.value)
                         }
-                        placeholder="Value"
+                        placeholder={t("userSignalDialog.fields.valuePlaceholder")}
                       />
                       <input
                         type="text"
@@ -277,7 +281,7 @@ export default function UserSignalDialog({
                         onChange={(e) =>
                           updateEnumRow(idx, "label", e.target.value)
                         }
-                        placeholder="Label"
+                        placeholder={t("userSignalDialog.fields.labelPlaceholder")}
                       />
                       <button
                         onClick={() => removeEnumRow(idx)}
@@ -292,7 +296,7 @@ export default function UserSignalDialog({
 
               {enumRows.length === 0 && (
                 <p className={`text-xs ${textSecondary}`}>
-                  No enum values defined. Click "Add Value" to define mappings.
+                  {t("userSignalDialog.fields.noEnums")}
                 </p>
               )}
             </div>
@@ -310,13 +314,13 @@ export default function UserSignalDialog({
           onClick={handleClose}
           className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
-          Cancel
+          {t("userSignalDialog.cancel")}
         </button>
         <button
           onClick={handleSubmit}
           className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          Add Signal
+          {t("userSignalDialog.submit")}
         </button>
       </div>
     </Dialog>

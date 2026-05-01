@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2, ArrowDown } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
@@ -32,11 +33,11 @@ interface GeneratorDialogProps {
   usedIds: Set<number>;
 }
 
-const TRIGGER_TYPES = [
-  { value: 0, label: "Periodic" },
-  { value: 1, label: "On Change" },
-  { value: 2, label: "One Shot" },
-];
+const TRIGGER_KEYS = [
+  { value: 0, key: "periodic" },
+  { value: 1, key: "onChange" },
+  { value: 2, key: "oneShot" },
+] as const;
 
 export default function GeneratorDialog({
   isOpen,
@@ -46,6 +47,7 @@ export default function GeneratorDialog({
   frameDefs,
   usedIds,
 }: GeneratorDialogProps) {
+  const { t } = useTranslation("rules");
   const selectableSignals = useRulesStore((s) => s.selectableSignals);
   const [generatorId, setGeneratorId] = useState(() => nextAvailableId(usedIds));
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export default function GeneratorDialog({
 
   const handleSubmit = () => {
     if (usedIds.has(generatorId)) {
-      setValidationError(`Generator ID ${formatHexId(generatorId)} is already in use.`);
+      setValidationError(t("generatorDialog.errors.idInUse", { id: formatHexId(generatorId) }));
       return;
     }
     setValidationError(null);
@@ -126,7 +128,7 @@ export default function GeneratorDialog({
     <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-2xl">
       <div className="p-6">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
-          Add Generator
+          {t("generatorDialog.title")}
         </h2>
 
         {validationError && (
@@ -135,28 +137,28 @@ export default function GeneratorDialog({
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Name</label>
+            <label className={labelDefault}>{t("generatorDialog.fields.name")}</label>
             <input
               className={inputSimple}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Optional"
+              placeholder={t("generatorDialog.fields.namePlaceholder")}
             />
           </div>
           <div>
-            <label className={labelDefault}>Description</label>
+            <label className={labelDefault}>{t("generatorDialog.fields.description")}</label>
             <input
               className={inputSimple}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional"
+              placeholder={t("generatorDialog.fields.namePlaceholder")}
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Generator ID</label>
+            <label className={labelDefault}>{t("generatorDialog.fields.generatorId")}</label>
             <input
               type="number"
               className={inputSimple}
@@ -165,7 +167,7 @@ export default function GeneratorDialog({
             />
           </div>
           <div>
-            <label className={labelDefault}>Frame Definition</label>
+            <label className={labelDefault}>{t("generatorDialog.fields.frameDef")}</label>
             <select
               className={inputSimple}
               value={frameDefId}
@@ -182,7 +184,7 @@ export default function GeneratorDialog({
 
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div>
-            <label className={labelDefault}>Output Interface</label>
+            <label className={labelDefault}>{t("generatorDialog.fields.outputInterface")}</label>
             <select
               className={inputSimple}
               value={interfaceIndex}
@@ -196,7 +198,7 @@ export default function GeneratorDialog({
             </select>
           </div>
           <div>
-            <label className={labelDefault}>Period (ms)</label>
+            <label className={labelDefault}>{t("generatorDialog.fields.periodMs")}</label>
             <input
               type="number"
               className={inputSimple}
@@ -206,15 +208,15 @@ export default function GeneratorDialog({
             />
           </div>
           <div>
-            <label className={labelDefault}>Trigger</label>
+            <label className={labelDefault}>{t("generatorDialog.fields.trigger")}</label>
             <select
               className={inputSimple}
               value={triggerType}
               onChange={(e) => setTriggerType(parseInt(e.target.value))}
             >
-              {TRIGGER_TYPES.map((tt) => (
+              {TRIGGER_KEYS.map((tt) => (
                 <option key={tt.value} value={tt.value}>
-                  {tt.label}
+                  {t(`generatorDialog.triggers.${tt.key}`)}
                 </option>
               ))}
             </select>
@@ -224,12 +226,12 @@ export default function GeneratorDialog({
         {/* Signal mappings */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <label className={labelDefault}>Signal Mappings</label>
+            <label className={labelDefault}>{t("generatorDialog.fields.mappings")}</label>
             <button
               onClick={addMapping}
               className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
             >
-              <Plus className={iconMd} /> Add Mapping
+              <Plus className={iconMd} /> {t("generatorDialog.fields.addMapping")}
             </button>
           </div>
           <div className="space-y-2">
@@ -240,22 +242,22 @@ export default function GeneratorDialog({
                 <div className="flex items-start gap-3">
                   {/* Source → Dest vertical flow */}
                   <div className="flex-1 space-y-1">
-                    <label className={`text-xs ${textTertiary}`}>Source Signal</label>
+                    <label className={`text-xs ${textTertiary}`}>{t("generatorDialog.fields.sourceSignal")}</label>
                     <SignalCombobox
                       signals={selectableSignals}
                       value={m.source_signal_id || null}
                       onChange={(id) => updateMapping(idx, "source_signal_id", id)}
-                      placeholder="Source signal"
+                      placeholder={t("generatorDialog.fields.sourcePlaceholder")}
                     />
                     <div className={`flex justify-center ${textTertiary}`}>
                       <ArrowDown className={iconSm} />
                     </div>
-                    <label className={`text-xs ${textTertiary}`}>Destination Signal</label>
+                    <label className={`text-xs ${textTertiary}`}>{t("generatorDialog.fields.destSignal")}</label>
                     <SignalCombobox
                       signals={selectableSignals}
                       value={m.dest_signal_id || null}
                       onChange={(id) => updateMapping(idx, "dest_signal_id", id)}
-                      placeholder="Dest signal"
+                      placeholder={t("generatorDialog.fields.destPlaceholder")}
                       minBitLength={srcSignal?.bit_length}
                     />
                   </div>
@@ -268,15 +270,15 @@ export default function GeneratorDialog({
                         updateMapping(idx, "transform_type", e.target.value)
                       }
                     >
-                      <option value="direct">Direct</option>
-                      <option value="scale">Scale</option>
-                      <option value="invert">Invert</option>
-                      <option value="mask">Mask</option>
+                      <option value="direct">{t("generatorDialog.transforms.direct")}</option>
+                      <option value="scale">{t("generatorDialog.transforms.scale")}</option>
+                      <option value="invert">{t("generatorDialog.transforms.invert")}</option>
+                      <option value="mask">{t("generatorDialog.transforms.mask")}</option>
                     </select>
                     <button
                       onClick={() => removeMapping(idx)}
                       className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-                      title="Remove mapping"
+                      title={t("generatorDialog.fields.removeMapping")}
                     >
                       <Trash2 className={iconSm} />
                     </button>
@@ -293,13 +295,13 @@ export default function GeneratorDialog({
           onClick={onClose}
           className={`px-4 py-2 text-sm rounded ${textSecondary} hover:bg-white/10`}
         >
-          Cancel
+          {t("generatorDialog.cancel")}
         </button>
         <button
           onClick={handleSubmit}
           className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
         >
-          Add Generator
+          {t("generatorDialog.submit")}
         </button>
       </div>
     </Dialog>
