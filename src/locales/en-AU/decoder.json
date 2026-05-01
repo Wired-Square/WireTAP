@@ -1,4 +1,17 @@
 {
+  "catalogPicker": {
+    "title": "Select Decoder Catalog"
+  },
+  "framesView": {
+    "sendToCalculator": "Send to Frame Calculator",
+    "showTimeRange": "Show time range",
+    "hideTimeRange": "Hide time range",
+    "bookmarkLoaded": "Bookmark loaded",
+    "loadBookmark": "Load bookmark",
+    "start": "Start",
+    "end": "End",
+    "playbackSpeed": "Playback speed"
+  },
   "topBar": {
     "showRawBytes": "Show raw bytes",
     "hideRawBytes": "Hide raw bytes",

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
+import { useTranslation } from "react-i18next";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
 import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFrames, getFilteredFrames } from "../../stores/decoderStore";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
@@ -40,6 +41,7 @@ import type { PlaybackSpeed, PlaybackState } from "../../components/TimeControll
 import type { FrameMessage } from "../../types/frame";
 
 export default function Decoder() {
+  const { t } = useTranslation("decoder");
   const { settings } = useSettings();
   const [catalogNotification, setCatalogNotification] = useState<string | null>(null);
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
@@ -1181,7 +1183,7 @@ export default function Decoder() {
           const sid = session.sessionId;
           if (sid) useSessionStore.getState().setSessionCatalogPath(sid, path);
         }}
-        title="Select Decoder Catalog"
+        title={t("catalogPicker.title")}
       />
 
       <BookmarkEditorDialog

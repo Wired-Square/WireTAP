@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { Calculator, Star, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter, Target, Send, BarChart3, Pencil } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
 import { validateChecksum, type ChecksumAlgorithm, type ChecksumValidationResult } from "../../../api/checksums";
@@ -351,6 +352,7 @@ function FrameCard({
   /** Context menu handler for signal row right-click */
   onSignalContextMenu?: (frame: FrameDetail, signal: DecodedSignal, position: { x: number; y: number }) => void;
 }) {
+  const { t } = useTranslation("decoder");
   // Track which byte indices are currently "bright" (recently changed)
   const [brightByteIndices, setBrightByteIndices] = useState<Set<number>>(new Set());
   const prevBytesRef = useRef<number[] | null>(null);
@@ -768,7 +770,7 @@ function FrameCard({
                     <button
                       onClick={() => sendHexDataToCalculator(decoded.value.replace(/\s+/g, ''))}
                       className="p-0.5 rounded hover:brightness-90 hover:bg-[var(--bg-surface)] transition-all"
-                      title="Send to Frame Calculator"
+                      title={t("framesView.sendToCalculator")}
                     >
                       <Calculator className={`${iconXs} text-orange-500`} />
                     </button>
@@ -887,6 +889,7 @@ export default function DecoderFramesView({
   scrollRef,
   onScroll,
 }: Props) {
+  const { t } = useTranslation("decoder");
   void _onToggleRawBytes; // Silence unused variable warning
   void _frameIdFilter; // Frame ID filtering is done at processing level in Decoder.tsx
   const proto = protocol ?? 'can';
@@ -1309,7 +1312,7 @@ export default function DecoderFramesView({
               ? 'bg-blue-600 text-white hover:bg-blue-500'
               : `${bgSurface} ${textSecondary} hover:brightness-95`
           }`}
-          title={showTimeRange ? "Hide time range" : "Show time range"}
+          title={showTimeRange ? t("framesView.hideTimeRange") : t("framesView.showTimeRange")}
         >
           <Clock className={iconSm} />
         </button>
@@ -1324,7 +1327,7 @@ export default function DecoderFramesView({
               ? 'bg-yellow-600 text-white hover:bg-yellow-500'
               : `${bgSurface} ${textSecondary} hover:brightness-95`
           }`}
-          title={isBookmarkActive ? "Bookmark loaded" : "Load bookmark"}
+          title={isBookmarkActive ? t("framesView.bookmarkLoaded") : t("framesView.loadBookmark")}
         >
           <Star
             className={iconSm}
@@ -1338,14 +1341,14 @@ export default function DecoderFramesView({
   // Time range inputs for toolbar (optional feature)
   const timeRangeInputs = showTimeRange && onStartTimeChange && onEndTimeChange ? (
     <div className={flexRowGap2}>
-      <label className={`text-xs ${textMuted}`}>Start</label>
+      <label className={`text-xs ${textMuted}`}>{t("framesView.start")}</label>
       <input
         type="datetime-local"
         value={startTime || ""}
         onChange={(e) => onStartTimeChange(e.target.value)}
         className={`px-2 py-1 text-xs rounded ${borderDefault} ${bgSurface} ${textPrimary}`}
       />
-      <label className={`text-xs ${textMuted} ml-2`}>End</label>
+      <label className={`text-xs ${textMuted} ml-2`}>{t("framesView.end")}</label>
       <input
         type="datetime-local"
         value={endTime || ""}
@@ -1404,7 +1407,7 @@ export default function DecoderFramesView({
       value={playbackSpeed}
       onChange={(e) => onSpeedChange(parseFloat(e.target.value) as PlaybackSpeed)}
       className={`px-2 py-0.5 text-xs rounded border ${borderDefault} ${bgSurface} ${textPrimary}`}
-      title="Playback speed"
+      title={t("framesView.playbackSpeed")}
     >
       {([0.125, 0.25, 0.5, 1, 2, 10, 30, 60] as PlaybackSpeed[]).map((s) => (
         <option key={s} value={s}>
@@ -1689,7 +1692,7 @@ export default function DecoderFramesView({
                       <button
                         onClick={() => sendHexDataToCalculator(bytesHex.replace(/\s+/g, ''))}
                         className={`p-1 rounded ${hoverBg} transition-colors`}
-                        title="Send to Frame Calculator"
+                        title={t("framesView.sendToCalculator")}
                       >
                         <Calculator className={`${iconSm} ${textDataOrange}`} />
                       </button>
