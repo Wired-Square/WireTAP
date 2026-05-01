@@ -3,6 +3,7 @@
 // CAN frame editor and single-shot transmit view.
 
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Send, Plus, RotateCcw } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
@@ -17,6 +18,7 @@ import { byteToHex } from "../../../utils/byteUtils";
 import CanFrameEditor from "../components/CanFrameEditor";
 
 export default function CanTransmitView() {
+  const { t } = useTranslation("transmit");
   // Store selectors
   const activeSession = useActiveSession();
   const canEditor = useTransmitStore((s) => s.canEditor);
@@ -76,9 +78,9 @@ export default function CanTransmitView() {
     return (
       <div className={emptyStateContainer}>
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>Not Connected</p>
+          <p className={emptyStateHeading}>{t("canView.notConnectedHeading")}</p>
           <p className={emptyStateDescription}>
-            Connect to an interface to transmit CAN frames.
+            {t("canView.notConnectedDescription")}
           </p>
         </div>
       </div>
@@ -90,9 +92,9 @@ export default function CanTransmitView() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
         <div className={`${textDataSecondary} text-center`}>
-          <p className="text-lg font-medium">CAN Not Supported</p>
+          <p className="text-lg font-medium">{t("canView.notSupportedHeading")}</p>
           <p className="text-sm mt-2">
-            This profile does not support CAN frame transmission.
+            {t("canView.notSupportedDescription")}
           </p>
         </div>
       </div>
@@ -110,7 +112,7 @@ export default function CanTransmitView() {
       {framePreview && (
         <div className={`px-4 py-3 ${bgDataToolbar} border-b ${borderDataView}`}>
           <div className="flex items-center gap-4">
-            <span className={`${textDataSecondary} text-xs`}>Preview:</span>
+            <span className={`${textDataSecondary} text-xs`}>{t("canView.preview")}</span>
             <code className="font-mono text-sm text-green-400">
               {framePreview.id}
             </code>
@@ -133,20 +135,20 @@ export default function CanTransmitView() {
           onClick={handleSend}
           disabled={!framePreview}
           className={playButtonBase}
-          title="Send frame once"
+          title={t("canView.sendOnceTooltip")}
         >
           <Send size={16} />
-          <span>Send Once</span>
+          <span>{t("canView.sendOnce")}</span>
         </button>
 
         <button
           onClick={handleAddToQueue}
           disabled={!framePreview}
           className={buttonBase}
-          title="Add to transmit queue"
+          title={t("canView.addToQueueTooltip")}
         >
           <Plus size={16} />
-          <span>Add to Queue</span>
+          <span>{t("canView.addToQueue")}</span>
         </button>
 
         <div className="flex-1" />
@@ -154,10 +156,10 @@ export default function CanTransmitView() {
         <button
           onClick={handleReset}
           className={buttonBase}
-          title="Reset to defaults"
+          title={t("canView.resetTooltip")}
         >
           <RotateCcw size={14} />
-          <span>Reset</span>
+          <span>{t("canView.reset")}</span>
         </button>
       </div>
     </div>

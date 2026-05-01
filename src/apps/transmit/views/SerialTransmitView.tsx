@@ -3,6 +3,7 @@
 // Serial bytes editor and single-shot transmit view.
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, RotateCcw, Send } from "lucide-react";
 import { useTransmitStore } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
@@ -23,6 +24,7 @@ import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescr
 import { byteToHex, hexToBytes } from "../../../utils/byteUtils";
 
 export default function SerialTransmitView() {
+  const { t } = useTranslation("transmit");
   // Store selectors
   const activeSession = useActiveSession();
   const serialEditor = useTransmitStore((s) => s.serialEditor);
@@ -131,9 +133,9 @@ export default function SerialTransmitView() {
     return (
       <div className={emptyStateContainer}>
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>Not Connected</p>
+          <p className={emptyStateHeading}>{t("serialView.notConnectedHeading")}</p>
           <p className={emptyStateDescription}>
-            Connect to an interface to transmit serial bytes.
+            {t("serialView.notConnectedDescription")}
           </p>
         </div>
       </div>
@@ -145,12 +147,12 @@ export default function SerialTransmitView() {
     return (
       <div className={emptyStateContainer}>
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>Serial Not Supported</p>
+          <p className={emptyStateHeading}>{t("serialView.notSupportedHeading")}</p>
           <p className={emptyStateDescription}>
-            This profile does not support serial byte transmission.
+            {t("serialView.notSupportedDescription")}
           </p>
           <p className={emptyStateHint}>
-            Only serial profiles support raw byte transmission.
+            {t("serialView.notSupportedHint")}
           </p>
         </div>
       </div>
@@ -164,12 +166,12 @@ export default function SerialTransmitView() {
         <div className="space-y-4">
           <div>
             <label className={`${textDataSecondary} text-xs mb-1 block`}>
-              Hex Bytes
+              {t("serialView.hexBytes")}
             </label>
             <textarea
               value={serialEditor.hexInput}
               onChange={handleHexInputChange}
-              placeholder="AA BB CC DD EE FF..."
+              placeholder={t("serialView.hexPlaceholder")}
               rows={4}
               className={`w-full ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-3 py-2 border ${borderDataView} ${focusBorder} uppercase resize-none`}
             />
@@ -177,19 +179,19 @@ export default function SerialTransmitView() {
 
           {/* Framing Mode */}
           <div className="space-y-2">
-            <label className={`${textDataSecondary} text-xs`}>Framing Mode:</label>
+            <label className={`${textDataSecondary} text-xs`}>{t("serialView.framingMode")}</label>
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => handleFramingModeChange("raw")}
                 className={toggleChipClass(serialEditor.framingMode === "raw")}
               >
-                Raw (No Framing)
+                {t("serialView.framingRaw")}
               </button>
               <button
                 onClick={() => handleFramingModeChange("slip")}
                 className={toggleChipClass(serialEditor.framingMode === "slip")}
               >
-                SLIP
+                {t("serialView.framingSlip")}
               </button>
               <button
                 onClick={() => handleFramingModeChange("delimiter")}
@@ -197,7 +199,7 @@ export default function SerialTransmitView() {
                   serialEditor.framingMode === "delimiter"
                 )}
               >
-                Delimiter
+                {t("serialView.framingDelimiter")}
               </button>
             </div>
           </div>
@@ -206,17 +208,17 @@ export default function SerialTransmitView() {
           {serialEditor.framingMode === "delimiter" && (
             <div>
               <label className={`${textDataSecondary} text-xs mb-1 block`}>
-                Delimiter (hex)
+                {t("serialView.delimiterLabel")}
               </label>
               <input
                 type="text"
                 value={serialEditor.delimiter.map(byteToHex).join(" ")}
                 onChange={handleDelimiterChange}
-                placeholder="0D 0A"
+                placeholder={t("serialView.delimiterPlaceholder")}
                 className={`w-32 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder} uppercase`}
               />
               <p className={`${textDataSecondary} text-xs mt-1`}>
-                Default: 0D 0A (CRLF)
+                {t("serialView.delimiterDefault")}
               </p>
             </div>
           )}
@@ -228,9 +230,9 @@ export default function SerialTransmitView() {
         <div className={`px-4 py-3 ${bgDataToolbar} border-b ${borderDataView}`}>
           <div className="space-y-1">
             <div className="flex items-center gap-4">
-              <span className={`${textDataSecondary} text-xs`}>Preview:</span>
+              <span className={`${textDataSecondary} text-xs`}>{t("serialView.preview")}</span>
               <span className="text-xs text-blue-400">
-                {preview.length} bytes
+                {t("serialView.bytesCount", { count: preview.length })}
               </span>
             </div>
             <div className="flex items-start gap-4">
@@ -239,7 +241,7 @@ export default function SerialTransmitView() {
               </code>
             </div>
             <div className={flexRowGap2}>
-              <span className={`${textDataSecondary} text-xs`}>ASCII:</span>
+              <span className={`${textDataSecondary} text-xs`}>{t("serialView.ascii")}</span>
               <code className={`font-mono text-xs ${textDataTertiary}`}>
                 {preview.ascii}
               </code>
@@ -254,20 +256,20 @@ export default function SerialTransmitView() {
           onClick={handleSend}
           disabled={!preview || isSending}
           className={`${buttonBase} ${preview && !isSending ? "bg-blue-600 hover:bg-blue-500" : ""}`}
-          title="Send bytes now"
+          title={t("serialView.sendTooltip")}
         >
           <Send size={16} />
-          <span>{isSending ? "Sending..." : "Send"}</span>
+          <span>{isSending ? t("serialView.sending") : t("serialView.send")}</span>
         </button>
 
         <button
           onClick={handleAddToQueue}
           disabled={!preview}
           className={buttonBase}
-          title="Add to transmit queue"
+          title={t("serialView.addToQueueTooltip")}
         >
           <Plus size={16} />
-          <span>Add to Queue</span>
+          <span>{t("serialView.addToQueue")}</span>
         </button>
 
         <div className="flex-1" />
@@ -275,10 +277,10 @@ export default function SerialTransmitView() {
         <button
           onClick={handleReset}
           className={buttonBase}
-          title="Reset to defaults"
+          title={t("serialView.resetTooltip")}
         >
           <RotateCcw size={14} />
-          <span>Reset</span>
+          <span>{t("serialView.reset")}</span>
         </button>
       </div>
     </div>

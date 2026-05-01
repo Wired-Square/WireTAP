@@ -3,6 +3,7 @@
 // CAN frame editor component with ID, DLC, flags, bus selector, and data grid.
 
 import { useCallback, useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useTransmitStore, CAN_FD_DLC_VALUES } from "../../../stores/transmitStore";
 import { useActiveSession } from "../../../stores/sessionStore";
 import {
@@ -15,6 +16,7 @@ import {
 import { toggleChipClass } from "../../../styles/buttonStyles";
 
 export default function CanFrameEditor() {
+  const { t } = useTranslation("transmit");
   // Local state for tracking focused data byte (allows select-all and type to replace)
   const [focusedByteIndex, setFocusedByteIndex] = useState<number | null>(null);
 
@@ -169,7 +171,7 @@ export default function CanFrameEditor() {
       <div className="flex items-end gap-4 flex-wrap">
         {/* Frame ID */}
         <div className="flex flex-col">
-          <label className={`${textDataSecondary} text-xs mb-1`}>Frame ID</label>
+          <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.frameId")}</label>
           <div className="flex items-center">
             <span className={`${textDataSecondary} text-sm mr-1`}>0x</span>
             <input
@@ -177,7 +179,7 @@ export default function CanFrameEditor() {
               value={canEditor.frameId}
               onChange={handleFrameIdChange}
               maxLength={canEditor.isExtended ? 8 : 3}
-              placeholder={canEditor.isExtended ? "12345678" : "123"}
+              placeholder={canEditor.isExtended ? t("canEditor.frameIdPlaceholderExt") : t("canEditor.frameIdPlaceholderStd")}
               className={`w-24 ${bgDataInput} ${textDataPrimary} font-mono text-sm rounded px-2 py-1.5 border ${borderDataView} ${focusBorder} uppercase`}
             />
           </div>
@@ -185,7 +187,7 @@ export default function CanFrameEditor() {
 
         {/* DLC */}
         <div className="flex flex-col">
-          <label className={`${textDataSecondary} text-xs mb-1`}>DLC</label>
+          <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.dlc")}</label>
           <select
             value={canEditor.dlc}
             onChange={handleDlcChange}
@@ -202,7 +204,7 @@ export default function CanFrameEditor() {
         {/* Bus (only for multi-bus) */}
         {isMultiBus && (
           <div className="flex flex-col">
-            <label className={`${textDataSecondary} text-xs mb-1`}>Bus</label>
+            <label className={`${textDataSecondary} text-xs mb-1`}>{t("canEditor.bus")}</label>
             <select
               value={canEditor.bus}
               onChange={handleBusChange}
@@ -210,7 +212,7 @@ export default function CanFrameEditor() {
             >
               {availableBuses.map((bus) => (
                 <option key={bus} value={bus}>
-                  Bus {bus}
+                  {t("canEditor.busLabel", { bus })}
                 </option>
               ))}
             </select>
@@ -220,14 +222,14 @@ export default function CanFrameEditor() {
 
       {/* Second Row: Flags */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className={`${textDataSecondary} text-xs mr-2`}>Flags:</span>
+        <span className={`${textDataSecondary} text-xs mr-2`}>{t("canEditor.flags")}</span>
 
         {supportsExtended && (
           <button
             onClick={handleExtendedToggle}
             className={toggleChipClass(canEditor.isExtended)}
           >
-            Extended (29-bit)
+            {t("canEditor.extendedFull")}
           </button>
         )}
 
@@ -236,7 +238,7 @@ export default function CanFrameEditor() {
             onClick={handleFdToggle}
             className={toggleChipClass(canEditor.isFd)}
           >
-            CAN FD
+            {t("canEditor.canFd")}
           </button>
         )}
 
@@ -245,7 +247,7 @@ export default function CanFrameEditor() {
             onClick={handleBrsToggle}
             className={toggleChipClass(canEditor.isBrs)}
           >
-            BRS
+            {t("canEditor.brs")}
           </button>
         )}
 
@@ -254,7 +256,7 @@ export default function CanFrameEditor() {
             onClick={handleRtrToggle}
             className={toggleChipClass(canEditor.isRtr)}
           >
-            RTR
+            {t("canEditor.rtr")}
           </button>
         )}
       </div>
@@ -262,7 +264,7 @@ export default function CanFrameEditor() {
       {/* Third Row: Data Bytes */}
       {canEditor.dlc > 0 && !canEditor.isRtr && (
         <div className="space-y-2">
-          <label className={`${textDataSecondary} text-xs`}>Data Bytes:</label>
+          <label className={`${textDataSecondary} text-xs`}>{t("canEditor.dataBytes")}</label>
           <div className="space-y-1">{renderDataGrid()}</div>
         </div>
       )}
@@ -270,7 +272,7 @@ export default function CanFrameEditor() {
       {/* RTR notice */}
       {canEditor.isRtr && (
         <div className={`${textDataSecondary} text-xs italic`}>
-          RTR (Remote Transmission Request) frames have no data payload.
+          {t("canEditor.rtrNotice")}
         </div>
       )}
     </div>
