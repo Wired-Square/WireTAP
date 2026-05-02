@@ -69,7 +69,7 @@ serialport = "4.3"
 keepawake = "0.5"
 # Firmware flashers — drive the ESP32 serial bootloader (esptool-style) and
 # STM32 USB DFU 1.1 / DfuSe protocols. Used by the Serial app's flash tabs.
-espflash = { version = "4", default-features = false }
+espflash = { version = "4", default-features = false, features = ["serialport"] }
 dfu-core = "0.10"
 dfu-nusb = "0.1"
 

@@ -5,8 +5,14 @@
 
 import { create } from "zustand";
 
+import type {
+  EspChipInfo,
+  EspFlashOptions,
+} from "../utils/flasherTypes";
+
 export type SerialTab = "terminal" | "esp" | "dfu";
 export type Parity = "none" | "odd" | "even";
+export type EspOperation = "flash" | "backup" | "erase";
 
 export interface SerialSettings {
   port: string | null;
@@ -44,6 +50,15 @@ export const initialFlashProgress: FlashProgress = {
   error: null,
 };
 
+/** Default flasher options — match the user's typical flow on this hardware. */
+const DEFAULT_ESP_OPTIONS: EspFlashOptions = {
+  chip: null,
+  flash_baud: 921_600,
+  flash_mode: "dio",
+  flash_freq: "80MHz",
+  flash_size: null,
+};
+
 interface SerialState {
   settings: SerialSettings;
   activeTab: SerialTab;
@@ -51,6 +66,13 @@ interface SerialState {
   localEcho: boolean;
   espFlash: FlashProgress;
   dfuFlash: FlashProgress;
+
+  /** Sub-mode within the ESP Flash tab (write / dump / wipe). */
+  espOperation: EspOperation;
+  /** Persistent flasher knobs, shared across operations. */
+  espOptions: EspFlashOptions;
+  /** Last successful chip detection. Populates the status bar + flash size default. */
+  espChip: EspChipInfo | null;
 
   // actions
   setSettings: (patch: Partial<SerialSettings>) => void;
@@ -63,6 +85,9 @@ interface SerialState {
   appendDfuLog: (line: string) => void;
   resetEspFlash: () => void;
   resetDfuFlash: () => void;
+  setEspOperation: (op: EspOperation) => void;
+  setEspOptions: (patch: Partial<EspFlashOptions>) => void;
+  setEspChip: (chip: EspChipInfo | null) => void;
 }
 
 export const useSerialStore = create<SerialState>((set) => ({
@@ -77,12 +102,17 @@ export const useSerialStore = create<SerialState>((set) => ({
   localEcho: false,
   espFlash: { ...initialFlashProgress },
   dfuFlash: { ...initialFlashProgress },
+  espOperation: "flash",
+  espOptions: { ...DEFAULT_ESP_OPTIONS },
+  espChip: null,
 
   setSettings: (patch) =>
     set((s) => ({ settings: { ...s.settings, ...patch } })),
   setPort: (port) =>
     set((s) => ({
       settings: { ...s.settings, port },
+      // A new port means our cached detection is no longer valid.
+      espChip: port === s.settings.port ? s.espChip : null,
     })),
   setActiveTab: (activeTab) => set({ activeTab }),
   setLocalEcho: (localEcho) => set({ localEcho }),
@@ -94,4 +124,8 @@ export const useSerialStore = create<SerialState>((set) => ({
     set((s) => ({ dfuFlash: { ...s.dfuFlash, log: [...s.dfuFlash.log, line] } })),
   resetEspFlash: () => set({ espFlash: { ...initialFlashProgress } }),
   resetDfuFlash: () => set({ dfuFlash: { ...initialFlashProgress } }),
+  setEspOperation: (espOperation) => set({ espOperation }),
+  setEspOptions: (patch) =>
+    set((s) => ({ espOptions: { ...s.espOptions, ...patch } })),
+  setEspChip: (espChip) => set({ espChip }),
 }));

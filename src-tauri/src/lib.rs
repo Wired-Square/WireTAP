@@ -1217,6 +1217,10 @@ pub fn run() {
             #[cfg(not(target_os = "ios"))]
             flashers::flasher_esp_flash,
             #[cfg(not(target_os = "ios"))]
+            flashers::flasher_esp_read_flash,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_esp_erase,
+            #[cfg(not(target_os = "ios"))]
             flashers::flasher_esp_cancel,
             #[cfg(not(target_os = "ios"))]
             flashers::flasher_dfu_list_devices,

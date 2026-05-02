@@ -53,6 +53,24 @@ pub struct EspChipInfo {
     pub flash_size_bytes: Option<u64>,
 }
 
+/// Flasher tuning passed in from the UI. Every field is optional — `None`
+/// means "let espflash decide / leave at its default". Mirrors the knobs on
+/// the `esptool ... write-flash` command line.
+#[derive(Clone, Deserialize, Default, Debug)]
+#[serde(default)]
+pub struct EspFlashOptions {
+    /// Forced chip type (`esp32`, `esp32s3`, …). `None` = auto-detect.
+    pub chip: Option<String>,
+    /// Bootloader baud rate. `None` defaults to 460_800.
+    pub flash_baud: Option<u32>,
+    /// Flash mode (`dio`, `qio`, `qout`, `dout`).
+    pub flash_mode: Option<String>,
+    /// Flash frequency (`40MHz`, `80MHz`, `26MHz`, `20MHz`).
+    pub flash_freq: Option<String>,
+    /// Flash size (`4MB`, `8MB`, `16MB`, …).
+    pub flash_size: Option<String>,
+}
+
 #[derive(Clone, Serialize, Debug)]
 pub struct DfuDeviceInfo {
     pub vid: u16,
@@ -108,55 +126,86 @@ fn new_flash_id(prefix: &str) -> String {
 // ============================================================================
 
 #[tauri::command(rename_all = "snake_case")]
-pub async fn flasher_esp_detect_chip(port: String, baud: u32) -> Result<EspChipInfo, String> {
-    esp_flasher::detect_chip(port, baud).await
+pub async fn flasher_esp_detect_chip(
+    port: String,
+    options: Option<EspFlashOptions>,
+) -> Result<EspChipInfo, String> {
+    esp_flasher::detect_chip(port, options.unwrap_or_default()).await
 }
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn flasher_esp_flash(
     app: AppHandle,
     port: String,
-    baud: u32,
     image_path: String,
     address: u32,
+    options: Option<EspFlashOptions>,
 ) -> Result<String, String> {
     let flash_id = new_flash_id("esp");
     register_flash(&flash_id);
     let id_clone = flash_id.clone();
     let app_clone = app.clone();
+    let opts = options.unwrap_or_default();
     tauri::async_runtime::spawn(async move {
         let result = esp_flasher::flash(
             app_clone.clone(),
             id_clone.clone(),
             port,
-            baud,
             image_path,
             address,
+            opts,
         )
         .await;
-        match result {
-            Ok(()) => emit_progress(
-                &app_clone,
-                FlasherProgress {
-                    flash_id: id_clone.clone(),
-                    phase: FlashPhase::Done,
-                    bytes_done: 0,
-                    bytes_total: 0,
-                    message: None,
-                },
-            ),
-            Err(err) => emit_progress(
-                &app_clone,
-                FlasherProgress {
-                    flash_id: id_clone.clone(),
-                    phase: FlashPhase::Error,
-                    bytes_done: 0,
-                    bytes_total: 0,
-                    message: Some(err),
-                },
-            ),
-        }
-        clear_flash(&id_clone);
+        finalise_flash_result(&app_clone, &id_clone, result);
+    });
+    Ok(flash_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn flasher_esp_read_flash(
+    app: AppHandle,
+    port: String,
+    output_path: String,
+    offset: u32,
+    size: Option<u32>,
+    options: Option<EspFlashOptions>,
+) -> Result<String, String> {
+    let flash_id = new_flash_id("esp");
+    register_flash(&flash_id);
+    let id_clone = flash_id.clone();
+    let app_clone = app.clone();
+    let opts = options.unwrap_or_default();
+    tauri::async_runtime::spawn(async move {
+        let result = esp_flasher::read_flash(
+            app_clone.clone(),
+            id_clone.clone(),
+            port,
+            output_path,
+            offset,
+            size,
+            opts,
+        )
+        .await;
+        finalise_flash_result(&app_clone, &id_clone, result);
+    });
+    Ok(flash_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn flasher_esp_erase(
+    app: AppHandle,
+    port: String,
+    options: Option<EspFlashOptions>,
+) -> Result<String, String> {
+    let flash_id = new_flash_id("esp");
+    register_flash(&flash_id);
+    let id_clone = flash_id.clone();
+    let app_clone = app.clone();
+    let opts = options.unwrap_or_default();
+    tauri::async_runtime::spawn(async move {
+        let result =
+            esp_flasher::erase(app_clone.clone(), id_clone.clone(), port, opts).await;
+        finalise_flash_result(&app_clone, &id_clone, result);
     });
     Ok(flash_id)
 }
@@ -165,6 +214,46 @@ pub async fn flasher_esp_flash(
 pub fn flasher_esp_cancel(flash_id: String) -> Result<(), String> {
     request_cancel(&flash_id);
     Ok(())
+}
+
+/// Final-status emitter used by every async ESP/DFU runner. The `flash` /
+/// `erasing` / `writing` phases all converge to either Done or Error here so
+/// the front-end progress UI can settle on a terminal state.
+fn finalise_flash_result(app: &AppHandle, flash_id: &str, result: Result<(), String>) {
+    let cancelled = is_cancelled(flash_id);
+    match result {
+        Ok(()) => emit_progress(
+            app,
+            FlasherProgress {
+                flash_id: flash_id.to_string(),
+                phase: FlashPhase::Done,
+                bytes_done: 0,
+                bytes_total: 0,
+                message: None,
+            },
+        ),
+        Err(err) if cancelled => emit_progress(
+            app,
+            FlasherProgress {
+                flash_id: flash_id.to_string(),
+                phase: FlashPhase::Cancelled,
+                bytes_done: 0,
+                bytes_total: 0,
+                message: Some(err),
+            },
+        ),
+        Err(err) => emit_progress(
+            app,
+            FlasherProgress {
+                flash_id: flash_id.to_string(),
+                phase: FlashPhase::Error,
+                bytes_done: 0,
+                bytes_total: 0,
+                message: Some(err),
+            },
+        ),
+    }
+    clear_flash(flash_id);
 }
 
 // ============================================================================
@@ -196,29 +285,7 @@ pub async fn flasher_dfu_flash(
             address,
         )
         .await;
-        match result {
-            Ok(()) => emit_progress(
-                &app_clone,
-                FlasherProgress {
-                    flash_id: id_clone.clone(),
-                    phase: FlashPhase::Done,
-                    bytes_done: 0,
-                    bytes_total: 0,
-                    message: None,
-                },
-            ),
-            Err(err) => emit_progress(
-                &app_clone,
-                FlasherProgress {
-                    flash_id: id_clone.clone(),
-                    phase: FlashPhase::Error,
-                    bytes_done: 0,
-                    bytes_total: 0,
-                    message: Some(err),
-                },
-            ),
-        }
-        clear_flash(&id_clone);
+        finalise_flash_result(&app_clone, &id_clone, result);
     });
     Ok(flash_id)
 }

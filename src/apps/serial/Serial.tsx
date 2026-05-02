@@ -108,21 +108,45 @@ export default function Serial() {
     terminalRef.current?.clear();
   }, [terminal]);
 
+  // Port hand-off for ESP/DFU operations: when the user kicks off a flash,
+  // backup, erase, or chip detect, we need the port exclusively. Remember
+  // whether the terminal was open at the time and reopen it once the op
+  // settles — so swapping between Terminal and ESP Flash feels seamless.
+  const restoreTerminalAfterEspOp = useRef(false);
+  const handleEspBeforeFlash = useCallback(async () => {
+    restoreTerminalAfterEspOp.current = terminal.isOpen;
+    if (terminal.isOpen) {
+      await terminal.close();
+    }
+  }, [terminal]);
+
+  const espPhase = useSerialStore((s) => s.espFlash.phase);
+  const prevEspPhaseRef = useRef(espPhase);
+  useEffect(() => {
+    const prev = prevEspPhaseRef.current;
+    prevEspPhaseRef.current = espPhase;
+    const wasBusy =
+      prev === "connecting" ||
+      prev === "erasing" ||
+      prev === "writing" ||
+      prev === "verifying";
+    const isSettled =
+      espPhase === "done" ||
+      espPhase === "error" ||
+      espPhase === "cancelled" ||
+      espPhase === "idle";
+    if (wasBusy && isSettled && restoreTerminalAfterEspOp.current) {
+      restoreTerminalAfterEspOp.current = false;
+      void handleConnect();
+    }
+  }, [espPhase, handleConnect]);
+
   // Refresh the terminal binding (write callback) whenever the terminal id
   // changes — passes a stable function reference to xterm.
   const writeFn = useMemo(() => {
     if (!terminal.isOpen) return null;
     return (bytes: number[]) => terminal.write(bytes);
   }, [terminal.isOpen, terminal]);
-
-  useEffect(() => {
-    // Surface a console message if a flash tab is going to need the port.
-    if (terminal.isOpen && (activeTab === "esp" || activeTab === "dfu")) {
-      tlog.debug(
-        `[Serial] tab=${activeTab} active while terminal open; flasher will close it`,
-      );
-    }
-  }, [activeTab, terminal.isOpen]);
 
   const tabs = useMemo<{ id: SerialTab; label: string; icon: typeof TerminalIcon }[]>(
     () => [
@@ -200,7 +224,10 @@ export default function Serial() {
           </div>
         )}
         {activeTab === "esp" && (
-          <EspFlashView onBeforeFlash={handleDisconnect} />
+          <EspFlashView
+            onBeforeFlash={handleEspBeforeFlash}
+            isTerminalOpen={terminal.isOpen}
+          />
         )}
         {activeTab === "dfu" && <DfuFlashView />}
       </div>

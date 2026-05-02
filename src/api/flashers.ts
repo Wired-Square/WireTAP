@@ -7,6 +7,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   EspChipInfo,
+  EspFlashOptions,
   DfuDeviceInfo,
 } from "../apps/serial/utils/flasherTypes";
 
@@ -14,23 +15,46 @@ export const FLASHER_PROGRESS_EVENT = "flasher-progress";
 
 export async function flasherEspDetectChip(
   port: string,
-  baud: number,
+  options?: EspFlashOptions,
 ): Promise<EspChipInfo> {
-  return invoke("flasher_esp_detect_chip", { port, baud });
+  return invoke("flasher_esp_detect_chip", { port, options });
 }
 
 export async function flasherEspFlash(
   port: string,
-  baud: number,
   imagePath: string,
   address: number,
+  options?: EspFlashOptions,
 ): Promise<string> {
   return invoke("flasher_esp_flash", {
     port,
-    baud,
     image_path: imagePath,
     address,
+    options,
   });
+}
+
+export async function flasherEspReadFlash(
+  port: string,
+  outputPath: string,
+  offset: number,
+  size: number | null,
+  options?: EspFlashOptions,
+): Promise<string> {
+  return invoke("flasher_esp_read_flash", {
+    port,
+    output_path: outputPath,
+    offset,
+    size,
+    options,
+  });
+}
+
+export async function flasherEspErase(
+  port: string,
+  options?: EspFlashOptions,
+): Promise<string> {
+  return invoke("flasher_esp_erase", { port, options });
 }
 
 export async function flasherEspCancel(flashId: string): Promise<void> {

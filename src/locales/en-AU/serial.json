@@ -1,5 +1,9 @@
 {
   "topBar": {
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "connectTooltip": "Open the selected serial port",
+    "connectNoPortTooltip": "Pick a serial port first",
     "disconnect": "Disconnect",
     "disconnectTooltip": "Disconnect from the serial port",
     "reset": "Reset",
