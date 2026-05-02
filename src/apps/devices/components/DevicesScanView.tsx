@@ -3,7 +3,7 @@
 // Unified scan view — discovers BLE devices with WiFi provisioning and/or
 // SMP capabilities, plus mDNS/UDP devices.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { RefreshCw, Globe, ChevronDown, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { textSecondary } from "../../../styles";
@@ -13,7 +13,8 @@ import { useDevicesStore } from "../stores/devicesStore";
 import { useProvisioningStore } from "../../provisioning/stores/provisioningStore";
 import { useUpgradeStore } from "../../upgrade/stores/upgradeStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
-import DeviceCard from "../../../components/DeviceCard";
+import MergedDeviceCard, { type ConnectVia } from "../../../components/MergedDeviceCard";
+import { mergeDevices, type MergedDevice } from "../utils/mergedDevices";
 import {
   deviceScanStart,
   deviceScanStop,
@@ -29,6 +30,9 @@ import {
 } from "../../../api/smpUpgrade";
 import { framelinkProbeDevice } from "../../../api/framelink";
 
+const STALE_PRUNE_MS = 4000;
+const STALE_PRUNE_INTERVAL_MS = 1000;
+
 export default function DevicesScanView() {
   const { t } = useTranslation("devices");
   const devices = useDevicesStore((s) => s.data.devices);
@@ -41,6 +45,9 @@ export default function DevicesScanView() {
   const setSelectedDevice = useDevicesStore((s) => s.setSelectedDevice);
   const setStep = useDevicesStore((s) => s.setStep);
   const clearDevices = useDevicesStore((s) => s.clearDevices);
+  const pruneStale = useDevicesStore((s) => s.pruneStale);
+
+  const mergedDevices = useMemo(() => mergeDevices(devices), [devices]);
 
   // Provisioning store actions (for reading device state on connect)
   const setProvisionSelectedDevice = useProvisioningStore((s) => s.setSelectedDevice);
@@ -56,7 +63,7 @@ export default function DevicesScanView() {
   const setImages = useUpgradeStore((s) => s.setImages);
   const setUpgradeConnectionState = useUpgradeStore((s) => s.setConnectionState);
 
-  const [connectingDeviceId, setConnectingDeviceId] = useState<string | null>(null);
+  const [connectingKey, setConnectingKey] = useState<{ name: string; via: ConnectVia } | null>(null);
   const [showManualIp, setShowManualIp] = useState(false);
   const [manualAddress, setManualAddress] = useState("");
   const [manualProtocol, setManualProtocol] = useState<"smp" | "framelink">("smp");
@@ -91,6 +98,16 @@ export default function DevicesScanView() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // While scanning, sweep stale entries (devices that stopped advertising or
+  // dropped off the network) so a powered-off device disappears within ~5s.
+  useEffect(() => {
+    if (!isScanning) return;
+    const handle = window.setInterval(() => {
+      pruneStale(STALE_PRUNE_MS);
+    }, STALE_PRUNE_INTERVAL_MS);
+    return () => window.clearInterval(handle);
+  }, [isScanning, pruneStale]);
+
   const handleRescan = useCallback(async () => {
     clearDevices();
     setError(null);
@@ -104,102 +121,140 @@ export default function DevicesScanView() {
     }
   }, [clearDevices, setError, setScanning]);
 
-  /** Connect to a BLE device and route to the appropriate first step. */
-  const handleConnect = async (deviceId: string) => {
-    setError(null);
-    setConnectingDeviceId(deviceId);
-    setConnectionState("connecting");
-
-    // Stop scanning if active
+  /** Stop the active scan and clear the spinner before initiating a connect. */
+  const stopScanIfActive = async () => {
     if (isScanning) {
       try { await deviceScanStop(); } catch { /* ignore */ }
       setScanning(false);
     }
+  };
 
-    const device = devices.find((d) => d.id === deviceId);
-    const caps = device?.capabilities ?? [];
-    const transport = device?.transport ?? "ble";
-    const name = device?.name ?? deviceId;
+  /** Restart scan after a failed connect, so the user can retry. */
+  const restartScanAfterFailure = () => {
+    clearDevices();
+    setScanning(true);
+    deviceScanStart().catch((scanErr) => {
+      setError(String(scanErr));
+      setScanning(false);
+    });
+  };
+
+  /** Read current WiFi state from a freshly-connected BLE device into the provisioning store. */
+  const hydrateProvisioningStateFromBle = async () => {
+    try {
+      const state = await bleReadDeviceState();
+      if (state.ssid) {
+        setDeviceSsid(state.ssid);
+        setSsid(state.ssid);
+      }
+      if (state.security !== null && state.security !== undefined) {
+        setSecurity(state.security);
+      }
+      setDeviceStatus(state.status);
+      if (state.ip_address) {
+        setDeviceIpAddress(state.ip_address);
+      }
+    } catch {
+      // Non-critical — continue to credentials even if read fails
+    }
+  };
+
+  /** Connect via BLE: routes by capability (wifi-provision → credentials, smp → inspect, framelink-only → framelink-setup). */
+  const handleConnectBle = async (m: MergedDevice) => {
+    if (!m.ble) return;
+    const { id: bleId, capabilities: caps } = m.ble;
+    const deviceId = `ble:${bleId}`;
+
+    setError(null);
+    setConnectingKey({ name: m.name, via: "ble" });
+    setConnectionState("connecting");
+    await stopScanIfActive();
 
     try {
-      // FrameLink-only devices don't need a persistent connection — they're probed on demand
       const isFrameLinkOnly = caps.includes("framelink") && !caps.includes("wifi-provision") && !caps.includes("smp");
 
       if (!isFrameLinkOnly) {
-        // Connect using the appropriate protocol
-        if (transport === "udp" && device?.address && device?.port) {
-          await smpConnectUdp(device.address, device.port);
-        } else if (device?.ble_id) {
-          if (caps.includes("wifi-provision")) {
-            await bleConnect(device.ble_id);
-          } else {
-            await smpConnectBle(device.ble_id);
-          }
+        if (caps.includes("wifi-provision")) {
+          await bleConnect(bleId);
+        } else if (caps.includes("smp")) {
+          await smpConnectBle(bleId);
         } else {
-          throw new Error("No BLE peripheral ID available for connection");
+          throw new Error("BLE device has no actionable capability");
         }
       }
 
       setConnectionState("connected");
-      setSelectedDevice(deviceId, name, transport, caps);
+      setSelectedDevice(deviceId, m.name, "ble", caps);
 
-      // Route to the appropriate first step
-      if (caps.includes("framelink") && !caps.includes("wifi-provision")) {
-        // FrameLink device — probe interfaces and create IO profiles
+      if (isFrameLinkOnly) {
         setStep("framelink-setup");
       } else if (caps.includes("wifi-provision")) {
-        // Set up provisioning store state (uses BLE peripheral ID for connection)
-        setProvisionSelectedDevice(device?.ble_id ?? deviceId, name);
+        setProvisionSelectedDevice(bleId, m.name);
         setProvisionConnectionState("connected");
-
-        // Read current WiFi state from device
-        try {
-          const state = await bleReadDeviceState();
-          if (state.ssid) {
-            setDeviceSsid(state.ssid);
-            setSsid(state.ssid);
-          }
-          if (state.security !== null && state.security !== undefined) {
-            setSecurity(state.security);
-          }
-          setDeviceStatus(state.status);
-          if (state.ip_address) {
-            setDeviceIpAddress(state.ip_address);
-          }
-        } catch {
-          // Non-critical — continue to credentials even if read fails
-        }
-
+        await hydrateProvisioningStateFromBle();
         setStep("credentials");
-      } else if (caps.includes("smp")) {
-        // SMP-only device — go straight to inspect
-        setUpgradeSelectedDevice(device?.ble_id ?? deviceId, name, transport);
+      } else {
+        setUpgradeSelectedDevice(bleId, m.name, "ble");
         setUpgradeConnectionState("connected");
-
         try {
           const images = await smpListImages();
           setImages(images);
-        } catch {
-          // Non-critical
-        }
-
-        // Guard: disconnect event may have reset state
+        } catch { /* non-critical */ }
         if (useDevicesStore.getState().ui.connectionState !== "connected") return;
         setStep("inspect");
       }
     } catch (e) {
       setConnectionState("idle");
       setError(String(e));
-      // Restart scan so user can retry
-      clearDevices();
-      setScanning(true);
-      deviceScanStart().catch((scanErr) => {
-        setError(String(scanErr));
-        setScanning(false);
-      });
+      restartScanAfterFailure();
     } finally {
-      setConnectingDeviceId(null);
+      setConnectingKey(null);
     }
+  };
+
+  /** Connect via IP: prefers FrameLink (→ framelink-setup) and falls back to SMP-over-UDP (→ inspect). */
+  const handleConnectIp = async (m: MergedDevice) => {
+    setError(null);
+    setConnectingKey({ name: m.name, via: "ip" });
+    setConnectionState("connecting");
+    await stopScanIfActive();
+
+    try {
+      if (m.framelink) {
+        const deviceId = `tcp:${m.name}`;
+        // FrameLink probe is performed by FrameLinkSetupView itself; here we just route.
+        setConnectionState("connected");
+        setSelectedDevice(deviceId, m.name, "tcp", ["framelink"]);
+        setStep("framelink-setup");
+      } else if (m.smp) {
+        const { address, port } = m.smp;
+        const deviceId = `udp:${m.name}`;
+        await smpConnectUdp(address, port);
+        setConnectionState("connected");
+        setSelectedDevice(deviceId, m.name, "udp", ["smp"]);
+        setUpgradeSelectedDevice(deviceId, m.name, "udp");
+        setUpgradeConnectionState("connected");
+        try {
+          const images = await smpListImages();
+          setImages(images);
+        } catch { /* non-critical */ }
+        if (useDevicesStore.getState().ui.connectionState !== "connected") return;
+        setStep("inspect");
+      } else {
+        throw new Error("No IP transport available for this device");
+      }
+    } catch (e) {
+      setConnectionState("idle");
+      setError(String(e));
+      restartScanAfterFailure();
+    } finally {
+      setConnectingKey(null);
+    }
+  };
+
+  const handleConnect = (m: MergedDevice, via: ConnectVia) => {
+    if (via === "ble") return handleConnectBle(m);
+    return handleConnectIp(m);
   };
 
   /** Connect to a manually entered IP address. */
@@ -218,8 +273,7 @@ export default function DevicesScanView() {
     // FrameLink direct connect — probe and go to framelink-setup
     if (manualProtocol === "framelink") {
       setError(null);
-      const tempId = `fl:${address}`;
-      setConnectingDeviceId(tempId);
+      setConnectingKey({ name: address, via: "ip" });
       setConnectionState("connecting");
       if (isScanning) {
         try { await deviceScanStop(); } catch { /* ignore */ }
@@ -239,7 +293,7 @@ export default function DevicesScanView() {
         setConnectionState("idle");
         setError(String(e));
       } finally {
-        setConnectingDeviceId(null);
+        setConnectingKey(null);
       }
       return;
     }
@@ -247,7 +301,7 @@ export default function DevicesScanView() {
     let deviceId = `udp:${address}`; // Temporary ID until we can probe for device_id
     let deviceName = address;
     setError(null);
-    setConnectingDeviceId(deviceId);
+    setConnectingKey({ name: address, via: "ip" });
     setConnectionState("connecting");
 
     if (isScanning) {
@@ -302,11 +356,11 @@ export default function DevicesScanView() {
         setScanning(false);
       });
     } finally {
-      setConnectingDeviceId(null);
+      setConnectingKey(null);
     }
   };
 
-  const connecting = connectingDeviceId !== null;
+  const connecting = connectingKey !== null;
 
   return (
     <div className="flex flex-col gap-4 p-4 h-full">
@@ -343,12 +397,12 @@ export default function DevicesScanView() {
 
       {/* Device list */}
       <div className="flex flex-col gap-2 overflow-y-auto flex-1">
-        {devices.map((device) => (
-          <DeviceCard
-            key={device.id}
+        {mergedDevices.map((device) => (
+          <MergedDeviceCard
+            key={device.name}
             device={device}
             onConnect={handleConnect}
-            connectingDeviceId={connectingDeviceId}
+            connecting={connectingKey}
           />
         ))}
       </div>

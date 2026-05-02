@@ -20,6 +20,25 @@
     "connect": "Connect",
     "connecting": "..."
   },
+  "card": {
+    "badges": {
+      "ble": "BLE",
+      "wifi": "WiFi",
+      "smp": "SMP",
+      "frameLink": "FrameLink"
+    },
+    "meta": {
+      "rssi": "rssi",
+      "rssiValue": "{{rssi}} dBm",
+      "addr": "addr",
+      "smpPort": "smp_port",
+      "frameLinkPort": "port"
+    },
+    "connect": "Connect",
+    "connecting": "Connecting...",
+    "connectViaBle": "Connect via BLE",
+    "connectViaIp": "Connect via IP"
+  },
   "credentials": {
     "title": "WiFi Credentials",
     "wifiLabel": "WiFi:",

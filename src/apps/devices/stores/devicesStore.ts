@@ -58,6 +58,8 @@ interface DevicesState {
   // Data actions
   addDevice: (device: UnifiedDevice) => void;
   clearDevices: () => void;
+  /** Drop entries whose lastSeenAt is older than (now - olderThanMs). */
+  pruneStale: (olderThanMs: number) => void;
   setSelectedDevice: (
     id: string | null,
     name: string | null,
@@ -98,6 +100,7 @@ export const useDevicesStore = create<DevicesState>((set) => ({
 
   addDevice: (device) =>
     set((s) => {
+      const now = Date.now();
       // Update if already seen (merge capabilities and transport-specific fields), otherwise add
       const existing = s.data.devices.find((d) => d.id === device.id);
       if (existing) {
@@ -114,15 +117,29 @@ export const useDevicesStore = create<DevicesState>((set) => ({
                 address: device.address ?? d.address,
                 port: device.port ?? d.port,
                 capabilities: mergedCaps,
+                lastSeenAt: now,
               } : d,
             ),
           },
         };
       }
-      return { data: { ...s.data, devices: [...s.data.devices, device] } };
+      return {
+        data: {
+          ...s.data,
+          devices: [...s.data.devices, { ...device, lastSeenAt: now }],
+        },
+      };
     }),
 
   clearDevices: () => set((s) => ({ data: { ...s.data, devices: [] } })),
+
+  pruneStale: (olderThanMs) =>
+    set((s) => {
+      const cutoff = Date.now() - olderThanMs;
+      const next = s.data.devices.filter((d) => (d.lastSeenAt ?? cutoff) >= cutoff);
+      if (next.length === s.data.devices.length) return s;
+      return { data: { ...s.data, devices: next } };
+    }),
 
   setSelectedDevice: (id, name, transport, capabilities) =>
     set((s) => ({

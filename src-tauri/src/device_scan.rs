@@ -14,7 +14,6 @@ use framelink::ble::{parse_peripheral, FRAMELINK_BLE_SERVICE_UUID};
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
@@ -145,11 +144,12 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
     // -- BLE scan task --
     let app_ble = app.clone();
     tokio::spawn(async move {
-        // Per-peripheral last-emitted (name, capabilities). Used to suppress
-        // unchanged re-emits while still letting late-arriving advertisements
-        // upgrade an existing card (e.g. MAC → "WiredFlexLink-4CD4" once the
-        // SCAN_RSP / manufacturer data lands on a later poll).
-        let mut last_emitted: std::collections::HashMap<String, (String, Vec<String>)> =
+        // Re-emit every visible peripheral on every poll so the frontend's
+        // lastSeenAt heartbeats stay fresh; the frontend prunes entries that
+        // stop arriving (powered-off devices) after a few seconds. The store
+        // merge is idempotent on (id, name, caps) so duplicate emits are cheap.
+        // We still suppress the verbose tlog on unchanged repeats.
+        let mut last_logged: std::collections::HashMap<String, (String, Vec<String>)> =
             std::collections::HashMap::new();
 
         for _ in 0..20 {
@@ -241,35 +241,35 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                         .or_else(|| props.local_name.clone())
                         .unwrap_or_else(|| ble_id.clone());
 
-                    // Suppress unchanged re-emits; emit the first time we see
-                    // a peripheral and again whenever its name or capability
-                    // set changes (so the frontend's addDevice merge replaces
-                    // a MAC-only placeholder with the real name).
-                    match last_emitted.get(&ble_id) {
-                        Some((prev_name, prev_caps))
-                            if prev_name == &name && prev_caps == &capabilities =>
-                        {
-                            continue;
-                        }
-                        _ => {}
-                    }
-                    last_emitted.insert(ble_id.clone(), (name.clone(), capabilities.clone()));
-
                     // id is keyed off the BLE peripheral id (MAC on Windows /
                     // Linux, opaque UUID on macOS) so it stays stable across
                     // re-emits as the name/caps progressively resolve.
                     let id = format!("ble:{}", ble_id);
 
-                    tlog!(
-                        "[device_scan] BLE matched: {} (ble_id={}, parsed={}, adv_name={:?}, local_name={:?}), RSSI: {:?}, caps: {:?}",
-                        name,
-                        ble_id,
-                        parsed.is_some(),
-                        props.advertisement_name,
-                        props.local_name,
-                        rssi,
-                        capabilities
-                    );
+                    // Only log when name or caps change vs. the last logged
+                    // state for this peripheral — the emit itself happens every
+                    // poll to keep the frontend heartbeat alive.
+                    let log_now = match last_logged.get(&ble_id) {
+                        Some((prev_name, prev_caps))
+                            if prev_name == &name && prev_caps == &capabilities =>
+                        {
+                            false
+                        }
+                        _ => true,
+                    };
+                    if log_now {
+                        last_logged.insert(ble_id.clone(), (name.clone(), capabilities.clone()));
+                        tlog!(
+                            "[device_scan] BLE matched: {} (ble_id={}, parsed={}, adv_name={:?}, local_name={:?}), RSSI: {:?}, caps: {:?}",
+                            name,
+                            ble_id,
+                            parsed.is_some(),
+                            props.advertisement_name,
+                            props.local_name,
+                            rssi,
+                            capabilities
+                        );
+                    }
 
                     let device = UnifiedDevice {
                         name,
@@ -349,10 +349,14 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                                     svc: &'static str,
                                     app_handle: AppHandle| {
             tokio::task::spawn_blocking(move || {
-                let poll_interval = std::time::Duration::from_millis(250);
+                let poll_interval = std::time::Duration::from_millis(500);
                 let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
                 let mut event_count = 0u32;
-                let mut seen = HashSet::<String>::new();
+                // Cache resolved devices so we can re-emit them every poll —
+                // the frontend prunes entries whose lastSeenAt goes stale,
+                // and mDNS ServiceResolved only fires once per resolution.
+                let mut resolved: std::collections::HashMap<String, UnifiedDevice> =
+                    std::collections::HashMap::new();
 
                 let (cap, transport) = if svc == MDNS_SERVICE_FRAMELINK {
                     ("framelink", "tcp")
@@ -363,58 +367,81 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
                 while std::time::Instant::now() < deadline {
                     while let Ok(event) = rx.try_recv() {
                         event_count += 1;
-                        if let ServiceEvent::ServiceResolved(info) = &event {
-                            tlog!(
-                                "[device_scan] mDNS ServiceResolved: {} addrs={:?} port={}",
-                                info.get_fullname(),
-                                info.get_addresses(),
-                                info.get_port()
-                            );
-                            for addr in info.get_addresses() {
-                                let port = info.get_port();
-
-                                let name = info
-                                    .get_fullname()
+                        match &event {
+                            ServiceEvent::ServiceResolved(info) => {
+                                tlog!(
+                                    "[device_scan] mDNS ServiceResolved: {} addrs={:?} port={}",
+                                    info.get_fullname(),
+                                    info.get_addresses(),
+                                    info.get_port()
+                                );
+                                for addr in info.get_addresses() {
+                                    let port = info.get_port();
+                                    let name = info
+                                        .get_fullname()
+                                        .split('.')
+                                        .next()
+                                        .unwrap_or("Unknown")
+                                        .to_string();
+                                    let id = format!("{}:{}", transport, name);
+                                    let is_new = !resolved.contains_key(&id);
+                                    if is_new {
+                                        tlog!(
+                                            "[device_scan] mDNS resolved: {} at {}:{} ({}, cap={})",
+                                            name,
+                                            addr,
+                                            port,
+                                            svc,
+                                            cap
+                                        );
+                                    }
+                                    // Reaching us via mDNS implies the device
+                                    // is already provisioned onto the network,
+                                    // so the wifi chip lights up on every
+                                    // mDNS card alongside the service-specific
+                                    // capability.
+                                    resolved.insert(
+                                        id.clone(),
+                                        UnifiedDevice {
+                                            name,
+                                            id,
+                                            transport: transport.to_string(),
+                                            ble_id: None,
+                                            rssi: None,
+                                            address: Some(addr.to_string()),
+                                            port: Some(port),
+                                            capabilities: vec![
+                                                "wifi-provision".to_string(),
+                                                cap.to_string(),
+                                            ],
+                                        },
+                                    );
+                                }
+                            }
+                            ServiceEvent::ServiceRemoved(_, fullname) => {
+                                let name = fullname
                                     .split('.')
                                     .next()
                                     .unwrap_or("Unknown")
                                     .to_string();
-
                                 let id = format!("{}:{}", transport, name);
-                                if seen.contains(&id) {
-                                    continue;
+                                if resolved.remove(&id).is_some() {
+                                    tlog!(
+                                        "[device_scan] mDNS removed: {} ({})",
+                                        name,
+                                        svc
+                                    );
                                 }
-                                seen.insert(id.clone());
-
-                                tlog!(
-                                    "[device_scan] mDNS emitting device: {} at {}:{} ({}, cap={})",
-                                    name,
-                                    addr,
-                                    port,
-                                    svc,
-                                    cap
-                                );
-
-                                // Reaching us via mDNS implies the device is
-                                // already provisioned onto the network, so
-                                // the wifi chip lights up on every mDNS card
-                                // alongside the service-specific capability.
-                                let device = UnifiedDevice {
-                                    name,
-                                    id,
-                                    transport: transport.to_string(),
-                                    ble_id: None,
-                                    rssi: None,
-                                    address: Some(addr.to_string()),
-                                    port: Some(port),
-                                    capabilities: vec![
-                                        "wifi-provision".to_string(),
-                                        cap.to_string(),
-                                    ],
-                                };
-                                let _ = app_handle.emit("device-discovered", &device);
                             }
+                            _ => {}
                         }
+                    }
+
+                    // Heartbeat: re-emit every cached device so the frontend's
+                    // lastSeenAt stays fresh and the prune sweep doesn't drop
+                    // entries that are still alive on the network.
+                    for device in resolved.values() {
+                        let _ = app_handle.emit("device-discovered", device);
                     }
 
                     std::thread::sleep(poll_interval);

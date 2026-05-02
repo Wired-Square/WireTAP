@@ -23,6 +23,8 @@ export interface UnifiedDevice {
   port: number | null;
   /** Capabilities: "wifi-provision", "smp", "framelink" */
   capabilities: string[];
+  /** Frontend-only: ms since epoch the entry was last refreshed by a discovery event. */
+  lastSeenAt?: number;
 }
 
 // ============================================================================
