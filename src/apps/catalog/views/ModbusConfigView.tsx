@@ -1,5 +1,6 @@
 // ui/src/apps/catalog/views/ModbusConfigView.tsx
 
+import { useTranslation } from "react-i18next";
 import { Network, Pencil } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { labelSmallMuted, monoBody, iconButtonHover, bgSecondary } from "../../../styles";
@@ -16,6 +17,7 @@ export default function ModbusConfigView({
   modbusConfig,
   onEditConfig,
 }: ModbusConfigViewProps) {
+  const { t } = useTranslation("catalog");
   const deviceAddress = modbusConfig?.device_address ?? selectedNode.metadata?.deviceAddress;
   const registerBase = modbusConfig?.register_base ?? selectedNode.metadata?.registerBase;
   const defaultInterval = modbusConfig?.default_interval;
@@ -32,10 +34,10 @@ export default function ModbusConfigView({
           </div>
           <div>
             <div className="text-lg font-bold text-[color:var(--text-primary)]">
-              Modbus Configuration
+              {t("modbusConfig.title")}
             </div>
             <p className="text-sm text-[color:var(--text-muted)]">
-              Protocol-level settings for all Modbus frames
+              {t("modbusConfig.subtitle")}
             </p>
           </div>
         </div>
@@ -43,7 +45,7 @@ export default function ModbusConfigView({
           <button
             onClick={onEditConfig}
             className={iconButtonHover}
-            title="Edit configuration"
+            title={t("modbusConfig.editTooltip")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
           </button>
@@ -54,65 +56,65 @@ export default function ModbusConfigView({
       <div className="grid grid-cols-2 gap-4">
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Device Address
+            {t("modbusConfig.deviceAddress")}
           </div>
           <div className={monoBody}>
             {deviceAddress !== undefined ? (
               deviceAddress
             ) : (
-              <span className="text-orange-500">Not set</span>
+              <span className="text-orange-500">{t("modbusConfig.notSet")}</span>
             )}
           </div>
         </div>
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Register Base
+            {t("modbusConfig.registerBase")}
           </div>
           <div className={monoBody}>
             {registerBase !== undefined ? (
-              registerBase === 0 ? "0-based" : "1-based"
+              registerBase === 0 ? t("modbusConfig.registerBase0") : t("modbusConfig.registerBase1")
             ) : (
-              <span className="text-orange-500">Not set</span>
+              <span className="text-orange-500">{t("modbusConfig.notSet")}</span>
             )}
           </div>
         </div>
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Default Interval
+            {t("modbusConfig.defaultInterval")}
           </div>
           <div className={monoBody}>
             {defaultInterval !== undefined ? (
-              `${defaultInterval} ms`
+              t("modbusConfig.intervalMs", { ms: defaultInterval })
             ) : (
-              <span className="text-[color:var(--text-muted)]">Not set</span>
+              <span className="text-[color:var(--text-muted)]">{t("modbusConfig.notSet")}</span>
             )}
           </div>
         </div>
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Byte Order
+            {t("modbusConfig.byteOrder")}
           </div>
           <div className={monoBody}>
             {defaultByteOrder !== undefined ? (
-              defaultByteOrder === "big" ? "Big-endian" : "Little-endian"
+              defaultByteOrder === "big" ? t("modbusConfig.endianBE") : t("modbusConfig.endianLE")
             ) : (
-              <span className="text-[color:var(--text-muted)]">Not set</span>
+              <span className="text-[color:var(--text-muted)]">{t("modbusConfig.notSet")}</span>
             )}
           </div>
         </div>
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Word Order
+            {t("modbusConfig.wordOrder")}
           </div>
           <div className={monoBody}>
             {defaultWordOrder !== undefined ? (
-              defaultWordOrder === "big" ? "Big-endian" : "Little-endian"
+              defaultWordOrder === "big" ? t("modbusConfig.endianBE") : t("modbusConfig.endianLE")
             ) : (
-              <span className="text-[color:var(--text-muted)]">Not set</span>
+              <span className="text-[color:var(--text-muted)]">{t("modbusConfig.notSet")}</span>
             )}
           </div>
         </div>
@@ -121,8 +123,7 @@ export default function ModbusConfigView({
       {/* Info box */}
       <div className="p-4 bg-[var(--bg-info)] rounded-lg border border-[color:var(--border-info)]">
         <p className="text-sm text-[color:var(--text-info)]">
-          <strong>Note:</strong> Individual Modbus frames inherit these settings.
-          To change the configuration, click the edit button above.
+          <strong>{t("modbusConfig.noteTitle")}</strong> {t("modbusConfig.noteText")}
         </p>
       </div>
     </div>

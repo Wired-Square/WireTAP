@@ -1,5 +1,6 @@
 // ui/src/apps/catalog/views/SerialConfigView.tsx
 
+import { useTranslation } from "react-i18next";
 import { Cable, Pencil } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, labelSmallMuted, monoBody, iconButtonHover, bgSecondary } from "../../../styles";
@@ -10,18 +11,19 @@ export type SerialConfigViewProps = {
   onEditConfig?: () => void;
 };
 
-const encodingLabels: Record<string, string> = {
-  slip: "SLIP (RFC 1055)",
-  cobs: "COBS",
-  raw: "Raw (delimiter-based)",
-  length_prefixed: "Length Prefixed",
-};
-
 export default function SerialConfigView({
   selectedNode,
   onEditConfig,
 }: SerialConfigViewProps) {
+  const { t } = useTranslation("catalog");
   const encoding = selectedNode.metadata?.encoding;
+
+  const encodingLabels: Record<string, string> = {
+    slip: t("serialConfig.encodingSlip"),
+    cobs: t("serialConfig.encodingCobs"),
+    raw: t("serialConfig.encodingRaw"),
+    length_prefixed: t("serialConfig.encodingLengthPrefixed"),
+  };
 
   return (
     <div className="space-y-6">
@@ -33,10 +35,10 @@ export default function SerialConfigView({
           </div>
           <div>
             <div className="text-lg font-bold text-[color:var(--text-primary)]">
-              Serial Configuration
+              {t("serialConfig.title")}
             </div>
             <p className="text-sm text-[color:var(--text-muted)]">
-              Protocol-level settings for all serial frames
+              {t("serialConfig.subtitle")}
             </p>
           </div>
         </div>
@@ -44,7 +46,7 @@ export default function SerialConfigView({
           <button
             onClick={onEditConfig}
             className={iconButtonHover}
-            title="Edit configuration"
+            title={t("serialConfig.editTooltip")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
           </button>
@@ -55,17 +57,17 @@ export default function SerialConfigView({
       <div className="grid grid-cols-2 gap-4">
         <div className={`p-4 ${bgSecondary} rounded-lg col-span-2`}>
           <div className={labelSmallMuted}>
-            Encoding
+            {t("serialConfig.encoding")}
           </div>
           <div className={monoBody}>
             {encoding ? (
               <span className="uppercase">{encodingLabels[encoding] || encoding}</span>
             ) : (
-              <span className="text-orange-500">Not set</span>
+              <span className="text-orange-500">{t("serialConfig.encodingNotSet")}</span>
             )}
           </div>
           <p className={`${caption} mt-2`}>
-            This encoding applies to all serial frames in the catalog.
+            {t("serialConfig.encodingApplies")}
           </p>
         </div>
       </div>
@@ -73,8 +75,7 @@ export default function SerialConfigView({
       {/* Info box */}
       <div className="p-4 bg-[var(--info-bg)] rounded-lg border border-[color:var(--info-border)]">
         <p className="text-sm text-[color:var(--info-text)]">
-          <strong>Note:</strong> Individual serial frames inherit this encoding.
-          To change the encoding, click the edit button above.
+          <strong>{t("serialConfig.noteTitle")}</strong> {t("serialConfig.noteText")}
         </p>
       </div>
     </div>

@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/views/MuxCaseView.tsx
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { caption, labelSmallMuted, iconButtonHover, iconButtonHoverDanger, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
@@ -40,6 +41,7 @@ export default function MuxCaseView({
   onRequestDeleteSignal,
   onSelectNode,
 }: MuxCaseViewProps) {
+  const { t } = useTranslation("catalog");
   const caseValue = selectedNode.metadata?.caseValue;
   const idKey = selectedNode.path[2];
 
@@ -122,7 +124,7 @@ export default function MuxCaseView({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
-          Mux Case: {caseValue}
+          {t("muxCaseView.titlePrefix", { value: caseValue })}
         </h3>
 
         <div className={flexRowGap2}>
@@ -132,17 +134,17 @@ export default function MuxCaseView({
               onAddSignal(idKey, selectedNode.path);
             }}
             className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
-            title="Add signal"
+            title={t("muxCaseView.addSignalTooltip")}
           >
-            + Signal
+            {t("muxCaseView.addSignal")}
           </button>
 
           <button
             onClick={() => onAddNestedMux(selectedNode.path)}
             className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
-            title="Add nested mux"
+            title={t("muxCaseView.addNestedMuxTooltip")}
           >
-            + Nested Mux
+            {t("muxCaseView.addNestedMux")}
           </button>
 
           {onEditCase && (
@@ -156,7 +158,7 @@ export default function MuxCaseView({
                 onEditCase(muxPath, caseValue || '', notesStr);
               }}
               className={iconButtonHover}
-              title="Edit case"
+              title={t("muxCaseView.editCase")}
             >
               <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
             </button>
@@ -170,7 +172,7 @@ export default function MuxCaseView({
               setConfirmOpen(true);
             }}
             className={iconButtonHoverDanger}
-            title="Delete case"
+            title={t("muxCaseView.deleteCase")}
           >
             <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
           </button>
@@ -179,7 +181,7 @@ export default function MuxCaseView({
 
       {selectedNode.metadata?.properties?.notes && (
         <div className={`p-3 ${bgSecondary} rounded-lg`}>
-          <div className={labelSmallMuted}>Notes</div>
+          <div className={labelSmallMuted}>{t("muxCaseView.notes")}</div>
           <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.properties.notes)
               ? selectedNode.metadata.properties.notes.join("\n")
@@ -191,7 +193,7 @@ export default function MuxCaseView({
       <div className="space-y-4">
         <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
           <div className="text-xs font-medium text-[color:var(--text-muted)] mb-2">
-            Bit Layout (includes frame signals and this case)
+            {t("muxCaseView.bitLayoutTitle")}
           </div>
           <BitPreview
             numBytes={numBytes}
@@ -203,10 +205,10 @@ export default function MuxCaseView({
 
         <div>
           <div className={`${sectionHeaderText} mb-2`}>
-            Signals ({caseSignals.length})
+            {t("muxCaseView.signalsHeader", { count: caseSignals.length })}
           </div>
           {caseSignals.length === 0 ? (
-            <div className={emptyStateText}>No signals in this case yet.</div>
+            <div className={emptyStateText}>{t("muxCaseView.noSignals")}</div>
           ) : (
             <div className="space-y-2">
               {caseSignals.map((signal: any, idx: number) => (
@@ -218,7 +220,7 @@ export default function MuxCaseView({
                     <div
                       className={`w-2 h-8 rounded-sm ${
                         colorForRange({
-                          name: signal.name || `Signal ${idx + 1}`,
+                          name: signal.name || t("muxCaseView.signalDefault", { idx: idx + 1 }),
                           start_bit: signal.start_bit || 0,
                           bit_length: signal.bit_length || 8,
                           type: "signal",
@@ -228,10 +230,14 @@ export default function MuxCaseView({
                     <div>
                       <div className="font-medium text-[color:var(--text-primary)] flex items-center gap-2">
                         <span>⚡</span>
-                        {signal.name || `Signal ${idx + 1}`}
+                        {signal.name || t("muxCaseView.signalDefault", { idx: idx + 1 })}
                       </div>
                       <div className={`${caption} mt-1`}>
-                        Bits {signal.start_bit ?? 0} - {(signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1} ({signal.bit_length ?? 0} bits)
+                        {t("muxCaseView.bitsRange", {
+                          start: signal.start_bit ?? 0,
+                          end: (signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1,
+                          length: signal.bit_length ?? 0,
+                        })}
                       </div>
                       {signal.notes && (
                         <div className="text-xs text-[color:var(--text-muted)] mt-2 italic whitespace-pre-wrap">
@@ -252,7 +258,7 @@ export default function MuxCaseView({
                         )
                       }
                       className={iconButtonHoverDanger}
-                      title="Delete signal"
+                      title={t("muxCaseView.deleteSignal")}
                     >
                       <Trash2 className={`${iconMd} text-[color:var(--status-danger-text)]`} />
                     </button>
@@ -266,7 +272,7 @@ export default function MuxCaseView({
         {nonSignalChildren.length > 0 && (
           <div>
             <div className={`${sectionHeaderText} mb-2`}>
-              Other Contents ({nonSignalChildren.length})
+              {t("muxCaseView.otherContents", { count: nonSignalChildren.length })}
             </div>
             <div className="space-y-2">
               {nonSignalChildren.map((child, idx) => (
@@ -283,8 +289,10 @@ export default function MuxCaseView({
 
                   {child.type === "signal" && child.metadata?.properties && (
                     <div className={`${caption} mt-1`}>
-                      Bits {child.metadata.properties.start_bit ?? 0} -
-                      {(child.metadata.properties.start_bit ?? 0) + (child.metadata.properties.bit_length ?? 0) - 1}
+                      {t("muxCaseView.bitsRangeShort", {
+                        start: child.metadata.properties.start_bit ?? 0,
+                        end: (child.metadata.properties.start_bit ?? 0) + (child.metadata.properties.bit_length ?? 0) - 1,
+                      })}
                     </div>
                   )}
                 </div>
@@ -296,10 +304,10 @@ export default function MuxCaseView({
 
       <ConfirmDeleteDialog
         open={confirmOpen}
-        title="Delete Mux Case"
-        message="Are you sure you want to delete mux case"
+        title={t("muxCaseView.deleteCaseTitle")}
+        message={t("muxCaseView.deleteCaseMessage")}
         highlightText={caseValue || undefined}
-        confirmText="Delete"
+        confirmText={t("muxCaseView.deleteLabel")}
         onCancel={() => {
           setConfirmOpen(false);
           setPendingDelete(null);

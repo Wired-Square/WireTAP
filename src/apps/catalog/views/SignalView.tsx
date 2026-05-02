@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/views/SignalView.tsx
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { labelSmall, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary } from "../../../styles";
@@ -30,6 +31,7 @@ export default function SignalView({
   onRequestDeleteSignal,
   onSetValidation,
 }: SignalViewProps) {
+  const { t } = useTranslation("catalog");
   // Use tree metadata directly instead of re-parsing TOML and searching by properties.
   const locateSignal = React.useCallback(() => {
     const signalsIdx = selectedNode.path.findIndex(
@@ -51,7 +53,7 @@ export default function SignalView({
     <div className="space-y-4">
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">Signal Details</h3>
+        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("signalDetails.title")}</h3>
         <div className={flexRowGap2}>
           <button
             onClick={() => {
@@ -61,11 +63,11 @@ export default function SignalView({
                 onEditSignal(found.idKey, found.idx, found.signal, found.signalsParentPath);
               } catch (error) {
                 console.error("Failed to locate/edit signal:", error);
-                onSetValidation([{ field: "signal", message: "Failed to locate signal for editing" }]);
+                onSetValidation([{ field: "signal", message: t("signalDetails.errorEdit") }]);
               }
             }}
             className={iconButtonHover}
-            title="Edit signal"
+            title={t("signalDetails.edit")}
           >
             <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
           </button>
@@ -79,11 +81,11 @@ export default function SignalView({
                 onRequestDeleteSignal(found.idKey, found.idx, found.signalsParentPath, found.signal?.name);
               } catch (error) {
                 console.error("Failed to locate/delete signal:", error);
-                onSetValidation([{ field: "signal", message: "Failed to locate signal for deletion" }]);
+                onSetValidation([{ field: "signal", message: t("signalDetails.errorDelete") }]);
               }
             }}
             className={iconButtonHoverDanger}
-            title="Delete signal"
+            title={t("signalDetails.delete")}
           >
             <Trash2 className={`${iconMd} text-[color:var(--text-danger)]`} />
           </button>
@@ -111,7 +113,7 @@ export default function SignalView({
 
             return (
               <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-                <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">Bit Preview</h4>
+                <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">{t("signalDetails.bitPreview")}</h4>
                 <BitPreview
                   numBytes={frameLength}
                   ranges={ranges}
@@ -130,7 +132,7 @@ export default function SignalView({
 
             return (
               <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
-                <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">Bit Preview</h4>
+                <h4 className="text-sm font-semibold text-[color:var(--text-primary)] mb-3">{t("signalDetails.bitPreview")}</h4>
                 <BitPreview
                   numBytes={numBytes}
                   ranges={[]}
@@ -145,7 +147,7 @@ export default function SignalView({
 
       {selectedNode.metadata?.muxCase && (
         <div className="p-3 bg-[var(--bg-purple)] border-2 border-[color:var(--border-purple)] rounded-lg">
-          <div className="text-xs font-medium text-[color:var(--text-purple)] mb-1">Mux Case</div>
+          <div className="text-xs font-medium text-[color:var(--text-purple)] mb-1">{t("signalDetails.muxCase")}</div>
           <div className="font-mono text-sm text-[color:var(--text-purple-strong)]">{selectedNode.metadata.muxCase}</div>
         </div>
       )}
@@ -183,10 +185,10 @@ export default function SignalView({
           return (
             <div className={`p-3 ${bgSecondary} rounded-lg min-w-0`}>
               <div className={`${flexRowGap2} mb-1`}>
-                <span className={labelSmall}>byte_order</span>
+                <span className={labelSmall}>{t("signalDetails.byteOrderLabel")}</span>
                 {isInherited && (
                   <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--bg-accent)] text-[color:var(--accent-primary)] rounded">
-                    Inherited
+                    {t("signalDetails.inheritedBadge")}
                   </span>
                 )}
               </div>

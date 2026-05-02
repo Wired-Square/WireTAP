@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/views/SerialFrameView.tsx
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Pencil, Settings, Trash2 } from "lucide-react";
 import { iconMd, iconXs } from "../../../styles/spacing";
 import { caption, labelSmall, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary, hoverLight, emptyStateText } from "../../../styles";
@@ -41,6 +42,7 @@ export default function SerialFrameView({
   onRequestDeleteSignal,
   onAddMux,
 }: SerialFrameViewProps) {
+  const { t } = useTranslation("catalog");
   const encoding = selectedNode.metadata?.encoding;
   const frameId = selectedNode.metadata?.frameId ?? selectedNode.key;
   const idKey = selectedNode.key;
@@ -86,7 +88,7 @@ export default function SerialFrameView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <p className="text-sm text-[color:var(--text-muted)]">Configure Serial frame properties</p>
+          <p className="text-sm text-[color:var(--text-muted)]">{t("serialFrame.subtitle")}</p>
           <div className="text-lg font-bold text-[color:var(--text-primary)]">
             {frameId}
           </div>
@@ -97,7 +99,7 @@ export default function SerialFrameView({
               <button
                 onClick={() => onEditFrame(selectedNode)}
                 className={iconButtonHover}
-                title="Edit frame"
+                title={t("serialFrame.editFrame")}
               >
                 <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
               </button>
@@ -106,7 +108,7 @@ export default function SerialFrameView({
               <button
                 onClick={() => onDeleteFrame(selectedNode.key)}
                 className={iconButtonHoverDanger}
-                title="Delete frame"
+                title={t("serialFrame.deleteFrame")}
               >
                 <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
               </button>
@@ -119,7 +121,7 @@ export default function SerialFrameView({
       <div className="grid grid-cols-2 gap-4">
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Frame ID
+            {t("serialFrame.frameId")}
           </div>
           <div className={monoBody}>
             {frameId}
@@ -129,30 +131,30 @@ export default function SerialFrameView({
         <button
           onClick={onEditSerialConfig}
           className={`p-4 ${bgSecondary} rounded-lg text-left ${hoverLight} transition-colors group`}
-          title="Edit serial encoding configuration"
+          title={t("serialFrame.editEncoding")}
         >
           <div className={`${labelSmallMuted} flex items-center gap-1`}>
-            Encoding
+            {t("serialFrame.encoding")}
             <Settings className={`${iconXs} opacity-0 group-hover:opacity-100 transition-opacity`} />
           </div>
           <div className={`${monoBody} uppercase`}>
-            {encoding ?? <span className="text-orange-500">Not set - click to configure</span>}
+            {encoding ?? <span className="text-orange-500">{t("serialFrame.encodingNotSet")}</span>}
           </div>
         </button>
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Length
+            {t("serialFrame.length")}
           </div>
           <div className={monoBody}>
-            {length ?? <span className="text-slate-400">Not set</span>}
+            {length ?? <span className="text-slate-400">{t("serialFrame.lengthNotSet")}</span>}
           </div>
         </div>
 
         {maxLength !== undefined && (
           <div className={`p-4 ${bgSecondary} rounded-lg`}>
             <div className={labelSmallMuted}>
-              Max Length
+              {t("serialFrame.maxLength")}
             </div>
             <div className={monoBody}>
               {maxLength}
@@ -163,7 +165,7 @@ export default function SerialFrameView({
         {transmitter && (
           <div className={`p-4 ${bgSecondary} rounded-lg`}>
             <div className={labelSmallMuted}>
-              Transmitter
+              {t("serialFrame.transmitter")}
             </div>
             <div className={monoBody}>
               {transmitter}
@@ -174,15 +176,15 @@ export default function SerialFrameView({
         {interval !== undefined && (
           <div className={`p-4 ${bgSecondary} rounded-lg`}>
             <div className={labelSmallMuted}>
-              Interval
+              {t("serialFrame.interval")}
               {intervalInherited && (
-                <span className="ml-1 text-[color:var(--text-blue)]" title="Inherited from default_interval">
-                  (inherited)
+                <span className="ml-1 text-[color:var(--text-blue)]" title={t("serialFrame.intervalInheritedTooltip")}>
+                  {t("serialFrame.intervalInheritedSuffix")}
                 </span>
               )}
             </div>
             <div className={monoBody}>
-              {interval} ms
+              {t("serialFrame.intervalMs", { ms: interval })}
             </div>
           </div>
         )}
@@ -192,7 +194,7 @@ export default function SerialFrameView({
       {delimiter && delimiter.length > 0 && (
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Delimiter
+            {t("serialFrame.delimiter")}
           </div>
           <div className={monoBody}>
             [{delimiter.map((b: number) => `0x${b.toString(16).padStart(2, "0").toUpperCase()}`).join(", ")}]
@@ -204,7 +206,7 @@ export default function SerialFrameView({
       {notes && (
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
-            Notes
+            {t("serialFrame.notes")}
           </div>
           <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(notes) ? notes.join("\n") : notes}
@@ -217,18 +219,18 @@ export default function SerialFrameView({
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">
-              Signals ({(selectedNode.metadata?.signals?.length || 0) + (selectedNode.metadata?.muxSignalCount || 0)})
+              {t("serialFrame.signalsHeader", { count: (selectedNode.metadata?.signals?.length || 0) + (selectedNode.metadata?.muxSignalCount || 0) })}
               {selectedNode.metadata?.hasMux && (
                 <span className="ml-2 text-xs font-normal text-[color:var(--text-purple)] inline-flex items-center gap-2">
                   {muxLegendColor && <span className={`inline-block w-3 h-3 rounded ${muxLegendColor}`} />}
-                  (includes {selectedNode.metadata.muxSignalCount} mux signals)
+                  {t("serialFrame.muxSignalsHint", { count: selectedNode.metadata.muxSignalCount })}
                 </span>
               )}
             </h3>
 
             <div className="flex items-center gap-3">
               <span className={caption}>
-                {length ? `${length} bytes total` : ""}
+                {length ? t("serialFrame.totalBytes", { count: length }) : ""}
               </span>
 
               {onAddMux && !selectedNode.metadata?.hasMux && (
@@ -236,7 +238,7 @@ export default function SerialFrameView({
                   onClick={() => onAddMux(idKey)}
                   className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-xs font-medium"
                 >
-                  + Add Mux
+                  {t("serialFrame.addMux")}
                 </button>
               )}
 
@@ -245,7 +247,7 @@ export default function SerialFrameView({
                   onClick={() => onAddSignal(idKey)}
                   className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs font-medium"
                 >
-                  + Add Signal
+                  {t("serialFrame.addSignal")}
                 </button>
               )}
             </div>
@@ -289,7 +291,7 @@ export default function SerialFrameView({
                 <>
                   <div className="mb-4 p-4 bg-[var(--bg-surface)] rounded-lg">
                     <div className="text-xs font-medium text-[color:var(--text-muted)] mb-3">
-                      Byte Layout (LSB first)
+                      {t("serialFrame.byteLayout")}
                     </div>
                     <BitPreview
                       numBytes={numBytes}
@@ -323,11 +325,15 @@ export default function SerialFrameView({
 
                               <div className={`${caption} mt-1 space-y-0.5`}>
                                 <div>
-                                  Bits {signal.start_bit ?? 0} - {(signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1} ({signal.bit_length ?? 0} bits)
+                                  {t("serialFrame.bitsRange", {
+                                    start: signal.start_bit ?? 0,
+                                    end: (signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1,
+                                    length: signal.bit_length ?? 0,
+                                  })}
                                 </div>
-                                {signal.unit && <div>Unit: {signal.unit}</div>}
-                                {signal.factor !== undefined && <div>Factor: {signal.factor}</div>}
-                                {signal.offset !== undefined && <div>Offset: {signal.offset}</div>}
+                                {signal.unit && <div>{t("serialFrame.unit", { unit: signal.unit })}</div>}
+                                {signal.factor !== undefined && <div>{t("serialFrame.factor", { factor: signal.factor })}</div>}
+                                {signal.offset !== undefined && <div>{t("serialFrame.offset", { offset: signal.offset })}</div>}
                               </div>
                               {signal.notes && (
                                 <div className="text-xs text-[color:var(--text-muted)] mt-2 italic whitespace-pre-wrap">
@@ -343,7 +349,7 @@ export default function SerialFrameView({
                                 <button
                                   onClick={() => onEditSignal(idKey, idx, signal, ["frame", "serial", idKey])}
                                   className="p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"
-                                  title="Edit signal"
+                                  title={t("serialFrame.editSignal")}
                                 >
                                   <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
                                 </button>
@@ -353,7 +359,7 @@ export default function SerialFrameView({
                                 <button
                                   onClick={() => onRequestDeleteSignal(idKey, idx, ["frame", "serial", idKey], signal.name)}
                                   className={iconButtonHoverDanger}
-                                  title="Delete signal"
+                                  title={t("serialFrame.deleteSignal")}
                                 >
                                   <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                                 </button>
@@ -370,7 +376,7 @@ export default function SerialFrameView({
 
           {(!selectedNode.metadata?.signals || selectedNode.metadata.signals.length === 0) && (
             <div className={`${emptyStateText} p-4 ${bgSecondary} rounded-lg`}>
-              No signals defined. Click "+ Add Signal" to create one.
+              {t("serialFrame.noSignalsHint")}
             </div>
           )}
         </div>

@@ -1,5 +1,6 @@
 // ui/src/apps/catalog/views/ModbusFrameView.tsx
 
+import { useTranslation } from "react-i18next";
 import { Pencil, Trash2 } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
 import { labelSmall, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, bgSecondary } from "../../../styles";
@@ -16,6 +17,7 @@ export default function ModbusFrameView({
   onEditFrame,
   onDeleteFrame,
 }: ModbusFrameViewProps) {
+  const { t } = useTranslation("catalog");
   const registerNumber = selectedNode.metadata?.registerNumber;
   const deviceAddress = selectedNode.metadata?.deviceAddress;
   const deviceAddressInherited = selectedNode.metadata?.deviceAddressInherited;
@@ -31,7 +33,7 @@ export default function ModbusFrameView({
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <p className="text-sm text-[color:var(--text-muted)]">Configure Modbus frame properties</p>
+          <p className="text-sm text-[color:var(--text-muted)]">{t("modbusFrame.subtitle")}</p>
           <div className="text-lg font-bold text-[color:var(--text-primary)]">
             {selectedNode.key}
           </div>
@@ -42,7 +44,7 @@ export default function ModbusFrameView({
               <button
                 onClick={() => onEditFrame(selectedNode)}
                 className={iconButtonHover}
-                title="Edit frame"
+                title={t("modbusFrame.editFrame")}
               >
                 <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
               </button>
@@ -51,7 +53,7 @@ export default function ModbusFrameView({
               <button
                 onClick={() => onDeleteFrame(selectedNode.key)}
                 className={iconButtonHoverDanger}
-                title="Delete frame"
+                title={t("modbusFrame.deleteFrame")}
               >
                 <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
               </button>
@@ -64,30 +66,30 @@ export default function ModbusFrameView({
       <div className="grid grid-cols-2 gap-4">
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Register Number
+            {t("modbusFrame.registerNumber")}
           </div>
           <div className={monoBody}>
-            {registerNumber ?? <span className="text-orange-500">Not set</span>}
+            {registerNumber ?? <span className="text-orange-500">{t("modbusFrame.notSet")}</span>}
           </div>
         </div>
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Device Address
+            {t("modbusFrame.deviceAddress")}
             {deviceAddressInherited && (
-              <span className="ml-1 text-[color:var(--text-blue)]" title="Inherited from default_modbus_device_address">
-                (inherited)
+              <span className="ml-1 text-[color:var(--text-blue)]" title={t("modbusFrame.deviceAddressInheritedTooltip")}>
+                {t("modbusFrame.deviceAddressInheritedSuffix")}
               </span>
             )}
           </div>
           <div className={monoBody}>
-            {deviceAddress ?? <span className="text-orange-500">Not set</span>}
+            {deviceAddress ?? <span className="text-orange-500">{t("modbusFrame.notSet")}</span>}
           </div>
         </div>
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Register Type
+            {t("modbusFrame.registerType")}
           </div>
           <div className={`${monoBody} capitalize`}>
             {registerType}
@@ -96,7 +98,7 @@ export default function ModbusFrameView({
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Length (Registers)
+            {t("modbusFrame.lengthRegisters")}
           </div>
           <div className={monoBody}>
             {length ?? 1}
@@ -106,7 +108,7 @@ export default function ModbusFrameView({
         {transmitter && (
           <div className={`p-4 ${bgSecondary} rounded-lg`}>
             <div className={labelSmallMuted}>
-              Transmitter
+              {t("modbusFrame.transmitter")}
             </div>
             <div className={monoBody}>
               {transmitter}
@@ -117,15 +119,15 @@ export default function ModbusFrameView({
         {interval !== undefined && (
           <div className={`p-4 ${bgSecondary} rounded-lg`}>
             <div className={labelSmallMuted}>
-              Interval
+              {t("modbusFrame.interval")}
               {intervalInherited && (
-                <span className="ml-1 text-[color:var(--text-blue)]" title="Inherited from default_interval">
-                  (inherited)
+                <span className="ml-1 text-[color:var(--text-blue)]" title={t("modbusFrame.intervalInheritedTooltip")}>
+                  {t("modbusFrame.intervalInheritedSuffix")}
                 </span>
               )}
             </div>
             <div className={monoBody}>
-              {interval} ms
+              {t("modbusFrame.intervalMs", { ms: interval })}
             </div>
           </div>
         )}
@@ -135,7 +137,7 @@ export default function ModbusFrameView({
       {notes && (
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={`${labelSmall} mb-2`}>
-            Notes
+            {t("modbusFrame.notes")}
           </div>
           <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(notes) ? notes.join("\n") : notes}
@@ -146,7 +148,7 @@ export default function ModbusFrameView({
       {/* Signals info */}
       {selectedNode.children && selectedNode.children.length > 0 && (
         <div className="text-sm text-[color:var(--text-muted)]">
-          This Modbus frame has {selectedNode.children.length} child node(s). Use the tree to navigate.
+          {t("modbusFrame.childNodesHint", { count: selectedNode.children.length })}
         </div>
       )}
     </div>
