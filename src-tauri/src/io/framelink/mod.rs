@@ -215,6 +215,14 @@ pub async fn framelink_get_interface_signals(
 
     // 2. Filter to signals targeting this interface
     let iface_signals = dsig::interface_signals(&all_signals, iface_index);
+    tlog!(
+        "[framelink:{}] iface={} signals_total={} iface_signals={} ids={:?}",
+        device_id,
+        iface_index,
+        all_signals.len(),
+        iface_signals.len(),
+        iface_signals.iter().map(|s| s.signal_id).collect::<Vec<_>>(),
+    );
     if iface_signals.is_empty() {
         return Ok(vec![]);
     }

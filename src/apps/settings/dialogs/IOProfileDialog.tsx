@@ -33,13 +33,17 @@ import {
   alertWarning,
   caption,
   textMedium,
+  textMuted,
   textSuccess,
   textWarning,
   checkboxDefault,
+  badgeNeutral,
+  badgeCyan,
 } from "../../../styles";
 import { probeSlcanDevice } from "../../../api/serial";
 import { probeGsUsbDevice } from "../../../api/gs_usb";
 import { probeDevice, type GvretDeviceInfo } from "../../../api/io";
+import { tlog } from "../../../api/settings";
 import { getPlatform, isWindows, isLinux, isMacOS } from "../../../utils/platform";
 import { getAvailableProfileKinds, type Platform, type ProfileKind } from "../../../utils/profileTraits";
 import type { GvretInterfaceConfig } from "../../../hooks/useSettings";
@@ -107,20 +111,22 @@ export default function IOProfileDialog({
   const [gvretDeviceInfo, setGvretDeviceInfo] = useState<GvretDeviceInfo | null>(null);
   const [gvretProbeError, setGvretProbeError] = useState<string | null>(null);
 
-  // FrameLink interface configuration state
-  const [flSignals, setFlSignals] = useState<SignalDescriptor[]>([]);
+  // FrameLink interface configuration state — per-interface signal map keyed by iface_index
+  const [flSignalsByIface, setFlSignalsByIface] = useState<Record<number, SignalDescriptor[]>>({});
   const [flLoading, setFlLoading] = useState(false);
   const [flFetched, setFlFetched] = useState(false);
   const [flError, setFlError] = useState<string | null>(null);
   const [flPersist, setFlPersist] = useState(true);
+  const [flExpandedIface, setFlExpandedIface] = useState<Record<number, boolean>>({});
 
   // Reset FrameLink config state when dialog closes or profile type changes
   useEffect(() => {
     if (!isOpen || profileForm.kind !== "framelink") {
-      setFlSignals([]);
+      setFlSignalsByIface({});
       setFlError(null);
       setFlLoading(false);
       setFlFetched(false);
+      setFlExpandedIface({});
     }
   }, [isOpen, profileForm.kind]);
 
@@ -135,16 +141,25 @@ export default function IOProfileDialog({
     setFlLoading(true);
     setFlError(null);
     try {
-      const allSignals: SignalDescriptor[] = [];
+      const next: Record<number, SignalDescriptor[]> = {};
       for (const iface of interfaces) {
-        const signals = await framelinkGetInterfaceSignals(device_id, iface.index, timeout);
-        allSignals.push(...signals);
+        next[iface.index] = await framelinkGetInterfaceSignals(device_id, iface.index, timeout);
       }
-      setFlSignals(allSignals);
+      setFlSignalsByIface(next);
       setFlFetched(true);
+      tlog.debug(
+        `[ioProfile/framelink] loaded signals: ${JSON.stringify(
+          Object.entries(next).map(([idx, sigs]) => ({
+            iface_index: Number(idx),
+            count: sigs.length,
+            ids: sigs.map((s) => s.signal_id),
+            names: sigs.map((s) => s.name),
+          })),
+        )}`,
+      );
     } catch (e) {
       setFlError(e instanceof Error ? e.message : String(e));
-      setFlSignals([]);
+      setFlSignalsByIface({});
       setFlFetched(false);
     } finally {
       setFlLoading(false);
@@ -168,12 +183,16 @@ export default function IOProfileDialog({
       const timeout = Number(timeoutStr) || 5;
       if (!device_id) return;
       await framelinkWriteSignal(device_id, signalId, value, flPersist, timeout);
-      // Update local state to reflect the written value
-      setFlSignals((prev) =>
-        prev.map((s) =>
-          s.signal_id === signalId ? { ...s, value, formatted_value: String(value) } : s,
-        ),
-      );
+      // Update local state to reflect the written value, in whichever interface bucket the signal lives
+      setFlSignalsByIface((prev) => {
+        const next: Record<number, SignalDescriptor[]> = {};
+        for (const [idx, sigs] of Object.entries(prev)) {
+          next[Number(idx)] = sigs.map((s) =>
+            s.signal_id === signalId ? { ...s, value, formatted_value: String(value) } : s,
+          );
+        }
+        return next;
+      });
     },
     [profileForm, flPersist],
   );
@@ -1108,95 +1127,132 @@ export default function IOProfileDialog({
                 />
               </FormField>
 
-              {/* Interfaces */}
-              {Array.isArray(profileForm.connection.interfaces) && profileForm.connection.interfaces.length > 0 && (
-                <div className={`border-t ${borderDefault} pt-4 mt-4`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className={h3}>{t("ioProfileDialog.framelink.interfacesTitle", { count: (profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string }>).length })}</h3>
-                    <SecondaryButton
-                      onClick={handleFlReprobe}
-                      disabled={flReprobing}
-                    >
-                      {flReprobing ? (
-                        <>
-                          <RefreshCw className={`${iconXs} animate-spin`} />
-                          {t("ioProfileDialog.framelink.reprobing")}
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className={iconXs} />
-                          {t("ioProfileDialog.framelink.reprobe")}
-                        </>
-                      )}
-                    </SecondaryButton>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {(profileForm.connection.interfaces as Array<{ index: number; iface_type: number; name: string; type_name?: string }>).map((iface) => (
-                      <div key={iface.index} className="flex items-center justify-between py-1.5 px-2 rounded bg-[var(--bg-primary)]">
-                        <span className={textMedium}>{iface.name}</span>
-                        <span className={caption}>{iface.type_name ?? t("ioProfileDialog.framelink.interfaceUnknown")}</span>
+              {/* Interfaces — each row is collapsible and contains its own device configuration */}
+              {Array.isArray(profileForm.connection.interfaces) && profileForm.connection.interfaces.length > 0 && (() => {
+                const interfaces = profileForm.connection.interfaces as Array<{
+                  index: number;
+                  iface_type: number;
+                  name: string;
+                  type_name?: string;
+                }>;
+                const totalSignalsLoaded = Object.values(flSignalsByIface).reduce((n, sigs) => n + sigs.length, 0);
+                const anyPersistable = Object.values(flSignalsByIface).some((sigs) => sigs.some((s) => s.persistable));
+                return (
+                  <div className={`border-t ${borderDefault} pt-4 mt-4`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className={h3}>{t("ioProfileDialog.framelink.interfacesTitle", { count: interfaces.length })}</h3>
+                      <div className="flex items-center gap-2">
+                        <SecondaryButton onClick={loadFlSignals} disabled={flLoading}>
+                          {flLoading ? (
+                            <>
+                              <RefreshCw className={`${iconXs} animate-spin`} />
+                              {t("ioProfileDialog.framelink.reading")}
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className={iconXs} />
+                              {t("ioProfileDialog.framelink.refresh")}
+                            </>
+                          )}
+                        </SecondaryButton>
+                        <SecondaryButton onClick={handleFlReprobe} disabled={flReprobing}>
+                          {flReprobing ? (
+                            <>
+                              <RefreshCw className={`${iconXs} animate-spin`} />
+                              {t("ioProfileDialog.framelink.reprobing")}
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className={iconXs} />
+                              {t("ioProfileDialog.framelink.reprobe")}
+                            </>
+                          )}
+                        </SecondaryButton>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
 
-              {/* Device Configuration (Signals) */}
-              <div className={`border-t ${borderDefault} pt-4 mt-4`}>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className={h3}>{t("ioProfileDialog.framelink.deviceConfig")}</h3>
-                  <SecondaryButton
-                    onClick={loadFlSignals}
-                    disabled={flLoading}
-                  >
-                    {flLoading ? (
-                      <>
-                        <RefreshCw className={`${iconXs} animate-spin`} />
-                        {t("ioProfileDialog.framelink.reading")}
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className={iconXs} />
-                        {t("ioProfileDialog.framelink.refresh")}
-                      </>
+                    {flError && (
+                      <div className={`${alertWarning} mb-3`}>
+                        <p className="text-sm text-[color:var(--text-warning)]">{flError}</p>
+                      </div>
                     )}
-                  </SecondaryButton>
-                </div>
 
-                {flError && (
-                  <div className={alertWarning}>
-                    <p className="text-sm text-[color:var(--text-warning)]">{flError}</p>
-                  </div>
-                )}
+                    <div className="flex flex-col gap-1.5">
+                      {interfaces.map((iface) => {
+                        const ifaceSignals = flSignalsByIface[iface.index] ?? [];
+                        const expanded = !!flExpandedIface[iface.index];
+                        const bitrateSig = ifaceSignals.find((s) => s.unit === "bps");
+                        const bitrateText = bitrateSig
+                          ? (bitrateSig.formatted_value || String(bitrateSig.value))
+                          : null;
+                        const isCanFd = iface.iface_type === 2;
+                        const chipClass = isCanFd ? badgeCyan : badgeNeutral;
+                        const chipLabel = iface.type_name ?? t("ioProfileDialog.framelink.interfaceUnknown");
+                        const grouped = ifaceSignals.reduce<Record<string, SignalDescriptor[]>>((acc, sig) => {
+                          const g = sig.group || t("ioProfileDialog.framelink.groupOther");
+                          (acc[g] ??= []).push(sig);
+                          return acc;
+                        }, {});
 
-                {flSignals.length > 0 && (
-                  <div className={spaceYDefault}>
-                    {/* Group signals by group name */}
-                    {Object.entries(
-                      flSignals.reduce<Record<string, SignalDescriptor[]>>((acc, sig) => {
-                        const g = sig.group || t("ioProfileDialog.framelink.groupOther");
-                        (acc[g] ??= []).push(sig);
-                        return acc;
-                      }, {}),
-                    ).map(([group, signals]) => (
-                      <div key={group}>
-                        <h4 className={`${caption} uppercase tracking-wide mb-2`}>{group}</h4>
-                        <div className={spaceYDefault}>
-                          {[...signals].sort((a, b) => signalSortKey(a.name) - signalSortKey(b.name)).map((sig) => (
-                            <FrameLinkSignalControl
-                              key={sig.signal_id}
-                              signal={sig}
-                              isFetched={flFetched}
-                              onWrite={handleFlWriteSignal}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                        return (
+                          <div key={iface.index} className={`rounded bg-[var(--bg-primary)] border ${borderDefault}`}>
+                            <button
+                              type="button"
+                              onClick={() => setFlExpandedIface((prev) => ({ ...prev, [iface.index]: !prev[iface.index] }))}
+                              className="w-full flex items-center justify-between py-2 px-2 text-left hover:bg-[var(--bg-surface)] transition-colors rounded"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {expanded ? <ChevronDown className={iconMd} /> : <ChevronRight className={iconMd} />}
+                                <span className={textMedium}>{iface.name}</span>
+                                {bitrateText && (
+                                  <span className={`${textMuted} text-xs ml-2 truncate`}>{bitrateText}</span>
+                                )}
+                              </div>
+                              <span className={chipClass}>{chipLabel}</span>
+                            </button>
 
-                    {/* Persist checkbox */}
-                    {flSignals.some((s) => s.persistable) && (
-                      <label className={`flex items-center gap-2 ${caption} mt-2`}>
+                            {expanded && (
+                              <div className={`px-3 pb-3 pt-1 border-t ${borderDefault}`}>
+                                {ifaceSignals.length === 0 && flLoading && (
+                                  <p className={caption}>{t("ioProfileDialog.framelink.readingConfig")}</p>
+                                )}
+                                {ifaceSignals.length === 0 && !flLoading && flFetched && (
+                                  <p className={caption}>{t("ioProfileDialog.framelink.configWillLoad")}</p>
+                                )}
+                                {ifaceSignals.length > 0 && (
+                                  <div className={spaceYDefault}>
+                                    {Object.entries(grouped).map(([group, signals]) => (
+                                      <div key={group}>
+                                        <h4 className={`${caption} uppercase tracking-wide mb-2`}>{group}</h4>
+                                        <div className={spaceYDefault}>
+                                          {[...signals].sort((a, b) => signalSortKey(a.name) - signalSortKey(b.name)).map((sig) => (
+                                            <FrameLinkSignalControl
+                                              key={sig.signal_id}
+                                              signal={sig}
+                                              isFetched={flFetched}
+                                              onWrite={handleFlWriteSignal}
+                                            />
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {totalSignalsLoaded === 0 && !flLoading && !flError && !flFetched && (
+                      <p className={`${caption} mt-3`}>
+                        {t("ioProfileDialog.framelink.configWillLoad")}
+                      </p>
+                    )}
+
+                    {anyPersistable && (
+                      <label className={`flex items-center gap-2 ${caption} mt-3`}>
                         <input
                           type="checkbox"
                           checked={flPersist}
@@ -1206,18 +1262,8 @@ export default function IOProfileDialog({
                       </label>
                     )}
                   </div>
-                )}
-
-                {flLoading && flSignals.length === 0 && (
-                  <p className={caption}>{t("ioProfileDialog.framelink.readingConfig")}</p>
-                )}
-
-                {!flLoading && flSignals.length === 0 && !flError && !flFetched && (
-                  <p className={caption}>
-                    {t("ioProfileDialog.framelink.configWillLoad")}
-                  </p>
-                )}
-              </div>
+                );
+              })()}
             </div>
           )}
 
