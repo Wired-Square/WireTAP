@@ -369,8 +369,8 @@ export default function DevicesScanView() {
         <div className={`text-sm ${textSecondary}`}>
           {isScanning
             ? t("scan.scanning")
-            : devices.length > 0
-              ? t("scan.foundDevices", { count: devices.length })
+            : mergedDevices.length > 0
+              ? t("scan.foundDevices", { count: mergedDevices.length })
               : t("scan.noDevices")}
         </div>
         <SecondaryButton onClick={handleRescan} disabled={isScanning} className="w-32 mr-3">
@@ -389,7 +389,7 @@ export default function DevicesScanView() {
       )}
 
       {/* Scanning spinner */}
-      {isScanning && devices.length === 0 && (
+      {isScanning && mergedDevices.length === 0 && (
         <div className="flex items-center justify-center py-8">
           <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
         </div>
