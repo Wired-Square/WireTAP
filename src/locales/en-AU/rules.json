@@ -7,7 +7,13 @@
     "generators": "Generators",
     "indicators": "Indicators",
     "userSignals": "User Signals",
-    "overview": "Overview"
+    "overview": "Overview",
+    "log": "Log"
+  },
+  "log": {
+    "empty": "No activity yet",
+    "count_one": "{{count}} entry",
+    "count_other": "{{count}} entries"
   },
   "topBar": {
     "selectDevice": "Select device…",
@@ -18,11 +24,17 @@
     "persistTooltip": "Persist all rules to device NVS",
     "clearConfig": "Clear Config",
     "confirmClear": "Confirm Clear",
-    "clearConfigTooltip": "Clear all persisted configuration from device flash"
+    "clearConfigTooltip": "Clear all persisted configuration from device flash",
+    "dismiss": "Dismiss"
   },
   "states": {
     "noDevices": "No FrameLink devices configured",
+    "noDevicesHint": "Add a FrameLink profile in the Devices app",
     "selectDevice": "Select a FrameLink device to manage rules",
+    "selectDeviceHint": "Use the device picker in the top bar.",
+    "connectingTo": "Connecting to {{label}}…",
+    "connectFailed": "Failed to connect to {{label}}",
+    "retry": "Retry",
     "ready": "Ready"
   },
   "common": {

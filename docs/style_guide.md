@@ -259,6 +259,233 @@ import { dataViewContainer, bgDataView } from "../../styles";
 </div>
 ```
 
+## App top bar
+
+Every panel renders its top bar through
+[AppTopBar.tsx](../src/components/AppTopBar.tsx). It enforces a single,
+flexible row containing five logical slots, in order:
+
+```
+[icon] [title?] | [identity picker] [secondary pickers] [custom children] | [actions]
+       FlexSeparator (between icon/title and the rest)
+                                                       FlexSeparator (only if actions)
+```
+
+- **Icon + title** — `icon` is a `lucide-react` component, coloured via
+  `iconColour` (use a CSS-variable text token, e.g.
+  `text-[color:var(--text-purple)]`). `title` is optional — omit it if
+  the identity picker conveys context on its own.
+- **Identity picker** — see *Identity pickers* below. Session-bound apps
+  pass an `ioSession` prop (renders `IOSessionControls`); apps bound to
+  a single device kind pass their picker as `children` (e.g. Rules with
+  `<FrameLinkDevicePicker>`).
+- **Secondary pickers** — `framePicker` and `catalog` props drive the
+  shared frame-and-catalog buttons that several apps use.
+- **Custom children** — anything the app needs between the picker and
+  the right-side actions (e.g. Discovery's Toolbox button).
+- **Actions** — right-aligned action buttons (Save, Export, Refresh,
+  …). Use `iconButtonBase` for icon-only and `buttonBase` for icon+text.
+
+### Single line, always
+
+The top bar must fit on one row at any reasonable window width. If you
+have more than ~5 actions, consolidate into a popover or move secondary
+controls into the panel body. The bar wraps when overflowed but a
+wrapped top bar is a UX failure — if you see wrapping in normal use,
+trim controls.
+
+### Extract a `<App>TopBar.tsx` wrapper
+
+When a panel's top bar takes more than ~10 props, extract a wrapper
+component following the
+[DiscoveryTopBar](../src/apps/discovery/views/DiscoveryTopBar.tsx) /
+[DecoderTopBar](../src/apps/decoder/views/DecoderTopBar.tsx) /
+[RulesTopBar](../src/apps/rules/views/RulesTopBar.tsx) pattern. The
+wrapper:
+- accepts a flat props object,
+- composes `AppTopBar` once,
+- keeps `Rules.tsx` (or equivalent) free of inline JSX.
+
+## Main view container
+
+Tabbed panel content lives inside a **data-view bubble** — a rounded
+border container with a tab bar header and a content area below. Two
+flavours, depending on whether the panel deals with streaming data:
+
+### Streaming / data apps — use `AppTabView`
+
+Apps that show frames, signals, or other live/recorded data (Discovery,
+Decoder) use [AppTabView.tsx](../src/components/AppTabView.tsx). It
+bundles `DataViewController` (tab bar + protocol badge + streaming
+status + optional pagination toolbar + optional timeline scrubber)
+inside `dataViewContainer` with a `bgDataView` content area.
+
+### Configuration / control apps — bubble + `dataViewTabClass`
+
+Apps that present static configuration tabs (Rules, future settings-style
+panels) don't need the streaming machinery. Wrap content in
+`dataViewContainer` directly and use `dataViewTabClass(isActive)` for
+the tab buttons:
+
+```tsx
+import {
+  dataViewContainer,
+  bgDataView,
+  bgDataToolbar,
+  borderDataView,
+} from "../../styles";
+import { dataViewTabClass } from "../../styles/buttonStyles";
+
+<div className={`flex flex-col flex-1 min-h-0 ${dataViewContainer}`}>
+  <div className={`flex-shrink-0 flex items-center px-1 border-b ${borderDataView} ${bgDataToolbar}`}>
+    {tabs.map((tab) => (
+      <button
+        key={tab.id}
+        type="button"
+        onClick={() => setActiveTab(tab.id)}
+        className={dataViewTabClass(activeTab === tab.id)}
+      >
+        {tab.label}
+      </button>
+    ))}
+  </div>
+  <div className={`flex-1 overflow-auto p-4 rounded-b-lg ${bgDataView}`}>
+    {/* tab content */}
+  </div>
+</div>
+```
+
+Don't reinvent tab styling with custom `bg-indigo-500/20` highlights —
+`dataViewTabClass` gives the consistent bottom-border-with-accent look
+used across the app. Wrap the bubble in `p-2 gap-2` if the panel also
+needs a status footer below it.
+
+### Activity log (Log tab)
+
+Long-running stateful apps (Rules) accumulate operation history —
+configuration changes, persist/clear cycles, transient errors. Surface
+that history as a **Log** tab inside the bubble rather than scattering
+ephemeral toasts or a fixed-height footer. The Log tab is the
+authoritative history; the picker's status dot already handles the
+"current state" question without needing a footer for it.
+
+Implementation: keep a `statusLog: StatusBarEntry[]` array in the store
+(cap ~200 entries). Mirror every status update into the log via a
+Zustand `subscribe` so existing setters don't need to be touched. The
+log is **in-memory only** — it resets on disconnect and is not
+persisted, so no manual "clear" affordance is needed. Render
+newest-first with a colour-coded dot per entry. Include the entity ID
+in every message ("Bridge 0x0001 added"), not just the verb — log
+entries should read clearly without needing to cross-reference the
+configuration tabs. See
+[apps/rules/stores/rulesStore.ts](../src/apps/rules/stores/rulesStore.ts)
+for the canonical implementation and
+[apps/rules/views/LogView.tsx](../src/apps/rules/views/LogView.tsx) for
+the rendering.
+
+## Identity pickers
+
+Two pickers, one visual language:
+
+| Picker | When | File |
+|---|---|---|
+| `SessionButton` (inside `IOSessionControls`) | Session-bound apps (Discovery, Decoder, Transmit) | [SessionControls.tsx](../src/components/SessionControls.tsx) |
+| `FrameLinkDevicePicker` | Apps bound to a single FrameLink device (Rules) | [FrameLinkDevicePicker.tsx](../src/components/FrameLinkDevicePicker.tsx) |
+
+Both render as a compact `buttonBase`-styled control: `[type icon] [status dot] [label]`.
+Click opens a popover (never a native `<select>` — popovers can show
+status dots and host-port hints; native selects can't on every platform).
+
+### Status-dot vocabulary
+
+The same dot semantics apply to both pickers and to the small status
+indicator in the operational footer:
+
+| State | Token | Meaning |
+|---|---|---|
+| `connected` | `bg-[var(--status-success-text)]` | Active, streaming/usable now |
+| `connecting` / `probing` | `bg-[var(--status-info-text)] animate-pulse` | Transient — work in flight |
+| `connectable` | `bg-[var(--status-info-text)]` | Reachable (mDNS scan or recent probe) but not in use |
+| `paused` | `bg-[var(--status-warning-text)]` | (Sessions only — pause state) |
+| `unknown` | `bg-[color:var(--text-muted)]` | Not yet probed and not seen by background discovery |
+| `missing` / `error` | `bg-[var(--status-danger-text)]` | Last probe failed, or active connection in error |
+
+Never hardcode `bg-green-500` etc. — colours must track the active
+theme via the status CSS variables.
+
+### Liveness for device pickers
+
+Device pickers need a "is this device reachable right now?" signal.
+The reusable hook
+[useFrameLinkDeviceLiveness](../src/hooks/useFrameLinkDeviceLiveness.ts)
+provides one: a hybrid of background mDNS scan (cheap, passive) plus
+on-demand probe (called by the picker on popover-open for any device
+the scan hasn't seen). Reuse this pattern when adding pickers for new
+device kinds — keep scan/probe state in a Zustand store so multiple
+panels share one signal.
+
+## Error display
+
+WireTAP has four standard surfaces for error and status messages.
+Choose the lightest weight one that fits the situation.
+
+| Surface | Token / Component | Use when |
+|---|---|---|
+| **Inline banner** (recoverable, dismissable) | `bgDanger` + `borderDanger` + `textDanger`, or `errorBoxCompact` from [cardStyles.ts](../src/styles/cardStyles.ts) | An operation failed but the panel is still usable; the user can retry |
+| **Modal `ErrorDialog`** (blocking) | `useSessionStore.getState().showAppError(title, message, details?)` from [appError.ts](../src/utils/appError.ts) | Unexpected failure with technical detail the user should see (stack, server response) |
+| **Toast `FlashNotification`** | [FlashNotification.tsx](../src/components/FlashNotification.tsx) | Transient confirmations and soft warnings that don't need acknowledgement |
+| **Operational status footer** (Rules-style) | App-specific footer using semantic status colours | Long-running stateful apps that benefit from a persistent "last operation" line; pair with a coloured status dot |
+
+### Inline banner recipe
+
+```tsx
+import { bgDanger, borderDanger, textDanger } from "../../styles";
+
+{error && (
+  <div
+    className={`mx-2 mt-1 px-3 py-2 text-xs rounded-lg flex justify-between items-center border ${bgDanger} ${borderDanger} ${textDanger}`}
+  >
+    <span>{error}</span>
+    <button onClick={clearError} className="ml-2 underline hover:brightness-125">
+      {t("common:actions.dismiss", "Dismiss")}
+    </button>
+  </div>
+)}
+```
+
+### When to call `showAppError`
+
+Reserve the modal for failures the user genuinely needs to see and
+acknowledge — typically those carrying technical details (stack
+traces, server responses) that are too noisy for a banner. Don't use
+it for routine "couldn't load X" cases the inline banner already
+handles.
+
+```tsx
+import { useSessionStore } from "../stores/sessionStore";
+
+try {
+  await persistSave();
+} catch (e) {
+  useSessionStore.getState().showAppError(
+    "Persist failed",
+    "Could not save rules to device NVS.",
+    String(e),
+  );
+  throw e;
+}
+```
+
+### Don'ts
+
+- Don't use raw Tailwind `bg-red-500/10`, `text-red-400` etc. — these
+  bypass theming and look broken on Windows WebView.
+- Don't `console.error` user-facing failures and leave them invisible.
+  Surface them in the matching banner / dialog / toast.
+- Don't stack two surfaces for the same failure (e.g. banner *and*
+  modal *and* toast). Pick one. The footer status line is the
+  exception — it's a passive log, not an alert.
+
 ## Localisation
 
 Strings are loaded via [react-i18next](https://react.i18next.com/). The

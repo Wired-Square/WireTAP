@@ -41,6 +41,16 @@
   "tooltips": {
     "selectFrames": "Select frames"
   },
+  "framelinkPicker": {
+    "selectDevice": "Select device…",
+    "empty": "No FrameLink devices configured",
+    "state": {
+      "connected": "Connected",
+      "connecting": "Connecting…",
+      "checking": "Checking…",
+      "missing": "Missing"
+    }
+  },
   "pagination": {
     "firstPage": "First page",
     "previousPage": "Previous page",

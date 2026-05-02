@@ -50,7 +50,8 @@ export type RulesTab =
   | "transformers"
   | "generators"
   | "indicators"
-  | "user-signals";
+  | "user-signals"
+  | "log";
 
 export type RulePersistenceState = "existing" | "temporary" | "persisted";
 
@@ -98,7 +99,11 @@ interface RulesState {
   selectedItemId: string | null;
   error: string | null;
   statusBar: StatusBarEntry | null;
+  /** Bounded history of status events (max 200), oldest first. */
+  statusLog: StatusBarEntry[];
 }
+
+const STATUS_LOG_MAX = 200;
 
 interface RulesActions {
   connectDevice: (host: string, port: number, label: string) => Promise<void>;
@@ -152,6 +157,7 @@ const initialState: RulesState = {
   selectedItemId: null,
   error: null,
   statusBar: null,
+  statusLog: [],
 };
 
 // ============================================================================
@@ -168,6 +174,11 @@ function statusError(text: string): StatusBarEntry {
 
 function statusInfo(text: string): StatusBarEntry {
   return { text, type: "info", timestamp: Date.now() };
+}
+
+/** Format a numeric ID as 0xNNNN for log readability. */
+function hexId(id: number): string {
+  return `0x${id.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
 // ============================================================================
@@ -304,10 +315,11 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
 
     addFrameDef: async (frameDef) => {
       await framelinkFrameDefAdd(deviceId(), frameDef);
+      const id = hexId(Number(frameDef.frame_def_id));
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.add(`framedef:${frameDef.frame_def_id}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("Frame definition added") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`Frame def ${id} added`) };
       });
       await loadTab("frame-defs");
       await get().loadSelectableSignals();
@@ -315,10 +327,11 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
 
     removeFrameDef: async (frameDefId) => {
       await framelinkFrameDefRemove(deviceId(), frameDefId);
+      const id = hexId(frameDefId);
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.delete(`framedef:${frameDefId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("Frame definition removed") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`Frame def ${id} removed`) };
       });
       await loadTab("frame-defs");
       await get().loadSelectableSignals();
@@ -326,79 +339,97 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
 
     addBridge: async (bridge) => {
       await framelinkBridgeAdd(deviceId(), bridge);
+      const id = hexId(Number(bridge.bridge_id));
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.add(`bridge:${bridge.bridge_id}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("Bridge added") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`Bridge ${id} added`) };
       });
       await loadTab("bridges");
     },
 
     removeBridge: async (bridgeId) => {
       await framelinkBridgeRemove(deviceId(), bridgeId);
+      const id = hexId(bridgeId);
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.delete(`bridge:${bridgeId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("Bridge removed") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`Bridge ${id} removed`) };
       });
       await loadTab("bridges");
     },
 
     enableBridge: async (bridgeId, enabled) => {
       await framelinkBridgeEnable(deviceId(), bridgeId, enabled);
-      set({ statusBar: statusSuccess(`Bridge ${enabled ? "enabled" : "disabled"}`) });
+      set({
+        statusBar: statusSuccess(
+          `Bridge ${hexId(bridgeId)} ${enabled ? "enabled" : "disabled"}`,
+        ),
+      });
       await loadTab("bridges");
     },
 
     addTransformer: async (transformer) => {
       await framelinkXformAdd(deviceId(), transformer);
+      const id = hexId(Number(transformer.transformer_id));
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.add(`xform:${transformer.transformer_id}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("Transformer added") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`Transformer ${id} added`) };
       });
       await loadTab("transformers");
     },
 
     removeTransformer: async (transformerId) => {
       await framelinkXformRemove(deviceId(), transformerId);
+      const id = hexId(transformerId);
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.delete(`xform:${transformerId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("Transformer removed") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`Transformer ${id} removed`) };
       });
       await loadTab("transformers");
     },
 
     enableTransformer: async (transformerId, enabled) => {
       await framelinkXformEnable(deviceId(), transformerId, enabled);
-      set({ statusBar: statusSuccess(`Transformer ${enabled ? "enabled" : "disabled"}`) });
+      set({
+        statusBar: statusSuccess(
+          `Transformer ${hexId(transformerId)} ${enabled ? "enabled" : "disabled"}`,
+        ),
+      });
       await loadTab("transformers");
     },
 
     addGenerator: async (generator) => {
       await framelinkGenAdd(deviceId(), generator);
+      const id = hexId(Number(generator.generator_id));
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.add(`gen:${generator.generator_id}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("Generator added") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`Generator ${id} added`) };
       });
       await loadTab("generators");
     },
 
     removeGenerator: async (generatorId) => {
       await framelinkGenRemove(deviceId(), generatorId);
+      const id = hexId(generatorId);
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.delete(`gen:${generatorId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("Generator removed") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`Generator ${id} removed`) };
       });
       await loadTab("generators");
     },
 
     enableGenerator: async (generatorId, enabled) => {
       await framelinkGenEnable(deviceId(), generatorId, enabled);
-      set({ statusBar: statusSuccess(`Generator ${enabled ? "enabled" : "disabled"}`) });
+      set({
+        statusBar: statusSuccess(
+          `Generator ${hexId(generatorId)} ${enabled ? "enabled" : "disabled"}`,
+        ),
+      });
       await loadTab("generators");
     },
 
@@ -456,20 +487,26 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
 
     addUserSignal: async (signalId, metadata) => {
       await framelinkUserSignalAdd(deviceId(), signalId, metadata);
+      const id = hexId(signalId);
+      const namePart = metadata?.name ? ` (${metadata.name})` : "";
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.add(`usersig:${signalId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("User signal added") };
+        return {
+          temporaryRules: temp,
+          statusBar: statusSuccess(`User signal ${id}${namePart} added`),
+        };
       });
       await get().loadSelectableSignals();
     },
 
     removeUserSignal: async (signalId) => {
       await framelinkUserSignalRemove(deviceId(), signalId);
+      const id = hexId(signalId);
       set((s) => {
         const temp = new Set(s.temporaryRules);
         temp.delete(`usersig:${signalId}`);
-        return { temporaryRules: temp, statusBar: statusSuccess("User signal removed") };
+        return { temporaryRules: temp, statusBar: statusSuccess(`User signal ${id} removed`) };
       });
       await get().loadSelectableSignals();
     },
@@ -491,4 +528,19 @@ export const useRulesStore = create<RulesState & RulesActions>()((set, get) => {
     setStatusBar: (entry) => set({ statusBar: entry }),
     reset: () => set({ ...initialState, temporaryRules: new Set() }),
   };
+});
+
+// Mirror every statusBar update into the bounded statusLog history.
+// The Log tab reads from statusLog; the footer reads statusBar.
+useRulesStore.subscribe((state, prev) => {
+  if (state.statusBar && state.statusBar !== prev.statusBar) {
+    const entry = state.statusBar;
+    useRulesStore.setState((s) => {
+      const log =
+        s.statusLog.length >= STATUS_LOG_MAX
+          ? s.statusLog.slice(-(STATUS_LOG_MAX - 1))
+          : s.statusLog;
+      return { statusLog: [...log, entry] };
+    });
+  }
 });
