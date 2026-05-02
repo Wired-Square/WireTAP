@@ -72,6 +72,8 @@ keepawake = "0.5"
 espflash = { version = "4", default-features = false, features = ["serialport"] }
 dfu-core = "0.10"
 dfu-nusb = "0.1"
+# Intel HEX parsing for the STM32 UART flasher.
+ihex = "3"
 
 # MacOS
 [target.'cfg(target_os = "macos")'.dependencies]

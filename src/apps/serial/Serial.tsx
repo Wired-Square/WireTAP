@@ -1,16 +1,17 @@
 // ui/src/apps/serial/Serial.tsx
 //
-// Serial terminal app. Three tabs:
+// Serial terminal app. Four tabs:
 //   - Terminal: bidirectional ANSI terminal over the chosen serial port
 //   - ESP32 Flash: esptool-style flasher driven by the same UART
 //   - STM32 DFU: dfu-util style flasher over raw USB
+//   - STM32 UART: AN3155 system-bootloader flasher over the same UART
 //
 // Talks to the port directly through the `serial_terminal_*` commands —
 // no IO sessions / multi-source broker / ad-hoc profile machinery. The
 // shared SerialPortPicker in the top nav drives connect/disconnect.
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Terminal as TerminalIcon, Cpu, Usb, Plug } from "lucide-react";
+import { Terminal as TerminalIcon, BookOpen, Cpu, Usb, Plug } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppLayout from "../../components/AppLayout";
 import {
@@ -33,6 +34,7 @@ import SerialTerminalView, {
 } from "./views/SerialTerminalView";
 import EspFlashView from "./views/EspFlashView";
 import DfuFlashView from "./views/DfuFlashView";
+import Stm32FlashView from "./views/Stm32FlashView";
 
 export default function Serial() {
   const { t } = useTranslation("serial");
@@ -141,6 +143,36 @@ export default function Serial() {
     }
   }, [espPhase, handleConnect]);
 
+  // Mirror of the ESP hand-off for the STM32 UART tab.
+  const restoreTerminalAfterStm32Op = useRef(false);
+  const handleStm32BeforeFlash = useCallback(async () => {
+    restoreTerminalAfterStm32Op.current = terminal.isOpen;
+    if (terminal.isOpen) {
+      await terminal.close();
+    }
+  }, [terminal]);
+
+  const stm32Phase = useSerialStore((s) => s.stm32Flash.phase);
+  const prevStm32PhaseRef = useRef(stm32Phase);
+  useEffect(() => {
+    const prev = prevStm32PhaseRef.current;
+    prevStm32PhaseRef.current = stm32Phase;
+    const wasBusy =
+      prev === "connecting" ||
+      prev === "erasing" ||
+      prev === "writing" ||
+      prev === "verifying";
+    const isSettled =
+      stm32Phase === "done" ||
+      stm32Phase === "error" ||
+      stm32Phase === "cancelled" ||
+      stm32Phase === "idle";
+    if (wasBusy && isSettled && restoreTerminalAfterStm32Op.current) {
+      restoreTerminalAfterStm32Op.current = false;
+      void handleConnect();
+    }
+  }, [stm32Phase, handleConnect]);
+
   // Refresh the terminal binding (write callback) whenever the terminal id
   // changes — passes a stable function reference to xterm.
   const writeFn = useMemo(() => {
@@ -153,6 +185,7 @@ export default function Serial() {
       { id: "terminal", label: t("tabs.terminal"), icon: TerminalIcon },
       { id: "esp", label: t("tabs.espFlash"), icon: Cpu },
       { id: "dfu", label: t("tabs.dfuFlash"), icon: Usb },
+      { id: "stm32", label: t("tabs.stm32Flash"), icon: BookOpen },
     ],
     [t],
   );
@@ -230,6 +263,12 @@ export default function Serial() {
           />
         )}
         {activeTab === "dfu" && <DfuFlashView />}
+        {activeTab === "stm32" && (
+          <Stm32FlashView
+            onBeforeFlash={handleStm32BeforeFlash}
+            isTerminalOpen={terminal.isOpen}
+          />
+        )}
       </div>
     </AppLayout>
   );

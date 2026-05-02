@@ -52,3 +52,38 @@ export interface DfuDeviceInfo {
   serial: string;
   display_name: string;
 }
+
+/**
+ * Result of an AN3155 GET + GET_ID handshake. PID is the 12-bit chip ID
+ * returned by GET_ID; `chip` is our friendly name from the lookup table on
+ * the Rust side. `rdp_level` is `"0"` if a 1-byte READ at the flash base
+ * succeeded, `"1 (locked)"` if the chip rejected it.
+ */
+export interface Stm32ChipInfo {
+  chip: string;
+  pid: number;
+  bootloader_version: string;
+  flash_size_kb?: number | null;
+  rdp_level?: string | null;
+}
+
+export type Stm32PinSelection = "rts" | "dtr" | "none";
+
+/**
+ * Tuning knobs for the STM32 UART flasher. Mirror of the `Stm32FlashOptions`
+ * struct on the Rust side. Defaults (DTR=BOOT0, RTS=NRST, NRST inverted)
+ * match the stm32flash convention; override per-board if your transistor
+ * wiring differs.
+ */
+export interface Stm32FlashOptions {
+  /** Pin driving BOOT0. Default `"dtr"`. */
+  boot0_pin?: Stm32PinSelection | null;
+  /** Pin driving NRST. Default `"rts"`. */
+  reset_pin?: Stm32PinSelection | null;
+  /** Invert BOOT0 polarity. Default `false`. */
+  boot0_invert?: boolean | null;
+  /** Invert RESET polarity. Default `true` (active-low NRST). */
+  reset_invert?: boolean | null;
+  /** Bootloader baud (1200..=115200). Default 115200. */
+  baud?: number | null;
+}

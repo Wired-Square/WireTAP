@@ -1,14 +1,15 @@
 //! Firmware flashers exposed through the Serial app.
 //!
 //! - ESP32 family: esptool-style serial bootloader (uses `espflash` crate).
-//! - STM32: USB DFU 1.1 / DfuSe (uses `dfu-nusb` + `dfu-core`).
+//! - STM32 DFU: USB DFU 1.1 / DfuSe (uses `dfu-nusb` + `dfu-core`).
+//! - STM32 UART: ST AN3155 system bootloader (hand-rolled over `serialport`).
 //!
 //! The Tauri commands here own the command surface and progress channel
 //! (`flasher-progress` event). The actual flashing happens in the
-//! `esp_flasher` and `dfu_flasher` submodules. The whole module is
-//! desktop-only — `serialport` (ESP32) and `nusb` (DFU) are not available
-//! on iOS, so the module is gated at the `mod flashers;` declaration in
-//! `lib.rs`.
+//! `esp_flasher`, `dfu_flasher`, and `stm32_flasher` submodules. The whole
+//! module is desktop-only — `serialport` (ESP32 / STM32 UART) and `nusb`
+//! (DFU) are not available on iOS, so the module is gated at the
+//! `mod flashers;` declaration in `lib.rs`.
 
 #![cfg(not(target_os = "ios"))]
 
@@ -20,6 +21,7 @@ use tauri::{AppHandle, Emitter};
 
 pub mod dfu_flasher;
 pub mod esp_flasher;
+pub mod stm32_flasher;
 
 pub const FLASHER_PROGRESS_EVENT: &str = "flasher-progress";
 
@@ -69,6 +71,40 @@ pub struct EspFlashOptions {
     pub flash_freq: Option<String>,
     /// Flash size (`4MB`, `8MB`, `16MB`, …).
     pub flash_size: Option<String>,
+}
+
+/// Identification returned by the STM32 system bootloader on connect — the
+/// PID (12 bits, returned as a `u16`), the bootloader firmware version, and
+/// our best-effort lookup of the chip name + flash size from the PID. The
+/// readout-protection level is probed by attempting a 1-byte read at the
+/// flash base; locked chips reject it.
+#[derive(Clone, Serialize, Debug)]
+pub struct Stm32ChipInfo {
+    pub chip: String,
+    pub pid: u16,
+    pub bootloader_version: String,
+    pub flash_size_kb: Option<u32>,
+    pub rdp_level: Option<String>,
+}
+
+/// Tuning knobs for the STM32 UART flasher. Pin mapping models the
+/// stm32flash-style convention (DTR=BOOT0, RTS=NRST) but is fully
+/// configurable for boards that wire it differently — the `"none"` setting
+/// disables drive of that line, leaving the user to enter the bootloader
+/// manually.
+#[derive(Clone, Deserialize, Default, Debug)]
+#[serde(default)]
+pub struct Stm32FlashOptions {
+    /// Pin driving BOOT0. `"rts"` | `"dtr"` | `"none"`. Default `"dtr"`.
+    pub boot0_pin: Option<String>,
+    /// Pin driving NRST. `"rts"` | `"dtr"` | `"none"`. Default `"rts"`.
+    pub reset_pin: Option<String>,
+    /// Invert BOOT0 polarity. Default `false` (asserted high = bootloader).
+    pub boot0_invert: Option<bool>,
+    /// Invert RESET polarity. Default `true` (active-low NRST through an RC).
+    pub reset_invert: Option<bool>,
+    /// Bootloader baud (1200..=115200 per AN3155). Default 115_200.
+    pub baud: Option<u32>,
 }
 
 #[derive(Clone, Serialize, Debug)]
@@ -292,6 +328,101 @@ pub async fn flasher_dfu_flash(
 
 #[tauri::command(rename_all = "snake_case")]
 pub fn flasher_dfu_cancel(flash_id: String) -> Result<(), String> {
+    request_cancel(&flash_id);
+    Ok(())
+}
+
+// ============================================================================
+// Tauri commands — STM32 UART (AN3155 system bootloader)
+// ============================================================================
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn flasher_stm32_detect_chip(
+    port: String,
+    options: Option<Stm32FlashOptions>,
+) -> Result<Stm32ChipInfo, String> {
+    stm32_flasher::detect_chip(port, options.unwrap_or_default()).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn flasher_stm32_flash(
+    app: AppHandle,
+    port: String,
+    image_path: String,
+    address: u32,
+    options: Option<Stm32FlashOptions>,
+) -> Result<String, String> {
+    let flash_id = new_flash_id("stm32");
+    register_flash(&flash_id);
+    let id_clone = flash_id.clone();
+    let app_clone = app.clone();
+    let opts = options.unwrap_or_default();
+    tauri::async_runtime::spawn(async move {
+        let result = stm32_flasher::flash(
+            app_clone.clone(),
+            id_clone.clone(),
+            port,
+            image_path,
+            address,
+            opts,
+        )
+        .await;
+        finalise_flash_result(&app_clone, &id_clone, result);
+    });
+    Ok(flash_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn flasher_stm32_read_flash(
+    app: AppHandle,
+    port: String,
+    output_path: String,
+    offset: u32,
+    size: Option<u32>,
+    options: Option<Stm32FlashOptions>,
+) -> Result<String, String> {
+    let flash_id = new_flash_id("stm32");
+    register_flash(&flash_id);
+    let id_clone = flash_id.clone();
+    let app_clone = app.clone();
+    let opts = options.unwrap_or_default();
+    tauri::async_runtime::spawn(async move {
+        let result = stm32_flasher::read_flash(
+            app_clone.clone(),
+            id_clone.clone(),
+            port,
+            output_path,
+            offset,
+            size,
+            opts,
+        )
+        .await;
+        finalise_flash_result(&app_clone, &id_clone, result);
+    });
+    Ok(flash_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn flasher_stm32_erase(
+    app: AppHandle,
+    port: String,
+    options: Option<Stm32FlashOptions>,
+) -> Result<String, String> {
+    let flash_id = new_flash_id("stm32");
+    register_flash(&flash_id);
+    let id_clone = flash_id.clone();
+    let app_clone = app.clone();
+    let opts = options.unwrap_or_default();
+    tauri::async_runtime::spawn(async move {
+        let result =
+            stm32_flasher::erase(app_clone.clone(), id_clone.clone(), port, opts).await;
+        finalise_flash_result(&app_clone, &id_clone, result);
+    });
+    Ok(flash_id)
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub fn flasher_stm32_cancel(flash_id: String) -> Result<(), String> {
     request_cancel(&flash_id);
     Ok(())
 }

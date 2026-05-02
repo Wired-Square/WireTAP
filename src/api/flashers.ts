@@ -1,14 +1,17 @@
 // ui/src/api/flashers.ts
 //
-// Tauri command wrappers for the ESP32 (esptool-style) and STM32 DFU
-// firmware flashers. Both flashers emit progress on the `flasher-progress`
-// event channel — see src/apps/serial/utils/flasherTypes.ts for the payload.
+// Tauri command wrappers for the ESP32 (esptool-style), STM32 DFU, and
+// STM32 UART (AN3155 system bootloader) firmware flashers. All three
+// emit progress on the `flasher-progress` event channel — see
+// src/apps/serial/utils/flasherTypes.ts for the payload.
 
 import { invoke } from "@tauri-apps/api/core";
 import type {
   EspChipInfo,
   EspFlashOptions,
   DfuDeviceInfo,
+  Stm32ChipInfo,
+  Stm32FlashOptions,
 } from "../apps/serial/utils/flasherTypes";
 
 export const FLASHER_PROGRESS_EVENT = "flasher-progress";
@@ -79,4 +82,56 @@ export async function flasherDfuFlash(
 
 export async function flasherDfuCancel(flashId: string): Promise<void> {
   await invoke("flasher_dfu_cancel", { flash_id: flashId });
+}
+
+// ---------------------------------------------------------------------------
+// STM32 UART (AN3155 system bootloader)
+// ---------------------------------------------------------------------------
+
+export async function flasherStm32DetectChip(
+  port: string,
+  options?: Stm32FlashOptions,
+): Promise<Stm32ChipInfo> {
+  return invoke("flasher_stm32_detect_chip", { port, options });
+}
+
+export async function flasherStm32Flash(
+  port: string,
+  imagePath: string,
+  address: number,
+  options?: Stm32FlashOptions,
+): Promise<string> {
+  return invoke("flasher_stm32_flash", {
+    port,
+    image_path: imagePath,
+    address,
+    options,
+  });
+}
+
+export async function flasherStm32ReadFlash(
+  port: string,
+  outputPath: string,
+  offset: number,
+  size: number | null,
+  options?: Stm32FlashOptions,
+): Promise<string> {
+  return invoke("flasher_stm32_read_flash", {
+    port,
+    output_path: outputPath,
+    offset,
+    size,
+    options,
+  });
+}
+
+export async function flasherStm32Erase(
+  port: string,
+  options?: Stm32FlashOptions,
+): Promise<string> {
+  return invoke("flasher_stm32_erase", { port, options });
+}
+
+export async function flasherStm32Cancel(flashId: string): Promise<void> {
+  await invoke("flasher_stm32_cancel", { flash_id: flashId });
 }

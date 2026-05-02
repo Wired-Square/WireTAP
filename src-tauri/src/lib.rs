@@ -1228,6 +1228,16 @@ pub fn run() {
             flashers::flasher_dfu_flash,
             #[cfg(not(target_os = "ios"))]
             flashers::flasher_dfu_cancel,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_stm32_detect_chip,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_stm32_flash,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_stm32_read_flash,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_stm32_erase,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_stm32_cancel,
             // Test Pattern protocol
             io_test::io_test_start,
             io_test::io_test_stop,

@@ -8,11 +8,14 @@ import { create } from "zustand";
 import type {
   EspChipInfo,
   EspFlashOptions,
+  Stm32ChipInfo,
+  Stm32FlashOptions,
 } from "../utils/flasherTypes";
 
-export type SerialTab = "terminal" | "esp" | "dfu";
+export type SerialTab = "terminal" | "esp" | "dfu" | "stm32";
 export type Parity = "none" | "odd" | "even";
 export type EspOperation = "flash" | "backup" | "erase";
+export type Stm32Operation = "flash" | "backup" | "erase";
 
 export interface SerialSettings {
   port: string | null;
@@ -59,6 +62,16 @@ const DEFAULT_ESP_OPTIONS: EspFlashOptions = {
   flash_size: null,
 };
 
+/** Default STM32 UART flasher options — stm32flash convention with the
+ * common "DTR=BOOT0, RTS=NRST (active low)" wiring. */
+const DEFAULT_STM32_OPTIONS: Stm32FlashOptions = {
+  boot0_pin: "dtr",
+  reset_pin: "rts",
+  boot0_invert: false,
+  reset_invert: true,
+  baud: 115_200,
+};
+
 interface SerialState {
   settings: SerialSettings;
   activeTab: SerialTab;
@@ -74,6 +87,12 @@ interface SerialState {
   /** Last successful chip detection. Populates the status bar + flash size default. */
   espChip: EspChipInfo | null;
 
+  /** Per-tab progress + state for the STM32 UART flasher. */
+  stm32Flash: FlashProgress;
+  stm32Operation: Stm32Operation;
+  stm32Options: Stm32FlashOptions;
+  stm32Chip: Stm32ChipInfo | null;
+
   // actions
   setSettings: (patch: Partial<SerialSettings>) => void;
   setPort: (port: string | null) => void;
@@ -88,6 +107,12 @@ interface SerialState {
   setEspOperation: (op: EspOperation) => void;
   setEspOptions: (patch: Partial<EspFlashOptions>) => void;
   setEspChip: (chip: EspChipInfo | null) => void;
+  setStm32Flash: (patch: Partial<FlashProgress>) => void;
+  appendStm32Log: (line: string) => void;
+  resetStm32Flash: () => void;
+  setStm32Operation: (op: Stm32Operation) => void;
+  setStm32Options: (patch: Partial<Stm32FlashOptions>) => void;
+  setStm32Chip: (chip: Stm32ChipInfo | null) => void;
 }
 
 export const useSerialStore = create<SerialState>((set) => ({
@@ -106,6 +131,11 @@ export const useSerialStore = create<SerialState>((set) => ({
   espOptions: { ...DEFAULT_ESP_OPTIONS },
   espChip: null,
 
+  stm32Flash: { ...initialFlashProgress },
+  stm32Operation: "flash",
+  stm32Options: { ...DEFAULT_STM32_OPTIONS },
+  stm32Chip: null,
+
   setSettings: (patch) =>
     set((s) => ({ settings: { ...s.settings, ...patch } })),
   setPort: (port) =>
@@ -113,6 +143,7 @@ export const useSerialStore = create<SerialState>((set) => ({
       settings: { ...s.settings, port },
       // A new port means our cached detection is no longer valid.
       espChip: port === s.settings.port ? s.espChip : null,
+      stm32Chip: port === s.settings.port ? s.stm32Chip : null,
     })),
   setActiveTab: (activeTab) => set({ activeTab }),
   setLocalEcho: (localEcho) => set({ localEcho }),
@@ -128,4 +159,13 @@ export const useSerialStore = create<SerialState>((set) => ({
   setEspOptions: (patch) =>
     set((s) => ({ espOptions: { ...s.espOptions, ...patch } })),
   setEspChip: (espChip) => set({ espChip }),
+  setStm32Flash: (patch) =>
+    set((s) => ({ stm32Flash: { ...s.stm32Flash, ...patch } })),
+  appendStm32Log: (line) =>
+    set((s) => ({ stm32Flash: { ...s.stm32Flash, log: [...s.stm32Flash.log, line] } })),
+  resetStm32Flash: () => set({ stm32Flash: { ...initialFlashProgress } }),
+  setStm32Operation: (stm32Operation) => set({ stm32Operation }),
+  setStm32Options: (patch) =>
+    set((s) => ({ stm32Options: { ...s.stm32Options, ...patch } })),
+  setStm32Chip: (stm32Chip) => set({ stm32Chip }),
 }));

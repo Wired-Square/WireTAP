@@ -16,7 +16,8 @@
   "tabs": {
     "terminal": "Terminal",
     "espFlash": "ESP32 Flash",
-    "dfuFlash": "STM32 DFU"
+    "dfuFlash": "STM32 DFU",
+    "stm32Flash": "STM32 UART"
   },
   "terminal": {
     "emptyState": "Pick a port from the top bar to begin."
