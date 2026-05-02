@@ -6,6 +6,7 @@
 // - utc: Uses UTC
 
 import { Globe } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { iconXs } from "../styles/spacing";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 
@@ -105,6 +106,7 @@ type TimezoneBadgeProps = {
 };
 
 export default function TimezoneBadge({ mode, onChange, className = "" }: TimezoneBadgeProps) {
+  const { t } = useTranslation("common");
   const defaultTz = useSettingsStore((s) => s.display.timezone);
   const label = getTimezoneLabel(mode, defaultTz);
 
@@ -121,7 +123,7 @@ export default function TimezoneBadge({ mode, onChange, className = "" }: Timezo
       className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full
         bg-[var(--status-info-bg)] text-[color:var(--status-info-text)]
         hover:brightness-95 transition-colors cursor-pointer ${className}`}
-      title="Click to change timezone"
+      title={t("timezone.changeTooltip")}
     >
       <Globe className={iconXs} />
       {label}

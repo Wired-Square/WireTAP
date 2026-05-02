@@ -1,6 +1,7 @@
 // ui/src/components/forms/BaudRateSelect.tsx
 
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Select from './Select';
 import Input from './Input';
 
@@ -39,6 +40,7 @@ export default function BaudRateSelect({
   defaultLabel,
   variant = 'default',
 }: BaudRateSelectProps) {
+  const { t } = useTranslation('common');
   const isStandard = STANDARD_RATES.includes(value);
   const [customMode, setCustomMode] = useState(!isStandard && value !== '');
 
@@ -58,7 +60,7 @@ export default function BaudRateSelect({
           min="1"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Baud rate"
+          placeholder={t('baudRate.placeholder')}
         />
         <button
           type="button"
@@ -70,9 +72,9 @@ export default function BaudRateSelect({
             }
           }}
           className="shrink-0 px-3 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
-          title="Switch back to preset list"
+          title={t('baudRate.switchBack')}
         >
-          Presets
+          {t('baudRate.presets')}
         </button>
       </div>
     );
@@ -96,7 +98,7 @@ export default function BaudRateSelect({
           {rate === defaultRate && defaultLabel ? ` (${defaultLabel})` : ''}
         </option>
       ))}
-      <option value="__custom__">Custom...</option>
+      <option value="__custom__">{t('baudRate.custom')}</option>
     </Select>
   );
 }

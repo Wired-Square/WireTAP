@@ -3,6 +3,7 @@
 // Shared catalog display button. Shows the selected catalog name,
 // or "No catalog" in italic when nothing is selected.
 
+import { useTranslation } from "react-i18next";
 import type { CatalogMetadata } from "../api/catalog";
 import { buttonBase } from "../styles/buttonStyles";
 
@@ -20,19 +21,20 @@ export default function CatalogButton({
   catalogPath,
   onClick,
 }: CatalogButtonProps) {
+  const { t } = useTranslation("common");
   const normalisedCatalogPath = catalogPath ? normalisePath(catalogPath) : null;
   const selectedCatalog = catalogs.find(
     (c) => normalisePath(c.path) === normalisedCatalogPath
   );
   const hasCatalog = !!selectedCatalog;
-  const catalogName = selectedCatalog?.name || "No catalog";
+  const catalogName = selectedCatalog?.name || t("catalogButton.noCatalog");
 
   if (hasCatalog) {
     return (
       <button
         onClick={onClick}
         className={buttonBase}
-        title="Select catalog"
+        title={t("catalogButton.selectCatalog")}
       >
         <span className="max-w-32 truncate">{catalogName}</span>
       </button>
@@ -43,9 +45,9 @@ export default function CatalogButton({
     <button
       onClick={onClick}
       className={buttonBase}
-      title="Select catalog"
+      title={t("catalogButton.selectCatalog")}
     >
-      <span className="text-[color:var(--text-muted)] italic">No catalog</span>
+      <span className="text-[color:var(--text-muted)] italic">{t("catalogButton.noCatalog")}</span>
     </button>
   );
 }

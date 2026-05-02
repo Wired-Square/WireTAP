@@ -4,6 +4,7 @@
 // Handles reader display, play/pause/leave controls, speed, and capture metadata.
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Star, FileText, Play, Pause, GitMerge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
 import { iconSm, iconXs } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
@@ -330,6 +331,7 @@ export function SessionActionButtons({
   onLeave,
   onOpenBookmarkPicker,
 }: SessionActionButtonsProps) {
+  const { t } = useTranslation("common");
   // Show Play when paused or stopped
   const showPlay = (isPaused || isStopped) && onPlay;
   // Show Pause when running (streaming but not paused)
@@ -342,7 +344,7 @@ export function SessionActionButtons({
         <button
           onClick={onOpenBookmarkPicker}
           className={buttonBase}
-          title="Load saved time bookmark"
+          title={t("session.loadBookmark")}
         >
           <Bookmark className={iconSm} />
         </button>
@@ -353,7 +355,7 @@ export function SessionActionButtons({
         <button
           onClick={onPlay}
           className={successIconButton}
-          title={isStopped ? "Resume IO stream" : "Play"}
+          title={isStopped ? t("session.resumeIo") : t("playback.play")}
         >
           <Play className={iconSm} />
         </button>
@@ -364,7 +366,7 @@ export function SessionActionButtons({
         <button
           onClick={onPause}
           className={buttonBase}
-          title="Pause"
+          title={t("playback.pause")}
         >
           <Pause className={iconSm} />
         </button>
@@ -496,6 +498,7 @@ export function IOSessionControls({
   onClearCapture,
   hasData = false,
 }: IOSessionControlsProps) {
+  const { t } = useTranslation("common");
   const isCaptureMode = isCaptureModeProp ?? isCaptureProfileId(ioProfile);
   const hasSource = ioProfile !== null;
 
@@ -556,7 +559,7 @@ export function IOSessionControls({
             <button
               onClick={startRename}
               className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-              title="Rename capture"
+              title={t("session.renameCapture")}
             >
               <Pencil className={iconXs} />
             </button>
@@ -569,7 +572,7 @@ export function IOSessionControls({
                   ? "text-[color:var(--status-warning-text)]"
                   : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
               }`}
-              title={capturePersistent ? "Unpin capture (will be cleared on restart)" : "Pin capture (survives restart)"}
+              title={capturePersistent ? t("session.unpinCapture") : t("session.pinCapture")}
             >
               {capturePersistent ? <Pin className={iconXs} /> : <PinOff className={iconXs} />}
             </button>
@@ -588,7 +591,7 @@ export function IOSessionControls({
                   if (e.key === "Escape") cancelRename();
                 }}
                 className="w-48 px-2 py-1 text-sm bg-transparent border border-[color:var(--status-info-text)] rounded outline-none text-[color:var(--text-primary)]"
-                placeholder="Capture name"
+                placeholder={t("session.captureName")}
               />
             </div>
           )}

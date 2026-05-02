@@ -40,5 +40,64 @@
   },
   "tooltips": {
     "selectFrames": "Select frames"
+  },
+  "pagination": {
+    "firstPage": "First page",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "lastPage": "Last page",
+    "rowsPerPage": "Rows per page"
+  },
+  "playback": {
+    "skipToStart": "Skip to start",
+    "skipToEnd": "Skip to end",
+    "skipBackFrames": "Skip back ~{{count}} frames",
+    "skipBackSeconds": "Skip back 10 seconds",
+    "skipForwardFrames": "Skip forward ~{{count}} frames",
+    "skipForwardSeconds": "Skip forward 10 seconds",
+    "playBackward": "Play backward",
+    "playForward": "Play forward",
+    "resumeForward": "Resume forward",
+    "resumeStream": "Resume stream",
+    "resumeStreamTooltip": "Resume stream (continue fetching from database)",
+    "pauseStream": "Pause stream",
+    "play": "Play",
+    "pause": "Pause",
+    "streaming": "Streaming",
+    "atStart": "At start of buffer",
+    "atEnd": "At end of buffer",
+    "stepBack": "Step backward one frame",
+    "stepForward": "Step forward one frame"
+  },
+  "framePicker": {
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "saveSelectionSet": "Save selection set",
+    "selectionSet": "Selection set"
+  },
+  "session": {
+    "state": "State:",
+    "type": "Type:",
+    "capture": "Capture:",
+    "frames": "Frames:",
+    "loadBookmark": "Load saved time bookmark",
+    "renameCapture": "Rename capture",
+    "captureName": "Capture name",
+    "resumeIo": "Resume IO stream",
+    "pinCapture": "Pin capture (survives restart)",
+    "unpinCapture": "Unpin capture (will be cleared on restart)"
+  },
+  "timezone": {
+    "changeTooltip": "Click to change timezone"
+  },
+  "catalogButton": {
+    "selectCatalog": "Select catalog",
+    "noCatalog": "No catalog"
+  },
+  "baudRate": {
+    "placeholder": "Baud rate",
+    "custom": "Custom...",
+    "presets": "Presets",
+    "switchBack": "Switch back to preset list"
   }
 }

@@ -6,6 +6,7 @@
 // Renders only transport buttons. Frame counter and speed selector are
 // rendered separately by the parent and placed in the toolbar's info/right slots.
 
+import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, FastForward, Play, RefreshCw, Rewind, SkipBack, SkipForward, Square } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import { badgeColorClass, playbackIconButton, playbackStepButton } from "../styles/buttonStyles";
@@ -95,6 +96,7 @@ export function PlaybackControls({
   onSpeedChange: _onSpeedChange,
   onResumeStream,
 }: PlaybackControlsProps) {
+  const { t } = useTranslation("common");
   const isPlaying = playbackState === "playing";
   const isPaused = playbackState === "paused";
   const isPlayingForward = isPlaying && playbackDirection === "forward";
@@ -180,7 +182,7 @@ export function PlaybackControls({
           type="button"
           onClick={handleSkipToStart}
           className={playbackIconButton}
-          title="Skip to start"
+          title={t("playback.skipToStart")}
         >
           <SkipBack className={iconSm} />
         </button>
@@ -192,7 +194,7 @@ export function PlaybackControls({
           type="button"
           onClick={handleSkipBack}
           className={playbackIconButton}
-          title={canSeekByFrame ? `Skip back ~${framesPerSkip} frames` : "Skip back 10 seconds"}
+          title={canSeekByFrame ? t("playback.skipBackFrames", { count: framesPerSkip }) : t("playback.skipBackSeconds")}
         >
           <Rewind className={iconSm} />
         </button>
@@ -209,7 +211,7 @@ export function PlaybackControls({
               ? badgeColorClass('blue')
               : "text-blue-500 hover:bg-[var(--hover-bg)] hover:brightness-110"
           }`}
-          title="Play backward"
+          title={t("playback.playBackward")}
         >
           <Play className={`${iconSm} rotate-180`} fill="currentColor" />
         </button>
@@ -225,7 +227,7 @@ export function PlaybackControls({
             ? badgeColorClass('red')
             : "text-red-500 hover:bg-[var(--hover-bg)] hover:brightness-110"
         }`}
-        title={isLiveStreaming ? "Pause stream" : "Pause"}
+        title={isLiveStreaming ? t("playback.pauseStream") : t("playback.pause")}
       >
         <Square className={iconSm} fill="currentColor" />
       </button>
@@ -240,7 +242,7 @@ export function PlaybackControls({
             onClick={onStepBackward}
             disabled={!canStep}
             className={playbackStepButton(canStep)}
-            title={atStart ? "At start of buffer" : "Step backward one frame"}
+            title={atStart ? t("playback.atStart") : t("playback.stepBack")}
           >
             <ChevronLeft className={iconSm} strokeWidth={3} />
           </button>
@@ -257,7 +259,7 @@ export function PlaybackControls({
             onClick={onStepForward}
             disabled={!canStep}
             className={playbackStepButton(canStep)}
-            title={atEnd ? "At end of buffer" : "Step forward one frame"}
+            title={atEnd ? t("playback.atEnd") : t("playback.stepForward")}
           >
             <ChevronRight className={iconSm} strokeWidth={3} />
           </button>
@@ -275,7 +277,7 @@ export function PlaybackControls({
               ? badgeColorClass('green')
               : "text-green-500 hover:bg-[var(--hover-bg)] hover:brightness-110"
           }`}
-          title={isPaused ? "Resume forward" : "Play forward"}
+          title={isPaused ? t("playback.resumeForward") : t("playback.playForward")}
         >
           <Play className={iconSm} fill="currentColor" />
         </button>
@@ -287,7 +289,7 @@ export function PlaybackControls({
           type="button"
           onClick={handleSkipForward}
           className={playbackIconButton}
-          title={canSeekByFrame ? `Skip forward ~${framesPerSkip} frames` : "Skip forward 10 seconds"}
+          title={canSeekByFrame ? t("playback.skipForwardFrames", { count: framesPerSkip }) : t("playback.skipForwardSeconds")}
         >
           <FastForward className={iconSm} />
         </button>
@@ -299,7 +301,7 @@ export function PlaybackControls({
           type="button"
           onClick={handleSkipToEnd}
           className={playbackIconButton}
-          title="Skip to end"
+          title={t("playback.skipToEnd")}
         >
           <SkipForward className={iconSm} />
         </button>
@@ -311,7 +313,7 @@ export function PlaybackControls({
           type="button"
           onClick={onResumeStream}
           className="p-1 rounded text-cyan-500 hover:bg-[var(--hover-bg)] hover:brightness-110"
-          title="Resume stream (continue fetching from database)"
+          title={t("playback.resumeStreamTooltip")}
         >
           <RefreshCw className={iconSm} />
         </button>

@@ -1,6 +1,7 @@
 // ui/src/components/FramePicker.tsx
 
 import { useMemo, memo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, AlertTriangle, Save, Star, CheckCheck, SquareSlash } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import { labelSmall, captionMuted, emptyStateText } from "../styles/typography";
@@ -62,6 +63,7 @@ function FramePicker({
   defaultExpanded = false,
   noInnerScroll = false,
 }: Props) {
+  const { t } = useTranslation("common");
   const sortedFrames = useMemo(
     () => [...frames].sort((a, b) => {
       const aId = parseFrameKey(a.id).frameId;
@@ -186,7 +188,7 @@ function FramePicker({
                         ? "text-[color:var(--text-muted)] cursor-not-allowed"
                         : `text-[color:var(--text-green)] ${hoverLight}`
                     }`}
-                    title="Select all frames"
+                    title={t("framePicker.selectAll")}
                   >
                     <CheckCheck className={iconSm} />
                   </button>
@@ -201,7 +203,7 @@ function FramePicker({
                         ? "text-[color:var(--text-muted)] cursor-not-allowed"
                         : `text-[color:var(--text-muted)] ${hoverLight}`
                     }`}
-                    title="Deselect all frames"
+                    title={t("framePicker.deselectAll")}
                   >
                     <SquareSlash className={iconSm} />
                   </button>
@@ -234,7 +236,7 @@ function FramePicker({
                         ? "text-[color:var(--text-muted)] cursor-not-allowed"
                         : hoverLight
                     }`}
-                    title="Save as new selection set"
+                    title={t("framePicker.saveSelectionSet")}
                   >
                     <Star className={iconSm} />
                   </button>
@@ -254,7 +256,7 @@ function FramePicker({
                     }
                   }}
                   className="text-[10px] px-1 py-0.5 rounded border border-[color:var(--border-default)] bg-[var(--bg-surface)] text-[color:var(--text-primary)] max-w-[140px]"
-                  title="Selection set"
+                  title={t("framePicker.selectionSet")}
                 >
                   <option value="">-- None --</option>
                   {selectionSets.map((s) => (

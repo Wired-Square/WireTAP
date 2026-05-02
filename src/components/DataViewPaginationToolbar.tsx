@@ -6,6 +6,7 @@
 // This three-zone layout keeps buttons stable on the left and selectors on the right,
 // with informational displays (frame counter, page counter) centered between them.
 
+import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import {
@@ -79,6 +80,7 @@ export default function DataViewPaginationToolbar({
   hidePagination = false,
   hidePageSize = false,
 }: DataViewPaginationToolbarProps) {
+  const { t } = useTranslation("common");
   const showPagination = !hidePagination && totalPages > 1 && pageSize !== -1;
 
   return (
@@ -101,7 +103,7 @@ export default function DataViewPaginationToolbar({
             onClick={() => onPageChange(0)}
             disabled={disabled || currentPage === 0}
             className={paginationButtonDark}
-            title="First page"
+            title={t("pagination.firstPage")}
           >
             <ChevronsLeft className={iconSm} />
           </button>
@@ -109,7 +111,7 @@ export default function DataViewPaginationToolbar({
             onClick={() => onPageChange(Math.max(0, currentPage - 1))}
             disabled={disabled || currentPage === 0}
             className={paginationButtonDark}
-            title="Previous page"
+            title={t("pagination.previousPage")}
           >
             <ChevronLeft className={iconSm} />
           </button>
@@ -117,7 +119,7 @@ export default function DataViewPaginationToolbar({
             onClick={() => onPageChange(Math.min(totalPages - 1, currentPage + 1))}
             disabled={disabled || currentPage >= totalPages - 1}
             className={paginationButtonDark}
-            title="Next page"
+            title={t("pagination.nextPage")}
           >
             <ChevronRight className={iconSm} />
           </button>
@@ -125,7 +127,7 @@ export default function DataViewPaginationToolbar({
             onClick={() => onPageChange(totalPages - 1)}
             disabled={disabled || currentPage >= totalPages - 1}
             className={paginationButtonDark}
-            title="Last page"
+            title={t("pagination.lastPage")}
           >
             <ChevronsRight className={iconSm} />
           </button>
@@ -142,7 +144,7 @@ export default function DataViewPaginationToolbar({
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
           className={`text-xs px-2 py-1 rounded border border-gray-600 ${bgDataInput} ${textDataPrimary}`}
-          title="Rows per page"
+          title={t("pagination.rowsPerPage")}
         >
           {pageSizeOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
