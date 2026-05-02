@@ -16,12 +16,11 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { storeGet, storeSet } from "../api/store";
-import { Settings as SettingsIcon, Search, Activity, FileText, Calculator, Send, Server, DatabaseZap, Network, BarChart3, FlaskConical } from "lucide-react";
 import { icon2xl } from "../styles/spacing";
 import { bgPrimary, textPrimary, textSecondary, textTertiary } from "../styles/colourTokens";
 import { launcherButton, launcherButtonLabel, launcherGrid } from "../styles/buttonStyles";
 import "dockview-react/dist/styles/dockview.css";
-import LogoMenu, { type PanelId } from "./LogoMenu";
+import LogoMenu from "./LogoMenu";
 import AppTab from "./AppTab";
 import {
   registerOpenPanelFn,
@@ -38,23 +37,9 @@ import {
 import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuState } from "../api";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
+import { apps, menuApps, menuGroupOrder, type AppEntry, type PanelId } from "../apps/registry";
+import type { LucideIcon } from "lucide-react";
 const logo = "/logo.svg";
-
-// Lazy load app components for better initial load
-const Discovery = lazy(() => import("../apps/discovery/Discovery"));
-const Decoder = lazy(() => import("../apps/decoder/Decoder"));
-const Transmit = lazy(() => import("../apps/transmit/Transmit"));
-const CatalogEditor = lazy(() => import("../apps/catalog/CatalogEditor"));
-const FrameCalculator = lazy(() => import("../apps/calculator/FrameCalculator"));
-const PayloadAnalysis = lazy(() => import("../apps/analysis/PayloadAnalysis"));
-const FrameOrderAnalysis = lazy(() => import("../apps/analysis/FrameOrderAnalysis"));
-const Query = lazy(() => import("../apps/query/Query"));
-const SessionManager = lazy(() => import("../apps/session-manager/SessionManager"));
-const Graph = lazy(() => import("../apps/graph/Graph"));
-const Rules = lazy(() => import("../apps/rules/Rules"));
-const Modbus = lazy(() => import("../apps/modbus/Modbus"));
-const TestPattern = lazy(() => import("../apps/test-pattern/TestPattern"));
-const Settings = lazy(() => import("../apps/settings/Settings"));
 
 // Get layout key for a specific window (per-window persistence)
 function getLayoutKey(windowLabel: string): string {
@@ -122,80 +107,22 @@ function PanelWrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Panel wrapper components for Dockview
-function DiscoveryPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><Discovery /></PanelWrapper>;
+// Build a Dockview panel component from a registry entry's lazy loader.
+function makePanelComponent(load: AppEntry["load"]) {
+  const LazyComponent = lazy(load);
+  return function Panel(_props: IDockviewPanelProps) {
+    return (
+      <PanelWrapper>
+        <LazyComponent />
+      </PanelWrapper>
+    );
+  };
 }
 
-function DecoderPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><Decoder /></PanelWrapper>;
-}
-
-function TransmitPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><Transmit /></PanelWrapper>;
-}
-
-function CatalogEditorPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><CatalogEditor /></PanelWrapper>;
-}
-
-function FrameCalculatorPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><FrameCalculator /></PanelWrapper>;
-}
-
-function PayloadAnalysisPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><PayloadAnalysis /></PanelWrapper>;
-}
-
-function FrameOrderAnalysisPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><FrameOrderAnalysis /></PanelWrapper>;
-}
-
-function QueryPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><Query /></PanelWrapper>;
-}
-
-function SessionManagerPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><SessionManager /></PanelWrapper>;
-}
-
-function GraphPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><Graph /></PanelWrapper>;
-}
-
-function RulesPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><Rules /></PanelWrapper>;
-}
-
-function ModbusPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><Modbus /></PanelWrapper>;
-}
-
-function TestPatternPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><TestPattern /></PanelWrapper>;
-}
-
-function SettingsPanel(_props: IDockviewPanelProps) {
-  return <PanelWrapper><Settings /></PanelWrapper>;
-}
-
-// Component registry for Dockview
-const components = {
-  discovery: DiscoveryPanel,
-  decoder: DecoderPanel,
-  transmit: TransmitPanel,
-  modbus: ModbusPanel,
-  "catalog-editor": CatalogEditorPanel,
-  "frame-calculator": FrameCalculatorPanel,
-  "payload-analysis": PayloadAnalysisPanel,
-  "frame-order-analysis": FrameOrderAnalysisPanel,
-  query: QueryPanel,
-  "session-manager": SessionManagerPanel,
-  graph: GraphPanel,
-  rules: RulesPanel,
-  "test-pattern": TestPatternPanel,
-  settings: SettingsPanel,
-};
+// Dockview component registry — derived from the single app registry.
+const components = Object.fromEntries(
+  apps.map((a) => [a.id, makePanelComponent(a.load)]),
+) as Record<PanelId, ReturnType<typeof makePanelComponent>>;
 
 // Watermark component shown when no panels are open
 function Watermark(_props: IWatermarkPanelProps) {
@@ -233,85 +160,43 @@ function Watermark(_props: IWatermarkPanelProps) {
           by Wired Square
         </p>
 
-        {/* App launcher buttons */}
-        <div className={`${launcherGrid} mt-8`}>
-          <WatermarkAppButton
-            icon={Search}
-            label={t("panels.discovery")}
-            color="text-purple-400"
-            bgColor="bg-purple-500/10 hover:bg-purple-500/20"
-            onClick={() => openPanel("discovery")}
-          />
-          <WatermarkAppButton
-            icon={Activity}
-            label={t("panels.decoder")}
-            color="text-green-400"
-            bgColor="bg-green-500/10 hover:bg-green-500/20"
-            onClick={() => openPanel("decoder")}
-          />
-          <WatermarkAppButton
-            icon={Send}
-            label={t("panels.transmit")}
-            color="text-red-400"
-            bgColor="bg-red-500/10 hover:bg-red-500/20"
-            onClick={() => openPanel("transmit")}
-          />
-          <WatermarkAppButton
-            icon={Server}
-            label={t("panels.modbus")}
-            color="text-amber-400"
-            bgColor="bg-amber-500/10 hover:bg-amber-500/20"
-            onClick={() => openPanel("modbus")}
-          />
-          <WatermarkAppButton
-            icon={FileText}
-            label={t("panels.catalogEditor")}
-            color="text-blue-400"
-            bgColor="bg-blue-500/10 hover:bg-blue-500/20"
-            onClick={() => openPanel("catalog-editor")}
-          />
-          <WatermarkAppButton
-            icon={Calculator}
-            label={t("panels.frameCalculator")}
-            color="text-teal-400"
-            bgColor="bg-teal-500/10 hover:bg-teal-500/20"
-            onClick={() => openPanel("frame-calculator")}
-          />
-          <WatermarkAppButton
-            icon={DatabaseZap}
-            label={t("panels.query")}
-            color="text-amber-400"
-            bgColor="bg-amber-500/10 hover:bg-amber-500/20"
-            onClick={() => openPanel("query")}
-          />
-          <WatermarkAppButton
-            icon={Network}
-            label={t("panels.sessionManager")}
-            color="text-cyan-400"
-            bgColor="bg-cyan-500/10 hover:bg-cyan-500/20"
-            onClick={() => openPanel("session-manager")}
-          />
-          <WatermarkAppButton
-            icon={BarChart3}
-            label={t("panels.graph")}
-            color="text-pink-400"
-            bgColor="bg-pink-500/10 hover:bg-pink-500/20"
-            onClick={() => openPanel("graph")}
-          />
-          <WatermarkAppButton
-            icon={FlaskConical}
-            label={t("panels.testPattern")}
-            color="text-emerald-400"
-            bgColor="bg-emerald-500/10 hover:bg-emerald-500/20"
-            onClick={() => openPanel("test-pattern")}
-          />
-          <WatermarkAppButton
-            icon={SettingsIcon}
-            label={t("panels.settings")}
-            color="text-orange-400"
-            bgColor="bg-orange-500/10 hover:bg-orange-500/20"
-            onClick={() => openPanel("settings")}
-          />
+        {/* App launcher — grouped by registry group, dividers between groups.
+            Outer flex-wrap lets groups stack on narrow viewports. */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-8 px-4">
+          {menuGroupOrder
+            .map((group) => ({
+              group,
+              items: menuApps.filter((a) => a.group === group),
+            }))
+            .filter((g) => g.items.length > 0)
+            .map((g, groupIndex) => (
+              <div key={g.group} className="flex items-center gap-3">
+                {groupIndex > 0 && (
+                  <div
+                    aria-hidden
+                    className="self-stretch w-px bg-[color:var(--border-default)] opacity-50"
+                  />
+                )}
+                <div className={launcherGrid}>
+                  {g.items.map((app) => (
+                    <WatermarkAppButton
+                      key={app.id}
+                      icon={app.icon}
+                      label={t(`panels.${app.i18nKey}`)}
+                      color={app.colour}
+                      bgColor={app.watermarkBg}
+                      onClick={() => {
+                        if (app.singleton) {
+                          openSettingsPanel();
+                        } else {
+                          openPanel(app.id);
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
         </div>
       </div>
     </div>
@@ -320,7 +205,7 @@ function Watermark(_props: IWatermarkPanelProps) {
 
 // Button component for watermark app launcher
 interface WatermarkAppButtonProps {
-  icon: typeof Search;
+  icon: LucideIcon;
   label: string;
   color: string;
   bgColor: string;
@@ -339,23 +224,10 @@ function WatermarkAppButton({ icon: Icon, label, color, bgColor, onClick }: Wate
   );
 }
 
-// Panel ID → menus.json key
-const panelI18nKeys: Record<PanelId, string> = {
-  discovery: "discovery",
-  decoder: "decoder",
-  transmit: "transmit",
-  modbus: "modbus",
-  "catalog-editor": "catalogEditor",
-  "frame-calculator": "frameCalculator",
-  "payload-analysis": "payloadAnalysis",
-  "frame-order-analysis": "frameOrderAnalysis",
-  query: "query",
-  "session-manager": "sessionManager",
-  graph: "graph",
-  rules: "rules",
-  "test-pattern": "testPattern",
-  settings: "settings",
-};
+// Panel ID → menus.json key — derived from the registry.
+const panelI18nKeys = Object.fromEntries(
+  apps.map((a) => [a.id, a.i18nKey]),
+) as Record<PanelId, string>;
 
 function getPanelTitle(t: TFunction, panelId: PanelId): string {
   const key = panelI18nKeys[panelId];

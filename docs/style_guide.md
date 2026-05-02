@@ -359,67 +359,109 @@ value.toLocaleString(i18n.language);
 
 ## Adding a new app
 
-An app must be registered in **all** of these places. Missing one leaves the
-app reachable from some entry points but not others — a recurring source of
-bugs. **Order matters across surfaces:** session-aware apps (Discovery,
-Decoder, Transmit, Modbus, Graph, etc.) come first as a contiguous block; tool
-apps (Catalog Editor, Calculator, Test Pattern, Query, Rules, Analysis) come
-next; Settings is always last. A new session-aware app goes inside the session
-block, not appended to the end.
+App registration is centralised in two files, plus the usual translation and
+panel-style work. The Logo menu, Watermark dashboard, native Tauri menu, and
+Dockview panel registry all fan out from the same data — you do **not** edit
+those individually.
 
-### 1. Panel registry — [MainLayout.tsx](../src/components/MainLayout.tsx)
+### Source-of-truth files
 
-- Add the panel ID to the `PanelId` union.
-- Add the lazy component to the `components` map (`React.lazy` + a small
-  `Panel` wrapper, like the existing entries).
-- Add a human-readable title to `panelTitles`.
+- **[../src/apps/apps.json](../src/apps/apps.json)** — structural data
+  (`id`, `label`, `group`, `accelerator`, `singleton`) shared by TypeScript
+  and Rust. The `groupOrder` array controls divider placement in both menus.
+- **[../src/apps/registry.ts](../src/apps/registry.ts)** — TypeScript-only
+  visual data (icon, colour classes, lazy import) keyed by panel id, plus
+  hidden-only panels (analysis tools opened programmatically, never from the
+  launcher).
 
-### 2. Logo menu — [LogoMenu.tsx](../src/components/LogoMenu.tsx)
+### 1. Add the structural entry
 
-- Add an entry to the apps array with `icon` (lucide-react), `label`, and
-  `panelId`.
-- Preserve the existing comment that documents the grouping
-  (`// Session-aware apps (1-N), then tools (N+1-M), then Settings`) and
-  update the counts.
+Append to `apps` in [../src/apps/apps.json](../src/apps/apps.json):
 
-### 3. Dashboard watermark — [MainLayout.tsx](../src/components/MainLayout.tsx)
+```json
+{ "id": "my-app", "label": "My App", "group": "utilities", "accelerator": "T" }
+```
 
-- Add a `<WatermarkAppButton>` inside the `Watermark` component with the same
-  `icon`, `label`, `color`, `bgColor` as the logo-menu entry, and
-  `onClick={() => onOpen("<panelId>")}`.
-- Order matches the logo menu: session-aware apps first, then tools, then
-  Settings.
+- `id` — kebab-case Dockview panel id (also used as i18n key after kebab-to-camel).
+- `group` — must be one of `groupOrder` (currently `sessions` / `database` /
+  `framelink` / `utilities` / `settings`). Order within a group is the
+  declared order in the array.
+- `accelerator` — optional; what follows `cmdOrCtrl+`. Numeric `1..0` are
+  conventional for the first ten apps. Omit if there's no good shortcut.
+- `singleton: true` — only Settings uses this today; opens via
+  `openSettingsPanel()` rather than as a stacked Dockview panel.
 
-### 4. Native Tauri menu — [src-tauri/src/lib.rs](../src-tauri/src/lib.rs)
+### 2. Add the visual config
 
-- Add a `MenuItem` for the new app under the appropriate submenu (Apps /
-  Tools).
-- Wire its `id` into the menu event handler so it emits `menu-open-panel`
-  with the panel ID. Existing entries (Discovery, Decoder, Settings, …) show
-  the pattern.
+Append to `visualConfig` in [../src/apps/registry.ts](../src/apps/registry.ts),
+keyed by the same `id`:
 
-### 5. Localisation
+```ts
+"my-app": {
+  icon: Beaker,                                            // lucide-react
+  colour: "text-purple-400",                               // text colour
+  bgColour: "hover:bg-purple-500/10",                      // LogoMenu hover
+  watermarkBg: "bg-purple-500/10 hover:bg-purple-500/20",  // Watermark tile
+  load: () => import("./my-app/MyApp"),
+},
+```
 
-- Add the panel title and any app-bar text to
-  [../src/locales/en-AU/menus.json](../src/locales/en-AU/menus.json) (or a new
-  namespace if the app has substantial UI of its own).
-- Don't ship hardcoded English in any of the four registration points above.
+The registry asserts at module load that every `apps.json` id has a
+`visualConfig` entry; a missing one throws immediately.
 
-### 6. Style
+### 3. Localise
 
-- The app's top bar must use [AppTopBar.tsx](../src/components/AppTopBar.tsx).
-- The panel root must wrap in `h-full overflow-hidden` (Dockview requirement).
-- Use existing tokens from [../src/styles/](../src/styles/) — no new
-  colour/spacing values added inline.
+Add the panel title to
+[../src/locales/en-AU/menus.json](../src/locales/en-AU/menus.json) under
+`panels.<i18nKey>`. The i18n key is the kebab-case id converted to camelCase
+(`my-app` → `myApp`, `frame-calculator` → `frameCalculator`).
 
-### Why grouping matters
+If the app has its own substantial UI, create a new namespace
+`src/locales/en-AU/<app>.json` rather than overloading `menus.json`.
 
-The three surfaces (logo menu, dashboard watermark, native menu) are
-independent code paths; users learning one expect the others to match. When
-the order drifts, users learn one and get confused by the others. Session-aware
-apps share state through
+### 4. Hidden Dockview panels
+
+Panels that should be Dockview-registered but never appear in the launcher
+(e.g. Payload Analysis, Frame Order Analysis — opened programmatically from
+inside another app) are added directly to `visualConfig` and listed in
+`hiddenApps` inside [../src/apps/registry.ts](../src/apps/registry.ts). They
+do **not** go in `apps.json`.
+
+### 5. Panel style
+
+- The app's top bar uses [AppTopBar.tsx](../src/components/AppTopBar.tsx).
+- The panel root wraps in `h-full overflow-hidden` (Dockview requirement).
+- Use tokens from [../src/styles/](../src/styles/) — no inline colour values.
+
+### What the harness does for you
+
+A single `apps.json` + `registry.ts` entry feeds:
+
+| Surface | Code path |
+|---|---|
+| Dockview component registry | [MainLayout.tsx](../src/components/MainLayout.tsx) iterates `apps` |
+| Panel tab title (i18n) | `apps[i].i18nKey` resolved via `t(\`panels.${key}\`)` |
+| Watermark dashboard | [MainLayout.tsx](../src/components/MainLayout.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
+| Logo menu (with dividers) | [LogoMenu.tsx](../src/components/LogoMenu.tsx) iterates `menuApps` grouped by `menuGroupOrder` |
+| Tab icon + colour | [AppTab.tsx](../src/components/AppTab.tsx) reads `appById[panelId]` |
+| Native Tauri **Apps** menu | [lib.rs](../src-tauri/src/lib.rs) `build_apps_menu` reads `apps.json` via `include_str!`, inserts separators between groups |
+| `cmdOrCtrl+<accel>` shortcut | Built from the JSON `accelerator` field |
+
+If a surface is missing your app, the cause is one of: missing `visualConfig`
+entry, wrong `group` (not in `groupOrder`), or a stale Cargo cache (the JSON
+is `include_str!`-embedded — rebuild Rust after editing `apps.json`).
+
+### Why grouping is centralised
+
+Logo menu, dashboard watermark, and native menu are three independent
+rendering surfaces. When their order or grouping drifts, users learn one and
+get confused by the others. Centralising structural data in `apps.json`
+guarantees they can't drift; the Rust menu reads the same file the TypeScript
+registry does, so a JSON edit re-flows all three surfaces consistently.
+
+Session-aware apps belong in the `sessions` group — they share state through
 [useIOSessionManager](../src/hooks/useIOSessionManager.ts) and benefit from
-being adjacent so the related tooling is visible at a glance.
+adjacency so related tooling is visible at a glance.
 
 ## Where things live
 
@@ -453,5 +495,3 @@ being adjacent so the related tooling is visible at a glance.
   `successButtonBase` behind status CSS variables for full theming.
 - Populate additional locales (`en-US`, `de`, `ja`, …). Infrastructure is
   ready; add a folder + register in `src/locales/index.ts`.
-- A single declarative app registry that fans out to all four registration
-  points so adding a new app needs only one entry.

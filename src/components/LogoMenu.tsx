@@ -1,7 +1,7 @@
 // ui/src/components/LogoMenu.tsx
 
 import { useState, useRef, useEffect } from "react";
-import { Search, Activity, FileText, Calculator, Settings, Send, Server, ArrowUpCircle, DatabaseZap, Network, BarChart3, Workflow, FlaskConical } from "lucide-react";
+import { ArrowUpCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, marginAppContent } from "../styles/spacing";
 import { bgSurface, borderDefault, textPrimary } from "../styles";
@@ -9,38 +9,22 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 const logo = "/logo.svg";
 import { useUpdateStore } from "../stores/updateStore";
 import { openSettingsPanel } from "../api";
+import { menuApps, menuGroupOrder, type PanelId } from "../apps/registry";
 
-export type PanelId = "discovery" | "decoder" | "catalog-editor" | "frame-calculator" | "payload-analysis" | "frame-order-analysis" | "transmit" | "modbus" | "query" | "session-manager" | "graph" | "rules" | "test-pattern" | "settings";
+export type { PanelId };
 
 interface LogoMenuProps {
   onPanelClick: (panelId: PanelId) => void;
 }
 
-interface MenuItem {
-  id: PanelId;
-  icon: typeof Search;
-  /** Translation key under `menus:panels.*` */
-  i18nKey: string;
-  color: string;
-  bgColor: string;
-}
-
-// Order and grouping matches the native Apps menu:
-// Session-aware apps (1-5), then tools (6-8), then Settings
-const menuItems: MenuItem[] = [
-  { id: "discovery", icon: Search, i18nKey: "discovery", color: "text-purple-400", bgColor: "hover:bg-purple-500/10" },
-  { id: "decoder", icon: Activity, i18nKey: "decoder", color: "text-green-400", bgColor: "hover:bg-green-500/10" },
-  { id: "transmit", icon: Send, i18nKey: "transmit", color: "text-red-400", bgColor: "hover:bg-red-500/10" },
-  { id: "modbus", icon: Server, i18nKey: "modbus", color: "text-amber-400", bgColor: "hover:bg-amber-500/10" },
-  { id: "query", icon: DatabaseZap, i18nKey: "query", color: "text-yellow-400", bgColor: "hover:bg-yellow-500/10" },
-  { id: "graph", icon: BarChart3, i18nKey: "graph", color: "text-pink-400", bgColor: "hover:bg-pink-500/10" },
-  { id: "rules", icon: Workflow, i18nKey: "rules", color: "text-indigo-400", bgColor: "hover:bg-indigo-500/10" },
-  { id: "catalog-editor", icon: FileText, i18nKey: "catalogEditor", color: "text-blue-400", bgColor: "hover:bg-blue-500/10" },
-  { id: "frame-calculator", icon: Calculator, i18nKey: "frameCalculator", color: "text-teal-400", bgColor: "hover:bg-teal-500/10" },
-  { id: "test-pattern", icon: FlaskConical, i18nKey: "testPattern", color: "text-emerald-400", bgColor: "hover:bg-emerald-500/10" },
-  { id: "session-manager", icon: Network, i18nKey: "sessionManager", color: "text-cyan-400", bgColor: "hover:bg-cyan-500/10" },
-  { id: "settings", icon: Settings, i18nKey: "settings", color: "text-orange-400", bgColor: "hover:bg-orange-500/10" },
-];
+// Items grouped by `menuGroupOrder`, preserving the registry's declared order
+// within each group. Empty groups are skipped so dividers don't double up.
+const menuGroups = menuGroupOrder
+  .map((group) => ({
+    group,
+    items: menuApps.filter((a) => a.group === group),
+  }))
+  .filter((g) => g.items.length > 0);
 
 export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
   const { t } = useTranslation("menus");
@@ -83,8 +67,8 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
   }, [isOpen]);
 
   const handleItemClick = (panelId: PanelId) => {
-    if (panelId === "settings") {
-      // Settings uses singleton behavior via backend
+    const app = menuApps.find((a) => a.id === panelId);
+    if (app?.singleton) {
       openSettingsPanel();
     } else {
       onPanelClick(panelId);
@@ -123,26 +107,31 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
       {/* Dropdown menu */}
       {isOpen && (
         <div className={`absolute top-full left-2 mt-1 min-w-[180px] ${bgSurface} ${borderDefault} ${textPrimary} rounded-lg shadow-xl z-50`}>
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const showDivider = item.id === "catalog-editor" || item.id === "settings";
-            return (
-              <div key={item.id} className={marginAppContent}>
-                {showDivider && <div className={`mb-2 -mx-2 border-t ${borderDefault}`} />}
-                <button
-                  onClick={() => handleItemClick(item.id)}
-                  className={`
-                    w-full flex items-center px-3 py-2 text-left rounded
-                    ${textPrimary} font-medium
-                    ${item.bgColor} transition-colors
-                  `}
-                >
-                  <Icon className={`${iconMd} ${item.color} shrink-0`} />
-                  <span className="text-sm ml-2">{t(`panels.${item.i18nKey}`)}</span>
-                </button>
-              </div>
-            );
-          })}
+          {menuGroups.map((g, groupIndex) => (
+            <div key={g.group}>
+              {groupIndex > 0 && (
+                <div className={`my-2 mx-2 border-t ${borderDefault}`} />
+              )}
+              {g.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.id} className={marginAppContent}>
+                    <button
+                      onClick={() => handleItemClick(item.id)}
+                      className={`
+                        w-full flex items-center px-3 py-2 text-left rounded
+                        ${textPrimary} font-medium
+                        ${item.bgColour} transition-colors
+                      `}
+                    >
+                      <Icon className={`${iconMd} ${item.colour} shrink-0`} />
+                      <span className="text-sm ml-2">{t(`panels.${item.i18nKey}`)}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>

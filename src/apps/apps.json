@@ -1,0 +1,18 @@
+{
+  "$comment": "Shared source of truth for app ordering, grouping, and accelerators. Consumed by the TypeScript registry (src/apps/registry.ts) and the Rust native menu (src-tauri/src/lib.rs). Visual concerns (icons, colours, lazy imports) live in registry.ts; structural concerns live here.",
+  "groupOrder": ["sessions", "database", "framelink", "utilities", "settings"],
+  "apps": [
+    { "id": "discovery",        "label": "Discovery",      "group": "sessions",   "accelerator": "1" },
+    { "id": "decoder",          "label": "Decoder",        "group": "sessions",   "accelerator": "2" },
+    { "id": "transmit",         "label": "Transmit",       "group": "sessions",   "accelerator": "3" },
+    { "id": "graph",            "label": "Graph",          "group": "sessions",   "accelerator": "4" },
+    { "id": "modbus",           "label": "Modbus",         "group": "sessions",   "accelerator": "5" },
+    { "id": "query",            "label": "Query",          "group": "database",   "accelerator": "6" },
+    { "id": "rules",            "label": "Rules",          "group": "framelink",  "accelerator": "7" },
+    { "id": "catalog-editor",   "label": "Catalog Editor", "group": "utilities",  "accelerator": "8" },
+    { "id": "frame-calculator", "label": "Calculator",     "group": "utilities",  "accelerator": "9" },
+    { "id": "test-pattern",     "label": "Test Pattern",   "group": "utilities" },
+    { "id": "session-manager",  "label": "Sessions",       "group": "utilities",  "accelerator": "0" },
+    { "id": "settings",         "label": "Settings",       "group": "settings",   "singleton": true }
+  ]
+}

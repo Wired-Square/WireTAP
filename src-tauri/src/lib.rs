@@ -520,6 +520,78 @@ fn update_bookmarks_menu(
     Ok(()) // No-op on iOS
 }
 
+/// Shared app registry data — must match the TypeScript schema in
+/// `src/apps/apps.json`. Visual concerns (icons, colours, lazy imports) are
+/// layered on top in `src/apps/registry.ts` and are not represented here.
+#[cfg(not(target_os = "ios"))]
+#[derive(serde::Deserialize)]
+struct AppRegistry {
+    #[serde(rename = "groupOrder")]
+    group_order: Vec<String>,
+    apps: Vec<AppRegistryEntry>,
+}
+
+#[cfg(not(target_os = "ios"))]
+#[derive(serde::Deserialize)]
+struct AppRegistryEntry {
+    id: String,
+    label: String,
+    group: String,
+    #[serde(default)]
+    accelerator: Option<String>,
+    #[serde(default)]
+    singleton: bool,
+}
+
+/// Build the "Apps" submenu from the shared registry, inserting separators
+/// between groups in `group_order`. The settings group is skipped — Settings
+/// has its own item in the WireTAP/app submenu and is opened as a singleton.
+#[cfg(not(target_os = "ios"))]
+fn build_apps_menu(
+    app: &mut tauri::App,
+) -> Result<tauri::menu::Submenu<Wry>, Box<dyn std::error::Error>> {
+    const APPS_JSON: &str = include_str!("../../src/apps/apps.json");
+    let registry: AppRegistry = serde_json::from_str(APPS_JSON)?;
+
+    // Build menu items eagerly so they outlive the submenu builder.
+    // Skip the settings group — Settings is wired into the WireTAP submenu.
+    let mut items_by_group: std::collections::HashMap<String, Vec<MenuItem<Wry>>> =
+        std::collections::HashMap::new();
+    for a in &registry.apps {
+        if a.singleton || a.group == "settings" {
+            continue;
+        }
+        let id = format!("app-{}", a.id);
+        let mut builder = MenuItemBuilder::with_id(&id, &a.label);
+        if let Some(accel) = &a.accelerator {
+            builder = builder.accelerator(format!("cmdOrCtrl+{}", accel));
+        }
+        items_by_group
+            .entry(a.group.clone())
+            .or_default()
+            .push(builder.build(app)?);
+    }
+
+    let mut builder = SubmenuBuilder::new(app, "Apps");
+    let mut group_emitted = false;
+    for group in &registry.group_order {
+        let Some(group_items) = items_by_group.get(group) else {
+            continue;
+        };
+        if group_items.is_empty() {
+            continue;
+        }
+        if group_emitted {
+            builder = builder.separator();
+        }
+        for item in group_items {
+            builder = builder.item(item);
+        }
+        group_emitted = true;
+    }
+    Ok(builder.build()?)
+}
+
 /// Setup menus for desktop platforms (not available on iOS)
 #[cfg(not(target_os = "ios"))]
 fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -537,51 +609,12 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
         .quit()
         .build()?;
 
-    // Create Apps menu items -- session-aware apps first (1-5), then tools (6-8)
-    let discovery_item = MenuItemBuilder::with_id("app-discovery", "Discovery")
-        .accelerator("cmdOrCtrl+1")
-        .build(app)?;
-    let decoder_item = MenuItemBuilder::with_id("app-decoder", "Decoder")
-        .accelerator("cmdOrCtrl+2")
-        .build(app)?;
-    let transmit_item = MenuItemBuilder::with_id("app-transmit", "Transmit")
-        .accelerator("cmdOrCtrl+3")
-        .build(app)?;
-    let query_item = MenuItemBuilder::with_id("app-query", "Query")
-        .accelerator("cmdOrCtrl+4")
-        .build(app)?;
-    let graph_item = MenuItemBuilder::with_id("app-graph", "Graph")
-        .accelerator("cmdOrCtrl+5")
-        .build(app)?;
-    let modbus_item = MenuItemBuilder::with_id("app-modbus", "Modbus")
-        .accelerator("cmdOrCtrl+6")
-        .build(app)?;
-    let rules_item = MenuItemBuilder::with_id("app-rules", "Rules")
-        .accelerator("cmdOrCtrl+7")
-        .build(app)?;
-    let catalog_item = MenuItemBuilder::with_id("app-catalog-editor", "Catalog Editor")
-        .accelerator("cmdOrCtrl+8")
-        .build(app)?;
-    let calculator_item = MenuItemBuilder::with_id("app-calculator", "Calculator")
-        .accelerator("cmdOrCtrl+9")
-        .build(app)?;
-    let sessions_item = MenuItemBuilder::with_id("app-session-manager", "Sessions")
-        .accelerator("cmdOrCtrl+0")
-        .build(app)?;
-
-    let apps_menu = SubmenuBuilder::new(app, "Apps")
-        .item(&discovery_item)
-        .item(&decoder_item)
-        .item(&transmit_item)
-        .item(&query_item)
-        .item(&graph_item)
-        .item(&modbus_item)
-        .item(&rules_item)
-        .separator()
-        .item(&catalog_item)
-        .item(&calculator_item)
-        .item(&sessions_item)
-        .build()?;
+    // Apps submenu — built from the shared declarative registry at
+    // `src/apps/apps.json`. That file is the single source of truth for app
+    // ordering, grouping, accelerators, and labels; the TS registry consumes
+    // it too. To add or rename an app, edit apps.json (and add visual config
+    // in src/apps/registry.ts on the TS side); this menu picks it up.
+    let apps_menu = build_apps_menu(app)?;
 
     // Create View menu items
     let new_window_item = MenuItemBuilder::with_id("new-window", "New Window")
@@ -741,12 +774,10 @@ fn setup_desktop_menus(app: &mut tauri::App) -> Result<(), Box<dyn std::error::E
             "find" => {
                 emit_to_focused_window(app, "menu-find", ());
             }
-            // App menu items - open as tabs in focused window
-            "app-discovery" | "app-decoder" | "app-transmit"
-            | "app-query" | "app-graph" | "app-modbus" | "app-rules"
-            | "app-catalog-editor" | "app-calculator"
-            | "app-session-manager" => {
-                let panel_id = event_id.strip_prefix("app-").unwrap_or(event_id);
+            // App menu items - open as tabs in focused window. The set of
+            // valid `app-*` IDs is defined declaratively in src/apps/apps.json.
+            id if id.starts_with("app-") => {
+                let panel_id = id.strip_prefix("app-").unwrap_or(id);
                 open_panel_in_focused_window(app, panel_id);
             }
             // Settings - singleton across all windows
