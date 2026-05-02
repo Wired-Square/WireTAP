@@ -23,6 +23,7 @@ import {
   Calculator,
   FlaskConical,
   Network,
+  Terminal,
   Settings as SettingsIcon,
   GitCompare,
   ListOrdered,
@@ -76,6 +77,13 @@ const visualConfig = {
     bgColour: "hover:bg-amber-500/10",
     watermarkBg: "bg-amber-500/10 hover:bg-amber-500/20",
     load: () => import("./modbus/Modbus"),
+  },
+  serial: {
+    icon: Terminal,
+    colour: "text-sky-400",
+    bgColour: "hover:bg-sky-500/10",
+    watermarkBg: "bg-sky-500/10 hover:bg-sky-500/20",
+    load: () => import("./serial/Serial"),
   },
   query: {
     icon: DatabaseZap,

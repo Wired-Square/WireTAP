@@ -173,7 +173,7 @@ pub fn get_traits_for_profile_kind(kind: &str) -> InterfaceTraits {
             temporal_mode: TemporalMode::Realtime,
             protocols: vec![Protocol::Serial],
             tx_frames: false,
-            tx_bytes: false,
+            tx_bytes: true,
             multi_source: true,
         },
         "framelink" => InterfaceTraits {

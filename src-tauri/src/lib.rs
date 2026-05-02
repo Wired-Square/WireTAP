@@ -13,11 +13,15 @@ mod dbc_export;
 mod dbc_import;
 mod dbquery;
 mod device_scan;
+#[cfg(not(target_os = "ios"))]
+mod flashers;
 mod framing;
 pub mod io;
 mod profile_tracker;
 mod sessions;
 mod settings;
+#[cfg(not(target_os = "ios"))]
+mod serial_terminal;
 mod smp_upgrade;
 mod store_manager;
 mod transmit;
@@ -1198,6 +1202,28 @@ pub fn run() {
             replay::io_stop_replay,
             replay::io_stop_all_replays,
             replay::get_replay_state,
+            // Direct serial-terminal (Serial app) — desktop only
+            #[cfg(not(target_os = "ios"))]
+            serial_terminal::serial_terminal_open,
+            #[cfg(not(target_os = "ios"))]
+            serial_terminal::serial_terminal_close,
+            #[cfg(not(target_os = "ios"))]
+            serial_terminal::serial_terminal_write,
+            #[cfg(not(target_os = "ios"))]
+            serial_terminal::serial_terminal_reset,
+            // Firmware flashers (Serial app) — desktop only
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_esp_detect_chip,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_esp_flash,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_esp_cancel,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_dfu_list_devices,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_dfu_flash,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_dfu_cancel,
             // Test Pattern protocol
             io_test::io_test_start,
             io_test::io_test_stop,

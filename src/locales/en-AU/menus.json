@@ -4,6 +4,7 @@
     "decoder": "Decoder",
     "transmit": "Transmit",
     "modbus": "Modbus",
+    "serial": "Serial",
     "graph": "Graph",
     "frameCalculator": "Calculator",
     "catalogEditor": "Catalog Editor",

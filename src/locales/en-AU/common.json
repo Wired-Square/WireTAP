@@ -51,6 +51,28 @@
       "missing": "Missing"
     }
   },
+  "serialPortPicker": {
+    "buttonChoose": "Choose port",
+    "buttonTitle": "Pick a serial port",
+    "headerTitle": "Serial ports ({{count}})",
+    "refresh": "Refresh",
+    "refreshTooltip": "Refresh port list",
+    "empty": "No serial ports detected. Plug in a device and refresh.",
+    "fields": {
+      "baud": "Baud",
+      "data": "Data",
+      "stop": "Stop",
+      "parity": "Parity"
+    },
+    "parity": {
+      "none": "None",
+      "odd": "Odd",
+      "even": "Even"
+    },
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "disconnect": "Disconnect"
+  },
   "pagination": {
     "firstPage": "First page",
     "previousPage": "Previous page",

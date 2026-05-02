@@ -67,6 +67,11 @@ framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", branch
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 serialport = "4.3"
 keepawake = "0.5"
+# Firmware flashers — drive the ESP32 serial bootloader (esptool-style) and
+# STM32 USB DFU 1.1 / DfuSe protocols. Used by the Serial app's flash tabs.
+espflash = { version = "4", default-features = false }
+dfu-core = "0.10"
+dfu-nusb = "0.1"
 
 # MacOS
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -107,3 +112,6 @@ optional = true
 socketcan = "3.3"
 # sync-secret-service uses DBus Secret Service (GNOME Keyring, KWallet)
 keyring = { version = "3", features = ["sync-secret-service"] }
+# nusb — used by the STM32 DFU flasher (dfu-nusb). Already a dep on
+# macOS/Windows; added here for Linux parity.
+nusb = { version = "0.2", features = ["tokio"] }

@@ -1,0 +1,20 @@
+{
+  "topBar": {
+    "disconnect": "Disconnect",
+    "disconnectTooltip": "Disconnect from the serial port",
+    "reset": "Reset",
+    "resetTooltip": "Pulse RTS/DTR to reset the connected µC",
+    "echoOn": "Echo on",
+    "echoOff": "Echo off",
+    "echoTooltipOn": "Local echo on — typed characters are mirrored to the terminal",
+    "echoTooltipOff": "Local echo off — only device output is shown"
+  },
+  "tabs": {
+    "terminal": "Terminal",
+    "espFlash": "ESP32 Flash",
+    "dfuFlash": "STM32 DFU"
+  },
+  "terminal": {
+    "emptyState": "Pick a port from the top bar to begin."
+  }
+}

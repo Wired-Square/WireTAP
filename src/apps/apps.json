@@ -7,12 +7,13 @@
     { "id": "transmit",         "label": "Transmit",       "group": "sessions",   "accelerator": "3" },
     { "id": "graph",            "label": "Graph",          "group": "sessions",   "accelerator": "4" },
     { "id": "modbus",           "label": "Modbus",         "group": "sessions",   "accelerator": "5" },
+    { "id": "test-pattern",     "label": "Test Pattern",   "group": "sessions" },
+    { "id": "session-manager",  "label": "Sessions",       "group": "sessions",   "accelerator": "0" },
     { "id": "query",            "label": "Query",          "group": "database",   "accelerator": "6" },
     { "id": "rules",            "label": "Rules",          "group": "framelink",  "accelerator": "7" },
     { "id": "catalog-editor",   "label": "Catalog Editor", "group": "utilities",  "accelerator": "8" },
     { "id": "frame-calculator", "label": "Calculator",     "group": "utilities",  "accelerator": "9" },
-    { "id": "test-pattern",     "label": "Test Pattern",   "group": "utilities" },
-    { "id": "session-manager",  "label": "Sessions",       "group": "utilities",  "accelerator": "0" },
+    { "id": "serial",           "label": "Serial",         "group": "utilities" },
     { "id": "settings",         "label": "Settings",       "group": "settings",   "singleton": true }
   ]
 }
