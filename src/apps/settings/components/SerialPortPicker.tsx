@@ -3,6 +3,7 @@
 // Component for selecting a serial port from available system ports
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
 import { listSerialPorts, SerialPortInfo } from "../../../api/serial";
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function SerialPortPicker({ value, onChange }: Props) {
+  const { t } = useTranslation("settings");
   const [ports, setPorts] = useState<SerialPortInfo[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export default function SerialPortPicker({ value, onChange }: Props) {
           onChange={(e) => onChange(e.target.value)}
           className="flex-1"
         >
-          <option value="">Select a port...</option>
+          <option value="">{t("serialPortPicker.selectPort")}</option>
           {ports.map((port) => (
             <option key={port.port_name} value={port.port_name}>
               {formatPortOption(port)}
@@ -70,7 +72,7 @@ export default function SerialPortPicker({ value, onChange }: Props) {
           onClick={refreshPorts}
           disabled={isRefreshing}
           className={`${iconButtonBase} disabled:opacity-50`}
-          title="Refresh port list"
+          title={t("serialPortPicker.refreshPortList")}
         >
           <RefreshCw
             className={`${iconLg} ${isRefreshing ? "animate-spin" : ""}`}
@@ -87,7 +89,7 @@ export default function SerialPortPicker({ value, onChange }: Props) {
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Or enter port manually (e.g., COM3, /dev/ttyUSB0)"
+          placeholder={t("serialPortPicker.manualEntryPlaceholder")}
           className="text-sm"
         />
       </div>
@@ -100,10 +102,10 @@ export default function SerialPortPicker({ value, onChange }: Props) {
             if (!port) return null;
             const details = [];
             if (port.vid && port.pid) {
-              details.push(`VID:PID ${port.vid.toString(16).padStart(4, "0")}:${port.pid.toString(16).padStart(4, "0")}`);
+              details.push(`${t("serialPortPicker.vidPidLabel")} ${port.vid.toString(16).padStart(4, "0")}:${port.pid.toString(16).padStart(4, "0")}`);
             }
             if (port.serial_number) {
-              details.push(`S/N: ${port.serial_number}`);
+              details.push(`${t("serialPortPicker.serialNumberLabel")} ${port.serial_number}`);
             }
             return details.join(" | ");
           })()}

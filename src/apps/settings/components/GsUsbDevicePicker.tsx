@@ -3,6 +3,7 @@
 // Component for selecting a gs_usb (candleLight) device.
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
 import {
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function GsUsbDevicePicker({ value, onChange }: Props) {
+  const { t } = useTranslation("settings");
   const [devices, setDevices] = useState<GsUsbDeviceInfo[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export default function GsUsbDevicePicker({ value, onChange }: Props) {
           onChange={(e) => handleChange(e.target.value)}
           className="flex-1"
         >
-          <option value="">Select a device...</option>
+          <option value="">{t("gsUsbDevicePicker.selectDevice")}</option>
           {devices.map((device) => {
             const deviceId = createDeviceId(device);
             return (
@@ -82,7 +84,7 @@ export default function GsUsbDevicePicker({ value, onChange }: Props) {
           onClick={refreshDevices}
           disabled={isRefreshing}
           className={`${iconButtonBase} disabled:opacity-50`}
-          title="Refresh device list"
+          title={t("gsUsbDevicePicker.refreshDeviceList")}
         >
           <RefreshCw
             className={`${iconLg} ${isRefreshing ? "animate-spin" : ""}`}
@@ -94,7 +96,7 @@ export default function GsUsbDevicePicker({ value, onChange }: Props) {
 
       {devices.length === 0 && !isRefreshing && !error && (
         <p className={helpText}>
-          No gs_usb devices found. Connect a CANable or other candleLight device.
+          {t("gsUsbDevicePicker.noDevicesFound")}
         </p>
       )}
 
@@ -102,12 +104,12 @@ export default function GsUsbDevicePicker({ value, onChange }: Props) {
       {selectedDevice && (
         <div className={helpText}>
           {[
-            selectedDevice.serial && `S/N: ${selectedDevice.serial}`,
-            `USB ${selectedDevice.bus}:${selectedDevice.address}`,
+            selectedDevice.serial && `${t("gsUsbDevicePicker.serialNumberLabel")} ${selectedDevice.serial}`,
+            t("gsUsbDevicePicker.usbBusAddress", { bus: selectedDevice.bus, address: selectedDevice.address }),
             selectedDevice.interface_name &&
-              `Interface: ${selectedDevice.interface_name}`,
+              t("gsUsbDevicePicker.interfaceLabel", { name: selectedDevice.interface_name }),
             selectedDevice.interface_up !== null &&
-              (selectedDevice.interface_up ? "(interface up)" : "(interface down)"),
+              (selectedDevice.interface_up ? t("gsUsbDevicePicker.interfaceUp") : t("gsUsbDevicePicker.interfaceDown")),
           ]
             .filter(Boolean)
             .join(" | ")}

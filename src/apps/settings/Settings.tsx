@@ -1,6 +1,7 @@
 // ui/src/apps/settings/Settings.tsx
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { pickDirectory } from "../../api/dialogs";
 import AppLayout from "../../components/AppLayout";
 import AppTopBar from "../../components/AppTopBar";
@@ -46,6 +47,7 @@ import { isIOS } from "../../utils/platform";
 import { onStoreChanged } from "../../api/store";
 
 export default function Settings() {
+  const { t } = useTranslation("settings");
   // Form state for dialogs
   const forms = useSettingsForms();
 
@@ -247,19 +249,19 @@ export default function Settings() {
 
   // Sidebar items (Storage hidden on iOS due to sandboxing restrictions)
   const sidebarItems: SideBarItem[] = [
-    { id: "bookmarks", label: "Bookmarks", icon: Bookmark },
-    { id: "captures", label: "Captures", icon: Database },
-    { id: "catalogs", label: "Catalogs", icon: BookOpen },
-    { id: "data-io", label: "Data IO", icon: Cable },
-    { id: "display", label: "Display", icon: Monitor },
-    { id: "devices", label: "Devices", icon: Cpu },
-    { id: "general", label: "General", icon: Cog },
-    { id: "graph-layouts", label: "Graph Layouts", icon: LayoutGrid },
-    { id: "privacy", label: "Privacy", icon: Shield },
-    { id: "selection-sets", label: "Selection Sets", icon: Star },
+    { id: "bookmarks", label: t("sidebar.bookmarks"), icon: Bookmark },
+    { id: "captures", label: t("sidebar.captures"), icon: Database },
+    { id: "catalogs", label: t("sidebar.catalogs"), icon: BookOpen },
+    { id: "data-io", label: t("sidebar.dataIo"), icon: Cable },
+    { id: "display", label: t("sidebar.display"), icon: Monitor },
+    { id: "devices", label: t("sidebar.devices"), icon: Cpu },
+    { id: "general", label: t("sidebar.general"), icon: Cog },
+    { id: "graph-layouts", label: t("sidebar.graphLayouts"), icon: LayoutGrid },
+    { id: "privacy", label: t("sidebar.privacy"), icon: Shield },
+    { id: "selection-sets", label: t("sidebar.selectionSets"), icon: Star },
     // Hide Storage on iOS - custom directory paths aren't supported
     ...(!isIOSPlatform
-      ? [{ id: "locations" as const, label: "Storage", icon: MapPin }]
+      ? [{ id: "locations" as const, label: t("sidebar.storage"), icon: MapPin }]
       : []),
   ];
 
@@ -490,8 +492,8 @@ export default function Settings() {
       {/* Delete IO Profile Confirmation Dialog */}
       <ConfirmDeleteDialog
         open={dialogs.deleteIOProfile}
-        title="Delete IO Profile"
-        message="Are you sure you want to delete"
+        title={t("confirmDelete.deleteIoProfileTitle")}
+        message={t("confirmDelete.areYouSure")}
         highlightText={dialogPayload.ioProfileToDelete?.name}
         onCancel={handlers.handleCancelDeleteIOProfile}
         onConfirm={handlers.handleConfirmDeleteIOProfile}
@@ -500,8 +502,8 @@ export default function Settings() {
       {/* Delete Catalog Confirmation Dialog */}
       <ConfirmDeleteDialog
         open={dialogs.deleteCatalog}
-        title="Delete Catalog"
-        message="Are you sure you want to delete"
+        title={t("confirmDelete.deleteCatalogTitle")}
+        message={t("confirmDelete.areYouSure")}
         highlightText={
           dialogPayload.catalogToDelete?.name ||
           dialogPayload.catalogToDelete?.filename
@@ -560,8 +562,8 @@ export default function Settings() {
       {/* Delete Bookmark Confirmation Dialog */}
       <ConfirmDeleteDialog
         open={dialogs.deleteBookmark}
-        title="Delete Bookmark"
-        message="Are you sure you want to delete"
+        title={t("confirmDelete.deleteBookmarkTitle")}
+        message={t("confirmDelete.areYouSure")}
         highlightText={dialogPayload.bookmarkToDelete?.name}
         onCancel={handlers.handleCancelDeleteBookmark}
         onConfirm={handlers.handleConfirmDeleteBookmark}
@@ -579,8 +581,8 @@ export default function Settings() {
       {/* Delete Selection Set Confirmation Dialog */}
       <ConfirmDeleteDialog
         open={dialogs.deleteSelectionSet}
-        title="Delete Selection Set"
-        message="Are you sure you want to delete"
+        title={t("confirmDelete.deleteSelectionSetTitle")}
+        message={t("confirmDelete.areYouSure")}
         highlightText={dialogPayload.selectionSetToDelete?.name}
         onCancel={handlers.handleCancelDeleteSelectionSet}
         onConfirm={handlers.handleConfirmDeleteSelectionSet}
@@ -598,8 +600,8 @@ export default function Settings() {
       {/* Delete Graph Layout Confirmation Dialog */}
       <ConfirmDeleteDialog
         open={dialogs.deleteGraphLayout}
-        title="Delete Graph Layout"
-        message="Are you sure you want to delete"
+        title={t("confirmDelete.deleteGraphLayoutTitle")}
+        message={t("confirmDelete.areYouSure")}
         highlightText={dialogPayload.graphLayoutToDelete?.name}
         onCancel={handlers.handleCancelDeleteGraphLayout}
         onConfirm={handlers.handleConfirmDeleteGraphLayout}

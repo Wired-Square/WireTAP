@@ -608,5 +608,54 @@
       "edit": "Edit graph layout",
       "delete": "Delete graph layout"
     }
+  },
+  "sidebar": {
+    "bookmarks": "Bookmarks",
+    "captures": "Captures",
+    "catalogs": "Catalogs",
+    "dataIo": "Data IO",
+    "display": "Display",
+    "devices": "Devices",
+    "general": "General",
+    "graphLayouts": "Graph Layouts",
+    "privacy": "Privacy",
+    "selectionSets": "Selection Sets",
+    "storage": "Storage"
+  },
+  "confirmDelete": {
+    "deleteIoProfileTitle": "Delete IO Profile",
+    "deleteCatalogTitle": "Delete Catalog",
+    "deleteBookmarkTitle": "Delete Bookmark",
+    "deleteSelectionSetTitle": "Delete Selection Set",
+    "deleteGraphLayoutTitle": "Delete Graph Layout",
+    "areYouSure": "Are you sure you want to delete"
+  },
+  "ioDeviceStatus": {
+    "firmware": "Firmware",
+    "hardware": "Hardware",
+    "checking": "Checking device...",
+    "connected": "Device connected",
+    "notResponding": "Device not responding",
+    "selectPort": "Select a port to check device",
+    "canFd": "CAN FD",
+    "can20": "CAN 2.0",
+    "testConnection": "Test connection"
+  },
+  "serialPortPicker": {
+    "selectPort": "Select a port...",
+    "refreshPortList": "Refresh port list",
+    "manualEntryPlaceholder": "Or enter port manually (e.g., COM3, /dev/ttyUSB0)",
+    "vidPidLabel": "VID:PID",
+    "serialNumberLabel": "S/N:"
+  },
+  "gsUsbDevicePicker": {
+    "selectDevice": "Select a device...",
+    "refreshDeviceList": "Refresh device list",
+    "noDevicesFound": "No gs_usb devices found. Connect a CANable or other candleLight device.",
+    "serialNumberLabel": "S/N:",
+    "usbBusAddress": "USB {{bus}}:{{address}}",
+    "interfaceLabel": "Interface: {{name}}",
+    "interfaceUp": "(interface up)",
+    "interfaceDown": "(interface down)"
   }
 }

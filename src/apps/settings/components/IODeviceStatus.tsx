@@ -4,6 +4,7 @@
 // Shows a green light with info if working, red light with error if not.
 // Can be used for slcan, GVRET USB, and other serial-connected devices.
 
+import { useTranslation } from "react-i18next";
 import { CircleCheck, CircleX, Loader2, RefreshCw } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, iconButtonHoverSmall } from "../../../styles";
@@ -48,14 +49,21 @@ interface Props {
 export default function IODeviceStatus({
   state,
   result,
-  primaryLabel = "Firmware",
-  secondaryLabel = "Hardware",
+  primaryLabel,
+  secondaryLabel,
   onRefresh,
-  probingText = "Checking device...",
-  successText = "Device connected",
-  errorText = "Device not responding",
-  idleText = "Select a port to check device",
+  probingText,
+  successText,
+  errorText,
+  idleText,
 }: Props) {
+  const { t } = useTranslation("settings");
+  const resolvedPrimaryLabel = primaryLabel ?? t("ioDeviceStatus.firmware");
+  const resolvedSecondaryLabel = secondaryLabel ?? t("ioDeviceStatus.hardware");
+  const resolvedProbingText = probingText ?? t("ioDeviceStatus.checking");
+  const resolvedSuccessText = successText ?? t("ioDeviceStatus.connected");
+  const resolvedErrorText = errorText ?? t("ioDeviceStatus.notResponding");
+  const resolvedIdleText = idleText ?? t("ioDeviceStatus.selectPort");
   return (
     <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--bg-surface)] border border-[color:var(--border-default)]">
       {/* Status indicator */}
@@ -78,36 +86,36 @@ export default function IODeviceStatus({
       <div className="flex-1 min-w-0">
         {state === "probing" && (
           <span className="text-sm text-[color:var(--text-muted)]">
-            {probingText}
+            {resolvedProbingText}
           </span>
         )}
         {state === "success" && result && (
           <div>
             <span className="text-sm font-medium text-[color:var(--text-green)]">
-              {successText}
+              {resolvedSuccessText}
             </span>
             {result.primaryInfo && (
               <span className="text-sm text-[color:var(--text-muted)] ml-2">
-                {primaryLabel}: {result.primaryInfo}
+                {resolvedPrimaryLabel}: {result.primaryInfo}
               </span>
             )}
             {result.secondaryInfo && (
               <span className="text-sm text-[color:var(--text-muted)] ml-2">
-                {secondaryLabel}: {result.secondaryInfo}
+                {resolvedSecondaryLabel}: {result.secondaryInfo}
               </span>
             )}
             {result.supports_fd === true && (
-              <span className={`ml-2 ${badgeSmallSuccess}`}>CAN FD</span>
+              <span className={`ml-2 ${badgeSmallSuccess}`}>{t("ioDeviceStatus.canFd")}</span>
             )}
             {result.supports_fd === false && (
-              <span className={`ml-2 ${badgeSmallNeutral}`}>CAN 2.0</span>
+              <span className={`ml-2 ${badgeSmallNeutral}`}>{t("ioDeviceStatus.can20")}</span>
             )}
           </div>
         )}
         {state === "error" && result && (
           <div>
             <span className="text-sm font-medium text-[color:var(--text-red)]">
-              {errorText}
+              {resolvedErrorText}
             </span>
             {result.error && (
               <p className={`${caption} mt-0.5 truncate`}>
@@ -118,7 +126,7 @@ export default function IODeviceStatus({
         )}
         {state === "idle" && (
           <span className="text-sm text-[color:var(--text-muted)]">
-            {idleText}
+            {resolvedIdleText}
           </span>
         )}
       </div>
@@ -129,7 +137,7 @@ export default function IODeviceStatus({
           type="button"
           onClick={onRefresh}
           className={iconButtonHoverSmall}
-          title="Test connection"
+          title={t("ioDeviceStatus.testConnection")}
         >
           <RefreshCw className={`${iconMd} text-[color:var(--text-muted)]`} />
         </button>
