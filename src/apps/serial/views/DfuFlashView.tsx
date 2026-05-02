@@ -3,11 +3,16 @@
 // STM32 DFU flasher — wraps the DFU 1.1 / DfuSe protocol via the
 // `dfu-nusb` + `dfu-core` Rust crates. Independent of the serial port:
 // the µC must already be in DFU mode (BOOT0 high, reset).
+//
+// Device selection lives in the shared SerialPortPicker (top nav). This
+// view just reads the selected DFU serial from the store and exposes the
+// firmware-image controls + progress UI.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
-import { FileUp, Play, RefreshCcw, Usb, X } from "lucide-react";
+import { FileUp, Play, ShieldAlert, Usb, X } from "lucide-react";
 import {
   bgPrimary,
   bgSurface,
@@ -20,44 +25,28 @@ import {
   FLASHER_PROGRESS_EVENT,
   flasherDfuCancel,
   flasherDfuFlash,
-  flasherDfuListDevices,
 } from "../../../api/flashers";
 import { tlog } from "../../../api/settings";
 import { useSerialStore } from "../stores/serialStore";
-import type {
-  DfuDeviceInfo,
-  FlasherProgressEvent,
-} from "../utils/flasherTypes";
+import type { FlasherProgressEvent } from "../utils/flasherTypes";
 
 export default function DfuFlashView() {
+  const { t } = useTranslation("serial");
   const dfuFlash = useSerialStore((s) => s.dfuFlash);
   const setDfuFlash = useSerialStore((s) => s.setDfuFlash);
   const appendLog = useSerialStore((s) => s.appendDfuLog);
   const reset = useSerialStore((s) => s.resetDfuFlash);
+  const dfuDevices = useSerialStore((s) => s.dfuDevices);
+  const dfuSerial = useSerialStore((s) => s.dfuSerial);
 
-  const [devices, setDevices] = useState<DfuDeviceInfo[]>([]);
-  const [scanning, setScanning] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [address, setAddress] = useState("0x08000000");
   const [busy, setBusy] = useState(false);
 
-  const refresh = useCallback(async () => {
-    setScanning(true);
-    try {
-      const list = await flasherDfuListDevices();
-      setDevices(list);
-      if (!selected && list.length > 0) setSelected(list[0].serial);
-    } catch (err) {
-      tlog.info(`[Serial/DFU] list failed: ${err}`);
-    } finally {
-      setScanning(false);
-    }
-  }, [selected]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  const selectedDevice = useMemo(
+    () => dfuDevices.find((d) => d.serial === dfuSerial) ?? null,
+    [dfuDevices, dfuSerial],
+  );
 
   // Subscribe to flasher progress events for our flash id only.
   useEffect(() => {
@@ -91,26 +80,26 @@ export default function DfuFlashView() {
   }, []);
 
   const flash = useCallback(async () => {
-    if (!selected || !imagePath) return;
+    if (!dfuSerial || !imagePath) return;
     const addr = parseInt(address, address.startsWith("0x") ? 16 : 10);
     if (Number.isNaN(addr)) {
-      appendLog(`Invalid address: ${address}`);
+      appendLog(t("dfu.invalidAddress", { address }));
       return;
     }
     setBusy(true);
     reset();
     try {
-      const flashId = await flasherDfuFlash(selected, imagePath, addr);
+      const flashId = await flasherDfuFlash(dfuSerial, imagePath, addr);
       setDfuFlash({ flashId, phase: "connecting" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       tlog.info(`[Serial/DFU] flash failed: ${msg}`);
-      appendLog(`Flash failed: ${msg}`);
+      appendLog(t("dfu.flashFailed", { error: msg }));
       setDfuFlash({ phase: "error", error: msg });
     } finally {
       setBusy(false);
     }
-  }, [selected, imagePath, address, reset, setDfuFlash, appendLog]);
+  }, [dfuSerial, imagePath, address, reset, setDfuFlash, appendLog, t]);
 
   const cancel = useCallback(async () => {
     if (!dfuFlash.flashId) return;
@@ -134,66 +123,48 @@ export default function DfuFlashView() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {/* Selected device status bar — picker lives in the top nav. */}
       <div
-        className={`flex items-center justify-between px-3 py-2 ${borderDivider} border-b`}
+        className={`flex items-center gap-3 px-3 py-2 ${borderDivider} border-b text-xs ${textSecondary}`}
       >
-        <span className={`text-xs font-medium ${textSecondary}`}>
-          DFU devices ({devices.length})
-        </span>
-        <button
-          onClick={refresh}
-          disabled={scanning}
-          className={`flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-[var(--hover-bg)] ${textSecondary}`}
-        >
-          <RefreshCcw size={12} className={scanning ? "animate-spin" : ""} />
-          Rescan
-        </button>
+        <Usb size={14} className="text-amber-300" />
+        {selectedDevice ? (
+          <>
+            <span className={`font-medium ${textPrimary}`}>
+              {selectedDevice.display_name}
+            </span>
+            <span className="font-mono">
+              · {hexId(selectedDevice.vid)}:{hexId(selectedDevice.pid)}
+            </span>
+            <span className={`font-mono truncate ${textMuted}`}>
+              · {selectedDevice.serial}
+            </span>
+          </>
+        ) : (
+          <div className="flex items-center gap-2">
+            <ShieldAlert size={12} className="text-amber-300" />
+            <span className={textMuted}>{t("dfu.noDeviceSelected")}</span>
+          </div>
+        )}
       </div>
 
-      <ul className="max-h-40 overflow-y-auto">
-        {devices.length === 0 && !scanning && (
-          <li className={`p-3 text-xs ${textMuted}`}>
-            No DFU devices detected. Hold BOOT0 high and reset the µC.
-          </li>
-        )}
-        {devices.map((d) => (
-          <li key={d.serial}>
-            <button
-              onClick={() => setSelected(d.serial)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs border-b ${borderDivider} ${
-                selected === d.serial ? "bg-sky-500/10" : "hover:bg-[var(--hover-bg)]"
-              }`}
-            >
-              <Usb size={14} className={textMuted} />
-              <div className="flex-1 min-w-0">
-                <div className={`font-mono ${textPrimary} truncate`}>
-                  {d.display_name}
-                </div>
-                <div className={`${textMuted} truncate`}>
-                  {hexId(d.vid)}:{hexId(d.pid)} · {d.serial}
-                </div>
-              </div>
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <div className={`p-3 ${bgSurface} ${borderDivider} border-y flex flex-wrap gap-3 items-end`}>
+      {/* Image + address controls */}
+      <div className={`p-3 ${bgSurface} ${borderDivider} border-b flex flex-wrap gap-3 items-end`}>
         <div className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
-            Image
+            {t("dfu.fields.image")}
           </span>
           <button
             onClick={pickFile}
             className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${bgPrimary} ${textPrimary} border ${borderDivider} hover:bg-[var(--hover-bg)]`}
           >
             <FileUp size={12} />
-            {imagePath ?? "Choose .bin / .dfu / .hex"}
+            {imagePath ?? t("dfu.fields.imageEmpty")}
           </button>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-wide text-[color:var(--text-muted)]">
-            Flash address
+            {t("dfu.fields.address")}
           </span>
           <input
             value={address}
@@ -208,32 +179,41 @@ export default function DfuFlashView() {
               className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-red-500/20 text-red-300 hover:bg-red-500/30"
             >
               <X size={12} />
-              Cancel
+              {t("dfu.cancel")}
             </button>
           ) : (
             <button
               onClick={flash}
-              disabled={!selected || !imagePath || busy}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!dfuSerial || !imagePath || busy}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Play size={12} />
-              Flash
+              {t("dfu.flash")}
             </button>
           )}
         </div>
       </div>
 
-      {(inProgress || dfuFlash.phase === "done" || dfuFlash.phase === "error") && (
+      {(inProgress || dfuFlash.phase === "done" || dfuFlash.phase === "error" || dfuFlash.phase === "cancelled") && (
         <div className={`px-3 py-2 ${borderDivider} border-b`}>
           <div className={`text-xs ${textSecondary} mb-1 capitalize`}>
-            {dfuFlash.phase} — {progressPct}% ({dfuFlash.bytesDone}/{dfuFlash.bytesTotal} bytes)
+            {dfuFlash.phase}
+            {dfuFlash.bytesTotal > 0 && (
+              <>
+                {" "}— {progressPct}% (
+                {dfuFlash.bytesDone.toLocaleString("en-AU")}/
+                {dfuFlash.bytesTotal.toLocaleString("en-AU")} {t("dfu.bytes")})
+              </>
+            )}
           </div>
-          <div className="h-2 rounded bg-[var(--bg-primary)] overflow-hidden">
-            <div
-              className="h-full bg-sky-400 transition-all"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
+          {dfuFlash.bytesTotal > 0 && (
+            <div className="h-2 rounded bg-[var(--bg-primary)] overflow-hidden">
+              <div
+                className="h-full bg-amber-400 transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          )}
           {dfuFlash.error && (
             <div className="text-xs text-[color:var(--text-danger)] mt-1">
               {dfuFlash.error}
@@ -245,7 +225,9 @@ export default function DfuFlashView() {
       <div className="flex-1 overflow-y-auto p-3 font-mono text-xs">
         {dfuFlash.log.length === 0 ? (
           <div className={textMuted}>
-            Boot the µC into DFU mode, pick an image, and click Flash.
+            {selectedDevice
+              ? t("dfu.emptyStateReady")
+              : t("dfu.emptyStateNoDevice")}
           </div>
         ) : (
           dfuFlash.log.map((line, i) => (

@@ -21,5 +21,20 @@
   },
   "terminal": {
     "emptyState": "Pick a port from the top bar to begin."
+  },
+  "dfu": {
+    "noDeviceSelected": "No DFU device selected — pick one from the device picker in the top bar.",
+    "fields": {
+      "image": "Image",
+      "imageEmpty": "Choose .bin / .dfu / .hex",
+      "address": "Flash address"
+    },
+    "flash": "Flash",
+    "cancel": "Cancel",
+    "bytes": "bytes",
+    "invalidAddress": "Invalid address: {{address}}",
+    "flashFailed": "Flash failed: {{error}}",
+    "emptyStateReady": "Pick an image and click Flash. The flasher will erase, program, and detach automatically.",
+    "emptyStateNoDevice": "Boot the µC into DFU mode (BOOT0 high + reset), then pick it from the device picker in the top bar."
   }
 }

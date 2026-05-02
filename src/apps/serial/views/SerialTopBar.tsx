@@ -19,6 +19,7 @@ import SerialPortPicker, {
   type AnnotatedSerialPort,
   type SerialPortSettings,
 } from "../../../components/SerialPortPicker";
+import type { DfuDeviceInfo } from "../utils/flasherTypes";
 import { iconSm } from "../../../styles/spacing";
 
 interface Props {
@@ -30,6 +31,16 @@ interface Props {
   connecting: boolean;
   settings: SerialPortSettings;
   localEcho: boolean;
+
+  /** When `"dfu"`, the picker button shows the selected DFU device and the
+   *  Connect / Echo / Reset actions are hidden — DFU has no persistent
+   *  connection. The DFU section in the popover is always visible. */
+  pickerMode: "serial" | "dfu";
+  dfuDevices: DfuDeviceInfo[];
+  activeDfu: string | null;
+  dfuLoading: boolean;
+  onRefreshDfu: () => void;
+  onSelectDfu: (serial: string) => void;
 
   onRefresh: () => void;
   onSelectPort: (port: string, matchedProfileName: string | null) => void;
@@ -49,6 +60,12 @@ export default function SerialTopBar({
   connecting,
   settings,
   localEcho,
+  pickerMode,
+  dfuDevices,
+  activeDfu,
+  dfuLoading,
+  onRefreshDfu,
+  onSelectDfu,
   onRefresh,
   onSelectPort,
   onSettingsChange,
@@ -59,11 +76,16 @@ export default function SerialTopBar({
 }: Props) {
   const { t } = useTranslation("serial");
 
+  // The Connect / Disconnect / Echo / Reset actions only apply in serial
+  // mode. In DFU mode the picker is just a selector — flashing kicks off
+  // from the DFU tab's Flash button, and there's no persistent connection.
+  const showSerialActions = pickerMode === "serial";
+
   return (
     <AppTopBar
       icon={TerminalIcon}
       iconColour="text-sky-400"
-      actions={
+      actions={showSerialActions ? (
         <div className="flex items-center gap-1">
           {isConnected ? (
             <button
@@ -122,7 +144,7 @@ export default function SerialTopBar({
             </>
           )}
         </div>
-      }
+      ) : null}
     >
       <SerialPortPicker
         ports={ports}
@@ -137,6 +159,12 @@ export default function SerialTopBar({
         onSettingsChange={onSettingsChange}
         onConnect={onConnect}
         onDisconnect={onDisconnect}
+        mode={pickerMode}
+        dfuDevices={dfuDevices}
+        activeDfu={activeDfu}
+        dfuLoading={dfuLoading}
+        onRefreshDfu={onRefreshDfu}
+        onSelectDfu={onSelectDfu}
       />
     </AppTopBar>
   );

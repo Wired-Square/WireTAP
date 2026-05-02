@@ -1,14 +1,15 @@
 // src/components/SerialPortPicker.tsx
 //
-// Shared serial-port picker for apps that consume a UART (e.g. the Serial
-// terminal). Parallel to FrameLinkDevicePicker but for raw serial ports:
-// renders a compact button showing the active port + a status dot, opens a
-// popover listing every detected serial port with the matching saved
-// `kind: "serial"` IO profile (if any) surfaced as a chip.
+// Shared device picker for the Serial app. Despite the name, this picker
+// covers both raw serial ports (Terminal / ESP32 Flash / STM32 UART tabs)
+// and USB DFU devices (STM32 DFU tab) — a single drop-down keeps the top
+// nav consistent across all four tabs.
 //
-// The popover also exposes baud / data bits / stop bits / parity controls
-// so the user can override saved profile defaults before connecting. The
-// picker itself is pure — pass enumerated ports + a connect callback in.
+// The popover lists serial ports with their matching saved `kind: "serial"`
+// IO profile (if any), and a separate "USB DFU" section below for chips in
+// bootloader mode. Framing controls (baud/data/stop/parity) and the Connect
+// button only appear in serial mode — DFU devices have no persistent
+// connection and no framing settings.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,6 +26,7 @@ import {
 } from "../styles/colourTokens";
 import type { SerialPortInfo } from "../api/serial";
 import type { IOProfile } from "../hooks/useSettings";
+import type { DfuDeviceInfo } from "../apps/serial/utils/flasherTypes";
 
 export type Parity = "none" | "odd" | "even";
 
@@ -63,6 +65,24 @@ export interface SerialPortPickerProps {
   /** Called when the user clicks Connect — passes the matched profile id (if any). */
   onConnect: (existingProfileId?: string) => void;
   onDisconnect: () => void;
+
+  /** Drive of which kind of device the picker button should display.
+   *  `"serial"` → picker button shows the selected serial port and the
+   *  popover footer renders framing controls + Connect.
+   *  `"dfu"` → picker button shows the selected DFU device; framing +
+   *  Connect are hidden (DFU has no persistent connection). */
+  mode?: "serial" | "dfu";
+  /** Enumerated USB DFU devices. Always shown in the popover so the user
+   *  can switch tabs and have the right device pre-selected. */
+  dfuDevices?: DfuDeviceInfo[];
+  /** USB serial of the currently selected DFU device. */
+  activeDfu?: string | null;
+  /** Refresh callback for DFU enumeration — separate from `onRefresh` so
+   *  the parent can control how often it scans (USB enumeration on macOS
+   *  can briefly stall if invoked too eagerly). */
+  onRefreshDfu?: () => void;
+  onSelectDfu?: (serial: string) => void;
+  dfuLoading?: boolean;
 }
 
 const COMMON_BAUDS = [
@@ -104,6 +124,12 @@ export default function SerialPortPicker({
   onSettingsChange,
   onConnect,
   onDisconnect,
+  mode = "serial",
+  dfuDevices = [],
+  activeDfu = null,
+  onRefreshDfu,
+  onSelectDfu,
+  dfuLoading = false,
 }: SerialPortPickerProps) {
   const { t } = useTranslation("common");
   const [isOpen, setIsOpen] = useState(false);
@@ -112,6 +138,11 @@ export default function SerialPortPicker({
   const matchedRow = useMemo(
     () => ports.find((p) => p.info.port_name === activePort) ?? null,
     [ports, activePort],
+  );
+
+  const matchedDfu = useMemo(
+    () => dfuDevices.find((d) => d.serial === activeDfu) ?? null,
+    [dfuDevices, activeDfu],
   );
 
   // Close on outside click.
@@ -139,23 +170,36 @@ export default function SerialPortPicker({
     return () => document.removeEventListener("keydown", handleKey);
   }, [isOpen]);
 
-  // Refresh ports each time the popover opens — devices come and go.
+  // Refresh both lists each time the popover opens — devices come and go.
   useEffect(() => {
-    if (isOpen) onRefresh();
+    if (isOpen) {
+      onRefresh();
+      onRefreshDfu?.();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const buttonState = isConnected
-    ? "connected"
-    : connecting
-      ? "connecting"
-      : activePort
+  const buttonState =
+    mode === "dfu"
+      ? activeDfu
         ? "selected"
-        : "idle";
+        : "idle"
+      : isConnected
+        ? "connected"
+        : connecting
+          ? "connecting"
+          : activePort
+            ? "selected"
+            : "idle";
 
-  const buttonLabel = activePort
-    ? `${activePort} @ ${settings.baudRate}`
-    : t("serialPortPicker.buttonChoose");
+  const buttonLabel =
+    mode === "dfu"
+      ? matchedDfu
+        ? matchedDfu.display_name
+        : t("serialPortPicker.dfuButtonChoose")
+      : activePort
+        ? `${activePort} @ ${settings.baudRate}`
+        : t("serialPortPicker.buttonChoose");
 
   return (
     <div ref={containerRef} className="relative shrink-0">
@@ -210,7 +254,7 @@ export default function SerialPortPicker({
             <ul role="listbox">
               {ports.map((p) => {
                 const Icon = portIcon(p.info.port_type);
-                const selected = p.info.port_name === activePort;
+                const selected = mode === "serial" && p.info.port_name === activePort;
                 const label = [p.info.manufacturer, p.info.product]
                   .filter(Boolean)
                   .join(" — ");
@@ -246,9 +290,66 @@ export default function SerialPortPicker({
                 );
               })}
             </ul>
+
+            {/* DFU device list — only rendered when the parent is wired up
+             *  for DFU enumeration. Always visible regardless of mode so the
+             *  user can pre-select a DFU device while still on a serial tab. */}
+            {onSelectDfu && (
+              <div>
+                <div
+                  className={`flex items-center justify-between px-3 py-1.5 ${borderDivider} border-y ${bgPrimary}`}
+                >
+                  <span className={`text-[10px] uppercase tracking-wide ${textSecondary}`}>
+                    {t("serialPortPicker.dfuHeader", { count: dfuDevices.length })}
+                  </span>
+                  {dfuLoading && (
+                    <RefreshCcw size={10} className={`${textMuted} animate-spin`} />
+                  )}
+                </div>
+                {dfuDevices.length === 0 ? (
+                  <div className={`p-3 text-xs ${textMuted}`}>
+                    {t("serialPortPicker.dfuEmpty")}
+                  </div>
+                ) : (
+                  <ul role="listbox">
+                    {dfuDevices.map((d) => {
+                      const selected = mode === "dfu" && d.serial === activeDfu;
+                      return (
+                        <li key={d.serial}>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            onClick={() => onSelectDfu(d.serial)}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs border-b ${borderDivider} ${
+                              selected
+                                ? "bg-amber-500/10"
+                                : "hover:bg-[var(--hover-bg)]"
+                            }`}
+                          >
+                            <Usb size={14} className="text-amber-300" />
+                            <div className="flex-1 min-w-0">
+                              <div className={`${textPrimary} truncate`}>
+                                {d.display_name}
+                              </div>
+                              <div className={`${textMuted} font-mono truncate`}>
+                                {hexId(d.vid)}:{hexId(d.pid)} · {d.serial}
+                              </div>
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Settings */}
+          {/* Settings — serial mode only. DFU has no framing or persistent
+           *  connection, so the picker just acts as a selector and the
+           *  actual flash kicks off from the DFU tab's Flash button. */}
+          {mode === "serial" && (
           <div
             className={`flex flex-wrap items-end gap-2 px-3 py-3 ${borderDivider} border-t`}
           >
@@ -345,10 +446,15 @@ export default function SerialPortPicker({
               )}
             </div>
           </div>
+          )}
         </div>
       )}
     </div>
   );
+}
+
+function hexId(n: number): string {
+  return `0x${n.toString(16).padStart(4, "0")}`;
 }
 
 function Field({

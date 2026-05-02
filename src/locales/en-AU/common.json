@@ -71,7 +71,10 @@
     },
     "connect": "Connect",
     "connecting": "Connecting…",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "dfuButtonChoose": "Choose DFU device",
+    "dfuHeader": "USB DFU ({{count}})",
+    "dfuEmpty": "No DFU devices detected. Hold BOOT0 high and reset the µC."
   },
   "pagination": {
     "firstPage": "First page",

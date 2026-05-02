@@ -6,6 +6,7 @@
 import { create } from "zustand";
 
 import type {
+  DfuDeviceInfo,
   EspChipInfo,
   EspFlashOptions,
   Stm32ChipInfo,
@@ -93,6 +94,13 @@ interface SerialState {
   stm32Options: Stm32FlashOptions;
   stm32Chip: Stm32ChipInfo | null;
 
+  /** Last enumerated USB DFU devices + the currently selected one. The
+   *  shared SerialPortPicker reads/writes both. The DFU device is
+   *  identified by USB serial — stable across re-plug for STM32
+   *  bootloaders, falls back to a synthetic `bus<N>-dev<M>` id otherwise. */
+  dfuDevices: DfuDeviceInfo[];
+  dfuSerial: string | null;
+
   // actions
   setSettings: (patch: Partial<SerialSettings>) => void;
   setPort: (port: string | null) => void;
@@ -113,6 +121,8 @@ interface SerialState {
   setStm32Operation: (op: Stm32Operation) => void;
   setStm32Options: (patch: Partial<Stm32FlashOptions>) => void;
   setStm32Chip: (chip: Stm32ChipInfo | null) => void;
+  setDfuDevices: (devices: DfuDeviceInfo[]) => void;
+  setDfuSerial: (serial: string | null) => void;
 }
 
 export const useSerialStore = create<SerialState>((set) => ({
@@ -135,6 +145,9 @@ export const useSerialStore = create<SerialState>((set) => ({
   stm32Operation: "flash",
   stm32Options: { ...DEFAULT_STM32_OPTIONS },
   stm32Chip: null,
+
+  dfuDevices: [],
+  dfuSerial: null,
 
   setSettings: (patch) =>
     set((s) => ({ settings: { ...s.settings, ...patch } })),
@@ -168,4 +181,6 @@ export const useSerialStore = create<SerialState>((set) => ({
   setStm32Options: (patch) =>
     set((s) => ({ stm32Options: { ...s.stm32Options, ...patch } })),
   setStm32Chip: (stm32Chip) => set({ stm32Chip }),
+  setDfuDevices: (dfuDevices) => set({ dfuDevices }),
+  setDfuSerial: (dfuSerial) => set({ dfuSerial }),
 }));

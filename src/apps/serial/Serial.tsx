@@ -10,7 +10,7 @@
 // no IO sessions / multi-source broker / ad-hoc profile machinery. The
 // shared SerialPortPicker in the top nav drives connect/disconnect.
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Terminal as TerminalIcon, BookOpen, Cpu, Usb, Plug } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppLayout from "../../components/AppLayout";
@@ -25,6 +25,7 @@ import {
 import { iconSm } from "../../styles/spacing";
 import { useSettings } from "../../hooks/useSettings";
 import { tlog } from "../../api/settings";
+import { flasherDfuListDevices } from "../../api/flashers";
 import { useSerialStore, type SerialTab } from "./stores/serialStore";
 import { useSerialPortPicker } from "./hooks/useSerialPortPicker";
 import { useSerialTerminal } from "./hooks/useSerialTerminal";
@@ -48,6 +49,29 @@ export default function Serial() {
   const setSerialSettings = useSerialStore((s) => s.setSettings);
   const localEcho = useSerialStore((s) => s.localEcho);
   const setLocalEcho = useSerialStore((s) => s.setLocalEcho);
+  const dfuDevices = useSerialStore((s) => s.dfuDevices);
+  const setDfuDevices = useSerialStore((s) => s.setDfuDevices);
+  const dfuSerial = useSerialStore((s) => s.dfuSerial);
+  const setDfuSerial = useSerialStore((s) => s.setDfuSerial);
+
+  // DFU enumeration: refreshed when the picker popover opens. Keep a busy
+  // flag so the picker can render a spinner inline.
+  const [dfuLoading, setDfuLoading] = useState(false);
+  const refreshDfu = useCallback(async () => {
+    setDfuLoading(true);
+    try {
+      const list = await flasherDfuListDevices();
+      setDfuDevices(list);
+      // Drop a stale selection if the device is no longer plugged in.
+      if (dfuSerial && !list.some((d) => d.serial === dfuSerial)) {
+        setDfuSerial(null);
+      }
+    } catch (err) {
+      tlog.info(`[Serial/DFU] enumerate failed: ${err}`);
+    } finally {
+      setDfuLoading(false);
+    }
+  }, [dfuSerial, setDfuDevices, setDfuSerial]);
 
   const terminalRef = useRef<SerialTerminalHandle | null>(null);
 
@@ -202,6 +226,12 @@ export default function Serial() {
           connecting={terminal.isOpening}
           settings={settingsState}
           localEcho={localEcho}
+          pickerMode={activeTab === "dfu" ? "dfu" : "serial"}
+          dfuDevices={dfuDevices}
+          activeDfu={dfuSerial}
+          dfuLoading={dfuLoading}
+          onRefreshDfu={refreshDfu}
+          onSelectDfu={setDfuSerial}
           onRefresh={portPicker.refresh}
           onSelectPort={handleSelectPort}
           onSettingsChange={setSerialSettings}
