@@ -4,6 +4,7 @@
 // Uses the shared FramingOptionsPanel component.
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { iconLg } from '../../../../styles/spacing';
 import { hoverLight } from '../../../../styles';
@@ -62,6 +63,7 @@ function toStoreConfig(panelConfig: FramingPanelConfig | null): FramingConfig | 
 }
 
 export default function FramingModeDialog({ isOpen, onClose, config, onApply }: FramingModeDialogProps) {
+  const { t } = useTranslation("discovery");
   const [panelConfig, setPanelConfig] = useState<FramingPanelConfig | null>(toPanelConfig(config));
 
   // Reset state when dialog opens
@@ -80,7 +82,7 @@ export default function FramingModeDialog({ isOpen, onClose, config, onApply }: 
     <Dialog isOpen={isOpen} maxWidth="max-w-md">
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Framing Mode</h2>
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("serial.framingModeTitle")}</h2>
           <button onClick={onClose} className={`p-1 ${hoverLight} rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]`}>
             <X className={iconLg} />
           </button>
@@ -95,7 +97,7 @@ export default function FramingModeDialog({ isOpen, onClose, config, onApply }: 
         <DialogFooter
           onCancel={onClose}
           onConfirm={handleApply}
-          confirmLabel="Apply"
+          confirmLabel={t("serial.apply")}
         />
       </div>
     </Dialog>

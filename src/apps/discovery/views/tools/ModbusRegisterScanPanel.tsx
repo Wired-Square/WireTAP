@@ -1,6 +1,7 @@
 // ui/src/apps/discovery/views/tools/ModbusRegisterScanPanel.tsx
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Play } from "lucide-react";
 import { iconMd } from "../../../../styles/spacing";
 import { bgSurface } from "../../../../styles";
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export default function ModbusRegisterScanPanel({ connection, onStartScan }: Props) {
+  const { t } = useTranslation("discovery");
   const [registerType, setRegisterType] = useState<ModbusRegisterType>("holding");
   const [unitId, setUnitId] = useState(connection.unit_id);
   const [startRegister, setStartRegister] = useState(0);
@@ -50,20 +52,20 @@ export default function ModbusRegisterScanPanel({ connection, onStartScan }: Pro
     <div className="space-y-3 text-xs">
       <div className="flex gap-3">
         <div className="flex-1 space-y-1">
-          <label className="text-[color:var(--text-muted)]">Register Type</label>
+          <label className="text-[color:var(--text-muted)]">{t("modbusRegister.registerType")}</label>
           <select
             value={registerType}
             onChange={(e) => handleRegisterTypeChange(e.target.value as ModbusRegisterType)}
             className={`w-full px-2 py-1 rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-primary)]`}
           >
-            <option value="holding">Holding (FC 3)</option>
-            <option value="input">Input (FC 4)</option>
-            <option value="coil">Coil (FC 1)</option>
-            <option value="discrete">Discrete (FC 2)</option>
+            <option value="holding">{t("modbusRegister.holdingFc")}</option>
+            <option value="input">{t("modbusRegister.inputFc")}</option>
+            <option value="coil">{t("modbusRegister.coilFc")}</option>
+            <option value="discrete">{t("modbusRegister.discreteFc")}</option>
           </select>
         </div>
         <div className="flex-1 space-y-1">
-          <label className="text-[color:var(--text-muted)]">Unit ID</label>
+          <label className="text-[color:var(--text-muted)]">{t("modbusRegister.unitId")}</label>
           <input
             type="number"
             min={1}
@@ -77,7 +79,7 @@ export default function ModbusRegisterScanPanel({ connection, onStartScan }: Pro
 
       <div className="flex gap-3">
         <div className="flex-1 space-y-1">
-          <label className="text-[color:var(--text-muted)]">Start Register</label>
+          <label className="text-[color:var(--text-muted)]">{t("modbusRegister.startRegister")}</label>
           <input
             type="number"
             min={0}
@@ -88,7 +90,7 @@ export default function ModbusRegisterScanPanel({ connection, onStartScan }: Pro
           />
         </div>
         <div className="flex-1 space-y-1">
-          <label className="text-[color:var(--text-muted)]">End Register</label>
+          <label className="text-[color:var(--text-muted)]">{t("modbusRegister.endRegister")}</label>
           <input
             type="number"
             min={0}
@@ -102,7 +104,7 @@ export default function ModbusRegisterScanPanel({ connection, onStartScan }: Pro
 
       <div className="flex gap-3">
         <div className="flex-1 space-y-1">
-          <label className="text-[color:var(--text-muted)]">Chunk Size</label>
+          <label className="text-[color:var(--text-muted)]">{t("modbusRegister.chunkSize")}</label>
           <input
             type="number"
             min={1}
@@ -113,7 +115,7 @@ export default function ModbusRegisterScanPanel({ connection, onStartScan }: Pro
           />
         </div>
         <div className="flex-1 space-y-1">
-          <label className="text-[color:var(--text-muted)]">Delay (ms)</label>
+          <label className="text-[color:var(--text-muted)]">{t("modbusRegister.delayMs")}</label>
           <input
             type="number"
             min={0}
@@ -126,8 +128,13 @@ export default function ModbusRegisterScanPanel({ connection, onStartScan }: Pro
       </div>
 
       <p className="text-[color:var(--text-muted)] pt-2 border-t border-[color:var(--border-default)]">
-        Scans {connection.host}:{connection.port} for {registerType} registers {startRegister}–{endRegister}.
-        Discovered registers will appear in the frame picker.
+        {t("modbusRegister.scanDescription", {
+          host: connection.host,
+          port: connection.port,
+          type: registerType,
+          start: startRegister,
+          end: endRegister,
+        })}
       </p>
 
       <button
@@ -141,7 +148,7 @@ export default function ModbusRegisterScanPanel({ connection, onStartScan }: Pro
         }`}
       >
         <Play className={iconMd} />
-        Run Scan
+        {t("modbusRegister.runScan")}
       </button>
     </div>
   );

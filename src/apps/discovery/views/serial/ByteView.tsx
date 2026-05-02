@@ -4,6 +4,7 @@
 // Supports backend buffer pagination for large captures.
 
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { SerialBytesEntry, RawBytesViewConfig } from '../../../../stores/discoveryStore';
 import { useDiscoverySerialStore } from '../../../../stores/discoverySerialStore';
 import { useDiscoveryUIStore } from '../../../../stores/discoveryUIStore';
@@ -69,6 +70,7 @@ function chunkBytesByGap(entries: SerialBytesEntry[], gapUs: number): ByteChunk[
 }
 
 export default function ByteView({ entries, viewConfig, autoScroll = true, displayTimeFormat = 'human', isStreaming = false }: ByteViewProps) {
+  const { t } = useTranslation("discovery");
   const containerRef = useRef<HTMLDivElement>(null);
   const wasAtBottom = useRef(true);
 
@@ -312,10 +314,10 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
   // Byte count info for toolbar
   const byteCountInfo = (
     <span className={`text-xs ${textDataSecondary}`}>
-      {totalBytes.toLocaleString()} bytes
+      {t("serial.byteCount", { count: totalBytes.toLocaleString() })}
       {isStreaming && (
         <span className={`ml-2 ${textDataGreen} bg-green-900/30 px-1.5 py-0.5 rounded font-medium`}>
-          LIVE
+          {t("serial.live")}
         </span>
       )}
     </span>
@@ -358,17 +360,17 @@ export default function ByteView({ entries, viewConfig, autoScroll = true, displ
       >
         {lines.length === 0 ? (
           <div className={`${textDataTertiary} text-center py-8`}>
-            {isLoadingPage ? 'Loading...' : 'Waiting for serial data...'}
+            {isLoadingPage ? t("serial.loading") : t("serial.waitingForData")}
           </div>
         ) : (
           <>
             <table className="w-full">
               <thead className={`sticky top-0 z-10 ${bgDataView} ${textDataSecondary} shadow-sm`}>
                 <tr>
-                  <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Time</th>
-                  {showBusColumn && <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Bus</th>}
-                  <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>Hex</th>
-                  {showAsciiColumn && <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>ASCII</th>}
+                  <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>{t("serial.headerTime")}</th>
+                  {showBusColumn && <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>{t("serial.headerBus")}</th>}
+                  <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>{t("serial.headerHex")}</th>
+                  {showAsciiColumn && <th className={`text-left px-2 py-1.5 border-b ${borderDataView}`}>{t("serial.headerAscii")}</th>}
                 </tr>
               </thead>
               <tbody>

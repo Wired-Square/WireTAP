@@ -1,6 +1,7 @@
 // ui/src/apps/discovery/views/tools/ModbusUnitIdScanPanel.tsx
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Play, Info } from "lucide-react";
 import { iconMd, iconSm } from "../../../../styles/spacing";
 import { bgSurface, textMuted } from "../../../../styles";
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export default function ModbusUnitIdScanPanel({ connection, onStartScan }: Props) {
+  const { t } = useTranslation("discovery");
   const [startUnitId, setStartUnitId] = useState(1);
   const [endUnitId, setEndUnitId] = useState(247);
   const [testRegister, setTestRegister] = useState(0);
@@ -36,7 +38,7 @@ export default function ModbusUnitIdScanPanel({ connection, onStartScan }: Props
     <div className="space-y-3 text-xs">
       <div className="flex gap-3">
         <div className="flex-1 space-y-1">
-          <label className="text-[color:var(--text-muted)]">Start Unit ID</label>
+          <label className="text-[color:var(--text-muted)]">{t("modbusUnitId.startUnitId")}</label>
           <input
             type="number"
             min={1}
@@ -47,7 +49,7 @@ export default function ModbusUnitIdScanPanel({ connection, onStartScan }: Props
           />
         </div>
         <div className="flex-1 space-y-1">
-          <label className="text-[color:var(--text-muted)]">End Unit ID</label>
+          <label className="text-[color:var(--text-muted)]">{t("modbusUnitId.endUnitId")}</label>
           <input
             type="number"
             min={1}
@@ -63,18 +65,18 @@ export default function ModbusUnitIdScanPanel({ connection, onStartScan }: Props
       <div className="flex items-start gap-2 px-2 py-1.5 rounded bg-[var(--bg-surface)] border border-[color:var(--border-default)]">
         <Info className={`${iconSm} shrink-0 mt-0.5 text-purple-400`} />
         <span className={`${textMuted}`}>
-          Each unit is probed with <strong className="text-[color:var(--text-secondary)]">Device Identification (FC43)</strong> first
-          to retrieve vendor, product, and revision info. If the device doesn't support FC43, a register
-          read is used as a fallback.
+          {t("modbusUnitId.fc43DescriptionPrefix")}
+          <strong className="text-[color:var(--text-secondary)]">{t("modbusUnitId.fc43Title")}</strong>
+          {t("modbusUnitId.fc43DescriptionSuffix")}
         </span>
       </div>
 
       {/* Fallback register config */}
       <div className="space-y-2 pt-1">
-        <label className="text-[color:var(--text-muted)] text-[10px] uppercase tracking-wider">Fallback register probe</label>
+        <label className="text-[color:var(--text-muted)] text-[10px] uppercase tracking-wider">{t("modbusUnitId.fallbackProbe")}</label>
         <div className="flex gap-3">
           <div className="flex-1 space-y-1">
-            <label className="text-[color:var(--text-muted)]">Register</label>
+            <label className="text-[color:var(--text-muted)]">{t("modbusUnitId.register")}</label>
             <input
               type="number"
               min={0}
@@ -85,23 +87,23 @@ export default function ModbusUnitIdScanPanel({ connection, onStartScan }: Props
             />
           </div>
           <div className="flex-1 space-y-1">
-            <label className="text-[color:var(--text-muted)]">Type</label>
+            <label className="text-[color:var(--text-muted)]">{t("modbusUnitId.type")}</label>
             <select
               value={registerType}
               onChange={(e) => setRegisterType(e.target.value as ModbusRegisterType)}
               className={`w-full px-2 py-1 rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-primary)]`}
             >
-              <option value="holding">Holding (FC 3)</option>
-              <option value="input">Input (FC 4)</option>
-              <option value="coil">Coil (FC 1)</option>
-              <option value="discrete">Discrete (FC 2)</option>
+              <option value="holding">{t("modbusUnitId.holdingFc")}</option>
+              <option value="input">{t("modbusUnitId.inputFc")}</option>
+              <option value="coil">{t("modbusUnitId.coilFc")}</option>
+              <option value="discrete">{t("modbusUnitId.discreteFc")}</option>
             </select>
           </div>
         </div>
       </div>
 
       <div className="space-y-1">
-        <label className="text-[color:var(--text-muted)]">Delay (ms)</label>
+        <label className="text-[color:var(--text-muted)]">{t("modbusUnitId.delayMs")}</label>
         <input
           type="number"
           min={0}
@@ -113,9 +115,14 @@ export default function ModbusUnitIdScanPanel({ connection, onStartScan }: Props
       </div>
 
       <p className="text-[color:var(--text-muted)] pt-2 border-t border-[color:var(--border-default)]">
-        Scans {connection.host}:{connection.port} for active unit IDs {startUnitId}–{endUnitId}.
-        Devices supporting FC43 will show vendor, product, and revision details. Others are detected
-        via {registerType} register {testRegister}.
+        {t("modbusUnitId.scanDescription", {
+          host: connection.host,
+          port: connection.port,
+          start: startUnitId,
+          end: endUnitId,
+          type: registerType,
+          register: testRegister,
+        })}
       </p>
 
       <button
@@ -129,7 +136,7 @@ export default function ModbusUnitIdScanPanel({ connection, onStartScan }: Props
         }`}
       >
         <Play className={iconMd} />
-        Run Scan
+        {t("modbusUnitId.runScan")}
       </button>
     </div>
   );

@@ -3,6 +3,7 @@
 // Dialog for configuring checksum detection and validation.
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { iconLg, flexRowGap2 } from '../../../../styles/spacing';
 import Dialog from '../../../../components/Dialog';
@@ -47,6 +48,7 @@ export default function ChecksumExtractionDialog({
   onApply,
   onClear,
 }: ChecksumExtractionDialogProps) {
+  const { t } = useTranslation("discovery");
   const [config, setConfig] = useState<ChecksumConfig>(initialConfig ?? DEFAULT_CHECKSUM_CONFIG);
   const [detectedAlgorithms, setDetectedAlgorithms] = useState<AlgorithmMatch[]>([]);
   const [matchRate, setMatchRate] = useState<{ matches: number; total: number }>({ matches: 0, total: 0 });
@@ -121,7 +123,7 @@ export default function ChecksumExtractionDialog({
     <Dialog isOpen={isOpen} maxWidth="max-w-2xl">
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-semibold ${textPrimary}`}>Configure Checksum</h2>
+          <h2 className={`text-lg font-semibold ${textPrimary}`}>{t("serial.checksumDialogTitle")}</h2>
           <button onClick={onClose} className={`p-1 ${hoverBg} rounded`}>
             <X className={`${iconLg} ${textSecondary}`} />
           </button>
@@ -130,7 +132,7 @@ export default function ChecksumExtractionDialog({
         {/* Algorithm Detection Results */}
         {detectedAlgorithms.length > 0 && (
           <div className="bg-green-900/30 border border-green-700 rounded p-3">
-            <div className="text-sm text-green-400 font-medium mb-2">Detected Algorithms:</div>
+            <div className="text-sm text-green-400 font-medium mb-2">{t("serial.detectedAlgorithms")}</div>
             <div className="flex flex-wrap gap-2">
               {detectedAlgorithms.map((match) => (
                 <button
@@ -195,7 +197,7 @@ export default function ChecksumExtractionDialog({
         {/* Configuration */}
         <div className={`grid grid-cols-2 gap-4 pt-2 border-t ${borderDefault}`}>
           <label className={`flex flex-col gap-1 text-sm ${textSecondary}`}>
-            Algorithm:
+            {t("serial.algorithm")}
             <select
               value={config.algorithm}
               onChange={(e) => {
@@ -218,30 +220,30 @@ export default function ChecksumExtractionDialog({
           </label>
 
           <label className={`flex flex-col gap-1 text-sm ${textSecondary}`}>
-            Byte order:
+            {t("serial.byteOrder")}
             <select
               value={config.endianness}
               onChange={(e) => setConfig(prev => ({ ...prev, endianness: e.target.value as 'big' | 'little' }))}
               className={`px-2 py-1.5 ${bgSurface} ${borderDefault} rounded ${textPrimary}`}
             >
-              <option value="little">Little Endian</option>
-              <option value="big">Big Endian</option>
+              <option value="little">{t("serial.littleEndian")}</option>
+              <option value="big">{t("serial.bigEndian")}</option>
             </select>
           </label>
 
           <label className={`flex flex-col gap-1 text-sm ${textSecondary}`}>
-            Checksum position:
+            {t("serial.checksumPosition")}
             <input
               type="number"
               value={config.startByte}
               onChange={(e) => setConfig(prev => ({ ...prev, startByte: Number(e.target.value) }))}
               className={`px-2 py-1.5 ${bgSurface} ${borderDefault} rounded ${textPrimary}`}
             />
-            <span className={`text-xs ${textMuted}`}>Negative = from end (e.g., -2)</span>
+            <span className={`text-xs ${textMuted}`}>{t("serial.negativeHint")}</span>
           </label>
 
           <label className={`flex flex-col gap-1 text-sm ${textSecondary}`}>
-            Calc data range:
+            {t("serial.calcDataRange")}
             <div className={flexRowGap2}>
               <input
                 type="number"
@@ -249,7 +251,7 @@ export default function ChecksumExtractionDialog({
                 onChange={(e) => setConfig(prev => ({ ...prev, calcStartByte: Number(e.target.value) }))}
                 className={`w-16 px-2 py-1.5 ${bgSurface} ${borderDefault} rounded ${textPrimary} text-center`}
               />
-              <span className={textMuted}>to</span>
+              <span className={textMuted}>{t("serial.rangeTo")}</span>
               <input
                 type="number"
                 value={config.calcEndByte}
@@ -266,7 +268,7 @@ export default function ChecksumExtractionDialog({
           matchPercentage >= 50 ? 'bg-yellow-900/30 text-yellow-400' :
           'bg-red-900/30 text-red-400'
         }`}>
-          Match rate: {matchRate.matches}/{matchRate.total} frames ({matchPercentage.toFixed(0)}%)
+          {t("serial.matchRate", { matches: matchRate.matches, total: matchRate.total, percent: matchPercentage.toFixed(0) })}
         </div>
 
         {/* Actions */}
@@ -279,14 +281,14 @@ export default function ChecksumExtractionDialog({
               }}
               className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 rounded"
             >
-              Clear
+              {t("serial.clear")}
             </button>
           ) : (
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm bg-gray-600 hover:bg-gray-500 rounded"
             >
-              Cancel
+              {t("modbusScan.cancel")}
             </button>
           )}
           <button
@@ -296,7 +298,7 @@ export default function ChecksumExtractionDialog({
             }}
             className="px-4 py-2 text-sm bg-amber-600 hover:bg-amber-500 rounded font-medium"
           >
-            Apply
+            {t("serial.apply")}
           </button>
         </div>
       </div>

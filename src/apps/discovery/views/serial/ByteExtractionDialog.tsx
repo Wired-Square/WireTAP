@@ -4,6 +4,7 @@
 // Used for frame ID and source address extraction.
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { iconLg, flexRowGap2 } from '../../../../styles/spacing';
 import Dialog from '../../../../components/Dialog';
@@ -35,6 +36,7 @@ export default function ByteExtractionDialog({
   color,
   supportsNegativeIndex = false,
 }: ByteExtractionDialogProps) {
+  const { t } = useTranslation("discovery");
   const [startByte, setStartByte] = useState(initialConfig.startByte);
   const [numBytes, setNumBytes] = useState(initialConfig.numBytes);
   const [endianness, setEndianness] = useState(initialConfig.endianness);
@@ -123,7 +125,7 @@ export default function ByteExtractionDialog({
         </div>
 
         <p className={`text-sm ${textSecondary}`}>
-          Click bytes to select range, or enter values manually below.
+          {t("serial.byteExtractClickHint")}
         </p>
 
         {/* Sample frames with clickable bytes */}
@@ -146,7 +148,7 @@ export default function ByteExtractionDialog({
                     {byteToHex(byte)}
                   </button>
                 ))}
-                <span className={`ml-2 ${colorClasses.text}`}>→ {extractValue(frame)}</span>
+                <span className={`ml-2 ${colorClasses.text}`}>{t("serial.extractValuePreview", { value: extractValue(frame) })}</span>
               </div>
             </div>
           ))}
@@ -170,11 +172,11 @@ export default function ByteExtractionDialog({
                 }}
                 className="rounded"
               />
-              From end
+              {t("serial.fromEnd")}
             </label>
           )}
           <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
-            {useNegativeIndex ? 'Offset from end:' : 'Start byte:'}
+            {useNegativeIndex ? t("serial.offsetFromEnd") : t("serial.startByte")}
             <input
               type="number"
               value={startByte}
@@ -183,27 +185,27 @@ export default function ByteExtractionDialog({
             />
           </label>
           <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
-            Length:
+            {t("serial.length")}
             <select
               value={numBytes}
               onChange={(e) => setNumBytes(Number(e.target.value))}
               className={`px-2 py-1 ${bgSurface} ${borderDefault} rounded ${textPrimary}`}
             >
-              <option value={1}>1 byte</option>
-              <option value={2}>2 bytes</option>
-              <option value={3}>3 bytes</option>
-              <option value={4}>4 bytes</option>
+              <option value={1}>{t("serial.lengthBytes", { count: 1 })}</option>
+              <option value={2}>{t("serial.lengthBytes", { count: 2 })}</option>
+              <option value={3}>{t("serial.lengthBytes", { count: 3 })}</option>
+              <option value={4}>{t("serial.lengthBytes", { count: 4 })}</option>
             </select>
           </label>
           <label className={`flex items-center gap-2 text-sm ${textSecondary}`}>
-            Byte order:
+            {t("serial.byteOrder")}
             <select
               value={endianness}
               onChange={(e) => setEndianness(e.target.value as 'big' | 'little')}
               className={`px-2 py-1 ${bgSurface} ${borderDefault} rounded ${textPrimary}`}
             >
-              <option value="big">Big Endian</option>
-              <option value="little">Little Endian</option>
+              <option value="big">{t("serial.bigEndian")}</option>
+              <option value="little">{t("serial.littleEndian")}</option>
             </select>
           </label>
         </div>
@@ -218,14 +220,14 @@ export default function ByteExtractionDialog({
               }}
               className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 rounded"
             >
-              Clear
+              {t("serial.clear")}
             </button>
           ) : (
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm bg-gray-600 hover:bg-gray-500 rounded"
             >
-              Cancel
+              {t("modbusScan.cancel")}
             </button>
           )}
           <button
@@ -235,7 +237,7 @@ export default function ByteExtractionDialog({
             }}
             className={`px-4 py-2 text-sm ${colorClasses.bg} ${colorClasses.bgHover} rounded font-medium`}
           >
-            Apply
+            {t("serial.apply")}
           </button>
         </div>
       </div>

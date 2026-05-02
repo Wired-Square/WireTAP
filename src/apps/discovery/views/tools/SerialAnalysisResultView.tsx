@@ -2,6 +2,7 @@
 // Results view for serial frame structure analysis (two phases)
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useDiscoveryStore, type FramingConfig } from "../../../../stores/discoveryStore";
 import type { FramingCandidate, CandidateChecksum, CandidateSourceAddress } from "../../../../utils/analysis/serialFrameAnalysis";
 import { Hash, Shield, Info, CheckCircle2, AlertCircle, Check, Layers, Radio, MapPin, X } from "lucide-react";
@@ -16,6 +17,7 @@ type Props = {
 };
 
 export default function SerialAnalysisResultView({ mode, onClose }: Props) {
+  const { t } = useTranslation("discovery");
   const allFramingResults = useDiscoveryStore((s) => s.toolbox.serialFramingResults);
   const allPayloadResults = useDiscoveryStore((s) => s.toolbox.serialPayloadResults);
   // Gate results by mode prop
@@ -161,7 +163,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
   if (!framingResults && !payloadResults) {
     return (
       <div className="flex items-center justify-center h-full text-[color:var(--text-muted)]">
-        Run Serial Analysis tools to see results
+        {t("serialAnalysis.runPrompt")}
       </div>
     );
   }
@@ -178,10 +180,10 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
           <Layers className={`${icon2xl} text-blue-500`} />
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
-              Framing Detection Results
+              {t("serialAnalysis.framingTitle")}
             </h3>
             <p className="text-sm text-[color:var(--text-muted)] mt-1">
-              Analyzed {framingResult.byteCount.toLocaleString()} raw bytes
+              {t("serialAnalysis.framingByteCount", { count: framingResult.byteCount.toLocaleString() })}
             </p>
           </div>
           {onClose && (
@@ -189,7 +191,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
               type="button"
               onClick={onClose}
               className={iconButtonDangerCompact}
-              title="Close"
+              title={t("serialAnalysis.close")}
             >
               <X className={iconXs} />
             </button>
@@ -201,7 +203,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
           <div className="space-y-2">
             <div className={`${flexRowGap2} ${sectionHeaderText}`}>
               <Info className={iconMd} />
-              <span>Summary</span>
+              <span>{t("serialAnalysis.summary")}</span>
             </div>
             <ul className="space-y-1 text-sm text-[color:var(--text-secondary)]">
               {framingResult.notes.map((note, i) => (
@@ -218,16 +220,16 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
         <div className="space-y-3">
           <div className={`${flexRowGap2} ${sectionHeaderText}`}>
             <Radio className={iconMd} />
-            <span>Detected Framing Modes</span>
+            <span>{t("serialAnalysis.detectedFramingTitle")}</span>
             <span className={captionMuted}>
-              ({appliedFramingIdx !== null ? "1 applied" : `${framingResult.candidates.length} found`})
+              ({appliedFramingIdx !== null ? t("serialAnalysis.appliedCount") : t("serialAnalysis.foundCount", { count: framingResult.candidates.length })})
             </span>
           </div>
 
           {framingResult.candidates.length === 0 ? (
             <div className="p-4 bg-[var(--status-warning-bg)] rounded-lg border border-[color:var(--status-warning-border)]">
               <p className="text-sm text-[color:var(--status-warning-text)]">
-                No clear framing pattern detected. Try applying framing manually in the Raw Bytes view.
+                {t("serialAnalysis.noFramingDetected")}
               </p>
             </div>
           ) : (
@@ -255,18 +257,18 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                           <div className={flexRowGap2}>
                             <span className={`${textMedium} font-mono uppercase`}>
                               {candidate.mode === 'delimiter'
-                                ? `Delimiter (0x${candidate.delimiterHex})`
+                                ? t("serialAnalysis.delimiterModeLabel", { hex: candidate.delimiterHex })
                                 : candidate.mode.replace('_', ' ')}
                             </span>
                             {!isApplied && idx === 0 && candidate.confidence >= 70 && (
                               <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
-                                Best Match
+                                {t("serialAnalysis.bestMatch")}
                               </span>
                             )}
                             {isApplied && (
                               <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
                                 <Check className={iconXs} />
-                                Applied
+                                {t("serialAnalysis.applied")}
                               </span>
                             )}
                           </div>
@@ -278,12 +280,12 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                                   ? "text-[color:var(--text-amber)]"
                                   : ""
                             }>
-                              {candidate.confidence}% confidence
+                              {t("serialAnalysis.confidencePercent", { percent: candidate.confidence })}
                             </span>
                             <span className="mx-2 text-[color:var(--text-muted)]">|</span>
-                            ~{candidate.estimatedFrameCount.toLocaleString()} frames
+                            {t("serialAnalysis.estFrames", { count: candidate.estimatedFrameCount.toLocaleString() })}
                             <span className="mx-2 text-[color:var(--text-muted)]">|</span>
-                            avg {candidate.avgFrameLength} bytes
+                            {t("serialAnalysis.avgFrameLength", { count: candidate.avgFrameLength })}
                           </div>
                           {candidate.notes.length > 0 && (
                             <div className={`${captionMuted} mt-1`}>
@@ -300,7 +302,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                                 : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg-strong)]"
                             }`}
                           >
-                            {isApplied ? "Applied" : "Apply"}
+                            {isApplied ? t("serialAnalysis.appliedButton") : t("serialAnalysis.applyButton")}
                           </button>
                           {isApplied ? (
                             <CheckCircle2 className={`${iconLg} text-blue-500`} />
@@ -323,12 +325,12 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
         {/* Next Steps */}
         <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
           <h4 className={`${sectionHeaderText} mb-2`}>
-            Next Steps
+            {t("serialAnalysis.nextSteps")}
           </h4>
           <ol className="text-sm text-[color:var(--text-secondary)] space-y-1 list-decimal list-inside">
-            <li>Click "Apply" on a framing mode above, or configure manually in the Framing dialog</li>
-            <li>Review the framed data in the "Framed Bytes" tab</li>
-            <li>Run analysis again to identify ID bytes and checksums</li>
+            <li>{t("serialAnalysis.nextStep1")}</li>
+            <li>{t("serialAnalysis.nextStep2")}</li>
+            <li>{t("serialAnalysis.nextStep3")}</li>
           </ol>
         </div>
       </div>
@@ -348,13 +350,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
       <div className="flex items-center gap-4 p-4 bg-[var(--bg-surface)] rounded-lg">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            Frame Structure Analysis
+            {t("serialAnalysis.frameStructureTitle")}
           </h3>
           <p className="text-sm text-[color:var(--text-muted)] mt-1">
-            Analyzed {analysisResult.frameCount.toLocaleString()} frames
+            {t("serialAnalysis.framesAnalyzed", { count: analysisResult.frameCount.toLocaleString() })}
             {analysisResult.hasVaryingLength
-              ? ` (${analysisResult.minLength}–${analysisResult.maxLength} bytes)`
-              : ` (${analysisResult.minLength} bytes)`}
+              ? ` ${t("serialAnalysis.lengthRange", { min: analysisResult.minLength, max: analysisResult.maxLength })}`
+              : ` ${t("serialAnalysis.lengthFixed", { count: analysisResult.minLength })}`}
           </p>
         </div>
         {onClose && (
@@ -362,7 +364,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
             type="button"
             onClick={onClose}
             className={iconButtonDangerCompact}
-            title="Close"
+            title={t("serialAnalysis.close")}
           >
             <X className={iconXs} />
           </button>
@@ -374,7 +376,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
         <div className="space-y-2">
           <div className={`${flexRowGap2} ${sectionHeaderText}`}>
             <Info className={iconMd} />
-            <span>Summary</span>
+            <span>{t("serialAnalysis.summary")}</span>
           </div>
           <ul className="space-y-1 text-sm text-[color:var(--text-secondary)]">
             {analysisResult.notes.map((note, i) => (
@@ -391,15 +393,15 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
       <div className="space-y-3">
         <div className={`${flexRowGap2} ${sectionHeaderText}`}>
           <Hash className={iconMd} />
-          <span>Candidate ID Bytes</span>
+          <span>{t("serialAnalysis.candidateIdBytes")}</span>
           <span className={captionMuted}>
-            ({appliedIdIdx !== null ? "1 applied" : `${analysisResult.candidateIdGroups.length} found`})
+            ({appliedIdIdx !== null ? t("serialAnalysis.appliedCount") : t("serialAnalysis.foundCount", { count: analysisResult.candidateIdGroups.length })})
           </span>
         </div>
 
         {analysisResult.candidateIdGroups.length === 0 ? (
           <p className="text-sm text-[color:var(--text-muted)] italic">
-            No clear ID byte patterns detected
+            {t("serialAnalysis.noIdPatterns")}
           </p>
         ) : (
           <div className="space-y-2">
@@ -423,25 +425,26 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                       <div className="flex-1">
                         <div className={flexRowGap2}>
                           <span className={`${textMedium} font-mono`}>
-                            byte{candidate.length > 1 ? "s" : ""} [{candidate.startByte}
-                            {candidate.length > 1 ? `:${candidate.startByte + candidate.length - 1}` : ""}]
+                            {candidate.length > 1
+                              ? t("serialAnalysis.byteRangeMulti", { start: candidate.startByte, end: candidate.startByte + candidate.length - 1 })
+                              : t("serialAnalysis.byteRangeSingle", { start: candidate.startByte })}
                           </span>
                           {!isApplied && idx === 0 && (
                             <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
-                              Best Match
+                              {t("serialAnalysis.bestMatch")}
                             </span>
                           )}
                           {isApplied && (
                             <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
                               <Check className={iconXs} />
-                              Applied ({getUniqueIdCount()} unique IDs)
+                              {t("serialAnalysis.appliedWithCount", { count: getUniqueIdCount() })}
                             </span>
                           )}
                         </div>
                         <div className="text-sm text-[color:var(--text-secondary)] mt-1">
-                          {candidate.uniqueValues.length} distinct values
+                          {t("serialAnalysis.distinctValues", { count: candidate.uniqueValues.length })}
                           <span className="mx-2 text-[color:var(--text-muted)]">|</span>
-                          {candidate.confidence.toFixed(0)}% confidence
+                          {t("serialAnalysis.confidencePercent", { percent: candidate.confidence.toFixed(0) })}
                         </div>
                         {candidate.notes.length > 0 && (
                           <div className="text-xs text-[color:var(--text-muted)] mt-1">
@@ -479,7 +482,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                             ? "border-[color:var(--status-success-border)]"
                             : "border-[color:var(--border-default)]"
                       }`}>
-                        <div className={`${caption} mb-1`}>Sample values:</div>
+                        <div className={`${caption} mb-1`}>{t("serialAnalysis.sampleValues")}</div>
                         <div className="flex flex-wrap gap-1">
                           {candidate.uniqueValues.slice(0, 16).map((val, i) => (
                             <span
@@ -491,7 +494,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                           ))}
                           {candidate.uniqueValues.length > 16 && (
                             <span className="text-xs text-slate-400">
-                              +{candidate.uniqueValues.length - 16} more
+                              {t("serialAnalysis.moreItems", { count: candidate.uniqueValues.length - 16 })}
                             </span>
                           )}
                         </div>
@@ -508,15 +511,15 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
       <div className="space-y-3">
         <div className={`${flexRowGap2} ${sectionHeaderText}`}>
           <MapPin className={iconMd} />
-          <span>Candidate Source Addresses</span>
+          <span>{t("serialAnalysis.candidateSourceAddresses")}</span>
           <span className={captionMuted}>
-            ({appliedSourceIdx !== null ? "1 applied" : `${analysisResult.candidateSourceAddresses.length} found`})
+            ({appliedSourceIdx !== null ? t("serialAnalysis.appliedCount") : t("serialAnalysis.foundCount", { count: analysisResult.candidateSourceAddresses.length })})
           </span>
         </div>
 
         {analysisResult.candidateSourceAddresses.length === 0 ? (
           <p className="text-sm text-[color:var(--text-muted)] italic">
-            No clear source address patterns detected
+            {t("serialAnalysis.noSourcePatterns")}
           </p>
         ) : (
           <div className="space-y-2">
@@ -540,25 +543,26 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                       <div className="flex-1">
                         <div className={flexRowGap2}>
                           <span className={`${textMedium} font-mono`}>
-                            byte{candidate.length > 1 ? "s" : ""} [{candidate.startByte}
-                            {candidate.length > 1 ? `:${candidate.startByte + candidate.length - 1}` : ""}]
+                            {candidate.length > 1
+                              ? t("serialAnalysis.byteRangeMulti", { start: candidate.startByte, end: candidate.startByte + candidate.length - 1 })
+                              : t("serialAnalysis.byteRangeSingle", { start: candidate.startByte })}
                           </span>
                           {!isApplied && idx === 0 && (
                             <span className="px-1.5 py-0.5 text-xs bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] rounded">
-                              Best Match
+                              {t("serialAnalysis.bestMatch")}
                             </span>
                           )}
                           {isApplied && (
                             <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
                               <Check className={iconXs} />
-                              Applied
+                              {t("serialAnalysis.applied")}
                             </span>
                           )}
                         </div>
                         <div className="text-sm text-[color:var(--text-secondary)] mt-1">
-                          {candidate.uniqueValues.length} distinct addresses
+                          {t("serialAnalysis.distinctAddresses", { count: candidate.uniqueValues.length })}
                           <span className="mx-2 text-[color:var(--text-muted)]">|</span>
-                          {candidate.confidence.toFixed(0)}% confidence
+                          {t("serialAnalysis.confidencePercent", { percent: candidate.confidence.toFixed(0) })}
                         </div>
                         {candidate.notes.length > 0 && (
                           <div className="text-xs text-[color:var(--text-muted)] mt-1">
@@ -596,7 +600,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                             ? "border-[color:var(--status-purple-border)]"
                             : "border-[color:var(--border-default)]"
                       }`}>
-                        <div className={`${caption} mb-1`}>Sample addresses:</div>
+                        <div className={`${caption} mb-1`}>{t("serialAnalysis.sampleAddresses")}</div>
                         <div className="flex flex-wrap gap-1">
                           {candidate.uniqueValues.slice(0, 16).map((val, i) => (
                             <span
@@ -608,7 +612,7 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                           ))}
                           {candidate.uniqueValues.length > 16 && (
                             <span className="text-xs text-slate-400">
-                              +{candidate.uniqueValues.length - 16} more
+                              {t("serialAnalysis.moreItems", { count: candidate.uniqueValues.length - 16 })}
                             </span>
                           )}
                         </div>
@@ -625,15 +629,15 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
       <div className="space-y-3">
         <div className={`${flexRowGap2} ${sectionHeaderText}`}>
           <Shield className={iconMd} />
-          <span>Candidate Checksums</span>
+          <span>{t("serialAnalysis.candidateChecksums")}</span>
           <span className={captionMuted}>
-            ({appliedChecksumIdx !== null ? "1 applied" : `${analysisResult.candidateChecksums.length} found`})
+            ({appliedChecksumIdx !== null ? t("serialAnalysis.appliedCount") : t("serialAnalysis.foundCount", { count: analysisResult.candidateChecksums.length })})
           </span>
         </div>
 
         {analysisResult.candidateChecksums.length === 0 ? (
           <p className="text-sm text-[color:var(--text-muted)] italic">
-            No checksum patterns detected
+            {t("serialAnalysis.noChecksumPatterns")}
           </p>
         ) : (
           <div className="space-y-2">
@@ -662,17 +666,17 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                             {candidate.algorithm}
                           </span>
                           <span className="text-sm text-[color:var(--text-secondary)]">
-                            at byte {candidate.position}
-                            {candidate.length > 1 ? ` (${candidate.length} bytes)` : ""}
+                            {t("serialAnalysis.atByte", { position: candidate.position })}
+                            {candidate.length > 1 ? t("serialAnalysis.ofLength", { count: candidate.length }) : ""}
                           </span>
                           {isApplied ? (
                             <span className="px-1.5 py-0.5 text-xs bg-[var(--status-info-bg)] text-[color:var(--status-info-text)] rounded flex items-center gap-1">
                               <Check className={iconXs} />
-                              Applied
+                              {t("serialAnalysis.applied")}
                             </span>
                           ) : candidate.matchRate === 100 && (
                             <span className="px-1.5 py-0.5 text-xs bg-[var(--status-success-bg)] text-[color:var(--status-success-text)] rounded">
-                              Perfect Match
+                              {t("serialAnalysis.perfectMatch")}
                             </span>
                           )}
                         </div>
@@ -686,13 +690,13 @@ export default function SerialAnalysisResultView({ mode, onClose }: Props) {
                                   : ""
                             }
                           >
-                            {candidate.matchRate.toFixed(1)}% match rate
+                            {t("serialAnalysis.matchPercent", { percent: candidate.matchRate.toFixed(1) })}
                           </span>
                           <span className="mx-2 text-[color:var(--text-muted)]">|</span>
-                          {candidate.matchCount.toLocaleString()} / {candidate.totalCount.toLocaleString()} frames
+                          {t("serialAnalysis.matchedFrames", { matched: candidate.matchCount.toLocaleString(), total: candidate.totalCount.toLocaleString() })}
                         </div>
                         <div className="text-xs text-[color:var(--text-muted)] mt-1">
-                          Calculation range: bytes [{candidate.calcStartByte}:{candidate.calcEndByte})
+                          {t("serialAnalysis.calcRange", { start: candidate.calcStartByte, end: candidate.calcEndByte })}
                         </div>
                         {candidate.notes.length > 0 && (
                           <div className="text-xs text-[color:var(--text-muted)] mt-1">

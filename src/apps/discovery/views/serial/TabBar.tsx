@@ -4,6 +4,7 @@
 // Uses the shared DiscoveryTabBar with serial-specific controls.
 
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Layers, Filter, Settings, Network, FileText } from 'lucide-react';
 import { iconSm, iconXs } from '../../../../styles/spacing';
 import { bgSurface, textSecondary } from '../../../../styles';
@@ -60,17 +61,18 @@ export default function TabBar({
   emitsRawBytes = true, // Default true for standalone serial sessions
   onTabClose,
 }: TabBarProps) {
+  const { t } = useTranslation("discovery");
   // Column visibility toggles from UI store (shared with CAN view)
   const showBusColumn = useDiscoveryUIStore((s) => s.showBusColumn);
   const toggleShowBusColumn = useDiscoveryUIStore((s) => s.toggleShowBusColumn);
   const showAsciiColumn = useDiscoveryUIStore((s) => s.showAsciiColumn);
   const toggleShowAsciiColumn = useDiscoveryUIStore((s) => s.toggleShowAsciiColumn);
   const getFramingLabel = () => {
-    if (!framingConfig) return 'Framing';
+    if (!framingConfig) return t("serial.framingLabel");
     switch (framingConfig.mode) {
-      case 'slip': return 'SLIP';
-      case 'raw': return 'Delimiter';
-      case 'modbus_rtu': return 'Modbus';
+      case 'slip': return t("serial.framingSlip");
+      case 'raw': return t("serial.framingDelimiter");
+      case 'modbus_rtu': return t("serial.framingModbus");
     }
   };
 
@@ -83,14 +85,14 @@ export default function TabBar({
 
     // Only show Raw Bytes tab if session emits bytes and framing hasn't been accepted
     if (emitsRawBytes && !framingAccepted) {
-      result.push({ id: 'raw', label: 'Raw Bytes', count: byteCount, countColor: 'gray' as const });
+      result.push({ id: 'raw', label: t("serial.tabRawBytes"), count: byteCount, countColor: 'gray' as const });
     }
 
-    result.push({ id: 'framed', label: 'Framed Bytes', count: frameCount, countColor: 'green' as const });
+    result.push({ id: 'framed', label: t("serial.tabFramedBytes"), count: frameCount, countColor: 'green' as const });
 
     // Show Filtered tab when there are filtered frames (frames excluded by minFrameLength filter)
     if (filteredCount > 0) {
-      result.push({ id: 'filtered', label: 'Filtered', count: filteredCount, countColor: 'orange' as const });
+      result.push({ id: 'filtered', label: t("serial.tabFiltered"), count: filteredCount, countColor: 'orange' as const });
     }
 
     // Dynamic tool output tabs
@@ -102,7 +104,7 @@ export default function TabBar({
     }
 
     return result;
-  }, [byteCount, frameCount, filteredCount, hasSerialFramingResults, hasSerialPayloadResults, framingAccepted, emitsRawBytes]);
+  }, [byteCount, frameCount, filteredCount, hasSerialFramingResults, hasSerialPayloadResults, framingAccepted, emitsRawBytes, t]);
 
   // Serial-specific control buttons (compact styling)
   // Only show controls on raw and framed tabs, not on tool output tabs
@@ -116,7 +118,7 @@ export default function TabBar({
             ? 'bg-cyan-600 text-white hover:bg-cyan-500'
             : `${bgSurface} ${textSecondary} hover:brightness-95`
         }`}
-        title={showBusColumn ? 'Hide Bus column' : 'Show Bus column'}
+        title={showBusColumn ? t("serial.hideBus") : t("serial.showBus")}
       >
         <Network className={iconSm} />
       </button>
@@ -127,7 +129,7 @@ export default function TabBar({
             ? 'bg-yellow-600 text-white hover:bg-yellow-500'
             : `${bgSurface} ${textSecondary} hover:brightness-95`
         }`}
-        title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
+        title={showAsciiColumn ? t("serial.hideAscii") : t("serial.showAscii")}
       >
         <FileText className={iconSm} />
       </button>
@@ -137,10 +139,10 @@ export default function TabBar({
         <button
           onClick={onOpenRawBytesViewDialog}
           className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${bgSurface} ${textSecondary} hover:brightness-95`}
-          title="Configure raw bytes display"
+          title={t("serial.configureRawBytes")}
         >
           <Settings className={iconXs} />
-          View
+          {t("serial.viewLabel")}
         </button>
       )}
 
@@ -153,7 +155,7 @@ export default function TabBar({
               ? 'bg-blue-600 text-white hover:bg-blue-500'
               : `${bgSurface} ${textSecondary} hover:brightness-95`
           }`}
-          title="Configure framing mode"
+          title={t("serial.configureFraming")}
         >
           <Layers className={iconXs} />
           {getFramingLabel()}
@@ -169,10 +171,10 @@ export default function TabBar({
               ? 'bg-amber-600 text-white hover:bg-amber-500'
               : `${bgSurface} ${textSecondary} hover:brightness-95`
           }`}
-          title="Configure frame filters"
+          title={t("serial.configureFilters")}
         >
           <Filter className={iconXs} />
-          {minFrameLength > 0 ? `${minFrameLength}+` : 'All'}
+          {minFrameLength > 0 ? t("serial.minLengthFilter", { min: minFrameLength }) : t("serial.filterAll")}
         </button>
       )}
     </>
@@ -183,7 +185,7 @@ export default function TabBar({
       tabs={tabs}
       activeTab={activeTab}
       onTabChange={(id) => onTabChange(id)}
-      protocolLabel="Serial"
+      protocolLabel={t("serial.protocolLabel")}
       isStreaming={isStreaming}
       isRecorded={isRecorded}
       controls={serialControls}

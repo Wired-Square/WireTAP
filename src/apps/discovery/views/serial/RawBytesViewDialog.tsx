@@ -3,6 +3,7 @@
 // Dialog for configuring raw bytes display mode (individual vs chunked).
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { iconLg, flexRowGap2 } from '../../../../styles/spacing';
 import Dialog from '../../../../components/Dialog';
@@ -31,6 +32,7 @@ function calculateByteTimeUs(baudRate: number): number {
 }
 
 export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }: RawBytesViewDialogProps) {
+  const { t } = useTranslation("discovery");
   const [displayMode, setDisplayMode] = useState<RawBytesDisplayMode>(config.displayMode);
   const [chunkGapUs, setChunkGapUs] = useState(config.chunkGapUs);
   const [baudRate, setBaudRate] = useState(9600);
@@ -54,7 +56,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
     <Dialog isOpen={isOpen} maxWidth="max-w-md">
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className={h2}>Raw Bytes Display</h2>
+          <h2 className={h2}>{t("serial.rawBytesTitle")}</h2>
           <button onClick={onClose} className={`p-1 ${hoverLight} rounded`}>
             <X className={`${iconLg} text-slate-400`} />
           </button>
@@ -63,15 +65,15 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
         <div className="space-y-3">
           {/* Display Mode Selection */}
           <div className="space-y-2">
-            <span className={labelSmall}>Display Mode</span>
+            <span className={labelSmall}>{t("serial.displayMode")}</span>
 
             <button
               onClick={() => setDisplayMode('individual')}
               className={selectionButtonClass(displayMode === 'individual')}
             >
-              <div className="font-medium">Individual Bytes</div>
+              <div className="font-medium">{t("serial.individualBytes")}</div>
               <div className={`text-xs mt-0.5 ${displayMode === 'individual' ? 'text-[color:var(--accent-primary)]/70' : 'text-[color:var(--text-muted)]'}`}>
-                Each byte shown with its exact timestamp (μs precision)
+                {t("serial.individualDescription")}
               </div>
             </button>
 
@@ -79,9 +81,9 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
               onClick={() => setDisplayMode('chunked')}
               className={selectionButtonClass(displayMode === 'chunked')}
             >
-              <div className="font-medium">Chunked Bytes</div>
+              <div className="font-medium">{t("serial.chunkedBytes")}</div>
               <div className={`text-xs mt-0.5 ${displayMode === 'chunked' ? 'text-[color:var(--accent-primary)]/70' : 'text-[color:var(--text-muted)]'}`}>
-                Group bytes arriving close together, show timing of first byte
+                {t("serial.chunkedDescription")}
               </div>
             </button>
           </div>
@@ -91,7 +93,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
             <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
               {/* Baud rate calculator */}
               <div className="bg-[var(--bg-surface)] rounded-lg p-3 space-y-2">
-                <span className={labelSmall}>Calculate from baud rate</span>
+                <span className={labelSmall}>{t("serial.calculateFromBaud")}</span>
                 <div className={flexRowGap2}>
                   <Select
                     variant="simple"
@@ -100,7 +102,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
                     className="flex-1 text-sm"
                   >
                     {COMMON_BAUD_RATES.map((rate) => (
-                      <option key={rate} value={rate}>{rate.toLocaleString()} baud</option>
+                      <option key={rate} value={rate}>{t("serial.baudUnit", { rate: rate.toLocaleString() })}</option>
                     ))}
                   </Select>
                   <span className="text-slate-400 text-sm">×</span>
@@ -120,17 +122,17 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
                     <option value={100}>100×</option>
                   </Select>
                   <PrimaryButton onClick={applyBaudRateGap} className="text-xs px-3 py-1.5">
-                    Apply
+                    {t("serial.applyBaud")}
                   </PrimaryButton>
                 </div>
                 <div className={helpText}>
-                  1 byte = {calculateByteTimeUs(baudRate)}μs → idle threshold = {suggestedGapUs.toLocaleString()}μs
+                  {t("serial.byteTimeHint", { us: calculateByteTimeUs(baudRate), threshold: suggestedGapUs.toLocaleString() })}
                 </div>
               </div>
 
               {/* Manual input */}
               <div className="space-y-1">
-                <label className={labelSmall}>Chunk gap threshold (μs):</label>
+                <label className={labelSmall}>{t("serial.chunkGapLabel")}</label>
                 <Input
                   variant="simple"
                   type="number"
@@ -140,8 +142,7 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
                   step={100}
                 />
                 <p className={helpText}>
-                  Bytes with gaps larger than this start a new chunk.
-                  Modbus RTU uses 3.5× byte time for frame detection.
+                  {t("serial.chunkGapHint")}
                 </p>
               </div>
             </div>
@@ -149,14 +150,14 @@ export default function RawBytesViewDialog({ isOpen, onClose, config, onApply }:
         </div>
 
         <div className={`flex justify-end gap-2 pt-2 border-t ${borderDefault}`}>
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <SecondaryButton onClick={onClose}>{t("modbusScan.cancel")}</SecondaryButton>
           <PrimaryButton
             onClick={() => {
               onApply({ displayMode, chunkGapUs });
               onClose();
             }}
           >
-            Apply
+            {t("serial.apply")}
           </PrimaryButton>
         </div>
       </div>

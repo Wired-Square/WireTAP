@@ -3,6 +3,7 @@
 // Display and configure framed serial data with ID/source/checksum extraction.
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDiscoveryStore, type FrameMessage } from '../../../../stores/discoveryStore';
 import { useDiscoverySerialStore } from '../../../../stores/discoverySerialStore';
 import { useDiscoveryToolboxStore } from '../../../../stores/discoveryToolboxStore';
@@ -37,6 +38,7 @@ interface ExtractionBadgeProps {
 }
 
 function ExtractionBadge({ label, config, isActive, onClick, color }: ExtractionBadgeProps) {
+  const { t } = useTranslation("discovery");
   const inactiveClasses = `${bgSurface} ${textSecondary} ${borderDefault}`;
   const colorClasses = color === 'cyan'
     ? { active: 'bg-cyan-700 text-cyan-200 border-cyan-600', inactive: inactiveClasses }
@@ -60,7 +62,15 @@ function ExtractionBadge({ label, config, isActive, onClick, color }: Extraction
       className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
         isActive ? colorClasses.active : colorClasses.inactive
       } hover:opacity-80`}
-      title={config ? `Bytes ${formatRange(config)}, ${config.endianness === 'big' ? 'BE' : 'LE'}` : 'Click to configure'}
+      title={
+        config
+          ? t("serial.extractionTooltipBytes", {
+              start: config.startByte,
+              end: config.startByte + config.numBytes - 1,
+              endian: config.endianness === 'big' ? 'BE' : 'LE',
+            })
+          : t("serial.extractionConfigure")
+      }
     >
       {label}
       {config && isActive && (
@@ -80,6 +90,7 @@ interface ChecksumBadgeProps {
 }
 
 function ChecksumBadge({ config, onClick }: ChecksumBadgeProps) {
+  const { t } = useTranslation("discovery");
   const isActive = config !== null;
   const colorClasses = {
     active: 'bg-amber-700 text-amber-200 border-amber-600',
@@ -96,9 +107,17 @@ function ChecksumBadge({ config, onClick }: ChecksumBadgeProps) {
       className={`px-2.5 py-1 text-xs font-medium rounded border transition-colors ${
         isActive ? colorClasses.active : colorClasses.inactive
       } hover:opacity-80`}
-      title={config ? `${getAlgoLabel(config.algorithm)}, bytes [${config.startByte}:${config.startByte + config.numBytes}]` : 'Click to configure checksum'}
+      title={
+        config
+          ? t("serial.checksumTooltip", {
+              algo: getAlgoLabel(config.algorithm),
+              start: config.startByte,
+              end: config.startByte + config.numBytes,
+            })
+          : t("serial.checksumConfigure")
+      }
     >
-      Checksum
+      {t("serial.extractionLabelChecksum")}
       {config && isActive && (
         <span className="ml-1 opacity-75">{getAlgoLabel(config.algorithm)}</span>
       )}
@@ -179,6 +198,7 @@ interface FramedDataViewProps {
 }
 
 export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onClearIdMapping, onApplySourceMapping, onClearSourceMapping, accepted, framingMode, displayTimeFormat = 'human', isStreaming = false }: FramedDataViewProps) {
+  const { t } = useTranslation("discovery");
   // Column visibility from UI store (shared with CAN views and ByteView)
   const showBusColumn = useDiscoveryUIStore((s) => s.showBusColumn);
   const showAsciiColumn = useDiscoveryUIStore((s) => s.showAsciiColumn);
@@ -577,14 +597,14 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
         <div className={`flex-shrink-0 px-3 py-2 border-b ${borderDataView} ${bgDataToolbar} flex items-center gap-3`}>
           {/* Extraction Badges */}
           <ExtractionBadge
-            label="ID"
+            label={t("serial.extractionLabelId")}
             config={idConfig}
             isActive={idConfig !== null}
             onClick={() => setShowIdDialog(true)}
             color="cyan"
           />
           <ExtractionBadge
-            label="Source"
+            label={t("serial.extractionLabelSource")}
             config={srcConfig}
             isActive={srcConfig !== null}
             onClick={() => setShowSrcDialog(true)}
@@ -601,7 +621,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
             onClick={handleAccept}
             className="px-4 py-1.5 text-sm bg-green-600 hover:bg-green-500 rounded font-medium"
           >
-            Accept
+            {t("serial.accept")}
           </button>
         </div>
       )}
@@ -641,7 +661,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
         showSourceAddress={hasSourceAddresses}
         sourceByteCount={srcConfig?.numBytes ?? 2}
         renderBytes={renderColoredBytes}
-        emptyMessage={isLoadingPage ? 'Loading frames...' : accepted ? 'Framing accepted - data moved to Discovery' : 'Apply framing to see frames here'}
+        emptyMessage={isLoadingPage ? t("serial.loadingFrames") : accepted ? t("serial.framingAccepted") : t("serial.applyFramingHint")}
         showAscii={showAsciiColumn}
         showBus={showBusColumn}
         showId={idConfig !== null || (serialConfig?.frame_id_start_byte !== undefined && serialConfig?.frame_id_bytes !== undefined)}
@@ -651,7 +671,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
       <ByteExtractionDialog
         isOpen={showIdDialog}
         onClose={() => setShowIdDialog(false)}
-        title="Configure Frame ID Extraction"
+        title={t("serial.frameIdExtractionTitle")}
         sampleFrames={sampleFrames}
         initialConfig={idConfig ?? { startByte: 0, numBytes: 2, endianness: 'big' }}
         onApply={handleApplyIdConfig}
@@ -661,7 +681,7 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
       <ByteExtractionDialog
         isOpen={showSrcDialog}
         onClose={() => setShowSrcDialog(false)}
-        title="Configure Source Address Extraction"
+        title={t("serial.sourceAddressExtractionTitle")}
         sampleFrames={sampleFrames}
         initialConfig={srcConfig ?? { startByte: 2, numBytes: 2, endianness: 'big' }}
         onApply={handleApplySrcConfig}

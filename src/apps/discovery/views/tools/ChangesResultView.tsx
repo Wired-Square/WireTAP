@@ -1,6 +1,7 @@
 // ui/src/apps/discovery/views/tools/ChangesResultView.tsx
 
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { GitCompare, RefreshCw, Minus, Activity, ChevronDown, ChevronRight, Layers, Thermometer, Type, Ruler, Copy, GitMerge, Download, X } from "lucide-react";
 import { iconSm, iconXs, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
 import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
@@ -48,6 +49,7 @@ type Props = {
 };
 
 export default function ChangesResultView({ embedded = false, onClose }: Props) {
+  const { t } = useTranslation("discovery");
   const results = useDiscoveryStore((s) => s.toolbox.changesResults);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const { settings } = useSettings();
@@ -100,9 +102,9 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
       <div className={emptyStateContainer}>
         <GitCompare className={`w-12 h-12 ${textMuted} mb-4`} />
         <div className={emptyStateText}>
-          <p className={emptyStateHeading}>No results yet</p>
+          <p className={emptyStateHeading}>{t("changes.noResults")}</p>
           <p className={emptyStateDescription}>
-            Select frames in the sidebar and click "Run Analysis" to detect payload patterns.
+            {t("changes.noResultsDescription")}
           </p>
         </div>
       </div>
@@ -126,10 +128,10 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
       <div className={`px-4 py-3 ${borderDivider} bg-[var(--bg-surface)]`}>
         <div className="flex flex-wrap gap-4 text-xs mb-2">
           <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{results.frameCount.toLocaleString()}</span> frames
+            <span className="font-medium text-[color:var(--text-primary)]">{results.frameCount.toLocaleString()}</span> {t("changes.framesUnit")}
           </span>
           <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{results.uniqueFrameIds}</span> unique IDs analyzed
+            <span className="font-medium text-[color:var(--text-primary)]">{results.uniqueFrameIds}</span> {t("changes.uniqueAnalyzed")}
           </span>
         </div>
 
@@ -139,30 +141,30 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
             {summary.mirrorGroupCount > 0 && (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-pink-100/50 text-pink-600">
                 <GitMerge className={iconXs} />
-                {summary.mirrorGroupCount} mirror group{summary.mirrorGroupCount > 1 ? 's' : ''}
+                {t("changes.mirrorGroup", { count: summary.mirrorGroupCount })}
               </span>
             )}
             {summary.identicalCount > 0 && (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--hover-bg)] text-[color:var(--text-secondary)]">
                 <Copy className={iconXs} />
-                {summary.identicalCount} identical
+                {t("changes.identical", { count: summary.identicalCount })}
               </span>
             )}
             {summary.varyingLengthCount > 0 && (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--status-warning-bg)] text-[color:var(--text-yellow)]">
                 <Ruler className={iconXs} />
-                {summary.varyingLengthCount} varying length
+                {t("changes.varyingLength", { count: summary.varyingLengthCount })}
               </span>
             )}
             {summary.muxCount > 0 && (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-100/50 text-[color:var(--text-orange)]">
                 <Layers className={iconXs} />
-                {summary.muxCount} multiplexed
+                {t("changes.multiplexed", { count: summary.muxCount })}
               </span>
             )}
             {summary.burstCount > 0 && (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-100/50 text-[color:var(--text-cyan)]">
-                {summary.burstCount} burst
+                {t("changes.burst", { count: summary.burstCount })}
               </span>
             )}
           </div>
@@ -176,7 +178,7 @@ export default function ChangesResultView({ embedded = false, onClose }: Props) 
           <div className="space-y-2">
             <div className="text-xs font-medium text-pink-600 flex items-center gap-1.5">
               <GitMerge className={iconSm} />
-              Mirror Frames
+              {t("changes.mirrorFrames")}
             </div>
             {mirrorGroups.map((group, idx) => (
               <MirrorGroupCard key={idx} group={group} />
@@ -223,15 +225,16 @@ type HeaderProps = {
 };
 
 function Header({ onExport, hasResults = false, onClose }: HeaderProps) {
+  const { t } = useTranslation("discovery");
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider}`}>
       <GitCompare className={`${iconLg} text-[color:var(--text-purple)]`} />
       <div className="flex-1">
         <h2 className={sectionHeaderText}>
-          Payload Changes Analysis
+          {t("changes.title")}
         </h2>
         <p className={caption}>
-          Detected byte patterns and characteristics
+          {t("changes.subtitle")}
         </p>
       </div>
       {hasResults && (
@@ -239,10 +242,10 @@ function Header({ onExport, hasResults = false, onClose }: HeaderProps) {
           type="button"
           onClick={onExport}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] hover:brightness-95 transition-colors"
-          title="Export analysis results"
+          title={t("changes.exportTooltip")}
         >
           <Download className={iconSm} />
-          Export
+          {t("changes.exportLabel")}
         </button>
       )}
       {onClose && (
@@ -250,7 +253,7 @@ function Header({ onExport, hasResults = false, onClose }: HeaderProps) {
           type="button"
           onClick={onClose}
           className={iconButtonDangerCompact}
-          title="Close"
+          title={t("changes.close")}
         >
           <X className={iconXs} />
         </button>
@@ -268,6 +271,7 @@ type MirrorGroupCardProps = {
 };
 
 function MirrorGroupCard({ group }: MirrorGroupCardProps) {
+  const { t } = useTranslation("discovery");
   return (
     <div className="p-3 bg-pink-50/50 rounded-lg border border-pink-300">
       <div className="flex items-start justify-between">
@@ -285,18 +289,18 @@ function MirrorGroupCard({ group }: MirrorGroupCardProps) {
             ))}
           </div>
           <span className="text-xs text-pink-500">
-            {group.matchPercentage}% match
+            {t("changes.matchPercent", { percent: group.matchPercentage })}
           </span>
         </div>
         <span className="text-[10px] text-pink-500">
-          {group.sampleCount} matching pairs
+          {t("changes.matchingPairs", { count: group.sampleCount })}
         </span>
       </div>
 
       {/* Sample payload */}
       {group.samplePayload && (
         <div className="mt-2 text-[10px] text-pink-600">
-          <span className="text-pink-500">Sample: </span>
+          <span className="text-pink-500">{t("changes.samplePrefix")} </span>
           <span className="font-mono">
             {group.samplePayload.map(b => b.toString(16).toUpperCase().padStart(2, '0')).join(' ')}
           </span>
@@ -304,7 +308,7 @@ function MirrorGroupCard({ group }: MirrorGroupCardProps) {
       )}
 
       <div className="mt-1.5 text-[10px] text-pink-500">
-        These frame IDs transmit identical payloads that change together
+        {t("changes.mirrorDescription")}
       </div>
     </div>
   );
@@ -319,6 +323,7 @@ type FrameAnalysisCardProps = {
 };
 
 function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
+  const { t } = useTranslation("discovery");
   const counts = countByteRoles(result.byteStats, result.multiBytePatterns);
 
   return (
@@ -330,35 +335,35 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
             {formatFrameId(result.frameId)}
           </span>
           <span className={captionMuted}>
-            {result.sampleCount} samples
+            {t("changes.samples", { count: result.sampleCount })}
           </span>
           {result.isBurstFrame && (
             <span className="px-1.5 py-0.5 text-[10px] bg-cyan-100/50 text-[color:var(--text-cyan)] rounded">
-              Burst
+              {t("changes.burstBadge")}
             </span>
           )}
           {result.isMuxFrame && (
             <span className="px-1.5 py-0.5 text-[10px] bg-orange-100/50 text-[color:var(--text-orange)] rounded flex items-center gap-0.5">
               <Layers className={iconXs} />
-              Mux
+              {t("changes.muxBadge")}
             </span>
           )}
           {result.hasVaryingLength && result.lengthRange && (
             <span
               className="px-1.5 py-0.5 text-[10px] bg-[var(--status-warning-bg)] text-[color:var(--text-yellow)] rounded flex items-center gap-0.5"
-              title={`Frame length varies from ${result.lengthRange.min} to ${result.lengthRange.max} bytes`}
+              title={t("changes.lengthRangeTooltip", { min: result.lengthRange.min, max: result.lengthRange.max })}
             >
               <Ruler className={iconXs} />
-              {result.lengthRange.min}–{result.lengthRange.max} bytes
+              {t("changes.lengthRangeBadge", { min: result.lengthRange.min, max: result.lengthRange.max })}
             </span>
           )}
           {result.isIdentical && (
             <span
               className="px-1.5 py-0.5 text-[10px] bg-[var(--hover-bg)] text-[color:var(--text-secondary)] rounded flex items-center gap-0.5"
-              title="All payloads in this frame are identical"
+              title={t("changes.identicalTooltip")}
             >
               <Copy className={iconXs} />
-              Identical
+              {t("changes.identicalBadge")}
             </span>
           )}
         </div>
@@ -366,31 +371,31 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
           {counts.staticCount > 0 && (
             <span className="flex items-center gap-1 text-[color:var(--text-muted)]">
               <Minus className={iconXs} />
-              {counts.staticCount} static
+              {t("changes.static", { count: counts.staticCount })}
             </span>
           )}
           {(counts.counterCount > 0 || counts.counter16Count > 0 || counts.counter32Count > 0) && (
             <span className="flex items-center gap-1 text-[color:var(--text-green)]">
               <RefreshCw className={iconXs} />
-              {counts.counterCount + counts.counter16Count + counts.counter32Count} counter
+              {t("changes.counter", { count: counts.counterCount + counts.counter16Count + counts.counter32Count })}
             </span>
           )}
           {(counts.sensorCount > 0 || counts.sensor16Count > 0) && (
             <span className="flex items-center gap-1 text-[color:var(--text-purple)]">
               <Thermometer className={iconXs} />
-              {counts.sensorCount + counts.sensor16Count} sensor
+              {t("changes.sensor", { count: counts.sensorCount + counts.sensor16Count })}
             </span>
           )}
           {counts.valueCount > 0 && (
             <span className="flex items-center gap-1 text-[color:var(--status-info-text)]">
               <Activity className={iconXs} />
-              {counts.valueCount} value
+              {t("changes.value", { count: counts.valueCount })}
             </span>
           )}
           {counts.textCount > 0 && (
             <span className="flex items-center gap-1 text-[color:var(--text-amber)]">
               <Type className={iconXs} />
-              {counts.textCount} text
+              {t("changes.text", { count: counts.textCount })}
             </span>
           )}
         </div>
@@ -399,9 +404,9 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
       {/* Mux info line */}
       {result.isMuxFrame && result.muxInfo && (
         <div className="mb-3 text-[10px] text-[color:var(--text-orange)]">
-          <span className="font-medium">Mux:</span>{" "}
+          <span className="font-medium">{t("changes.muxLabelPrefix")}</span>{" "}
           {result.muxInfo.isTwoByte ? "byte[0:1]" : `byte[${result.muxInfo.selectorByte}]`}
-          , cases: {result.muxInfo.selectorValues.map(v => formatMuxValue(v, result.muxInfo!.isTwoByte)).join(", ")}
+          , {t("changes.muxCases")} {result.muxInfo.selectorValues.map(v => formatMuxValue(v, result.muxInfo!.isTwoByte)).join(", ")}
         </div>
       )}
 
@@ -423,7 +428,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
           {/* Byte visualization (non-mux frames) - with multi-byte patterns inline */}
           <div className="mb-3">
             <div className="text-[10px] text-[color:var(--text-muted)] mb-1">
-              Bytes {result.analyzedFromByte}–{result.analyzedToByteExclusive - 1}
+              {t("changes.byteRange", { from: result.analyzedFromByte, to: result.analyzedToByteExclusive - 1 })}
             </div>
             <ByteVisualization
               byteStats={result.byteStats}
@@ -435,7 +440,7 @@ function FrameAnalysisCard({ result }: FrameAnalysisCardProps) {
           {result.notes.length > 0 && (
             <div className="border-t border-[color:var(--border-default)] pt-2">
               <div className="text-[10px] font-medium text-[color:var(--text-muted)] mb-1">
-                Notes
+                {t("changes.notes")}
               </div>
               <ul className="space-y-0.5">
                 {result.notes.map((note, idx) => (
@@ -464,6 +469,7 @@ type MuxCaseSectionProps = {
 };
 
 function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToByteExclusive }: MuxCaseSectionProps) {
+  const { t } = useTranslation("discovery");
   const [isExpanded, setIsExpanded] = useState(false);
 
   const counts = countByteRoles(caseAnalysis.byteStats, caseAnalysis.multiBytePatterns);
@@ -483,27 +489,27 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
             <ChevronRight className={`${iconXs} text-slate-400`} />
           )}
           <span className="text-[10px] font-medium text-[color:var(--text-orange)]">
-            Case {formatMuxValue(caseAnalysis.muxValue, isTwoByte)}
+            {t("changes.case", { value: formatMuxValue(caseAnalysis.muxValue, isTwoByte) })}
           </span>
           <span className="text-[10px] text-[color:var(--text-muted)]">
-            ({caseAnalysis.sampleCount} samples)
+            {t("changes.casesSamples", { count: caseAnalysis.sampleCount })}
           </span>
         </div>
         <div className="flex items-center gap-2 text-[10px]">
           {counts.staticCount > 0 && (
-            <span className="text-[color:var(--text-muted)]">{counts.staticCount} static</span>
+            <span className="text-[color:var(--text-muted)]">{t("changes.static", { count: counts.staticCount })}</span>
           )}
           {(counts.counterCount > 0 || counts.counter16Count > 0 || counts.counter32Count > 0) && (
-            <span className="text-[color:var(--text-green)]">{counts.counterCount + counts.counter16Count + counts.counter32Count} counter</span>
+            <span className="text-[color:var(--text-green)]">{t("changes.counter", { count: counts.counterCount + counts.counter16Count + counts.counter32Count })}</span>
           )}
           {(counts.sensorCount > 0 || counts.sensor16Count > 0) && (
-            <span className="text-[color:var(--text-purple)]">{counts.sensorCount + counts.sensor16Count} sensor</span>
+            <span className="text-[color:var(--text-purple)]">{t("changes.sensor", { count: counts.sensorCount + counts.sensor16Count })}</span>
           )}
           {counts.valueCount > 0 && (
-            <span className="text-[color:var(--status-info-text)]">{counts.valueCount} value</span>
+            <span className="text-[color:var(--status-info-text)]">{t("changes.value", { count: counts.valueCount })}</span>
           )}
           {counts.textCount > 0 && (
-            <span className="text-[color:var(--text-amber)]">{counts.textCount} text</span>
+            <span className="text-[color:var(--text-amber)]">{t("changes.text", { count: counts.textCount })}</span>
           )}
         </div>
       </button>
@@ -514,7 +520,7 @@ function MuxCaseSection({ caseAnalysis, isTwoByte, analyzedFromByte, analyzedToB
           {/* Byte visualization */}
           <div className="mb-2">
             <div className="text-[10px] text-[color:var(--text-muted)] mb-1">
-              Bytes {analyzedFromByte}–{analyzedToByteExclusive - 1}
+              {t("changes.byteRange", { from: analyzedFromByte, to: analyzedToByteExclusive - 1 })}
             </div>
             <ByteVisualization
               byteStats={caseAnalysis.byteStats}
@@ -549,34 +555,42 @@ type ByteChipProps = {
 };
 
 function ByteChip({ byte }: ByteChipProps) {
+  const { t } = useTranslation("discovery");
   let bgClass = "bg-[var(--hover-bg)]";
   let textClass = "text-[color:var(--text-secondary)]";
-  let title = `byte[${byte.byteIndex}]: unknown`;
+  let title = t("changes.byteTooltipUnknown", { idx: byte.byteIndex });
 
   if (byte.role === 'static') {
     bgClass = "bg-[var(--border-default)]";
     textClass = "text-[color:var(--text-primary)]";
-    title = `byte[${byte.byteIndex}]: static = 0x${byte.staticValue!.toString(16).toUpperCase().padStart(2, '0')}`;
+    title = t("changes.byteTooltipStatic", { idx: byte.byteIndex, value: byte.staticValue!.toString(16).toUpperCase().padStart(2, '0') });
   } else if (byte.role === 'counter') {
     bgClass = "bg-[var(--status-success-bg)]";
     textClass = "text-[color:var(--status-success-text)]";
     const dir = byte.counterDirection === 'up' ? '↑' : '↓';
     if (byte.isLoopingCounter && byte.loopingRange && byte.loopingModulo) {
-      title = `byte[${byte.byteIndex}]: looping counter ${dir} step=${byte.counterStep}, range ${byte.loopingRange.min}–${byte.loopingRange.max} (mod ${byte.loopingModulo})`;
+      title = t("changes.byteTooltipLoopingCounter", {
+        idx: byte.byteIndex,
+        dir,
+        step: byte.counterStep,
+        min: byte.loopingRange.min,
+        max: byte.loopingRange.max,
+        mod: byte.loopingModulo,
+      });
     } else {
-      const rollover = byte.rolloverDetected ? ' (rollover)' : '';
-      title = `byte[${byte.byteIndex}]: counter ${dir} step=${byte.counterStep}${rollover}`;
+      const rollover = byte.rolloverDetected ? t("changes.byteTooltipCounterRollover") : '';
+      title = t("changes.byteTooltipCounter", { idx: byte.byteIndex, dir, step: byte.counterStep, rollover });
     }
   } else if (byte.role === 'sensor') {
     bgClass = "bg-orange-100/50";
     textClass = "text-[color:var(--text-orange)]";
     const trend = byte.sensorTrend === 'increasing' ? '↑' : byte.sensorTrend === 'decreasing' ? '↓' : '↕';
-    const strength = byte.trendStrength ? ` (${Math.round(byte.trendStrength * 100)}% trend)` : '';
-    title = `byte[${byte.byteIndex}]: sensor ${trend} range ${byte.min}–${byte.max}${strength}`;
+    const strength = byte.trendStrength ? t("changes.byteTooltipSensorStrength", { percent: Math.round(byte.trendStrength * 100) }) : '';
+    title = t("changes.byteTooltipSensor", { idx: byte.byteIndex, trend, min: byte.min, max: byte.max, strength });
   } else if (byte.role === 'value') {
     bgClass = "bg-[var(--status-info-bg)]";
     textClass = "text-[color:var(--status-info-text)]";
-    title = `byte[${byte.byteIndex}]: value range ${byte.min}–${byte.max} (${byte.uniqueValues.size} unique)`;
+    title = t("changes.byteTooltipValue", { idx: byte.byteIndex, min: byte.min, max: byte.max, count: byte.uniqueValues.size });
   }
 
   return (

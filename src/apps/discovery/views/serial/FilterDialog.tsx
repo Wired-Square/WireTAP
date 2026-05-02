@@ -4,6 +4,7 @@
 // Uses the shared FilterOptionsPanel component.
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { iconLg } from '../../../../styles/spacing';
 import { hoverLight } from '../../../../styles';
@@ -19,6 +20,7 @@ interface FilterDialogProps {
 }
 
 export default function FilterDialog({ isOpen, onClose, minLength: initialMinLength, onApply }: FilterDialogProps) {
+  const { t } = useTranslation("discovery");
   const [config, setConfig] = useState<FilterConfig>({ minFrameLength: initialMinLength });
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function FilterDialog({ isOpen, onClose, minLength: initialMinLen
     <Dialog isOpen={isOpen} maxWidth="max-w-sm">
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Filter Settings</h2>
+          <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("serial.filterTitle")}</h2>
           <button onClick={onClose} className={`p-1 ${hoverLight} rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)]`}>
             <X className={iconLg} />
           </button>
@@ -51,7 +53,7 @@ export default function FilterDialog({ isOpen, onClose, minLength: initialMinLen
         <DialogFooter
           onCancel={onClose}
           onConfirm={handleApply}
-          confirmLabel="Apply"
+          confirmLabel={t("serial.apply")}
         />
       </div>
     </Dialog>

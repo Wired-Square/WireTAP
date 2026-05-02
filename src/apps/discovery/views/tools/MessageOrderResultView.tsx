@@ -1,6 +1,7 @@
 // ui/src/apps/discovery/views/tools/MessageOrderResultView.tsx
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ListOrdered, Clock, Layers, Play, Shuffle, Zap, GitBranch, Download, X } from "lucide-react";
 import { iconXs, iconMd, iconSm, iconLg, flexRowGap2, paddingCardSm } from "../../../../styles/spacing";
 import { iconButtonDangerCompact } from "../../../../styles/buttonStyles";
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export default function MessageOrderResultView({ embedded = false, onClose }: Props) {
+  const { t } = useTranslation("discovery");
   const results = useDiscoveryStore((s) => s.toolbox.messageOrderResults);
   const updateOptions = useDiscoveryStore((s) => s.updateMessageOrderOptions);
   const runAnalysis = useDiscoveryStore((s) => s.runAnalysis);
@@ -59,9 +61,9 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
         <div className={emptyStateContainer}>
           <ListOrdered className={`w-12 h-12 ${textMuted} mb-4`} />
           <div className={emptyStateText}>
-            <p className={emptyStateHeading}>No results yet</p>
+            <p className={emptyStateHeading}>{t("messageOrder.noResults")}</p>
             <p className={emptyStateDescription}>
-              Select frames and click "Run Analysis" to detect message order patterns.
+              {t("messageOrder.noResultsDescription")}
             </p>
           </div>
         </div>
@@ -77,13 +79,13 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
       <div className={`px-4 py-2 ${borderDivider} bg-[var(--bg-surface)]`}>
         <div className="flex flex-wrap gap-4 text-xs">
           <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{results.totalFramesAnalyzed.toLocaleString()}</span> frames
+            <span className="font-medium text-[color:var(--text-primary)]">{results.totalFramesAnalyzed.toLocaleString()}</span> {t("messageOrder.framesUnit")}
           </span>
           <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{results.uniqueFrameIds}</span> unique IDs
+            <span className="font-medium text-[color:var(--text-primary)]">{results.uniqueFrameIds}</span> {t("messageOrder.uniqueIdsUnit")}
           </span>
           <span className="text-[color:var(--text-muted)]">
-            <span className="font-medium text-[color:var(--text-primary)]">{formatMs(results.timeSpanMs)}</span> span
+            <span className="font-medium text-[color:var(--text-primary)]">{formatMs(results.timeSpanMs)}</span> {t("messageOrder.spanUnit")}
           </span>
         </div>
       </div>
@@ -118,8 +120,11 @@ export default function MessageOrderResultView({ embedded = false, onClose }: Pr
 
       <ExportReportDialog
         open={showExportDialog}
-        title="Export Frame Order Analysis"
-        description={`Export analysis of ${results.uniqueFrameIds} frame IDs (${results.totalFramesAnalyzed.toLocaleString()} samples)`}
+        title={t("messageOrder.exportTitle")}
+        description={t("messageOrder.exportDescription", {
+          ids: results.uniqueFrameIds,
+          samples: results.totalFramesAnalyzed.toLocaleString(),
+        })}
         defaultFilename="frame-order-report"
         defaultPath={settings?.report_dir}
         onCancel={() => setShowExportDialog(false)}
@@ -140,15 +145,16 @@ type HeaderProps = {
 };
 
 function Header({ onExport, hasResults, onClose }: HeaderProps) {
+  const { t } = useTranslation("discovery");
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${borderDivider}`}>
       <ListOrdered className={`${iconLg} text-[color:var(--text-purple)]`} />
       <div className="flex-1">
         <h2 className={sectionHeaderText}>
-          Frame Order Analysis
+          {t("messageOrder.title")}
         </h2>
         <p className={caption}>
-          Detected transmission patterns and timing
+          {t("messageOrder.subtitle")}
         </p>
       </div>
       {hasResults && (
@@ -156,10 +162,10 @@ function Header({ onExport, hasResults, onClose }: HeaderProps) {
           type="button"
           onClick={onExport}
           className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs text-[color:var(--text-secondary)] ${hoverLight} transition-colors`}
-          title="Export report"
+          title={t("messageOrder.exportButtonTooltip")}
         >
           <Download className={iconSm} />
-          <span>Export</span>
+          <span>{t("messageOrder.exportLabel")}</span>
         </button>
       )}
       {onClose && (
@@ -167,7 +173,7 @@ function Header({ onExport, hasResults, onClose }: HeaderProps) {
           type="button"
           onClick={onClose}
           className={iconButtonDangerCompact}
-          title="Close"
+          title={t("messageOrder.close")}
         >
           <X className={iconXs} />
         </button>
@@ -185,15 +191,16 @@ type PatternSectionProps = {
 };
 
 function PatternSection({ patterns }: PatternSectionProps) {
+  const { t } = useTranslation("discovery");
   if (patterns.length === 0) {
     return (
       <section>
         <div className="flex items-center gap-2 mb-2">
           <Play className={`${iconMd} text-slate-400`} />
-          <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">Detected Patterns</h3>
+          <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">{t("messageOrder.patterns")}</h3>
         </div>
         <p className={captionMuted}>
-          No patterns detected. Try selecting a Start Message ID from the candidates below.
+          {t("messageOrder.noPatterns")}
         </p>
       </section>
     );
@@ -204,7 +211,7 @@ function PatternSection({ patterns }: PatternSectionProps) {
       <div className="flex items-center gap-2 mb-3">
         <Play className={`${iconMd} text-purple-500`} />
         <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
-          Detected Patterns ({patterns.length})
+          {t("messageOrder.patternsCount", { count: patterns.length })}
         </h3>
       </div>
       <div className="space-y-3">
@@ -222,6 +229,7 @@ type PatternCardProps = {
 };
 
 function PatternCard({ pattern, rank }: PatternCardProps) {
+  const { t } = useTranslation("discovery");
   const confidencePercent = Math.round(pattern.confidence * 100);
   const isHighConfidence = pattern.confidence >= 0.8;
 
@@ -230,15 +238,15 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
       <div className="flex items-start justify-between mb-2">
         <div className={flexRowGap2}>
           <span className={labelSmall}>
-            Pattern #{rank}
+            {t("messageOrder.patternRank", { rank })}
           </span>
           <span className={captionMuted}>
-            starts with <span className="font-mono text-[color:var(--text-purple)]">{formatFrameId(pattern.startId)}</span>
+            {t("messageOrder.patternStartsWith")} <span className="font-mono text-[color:var(--text-purple)]">{formatFrameId(pattern.startId)}</span>
           </span>
         </div>
         <div className="flex items-center gap-3 text-xs">
           <span className="text-[color:var(--text-muted)]">
-            {pattern.occurrences}× seen
+            {t("messageOrder.occurrences", { count: pattern.occurrences })}
           </span>
           <span
             className={`font-medium ${
@@ -247,7 +255,7 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
                 : "text-[color:var(--text-amber)]"
             }`}
           >
-            {confidencePercent}% consistent
+            {t("messageOrder.consistent", { percent: confidencePercent })}
           </span>
         </div>
       </div>
@@ -269,7 +277,7 @@ function PatternCard({ pattern, rank }: PatternCardProps) {
       </div>
 
       <div className={captionMuted}>
-        {pattern.sequence.length} frames • avg cycle: {formatMs(pattern.avgCycleTimeMs)}
+        {t("messageOrder.framesAvgCycle", { count: pattern.sequence.length, cycle: formatMs(pattern.avgCycleTimeMs) })}
       </div>
     </div>
   );
@@ -285,6 +293,7 @@ type CandidatesSectionProps = {
 };
 
 function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
+  const { t } = useTranslation("discovery");
   if (candidates.length === 0) {
     return null;
   }
@@ -294,21 +303,21 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
       <div className="flex items-center gap-2 mb-3">
         <Clock className={`${iconMd} text-blue-500`} />
         <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
-          Start ID Candidates
+          {t("messageOrder.candidates")}
         </h3>
         <span className={captionMuted}>
-          (sorted by max gap before)
+          {t("messageOrder.candidatesSorted")}
         </span>
       </div>
       <div className={`${cardDefault} overflow-hidden`}>
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Frame ID</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Max Gap</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Avg Gap</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Min Gap</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Count</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFrameId")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableMaxGap")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableAvgGap")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableMinGap")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableCount")}</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
@@ -339,7 +348,7 @@ function CandidatesSection({ candidates, onSelect }: CandidatesSectionProps) {
                     onClick={() => onSelect(candidate.id)}
                     className="text-xs text-[color:var(--text-purple)] hover:underline"
                   >
-                    Use
+                    {t("messageOrder.useButton")}
                   </button>
                 </td>
               </tr>
@@ -360,6 +369,7 @@ type MultiplexedSectionProps = {
 };
 
 function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
+  const { t } = useTranslation("discovery");
   if (multiplexed.length === 0) {
     return null;
   }
@@ -369,21 +379,21 @@ function MultiplexedSection({ multiplexed }: MultiplexedSectionProps) {
       <div className="flex items-center gap-2 mb-3">
         <Shuffle className={`${iconMd} text-orange-500`} />
         <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
-          Potential Multiplexed Frames ({multiplexed.length})
+          {t("messageOrder.multiplexedTitle", { count: multiplexed.length })}
         </h3>
         <span className={captionMuted}>
-          (same ID, byte[0] increments)
+          {t("messageOrder.multiplexedHint")}
         </span>
       </div>
       <div className={`${cardDefault} overflow-hidden`}>
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Frame ID</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Selector</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Cases</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Mux Period</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Inter-msg</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFrameId")}</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableSelector")}</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableCases")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableMuxPeriod")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableInterMsg")}</th>
             </tr>
           </thead>
           <tbody>
@@ -451,6 +461,7 @@ type BurstSectionProps = {
 };
 
 function BurstSection({ bursts }: BurstSectionProps) {
+  const { t } = useTranslation("discovery");
   if (bursts.length === 0) {
     return null;
   }
@@ -460,22 +471,22 @@ function BurstSection({ bursts }: BurstSectionProps) {
       <div className="flex items-center gap-2 mb-3">
         <Zap className={`${iconMd} text-cyan-500`} />
         <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
-          Burst/Transaction Frames ({bursts.length})
+          {t("messageOrder.burstTitle", { count: bursts.length })}
         </h3>
         <span className={captionMuted}>
-          (variable DLC, request-response patterns)
+          {t("messageOrder.burstHint")}
         </span>
       </div>
       <div className={`${cardDefault} overflow-hidden`}>
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Frame ID</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">DLCs</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Burst Size</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Cycle</th>
-              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">Intra-burst</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Flags</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFrameId")}</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableDlcs")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableBurstSize")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableCycle")}</th>
+              <th className="text-right px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableIntraBurst")}</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFlags")}</th>
             </tr>
           </thead>
           <tbody>
@@ -538,6 +549,7 @@ type MultiBusSectionProps = {
 };
 
 function MultiBusSection({ multiBus }: MultiBusSectionProps) {
+  const { t } = useTranslation("discovery");
   if (multiBus.length === 0) {
     return null;
   }
@@ -547,19 +559,19 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
       <div className="flex items-center gap-2 mb-3">
         <GitBranch className={`${iconMd} text-rose-500`} />
         <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
-          Multi-Bus Frames ({multiBus.length})
+          {t("messageOrder.multiBusTitle", { count: multiBus.length })}
         </h3>
         <span className={captionMuted}>
-          (same ID seen on multiple buses)
+          {t("messageOrder.multiBusHint")}
         </span>
       </div>
       <div className={`${cardDefault} overflow-hidden`}>
         <table className="w-full text-xs">
           <thead>
             <tr className={borderDivider}>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Frame ID</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Buses</th>
-              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">Count per Bus</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableFrameId")}</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableBuses")}</th>
+              <th className="text-left px-3 py-2 font-medium text-[color:var(--text-muted)]">{t("messageOrder.tableCountPerBus")}</th>
             </tr>
           </thead>
           <tbody>
@@ -578,7 +590,7 @@ function MultiBusSection({ multiBus }: MultiBusSectionProps) {
                         key={bus}
                         className="px-1.5 py-0.5 bg-[var(--badge-rose-bg)] text-[color:var(--badge-rose-text)] rounded text-[10px] font-mono"
                       >
-                        Bus {bus}
+                        {t("messageOrder.busLabel", { bus })}
                       </span>
                     ))}
                   </div>
@@ -615,6 +627,7 @@ type IntervalSectionProps = {
 };
 
 function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionProps) {
+  const { t } = useTranslation("discovery");
   if (groups.length === 0) {
     return null;
   }
@@ -624,10 +637,10 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
       <div className="flex items-center gap-2 mb-3">
         <Layers className={`${iconMd} text-emerald-500`} />
         <h3 className="text-xs font-medium text-[color:var(--text-secondary)]">
-          Repetition Period Groups
+          {t("messageOrder.intervalGroups")}
         </h3>
         <span className={captionMuted}>
-          (frames grouped by how often they repeat)
+          {t("messageOrder.intervalHint")}
         </span>
       </div>
       <div className="space-y-2">
@@ -641,7 +654,7 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
                 ~{formatMs(group.intervalMs)}
               </span>
               <span className={captionMuted}>
-                ({group.frameIds.length} frame{group.frameIds.length !== 1 ? "s" : ""})
+                {t("messageOrder.frameCount", { count: group.frameIds.length })}
               </span>
             </div>
             <div className="flex flex-wrap gap-1">
@@ -658,7 +671,7 @@ function IntervalSection({ groups, multiplexedIds, burstIds }: IntervalSectionPr
                         ? "bg-[var(--badge-cyan-bg)] text-[color:var(--badge-cyan-text)]"
                         : "bg-[var(--hover-bg)] text-[color:var(--text-secondary)]"
                     }`}
-                    title={isMux ? "Multiplexed frame" : isBurst ? "Burst/transaction frame" : undefined}
+                    title={isMux ? t("messageOrder.tooltipMultiplexed") : isBurst ? t("messageOrder.tooltipBurst") : undefined}
                   >
                     {formatFrameId(id)}
                     {isMux && <span className="ml-0.5 text-orange-500">⚡</span>}

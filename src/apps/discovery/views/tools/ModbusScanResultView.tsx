@@ -1,5 +1,6 @@
 // ui/src/apps/discovery/views/tools/ModbusScanResultView.tsx
 
+import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import type { ModbusScanResults } from "../../../../stores/discoveryToolboxStore";
 import { bgDataView, textMuted, textPrimary, textSecondary, borderDefault, emptyStateContainer, emptyStateText } from "../../../../styles";
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export default function ModbusScanResultView({ results, onClose, onCancel }: Props) {
+  const { t } = useTranslation("discovery");
   const { frames, scanType, isScanning, progress, deviceInfo } = results;
   const hasDeviceInfo = deviceInfo.size > 0;
 
@@ -22,17 +24,19 @@ export default function ModbusScanResultView({ results, onClose, onCancel }: Pro
       <div className={`flex items-center justify-between px-4 py-2 border-b ${borderDefault}`}>
         <div className="flex items-center gap-3">
           <h3 className={`text-sm font-medium ${textPrimary}`}>
-            {scanType === 'register' ? 'Register Scan' : 'Unit ID Scan'}
+            {scanType === 'register' ? t("modbusScan.registerScanTitle") : t("modbusScan.unitIdScanTitle")}
           </h3>
           {isScanning && progress && (
             <span className={`text-xs ${textMuted}`}>
-              Scanning {progress.current}/{progress.total} — {progress.found_count} found
+              {t("modbusScan.scanningProgress", { current: progress.current, total: progress.total, found: progress.found_count })}
             </span>
           )}
           {!isScanning && (
             <span className={`text-xs ${textMuted}`}>
-              {frames.length} {scanType === 'register' ? 'register' : 'device'}{frames.length !== 1 ? 's' : ''} found
-              {hasDeviceInfo && ` (${deviceInfo.size} identified via FC43)`}
+              {scanType === 'register'
+                ? t("modbusScan.registersFound", { count: frames.length })
+                : t("modbusScan.devicesFound", { count: frames.length })}
+              {hasDeviceInfo && ` ${t("modbusScan.identified", { count: deviceInfo.size })}`}
             </span>
           )}
         </div>
@@ -42,11 +46,11 @@ export default function ModbusScanResultView({ results, onClose, onCancel }: Pro
               onClick={onCancel}
               className="px-2 py-0.5 rounded text-xs hover:bg-red-600 hover:text-white transition-colors text-[color:var(--text-muted)]"
             >
-              Cancel
+              {t("modbusScan.cancel")}
             </button>
           )}
           {!isScanning && (
-            <button onClick={onClose} className={`${textMuted} hover:${textPrimary}`} title="Close">
+            <button onClick={onClose} className={`${textMuted} hover:${textPrimary}`} title={t("modbusScan.close")}>
               <X className={iconSm} />
             </button>
           )}
@@ -67,19 +71,19 @@ export default function ModbusScanResultView({ results, onClose, onCancel }: Pro
       <div className="flex-1 overflow-auto">
         {frames.length === 0 ? (
           <div className={emptyStateContainer}>
-            <p className={emptyStateText}>{isScanning ? 'Scanning...' : 'No results found'}</p>
+            <p className={emptyStateText}>{isScanning ? t("modbusScan.scanning") : t("modbusScan.noResults")}</p>
           </div>
         ) : scanType === 'unit-id' ? (
           /* Unit ID scan table — shows device identification when available */
           <table className="w-full text-xs">
             <thead className={`sticky top-0 ${bgDataView}`}>
               <tr className={`border-b ${borderDefault}`}>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>#</th>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>Unit ID</th>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>Vendor</th>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>Product</th>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>Revision</th>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>Data</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableNumber")}</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableUnitId")}</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableVendor")}</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableProduct")}</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableRevision")}</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableData")}</th>
               </tr>
             </thead>
             <tbody>
@@ -92,11 +96,11 @@ export default function ModbusScanResultView({ results, onClose, onCancel }: Pro
                   >
                     <td className={`px-4 py-1 ${textMuted} font-mono`}>{i + 1}</td>
                     <td className={`px-4 py-1 ${textSecondary} font-mono`}>{frame.bus}</td>
-                    <td className={`px-4 py-1 ${textPrimary}`}>{info?.vendor ?? '—'}</td>
-                    <td className={`px-4 py-1 ${textSecondary}`}>{info?.product_code ?? '—'}</td>
-                    <td className={`px-4 py-1 ${textMuted}`}>{info?.revision ?? '—'}</td>
+                    <td className={`px-4 py-1 ${textPrimary}`}>{info?.vendor ?? t("modbusScan.noValue")}</td>
+                    <td className={`px-4 py-1 ${textSecondary}`}>{info?.product_code ?? t("modbusScan.noValue")}</td>
+                    <td className={`px-4 py-1 ${textMuted}`}>{info?.revision ?? t("modbusScan.noValue")}</td>
                     <td className={`px-4 py-1 ${textMuted} font-mono`}>
-                      {frame.bytes.length > 0 ? bytesToHex(frame.bytes) : '—'}
+                      {frame.bytes.length > 0 ? bytesToHex(frame.bytes) : t("modbusScan.noValue")}
                     </td>
                   </tr>
                 );
@@ -108,10 +112,10 @@ export default function ModbusScanResultView({ results, onClose, onCancel }: Pro
           <table className="w-full text-xs">
             <thead className={`sticky top-0 ${bgDataView}`}>
               <tr className={`border-b ${borderDefault}`}>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>#</th>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>Register</th>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>Length</th>
-                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>Data</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableNumber")}</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableRegister")}</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableLength")}</th>
+                <th className={`text-left px-4 py-1.5 ${textMuted} font-medium`}>{t("modbusScan.tableData")}</th>
               </tr>
             </thead>
             <tbody>
