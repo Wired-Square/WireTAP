@@ -1,5 +1,6 @@
 // ui/src/apps/catalog/views/CANFrameEditView.tsx
 
+import { useTranslation } from "react-i18next";
 import type { CanidFields } from "../types";
 import { textMedium, focusRing, secondaryButton } from "../../../styles";
 
@@ -20,42 +21,46 @@ export type CANFrameEditViewProps = {
 };
 
 export default function CANFrameEditView({
-  title = "Add New CAN Frame",
-  subtitle = "Create a new CAN message definition",
+  title,
+  subtitle,
   idFields,
   setIdFields,
   availablePeers,
-  primaryActionLabel = "Add Frame",
+  primaryActionLabel,
   onCancel,
   onSave,
   disableSave,
 }: CANFrameEditViewProps) {
+  const { t } = useTranslation("catalog");
+  const resolvedTitle = title ?? t("canFrameEditView.addTitle");
+  const resolvedSubtitle = subtitle ?? t("canFrameEditView.addSubtitle");
+  const resolvedAction = primaryActionLabel ?? t("canFrameEditView.addButton");
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2">{title}</h2>
-        <p className="text-sm text-[color:var(--text-muted)]">{subtitle}</p>
+        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2">{resolvedTitle}</h2>
+        <p className="text-sm text-[color:var(--text-muted)]">{resolvedSubtitle}</p>
       </div>
 
       <div className="space-y-4">
         {/* ID - Required */}
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            ID <span className="text-red-500">*</span>
+            {t("canFrameEditView.id")} <span className="text-red-500">{t("canFrameEditView.required")}</span>
           </label>
           <input
             type="text"
             value={idFields.id}
             onChange={(e) => setIdFields({ ...idFields, id: e.target.value })}
             className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
-            placeholder="0x123"
+            placeholder={t("canFrameEditView.idPlaceholder")}
           />
         </div>
 
         {/* Length (DLC) - Required */}
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Length (DLC) <span className="text-red-500">*</span>
+            {t("canFrameEditView.lengthDlc")} <span className="text-red-500">{t("canFrameEditView.required")}</span>
           </label>
           <input
             type="number"
@@ -70,14 +75,14 @@ export default function CANFrameEditView({
         {/* Transmitter (Peer) - Optional */}
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Transmitter (Peer)
+            {t("canFrameEditView.transmitter")}
           </label>
           <select
             value={idFields.transmitter || ""}
             onChange={(e) => setIdFields({ ...idFields, transmitter: e.target.value || undefined })}
             className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
           >
-            <option value="">None</option>
+            <option value="">{t("canFrameEditView.transmitterNone")}</option>
             {availablePeers.map((peer) => (
               <option key={peer} value={peer}>
                 {peer}
@@ -89,7 +94,7 @@ export default function CANFrameEditView({
         {/* Interval (ms) - Optional */}
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Interval (ms)
+            {t("canFrameEditView.interval")}
           </label>
           <input
             type="number"
@@ -102,14 +107,14 @@ export default function CANFrameEditView({
               })
             }
             className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-            placeholder="1000"
+            placeholder={t("canFrameEditView.intervalPlaceholder")}
           />
         </div>
 
         {/* Notes - Optional */}
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Notes
+            {t("canFrameEditView.notes")}
           </label>
           <textarea
             rows={4}
@@ -131,7 +136,7 @@ export default function CANFrameEditView({
               }
             }}
             className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono text-sm ${focusRing}`}
-            placeholder="Add notes about this frame (one per line)"
+            placeholder={t("canFrameEditView.notesPlaceholder")}
           />
         </div>
 
@@ -140,14 +145,14 @@ export default function CANFrameEditView({
             onClick={onCancel}
             className={secondaryButton}
           >
-            Cancel
+            {t("canFrameEditView.cancel")}
           </button>
           <button
             onClick={onSave}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             disabled={disableSave || !idFields.id}
           >
-            {primaryActionLabel}
+            {resolvedAction}
           </button>
         </div>
       </div>

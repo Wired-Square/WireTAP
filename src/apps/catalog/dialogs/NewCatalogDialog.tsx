@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/NewCatalogDialog.tsx
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Network, Server, Cable } from "lucide-react";
 import { iconLg } from "../../../styles/spacing";
 import Dialog from "../../../components/Dialog";
@@ -37,18 +38,6 @@ export type NewCatalogDialogProps = {
   onCreate: (selectedProtocol: ProtocolType) => void;
 };
 
-// Protocol configuration for buttons
-const protocols: Array<{
-  type: ProtocolType;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  namePlaceholder: string;
-}> = [
-  { type: "can", label: "CAN", icon: Network, namePlaceholder: "My CAN Protocol" },
-  { type: "modbus", label: "Modbus", icon: Server, namePlaceholder: "My Modbus Protocol" },
-  { type: "serial", label: "Serial", icon: Cable, namePlaceholder: "My Serial Protocol" },
-];
-
 export default function NewCatalogDialog({
   open,
   metaFields,
@@ -67,6 +56,20 @@ export default function NewCatalogDialog({
   onCancel,
   onCreate,
 }: NewCatalogDialogProps) {
+  const { t } = useTranslation("catalog");
+
+  // Protocol configuration for buttons
+  const protocols: Array<{
+    type: ProtocolType;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    namePlaceholder: string;
+  }> = [
+    { type: "can", label: t("newCatalog.protocolCan"), icon: Network, namePlaceholder: t("newCatalog.namePlaceholderCan") },
+    { type: "modbus", label: t("newCatalog.protocolModbus"), icon: Server, namePlaceholder: t("newCatalog.namePlaceholderModbus") },
+    { type: "serial", label: t("newCatalog.protocolSerial"), icon: Cable, namePlaceholder: t("newCatalog.namePlaceholderSerial") },
+  ];
+
   // Local state for selected protocol (determines which config section to show)
   const [selectedProtocol, setSelectedProtocol] = useState<ProtocolType>("can");
 
@@ -87,7 +90,7 @@ export default function NewCatalogDialog({
   return (
     <Dialog isOpen={open} maxWidth="max-w-2xl">
       <div className="p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className={`${h2} mb-6`}>Create New Catalog</h2>
+        <h2 className={`${h2} mb-6`}>{t("newCatalog.title")}</h2>
 
         {metaError && (
           <div className={`${alertDanger} mb-4`}>
@@ -97,7 +100,7 @@ export default function NewCatalogDialog({
 
         <div className="space-y-4">
           {/* Protocol Selector Buttons */}
-          <FormField label="Protocol Type" variant="default">
+          <FormField label={t("newCatalog.protocolType")} variant="default">
             <div className="grid grid-cols-3 gap-3">
               {protocols.map(({ type, label, icon: Icon }) => {
                 const isSelected = selectedProtocol === type;
@@ -127,17 +130,17 @@ export default function NewCatalogDialog({
           </FormField>
 
           {/* Name */}
-          <FormField label="Name" required variant="default">
+          <FormField label={t("newCatalog.name")} required variant="default">
             <Input
               variant="default"
               value={metaFields.name}
               onChange={(e) => setMetaFields({ ...metaFields, name: e.target.value })}
-              placeholder={currentProtocolConfig?.namePlaceholder ?? "My Protocol"}
+              placeholder={currentProtocolConfig?.namePlaceholder ?? t("newCatalog.namePlaceholderDefault")}
             />
           </FormField>
 
           {/* Version */}
-          <FormField label="Version" required variant="default">
+          <FormField label={t("newCatalog.version")} required variant="default">
             <Input
               variant="default"
               type="number"
@@ -155,26 +158,26 @@ export default function NewCatalogDialog({
           {selectedProtocol === "can" && (
             <>
               {/* Default Byte Order */}
-              <FormField label="Default Byte Order" required variant="default">
+              <FormField label={t("newCatalog.defaultByteOrder")} required variant="default">
                 <Select
                   variant="default"
                   value={canDefaultEndianness}
                   onChange={(e) => setCanDefaultEndianness(e.target.value as "little" | "big")}
                 >
-                  <option value="little">Little Endian</option>
-                  <option value="big">Big Endian</option>
+                  <option value="little">{t("newCatalog.endianLE")}</option>
+                  <option value="big">{t("newCatalog.endianBE")}</option>
                 </Select>
               </FormField>
 
               {/* Default Interval */}
-              <FormField label="Default Interval (ms) (optional)" variant="default">
+              <FormField label={t("newCatalog.defaultIntervalOptional")} variant="default">
                 <Input
                   variant="default"
                   type="number"
                   min={0}
                   value={canDefaultInterval !== undefined ? canDefaultInterval : ""}
                   onChange={(e) => setCanDefaultInterval(e.target.value ? parseInt(e.target.value) : undefined)}
-                  placeholder="1000"
+                  placeholder={t("newCatalog.intervalPlaceholder")}
                 />
               </FormField>
             </>
@@ -184,7 +187,7 @@ export default function NewCatalogDialog({
           {selectedProtocol === "modbus" && (
             <>
               {/* Device Address */}
-              <FormField label="Device Address" required variant="default">
+              <FormField label={t("newCatalog.deviceAddress")} required variant="default">
                 <Input
                   variant="default"
                   type="number"
@@ -192,22 +195,22 @@ export default function NewCatalogDialog({
                   max={247}
                   value={modbusDeviceAddress}
                   onChange={(e) => setModbusDeviceAddress(parseInt(e.target.value) || 1)}
-                  placeholder="1"
+                  placeholder={t("newCatalog.deviceAddressPlaceholder")}
                 />
                 <p className={`mt-1 ${caption}`}>
-                  Slave address (1-247) for all Modbus frames
+                  {t("newCatalog.deviceAddressHint")}
                 </p>
               </FormField>
 
               {/* Register Base */}
-              <FormField label="Register Addressing" required variant="default">
+              <FormField label={t("newCatalog.registerAddressing")} required variant="default">
                 <Select
                   variant="default"
                   value={modbusRegisterBase}
                   onChange={(e) => setModbusRegisterBase(parseInt(e.target.value) as 0 | 1)}
                 >
-                  <option value={1}>1-based (Modbus standard)</option>
-                  <option value={0}>0-based</option>
+                  <option value={1}>{t("newCatalog.registerBase1")}</option>
+                  <option value={0}>{t("newCatalog.registerBase0")}</option>
                 </Select>
               </FormField>
             </>
@@ -215,28 +218,28 @@ export default function NewCatalogDialog({
 
           {/* Serial-specific fields */}
           {selectedProtocol === "serial" && (
-            <FormField label="Encoding" required variant="default">
+            <FormField label={t("newCatalog.encoding")} required variant="default">
               <Select
                 variant="default"
                 value={serialEncoding}
                 onChange={(e) => setSerialEncoding(e.target.value as SerialEncoding)}
               >
-                <option value="slip">SLIP (RFC 1055)</option>
-                <option value="cobs">COBS (Consistent Overhead Byte Stuffing)</option>
-                <option value="raw">Raw (delimiter-based)</option>
-                <option value="length_prefixed">Length Prefixed</option>
+                <option value="slip">{t("newCatalog.encodingSlip")}</option>
+                <option value="cobs">{t("newCatalog.encodingCobs")}</option>
+                <option value="raw">{t("newCatalog.encodingRaw")}</option>
+                <option value="length_prefixed">{t("newCatalog.encodingLengthPrefixed")}</option>
               </Select>
               <p className={`mt-1 ${caption}`}>
-                Framing method used to delimit messages on the serial bus
+                {t("newCatalog.encodingHint")}
               </p>
             </FormField>
           )}
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+          <SecondaryButton onClick={onCancel}>{t("newCatalog.cancel")}</SecondaryButton>
           <SuccessButton onClick={() => onCreate(selectedProtocol)} disabled={nameInvalid || versionInvalid}>
-            Create Catalog
+            {t("newCatalog.createButton")}
           </SuccessButton>
         </div>
       </div>

@@ -1,5 +1,6 @@
 // ui/src/apps/catalog/views/protocol-editors/CANConfigSection.tsx
 
+import { useTranslation } from "react-i18next";
 import type { CANConfig } from "../../types";
 import { flexRowGap2 } from "../../../../styles/spacing";
 import { caption, textMedium, focusRing, checkboxDefault } from "../../../../styles";
@@ -15,22 +16,23 @@ export default function CANConfigSection({
   config,
   onChange,
 }: CANConfigSectionProps) {
+  const { t } = useTranslation("catalog");
   return (
     <div className="space-y-4">
       {/* ID - Required */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          ID <span className="text-red-500">*</span>
+          {t("protocolEditors.canIdLabel")} <span className="text-red-500">{t("protocolEditors.canIdRequired")}</span>
         </label>
         <input
           type="text"
           value={config.id}
           onChange={(e) => onChange({ ...config, id: e.target.value })}
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
-          placeholder="0x123"
+          placeholder={t("protocolEditors.canIdPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
-          Hex (0x123) or decimal (291) format
+          {t("protocolEditors.canIdHint")}
         </p>
       </div>
 
@@ -44,14 +46,14 @@ export default function CANConfigSection({
           className={checkboxDefault}
         />
         <label htmlFor="extended" className="text-sm text-[color:var(--text-secondary)]">
-          Extended ID (29-bit)
+          {t("protocolEditors.canExtendedLabel")}
         </label>
       </div>
 
       {/* Bus - Optional */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          Bus
+          {t("protocolEditors.canBusLabel")}
         </label>
         <input
           type="number"
@@ -64,17 +66,17 @@ export default function CANConfigSection({
             })
           }
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-          placeholder="0"
+          placeholder={t("protocolEditors.canBusPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
-          CAN bus index (optional, for multi-bus systems)
+          {t("protocolEditors.canBusHint")}
         </p>
       </div>
 
       {/* Copy from - Optional (mutually exclusive with Mirror Of) */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          Copy From
+          {t("protocolEditors.canCopyFromLabel")}
         </label>
         <input
           type="text"
@@ -88,17 +90,17 @@ export default function CANConfigSection({
           }
           disabled={!!config.mirror_of}
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing} disabled:opacity-50 disabled:cursor-not-allowed`}
-          placeholder="0x456"
+          placeholder={t("protocolEditors.canCopyFromPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
-          Inherit metadata (length, transmitter, interval) from another frame
+          {t("protocolEditors.canCopyFromHint")}
         </p>
       </div>
 
       {/* Mirror Of - Optional (mutually exclusive with Copy From) */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          Mirror Of
+          {t("protocolEditors.canMirrorOfLabel")}
         </label>
         <input
           type="text"
@@ -112,10 +114,10 @@ export default function CANConfigSection({
           }
           disabled={!!config.copy}
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing} disabled:opacity-50 disabled:cursor-not-allowed`}
-          placeholder="0x456"
+          placeholder={t("protocolEditors.canMirrorOfPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
-          Inherit ALL signals from another frame (override by bit position)
+          {t("protocolEditors.canMirrorOfHint")}
         </p>
       </div>
     </div>

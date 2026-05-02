@@ -1,5 +1,6 @@
 // ui/src/apps/catalog/views/protocol-editors/ModbusConfigSection.tsx
 
+import { useTranslation } from "react-i18next";
 import type { ModbusConfig } from "../../types";
 import { caption, textMedium, focusRing } from "../../../../styles";
 
@@ -25,29 +26,30 @@ export default function ModbusConfigSection({
   defaultDeviceAddress,
   defaultRegisterBase,
 }: ModbusConfigSectionProps) {
+  const { t } = useTranslation("catalog");
   return (
     <div className="space-y-4">
       {/* Frame Key (friendly name) - Required */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          Frame Name <span className="text-red-500">*</span>
+          {t("protocolEditors.modbusFrameNameLabel")} <span className="text-red-500">{t("protocolEditors.modbusFrameNameRequired")}</span>
         </label>
         <input
           type="text"
           value={frameKey}
           onChange={(e) => onFrameKeyChange(e.target.value)}
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-          placeholder="battery_voltage"
+          placeholder={t("protocolEditors.modbusFrameNamePlaceholder")}
         />
         <p className={`${caption} mt-1`}>
-          A descriptive name for this register group
+          {t("protocolEditors.modbusFrameNameHint")}
         </p>
       </div>
 
       {/* Register Number - Required */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          Register Number <span className="text-red-500">*</span>
+          {t("protocolEditors.modbusRegisterNumberLabel")} <span className="text-red-500">{t("protocolEditors.modbusRegisterNumberRequired")}</span>
         </label>
         <input
           type="number"
@@ -58,10 +60,10 @@ export default function ModbusConfigSection({
             onChange({ ...config, register_number: parseInt(e.target.value) || 0 })
           }
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-          placeholder="100"
+          placeholder={t("protocolEditors.modbusRegisterNumberPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
-          Starting register address (0-65535)
+          {t("protocolEditors.modbusRegisterNumberHint")}
         </p>
       </div>
 
@@ -69,7 +71,7 @@ export default function ModbusConfigSection({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className={`block ${textMedium}`}>
-            Device Address <span className="text-red-500">*</span>
+            {t("protocolEditors.modbusDeviceAddressLabel")} <span className="text-red-500">{t("protocolEditors.modbusDeviceAddressRequired")}</span>
           </label>
           {defaultDeviceAddress !== undefined && onDeviceAddressInheritedChange && (
             <label className={`flex items-center gap-2 ${caption}`}>
@@ -79,7 +81,7 @@ export default function ModbusConfigSection({
                 onChange={(e) => onDeviceAddressInheritedChange(e.target.checked)}
                 className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
               />
-              Use default ({defaultDeviceAddress})
+              {t("protocolEditors.modbusUseDefault", { value: defaultDeviceAddress })}
             </label>
           )}
         </div>
@@ -95,17 +97,17 @@ export default function ModbusConfigSection({
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
             isDeviceAddressInherited ? "opacity-50 cursor-not-allowed" : ""
           }`}
-          placeholder="1"
+          placeholder={t("protocolEditors.modbusDeviceAddressPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
-          Modbus slave address (1-247)
+          {t("protocolEditors.modbusDeviceAddressHint")}
         </p>
       </div>
 
       {/* Register Type */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          Register Type
+          {t("protocolEditors.modbusRegisterTypeLabel")}
         </label>
         <select
           value={config.register_type ?? "holding"}
@@ -117,17 +119,17 @@ export default function ModbusConfigSection({
           }
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
         >
-          <option value="holding">Holding Registers (FC 03/06/16)</option>
-          <option value="input">Input Registers (FC 04)</option>
-          <option value="coil">Coils (FC 01/05/15)</option>
-          <option value="discrete">Discrete Inputs (FC 02)</option>
+          <option value="holding">{t("protocolEditors.modbusRegisterTypeHolding")}</option>
+          <option value="input">{t("protocolEditors.modbusRegisterTypeInput")}</option>
+          <option value="coil">{t("protocolEditors.modbusRegisterTypeCoil")}</option>
+          <option value="discrete">{t("protocolEditors.modbusRegisterTypeDiscrete")}</option>
         </select>
       </div>
 
       {/* Register Base - Optional (uses catalog default if not specified) */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          Register Base
+          {t("protocolEditors.modbusRegisterBaseLabel")}
         </label>
         <select
           value={config.register_base ?? ""}
@@ -141,14 +143,14 @@ export default function ModbusConfigSection({
         >
           <option value="">
             {defaultRegisterBase !== undefined
-              ? `Use default (${defaultRegisterBase}-based)`
-              : "Not specified"}
+              ? t("protocolEditors.modbusRegisterBaseDefault", { base: defaultRegisterBase })
+              : t("protocolEditors.modbusRegisterBaseNotSpecified")}
           </option>
-          <option value="0">0-based (0-65535)</option>
-          <option value="1">1-based (1-65536)</option>
+          <option value="0">{t("protocolEditors.modbusRegisterBase0")}</option>
+          <option value="1">{t("protocolEditors.modbusRegisterBase1")}</option>
         </select>
         <p className={`${caption} mt-1`}>
-          Some manufacturers count registers from 0, others from 1
+          {t("protocolEditors.modbusRegisterBaseHint")}
         </p>
       </div>
     </div>

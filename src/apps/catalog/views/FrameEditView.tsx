@@ -2,6 +2,7 @@
 // Generic frame editor that handles CAN, Modbus, and Serial protocols
 
 import { useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Network, Server, Cable } from "lucide-react";
 import { iconMd, iconLg } from "../../../styles/spacing";
 import { caption, disabledState, textMedium, focusRing, secondaryButton } from "../../../styles";
@@ -64,18 +65,22 @@ export type FrameEditViewProps = {
 };
 
 export default function FrameEditView({
-  title = "Add New Frame",
-  subtitle = "Create a new frame definition",
+  title,
+  subtitle,
   fields,
   setFields,
   availablePeers,
   allowProtocolChange = true,
   defaults,
-  primaryActionLabel = "Add Frame",
+  primaryActionLabel,
   onCancel,
   onSave,
   disableSave,
 }: FrameEditViewProps) {
+  const { t } = useTranslation("catalog");
+  const resolvedTitle = title ?? t("frameEditView.addTitle");
+  const resolvedSubtitle = subtitle ?? t("frameEditView.addSubtitle");
+  const resolvedAction = primaryActionLabel ?? t("frameEditView.addButton");
   // Get registered protocols
   const protocols = useMemo(() => protocolRegistry.all(), []);
 
@@ -188,8 +193,8 @@ export default function FrameEditView({
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2">{title}</h2>
-        <p className="text-sm text-[color:var(--text-muted)]">{subtitle}</p>
+        <h2 className="text-2xl font-bold text-[color:var(--text-primary)] mb-2">{resolvedTitle}</h2>
+        <p className="text-sm text-[color:var(--text-muted)]">{resolvedSubtitle}</p>
       </div>
 
       <div className="space-y-6">
@@ -197,7 +202,7 @@ export default function FrameEditView({
         {allowProtocolChange && (
           <div>
             <label className={`block ${textMedium} mb-3`}>
-              Protocol
+              {t("frameEditView.protocolLabel")}
             </label>
             <div className="grid grid-cols-3 gap-3">
               {protocols.map((handler) => {
@@ -242,7 +247,7 @@ export default function FrameEditView({
                   const Icon = protocolIcons[currentHandler.type];
                   return <Icon className={iconMd} />;
                 })()}
-                {currentHandler.displayName} Configuration
+                {currentHandler.displayName} {t("frameEditView.configurationSuffix")}
               </>
             )}
           </h3>
@@ -252,15 +257,15 @@ export default function FrameEditView({
         {/* Common Frame Fields */}
         <div className="p-4 bg-[var(--bg-surface)] rounded-lg">
           <h3 className="text-sm font-semibold text-[color:var(--text-secondary)] mb-4">
-            Common Properties
+            {t("frameEditView.commonProperties")}
           </h3>
 
           <div className="space-y-4">
             {/* Length (DLC) */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Length {fields.protocol === "can" && "(DLC)"}{" "}
-                {fields.protocol === "modbus" && "(Registers)"}
+                {t("frameEditView.lengthLabel")} {fields.protocol === "can" && t("frameEditView.lengthDlcSuffix")}{" "}
+                {fields.protocol === "modbus" && t("frameEditView.lengthRegistersSuffix")}
               </label>
               <input
                 type="number"
@@ -275,14 +280,14 @@ export default function FrameEditView({
             {/* Transmitter (Peer) */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Transmitter (Peer)
+                {t("frameEditView.transmitterLabel")}
               </label>
               <select
                 value={fields.base.transmitter || ""}
                 onChange={(e) => handleBaseChange({ transmitter: e.target.value || undefined })}
                 className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
               >
-                <option value="">None</option>
+                <option value="">{t("frameEditView.transmitterNone")}</option>
                 {availablePeers.map((peer) => (
                   <option key={peer} value={peer}>
                     {peer}
@@ -295,7 +300,7 @@ export default function FrameEditView({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className={`block ${textMedium}`}>
-                  Interval (ms)
+                  {t("frameEditView.intervalLabel")}
                 </label>
                 {defaults?.interval !== undefined && (
                   <label className={`flex items-center gap-2 ${caption}`}>
@@ -305,7 +310,7 @@ export default function FrameEditView({
                       onChange={(e) => handleInheritanceChange("isIntervalInherited", e.target.checked)}
                       className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
                     />
-                    Use default ({defaults.interval})
+                    {t("frameEditView.useDefault", { value: defaults.interval })}
                   </label>
                 )}
               </div>
@@ -322,14 +327,14 @@ export default function FrameEditView({
                 className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
                   fields.isIntervalInherited ? "opacity-50 cursor-not-allowed" : ""
                 }`}
-                placeholder="1000"
+                placeholder={t("frameEditView.intervalPlaceholder")}
               />
             </div>
 
             {/* Notes */}
             <div>
               <label className={`block ${textMedium} mb-2`}>
-                Notes
+                {t("frameEditView.notesLabel")}
               </label>
               <textarea
                 rows={3}
@@ -350,7 +355,7 @@ export default function FrameEditView({
                   }
                 }}
                 className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono text-sm ${focusRing}`}
-                placeholder="Add notes about this frame (one per line)"
+                placeholder={t("frameEditView.notesPlaceholder")}
               />
             </div>
           </div>
@@ -362,14 +367,14 @@ export default function FrameEditView({
             onClick={onCancel}
             className={secondaryButton}
           >
-            Cancel
+            {t("frameEditView.cancel")}
           </button>
           <button
             onClick={onSave}
             className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${disabledState}`}
             disabled={disableSave}
           >
-            {primaryActionLabel}
+            {resolvedAction}
           </button>
         </div>
       </div>

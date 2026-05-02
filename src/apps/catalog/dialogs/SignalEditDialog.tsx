@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/dialogs/SignalEditDialog.tsx
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { List, X } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { Input, Select, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
@@ -53,6 +54,7 @@ export default function SignalEditDialog({
   onCancel,
   onSave,
 }: SignalEditDialogProps) {
+  const { t } = useTranslation("catalog");
   const [showEnumEditor, setShowEnumEditor] = useState(false);
 
   // Early return if not open or no selected node - prevents errors when dialog is closed
@@ -155,12 +157,12 @@ export default function SignalEditDialog({
     <Dialog isOpen={open} maxWidth="max-w-7xl">
       <div className="p-6 max-h-[90vh] overflow-y-auto">
         <h2 className={`${h2} mb-4`}>
-          {editingIndex !== null ? "Edit Signal" : "Add Signal"}
+          {editingIndex !== null ? t("signalEdit.editTitle") : t("signalEdit.addTitle")}
         </h2>
 
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-4">
-            <FormField label="Name" required variant="default">
+            <FormField label={t("signalEdit.name")} required variant="default">
               <Input
                 variant="default"
                 value={fields.name}
@@ -169,7 +171,7 @@ export default function SignalEditDialog({
             </FormField>
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Start Bit" required variant="default">
+              <FormField label={t("signalEdit.startBit")} required variant="default">
                 <Input
                   variant="default"
                   type="number"
@@ -177,7 +179,7 @@ export default function SignalEditDialog({
                   onChange={(e) => setFields({ ...fields, start_bit: parseInt(e.target.value, 10) || 0 })}
                 />
               </FormField>
-              <FormField label="Bit Length" required variant="default">
+              <FormField label={t("signalEdit.bitLength")} required variant="default">
                 <Input
                   variant="default"
                   type="number"
@@ -188,18 +190,18 @@ export default function SignalEditDialog({
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Format" variant="default">
+              <FormField label={t("signalEdit.format")} variant="default">
                 <Select
                   variant="default"
                   value={fields.format || "number"}
                   onChange={(e) => setFields({ ...fields, format: e.target.value })}
                 >
-                  <option value="number">Number</option>
-                  <option value="enum">Enum</option>
-                  <option value="utf8">UTF-8</option>
-                  <option value="ascii">ASCII</option>
-                  <option value="hex">Hex</option>
-                  <option value="unix_time">Unix Time</option>
+                  <option value="number">{t("signalEdit.formatNumber")}</option>
+                  <option value="enum">{t("signalEdit.formatEnum")}</option>
+                  <option value="utf8">{t("signalEdit.formatUtf8")}</option>
+                  <option value="ascii">{t("signalEdit.formatAscii")}</option>
+                  <option value="hex">{t("signalEdit.formatHex")}</option>
+                  <option value="unix_time">{t("signalEdit.formatUnixTime")}</option>
                 </Select>
               </FormField>
               <div className="flex items-center gap-2 self-end pb-2">
@@ -215,14 +217,14 @@ export default function SignalEditDialog({
                   htmlFor="signal-signed"
                   className={`${labelSmall} ${isFormatDisabled ? "text-[color:var(--text-muted)]" : ""}`}
                 >
-                  Signed
+                  {t("signalEdit.signed")}
                 </label>
               </div>
             </div>
 
             {fields.format === "enum" && (
               <div>
-                <label className={`${labelSmall} mb-2`}>Enum Values *</label>
+                <label className={`${labelSmall} mb-2`}>{t("signalEdit.enumValuesLabel")}</label>
                 <div className={flexRowGap2}>
                   <button
                     type="button"
@@ -231,18 +233,18 @@ export default function SignalEditDialog({
                   >
                     <List className={iconMd} />
                     {fields.enum && Object.keys(fields.enum).length > 0
-                      ? `Edit Enum (${Object.keys(fields.enum).length} values)`
-                      : "Add Enum Values"}
+                      ? t("signalEdit.editEnumWithCount", { count: Object.keys(fields.enum).length })
+                      : t("signalEdit.addEnumValues")}
                   </button>
                   {fields.enum && Object.keys(fields.enum).length > 0 && (
                     <button
                       type="button"
                       onClick={() => setFields({ ...fields, enum: undefined })}
                       className="flex items-center gap-1 px-3 py-2 text-sm text-[color:var(--danger)] hover:bg-[var(--danger-bg-subtle)] rounded-lg transition-colors"
-                      title="Clear enum values"
+                      title={t("signalEdit.clearTooltip")}
                     >
                       <X className={iconMd} />
-                      Clear
+                      {t("signalEdit.clear")}
                     </button>
                   )}
                 </div>
@@ -251,35 +253,35 @@ export default function SignalEditDialog({
 
             {fields.format !== "enum" && (
               <div className="grid grid-cols-3 gap-3">
-                <FormField label="Factor" variant="default">
+                <FormField label={t("signalEdit.factor")} variant="default">
                   <Input
                     variant="default"
                     type="number"
                     step="any"
                     value={fields.factor ?? ""}
-                    placeholder="e.g. 0.1"
+                    placeholder={t("signalEdit.factorPlaceholder")}
                     disabled={isFormatDisabled}
                     className={isFormatDisabled ? "opacity-50 cursor-not-allowed" : ""}
                     onChange={(e) => setFields({ ...fields, factor: e.target.value === "" ? undefined : Number(e.target.value) })}
                   />
                 </FormField>
-                <FormField label="Offset" variant="default">
+                <FormField label={t("signalEdit.offset")} variant="default">
                   <Input
                     variant="default"
                     type="number"
                     step="any"
                     value={fields.offset ?? ""}
-                    placeholder="e.g. -40"
+                    placeholder={t("signalEdit.offsetPlaceholder")}
                     disabled={isFormatDisabled}
                     className={isFormatDisabled ? "opacity-50 cursor-not-allowed" : ""}
                     onChange={(e) => setFields({ ...fields, offset: e.target.value === "" ? undefined : Number(e.target.value) })}
                   />
                 </FormField>
-                <FormField label="Unit" variant="default">
+                <FormField label={t("signalEdit.unit")} variant="default">
                   <Input
                     variant="default"
                     value={fields.unit ?? ""}
-                    placeholder="e.g. °C"
+                    placeholder={t("signalEdit.unitPlaceholder")}
                     onChange={(e) => setFields({ ...fields, unit: e.target.value || undefined })}
                   />
                 </FormField>
@@ -287,24 +289,24 @@ export default function SignalEditDialog({
             )}
 
             <div className="grid grid-cols-2 gap-3 items-end">
-              <FormField label="Confidence" variant="default">
+              <FormField label={t("signalEdit.confidence")} variant="default">
                 <Select
                   variant="default"
                   value={fields.confidence || "none"}
                   onChange={(e) => setFields({ ...fields, confidence: e.target.value })}
                 >
-                  <option value="none">None</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
+                  <option value="none">{t("signalEdit.confidenceNone")}</option>
+                  <option value="low">{t("signalEdit.confidenceLow")}</option>
+                  <option value="medium">{t("signalEdit.confidenceMedium")}</option>
+                  <option value="high">{t("signalEdit.confidenceHigh")}</option>
                 </Select>
               </FormField>
               <FormField
                 label={
                   <span className="inline-flex items-center gap-2">
-                    Byte Order
+                    {t("signalEdit.byteOrder")}
                     {!fields.endianness && inheritedByteOrder && (
-                      <span className={badgeInfo}>Inherited</span>
+                      <span className={badgeInfo}>{t("signalEdit.inheritedBadge")}</span>
                     )}
                   </span>
                 }
@@ -318,28 +320,30 @@ export default function SignalEditDialog({
                 >
                   <option value="">
                     {inheritedByteOrder
-                      ? `Inherit (${inheritedByteOrder === "little" ? "Little Endian" : "Big Endian"})`
-                      : "Not set"}
+                      ? inheritedByteOrder === "little"
+                        ? t("signalEdit.inheritOptionLE")
+                        : t("signalEdit.inheritOptionBE")
+                      : t("signalEdit.byteOrderNotSet")}
                   </option>
-                  <option value="little">Little Endian</option>
-                  <option value="big">Big Endian</option>
+                  <option value="little">{t("signalEdit.endianLE")}</option>
+                  <option value="big">{t("signalEdit.endianBE")}</option>
                 </Select>
               </FormField>
             </div>
 
-            <FormField label="Notes" variant="default">
+            <FormField label={t("signalEdit.notes")} variant="default">
               <Textarea
                 variant="default"
                 value={fields.notes ?? ""}
                 onChange={(e) => setFields({ ...fields, notes: e.target.value || undefined })}
-                placeholder="Optional notes about this signal..."
+                placeholder={t("signalEdit.notesPlaceholder")}
                 rows={2}
               />
             </FormField>
           </div>
 
           <div>
-            <h3 className={`${h3} mb-3`}>Bit Preview</h3>
+            <h3 className={`${h3} mb-3`}>{t("signalEdit.bitPreview")}</h3>
             <BitPreview
               numBytes={frameLength}
               ranges={ranges}
@@ -352,12 +356,12 @@ export default function SignalEditDialog({
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+          <SecondaryButton onClick={onCancel}>{t("signalEdit.cancel")}</SecondaryButton>
           <PrimaryButton
             onClick={onSave}
             disabled={!fields.name || fields.bit_length < 1}
           >
-            {editingIndex !== null ? "Update" : "Add"} Signal
+            {editingIndex !== null ? t("signalEdit.updateButton") : t("signalEdit.addButton")}
           </PrimaryButton>
         </div>
       </div>

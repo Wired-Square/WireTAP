@@ -1,5 +1,6 @@
 // ui/src/apps/catalog/views/protocol-editors/SerialConfigSection.tsx
 
+import { useTranslation } from "react-i18next";
 import type { SerialConfig, SerialEncoding } from "../../types";
 import { caption, textMedium, focusRing } from "../../../../styles";
 
@@ -15,6 +16,7 @@ export default function SerialConfigSection({
   onChange,
   catalogEncoding,
 }: SerialConfigSectionProps) {
+  const { t } = useTranslation("catalog");
   // Convert delimiter array to hex string for display
   const delimiterToString = (delimiter?: number[]): string => {
     if (!delimiter || delimiter.length === 0) return "";
@@ -41,17 +43,17 @@ export default function SerialConfigSection({
       {/* Frame ID - Required */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          Frame Identifier <span className="text-red-500">*</span>
+          {t("protocolEditors.serialFrameIdLabel")} <span className="text-red-500">{t("protocolEditors.serialFrameIdRequired")}</span>
         </label>
         <input
           type="text"
           value={config.frame_id ?? ""}
           onChange={(e) => onChange({ ...config, frame_id: e.target.value || undefined })}
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-          placeholder="status_frame"
+          placeholder={t("protocolEditors.serialFrameIdPlaceholder")}
         />
         <p className={`${caption} mt-1`}>
-          A unique identifier for this serial frame
+          {t("protocolEditors.serialFrameIdHint")}
         </p>
       </div>
 
@@ -59,7 +61,7 @@ export default function SerialConfigSection({
       {catalogEncoding === "raw" && (
         <div>
           <label className={`block ${textMedium} mb-2`}>
-            Delimiter
+            {t("protocolEditors.serialDelimiterLabel")}
           </label>
           <input
             type="text"
@@ -69,10 +71,10 @@ export default function SerialConfigSection({
               onChange({ ...config, delimiter });
             }}
             className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] font-mono ${focusRing}`}
-            placeholder="0x0D, 0x0A"
+            placeholder={t("protocolEditors.serialDelimiterPlaceholder")}
           />
           <p className={`${caption} mt-1`}>
-            Byte sequence marking frame boundaries (comma-separated hex or decimal)
+            {t("protocolEditors.serialDelimiterHint")}
           </p>
         </div>
       )}
