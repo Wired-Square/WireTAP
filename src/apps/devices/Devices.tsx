@@ -1,13 +1,12 @@
 // ui/src/apps/devices/Devices.tsx
 //
-// Unified Devices panel — combines WiFi provisioning and firmware upgrade
-// into a single wizard that adapts based on device capabilities.
+// Top-level devices panel: holds the Tauri event subscriptions, switches
+// between the scan list and the per-device tabbed page. All tab-specific
+// logic lives in tabs/ and the lifecycle plumbing lives in
+// hooks/useDeviceConnection.
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { Cpu } from "lucide-react";
-import { bgPrimary, textPrimary, textSecondary } from "../../styles";
-import { iconMd } from "../../styles/spacing";
 import { useDevicesStore } from "./stores/devicesStore";
 import { useProvisioningStore } from "../provisioning/stores/provisioningStore";
 import { useUpgradeStore } from "../upgrade/stores/upgradeStore";
@@ -22,25 +21,17 @@ import {
   STATUS_ERROR,
 } from "../../api/bleProvision";
 import DevicesScanView from "./components/DevicesScanView";
-import CredentialsView from "./components/CredentialsView";
-import ProvisioningView from "./components/ProvisioningView";
-import ProvisionCompleteView from "./components/ProvisionCompleteView";
-import InspectView from "./components/InspectView";
-import UploadView from "./components/UploadView";
-import UpgradeCompleteView from "./components/UpgradeCompleteView";
-import FrameLinkSetupView from "./components/FrameLinkSetupView";
-import StatusIndicator from "./components/StatusIndicator";
+import DeviceView from "./components/DeviceView";
 
 export default function Devices() {
-  const step = useDevicesStore((s) => s.ui.step);
-  const connectionState = useDevicesStore((s) => s.ui.connectionState);
-  const selectedDeviceName = useDevicesStore((s) => s.data.selectedDeviceName);
+  const screen = useDevicesStore((s) => s.ui.screen);
 
   const addDevice = useDevicesStore((s) => s.addDevice);
   const setScanning = useDevicesStore((s) => s.setScanning);
-  const setConnectionState = useDevicesStore((s) => s.setConnectionState);
-  const setStep = useDevicesStore((s) => s.setStep);
+  const setScreen = useDevicesStore((s) => s.setScreen);
   const setError = useDevicesStore((s) => s.setError);
+  const resetTransports = useDevicesStore((s) => s.resetTransports);
+  const setConnectionState = useDevicesStore((s) => s.setConnectionState);
 
   const setProvisionState = useProvisioningStore((s) => s.setProvisionState);
   const setProvisionError = useProvisioningStore((s) => s.setError);
@@ -49,10 +40,8 @@ export default function Devices() {
 
   const setUploadProgress = useUpgradeStore((s) => s.setUploadProgress);
 
-  // Set up Tauri event listeners
   useEffect(() => {
     const unlistenPromises = [
-      // Unified device scan events
       listen<UnifiedDevice>("device-discovered", (event) => {
         addDevice(event.payload);
       }),
@@ -60,7 +49,6 @@ export default function Devices() {
         setScanning(false);
       }),
 
-      // Provisioning status events
       listen<ProvisioningStatus>("ble-provision-status", (event) => {
         const { status, status_code } = event.payload;
         setStatusMessage(`Device status: ${status}`);
@@ -76,31 +64,30 @@ export default function Devices() {
         setDeviceIpAddress(event.payload);
       }),
 
-      // Firmware upload events
       listen<UploadProgress>("smp-upload-progress", (event) => {
         setUploadProgress(event.payload);
       }),
       listen<void>("smp-upload-complete", () => {
-        // Upload complete — UploadView handles the rest
+        // Upload complete — FirmwareTab handles the rest
       }),
 
-      // BLE disconnect events (from either provisioning or SMP)
       listen<string>("ble-device-disconnected", () => {
         const { ui } = useDevicesStore.getState();
-        if (ui.connectionState === "idle" || ui.connectionState === "connecting") return;
+        if (ui.screen !== "device") return;
+        resetTransports();
         setConnectionState("idle");
-        setStep("scan");
         setError("Device disconnected unexpectedly");
-        // Reset sub-stores
+        setScreen("scan");
         useProvisioningStore.getState().reset();
         useUpgradeStore.getState().reset();
       }),
       listen<string>("smp-device-disconnected", () => {
         const { ui } = useDevicesStore.getState();
-        if (ui.connectionState === "idle" || ui.connectionState === "connecting") return;
+        if (ui.screen !== "device") return;
+        resetTransports();
         setConnectionState("idle");
-        setStep("scan");
         setError("Device disconnected unexpectedly");
+        setScreen("scan");
         useProvisioningStore.getState().reset();
         useUpgradeStore.getState().reset();
       }),
@@ -111,7 +98,7 @@ export default function Devices() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cleanup on unmount: stop scan, disconnect, reset stores
+  // Cleanup on unmount: stop scan, disconnect everything, reset stores.
   useEffect(() => {
     return () => {
       deviceScanStop().catch(() => {});
@@ -124,32 +111,8 @@ export default function Devices() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className={`flex flex-col h-full ${bgPrimary}`}>
-      {/* Top bar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-[color:var(--border-default)]">
-        <Cpu className={`${iconMd} text-sky-400`} />
-        <span className={`text-sm font-medium ${textPrimary}`}>Devices</span>
-        {connectionState === "connected" && selectedDeviceName && (
-          <span className={`text-xs ${textSecondary} ml-auto`}>
-            {selectedDeviceName}
-          </span>
-        )}
-        {connectionState === "connected" && (
-          <StatusIndicator statusCode={2} />
-        )}
-      </div>
-
-      {/* Step content */}
-      <div className="flex-1 overflow-y-auto">
-        {step === "scan" && <DevicesScanView />}
-        {step === "credentials" && <CredentialsView />}
-        {step === "provisioning" && <ProvisioningView />}
-        {step === "provision-complete" && <ProvisionCompleteView />}
-        {step === "inspect" && <InspectView />}
-        {step === "upload" && <UploadView />}
-        {step === "upgrade-complete" && <UpgradeCompleteView />}
-        {step === "framelink-setup" && <FrameLinkSetupView />}
-      </div>
+    <div className="flex flex-col h-full bg-[var(--bg-primary)]">
+      {screen === "scan" ? <DevicesScanView /> : <DeviceView />}
     </div>
   );
 }

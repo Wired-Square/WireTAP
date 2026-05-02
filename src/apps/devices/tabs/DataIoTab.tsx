@@ -1,44 +1,47 @@
-// ui/src/apps/devices/components/FrameLinkSetupView.tsx
+// ui/src/apps/devices/tabs/DataIoTab.tsx
 //
-// FrameLink device setup — probes the device, shows discovered interfaces,
-// and creates a single grouped IO profile with all interfaces.
+// Data IO tab — probes the device for FrameLink interfaces, then offers a
+// single "Add to Data IO" button that creates a grouped IO profile.
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Plus, Check, Loader2 } from "lucide-react";
-import { textPrimary, textSecondary } from "../../../styles";
-import { iconMd } from "../../../styles/spacing";
+import { Check, Loader2, Plus } from "lucide-react";
+import {
+  alertDanger,
+  iconMd,
+  textDanger,
+  textPrimary,
+  textSecondary,
+} from "../../../styles";
 import { cardDefault } from "../../../styles/cardStyles";
-import { PrimaryButton, SecondaryButton } from "../../../components/forms";
+import { PrimaryButton } from "../../../components/forms";
 import { useDevicesStore } from "../stores/devicesStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
+import { useDeviceConnection } from "../hooks/useDeviceConnection";
 import {
   framelinkProbeDevice,
-  type ProbeInterface,
   type FrameLinkProbeResult,
+  type ProbeInterface,
 } from "../../../api/framelink";
 import type { IOProfile } from "../../../hooks/useSettings";
 
-export default function FrameLinkSetupView() {
+export default function DataIoTab() {
   const { t } = useTranslation("devices");
   const selectedDeviceName = useDevicesStore((s) => s.data.selectedDeviceName);
-  const selectedDeviceId = useDevicesStore((s) => s.data.selectedDeviceId);
-  const devices = useDevicesStore((s) => s.data.devices);
-  const setStep = useDevicesStore((s) => s.setStep);
-  const setConnectionState = useDevicesStore((s) => s.setConnectionState);
+  const selectedAddress = useDevicesStore((s) => s.data.selectedAddress);
+  const selectedFrameLinkPort = useDevicesStore((s) => s.data.selectedFrameLinkPort);
   const addProfile = useSettingsStore((s) => s.addProfile);
+
+  const { ensureIpFrameLink } = useDeviceConnection();
 
   const [probeResult, setProbeResult] = useState<FrameLinkProbeResult | null>(null);
   const [probing, setProbing] = useState(true);
   const [probeError, setProbeError] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
 
-  // Extract host/port from the selected device
-  const device = devices.find((d) => d.id === selectedDeviceId);
-  const host = device?.address ?? "";
-  const port = 120; // Standard FrameLink port (device.port may be the SMP port)
+  const host = selectedAddress ?? "";
+  const port = selectedFrameLinkPort ?? 120;
 
-  // Probe on mount
   useEffect(() => {
     if (!host) {
       setProbeError(t("frameLink.noAddress"));
@@ -49,33 +52,26 @@ export default function FrameLinkSetupView() {
     let cancelled = false;
     (async () => {
       try {
+        await ensureIpFrameLink();
         const result = await framelinkProbeDevice(host, port, 5);
-        if (!cancelled) {
-          setProbeResult(result);
-          setProbing(false);
-        }
+        if (cancelled) return;
+        setProbeResult(result);
+        setProbing(false);
       } catch (e) {
-        if (!cancelled) {
-          setProbeError(String(e));
-          setProbing(false);
-        }
+        if (cancelled) return;
+        setProbeError(String(e));
+        setProbing(false);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [host, port]);
+  }, [host, port, ensureIpFrameLink, t]);
 
-  const handleBack = () => {
-    setConnectionState("idle");
-    setStep("scan");
-  };
-
-  // Use device_id from capabilities as the canonical label (e.g. "WiredFlexLink-9D04")
-  const deviceLabel = probeResult?.device_id ?? selectedDeviceName ?? t("frameLink.fallbackName");
+  const deviceLabel =
+    probeResult?.device_id ?? selectedDeviceName ?? t("frameLink.fallbackName");
 
   const handleAddProfile = () => {
     if (!probeResult) return;
-
     const profile: IOProfile = {
       id: `io_fl_${Date.now()}`,
       name: deviceLabel,
@@ -100,22 +96,6 @@ export default function FrameLinkSetupView() {
 
   return (
     <div className="flex flex-col gap-4 p-4 h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <SecondaryButton onClick={handleBack} className="px-2 py-1">
-          <ArrowLeft className={iconMd} />
-        </SecondaryButton>
-        <div>
-          <h2 className={`text-sm font-medium ${textPrimary}`}>
-            {deviceLabel}
-          </h2>
-          <span className={`text-xs ${textSecondary}`}>
-            {host}:{port}
-          </span>
-        </div>
-      </div>
-
-      {/* Probing state */}
       {probing && (
         <div className="flex items-center justify-center py-12 gap-3">
           <Loader2 className={`${iconMd} animate-spin text-sky-400`} />
@@ -123,14 +103,10 @@ export default function FrameLinkSetupView() {
         </div>
       )}
 
-      {/* Error */}
       {probeError && (
-        <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-200">
-          {probeError}
-        </div>
+        <div className={`${alertDanger} ${textDanger} text-sm`}>{probeError}</div>
       )}
 
-      {/* Probe results */}
       {probeResult && (
         <>
           {probeResult.board_name && (
@@ -150,7 +126,9 @@ export default function FrameLinkSetupView() {
                   <span className={`text-sm font-medium ${textPrimary}`}>{iface.name}</span>
                   <span className={`text-xs ${textSecondary} ml-2`}>{iface.type_name}</span>
                 </div>
-                <span className={`text-xs ${textSecondary}`}>{t("frameLink.interfaceIndex", { index: iface.index })}</span>
+                <span className={`text-xs ${textSecondary}`}>
+                  {t("frameLink.interfaceIndex", { index: iface.index })}
+                </span>
               </div>
             ))}
           </div>

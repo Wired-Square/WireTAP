@@ -1,9 +1,8 @@
 // ui/src/apps/devices/stores/devicesStore.ts
 //
-// Lightweight store for the unified Devices tab. Manages the scan phase
-// and overall wizard step. Sub-workflow state (provisioning credentials,
-// firmware upload progress, etc.) remains in provisioningStore and
-// upgradeStore respectively.
+// Lightweight store for the unified Devices tab. Two screens — scan and the
+// per-device tabbed page. Per-tab data (provisioning credentials, firmware
+// upload progress, etc.) lives in provisioningStore and upgradeStore.
 
 import { create } from "zustand";
 import type { UnifiedDevice } from "../../../api/deviceScan";
@@ -12,20 +11,30 @@ import type { UnifiedDevice } from "../../../api/deviceScan";
 // Types
 // ============================================================================
 
-export type DevicesStep =
-  | "scan"
-  // Provisioning sub-flow
-  | "credentials"
-  | "provisioning"
-  | "provision-complete"
-  // Upgrade sub-flow
-  | "inspect"
-  | "upload"
-  | "upgrade-complete"
-  // FrameLink sub-flow
-  | "framelink-setup";
+export type DevicesScreen = "scan" | "device";
+
+export type DeviceTabId =
+  | "wifi"
+  | "firmware-ble"
+  | "firmware-ip"
+  | "dataio";
 
 export type ConnectionState = "idle" | "connecting" | "connected";
+
+/**
+ * Tracks which transports/protocols are live. Used by useDeviceConnection
+ * so each tab's ensureXxx() call is idempotent.
+ */
+export interface TransportsConnected {
+  /** BLE GATT link for WiFi provisioning service. */
+  bleProv: boolean;
+  /** SMP layer attached to the BLE link (either via fresh connect or attach). */
+  bleSmp: boolean;
+  /** UDP SMP transport. */
+  ipSmp: boolean;
+  /** FrameLink probe completed (no persistent socket). */
+  ipFrameLink: boolean;
+}
 
 // ============================================================================
 // Store
@@ -35,20 +44,33 @@ interface DevicesState {
   data: {
     /** Discovered devices (BLE + mDNS) */
     devices: UnifiedDevice[];
-    /** Currently selected device ID */
+    /** Currently selected device ID (transport-prefixed: ble:..., udp:..., fl:...) */
     selectedDeviceId: string | null;
     /** Selected device name (for display) */
     selectedDeviceName: string | null;
-    /** Selected device transport */
-    selectedDeviceTransport: "ble" | "udp" | "tcp" | null;
-    /** Selected device capabilities */
-    selectedDeviceCapabilities: string[];
+    /**
+     * BLE peripheral ID for the selected device, if one was discovered. Used
+     * by Wi-Fi and Firmware (BLE) tabs to (re)connect.
+     */
+    selectedBleId: string | null;
+    /** Selected device IP address (mDNS or manual) */
+    selectedAddress: string | null;
+    /** Selected device SMP UDP port (mDNS or manual). */
+    selectedSmpPort: number | null;
+    /** FrameLink TCP port (defaults to 120). */
+    selectedFrameLinkPort: number | null;
+    /** Selected device capabilities (from mDNS + BLE merged). */
+    selectedCapabilities: string[];
   };
   ui: {
-    /** Current wizard step */
-    step: DevicesStep;
-    /** Connection state */
+    /** Top-level screen — scan list or per-device tabbed page. */
+    screen: DevicesScreen;
+    /** Active tab on the device page. */
+    activeTab: DeviceTabId;
+    /** Connection state (any live transport → "connected"). */
     connectionState: ConnectionState;
+    /** Per-transport connection flags. */
+    transports: TransportsConnected;
     /** Whether scanning is active */
     isScanning: boolean;
     /** Error message */
@@ -60,16 +82,26 @@ interface DevicesState {
   clearDevices: () => void;
   /** Drop entries whose lastSeenAt is older than (now - olderThanMs). */
   pruneStale: (olderThanMs: number) => void;
-  setSelectedDevice: (
-    id: string | null,
-    name: string | null,
-    transport: "ble" | "udp" | "tcp" | null,
-    capabilities: string[],
-  ) => void;
+  /**
+   * Capture the device the user is about to interact with. The fields that
+   * are null get filled in as discovery sources confirm them.
+   */
+  selectDevice: (selection: {
+    id: string;
+    name: string;
+    bleId: string | null;
+    address: string | null;
+    smpPort: number | null;
+    frameLinkPort: number | null;
+    capabilities: string[];
+  }) => void;
 
   // UI actions
-  setStep: (step: DevicesStep) => void;
+  setScreen: (screen: DevicesScreen) => void;
+  setActiveTab: (tab: DeviceTabId) => void;
   setConnectionState: (state: ConnectionState) => void;
+  setTransport: (key: keyof TransportsConnected, value: boolean) => void;
+  resetTransports: () => void;
   setScanning: (scanning: boolean) => void;
   setError: (error: string | null) => void;
 
@@ -81,13 +113,25 @@ const initialData = {
   devices: [] as UnifiedDevice[],
   selectedDeviceId: null as string | null,
   selectedDeviceName: null as string | null,
-  selectedDeviceTransport: null as "ble" | "udp" | "tcp" | null,
-  selectedDeviceCapabilities: [] as string[],
+  selectedBleId: null as string | null,
+  selectedAddress: null as string | null,
+  selectedSmpPort: null as number | null,
+  selectedFrameLinkPort: null as number | null,
+  selectedCapabilities: [] as string[],
+};
+
+const initialTransports: TransportsConnected = {
+  bleProv: false,
+  bleSmp: false,
+  ipSmp: false,
+  ipFrameLink: false,
 };
 
 const initialUi = {
-  step: "scan" as DevicesStep,
+  screen: "scan" as DevicesScreen,
+  activeTab: "wifi" as DeviceTabId,
   connectionState: "idle" as ConnectionState,
+  transports: { ...initialTransports },
   isScanning: false,
   error: null as string | null,
 };
@@ -141,23 +185,39 @@ export const useDevicesStore = create<DevicesState>((set) => ({
       return { data: { ...s.data, devices: next } };
     }),
 
-  setSelectedDevice: (id, name, transport, capabilities) =>
+  selectDevice: (selection) =>
     set((s) => ({
       data: {
         ...s.data,
-        selectedDeviceId: id,
-        selectedDeviceName: name,
-        selectedDeviceTransport: transport,
-        selectedDeviceCapabilities: capabilities,
+        selectedDeviceId: selection.id,
+        selectedDeviceName: selection.name,
+        selectedBleId: selection.bleId,
+        selectedAddress: selection.address,
+        selectedSmpPort: selection.smpPort,
+        selectedFrameLinkPort: selection.frameLinkPort,
+        selectedCapabilities: selection.capabilities,
       },
     })),
 
   // ── UI actions ──
 
-  setStep: (step) => set((s) => ({ ui: { ...s.ui, step } })),
+  setScreen: (screen) => set((s) => ({ ui: { ...s.ui, screen } })),
+
+  setActiveTab: (activeTab) => set((s) => ({ ui: { ...s.ui, activeTab } })),
 
   setConnectionState: (connectionState) =>
     set((s) => ({ ui: { ...s.ui, connectionState } })),
+
+  setTransport: (key, value) =>
+    set((s) => ({
+      ui: {
+        ...s.ui,
+        transports: { ...s.ui.transports, [key]: value },
+      },
+    })),
+
+  resetTransports: () =>
+    set((s) => ({ ui: { ...s.ui, transports: { ...initialTransports } } })),
 
   setScanning: (isScanning) => set((s) => ({ ui: { ...s.ui, isScanning } })),
 

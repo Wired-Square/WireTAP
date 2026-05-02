@@ -18,7 +18,40 @@
     "manualPort": "Port",
     "manualIpPlaceholder": "192.168.1.100",
     "connect": "Connect",
-    "connecting": "..."
+    "connecting": "...",
+    "errors": {
+      "addressRequired": "Please enter an IP address",
+      "invalidPort": "Please enter a valid port number (1–65535)",
+      "bleNoActionable": "This device has no BLE-side capability we can use",
+      "ipNoActionable": "This device has no IP-side capability we can use"
+    }
+  },
+  "device": {
+    "back": "Back",
+    "unknown": "Unknown device",
+    "connectingBle": "Connecting to BLE…",
+    "connectingBleSmp": "Attaching SMP over BLE…",
+    "connectingIpSmp": "Connecting SMP over UDP…",
+    "changeWifi": "Change Wi-Fi",
+    "goToFirmwareBle": "Go to Firmware (BLE)",
+    "tabs": {
+      "wifi": "Wi-Fi (BLE)",
+      "firmwareBle": "Firmware (BLE)",
+      "firmwareIp": "Firmware (IP)",
+      "dataio": "Data IO"
+    },
+    "unavailable": {
+      "try": "Available on this device:",
+      "noBle": "This device isn't reachable over BLE. Move closer or power-cycle it, then rescan.",
+      "noIp": "This device isn't reachable over IP. Make sure it's joined the network and visible to mDNS.",
+      "noWifiProv": "This device isn't advertising the Wi-Fi provisioning service over BLE.",
+      "noBleSmp": "This device isn't advertising SMP over BLE.",
+      "bleSmpStubbed": "Firmware upgrade over BLE is temporarily disabled while we wait on an upstream dependency. Use Firmware (IP) instead.",
+      "noSmpService": "This device isn't advertising the SMP service.",
+      "noSmpPort": "No SMP UDP port is known for this device.",
+      "noFrameLink": "This device isn't advertising FrameLink.",
+      "noFrameLinkPort": "No FrameLink TCP port is known for this device."
+    }
   },
   "card": {
     "badges": {
@@ -160,6 +193,7 @@
     "retry": "Retry",
     "cancel": "Cancel",
     "back": "Back",
+    "backToInspect": "Back to slots",
     "kbSize": "{{kb}} KB",
     "browse": "Browse",
     "noFile": "No firmware file selected",
