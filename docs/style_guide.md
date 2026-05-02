@@ -357,22 +357,6 @@ value.toLocaleString(i18n.language);
 | `bg-purple-600 hover:bg-purple-700 text-white` | `toggleButtonClass(true, "purple")` or extend `buttonStyles.ts` with a semantic variant |
 | `hover:bg-zinc-700` | `hover:brightness-95` (or `hoverBg` for tokens) |
 
-## Refactor backlog
-
-These patterns recur across the app and should be migrated when surrounding
-code is touched. Listed by frequency / impact.
-
-1. **Hardcoded JSX text strings** (~700 across the app) — Settings
-   `GeneralView`, `PrivacyView`, `LocationsView`, `CapturesView`, and
-   `CatalogsView` are migrated to `t(…)`. The remaining settings views
-   (`DisplayView`, `DataIOView`, `BookmarksView`, `SelectionSetsView`,
-   `GraphLayoutsView`) and the settings dialogs (`IOProfileDialog`,
-   `EditCatalogDialog`, etc.) still contain hardcoded English. Discovery,
-   Decoder, Transmit, Graph, Calculator and the rest of the apps are also
-   un-migrated. Migrate as you touch them: pick or create a namespace, move
-   strings into `src/locales/en-AU/<ns>.json`, and replace JSX literals with
-   `t(...)`.
-
 ## Adding a new app
 
 An app must be registered in **all** of these places. Missing one leaves the
