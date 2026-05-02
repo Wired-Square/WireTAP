@@ -1,5 +1,6 @@
 // ui/src/apps/catalog/views/MetaView.tsx
 
+import { useTranslation } from "react-i18next";
 import { FileText, Pencil, Network, Cable, Check } from "lucide-react";
 import { iconMd, iconXs, iconLg, flexRowGap2 } from "../../../styles/spacing";
 import { labelSmallMuted, monoBody, iconButtonHover, bgSecondary, captionMuted, sectionHeaderText } from "../../../styles";
@@ -26,6 +27,7 @@ export default function MetaView({
   hasModbusFrames,
   onEditMeta,
 }: MetaViewProps) {
+  const { t } = useTranslation("catalog");
   return (
     <div className="space-y-6">
       {/* Header with actions */}
@@ -36,17 +38,17 @@ export default function MetaView({
           </div>
           <div>
             <div className="text-lg font-bold text-[color:var(--text-primary)]">
-              Catalog Metadata
+              {t("metaView.title")}
             </div>
             <p className="text-sm text-[color:var(--text-muted)]">
-              Name, version, and protocol settings
+              {t("metaView.subtitle")}
             </p>
           </div>
         </div>
         <button
           onClick={onEditMeta}
           className={iconButtonHover}
-          title="Edit metadata and config"
+          title={t("metaView.editTooltip")}
         >
           <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
         </button>
@@ -56,16 +58,16 @@ export default function MetaView({
       <div className="grid grid-cols-2 gap-4">
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Name <span className="text-red-500">*</span>
+            {t("metaView.name")} <span className="text-red-500">{t("metaView.required")}</span>
           </div>
           <div className={monoBody}>
-            {metaFields.name || <span className="text-red-500">Not set</span>}
+            {metaFields.name || <span className="text-red-500">{t("metaView.notSet")}</span>}
           </div>
         </div>
 
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
-            Version <span className="text-red-500">*</span>
+            {t("metaView.version")} <span className="text-red-500">{t("metaView.required")}</span>
           </div>
           <div className={monoBody}>
             {metaFields.version}
@@ -76,28 +78,28 @@ export default function MetaView({
       {/* Protocol Configurations */}
       <div className="space-y-3">
         <h3 className={sectionHeaderText}>
-          Protocol Configurations
+          {t("metaView.protocolConfigurations")}
         </h3>
 
         {/* CAN Config */}
         <ProtocolConfigCard
           icon={<Network className={`${iconMd} text-[color:var(--status-success)]`} />}
           iconBg="bg-[var(--status-success-bg)]"
-          name="CAN"
+          name={t("metaView.canName")}
           isConfigured={!!canConfig}
           hasFrames={hasCanFrames}
         >
           {canConfig && (
             <div className="text-xs text-[color:var(--text-muted)]">
-              <span>Byte order: {canConfig.default_endianness}</span>
+              <span>{t("metaView.byteOrder", { order: canConfig.default_endianness })}</span>
               {canConfig.default_interval !== undefined && (
-                <span> • Interval: {canConfig.default_interval}ms</span>
+                <span> • {t("metaView.intervalMs", { ms: canConfig.default_interval })}</span>
               )}
               {canConfig.frame_id_mask !== undefined && (
-                <span> • Mask: 0x{canConfig.frame_id_mask.toString(16).toUpperCase()}</span>
+                <span> • {t("metaView.maskHex", { hex: canConfig.frame_id_mask.toString(16).toUpperCase() })}</span>
               )}
               {canConfig.fields && Object.keys(canConfig.fields).length > 0 && (
-                <span> • {Object.keys(canConfig.fields).length} header field(s)</span>
+                <span> • {t("metaView.headerFields", { count: Object.keys(canConfig.fields).length })}</span>
               )}
             </div>
           )}
@@ -107,24 +109,24 @@ export default function MetaView({
         <ProtocolConfigCard
           icon={<Cable className={`${iconMd} text-[color:var(--status-info)]`} />}
           iconBg="bg-[var(--status-info-bg)]"
-          name="Serial"
+          name={t("metaView.serialName")}
           isConfigured={!!serialConfig}
           hasFrames={hasSerialFrames}
         >
           {serialConfig && (
             <div className="text-xs text-[color:var(--text-muted)]">
-              <span>Encoding: {serialConfig.encoding?.toUpperCase()}</span>
+              <span>{t("metaView.encoding", { encoding: serialConfig.encoding?.toUpperCase() })}</span>
               {serialConfig.byte_order && (
-                <span> • {serialConfig.byte_order === 'big' ? 'BE' : 'LE'}</span>
+                <span> • {serialConfig.byte_order === 'big' ? t("metaView.endianBE") : t("metaView.endianLE")}</span>
               )}
               {serialConfig.header_length !== undefined && (
-                <span> • Header: {serialConfig.header_length}B</span>
+                <span> • {t("metaView.headerLength", { length: serialConfig.header_length })}</span>
               )}
               {serialConfig.fields && Object.keys(serialConfig.fields).length > 0 && (
-                <span> • {Object.keys(serialConfig.fields).length} field(s)</span>
+                <span> • {t("metaView.fields", { count: Object.keys(serialConfig.fields).length })}</span>
               )}
               {serialConfig.checksum && (
-                <span> • Checksum: {serialConfig.checksum.algorithm.toUpperCase()}</span>
+                <span> • {t("metaView.checksumLabel", { algo: serialConfig.checksum.algorithm.toUpperCase() })}</span>
               )}
             </div>
           )}
@@ -134,22 +136,22 @@ export default function MetaView({
         <ProtocolConfigCard
           icon={<Network className={`${iconMd} text-[color:var(--status-warning)]`} />}
           iconBg="bg-[var(--status-warning-bg)]"
-          name="Modbus"
+          name={t("metaView.modbusName")}
           isConfigured={!!modbusConfig}
           hasFrames={hasModbusFrames}
         >
           {modbusConfig && (
             <div className="text-xs text-[color:var(--text-muted)]">
-              <span>Address: {modbusConfig.device_address}</span>
-              <span> • Base: {modbusConfig.register_base}-based</span>
+              <span>{t("metaView.address", { addr: modbusConfig.device_address })}</span>
+              <span> • {t("metaView.registerBase", { base: modbusConfig.register_base })}</span>
               {modbusConfig.default_interval !== undefined && (
-                <span> • Interval: {modbusConfig.default_interval}ms</span>
+                <span> • {t("metaView.intervalMs", { ms: modbusConfig.default_interval })}</span>
               )}
               {modbusConfig.default_byte_order && (
-                <span> • Byte: {modbusConfig.default_byte_order === "big" ? "BE" : "LE"}</span>
+                <span> • {t("metaView.byteShort", { order: modbusConfig.default_byte_order === "big" ? t("metaView.endianBE") : t("metaView.endianLE") })}</span>
               )}
               {modbusConfig.default_word_order && (
-                <span> • Word: {modbusConfig.default_word_order === "big" ? "BE" : "LE"}</span>
+                <span> • {t("metaView.wordShort", { order: modbusConfig.default_word_order === "big" ? t("metaView.endianBE") : t("metaView.endianLE") })}</span>
               )}
             </div>
           )}
@@ -175,6 +177,7 @@ function ProtocolConfigCard({
   hasFrames?: boolean;
   children?: React.ReactNode;
 }) {
+  const { t } = useTranslation("catalog");
   const showWarning = hasFrames && !isConfigured;
 
   return (
@@ -188,17 +191,17 @@ function ProtocolConfigCard({
           {isConfigured && (
             <span className="flex items-center gap-1 text-xs text-[color:var(--status-success)]">
               <Check className={iconXs} />
-              configured
+              {t("metaView.configured")}
             </span>
           )}
           {showWarning && (
             <span className="text-xs text-[color:var(--status-warning)]">
-              frames exist, no config
+              {t("metaView.framesNoConfig")}
             </span>
           )}
           {!isConfigured && !hasFrames && (
             <span className={captionMuted}>
-              not configured
+              {t("metaView.notConfigured")}
             </span>
           )}
         </div>

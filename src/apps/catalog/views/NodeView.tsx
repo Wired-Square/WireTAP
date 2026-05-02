@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/views/NodeView.tsx
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { iconMd, flexRowGap2 } from "../../../styles/spacing";
 import { caption, labelSmallMuted, monoBody, iconButtonHover, iconButtonHoverDanger, textMedium, bgSecondary, sectionHeaderText, hoverLight, emptyStateText } from "../../../styles";
@@ -49,6 +50,7 @@ export default function NodeView({
   onRequestDeleteSignal,
   displayFrameIdFormat = "hex",
 }: NodeViewProps) {
+  const { t } = useTranslation("catalog");
   const nodeName = selectedNode.key;
   const framesForNode = React.useMemo<FrameWithSignals[]>(() => {
     try {
@@ -139,17 +141,17 @@ export default function NodeView({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">Node</h3>
+        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("nodeView.transmittingNode")}</h3>
 
         <div className={flexRowGap2}>
           {onAddCanFrameForNode && (
             <button
               onClick={() => onAddCanFrameForNode(nodeName)}
               className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
-              title="Add CAN frame for this node"
+              title={t("nodeView.addCanFrame")}
             >
               <Plus className={iconMd} />
-              Add CAN Frame
+              {t("nodeView.addCanFrame")}
             </button>
           )}
 
@@ -163,7 +165,7 @@ export default function NodeView({
                 onEditNode(nodeName, notesStr);
               }}
               className={iconButtonHover}
-              title="Edit node"
+              title={t("nodeView.edit")}
             >
               <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
             </button>
@@ -173,7 +175,7 @@ export default function NodeView({
             <button
               onClick={() => onDeleteNode(nodeName)}
               className={iconButtonHoverDanger}
-              title="Delete node"
+              title={t("nodeView.deleteTooltip")}
             >
               <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
             </button>
@@ -182,13 +184,13 @@ export default function NodeView({
       </div>
 
       <div className={`p-4 ${bgSecondary} rounded-lg`}>
-        <div className={labelSmallMuted}>Name</div>
+        <div className={labelSmallMuted}>{t("metaView.name")}</div>
         <div className={monoBody}>{nodeName}</div>
       </div>
 
       {selectedNode.metadata?.properties?.notes && (
         <div className={`p-3 ${bgSecondary} rounded-lg`}>
-          <div className={labelSmallMuted}>Notes</div>
+          <div className={labelSmallMuted}>{t("nodeView.notes")}</div>
           <div className="text-sm text-[color:var(--text-secondary)] whitespace-pre-wrap">
             {Array.isArray(selectedNode.metadata.properties.notes)
               ? selectedNode.metadata.properties.notes.join("\n")
@@ -200,7 +202,7 @@ export default function NodeView({
       {selectedNode.children && selectedNode.children.length > 0 ? (
         <div className="space-y-2">
           <div className={sectionHeaderText}>
-            Items ({selectedNode.children.length})
+            {t("nodeView.items", { count: selectedNode.children.length })}
           </div>
 
           {selectedNode.children.map((child, idx) => (
@@ -222,8 +224,8 @@ export default function NodeView({
 
                   {child.type === "can-frame" && child.metadata?.length !== undefined && (
                     <div className={caption}>
-                      {child.metadata.length} bytes
-                      {child.metadata.transmitter ? ` • tx: ${child.metadata.transmitter}` : ""}
+                      {t("nodeView.bytesUnit", { count: child.metadata.length })}
+                      {child.metadata.transmitter ? ` • ${t("nodeView.txTransmitter", { name: child.metadata.transmitter })}` : ""}
                     </div>
                   )}
                 </div>
@@ -236,16 +238,16 @@ export default function NodeView({
           ))}
         </div>
       ) : (
-        <div className={emptyStateText}>No items</div>
+        <div className={emptyStateText}>{t("nodeView.noItems")}</div>
       )}
 
       <div className="space-y-2">
         <div className={sectionHeaderText}>
-          Transmitted CAN Frames ({framesForNode.length})
+          {t("nodeView.transmittedFrames", { count: framesForNode.length })}
         </div>
 
         {framesForNode.length === 0 ? (
-          <div className="text-sm text-[color:var(--text-muted)]">No CAN frames use this node as transmitter.</div>
+          <div className="text-sm text-[color:var(--text-muted)]">{t("nodeView.noTransmittedFrames")}</div>
         ) : (
           framesForNode.map((frame) => (
             <div
@@ -270,13 +272,13 @@ export default function NodeView({
                 <div className={flexRowGap2}>
                   {frame.length !== undefined && (
                     <div className={caption}>
-                      {frame.length} bytes
+                      {t("nodeView.bytesUnit", { count: frame.length })}
                     </div>
                   )}
                   <button
                     onClick={() => onSelectPath(["frame", "can", frame.id])}
                     className={iconButtonHover}
-                    title="Edit frame"
+                    title={t("nodeView.editFrame")}
                   >
                     <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
                   </button>
@@ -284,7 +286,7 @@ export default function NodeView({
                     <button
                       onClick={() => onRequestDeleteFrame(frame.id)}
                       className={iconButtonHoverDanger}
-                      title="Delete frame"
+                      title={t("nodeView.deleteFrame")}
                     >
                       <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                     </button>
@@ -295,7 +297,7 @@ export default function NodeView({
               })()}
 
               {frame.signals.length === 0 ? (
-                <div className={emptyStateText}>No signals defined.</div>
+                <div className={emptyStateText}>{t("nodeView.noSignals")}</div>
               ) : (
                 <div className="space-y-2">
                   {frame.signals.map((signal, idx) => (
@@ -306,8 +308,16 @@ export default function NodeView({
                           {signal.name}
                         </div>
                         <div className={caption}>
-                          Bits {signal.start_bit ?? 0} - {(signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1}
-                          {signal.bit_length ? ` (${signal.bit_length} bits)` : ""}
+                          {signal.bit_length
+                            ? t("nodeView.bitsRangeWithLength", {
+                                start: signal.start_bit ?? 0,
+                                end: (signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1,
+                                length: signal.bit_length,
+                              })
+                            : t("nodeView.bitsRange", {
+                                start: signal.start_bit ?? 0,
+                                end: (signal.start_bit ?? 0) + (signal.bit_length ?? 0) - 1,
+                              })}
                           {signal.location ? ` • ${signal.location}` : ""}
                         </div>
                       </div>
@@ -315,7 +325,7 @@ export default function NodeView({
                         <button
                           onClick={() => onSelectPath(signal.path)}
                           className={iconButtonHover}
-                          title="Edit signal"
+                          title={t("nodeView.editSignal")}
                         >
                           <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
                         </button>
@@ -330,7 +340,7 @@ export default function NodeView({
                               )
                             }
                             className={iconButtonHoverDanger}
-                            title="Delete signal"
+                            title={t("nodeView.deleteSignal")}
                           >
                             <Trash2 className={`${iconMd} text-[color:var(--text-red)]`} />
                           </button>
