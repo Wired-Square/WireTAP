@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSettings } from '../hooks/useSettings';
 import { flexRowGap2 } from '../styles/spacing';
 
@@ -160,6 +161,7 @@ export default function BitPreview({
   compact = false,
   bytesPerRowOverride,
 }: BitPreviewProps) {
+  const { t } = useTranslation('common');
   const { settings } = useSettings();
   // Use prop if provided, otherwise fall back to settings, then default
   const binaryZeroColour = binaryZeroColourProp ?? settings?.binary_zero_colour ?? "#94a3b8";
@@ -239,13 +241,13 @@ export default function BitPreview({
       map.set(key, className);
       legend.push({
         key,
-        label: r.name || (r.type === "mux" ? "Mux selector" : "Signal"),
+        label: r.name || (r.type === "mux" ? t('bitPreview.muxFallback') : t('bitPreview.signalFallback')),
         className,
       });
     });
 
     return { colorByKey: map, legendEntries: legend };
-  }, [ranges]);
+  }, [ranges, t]);
 
   // Use a ref to store onColorMapping to avoid infinite loops when parent passes
   // an inline function. We only want to call it when colorByKey actually changes.
@@ -410,17 +412,17 @@ export default function BitPreview({
               ? rangeColorClass
               : availableClass;
 
-            const overlappingNames = overlappingRanges.map(r => r.name || (r.type === "mux" ? "Mux" : "Signal"));
+            const overlappingNames = overlappingRanges.map(r => r.name || (r.type === "mux" ? t('bitPreview.muxShort') : t('bitPreview.signalShort')));
 
             const tooltip = isDragSelected
-              ? `Selecting bit ${bitIdx}`
+              ? t('bitPreview.tooltipSelecting', { bit: bitIdx })
               : isOverlap
-              ? `OVERLAP: ${overlappingNames.join(", ")}`
+              ? t('bitPreview.tooltipOverlap', { names: overlappingNames.join(", ") })
               : rangeType === 'current'
-              ? `Bit ${bitIdx} (current)`
+              ? t('bitPreview.tooltipCurrent', { bit: bitIdx })
               : rangeAtBit
-              ? `Bit ${bitIdx}: ${rangeAtBit.name || "Signal"}`
-              : `Bit ${bitIdx} (available)`;
+              ? t('bitPreview.tooltipNamed', { bit: bitIdx, name: rangeAtBit.name || t('bitPreview.signalShort') })
+              : t('bitPreview.tooltipAvailable', { bit: bitIdx });
 
             // Only apply custom style for available bits (when no other styling applies)
             const useCustomStyle = availableStyle && !isDragSelected && !isOverlap && rangeType !== 'current' && !rangeColorClass;
@@ -491,14 +493,14 @@ export default function BitPreview({
         {hasOverlap && (
           <div className={flexRowGap2}>
             <div className="w-4 h-4 bg-red-500 rounded" />
-            <span className="text-[color:var(--text-secondary)]">Overlap (error!)</span>
+            <span className="text-[color:var(--text-secondary)]">{t('bitPreview.legendOverlap')}</span>
           </div>
         )}
 
         {interactive && (
           <div className={flexRowGap2}>
             <div className="w-4 h-4 bg-[var(--status-warning)] rounded" />
-            <span className="text-[color:var(--text-secondary)]">Click and drag to select</span>
+            <span className="text-[color:var(--text-secondary)]">{t('bitPreview.instruction')}</span>
           </div>
         )}
 

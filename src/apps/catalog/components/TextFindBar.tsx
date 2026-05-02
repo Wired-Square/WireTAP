@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/components/TextFindBar.tsx
 
 import { useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
 import { disabledState, borderDivider, focusRing, iconButtonHoverSmall } from "../../../styles";
@@ -27,6 +28,7 @@ function findAllMatches(text: string, query: string): number[] {
 }
 
 export default function TextFindBar({ textareaRef }: TextFindBarProps) {
+  const { t } = useTranslation("common");
   const inputRef = useRef<HTMLInputElement>(null);
   const matchPositionsRef = useRef<number[]>([]);
 
@@ -119,7 +121,7 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
         value={textFind.query}
         onChange={(e) => setTextFindQuery(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Find in text..."
+        placeholder={t("findBar.placeholderText")}
         className={`flex-1 px-3 py-1.5 text-sm rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
       />
 
@@ -127,9 +129,9 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
         {textFind.query.trim()
           ? matchCount > 0
             ? textFind.currentIndex >= 0
-              ? `${currentMatch}/${matchCount}`
-              : `${matchCount} found`
-            : "No results"
+              ? t("findBar.currentOfTotal", { current: currentMatch, total: matchCount })
+              : t("findBar.matchesFound", { count: matchCount })
+            : t("findBar.noResults")
           : ""}
       </span>
 
@@ -137,7 +139,7 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
         onClick={textFindPrevious}
         disabled={matchCount === 0}
         className={`${iconButtonHoverSmall} ${disabledState}`}
-        title="Previous match (Shift+Enter)"
+        title={t("findBar.previous")}
       >
         <ChevronUp className={iconMd} />
       </button>
@@ -146,7 +148,7 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
         onClick={textFindNext}
         disabled={matchCount === 0}
         className={`${iconButtonHoverSmall} ${disabledState}`}
-        title="Next match (Enter)"
+        title={t("findBar.next")}
       >
         <ChevronDown className={iconMd} />
       </button>
@@ -154,7 +156,7 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
       <button
         onClick={closeTextFind}
         className={iconButtonHoverSmall}
-        title="Close (Escape)"
+        title={t("findBar.close")}
       >
         <X className={iconMd} />
       </button>

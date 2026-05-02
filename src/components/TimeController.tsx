@@ -1,6 +1,7 @@
 // ui/src/components/TimeController.tsx
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Play, Pause, Square, Clock, Zap } from "lucide-react";
 import TimeDisplay from "./TimeDisplay";
 import type { IOCapabilities } from '../api/io';
@@ -84,6 +85,7 @@ export default function TimeController({
   compact = false,
   capabilities,
 }: TimeControllerProps) {
+  const { t } = useTranslation("common");
   const [localStartTime, setLocalStartTime] = useState(startTime || "");
   const [localEndTime, setLocalEndTime] = useState(endTime || "");
 
@@ -126,20 +128,20 @@ export default function TimeController({
             onClick={onPlay}
             disabled={disabled}
             className={compact ? playButtonCompact : playButtonBase}
-            title="Play"
+            title={t("timeController.play")}
           >
             <Play className={compact ? iconSm : iconMd} />
-            {!compact && "Play"}
+            {!compact && t("timeController.play")}
           </button>
         ) : showPauseButton ? (
           <button
             onClick={onPause}
             disabled={disabled}
             className={compact ? pauseButtonCompact : pauseButtonBase}
-            title="Pause playback"
+            title={t("timeController.pausePlayback")}
           >
             <Pause className={compact ? iconSm : iconMd} />
-            {!compact && "Pause"}
+            {!compact && t("timeController.pause")}
           </button>
         ) : (
           // For realtime sources that can't pause, show disabled play button
@@ -148,10 +150,10 @@ export default function TimeController({
             className={`flex items-center gap-2 rounded-lg transition-colors bg-green-600/50 text-white/70 cursor-not-allowed ${
               compact ? "px-2 py-1" : "px-3 py-1.5"
             }`}
-            title="Streaming..."
+            title={t("timeController.streaming")}
           >
             <Play className={compact ? iconSm : iconMd} />
-            {!compact && "Live"}
+            {!compact && t("timeController.live")}
           </button>
         )}
 
@@ -159,10 +161,10 @@ export default function TimeController({
           onClick={onStop}
           disabled={disabled || isPaused}
           className={compact ? stopButtonCompact : stopButtonBase}
-          title="Pause"
+          title={t("timeController.pause")}
         >
           <Square className={compact ? iconSm : iconMd} />
-          {!compact && "Pause"}
+          {!compact && t("timeController.pause")}
         </button>
       </div>
 
@@ -211,7 +213,7 @@ export default function TimeController({
       {showTimeRangeInputs && (
         <div className={`${flexRowGap2} border-l border-[color:var(--border-default)] pl-3`}>
           <label className="text-xs text-[color:var(--text-muted)]">
-            From:
+            {t("timeController.from")}
           </label>
           <input
             type="datetime-local"
@@ -224,7 +226,7 @@ export default function TimeController({
             } rounded border bg-[var(--bg-surface)] border-[color:var(--border-default)] text-[color:var(--text-primary)] ${disabledState} font-mono`}
           />
           <label className="text-xs text-[color:var(--text-muted)]">
-            To:
+            {t("timeController.to")}
           </label>
           <input
             type="datetime-local"

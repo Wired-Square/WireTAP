@@ -4,6 +4,7 @@
 // Allows drag selection to define mask and auto-calculates shift
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { flexRowGap2 } from '../styles/spacing';
 import { caption, captionMuted, sectionHeaderText } from '../styles/typography';
 
@@ -34,6 +35,7 @@ export default function MaskBitPicker({
   activeBits,
   label,
 }: MaskBitPickerProps) {
+  const { t } = useTranslation('common');
   // Calculate total bits and active bits
   const totalBits = numBytes * 8;
   const numActiveBits = activeBits ?? totalBits;
@@ -131,12 +133,12 @@ export default function MaskBitPicker({
       }
 
       const tooltip = isOutOfRange
-        ? `Bit ${bitIdx} (not used in ${numActiveBits}-bit ID)`
+        ? t('maskBitPicker.tooltipUnused', { bit: bitIdx, activeBits: numActiveBits })
         : isDragSelected
-        ? `Selecting bit ${bitIdx}`
+        ? t('maskBitPicker.tooltipSelecting', { bit: bitIdx })
         : isSelected
-        ? `Bit ${bitIdx} (in mask)`
-        : `Bit ${bitIdx}`;
+        ? t('maskBitPicker.tooltipInMask', { bit: bitIdx })
+        : t('maskBitPicker.tooltipBit', { bit: bitIdx });
 
       bits.push(
         <div
@@ -175,8 +177,12 @@ export default function MaskBitPicker({
   const hexDigits = numBytes * 2;
   const maskHex = `0x${(mask << shift).toString(16).toUpperCase().padStart(hexDigits, '0')}`;
   const extractedBits = selectedRange
-    ? `bits ${selectedRange.start}-${selectedRange.end} (${selectedRange.end - selectedRange.start + 1} bits)`
-    : 'none';
+    ? t('maskBitPicker.extractingRange', {
+        start: selectedRange.start,
+        end: selectedRange.end,
+        count: selectedRange.end - selectedRange.start + 1,
+      })
+    : t('maskBitPicker.extractingNone');
 
   return (
     <div className="space-y-2">
@@ -201,8 +207,8 @@ export default function MaskBitPicker({
             const startBit = byteIdx * 8;
             const endBit = startBit + 8;
             const label = numBytes <= 4
-              ? `bits ${endBit - 1}-${startBit}`
-              : `byte ${byteIdx}`;
+              ? t('maskBitPicker.rowLabelBits', { end: endBit - 1, start: startBit })
+              : t('maskBitPicker.rowLabelByte', { byte: byteIdx });
             return renderBitRow(startBit, endBit, label);
           })}
         </div>
@@ -211,19 +217,19 @@ export default function MaskBitPicker({
           <div className="flex items-center gap-4 text-xs">
             <div className={flexRowGap2}>
               <div className="w-3 h-3 bg-[var(--accent-primary)] rounded-sm" />
-              <span className="text-[color:var(--text-muted)]">Selected</span>
+              <span className="text-[color:var(--text-muted)]">{t('maskBitPicker.legendSelected')}</span>
             </div>
             <div className={flexRowGap2}>
               <div className="w-3 h-3 bg-[var(--text-yellow)] rounded-sm" />
-              <span className="text-[color:var(--text-muted)]">Dragging</span>
+              <span className="text-[color:var(--text-muted)]">{t('maskBitPicker.legendDragging')}</span>
             </div>
           </div>
 
           <p className={caption}>
-            Full mask: <span className="font-mono">{maskHex}</span> | Extracting: {extractedBits}
+            {t('maskBitPicker.fullMaskLabel')} <span className="font-mono">{maskHex}</span> | {t('maskBitPicker.extractingLabel')} {extractedBits}
           </p>
           <p className={`${captionMuted} italic`}>
-            Click and drag to select bits
+            {t('maskBitPicker.instruction')}
           </p>
         </div>
       </div>

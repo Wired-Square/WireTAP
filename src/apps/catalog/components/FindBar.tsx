@@ -1,6 +1,7 @@
 // ui/src/apps/catalog/components/FindBar.tsx
 
 import { useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
 import { iconMd } from "../../../styles/spacing";
 import { disabledState, borderDivider, focusRing, iconButtonHoverSmall } from "../../../styles";
@@ -60,6 +61,7 @@ function getParentPaths(path: string[]): string[] {
 }
 
 export default function FindBar() {
+  const { t } = useTranslation("common");
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Store state
@@ -147,19 +149,23 @@ export default function FindBar() {
         value={find.query}
         onChange={(e) => setFindQuery(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Find in catalog..."
+        placeholder={t("findBar.placeholderCatalog")}
         className={`flex-1 px-3 py-1.5 text-sm rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
       />
 
       <span className="text-sm text-[color:var(--text-muted)] min-w-[60px] text-center">
-        {find.query.trim() ? (matchCount > 0 ? `${currentMatch}/${matchCount}` : "No results") : ""}
+        {find.query.trim()
+          ? matchCount > 0
+            ? t("findBar.currentOfTotal", { current: currentMatch, total: matchCount })
+            : t("findBar.noResults")
+          : ""}
       </span>
 
       <button
         onClick={findPrevious}
         disabled={matchCount === 0}
         className={`${iconButtonHoverSmall} ${disabledState}`}
-        title="Previous match (Shift+Enter)"
+        title={t("findBar.previous")}
       >
         <ChevronUp className={iconMd} />
       </button>
@@ -168,7 +174,7 @@ export default function FindBar() {
         onClick={findNext}
         disabled={matchCount === 0}
         className={`${iconButtonHoverSmall} ${disabledState}`}
-        title="Next match (Enter)"
+        title={t("findBar.next")}
       >
         <ChevronDown className={iconMd} />
       </button>
@@ -176,7 +182,7 @@ export default function FindBar() {
       <button
         onClick={closeFind}
         className={iconButtonHoverSmall}
-        title="Close (Escape)"
+        title={t("findBar.close")}
       >
         <X className={iconMd} />
       </button>

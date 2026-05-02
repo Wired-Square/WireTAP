@@ -9,6 +9,7 @@
 // - "card": Full card buttons with descriptions
 
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { hexToBytes, bytesToHex } from "../utils/byteUtils";
 import { toggleCardClass, toggleChipClass, bgDataInput, borderDataView, textDataSecondary, caption, captionMuted, bgSurface } from "../styles";
 
@@ -52,6 +53,7 @@ export default function FramingOptionsPanel({
   showEmitRawBytes = false,
   disabled = false,
 }: Props) {
+  const { t } = useTranslation("common");
   const [delimiterHex, setDelimiterHex] = useState(config?.delimiterHex || "0A");
   const [maxLength, setMaxLength] = useState(config?.maxFrameLength || 256);
 
@@ -145,8 +147,8 @@ export default function FramingOptionsPanel({
           onClick={() => handleModeChange(currentMode === "slip" ? "raw" : "slip")}
           className={`${toggleCardClass(currentMode === "slip")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
-          <div className="font-medium">SLIP</div>
-          <div className={`text-xs ${textDataSecondary} mt-0.5`}>RFC 1055 framing with 0xC0 delimiter</div>
+          <div className="font-medium">{t("framingOptions.slipTitle")}</div>
+          <div className={`text-xs ${textDataSecondary} mt-0.5`}>{t("framingOptions.slipDescription")}</div>
         </button>
 
         {/* Delimiter Option */}
@@ -156,24 +158,24 @@ export default function FramingOptionsPanel({
           onClick={() => handleModeChange(currentMode === "delimiter" ? "raw" : "delimiter")}
           className={`${toggleCardClass(currentMode === "delimiter")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
-          <div className="font-medium">Delimiter</div>
-          <div className={`text-xs ${textDataSecondary} mt-0.5`}>Split on custom delimiter bytes</div>
+          <div className="font-medium">{t("framingOptions.delimiterTitle")}</div>
+          <div className={`text-xs ${textDataSecondary} mt-0.5`}>{t("framingOptions.delimiterDescription")}</div>
         </button>
         {currentMode === "delimiter" && (
           <div className="ml-4 pl-4 border-l-2 border-blue-600 space-y-3 py-2">
             <label className="block text-sm">
-              <span className={textDataSecondary}>Delimiter (hex):</span>
+              <span className={textDataSecondary}>{t("framingOptions.delimiterHexLabel")}</span>
               <input
                 type="text"
                 value={delimiterHex}
                 onChange={(e) => handleDelimiterChange(e.target.value)}
                 disabled={disabled}
                 className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded text-white disabled:opacity-50`}
-                placeholder="0A or 0D0A"
+                placeholder={t("framingOptions.delimiterPlaceholder")}
               />
             </label>
             <label className="block text-sm">
-              <span className={textDataSecondary}>Max frame length:</span>
+              <span className={textDataSecondary}>{t("framingOptions.maxFrameLengthLabel")}</span>
               <input
                 type="number"
                 value={maxLength}
@@ -192,8 +194,8 @@ export default function FramingOptionsPanel({
           onClick={() => handleModeChange(currentMode === "modbus_rtu" ? "raw" : "modbus_rtu")}
           className={`${toggleCardClass(currentMode === "modbus_rtu")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
-          <div className="font-medium">Modbus RTU</div>
-          <div className={`text-xs ${textDataSecondary} mt-0.5`}>CRC-16 validation based framing</div>
+          <div className="font-medium">{t("framingOptions.modbusRtuTitle")}</div>
+          <div className={`text-xs ${textDataSecondary} mt-0.5`}>{t("framingOptions.modbusRtuDescription")}</div>
         </button>
         {currentMode === "modbus_rtu" && (
           <div className="ml-4 pl-4 border-l-2 border-blue-600 py-2">
@@ -205,7 +207,7 @@ export default function FramingOptionsPanel({
                 disabled={disabled}
                 className="rounded"
               />
-              Validate CRC-16
+              {t("framingOptions.validateCrc")}
             </label>
           </div>
         )}
@@ -220,7 +222,7 @@ export default function FramingOptionsPanel({
               disabled={disabled}
               className="rounded"
             />
-            Also capture raw bytes
+            {t("framingOptions.captureRawBytes")}
           </label>
         )}
       </div>
@@ -233,7 +235,7 @@ export default function FramingOptionsPanel({
       {/* Encoding selection */}
       <div>
         <label className={`block ${caption} mb-1.5`}>
-          Encoding
+          {t("framingOptions.encoding")}
         </label>
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -242,7 +244,7 @@ export default function FramingOptionsPanel({
             onClick={() => handleModeChange("raw")}
             className={`${toggleChipClass(currentMode === "raw")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            None
+            {t("framingOptions.modeNone")}
           </button>
           <button
             type="button"
@@ -250,7 +252,7 @@ export default function FramingOptionsPanel({
             onClick={() => handleModeChange("slip")}
             className={`${toggleChipClass(currentMode === "slip")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            SLIP
+            {t("framingOptions.modeSlip")}
           </button>
           <button
             type="button"
@@ -258,7 +260,7 @@ export default function FramingOptionsPanel({
             onClick={() => handleModeChange("delimiter")}
             className={`${toggleChipClass(currentMode === "delimiter")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            Delimiter
+            {t("framingOptions.modeDelimiter")}
           </button>
           <button
             type="button"
@@ -266,7 +268,7 @@ export default function FramingOptionsPanel({
             onClick={() => handleModeChange("modbus_rtu")}
             className={`${toggleChipClass(currentMode === "modbus_rtu")} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            Modbus RTU
+            {t("framingOptions.modeModbusRtu")}
           </button>
         </div>
       </div>
@@ -276,23 +278,23 @@ export default function FramingOptionsPanel({
         <div className="space-y-2 pl-2 border-l-2 border-[color:var(--accent-primary)]">
           <div>
             <label className={`block ${caption} mb-1`}>
-              Delimiter (hex)
+              {t("framingOptions.delimiterHexLabelShort")}
             </label>
             <input
               type="text"
               value={delimiterHex}
               onChange={(e) => handleDelimiterChange(e.target.value)}
               disabled={disabled}
-              placeholder="0A or 0D0A"
+              placeholder={t("framingOptions.delimiterPlaceholder")}
               className={`w-full px-2 py-1.5 text-xs rounded border border-[color:var(--border-default)] ${bgSurface} text-[color:var(--text-secondary)] disabled:opacity-50`}
             />
             <div className={`${captionMuted} mt-0.5`}>
-              LF=0A, CR=0D, CRLF=0D0A
+              {t("framingOptions.delimiterHint")}
             </div>
           </div>
           <div>
             <label className={`block ${caption} mb-1`}>
-              Max frame length
+              {t("framingOptions.maxFrameLengthLabelShort")}
             </label>
             <input
               type="number"
@@ -318,7 +320,7 @@ export default function FramingOptionsPanel({
               disabled={disabled}
               className="rounded border-[color:var(--border-default)]"
             />
-            <span>Validate CRC-16</span>
+            <span>{t("framingOptions.validateCrc")}</span>
           </label>
         </div>
       )}
@@ -333,7 +335,7 @@ export default function FramingOptionsPanel({
             disabled={disabled}
             className="rounded border-[color:var(--border-default)]"
           />
-          <span>Also capture raw bytes</span>
+          <span>{t("framingOptions.captureRawBytes")}</span>
         </label>
       )}
     </div>

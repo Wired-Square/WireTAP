@@ -1,6 +1,7 @@
 // ui/src/apps/discovery/components/DiscoveryFindBar.tsx
 
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { X, ChevronUp, ChevronDown, Loader } from "lucide-react";
 import { iconMd, iconXs } from "../../../styles/spacing";
 import { disabledState, borderDivider, focusRing, iconButtonHoverSmall } from "../../../styles";
@@ -20,10 +21,10 @@ type Props = {
   isSearching: boolean;
 };
 
-const MODES: { key: FindSearchMode; label: string }[] = [
-  { key: 'both', label: 'Both' },
-  { key: 'id',   label: 'ID' },
-  { key: 'data', label: 'Data' },
+const MODES: { key: FindSearchMode; labelKey: string; tooltipKey: string }[] = [
+  { key: 'both', labelKey: 'findBar.modeBoth', tooltipKey: 'findBar.searchModeTooltipBoth' },
+  { key: 'id',   labelKey: 'findBar.modeId',   tooltipKey: 'findBar.searchModeTooltipId' },
+  { key: 'data', labelKey: 'findBar.modeData', tooltipKey: 'findBar.searchModeTooltipData' },
 ];
 
 export default function DiscoveryFindBar({
@@ -38,6 +39,7 @@ export default function DiscoveryFindBar({
   onSearchModeChange,
   isSearching,
 }: Props) {
+  const { t } = useTranslation("common");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -61,8 +63,8 @@ export default function DiscoveryFindBar({
     ? ""
     : query.replace(/\s/g, '')
       ? matchCount > 0
-        ? `${currentIndex + 1}/${matchCount}`
-        : "No results"
+        ? t("findBar.currentOfTotal", { current: currentIndex + 1, total: matchCount })
+        : t("findBar.noResults")
       : "";
 
   return (
@@ -73,13 +75,13 @@ export default function DiscoveryFindBar({
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Find in frames…"
+        placeholder={t("findBar.placeholderFrames")}
         className={`w-48 px-2.5 py-1 text-sm rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
       />
 
       {/* Mode toggle */}
       <div className="flex items-center rounded border border-[color:var(--border-default)] overflow-hidden text-xs">
-        {MODES.map(({ key, label }) => (
+        {MODES.map(({ key, labelKey, tooltipKey }) => (
           <button
             key={key}
             onClick={() => onSearchModeChange(key)}
@@ -88,9 +90,9 @@ export default function DiscoveryFindBar({
                 ? 'bg-gray-600 text-white'
                 : 'bg-[var(--bg-primary)] text-[color:var(--text-secondary)] hover:brightness-95'
             }`}
-            title={`Search ${label === 'Both' ? 'ID and Data' : label} column${label === 'Both' ? 's' : ''}`}
+            title={t(tooltipKey)}
           >
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </div>
@@ -106,7 +108,7 @@ export default function DiscoveryFindBar({
         onClick={onPrev}
         disabled={matchCount === 0 || isSearching}
         className={`${iconButtonHoverSmall} ${disabledState}`}
-        title="Previous match (Shift+Enter)"
+        title={t("findBar.previous")}
       >
         <ChevronUp className={iconMd} />
       </button>
@@ -115,7 +117,7 @@ export default function DiscoveryFindBar({
         onClick={onNext}
         disabled={matchCount === 0 || isSearching}
         className={`${iconButtonHoverSmall} ${disabledState}`}
-        title="Next match (Enter)"
+        title={t("findBar.next")}
       >
         <ChevronDown className={iconMd} />
       </button>
@@ -123,7 +125,7 @@ export default function DiscoveryFindBar({
       <button
         onClick={onClose}
         className={iconButtonHoverSmall}
-        title="Close (Escape)"
+        title={t("findBar.close")}
       >
         <X className={iconMd} />
       </button>

@@ -4,6 +4,7 @@
 // Used in Query app (with bookmarks) and BookmarkEditorDialog (without bookmarks).
 
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Globe } from "lucide-react";
@@ -73,6 +74,7 @@ export default function TimeBoundsInput({
   showBookmarks = true,
   disabled = false,
 }: TimeBoundsInputProps) {
+  const { t } = useTranslation("common");
   const defaultTz = useSettingsStore((s) => s.display.timezone);
   const localTzAbbr = useMemo(() => getLocalTimezoneAbbr(), []);
 
@@ -180,14 +182,14 @@ export default function TimeBoundsInput({
       {/* Bookmarks dropdown (optional) */}
       {showBookmarks && bookmarks.length > 0 && (
         <div>
-          <label className={`block ${caption} mb-1`}>Bookmarks</label>
+          <label className={`block ${caption} mb-1`}>{t("timeBounds.bookmarks")}</label>
           <select
             value={bookmarks.find((b) => b.name === value.bookmarkName)?.id ?? ""}
             onChange={handleBookmarkChange}
             disabled={disabled}
             className={inputClasses}
           >
-            <option value="">Select a bookmark...</option>
+            <option value="">{t("timeBounds.selectBookmark")}</option>
             {bookmarks.map((bm) => (
               <option key={bm.id} value={bm.id}>
                 {bm.name}
@@ -199,7 +201,7 @@ export default function TimeBoundsInput({
 
       {/* Timezone toggle */}
       <div className="flex items-center justify-between">
-        <label className={caption}>Time Zone</label>
+        <label className={caption}>{t("timeBounds.timeZone")}</label>
         <div className="flex items-center gap-1 bg-[var(--hover-bg)] rounded p-0.5">
           <button
             type="button"
@@ -232,7 +234,7 @@ export default function TimeBoundsInput({
       {/* Start/End time inputs using react-datepicker */}
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className={`block ${caption} mb-1`}>Start Time</label>
+          <label className={`block ${caption} mb-1`}>{t("timeBounds.startTime")}</label>
           <DatePicker
             selected={startDate}
             onChange={handleStartDateChange}
@@ -243,12 +245,12 @@ export default function TimeBoundsInput({
             maxDate={maxDate}
             disabled={disabled}
             className={inputClasses}
-            placeholderText="Select start time..."
+            placeholderText={t("timeBounds.startPlaceholder")}
             isClearable
           />
         </div>
         <div>
-          <label className={`block ${caption} mb-1`}>End Time</label>
+          <label className={`block ${caption} mb-1`}>{t("timeBounds.endTime")}</label>
           <DatePicker
             selected={endDate}
             onChange={handleEndDateChange}
@@ -260,7 +262,7 @@ export default function TimeBoundsInput({
             minDate={startDate ?? undefined}
             disabled={disabled}
             className={inputClasses}
-            placeholderText="Select end time..."
+            placeholderText={t("timeBounds.endPlaceholder")}
             isClearable
           />
         </div>
@@ -268,11 +270,11 @@ export default function TimeBoundsInput({
 
       {/* Max frames input */}
       <div>
-        <label className={`block ${caption} mb-1`}>Max Frames</label>
+        <label className={`block ${caption} mb-1`}>{t("timeBounds.maxFrames")}</label>
         <input
           type="number"
           min={1}
-          placeholder="No limit"
+          placeholder={t("timeBounds.noLimitPlaceholder")}
           value={value.maxFrames ?? ""}
           onChange={handleMaxFramesChange}
           disabled={disabled}
