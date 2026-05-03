@@ -1,17 +1,17 @@
-// ui/src/apps/serial/Serial.tsx
+// src/apps/serial/Serial.tsx
 //
-// Serial terminal app. Four tabs:
+// Serial app shell. Two tabs:
 //   - Terminal: bidirectional ANSI terminal over the chosen serial port
-//   - ESP32 Flash: esptool-style flasher driven by the same UART
-//   - STM32 DFU: dfu-util style flasher over raw USB
-//   - STM32 UART: AN3155 system-bootloader flasher over the same UART
+//   - Flash: unified firmware flasher (ESP32 / STM32 UART / STM32 DFU),
+//            driven by the active driver record from the flasher registry
 //
 // Talks to the port directly through the `serial_terminal_*` commands —
 // no IO sessions / multi-source broker / ad-hoc profile machinery. The
-// shared SerialPortPicker in the top nav drives connect/disconnect.
+// shared SerialPortPicker in the top nav drives connect/disconnect for
+// the terminal and device selection for the Flash view.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Terminal as TerminalIcon, BookOpen, Cpu, Usb, Plug } from "lucide-react";
+import { Terminal as TerminalIcon, Cpu, Plug } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppLayout from "../../components/AppLayout";
 import {
@@ -27,15 +27,14 @@ import { useSettings } from "../../hooks/useSettings";
 import { tlog } from "../../api/settings";
 import { flasherDfuListDevices } from "../../api/flashers";
 import { useSerialStore, type SerialTab } from "./stores/serialStore";
+import { useFlasherStore } from "./stores/flasherStore";
 import { useSerialPortPicker } from "./hooks/useSerialPortPicker";
 import { useSerialTerminal } from "./hooks/useSerialTerminal";
 import SerialTopBar from "./views/SerialTopBar";
 import SerialTerminalView, {
   type SerialTerminalHandle,
 } from "./views/SerialTerminalView";
-import EspFlashView from "./views/EspFlashView";
-import DfuFlashView from "./views/DfuFlashView";
-import Stm32FlashView from "./views/Stm32FlashView";
+import FlashView from "./views/FlashView";
 
 export default function Serial() {
   const { t } = useTranslation("serial");
@@ -53,6 +52,8 @@ export default function Serial() {
   const setDfuDevices = useSerialStore((s) => s.setDfuDevices);
   const dfuSerial = useSerialStore((s) => s.dfuSerial);
   const setDfuSerial = useSerialStore((s) => s.setDfuSerial);
+  const flashTarget = useSerialStore((s) => s.flashTarget);
+  const setFlashTarget = useSerialStore((s) => s.setFlashTarget);
 
   // DFU enumeration: refreshed when the picker popover opens. Keep a busy
   // flag so the picker can render a spinner inline.
@@ -88,9 +89,11 @@ export default function Serial() {
 
   // When the user picks a port that matches a saved profile, pull its
   // saved framing in as defaults so the picker shows the right values.
+  // Picking a port also flips the Flash target back to serial.
   const handleSelectPort = useCallback(
     (portName: string, _matched: string | null) => {
       setPort(portName);
+      setFlashTarget("serial");
       const profile = portPicker.ports.find(
         (p) => p.info.port_name === portName,
       )?.profile;
@@ -109,7 +112,16 @@ export default function Serial() {
         setSerialSettings({ baudRate: baud, dataBits, stopBits, parity });
       }
     },
-    [portPicker.ports, setPort, setSerialSettings],
+    [portPicker.ports, setPort, setFlashTarget, setSerialSettings],
+  );
+
+  // Picking a DFU device flips the Flash target onto the USB device.
+  const handleSelectDfu = useCallback(
+    (serial: string) => {
+      setDfuSerial(serial);
+      setFlashTarget("dfu");
+    },
+    [setDfuSerial, setFlashTarget],
   );
 
   const handleConnect = useCallback(async () => {
@@ -134,68 +146,39 @@ export default function Serial() {
     terminalRef.current?.clear();
   }, [terminal]);
 
-  // Port hand-off for ESP/DFU operations: when the user kicks off a flash,
-  // backup, erase, or chip detect, we need the port exclusively. Remember
-  // whether the terminal was open at the time and reopen it once the op
-  // settles — so swapping between Terminal and ESP Flash feels seamless.
-  const restoreTerminalAfterEspOp = useRef(false);
-  const handleEspBeforeFlash = useCallback(async () => {
-    restoreTerminalAfterEspOp.current = terminal.isOpen;
+  // Port hand-off for any flash operation: when the unified Flash view
+  // kicks off a flash, backup, erase, or chip detect, we need the port
+  // exclusively. Remember whether the terminal was open at the time and
+  // reopen it once the op settles — so swapping between Terminal and
+  // Flash tabs feels seamless.
+  const restoreTerminalAfterFlash = useRef(false);
+  const handleBeforeFlash = useCallback(async () => {
+    restoreTerminalAfterFlash.current = terminal.isOpen;
     if (terminal.isOpen) {
       await terminal.close();
     }
   }, [terminal]);
 
-  const espPhase = useSerialStore((s) => s.espFlash.phase);
-  const prevEspPhaseRef = useRef(espPhase);
+  const flashPhase = useFlasherStore((s) => s.flash.phase);
+  const prevFlashPhaseRef = useRef(flashPhase);
   useEffect(() => {
-    const prev = prevEspPhaseRef.current;
-    prevEspPhaseRef.current = espPhase;
+    const prev = prevFlashPhaseRef.current;
+    prevFlashPhaseRef.current = flashPhase;
     const wasBusy =
       prev === "connecting" ||
       prev === "erasing" ||
       prev === "writing" ||
       prev === "verifying";
     const isSettled =
-      espPhase === "done" ||
-      espPhase === "error" ||
-      espPhase === "cancelled" ||
-      espPhase === "idle";
-    if (wasBusy && isSettled && restoreTerminalAfterEspOp.current) {
-      restoreTerminalAfterEspOp.current = false;
+      flashPhase === "done" ||
+      flashPhase === "error" ||
+      flashPhase === "cancelled" ||
+      flashPhase === "idle";
+    if (wasBusy && isSettled && restoreTerminalAfterFlash.current) {
+      restoreTerminalAfterFlash.current = false;
       void handleConnect();
     }
-  }, [espPhase, handleConnect]);
-
-  // Mirror of the ESP hand-off for the STM32 UART tab.
-  const restoreTerminalAfterStm32Op = useRef(false);
-  const handleStm32BeforeFlash = useCallback(async () => {
-    restoreTerminalAfterStm32Op.current = terminal.isOpen;
-    if (terminal.isOpen) {
-      await terminal.close();
-    }
-  }, [terminal]);
-
-  const stm32Phase = useSerialStore((s) => s.stm32Flash.phase);
-  const prevStm32PhaseRef = useRef(stm32Phase);
-  useEffect(() => {
-    const prev = prevStm32PhaseRef.current;
-    prevStm32PhaseRef.current = stm32Phase;
-    const wasBusy =
-      prev === "connecting" ||
-      prev === "erasing" ||
-      prev === "writing" ||
-      prev === "verifying";
-    const isSettled =
-      stm32Phase === "done" ||
-      stm32Phase === "error" ||
-      stm32Phase === "cancelled" ||
-      stm32Phase === "idle";
-    if (wasBusy && isSettled && restoreTerminalAfterStm32Op.current) {
-      restoreTerminalAfterStm32Op.current = false;
-      void handleConnect();
-    }
-  }, [stm32Phase, handleConnect]);
+  }, [flashPhase, handleConnect]);
 
   // Refresh the terminal binding (write callback) whenever the terminal id
   // changes — passes a stable function reference to xterm.
@@ -207,11 +190,22 @@ export default function Serial() {
   const tabs = useMemo<{ id: SerialTab; label: string; icon: typeof TerminalIcon }[]>(
     () => [
       { id: "terminal", label: t("tabs.terminal"), icon: TerminalIcon },
-      { id: "esp", label: t("tabs.espFlash"), icon: Cpu },
-      { id: "dfu", label: t("tabs.dfuFlash"), icon: Usb },
-      { id: "stm32", label: t("tabs.stm32Flash"), icon: BookOpen },
+      { id: "flash", label: t("tabs.flash"), icon: Cpu },
     ],
     [t],
+  );
+
+  // The picker shows the active device based on the current tab and flash
+  // target. Terminal tab is always serial; Flash tab follows whichever
+  // kind of device the user last picked.
+  const pickerMode = activeTab === "flash" && flashTarget === "dfu"
+    ? "dfu"
+    : "serial";
+
+  // Which DFU device is "active" (flowing through to the Flash view).
+  const activeDfuDevice = useMemo(
+    () => dfuDevices.find((d) => d.serial === dfuSerial) ?? null,
+    [dfuDevices, dfuSerial],
   );
 
   return (
@@ -226,12 +220,12 @@ export default function Serial() {
           connecting={terminal.isOpening}
           settings={settingsState}
           localEcho={localEcho}
-          pickerMode={activeTab === "dfu" ? "dfu" : "serial"}
+          pickerMode={pickerMode}
           dfuDevices={dfuDevices}
           activeDfu={dfuSerial}
           dfuLoading={dfuLoading}
           onRefreshDfu={refreshDfu}
-          onSelectDfu={setDfuSerial}
+          onSelectDfu={handleSelectDfu}
           onRefresh={portPicker.refresh}
           onSelectPort={handleSelectPort}
           onSettingsChange={setSerialSettings}
@@ -286,17 +280,12 @@ export default function Serial() {
             )}
           </div>
         )}
-        {activeTab === "esp" && (
-          <EspFlashView
-            onBeforeFlash={handleEspBeforeFlash}
+        {activeTab === "flash" && (
+          <FlashView
+            serialPort={flashTarget === "serial" ? settingsState.port : null}
+            dfuDevice={flashTarget === "dfu" ? activeDfuDevice : null}
             isTerminalOpen={terminal.isOpen}
-          />
-        )}
-        {activeTab === "dfu" && <DfuFlashView />}
-        {activeTab === "stm32" && (
-          <Stm32FlashView
-            onBeforeFlash={handleStm32BeforeFlash}
-            isTerminalOpen={terminal.isOpen}
+            onBeforeFlash={handleBeforeFlash}
           />
         )}
       </div>

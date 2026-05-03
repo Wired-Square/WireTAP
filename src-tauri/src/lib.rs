@@ -1238,6 +1238,8 @@ pub fn run() {
             flashers::flasher_stm32_erase,
             #[cfg(not(target_os = "ios"))]
             flashers::flasher_stm32_cancel,
+            #[cfg(not(target_os = "ios"))]
+            flashers::flasher_serial_detect,
             // Test Pattern protocol
             io_test::io_test_start,
             io_test::io_test_stop,

@@ -19,6 +19,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
+pub mod detect;
 pub mod dfu_flasher;
 pub mod esp_flasher;
 pub mod stm32_flasher;
@@ -113,6 +114,11 @@ pub struct DfuDeviceInfo {
     pub pid: u16,
     pub serial: String,
     pub display_name: String,
+    /// Chip family this DFU device belongs to. The frontend keys its driver
+    /// registry off this — `"STM32 DFU"` for the STM ROM bootloader, generic
+    /// `"DFU"` for everything else (which still flashes via the same code
+    /// path but doesn't get a recognised badge).
+    pub manufacturer: String,
 }
 
 /// Cancellation registry — flasher tasks check this flag periodically.
@@ -425,4 +431,16 @@ pub async fn flasher_stm32_erase(
 pub fn flasher_stm32_cancel(flash_id: String) -> Result<(), String> {
     request_cancel(&flash_id);
     Ok(())
+}
+
+// ============================================================================
+// Tauri command — unified chip-family detection
+// ============================================================================
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn flasher_serial_detect(
+    port: String,
+    stm32_options: Option<Stm32FlashOptions>,
+) -> Result<detect::DetectedChip, String> {
+    detect::detect(port, stm32_options.unwrap_or_default()).await
 }

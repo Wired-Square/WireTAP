@@ -67,6 +67,7 @@ pub async fn list_devices() -> Result<Vec<DfuDeviceInfo>, String> {
                         format!("bus{}-dev{}", info.bus_number(), info.device_address())
                     }),
                 display_name: friendly_name(&info),
+                manufacturer: manufacturer_for(&info),
             });
         }
         Ok(out)
@@ -260,6 +261,17 @@ fn pick_dfu_interface(info: &nusb::DeviceInfo) -> Option<u8> {
     info.interfaces()
         .find(|i| is_dfu_interface(i))
         .map(|i| i.interface_number())
+}
+
+/// Map a DFU device to its chip-family badge. STM ROM bootloader is the
+/// only family we currently recognise; everything else gets a generic
+/// `"DFU"` so the frontend renders an "Unknown" badge but still flashes.
+fn manufacturer_for(info: &nusb::DeviceInfo) -> String {
+    if info.vendor_id() == STM32_DFU_VID && info.product_id() == STM32_DFU_PID {
+        "STM32 DFU".to_string()
+    } else {
+        "DFU".to_string()
+    }
 }
 
 /// Friendly device label for the picker. Prefers product/manufacturer

@@ -125,3 +125,15 @@ export const badgeDarkPanelCyan = `${badgeDarkPanelBase} bg-[var(--status-cyan-b
  * Metadata badge - muted gray, for displaying filenames/types - uses CSS variable
  */
 export const badgeMetadata = "px-2 py-1 text-xs font-medium bg-[var(--bg-surface)] text-[color:var(--text-secondary)] rounded";
+
+// ============================================================================
+// Manufacturer Badges - chip family identification in the flash UI.
+// Each chip family gets its own colour so the user can tell at a glance
+// which device they're talking to.
+// ============================================================================
+
+export const badgeManufacturerEsp32 = `${badgeBase} bg-cyan-600/20 text-cyan-600`;
+export const badgeManufacturerEsp8266 = `${badgeBase} bg-amber-600/20 text-amber-600`;
+export const badgeManufacturerStm32 = `${badgeBase} bg-sky-600/20 text-sky-600`;
+export const badgeManufacturerStm32Dfu = `${badgeBase} bg-violet-600/20 text-violet-600`;
+export const badgeManufacturerUnknown = `${badgeBase} bg-[var(--bg-surface)] text-[color:var(--text-secondary)]`;

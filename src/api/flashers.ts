@@ -7,6 +7,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  DetectedChip,
   EspChipInfo,
   EspFlashOptions,
   DfuDeviceInfo,
@@ -134,4 +135,23 @@ export async function flasherStm32Erase(
 
 export async function flasherStm32Cancel(flashId: string): Promise<void> {
   await invoke("flasher_stm32_cancel", { flash_id: flashId });
+}
+
+// ---------------------------------------------------------------------------
+// Unified chip-family detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Probe a serial port for any supported chip family. Tries STM32 AN3155
+ * first (single 0x7F handshake, fast), then ESP esptool. Pass the user's
+ * current STM32 pin map so detection uses their RTS/DTR wiring.
+ */
+export async function flasherSerialDetect(
+  port: string,
+  stm32Options?: Stm32FlashOptions,
+): Promise<DetectedChip> {
+  return invoke("flasher_serial_detect", {
+    port,
+    stm32_options: stm32Options,
+  });
 }

@@ -51,6 +51,25 @@ export interface DfuDeviceInfo {
   pid: number;
   serial: string;
   display_name: string;
+  /** Chip-family badge string emitted by the backend. `"STM32 DFU"` for the
+   *  ST ROM bootloader (VID 0x0483, PID 0xDF11); `"DFU"` for any other DFU
+   *  device. Drives the manufacturer badge in the unified Flash view. */
+  manufacturer: string;
+}
+
+/** Unified detection result returned by `flasher_serial_detect`. */
+export interface DetectedChip {
+  /** Driver registry id — `"esp-uart"` or `"stm32-uart"`. */
+  driver_id: string;
+  /** Manufacturer badge string — `"ESP32"`, `"ESP8266"`, `"STM32"`. */
+  manufacturer: string;
+  /** Friendly chip name (`"ESP32-S3"`, `"STM32F103"`, …). */
+  chip_name: string;
+  /** Flash size in KB if known. */
+  flash_size_kb?: number | null;
+  /** Original chip-info struct (`EspChipInfo` or `Stm32ChipInfo`) so the
+   *  driver-specific UI can render extra fields (MAC, RDP, …). */
+  extra: unknown;
 }
 
 /**
