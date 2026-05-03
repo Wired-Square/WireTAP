@@ -23,7 +23,6 @@ import {
   bleReadDeviceState,
 } from "../../../api/bleProvision";
 import {
-  smpAttachBle,
   smpConnectBle,
   smpConnectUdp,
   smpDisconnect,
@@ -33,8 +32,9 @@ export interface DeviceConnection {
   /** Bring up BLE provisioning GATT, hydrate Wi-Fi state into provisioning store. */
   ensureBleProv: () => Promise<void>;
   /**
-   * Bring up SMP. If BLE provisioning is already live we attach SMP onto the
-   * same GATT link; otherwise we do a fresh BLE connect-and-attach.
+   * Bring up SMP. framelink's refcounted peripheral lease shares one BLE
+   * link with any sibling Wi-Fi-prov session on the same device, so this
+   * call is safe whether or not `bleConnect` has already been issued.
    */
   ensureBleSmp: () => Promise<void>;
   /** Open SMP UDP transport to the selected device's address/port. */
@@ -140,11 +140,7 @@ export function useDeviceConnection(): DeviceConnection {
         const setConnectionState = useDevicesStore.getState().setConnectionState;
 
         setConnectionState("connecting");
-        if (ui.transports.bleProv) {
-          await smpAttachBle();
-        } else {
-          await smpConnectBle(data.selectedBleId);
-        }
+        await smpConnectBle(data.selectedBleId);
         setTransport("bleSmp", true);
         setConnectionState("connected");
 

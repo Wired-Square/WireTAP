@@ -55,9 +55,14 @@ export async function smpConnectBle(deviceId: string): Promise<void> {
   await invoke("smp_connect_ble", { deviceId });
 }
 
-/** Attach SMP to the already-connected provisioning BLE peripheral (no adapter lookup). */
-export async function smpAttachBle(): Promise<void> {
-  await invoke("smp_attach_ble");
+/**
+ * Reconnect SMP over BLE using the device's stable local name. Use after a
+ * firmware test-boot — the BLE peripheral identifier rotates across the
+ * reboot, so any cached `deviceId` is stale, but the name is firmware-stable.
+ * Backend polls Discovery up to `timeoutSecs` for a fresh match.
+ */
+export async function smpReconnectBleByName(name: string, timeoutSecs: number): Promise<void> {
+  await invoke("smp_reconnect_ble_by_name", { name, timeoutSecs });
 }
 
 export async function smpConnectUdp(address: string, port: number): Promise<void> {

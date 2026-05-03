@@ -39,9 +39,9 @@ import { useDeviceConnection } from "../hooks/useDeviceConnection";
 import {
   smpCancelUpload,
   smpConfirmImage,
-  smpConnectBle,
   smpConnectUdp,
   smpListImages,
+  smpReconnectBleByName,
   smpResetDevice,
   smpTestImage,
   smpUploadFirmware,
@@ -93,7 +93,6 @@ export default function FirmwareTab({ transport }: FirmwareTabProps) {
   const setUpgradeConnectionState = useUpgradeStore((s) => s.setConnectionState);
 
   const transports = useDevicesStore((s) => s.ui.transports);
-  const selectedBleId = useDevicesStore((s) => s.data.selectedBleId);
   const selectedAddress = useDevicesStore((s) => s.data.selectedAddress);
   const selectedSmpPort = useDevicesStore((s) => s.data.selectedSmpPort);
 
@@ -252,8 +251,13 @@ export default function FirmwareTab({ transport }: FirmwareTabProps) {
         }
         await smpConnectUdp(selectedAddress, selectedSmpPort);
       } else {
-        if (!selectedBleId) throw new Error("BLE id missing for reconnect");
-        await smpConnectBle(selectedBleId);
+        // Firmware test-boot rotates the device's BLE peripheral
+        // identifier, so the cached selectedBleId is stale. Reconnect by
+        // name (firmware-stable) and let the backend poll Discovery for
+        // the device's new BLE id.
+        const name = useDevicesStore.getState().data.selectedDeviceName;
+        if (!name) throw new Error("Device name missing for reconnect");
+        await smpReconnectBleByName(name, 30);
       }
       setUpgradeConnectionState("connected");
 

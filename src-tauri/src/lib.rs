@@ -1296,6 +1296,7 @@ pub fn run() {
                         smp_upgrade::smp_scan_start,
                         smp_upgrade::smp_scan_stop,
                         smp_upgrade::smp_connect_ble,
+                        smp_upgrade::smp_reconnect_ble_by_name,
                         smp_upgrade::smp_connect_udp,
                         smp_upgrade::smp_disconnect,
                         smp_upgrade::smp_list_images,

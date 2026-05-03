@@ -12,7 +12,7 @@
 use crate::device_scan::{
     canonical_device_id, device_scan_start, device_scan_stop, discovery_handle,
 };
-use framelink::{ImageSlot as FlImageSlot, SmpSession, Transport};
+use framelink::{CapabilitySet, ImageSlot as FlImageSlot, SmpSession, Transport};
 use futures::StreamExt;
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -128,6 +128,65 @@ pub async fn smp_connect_ble(_app: AppHandle, device_id: String) -> Result<(), S
     state.session = Some(Arc::new(session));
     tlog!("[smp_upgrade] SMP-BLE session opened on {}", id);
     Ok(())
+}
+
+/// Reconnect over BLE by device name, polling Discovery for a fresh
+/// match. Used after a firmware test-boot — the device's btleplug
+/// peripheral identifier rotates across the reboot, so the cached
+/// `device_id` from before the upload is stale, but the local name
+/// (e.g. "WiredFlexLink-4CD4") is firmware-stable.
+///
+/// Iterates until either a BLE+SMP-capable device with the matching
+/// name comes back and `open_smp_ble` succeeds, or the timeout
+/// elapses (the device may still be booting; the loop also covers
+/// the brief window where Discovery still holds the pre-reboot
+/// peripheral handle but it's no longer connectable).
+#[tauri::command]
+pub async fn smp_reconnect_ble_by_name(
+    name: String,
+    timeout_secs: u32,
+) -> Result<(), String> {
+    let discovery = discovery_handle().await?;
+    let deadline = tokio::time::Instant::now()
+        + std::time::Duration::from_secs(timeout_secs.max(1) as u64);
+    let mut last_err: Option<String> = None;
+
+    loop {
+        let candidate = discovery
+            .devices()
+            .await
+            .into_iter()
+            .find(|d| {
+                d.name() == name
+                    && d.transports().contains(&Transport::Ble)
+                    && d.capabilities().contains(CapabilitySet::SMP)
+            });
+
+        if let Some(device) = candidate {
+            let id = device.id().clone();
+            match discovery.open_smp_ble(&id).await {
+                Ok(session) => {
+                    let mut state = STATE.lock().await;
+                    state.session = Some(Arc::new(session));
+                    tlog!("[smp_upgrade] SMP-BLE re-opened on {} ({})", name, id);
+                    return Ok(());
+                }
+                Err(e) => last_err = Some(e.to_string()),
+            }
+        }
+
+        if tokio::time::Instant::now() >= deadline {
+            return Err(match last_err {
+                Some(e) => format!(
+                    "Device '{name}' did not reconnect within {timeout_secs}s: {e}"
+                ),
+                None => format!(
+                    "Device '{name}' did not reappear within {timeout_secs}s"
+                ),
+            });
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
 }
 
 /// Connect over UDP. The address+port must match an mDNS-discovered

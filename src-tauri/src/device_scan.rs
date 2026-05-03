@@ -62,17 +62,30 @@ struct DiscoveryState {
     /// `device-discovered` / `device-disappeared`. `None` between
     /// `device_scan_start` and `device_scan_stop` calls.
     forwarder: Option<JoinHandle<()>>,
-    /// Heartbeat task that re-emits the current device snapshot every
-    /// 500 ms so the frontend's `lastSeenAt` prune logic sees a steady
-    /// stream of updates for still-present devices.
+    /// Heartbeat task that re-emits the current device snapshot so the
+    /// frontend's `lastSeenAt` prune logic sees a steady stream of
+    /// updates for still-present devices.
     heartbeat: Option<JoinHandle<()>>,
+    /// One-shot timer that emits `device-scan-finished` once the initial
+    /// scan window has settled. The frontend uses this to flip
+    /// `isScanning` off and re-enable the Rescan button — events keep
+    /// flowing afterwards, this is purely a UI signal.
+    settled_signal: Option<JoinHandle<()>>,
 }
+
+/// How long after `device_scan_start` to emit `device-scan-finished`.
+/// Long enough for the BLE poll cadence (500 ms inside framelink) to
+/// have surfaced any device in advertising range plus the mDNS resolver
+/// to have answered, short enough that the user sees the Rescan button
+/// light up well before they grow impatient.
+const SCAN_SETTLE_AFTER: std::time::Duration = std::time::Duration::from_secs(8);
 
 static STATE: Lazy<Arc<Mutex<DiscoveryState>>> = Lazy::new(|| {
     Arc::new(Mutex::new(DiscoveryState {
         discovery: None,
         forwarder: None,
         heartbeat: None,
+        settled_signal: None,
     }))
 });
 
@@ -223,6 +236,12 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
         }
     }));
 
+    let app_for_settled = app;
+    state.settled_signal = Some(tokio::spawn(async move {
+        tokio::time::sleep(SCAN_SETTLE_AFTER).await;
+        let _ = app_for_settled.emit("device-scan-finished", ());
+    }));
+
     tlog!("[device_scan] forwarding Discovery events to frontend");
     Ok(())
 }
@@ -237,6 +256,9 @@ pub async fn device_scan_stop(_app: AppHandle) -> Result<(), String> {
         handle.abort();
     }
     if let Some(handle) = state.heartbeat.take() {
+        handle.abort();
+    }
+    if let Some(handle) = state.settled_signal.take() {
         handle.abort();
     }
     tlog!("[device_scan] forwarding stopped");

@@ -38,6 +38,8 @@ __pycache__/
 # Rust/Cargo
 src-tauri/target/
 tools/bt_scan_cli/target/
+# Local-only cargo config (paths overrides for sibling-checkout iteration).
+.cargo/
 
 # Tauri generated schemas
 src-tauri/gen/schemas
