@@ -89,7 +89,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -100,7 +100,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -557,34 +557,6 @@ dependencies = [
 
 [[package]]
 name = "btleplug"
-version = "0.11.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9a11621cb2c8c024e444734292482b1ad86fb50ded066cf46252e46643c8748"
-dependencies = [
- "async-trait",
- "bitflags 2.11.1",
- "bluez-async",
- "dashmap 6.1.0",
- "dbus",
- "futures",
- "jni 0.19.0",
- "jni-utils",
- "log",
- "objc2 0.5.2",
- "objc2-core-bluetooth",
- "objc2-foundation 0.2.2",
- "once_cell",
- "static_assertions",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "uuid",
- "windows 0.61.3",
- "windows-future 0.2.1",
-]
-
-[[package]]
-name = "btleplug"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52c3264dbe2c8e29381e4e95aa2d2783ad0b9192b511240f3755b7e5e3cee87e"
@@ -592,7 +564,7 @@ dependencies = [
  "async-trait",
  "bitflags 2.11.1",
  "bluez-async",
- "dashmap 6.1.0",
+ "dashmap",
  "dbus",
  "futures",
  "jni 0.19.0",
@@ -1273,19 +1245,6 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "5.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
-dependencies = [
- "cfg-if",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core",
-]
-
-[[package]]
-name = "dashmap"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
@@ -1547,7 +1506,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1742,7 +1701,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1981,16 +1940,21 @@ dependencies = [
 [[package]]
 name = "framelink"
 version = "0.1.1"
-source = "git+ssh://git@github.com/Wired-Square/framelink-rs.git?branch=main#3d275257ab2e3984cd1a11f4291360e13e4fc97e"
+source = "git+ssh://git@github.com/Wired-Square/framelink-rs.git?branch=main#cf5c21cfc1ad54606071063e8df4c084f4e536ac"
 dependencies = [
- "btleplug 0.12.0",
+ "async-trait",
+ "btleplug",
  "flate2",
+ "mcumgr-smp",
  "mdns-sd",
  "serde",
+ "sha2 0.10.9",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-stream",
  "toml 0.8.23",
  "toml_edit 0.22.27",
+ "tracing",
  "uuid",
 ]
 
@@ -2737,7 +2701,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -3109,21 +3073,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jni-utils"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "259e9f2c3ead61de911f147000660511f07ab00adeed1d84f5ac4d0386e7a6c4"
-dependencies = [
- "dashmap 5.5.3",
- "futures",
- "jni 0.19.0",
- "log",
- "once_cell",
- "static_assertions",
- "uuid",
-]
-
-[[package]]
 name = "js-sys"
 version = "0.3.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3447,15 +3396,10 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5382861910ea9e9b7f20b058dab2b0435497b67575979673e65fb127ec0c0245"
 dependencies = [
- "async-trait",
- "btleplug 0.11.8",
  "ciborium",
- "futures",
  "serde",
  "serde_bytes",
  "thiserror 1.0.69",
- "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -3820,7 +3764,7 @@ dependencies = [
  "rustix 1.1.4",
  "slab",
  "tokio",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5183,7 +5127,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5786,7 +5730,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6514,10 +6458,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand 2.4.1",
- "getrandom 0.4.2",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7102,7 +7046,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset 0.9.1",
  "tempfile",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -7623,7 +7567,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -8224,7 +8168,6 @@ name = "wiretap"
 version = "0.6.4"
 dependencies = [
  "async-trait",
- "btleplug 0.12.0",
  "can-dbc",
  "chrono",
  "clap",
@@ -8238,8 +8181,6 @@ dependencies = [
  "ihex",
  "keepawake",
  "keyring",
- "mcumgr-smp",
- "mdns-sd",
  "nusb 0.1.14",
  "nusb 0.2.3",
  "once_cell",
@@ -8249,7 +8190,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serialport",
- "sha2 0.10.9",
  "socketcan",
  "tauri",
  "tauri-build",
@@ -8264,7 +8204,6 @@ dependencies = [
  "tokio-postgres",
  "tokio-tungstenite",
  "toml 0.8.23",
- "uuid",
  "windows-sys 0.59.0",
 ]
 

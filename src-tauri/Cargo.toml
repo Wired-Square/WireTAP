@@ -51,13 +51,12 @@ rumqttc = "0.24"
 tokio-modbus = { version = "0.17", default-features = false, features = ["tcp"] }
 tokio-tungstenite = "0.26"
 rusqlite = { version = "0.32", features = ["bundled"] }
-btleplug = "0.12"
 futures = "0.3"
-uuid = "1"
-mcumgr-smp = { version = "0.8", default-features = false, features = ["transport-ble-async", "transport-udp-async", "payload-cbor"] }
-mdns-sd = "0.13"
-sha2 = "0.10"
-framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", branch = "main", features = ["discovery", "ble"] }
+# BLE scanning, mDNS discovery, the WiFi-prov GATT service, and the SMP
+# transports for firmware upgrade are all provided by framelink (which
+# vendors btleplug 0.12, mdns-sd, and mcumgr-smp internally — we don't
+# depend on any of them directly any more).
+framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", branch = "main", features = ["discovery", "ble", "wifi-prov", "smp"] }
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 serialport = "4.3"

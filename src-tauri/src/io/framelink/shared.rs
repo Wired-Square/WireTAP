@@ -301,19 +301,26 @@ pub(crate) async fn get_connection(
             .ok_or_else(|| format!("Reconnection to '{}' failed", device_id))
     } else {
         drop(pool);
-        // Not in pool — discover via mDNS and connect
-        let timeout = Duration::from_secs_f64(timeout_sec);
-        let devices = framelink::discovery::discover(timeout)
-            .await
-            .map_err(|e| format!("mDNS discovery failed: {}", e))?;
+        // Not in pool — poll the shared Discovery for an mDNS-resolved match
+        let discovery = crate::device_scan::discovery_handle().await?;
+        let deadline = tokio::time::Instant::now() + Duration::from_secs_f64(timeout_sec);
+        let device = loop {
+            let snapshot = discovery.devices().await;
+            if let Some(d) = snapshot
+                .into_iter()
+                .find(|d| d.name() == device_id && d.address().is_some())
+            {
+                break d;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err(format!("Device '{}' not found via discovery", device_id));
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        };
 
-        let device = devices
-            .into_iter()
-            .find(|d| d.name == device_id)
-            .ok_or_else(|| format!("Device '{}' not found via discovery", device_id))?;
-
-        let host = device.addr.ip().to_string();
-        let port = device.addr.port();
+        let addr = device.address().expect("filtered by address.is_some()");
+        let host = addr.ip().to_string();
+        let port = addr.port();
         connect_by_address(&host, port, timeout_sec).await?;
 
         let pool = POOL.lock().await;

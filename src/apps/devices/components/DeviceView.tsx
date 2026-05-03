@@ -16,14 +16,6 @@ import WifiTab from "../tabs/WifiTab";
 import FirmwareTab from "../tabs/FirmwareTab";
 import DataIoTab from "../tabs/DataIoTab";
 
-// SMP-over-BLE is currently stubbed in the Rust backend (see
-// src-tauri/src/smp_upgrade.rs:199 — pending mcumgr-smp upgrade to
-// btleplug 0.12). Connecting via BLE for SMP still grabs the radio though,
-// which fights any subsequent bleConnect() in the Wi-Fi tab and panics
-// btleplug. Until the dependency is updated, mark Firmware (BLE) as
-// unavailable and explain why.
-const BLE_SMP_DISABLED = true;
-
 interface TabSpec {
   id: DeviceTabId;
   label: string;
@@ -64,12 +56,10 @@ export default function DeviceView() {
       id: "firmware-ble",
       label: t("device.tabs.firmwareBle"),
       icon: Bluetooth,
-      available: hasBle && hasSmp && !BLE_SMP_DISABLED,
-      unavailableReason: BLE_SMP_DISABLED
-        ? t("device.unavailable.bleSmpStubbed")
-        : !hasBle
-          ? t("device.unavailable.noBle")
-          : t("device.unavailable.noBleSmp"),
+      available: hasBle && hasSmp,
+      unavailableReason: !hasBle
+        ? t("device.unavailable.noBle")
+        : t("device.unavailable.noBleSmp"),
     },
     {
       id: "firmware-ip",
