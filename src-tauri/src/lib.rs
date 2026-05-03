@@ -1,6 +1,5 @@
 #[macro_use]
 pub(crate) mod logging;
-mod ble_common;
 mod ble_provision;
 mod capture_db;
 mod capturequery;
@@ -1296,7 +1295,6 @@ pub fn run() {
                         // SMP Firmware Upgrade API
                         smp_upgrade::smp_scan_start,
                         smp_upgrade::smp_scan_stop,
-                        smp_upgrade::smp_attach_ble,
                         smp_upgrade::smp_connect_ble,
                         smp_upgrade::smp_connect_udp,
                         smp_upgrade::smp_disconnect,

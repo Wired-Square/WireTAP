@@ -2,6 +2,14 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **BLE / mDNS / SMP unified onto `framelink::Discovery`**: `framelink-rs` 0.1.1 ships a single `Discovery` handle that runs BLE + mDNS scanning, decodes FrameLink manufacturer data, and exposes session openers for WiFi provisioning (`open_wifi_prov`) and SMP firmware upgrade (`open_smp_ble` / `open_smp_udp`). WireTAP's three bespoke implementations now drive that one handle instead — sessions on the same device share one BLE connection (refcounted by framelink), and the heartbeat / capability decode / GATT plumbing all live inside the library. Net effect: ~2400 lines of WireTAP code drop, plus `btleplug`, `mdns-sd`, `mcumgr-smp`, `sha2`, and `uuid` are removed from [src-tauri/Cargo.toml](src-tauri/Cargo.toml) (they live transitively under `framelink` now). The diagnostic CLI [tools/bt_scan_cli/](tools/bt_scan_cli/) is deleted — it has been incorporated into `framelink-cli`. Affected backends: [src-tauri/src/device_scan.rs](src-tauri/src/device_scan.rs), [src-tauri/src/ble_provision.rs](src-tauri/src/ble_provision.rs), [src-tauri/src/smp_upgrade.rs](src-tauri/src/smp_upgrade.rs); `src-tauri/src/ble_common.rs` is removed entirely. The Tauri command surface and the `device-discovered` / `ble-provision-status` / `smp-upload-progress` event payloads are unchanged so the frontend continues to work without modification — except `smp_attach_ble` (no longer needed) which is dropped.
+
+- **Firmware (BLE) un-stubbed in the Devices wizard**: `framelink::smp` vendors its own BLE transport on top of btleplug 0.12 (using `mcumgr-smp` only for the frame codec), which sidesteps the upstream-mcumgr-smp btleplug-0.11 pin that previously forced the Firmware (BLE) tab into a "temporarily disabled" explainer. The `BLE_SMP_DISABLED` gate and its locale string are removed from [src/apps/devices/components/DeviceView.tsx](src/apps/devices/components/DeviceView.tsx); the tab now lights up whenever the device advertises BLE + SMP. Sibling Wi-Fi-prov + Firmware-BLE sessions on the same device share one BLE link (refcounted by framelink), so the previous "BLE radio fight" between the two flows is also gone.
+
 ## [0.6.4] - 2026-05-03
 
 ### Added

@@ -1,103 +1,160 @@
 // Unified device scan module
 //
-// Discovers BLE devices that advertise either the WiFi provisioning GATT
-// service or the SMP firmware upgrade service (or both), plus mDNS devices
-// advertising _mcumgr._udp or _framelink._tcp.
+// Drives `framelink::Discovery` — one handle that scans BLE + mDNS in
+// parallel, decodes FrameLink manufacturer data, and emits `Seen /
+// Updated / Lost / Error` events. We translate those into the
+// `UnifiedDevice` payload that the frontend already consumes via
+// `device-discovered`.
 //
-// Emits `device-discovered` events with a `UnifiedDevice` payload that
-// includes a `capabilities` list so the UI can show one device card with
-// appropriate badges and route to the correct wizard flow.
+// The same `Discovery` handle is reused by `ble_provision` and
+// `smp_upgrade` to open WiFi-prov / SMP sessions — that's why it lives
+// here behind `discovery_handle()` rather than inside one of the
+// per-feature modules. Sessions opened on the same device share one
+// BLE link (refcounted inside framelink).
 
-use crate::ble_common;
-use btleplug::api::{Central, Peripheral as _, ScanFilter};
-use framelink::ble::{parse_peripheral, FRAMELINK_BLE_SERVICE_UUID};
-use mdns_sd::{ServiceDaemon, ServiceEvent};
+use framelink::{
+    Capability, Device, DeviceId, Discovery, DiscoveryEvent, Transport,
+};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
-use uuid::Uuid;
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/// WiFi provisioning GATT service UUID
-const WIFI_PROV_SERVICE_UUID: Uuid =
-    ble_common::uuid_from_fields(0x14387800, 0x130c, 0x49e7, 0xb877, 0x2881c89cb258);
-
-/// Standard SMP GATT service UUID
-const SMP_SERVICE_UUID: Uuid =
-    ble_common::uuid_from_fields(0x8D53DC1D, 0x1DB7, 0x4CD3, 0x868B, 0x8A527460AA84);
-
-/// mDNS service types to browse
-const MDNS_SERVICE_MCUMGR: &str = "_mcumgr._udp.local.";
-const MDNS_SERVICE_FRAMELINK: &str = "_framelink._tcp.local.";
+use tokio::task::JoinHandle;
+use futures::StreamExt;
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /// A discovered device with its capabilities (which services it advertises).
+///
+/// Wire-compatible with what the frontend already deserialises. `id` is now
+/// the framelink-assigned `DeviceId` (`ble:{btleplug_id}` /
+/// `mdns:{tcp|udp}:{fullname}`); for the BLE case `ble_id` carries the
+/// legacy unprefixed btleplug id so older frontend code that read it keeps
+/// working.
 #[derive(Clone, Serialize)]
 pub struct UnifiedDevice {
     pub name: String,
-    /// Device name with unique hardware suffix (e.g. "WiredFlexLink-9D04"),
-    /// stable across BLE, mDNS, and IP changes.
     pub id: String,
-    /// "ble" or "udp"
+    /// "ble" | "tcp" | "udp"
     pub transport: String,
-    /// BLE peripheral ID (needed for BLE connections, absent for mDNS-only)
     pub ble_id: Option<String>,
-    /// BLE only
     pub rssi: Option<i16>,
-    /// mDNS only: IP address
     pub address: Option<String>,
-    /// mDNS only: port number
     pub port: Option<u16>,
-    /// Capabilities: "wifi-provision", "smp", "framelink"
+    /// "wifi-provision" | "smp" | "framelink"
     pub capabilities: Vec<String>,
 }
 
 // ============================================================================
-// Module state
+// Shared Discovery handle
 // ============================================================================
 
-struct DeviceScanState {
-    scanning: bool,
-    mdns_scanning: bool,
-    mdns_daemon: Option<ServiceDaemon>,
+struct DiscoveryState {
+    /// Process-wide `Discovery` instance. Lazily created on the first
+    /// `discovery_handle()` call (which may be a `device_scan_start` from
+    /// the UI or an `open_*` from `ble_provision` / `smp_upgrade`); held
+    /// for the rest of the process.
+    discovery: Option<Discovery>,
+    /// Task forwarding `discovery.events()` to the frontend as
+    /// `device-discovered` / `device-disappeared`. `None` between
+    /// `device_scan_start` and `device_scan_stop` calls.
+    forwarder: Option<JoinHandle<()>>,
+    /// Heartbeat task that re-emits the current device snapshot every
+    /// 500 ms so the frontend's `lastSeenAt` prune logic sees a steady
+    /// stream of updates for still-present devices.
+    heartbeat: Option<JoinHandle<()>>,
 }
 
-static SCAN_STATE: Lazy<Arc<Mutex<DeviceScanState>>> = Lazy::new(|| {
-    Arc::new(Mutex::new(DeviceScanState {
-        scanning: false,
-        mdns_scanning: false,
-        mdns_daemon: None,
+static STATE: Lazy<Arc<Mutex<DiscoveryState>>> = Lazy::new(|| {
+    Arc::new(Mutex::new(DiscoveryState {
+        discovery: None,
+        forwarder: None,
+        heartbeat: None,
     }))
 });
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/// Get a clone of the shared BLE adapter.
-async fn get_adapter() -> Result<btleplug::platform::Adapter, String> {
-    let state = ble_common::BLE_ADAPTER.lock().await;
-    state
-        .adapter
-        .clone()
-        .ok_or_else(|| "BLE adapter not initialised".to_string())
+/// Lazily start (or return) the process-wide `Discovery`. Called by both
+/// the device-scan command and the WiFi-prov / SMP open paths so they all
+/// share one set of scanners and one BLE peripheral store.
+pub async fn discovery_handle() -> Result<Discovery, String> {
+    let mut state = STATE.lock().await;
+    if let Some(d) = &state.discovery {
+        return Ok(d.clone());
+    }
+    let d = Discovery::start()
+        .await
+        .map_err(|e| format!("framelink::Discovery::start failed: {e}"))?;
+    state.discovery = Some(d.clone());
+    tlog!("[device_scan] framelink::Discovery started");
+    Ok(d)
 }
 
-/// Shut down the mDNS daemon if running.
-async fn shutdown_mdns() {
-    let mut state = SCAN_STATE.lock().await;
-    state.mdns_scanning = false;
-    if let Some(daemon) = state.mdns_daemon.take() {
-        drop(state);
-        let _ = daemon.shutdown();
+// ============================================================================
+// Mapping framelink::Device → UnifiedDevice
+// ============================================================================
+
+fn capability_strs(device: &Device) -> Vec<String> {
+    let transports = device.transports();
+    let mut caps: Vec<&'static str> = device
+        .capabilities()
+        .iter()
+        .filter_map(|c| match c {
+            Capability::WifiProv => Some("wifi-provision"),
+            Capability::Smp => Some("smp"),
+            Capability::FrameLinkBle => Some("framelink"),
+            _ => None,
+        })
+        .collect();
+
+    // mDNS-only devices don't carry the WifiProv / FrameLinkBle bits in the
+    // capability bitfield — the bitfield is BLE-mfg-data territory. But
+    // reaching us via mDNS implies the device is provisioned, and
+    // `_framelink._tcp` is itself the FrameLink-over-TCP announcement.
+    // Synthesise both so the UI can route to the right flow.
+    let is_mdns =
+        transports.contains(&Transport::Tcp) || transports.contains(&Transport::Udp);
+    if is_mdns && !caps.contains(&"wifi-provision") {
+        caps.push("wifi-provision");
+    }
+    if transports.contains(&Transport::Tcp) && !caps.contains(&"framelink") {
+        caps.push("framelink");
+    }
+    caps.into_iter().map(String::from).collect()
+}
+
+fn to_unified(device: &Device) -> UnifiedDevice {
+    let id = device.id().as_str().to_string();
+    let transport = device
+        .transports()
+        .first()
+        .map(|t| t.to_string())
+        .unwrap_or_else(|| "ble".to_string());
+    let address_port = device.address().map(|sa| (sa.ip().to_string(), sa.port()));
+
+    UnifiedDevice {
+        name: device.name().to_string(),
+        ble_id: id.strip_prefix("ble:").map(|s| s.to_string()),
+        id,
+        transport,
+        rssi: device.rssi(),
+        address: address_port.as_ref().map(|(a, _)| a.clone()),
+        port: address_port.as_ref().map(|(_, p)| *p),
+        capabilities: capability_strs(device),
+    }
+}
+
+/// Normalise a wire-form id (legacy unprefixed btleplug id, full
+/// `"ble:..."`, or `"mdns:..."`) into a [`DeviceId`] the live Discovery
+/// will recognise. Shared by `ble_provision` and `smp_upgrade` so the
+/// frontend can pass either form on connect.
+pub fn canonical_device_id(device_id: String) -> DeviceId {
+    if device_id.starts_with("ble:") || device_id.starts_with("mdns:") {
+        DeviceId::new(device_id)
+    } else {
+        DeviceId::new(format!("ble:{device_id}"))
     }
 }
 
@@ -105,398 +162,84 @@ async fn shutdown_mdns() {
 // Tauri commands
 // ============================================================================
 
-/// Start a unified scan for devices via BLE (checking both WiFi provisioning
-/// and SMP service UUIDs) and mDNS (_mcumgr._udp, _framelink._tcp).
-/// Discovered devices are emitted as `device-discovered` events.
-/// The scan auto-stops after ~10 seconds or when `device_scan_stop` is called.
+/// Start emitting `device-discovered` events from the live framelink
+/// Discovery. Idempotent — repeat calls do nothing while a forwarder is
+/// already running.
 #[tauri::command]
 pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
-    ble_common::ensure_adapter().await?;
+    let discovery = discovery_handle().await?;
 
-    // Shut down any previous mDNS daemon
-    shutdown_mdns().await;
-
-    let mut state = SCAN_STATE.lock().await;
-    if state.scanning {
+    let mut state = STATE.lock().await;
+    if state.forwarder.is_some() {
         return Ok(());
     }
-    state.scanning = true;
-    state.mdns_scanning = true;
-    drop(state);
 
-    let adapter = get_adapter().await?;
+    // Re-emit anything the scanners have already seen so the UI has a
+    // populated list immediately rather than waiting for the next
+    // advertisement cycle.
+    for device in discovery.devices().await {
+        let _ = app.emit("device-discovered", to_unified(&device));
+    }
 
-    // Unfiltered scan — CoreBluetooth doesn't reliably match 128-bit UUIDs
-    // in scan response data, so we discover all devices and filter on the
-    // application side.
-    adapter
-        .start_scan(ScanFilter::default())
-        .await
-        .map_err(|e| format!("Failed to start BLE scan: {e}"))?;
-
-    tlog!(
-        "[device_scan] Scan started (WiFi prov {:?}, SMP {:?}, FrameLink {:?})",
-        WIFI_PROV_SERVICE_UUID,
-        SMP_SERVICE_UUID,
-        FRAMELINK_BLE_SERVICE_UUID
-    );
-
-    // -- BLE scan task --
-    let app_ble = app.clone();
-    tokio::spawn(async move {
-        // Re-emit every visible peripheral on every poll so the frontend's
-        // lastSeenAt heartbeats stay fresh; the frontend prunes entries that
-        // stop arriving (powered-off devices) after a few seconds. The store
-        // merge is idempotent on (id, name, caps) so duplicate emits are cheap.
-        // We still suppress the verbose tlog on unchanged repeats.
-        let mut last_logged: std::collections::HashMap<String, (String, Vec<String>)> =
-            std::collections::HashMap::new();
-
-        for _ in 0..20 {
-            // Poll every 500ms for 10 seconds total
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-            // Check if scan was stopped externally
-            let state = SCAN_STATE.lock().await;
-            if !state.scanning {
-                break;
-            }
-            drop(state);
-
-            let adapter = match get_adapter().await {
-                Ok(a) => a,
-                Err(_) => break,
-            };
-
-            if let Ok(peripherals) = adapter.peripherals().await {
-                for peripheral in peripherals {
-                    let ble_id = peripheral.id().to_string();
-
-                    let props = match peripheral.properties().await.ok().flatten() {
-                        Some(p) => p,
-                        None => continue,
-                    };
-                    let rssi = props.rssi;
-
-                    // Decode FrameLink primary service + manufacturer-data
-                    // capability bitmask. This is the canonical match for any
-                    // FrameLink device — including ones whose local_name is
-                    // None on Windows 11 pre-connect.
-                    let parsed = parse_peripheral(ble_id.clone(), &props);
-                    let mut capabilities: Vec<String> = Vec::new();
-
-                    if let Some(d) = &parsed {
-                        if let Some(p) = &d.payload {
-                            let caps = p.capabilities;
-                            if caps.has_wifi_prov() {
-                                capabilities.push("wifi-provision".into());
-                            }
-                            if caps.has_smp() {
-                                capabilities.push("smp".into());
-                            }
-                            if caps.has_framelink_ble() {
-                                capabilities.push("framelink".into());
-                            }
-                        }
+    let app_for_events = app.clone();
+    let discovery_for_events = discovery.clone();
+    state.forwarder = Some(tokio::spawn(async move {
+        let mut events = discovery_for_events.events();
+        while let Some(event) = events.next().await {
+            match event {
+                DiscoveryEvent::Seen { device } => {
+                    let _ = app_for_events.emit("device-discovered", to_unified(&device));
+                }
+                DiscoveryEvent::Updated { id, .. } => {
+                    if let Some(device) = discovery_for_events.get(&id).await {
+                        let _ = app_for_events.emit("device-discovered", to_unified(&device));
                     }
-
-                    // UUID-only fallback: a device may advertise wifi-prov or
-                    // SMP via the GATT service UUID but not be decodable by
-                    // parse_peripheral (legacy firmware, non-FrameLink hosts
-                    // that just expose those services).
-                    let has_wifi_prov = props.services.contains(&WIFI_PROV_SERVICE_UUID)
-                        || props.service_data.contains_key(&WIFI_PROV_SERVICE_UUID);
-                    if has_wifi_prov && !capabilities.iter().any(|c| c == "wifi-provision") {
-                        capabilities.push("wifi-provision".into());
-                    }
-                    let has_smp = props.services.contains(&SMP_SERVICE_UUID)
-                        || props.service_data.contains_key(&SMP_SERVICE_UUID);
-                    if has_smp && !capabilities.iter().any(|c| c == "smp") {
-                        capabilities.push("smp".into());
-                    }
-                    let has_framelink_uuid = props.services.contains(&FRAMELINK_BLE_SERVICE_UUID)
-                        || props
-                            .service_data
-                            .contains_key(&FRAMELINK_BLE_SERVICE_UUID);
-                    if has_framelink_uuid && !capabilities.iter().any(|c| c == "framelink") {
-                        capabilities.push("framelink".into());
-                    }
-
-                    // Drop non-FrameLink-family peripherals quietly.
-                    if capabilities.is_empty() {
-                        continue;
-                    }
-
-                    // Resolve a display name. Prefer the parse_peripheral
-                    // name (stable, derived from manufacturer data — works on
-                    // Windows 11 even when the OS doesn't surface local_name);
-                    // fall back through the btleplug 0.12 advertisement_name,
-                    // then post-connect local_name, then the BLE id so the
-                    // card appears immediately and gets upgraded later when
-                    // the full advert lands.
-                    let name = parsed
-                        .as_ref()
-                        .map(|d| d.name.clone())
-                        .or_else(|| props.advertisement_name.clone())
-                        .or_else(|| props.local_name.clone())
-                        .unwrap_or_else(|| ble_id.clone());
-
-                    // id is keyed off the BLE peripheral id (MAC on Windows /
-                    // Linux, opaque UUID on macOS) so it stays stable across
-                    // re-emits as the name/caps progressively resolve.
-                    let id = format!("ble:{}", ble_id);
-
-                    // Only log when name or caps change vs. the last logged
-                    // state for this peripheral — the emit itself happens every
-                    // poll to keep the frontend heartbeat alive.
-                    let log_now = match last_logged.get(&ble_id) {
-                        Some((prev_name, prev_caps))
-                            if prev_name == &name && prev_caps == &capabilities =>
-                        {
-                            false
-                        }
-                        _ => true,
-                    };
-                    if log_now {
-                        last_logged.insert(ble_id.clone(), (name.clone(), capabilities.clone()));
-                        tlog!(
-                            "[device_scan] BLE matched: {} (ble_id={}, parsed={}, adv_name={:?}, local_name={:?}), RSSI: {:?}, caps: {:?}",
-                            name,
-                            ble_id,
-                            parsed.is_some(),
-                            props.advertisement_name,
-                            props.local_name,
-                            rssi,
-                            capabilities
-                        );
-                    }
-
-                    let device = UnifiedDevice {
-                        name,
-                        id,
-                        transport: "ble".to_string(),
-                        ble_id: Some(ble_id),
-                        rssi,
-                        address: None,
-                        port: None,
-                        capabilities,
-                    };
-                    let _ = app_ble.emit("device-discovered", &device);
+                }
+                DiscoveryEvent::Lost { id } => {
+                    let _ = app_for_events.emit("device-disappeared", id.as_str().to_string());
+                }
+                DiscoveryEvent::Error { source, message } => {
+                    tlog!("[device_scan] Discovery error ({:?}): {}", source, message);
                 }
             }
         }
+        tlog!("[device_scan] event stream ended");
+    }));
 
-        // Auto-stop scan after timeout
-        let mut state = SCAN_STATE.lock().await;
-        if state.scanning {
-            state.scanning = false;
-            drop(state);
-            if let Ok(adapter) = get_adapter().await {
-                let _ = adapter.stop_scan().await;
+    let app_for_heartbeat = app.clone();
+    let discovery_for_heartbeat = discovery;
+    state.heartbeat = Some(tokio::spawn(async move {
+        // 2s cadence — Discovery's own event stream pushes Seen / Updated
+        // / Lost as they happen, so the heartbeat only exists to keep the
+        // frontend's lastSeenAt prune from culling devices that are
+        // present but quiet (no advertisement updates this cycle).
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(2));
+        tick.tick().await; // first tick fires immediately — already emitted the snapshot
+        loop {
+            tick.tick().await;
+            for device in discovery_for_heartbeat.devices().await {
+                let _ = app_for_heartbeat.emit("device-discovered", to_unified(&device));
             }
-        } else {
-            drop(state);
         }
-        tlog!("[device_scan] BLE scan finished");
-        let _ = app_ble.emit("device-scan-finished", ());
-    });
+    }));
 
-    // -- mDNS browse task --
-    tokio::spawn(async move {
-        tlog!("[device_scan] Creating mDNS daemon...");
-        let daemon = match ServiceDaemon::new() {
-            Ok(d) => {
-                tlog!("[device_scan] mDNS daemon created successfully");
-                d
-            }
-            Err(e) => {
-                tlog!("[device_scan] Failed to create mDNS daemon: {e}");
-                return;
-            }
-        };
-
-        // Store daemon in state for later shutdown
-        {
-            let mut state = SCAN_STATE.lock().await;
-            state.mdns_daemon = Some(daemon.clone());
-        }
-
-        let receiver_mcumgr = match daemon.browse(MDNS_SERVICE_MCUMGR) {
-            Ok(r) => r,
-            Err(e) => {
-                tlog!("[device_scan] Failed to browse {MDNS_SERVICE_MCUMGR}: {e}");
-                return;
-            }
-        };
-
-        let receiver_framelink = match daemon.browse(MDNS_SERVICE_FRAMELINK) {
-            Ok(r) => r,
-            Err(e) => {
-                tlog!("[device_scan] Failed to browse {MDNS_SERVICE_FRAMELINK}: {e}");
-                return;
-            }
-        };
-
-        tlog!(
-            "[device_scan] mDNS browse started for {} and {}",
-            MDNS_SERVICE_MCUMGR,
-            MDNS_SERVICE_FRAMELINK
-        );
-
-        // Spawn a blocking receiver task per service type — each service
-        // becomes its own device card (no cross-service merging).
-        let spawn_mdns_receiver = |rx: mdns_sd::Receiver<ServiceEvent>,
-                                    svc: &'static str,
-                                    app_handle: AppHandle| {
-            tokio::task::spawn_blocking(move || {
-                let poll_interval = std::time::Duration::from_millis(500);
-                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
-                let mut event_count = 0u32;
-                // Cache resolved devices so we can re-emit them every poll —
-                // the frontend prunes entries whose lastSeenAt goes stale,
-                // and mDNS ServiceResolved only fires once per resolution.
-                let mut resolved: std::collections::HashMap<String, UnifiedDevice> =
-                    std::collections::HashMap::new();
-
-                let (cap, transport) = if svc == MDNS_SERVICE_FRAMELINK {
-                    ("framelink", "tcp")
-                } else {
-                    ("smp", "udp")
-                };
-
-                while std::time::Instant::now() < deadline {
-                    while let Ok(event) = rx.try_recv() {
-                        event_count += 1;
-                        match &event {
-                            ServiceEvent::ServiceResolved(info) => {
-                                tlog!(
-                                    "[device_scan] mDNS ServiceResolved: {} addrs={:?} port={}",
-                                    info.get_fullname(),
-                                    info.get_addresses(),
-                                    info.get_port()
-                                );
-                                for addr in info.get_addresses() {
-                                    let port = info.get_port();
-                                    let name = info
-                                        .get_fullname()
-                                        .split('.')
-                                        .next()
-                                        .unwrap_or("Unknown")
-                                        .to_string();
-                                    let id = format!("{}:{}", transport, name);
-                                    let is_new = !resolved.contains_key(&id);
-                                    if is_new {
-                                        tlog!(
-                                            "[device_scan] mDNS resolved: {} at {}:{} ({}, cap={})",
-                                            name,
-                                            addr,
-                                            port,
-                                            svc,
-                                            cap
-                                        );
-                                    }
-                                    // Reaching us via mDNS implies the device
-                                    // is already provisioned onto the network,
-                                    // so the wifi chip lights up on every
-                                    // mDNS card alongside the service-specific
-                                    // capability.
-                                    resolved.insert(
-                                        id.clone(),
-                                        UnifiedDevice {
-                                            name,
-                                            id,
-                                            transport: transport.to_string(),
-                                            ble_id: None,
-                                            rssi: None,
-                                            address: Some(addr.to_string()),
-                                            port: Some(port),
-                                            capabilities: vec![
-                                                "wifi-provision".to_string(),
-                                                cap.to_string(),
-                                            ],
-                                        },
-                                    );
-                                }
-                            }
-                            ServiceEvent::ServiceRemoved(_, fullname) => {
-                                let name = fullname
-                                    .split('.')
-                                    .next()
-                                    .unwrap_or("Unknown")
-                                    .to_string();
-                                let id = format!("{}:{}", transport, name);
-                                if resolved.remove(&id).is_some() {
-                                    tlog!(
-                                        "[device_scan] mDNS removed: {} ({})",
-                                        name,
-                                        svc
-                                    );
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    // Heartbeat: re-emit every cached device so the frontend's
-                    // lastSeenAt stays fresh and the prune sweep doesn't drop
-                    // entries that are still alive on the network.
-                    for device in resolved.values() {
-                        let _ = app_handle.emit("device-discovered", device);
-                    }
-
-                    std::thread::sleep(poll_interval);
-                }
-
-                tlog!(
-                    "[device_scan] mDNS receiver for {} finished after {} events",
-                    svc,
-                    event_count
-                );
-            })
-        };
-
-        let h1 = spawn_mdns_receiver(
-            receiver_mcumgr,
-            MDNS_SERVICE_MCUMGR,
-            app.clone(),
-        );
-        let h2 = spawn_mdns_receiver(
-            receiver_framelink,
-            MDNS_SERVICE_FRAMELINK,
-            app.clone(),
-        );
-
-        // Wait for both receiver tasks to finish
-        let _ = h1.await;
-        let _ = h2.await;
-
-        // Clean up mDNS
-        shutdown_mdns().await;
-        tlog!("[device_scan] mDNS browse finished");
-    });
-
+    tlog!("[device_scan] forwarding Discovery events to frontend");
     Ok(())
 }
 
-/// Stop an active unified scan (both BLE and mDNS).
+/// Stop forwarding Discovery events. The underlying scanners stay alive
+/// (no API to pause them) so re-starting is instant; the frontend just
+/// stops receiving heartbeats.
 #[tauri::command]
 pub async fn device_scan_stop(_app: AppHandle) -> Result<(), String> {
-    let mut state = SCAN_STATE.lock().await;
-    if !state.scanning && !state.mdns_scanning {
-        return Ok(());
+    let mut state = STATE.lock().await;
+    if let Some(handle) = state.forwarder.take() {
+        handle.abort();
     }
-    state.scanning = false;
-    state.mdns_scanning = false;
-    drop(state);
-
-    if let Ok(adapter) = get_adapter().await {
-        adapter
-            .stop_scan()
-            .await
-            .map_err(|e| format!("Failed to stop BLE scan: {e}"))?;
+    if let Some(handle) = state.heartbeat.take() {
+        handle.abort();
     }
-
-    shutdown_mdns().await;
-
+    tlog!("[device_scan] forwarding stopped");
     Ok(())
 }
+

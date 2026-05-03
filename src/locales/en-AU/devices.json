@@ -46,7 +46,6 @@
       "noIp": "This device isn't reachable over IP. Make sure it's joined the network and visible to mDNS.",
       "noWifiProv": "This device isn't advertising the Wi-Fi provisioning service over BLE.",
       "noBleSmp": "This device isn't advertising SMP over BLE.",
-      "bleSmpStubbed": "Firmware upgrade over BLE is temporarily disabled while we wait on an upstream dependency. Use Firmware (IP) instead.",
       "noSmpService": "This device isn't advertising the SMP service.",
       "noSmpPort": "No SMP UDP port is known for this device.",
       "noFrameLink": "This device isn't advertising FrameLink.",
