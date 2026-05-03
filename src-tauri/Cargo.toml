@@ -17,11 +17,6 @@ name = "gs_usb_cli"
 path = "../tools/gs_usb_cli/main.rs"
 required-features = ["cli"]
 
-[[bin]]
-name = "bt_scan_cli"
-path = "../tools/bt_scan_cli/main.rs"
-required-features = ["cli"]
-
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
@@ -96,20 +91,11 @@ nusb = { version = "0.2", features = ["tokio"] }
 windows-sys = { version = "0.59", features = ["Win32_UI_HiDpi", "Win32_Foundation"] }
 
 [features]
-cli = ["clap", "dep:ratatui", "dep:crossterm"]
+cli = ["clap"]
 
 [dependencies.clap]
 version = "4"
 features = ["derive"]
-optional = true
-
-[dependencies.ratatui]
-version = "0.29"
-optional = true
-
-[dependencies.crossterm]
-version = "0.28"
-features = ["event-stream"]
 optional = true
 
 # Linux

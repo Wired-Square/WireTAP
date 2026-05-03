@@ -1,0 +1,25 @@
+[package]
+name = "bt_scan_cli"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "FrameLink discovery diagnostic — drives framelink::Discovery and renders what it sees."
+
+[[bin]]
+name = "bt_scan_cli"
+path = "main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+ratatui = "0.29"
+crossterm = { version = "0.28", features = ["event-stream"] }
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", branch = "alex/discovery-api", features = ["discovery", "ble"] }
+
+# Local-dev override: while alex/discovery-api is unmerged in framelink-rs,
+# build against the sibling checkout. Drop this block once the upstream
+# PR merges and bump the branch above to "main".
+[patch."ssh://git@github.com/Wired-Square/framelink-rs.git"]
+framelink = { path = "../../../framelink-rs" }
