@@ -77,13 +77,18 @@ pub struct BridgeDescriptor {
     pub dest_interface_name: String,
     pub interface_type_name: String,
     pub enabled: bool,
+    pub default_action: bridge::BridgeDefaultAction,
     pub filters: Vec<BridgeFilterDescriptor>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BridgeFilterDescriptor {
-    pub can_id: u32,
-    pub mask: u32,
+    pub kind: bridge::BridgeFilterType,
+    pub ide: bridge::BridgeFilterIde,
+    /// Mask: `can_id`. Range: inclusive `lo`.
+    pub a: u32,
+    /// Mask: `mask`. Range: inclusive `hi`.
+    pub b: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -215,12 +220,15 @@ fn bridge_to_descriptor(info: &BridgeInfo, board_def: Option<&BoardDef>) -> Brid
         dest_interface_name: resolve_iface_display(info.dest_interface, board_def, None),
         interface_type_name: interface_name(info.interface_type).to_string(),
         enabled: info.enabled,
+        default_action: info.default_action,
         filters: info
             .filters
             .iter()
             .map(|f| BridgeFilterDescriptor {
-                can_id: f.can_id,
-                mask: f.mask,
+                kind: f.kind,
+                ide: f.ide,
+                a: f.a,
+                b: f.b,
             })
             .collect(),
     }
@@ -384,21 +392,35 @@ fn parse_frame_def_info(v: &Value) -> Result<FrameDefInfo, String> {
 }
 
 fn parse_bridge_info(v: &Value) -> Result<BridgeInfo, String> {
+    let default_action = bridge::BridgeDefaultAction::from_name(
+        v["default_action"].as_str().unwrap_or("pass"),
+    )
+    .ok_or("Invalid default_action")?;
+
     Ok(BridgeInfo {
         bridge_id: v["bridge_id"].as_u64().ok_or("Missing bridge_id")? as u16,
         source_interface: v["source_interface"].as_u64().ok_or("Missing source_interface")? as u8,
         dest_interface: v["dest_interface"].as_u64().ok_or("Missing dest_interface")? as u8,
         interface_type: v["interface_type"].as_u64().ok_or("Missing interface_type")? as u8,
         enabled: v["enabled"].as_bool().unwrap_or(true),
+        default_action,
         filters: v["filters"]
             .as_array()
             .map(|arr| {
                 arr.iter()
                     .filter_map(|f| {
-                        Some(bridge::BridgeFilter {
-                            can_id: f["can_id"].as_u64()? as u32,
-                            mask: f["mask"].as_u64().unwrap_or(0xFFFFFFFF) as u32,
-                        })
+                        let kind = bridge::BridgeFilterType::from_name(
+                            f["kind"].as_str().unwrap_or("mask"),
+                        )?;
+                        let ide = bridge::BridgeFilterIde::from_name(
+                            f["ide"].as_str().unwrap_or("any"),
+                        )?;
+                        let a = f["a"].as_u64()? as u32;
+                        let b = f["b"]
+                            .as_u64()
+                            .unwrap_or(u64::from(bridge::CAN_ID_MASK_29))
+                            as u32;
+                        Some(bridge::BridgeFilter { kind, ide, a, b })
                     })
                     .collect()
             })

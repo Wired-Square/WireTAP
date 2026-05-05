@@ -34,9 +34,17 @@ export interface FrameDefDescriptor {
   signals: SignalDefDescriptor[];
 }
 
+export type BridgeFilterKind = 'mask' | 'range';
+export type BridgeFilterIde = 'any' | 'std' | 'ext';
+export type BridgeDefaultAction = 'pass' | 'block';
+
 export interface BridgeFilterDescriptor {
-  can_id: number;
-  mask: number;
+  kind: BridgeFilterKind;
+  ide: BridgeFilterIde;
+  /** Mask: `can_id`. Range: inclusive `lo`. */
+  a: number;
+  /** Mask: `mask`. Range: inclusive `hi`. */
+  b: number;
 }
 
 export interface BridgeDescriptor {
@@ -48,6 +56,8 @@ export interface BridgeDescriptor {
   dest_interface_name: string;
   interface_type_name: string;
   enabled: boolean;
+  /** "pass" = forward unmatched (denylist); "block" = drop unmatched (allowlist). */
+  default_action: BridgeDefaultAction;
   filters: BridgeFilterDescriptor[];
 }
 

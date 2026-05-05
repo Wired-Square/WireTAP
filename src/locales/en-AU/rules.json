@@ -315,14 +315,47 @@
       "sourceInterface": "Source Interface",
       "destInterface": "Destination Interface",
       "bidirectional": "Bidirectional (creates A→B and B→A)",
-      "filters": "CAN ID Filters (optional)",
+      "defaultAction": "Default Action",
+      "filtersDeny": "Frames to drop (deny list)",
+      "filtersAllow": "Frames to forward (allow list)",
       "addFilter": "Add Filter",
       "canIdHex": "CAN ID (hex)",
-      "maskHex": "Mask (hex)"
+      "maskHex": "Mask (hex)",
+      "loHex": "Lo (hex)",
+      "hiHex": "Hi (hex)"
+    },
+    "kind": {
+      "mask": "Mask",
+      "range": "Range"
+    },
+    "ide": {
+      "any": "Any",
+      "std": "Std",
+      "ext": "Ext"
+    },
+    "action": {
+      "pass": "Pass (forward by default)",
+      "block": "Block (drop by default)"
+    },
+    "tooltips": {
+      "bridgeId": "Numeric identifier for this bridge rule on the device. Each rule needs a unique ID so it can be enabled, disabled, or removed individually. If you tick Bidirectional, the reverse rule uses the next ID up.",
+      "sourceInterface": "The interface frames are received from. Frames matching the filters below are forwarded to the destination interface.",
+      "destInterface": "The interface matched frames are transmitted on. The source and destination must be the same interface type (CAN to CAN, RS-485 to RS-485).",
+      "bidirectional": "Creates two bridge rules at once: source→destination, and destination→source. Use this when both ends of the bridge should mirror each other's traffic. The reverse rule reuses the same filter list.",
+      "defaultAction": "Sets what happens to frames that don't match any filter. Pass forwards everything by default and the filter list specifies IDs to drop (a deny list — useful for blocking a few noisy IDs). Block drops everything by default and the filter list specifies IDs to forward (an allow list — useful for forwarding only a few specific IDs). With no filters, Pass forwards every frame and Block drops every frame.",
+      "filtersDeny": "IDs listed here are dropped; everything else is forwarded. Add multiple entries to drop more IDs or ranges. RS-485 bridges ignore filters and always forward.",
+      "filtersAllow": "IDs listed here are forwarded; everything else is dropped. Add multiple entries to allow more IDs or ranges. RS-485 bridges ignore filters and always forward.",
+      "kind": "How this entry matches an incoming CAN ID. Mask matches a bit pattern — useful for catching all IDs that share the same prefix or suffix. Range matches every ID between the two values inclusive — useful for arbitrary low/high bounds like 0x100..0x1FF.",
+      "ide": "Restricts the entry to a specific frame format. Any matches both standard 11-bit and extended 29-bit frames. Std matches 11-bit only, Ext matches 29-bit only. Use Std or Ext when the same numeric ID can appear in both formats on the bus (e.g. mixed J1939 + legacy).",
+      "aMask": "The CAN ID to match. Bits set to 0 in the mask are ignored — set this to the value you want those bits to take when the mask bits are 1.",
+      "aRange": "Lower bound of the inclusive range. Frames with CAN IDs below this value are not matched.",
+      "bMask": "Bitmask. A 1 bit means 'this bit must match the CAN ID value'; a 0 bit means 'don't care'. Common values: 0x7FF for an exact 11-bit ID match, 0x1FFFFFFF for an exact 29-bit ID match, 0x700 to match the top 3 bits of an 11-bit ID.",
+      "bRange": "Upper bound of the inclusive range. Frames with CAN IDs above this value are not matched. Must be greater than or equal to the Lo value."
     },
     "errors": {
       "idInUse": "Bridge ID {{id}} is already in use.",
-      "reverseInUse": "Bridge ID {{id}} (reverse) is already in use."
+      "reverseInUse": "Bridge ID {{id}} (reverse) is already in use.",
+      "rangeLoGtHi": "Range filter has lo > hi ({{lo}} > {{hi}})."
     },
     "cancel": "Cancel",
     "submitOne": "Add Bridge",

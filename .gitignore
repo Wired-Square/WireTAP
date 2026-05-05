@@ -49,3 +49,4 @@ src-tauri/gen/schemas
 
 # Local research notes
 docs/local/
+/src-tauri/.cargo/
