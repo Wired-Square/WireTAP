@@ -322,7 +322,24 @@
       "canIdHex": "CAN ID (hex)",
       "maskHex": "Mask (hex)",
       "loHex": "Lo (hex)",
-      "hiHex": "Hi (hex)"
+      "hiHex": "Hi (hex)",
+      "canIdLabel": "CAN ID",
+      "maskLabel": "Mask",
+      "loLabel": "Lo",
+      "hiLabel": "Hi",
+      "helpShow": "Show help",
+      "helpHide": "Hide help",
+      "useTheseValues": "Use these values"
+    },
+    "help": {
+      "maskIntro": "A mask says which bits of the CAN ID must match. A 1 in the mask means \"this bit must equal the ID bit\"; a 0 means \"don't care\". An exact match needs every bit set (0x7FF for 11-bit IDs, 0x1FFFFFFF for 29-bit). Setting some bits to 0 broadens the match — useful for catching all IDs that share a prefix.",
+      "maskTryIt": "Try it",
+      "maskCalcCanId": "CAN ID",
+      "maskCalcMask": "Mask",
+      "maskMatchedSingle": "Matches 1 ID: {{id}}",
+      "maskMatchedRange": "Matches {{count}} IDs: {{lo}} – {{hi}}",
+      "rangeIntro": "Matches every CAN ID from Lo to Hi inclusive. Use Range when the IDs you want share no useful bit pattern, such as an arbitrary span like 0x100–0x1FF or 0x300–0x37F. Both bounds are inclusive; Hi must be ≥ Lo.",
+      "rangeExample": "Example: Lo 0x100, Hi 0x1FF matches all 256 IDs from 0x100 through 0x1FF."
     },
     "kind": {
       "mask": "Mask",
@@ -350,7 +367,8 @@
       "aMask": "The CAN ID to match. Bits set to 0 in the mask are ignored — set this to the value you want those bits to take when the mask bits are 1.",
       "aRange": "Lower bound of the inclusive range. Frames with CAN IDs below this value are not matched.",
       "bMask": "Bitmask. A 1 bit means 'this bit must match the CAN ID value'; a 0 bit means 'don't care'. Common values: 0x7FF for an exact 11-bit ID match, 0x1FFFFFFF for an exact 29-bit ID match, 0x700 to match the top 3 bits of an 11-bit ID.",
-      "bRange": "Upper bound of the inclusive range. Frames with CAN IDs above this value are not matched. Must be greater than or equal to the Lo value."
+      "bRange": "Upper bound of the inclusive range. Frames with CAN IDs above this value are not matched. Must be greater than or equal to the Lo value.",
+      "helpToggle": "Show or hide help for this filter — explains how this match type works, with an interactive calculator for masks."
     },
     "errors": {
       "idInUse": "Bridge ID {{id}} is already in use.",

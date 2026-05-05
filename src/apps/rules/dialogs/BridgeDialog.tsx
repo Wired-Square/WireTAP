@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, HelpCircle } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
@@ -11,6 +11,8 @@ import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { nextAvailableId } from "../utils/framelinkConstants";
 import { formatHexId } from "../utils/formatHex";
+import { ID_MASK_29, parseHex } from "../utils/canMask";
+import BridgeFilterHelp from "./BridgeFilterHelp";
 import type {
   BridgeFilterKind,
   BridgeFilterIde,
@@ -23,8 +25,6 @@ interface FilterRow {
   a: string;
   b: string;
 }
-
-const ID_MASK_29 = 0x1FFFFFFF;
 
 interface BridgeDialogProps {
   isOpen: boolean;
@@ -53,6 +53,15 @@ export default function BridgeDialog({
   const [bidirectional, setBidirectional] = useState(true);
   const [defaultAction, setDefaultAction] = useState<BridgeDefaultAction>('pass');
   const [filters, setFilters] = useState<FilterRow[]>([]);
+  const [openHelp, setOpenHelp] = useState<Set<number>>(new Set());
+
+  const toggleHelp = useCallback((idx: number) => {
+    setOpenHelp((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  }, []);
 
   const interfaceType = interfaces.find(
     (i) => i.index === sourceInterface,
@@ -75,6 +84,14 @@ export default function BridgeDialog({
 
   const removeFilter = useCallback((idx: number) => {
     setFilters((prev) => prev.filter((_, i) => i !== idx));
+    setOpenHelp((prev) => {
+      const next = new Set<number>();
+      prev.forEach((i) => {
+        if (i < idx) next.add(i);
+        else if (i > idx) next.add(i - 1);
+      });
+      return next;
+    });
   }, []);
 
   const updateFilter = useCallback(
@@ -96,15 +113,10 @@ export default function BridgeDialog({
       return;
     }
     setValidationError(null);
-    const parseHex = (s: string, fallback: number): number => {
-      const n = parseInt(s, 16);
-      return (Number.isNaN(n) ? fallback : n) & ID_MASK_29;
-    };
-
     const parsedFilters = filters.map((f) => {
-      const a = parseHex(f.a, 0);
+      const a = parseHex(f.a, 0, ID_MASK_29);
       const bDefault = f.kind === 'mask' ? ID_MASK_29 : a;
-      const b = parseHex(f.b, bDefault);
+      const b = parseHex(f.b, bDefault, ID_MASK_29);
       return { kind: f.kind, ide: f.ide, a, b };
     });
 
@@ -149,7 +161,7 @@ export default function BridgeDialog({
   };
 
   return (
-    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-lg">
+    <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-xl">
       <div className="p-6">
         <h2 className={`text-lg font-semibold ${textPrimary} mb-4`}>
           {t("bridgeDialog.title")}
@@ -261,67 +273,124 @@ export default function BridgeDialog({
             </div>
 
             {filters.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {filters.map((f, idx) => {
-                  const aPlaceholder = f.kind === 'mask'
-                    ? t("bridgeDialog.fields.canIdHex")
-                    : t("bridgeDialog.fields.loHex");
-                  const bPlaceholder = f.kind === 'mask'
-                    ? t("bridgeDialog.fields.maskHex")
-                    : t("bridgeDialog.fields.hiHex");
-                  const aTooltip = f.kind === 'mask'
-                    ? t("bridgeDialog.tooltips.aMask")
-                    : t("bridgeDialog.tooltips.aRange");
-                  const bTooltip = f.kind === 'mask'
-                    ? t("bridgeDialog.tooltips.bMask")
-                    : t("bridgeDialog.tooltips.bRange");
+                  const isMask = f.kind === 'mask';
+                  const aLabel = t(isMask
+                    ? "bridgeDialog.fields.canIdLabel"
+                    : "bridgeDialog.fields.loLabel");
+                  const bLabel = t(isMask
+                    ? "bridgeDialog.fields.maskLabel"
+                    : "bridgeDialog.fields.hiLabel");
+                  const aPlaceholder = t(isMask
+                    ? "bridgeDialog.fields.canIdHex"
+                    : "bridgeDialog.fields.loHex");
+                  const bPlaceholder = t(isMask
+                    ? "bridgeDialog.fields.maskHex"
+                    : "bridgeDialog.fields.hiHex");
+                  const aTooltip = t(isMask
+                    ? "bridgeDialog.tooltips.aMask"
+                    : "bridgeDialog.tooltips.aRange");
+                  const bTooltip = t(isMask
+                    ? "bridgeDialog.tooltips.bMask"
+                    : "bridgeDialog.tooltips.bRange");
+                  const helpOpen = openHelp.has(idx);
                   return (
-                    <div key={idx} className="flex items-center gap-2">
-                      <select
-                        className={`${inputSimple} flex-none w-20`}
-                        value={f.kind}
-                        onChange={(e) =>
-                          updateFilter(idx, 'kind', e.target.value as BridgeFilterKind)
-                        }
-                        title={t("bridgeDialog.tooltips.kind")}
-                      >
-                        <option value="mask">{t("bridgeDialog.kind.mask")}</option>
-                        <option value="range">{t("bridgeDialog.kind.range")}</option>
-                      </select>
-                      <select
-                        className={`${inputSimple} flex-none w-16`}
-                        value={f.ide}
-                        onChange={(e) =>
-                          updateFilter(idx, 'ide', e.target.value as BridgeFilterIde)
-                        }
-                        title={t("bridgeDialog.tooltips.ide")}
-                      >
-                        <option value="any">{t("bridgeDialog.ide.any")}</option>
-                        <option value="std">{t("bridgeDialog.ide.std")}</option>
-                        <option value="ext">{t("bridgeDialog.ide.ext")}</option>
-                      </select>
-                      <input
-                        type="text"
-                        className={`${inputSimple} font-mono flex-1`}
-                        value={f.a}
-                        onChange={(e) => updateFilter(idx, 'a', e.target.value)}
-                        placeholder={aPlaceholder}
-                        title={aTooltip}
-                      />
-                      <input
-                        type="text"
-                        className={`${inputSimple} font-mono flex-1`}
-                        value={f.b}
-                        onChange={(e) => updateFilter(idx, 'b', e.target.value)}
-                        placeholder={bPlaceholder}
-                        title={bTooltip}
-                      />
-                      <button
-                        onClick={() => removeFilter(idx)}
-                        className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
-                      >
-                        <Trash2 className={iconMd} />
-                      </button>
+                    <div
+                      key={idx}
+                      className="p-3 rounded border border-[color:var(--border-default)] space-y-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="flex-none w-28">
+                          <select
+                            className={inputSimple}
+                            value={f.kind}
+                            onChange={(e) =>
+                              updateFilter(idx, 'kind', e.target.value as BridgeFilterKind)
+                            }
+                            title={t("bridgeDialog.tooltips.kind")}
+                          >
+                            <option value="mask">{t("bridgeDialog.kind.mask")}</option>
+                            <option value="range">{t("bridgeDialog.kind.range")}</option>
+                          </select>
+                        </div>
+                        <div className="flex-none w-24">
+                          <select
+                            className={inputSimple}
+                            value={f.ide}
+                            onChange={(e) =>
+                              updateFilter(idx, 'ide', e.target.value as BridgeFilterIde)
+                            }
+                            title={t("bridgeDialog.tooltips.ide")}
+                          >
+                            <option value="any">{t("bridgeDialog.ide.any")}</option>
+                            <option value="std">{t("bridgeDialog.ide.std")}</option>
+                            <option value="ext">{t("bridgeDialog.ide.ext")}</option>
+                          </select>
+                        </div>
+                        <div className="flex-1" />
+                        <button
+                          type="button"
+                          onClick={() => toggleHelp(idx)}
+                          aria-pressed={helpOpen}
+                          aria-label={t(helpOpen
+                            ? "bridgeDialog.fields.helpHide"
+                            : "bridgeDialog.fields.helpShow")}
+                          title={t("bridgeDialog.tooltips.helpToggle")}
+                          className={`p-1 rounded hover:bg-white/10 ${
+                            helpOpen ? "text-blue-400" : textTertiary
+                          } hover:text-blue-300`}
+                        >
+                          <HelpCircle className={iconMd} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeFilter(idx)}
+                          className={`p-1 rounded hover:bg-red-500/20 ${textTertiary} hover:text-red-400`}
+                        >
+                          <Trash2 className={iconMd} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={`block text-xs ${textSecondary} mb-1`}>
+                            {aLabel}
+                          </label>
+                          <input
+                            type="text"
+                            className={`${inputSimple} font-mono w-full`}
+                            value={f.a}
+                            onChange={(e) => updateFilter(idx, 'a', e.target.value)}
+                            placeholder={aPlaceholder}
+                            title={aTooltip}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block text-xs ${textSecondary} mb-1`}>
+                            {bLabel}
+                          </label>
+                          <input
+                            type="text"
+                            className={`${inputSimple} font-mono w-full`}
+                            value={f.b}
+                            onChange={(e) => updateFilter(idx, 'b', e.target.value)}
+                            placeholder={bPlaceholder}
+                            title={bTooltip}
+                          />
+                        </div>
+                      </div>
+
+                      {helpOpen && (
+                        <BridgeFilterHelp
+                          kind={f.kind}
+                          ide={f.ide}
+                          onApplyMask={(canIdHex, maskHex) => {
+                            updateFilter(idx, 'a', canIdHex);
+                            updateFilter(idx, 'b', maskHex);
+                          }}
+                        />
+                      )}
                     </div>
                   );
                 })}
