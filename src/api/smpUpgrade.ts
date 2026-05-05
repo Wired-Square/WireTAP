@@ -65,8 +65,8 @@ export async function smpReconnectBleByName(name: string, timeoutSecs: number): 
   await invoke("smp_reconnect_ble_by_name", { name, timeoutSecs });
 }
 
-export async function smpConnectUdp(address: string, port: number): Promise<void> {
-  await invoke("smp_connect_udp", { address, port });
+export async function smpConnectUdp(deviceId: string): Promise<void> {
+  await invoke("smp_connect_udp", { deviceId });
 }
 
 export async function smpDisconnect(): Promise<void> {

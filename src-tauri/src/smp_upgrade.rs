@@ -16,7 +16,6 @@ use framelink::{CapabilitySet, ImageSlot as FlImageSlot, SmpSession, Transport};
 use futures::StreamExt;
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{Mutex, Notify};
@@ -189,32 +188,14 @@ pub async fn smp_reconnect_ble_by_name(
     }
 }
 
-/// Connect over UDP. The address+port must match an mDNS-discovered
-/// `_mcumgr._udp` device — we look it up in the live Discovery snapshot
-/// to recover the framelink DeviceId before opening the session.
+/// Connect over UDP. Takes the framelink `DeviceId` for the
+/// `_mcumgr._udp` mDNS entry directly (e.g.
+/// `mdns:udp:WiredFlexLink-9C1C._mcumgr._udp.local.`) — no
+/// snapshot reverse lookup, mirrors `smp_connect_ble`.
 #[tauri::command]
-pub async fn smp_connect_udp(address: String, port: u16) -> Result<(), String> {
-    let target: SocketAddr = format!("{address}:{port}")
-        .parse()
-        .map_err(|e| format!("Invalid address: {e}"))?;
-
+pub async fn smp_connect_udp(device_id: String) -> Result<(), String> {
+    let id = canonical_device_id(device_id);
     let discovery = discovery_handle().await?;
-    let device = discovery
-        .devices()
-        .await
-        .into_iter()
-        .find(|d| {
-            d.transports().contains(&Transport::Udp)
-                && d.address().map(|a| a.ip() == target.ip() && a.port() == target.port())
-                    .unwrap_or(false)
-        })
-        .ok_or_else(|| {
-            format!(
-                "No mDNS-discovered UDP device matches {target}; rescan and try again"
-            )
-        })?;
-
-    let id = device.id().clone();
     let session = discovery
         .open_smp_udp(&id)
         .await
@@ -222,7 +203,7 @@ pub async fn smp_connect_udp(address: String, port: u16) -> Result<(), String> {
 
     let mut state = STATE.lock().await;
     state.session = Some(Arc::new(session));
-    tlog!("[smp_upgrade] SMP-UDP session opened on {} ({target})", id);
+    tlog!("[smp_upgrade] SMP-UDP session opened on {}", id);
     Ok(())
 }
 

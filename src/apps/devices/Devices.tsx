@@ -27,6 +27,7 @@ export default function Devices() {
   const screen = useDevicesStore((s) => s.ui.screen);
 
   const addDevice = useDevicesStore((s) => s.addDevice);
+  const removeDevice = useDevicesStore((s) => s.removeDevice);
   const setScanning = useDevicesStore((s) => s.setScanning);
   const setScreen = useDevicesStore((s) => s.setScreen);
   const setError = useDevicesStore((s) => s.setError);
@@ -44,6 +45,9 @@ export default function Devices() {
     const unlistenPromises = [
       listen<UnifiedDevice>("device-discovered", (event) => {
         addDevice(event.payload);
+      }),
+      listen<string>("device-disappeared", (event) => {
+        removeDevice(event.payload);
       }),
       listen<void>("device-scan-finished", () => {
         setScanning(false);

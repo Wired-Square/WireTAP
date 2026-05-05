@@ -163,7 +163,10 @@
     "copyHash": "Copy hash",
     "selectedLabel": "Selected:",
     "selectedSize": "({{kb}} KB)",
-    "selectFirmware": "Select Firmware"
+    "selectFirmware": "Select Firmware",
+    "confirmActive": "Confirm Image",
+    "confirmingActive": "Confirming…",
+    "nothingToConfirm": "No active unconfirmed image to confirm."
   },
   "firmware": {
     "title": "Firmware",

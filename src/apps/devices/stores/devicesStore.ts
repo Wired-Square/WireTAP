@@ -55,6 +55,8 @@ interface DevicesState {
     selectedBleId: string | null;
     /** Selected device IP address (mDNS or manual) */
     selectedAddress: string | null;
+    /** framelink::DeviceId for the SMP-UDP transport (mDNS-discovered). */
+    selectedSmpId: string | null;
     /** Selected device SMP UDP port (mDNS or manual). */
     selectedSmpPort: number | null;
     /** FrameLink TCP port (defaults to 120). */
@@ -79,6 +81,13 @@ interface DevicesState {
 
   // Data actions
   addDevice: (device: UnifiedDevice) => void;
+  /**
+   * Remove all UnifiedDevice entries with this framelink `DeviceId`. A
+   * single physical device can have several entries (one per transport)
+   * sharing the same id prefix scheme but distinct ids — only the
+   * matching one is removed. Driven by Discovery's `Lost` event.
+   */
+  removeDevice: (id: string) => void;
   clearDevices: () => void;
   /** Drop entries whose lastSeenAt is older than (now - olderThanMs). */
   pruneStale: (olderThanMs: number) => void;
@@ -91,6 +100,7 @@ interface DevicesState {
     name: string;
     bleId: string | null;
     address: string | null;
+    smpId: string | null;
     smpPort: number | null;
     frameLinkPort: number | null;
     capabilities: string[];
@@ -115,6 +125,7 @@ const initialData = {
   selectedDeviceName: null as string | null,
   selectedBleId: null as string | null,
   selectedAddress: null as string | null,
+  selectedSmpId: null as string | null,
   selectedSmpPort: null as number | null,
   selectedFrameLinkPort: null as number | null,
   selectedCapabilities: [] as string[],
@@ -175,6 +186,13 @@ export const useDevicesStore = create<DevicesState>((set) => ({
       };
     }),
 
+  removeDevice: (id) =>
+    set((s) => {
+      const next = s.data.devices.filter((d) => d.id !== id);
+      if (next.length === s.data.devices.length) return s;
+      return { data: { ...s.data, devices: next } };
+    }),
+
   clearDevices: () => set((s) => ({ data: { ...s.data, devices: [] } })),
 
   pruneStale: (olderThanMs) =>
@@ -193,6 +211,7 @@ export const useDevicesStore = create<DevicesState>((set) => ({
         selectedDeviceName: selection.name,
         selectedBleId: selection.bleId,
         selectedAddress: selection.address,
+        selectedSmpId: selection.smpId,
         selectedSmpPort: selection.smpPort,
         selectedFrameLinkPort: selection.frameLinkPort,
         selectedCapabilities: selection.capabilities,

@@ -39,7 +39,6 @@ import { useDeviceConnection } from "../hooks/useDeviceConnection";
 import {
   smpCancelUpload,
   smpConfirmImage,
-  smpConnectUdp,
   smpListImages,
   smpReconnectBleByName,
   smpResetDevice,
@@ -56,11 +55,14 @@ interface FirmwareTabProps {
   transport: FirmwareTransport;
 }
 
-function formatKB(bytes: number): string {
-  return (bytes / 1024).toFixed(1);
+function formatKB(bytes: number, padToBytes?: number): string {
+  const kb = Math.round(bytes / 1024).toString();
+  if (padToBytes === undefined) return kb;
+  const width = Math.round(padToBytes / 1024).toString().length;
+  return kb.padStart(width, " ");
 }
 
-function SlotBadge({ label, active }: { label: string; active: boolean }) {
+function SlotBadge({ label, active = true }: { label: string; active?: boolean }) {
   return (
     <span
       className={`text-xs px-1.5 py-0.5 rounded font-medium min-w-[72px] text-center inline-block ${
@@ -93,10 +95,9 @@ export default function FirmwareTab({ transport }: FirmwareTabProps) {
   const setUpgradeConnectionState = useUpgradeStore((s) => s.setConnectionState);
 
   const transports = useDevicesStore((s) => s.ui.transports);
-  const selectedAddress = useDevicesStore((s) => s.data.selectedAddress);
-  const selectedSmpPort = useDevicesStore((s) => s.data.selectedSmpPort);
+  const selectedSmpId = useDevicesStore((s) => s.data.selectedSmpId);
 
-  const { ensureBleSmp, ensureIpSmp } = useDeviceConnection();
+  const { ensureBleSmp, ensureIpSmp, reconnectIpSmpWithDeadline } = useDeviceConnection();
 
   const [phase, setPhase] = useState<FirmwarePhase>("inspect");
   const [refreshing, setRefreshing] = useState(false);
@@ -246,10 +247,10 @@ export default function FirmwareTab({ transport }: FirmwareTabProps) {
     try {
       // The device rebooted; the prior socket is stale. Re-establish.
       if (transport === "ip") {
-        if (!selectedAddress || selectedSmpPort == null) {
+        if (!selectedSmpId) {
           throw new Error(t("upgradeFlow.noUdpAddress"));
         }
-        await smpConnectUdp(selectedAddress, selectedSmpPort);
+        await reconnectIpSmpWithDeadline(30_000);
       } else {
         // Firmware test-boot rotates the device's BLE peripheral
         // identifier, so the cached selectedBleId is stale. Reconnect by
@@ -272,6 +273,30 @@ export default function FirmwareTab({ transport }: FirmwareTabProps) {
         await smpConfirmImage(hashBytes);
       }
       setUploadState("confirming");
+    } catch (e) {
+      setUpgradeError(String(e));
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  // Manual fallback when the auto Reconnect-&-Confirm flow didn't run or
+  // didn't complete (e.g. user closed the app before reboot, or the
+  // device's mDNS reappeared after the deadline). Confirms whatever
+  // active+!confirmed image the device is currently advertising.
+  const handleConfirmActive = async () => {
+    setConfirming(true);
+    setUpgradeError(null);
+    try {
+      const target = images.find((img) => img.active && !img.confirmed);
+      if (!target) throw new Error(t("inspect.nothingToConfirm"));
+      const hashBytes: number[] = [];
+      for (let i = 0; i < target.hash.length; i += 2) {
+        hashBytes.push(parseInt(target.hash.slice(i, i + 2), 16));
+      }
+      await smpConfirmImage(hashBytes);
+      const imgs = await smpListImages();
+      setImages(imgs);
     } catch (e) {
       setUpgradeError(String(e));
     } finally {
@@ -357,9 +382,9 @@ export default function FirmwareTab({ transport }: FirmwareTabProps) {
                       style={{ width: `${Math.round(uploadProgress.percent)}%` }}
                     />
                   </div>
-                  <div className={`text-xs ${textSecondary}`}>
+                  <div className={`text-xs font-mono ${textSecondary}`}>
                     {t("upload.uploadProgress", {
-                      sent: formatKB(uploadProgress.bytes_sent),
+                      sent: formatKB(uploadProgress.bytes_sent, uploadProgress.total_bytes),
                       total: formatKB(uploadProgress.total_bytes),
                     })}
                   </div>
@@ -537,11 +562,11 @@ export default function FirmwareTab({ transport }: FirmwareTabProps) {
                     : t("inspect.slotLabel", { slot: img.slot })}
                 </span>
                 <div className="flex gap-1">
-                  {img.active && <SlotBadge label={t("inspect.active")} active />}
-                  {img.confirmed && <SlotBadge label={t("inspect.confirmed")} active={false} />}
-                  {img.pending && <SlotBadge label={t("inspect.pending")} active={false} />}
-                  {img.bootable && <SlotBadge label={t("inspect.bootable")} active={false} />}
-                  {img.permanent && <SlotBadge label={t("inspect.permanent")} active={false} />}
+                  {img.active && <SlotBadge label={t("inspect.active")} />}
+                  {img.confirmed && <SlotBadge label={t("inspect.confirmed")} />}
+                  {img.pending && <SlotBadge label={t("inspect.pending")} />}
+                  {img.bootable && <SlotBadge label={t("inspect.bootable")} />}
+                  {img.permanent && <SlotBadge label={t("inspect.permanent")} />}
                 </div>
               </div>
               <div className={`text-xs ${textSecondary} space-y-0.5`}>
@@ -585,11 +610,22 @@ export default function FirmwareTab({ transport }: FirmwareTabProps) {
       {selectedFileName && (
         <div className={`text-xs ${textSecondary}`}>
           {t("inspect.selectedLabel")} <span className={textPrimary}>{selectedFileName}</span>
-          {selectedFileSize !== null && ` ${t("inspect.selectedSize", { kb: (selectedFileSize / 1024).toFixed(1) })}`}
+          {selectedFileSize !== null && ` ${t("inspect.selectedSize", { kb: formatKB(selectedFileSize) })}`}
         </div>
       )}
 
-      <div className="mt-auto pt-4 flex justify-end">
+      <div className="mt-auto pt-4 flex justify-end gap-2">
+        {transportReady && images.some((img) => img.active && !img.confirmed) && (
+          <SecondaryButton
+            onClick={handleConfirmActive}
+            disabled={confirming}
+            className="min-w-[10rem]"
+          >
+            {confirming
+              ? t("inspect.confirmingActive")
+              : t("inspect.confirmActive")}
+          </SecondaryButton>
+        )}
         <PrimaryButton
           onClick={handleSelectFirmware}
           disabled={!transportReady}

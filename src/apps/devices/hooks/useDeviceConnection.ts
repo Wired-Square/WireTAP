@@ -27,6 +27,7 @@ import {
   smpConnectUdp,
   smpDisconnect,
 } from "../../../api/smpUpgrade";
+import type { UnifiedDevice } from "../../../api/deviceScan";
 
 export interface DeviceConnection {
   /** Bring up BLE provisioning GATT, hydrate Wi-Fi state into provisioning store. */
@@ -39,6 +40,12 @@ export interface DeviceConnection {
   ensureBleSmp: () => Promise<void>;
   /** Open SMP UDP transport to the selected device's address/port. */
   ensureIpSmp: () => Promise<void>;
+  /**
+   * Retry `smpConnectUdp` until the device reappears in Discovery or
+   * `timeoutMs` elapses. Used after the device reboots — the framelink
+   * `DeviceId` is stable but mDNS needs a moment to re-resolve.
+   */
+  reconnectIpSmpWithDeadline: (timeoutMs: number) => Promise<void>;
   /**
    * Mark FrameLink as ready. There's no persistent FrameLink socket — the
    * probe call inside DataIoTab is what actually proves reachability.
@@ -158,15 +165,15 @@ export function useDeviceConnection(): DeviceConnection {
       async () => {
         const { ui, data } = useDevicesStore.getState();
         if (ui.transports.ipSmp) return;
-        if (!data.selectedAddress || data.selectedSmpPort == null) {
-          throw new Error("No SMP address/port for this device");
+        if (!data.selectedSmpId) {
+          throw new Error("No mDNS-discovered SMP-UDP entry for this device");
         }
 
         const setTransport = useDevicesStore.getState().setTransport;
         const setConnectionState = useDevicesStore.getState().setConnectionState;
 
         setConnectionState("connecting");
-        await smpConnectUdp(data.selectedAddress, data.selectedSmpPort);
+        await smpConnectUdp(data.selectedSmpId);
         setTransport("ipSmp", true);
         setConnectionState("connected");
 
@@ -179,6 +186,47 @@ export function useDeviceConnection(): DeviceConnection {
         upgrade.setConnectionState("connected");
       },
     );
+  }, []);
+
+  const reconnectIpSmpWithDeadline = useCallback(async (timeoutMs: number) => {
+    const { data } = useDevicesStore.getState();
+    if (!data.selectedSmpId) {
+      throw new Error("No mDNS-discovered SMP-UDP entry for this device");
+    }
+    const id = data.selectedSmpId;
+    const setTransport = useDevicesStore.getState().setTransport;
+    const setConnectionState = useDevicesStore.getState().setConnectionState;
+
+    setConnectionState("connecting");
+    // Wait for Discovery (via the devicesStore that already mirrors its
+    // events) to surface the UDP entry for this id, then open the session
+    // exactly once. No polling — driven by the `device-discovered` event
+    // the backend forwards from framelink::Discovery::events().
+    const isPresent = (devices: UnifiedDevice[]) =>
+      devices.some((d) => d.id === id && d.transport === "udp");
+    if (!isPresent(useDevicesStore.getState().data.devices)) {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          unsubscribe();
+          reject(
+            new Error(
+              `Device did not reappear in discovery within ${Math.round(timeoutMs / 1000)}s`,
+            ),
+          );
+        }, timeoutMs);
+        const unsubscribe = useDevicesStore.subscribe((s) => {
+          if (isPresent(s.data.devices)) {
+            clearTimeout(timer);
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+    }
+
+    await smpConnectUdp(id);
+    setTransport("ipSmp", true);
+    setConnectionState("connected");
   }, []);
 
   const ensureIpFrameLink = useCallback(async () => {
@@ -222,6 +270,7 @@ export function useDeviceConnection(): DeviceConnection {
     ensureBleProv,
     ensureBleSmp,
     ensureIpSmp,
+    reconnectIpSmpWithDeadline,
     ensureIpFrameLink,
     disconnectAll,
   };

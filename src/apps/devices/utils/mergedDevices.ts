@@ -16,6 +16,7 @@ export interface MergedBle {
 }
 
 export interface MergedNetwork {
+  id: string;
   address: string;
   port: number;
   lastSeenAt: number;
@@ -48,9 +49,9 @@ export function mergeDevices(devices: UnifiedDevice[]): MergedDevice[] {
         lastSeenAt,
       };
     } else if (d.transport === "udp" && d.address && d.port != null) {
-      m.smp = { address: d.address, port: d.port, lastSeenAt };
+      m.smp = { id: d.id, address: d.address, port: d.port, lastSeenAt };
     } else if (d.transport === "tcp" && d.address && d.port != null) {
-      m.framelink = { address: d.address, port: d.port, lastSeenAt };
+      m.framelink = { id: d.id, address: d.address, port: d.port, lastSeenAt };
     }
   }
 
