@@ -11,7 +11,7 @@ import { Globe } from "lucide-react";
 import { iconXs } from "../styles/spacing";
 import { caption } from "../styles/typography";
 import { bgSurface } from "../styles/colourTokens";
-import { getLocalTimezoneAbbr, convertDatetimeLocal } from "./TimezoneBadge";
+import { getLocalTimezoneAbbr, convertDatetimeLocal } from "../utils/timezone";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import type { TimeRangeFavorite } from "../utils/favorites";
 

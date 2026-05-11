@@ -28,6 +28,7 @@ export const MsgType = {
   TransmitUpdated: 0x0b,
   ReplayState: 0x0c,
   TestPatternState: 0x0d,
+  OtaEvent: 0x0e,
   Subscribe: 0x10,
   Unsubscribe: 0x11,
   SubscribeAck: 0x12,

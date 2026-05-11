@@ -33,11 +33,10 @@
     "connectingBleSmp": "Attaching SMP over BLE…",
     "connectingIpSmp": "Connecting SMP over UDP…",
     "changeWifi": "Change Wi-Fi",
-    "goToFirmwareBle": "Go to Firmware (BLE)",
+    "goToFirmware": "Go to Firmware",
     "tabs": {
       "wifi": "Wi-Fi (BLE)",
-      "firmwareBle": "Firmware (BLE)",
-      "firmwareIp": "Firmware (IP)",
+      "firmware": "Firmware",
       "dataio": "Data IO"
     },
     "unavailable": {
@@ -180,60 +179,44 @@
     "sectionTitle": "Firmware Upgrade",
     "refresh": "Refresh",
     "noSlots": "No image slot information available",
-    "selectFirmware": "Select Firmware"
-  },
-  "upload": {
-    "title": "Upload Firmware",
-    "selectFile": "Select File",
-    "uploading": "Uploading…",
-    "verifying": "Verifying…",
-    "rebooting": "Rebooting…",
-    "complete": "Upload complete",
-    "failed": "Upload failed",
-    "progressFmt": "{{current}} / {{total}} bytes",
-    "speedFmt": "{{kbps}} kB/s",
-    "retry": "Retry",
-    "cancel": "Cancel",
-    "back": "Back",
-    "backToInspect": "Back to slots",
-    "kbSize": "{{kb}} KB",
-    "browse": "Browse",
-    "noFile": "No firmware file selected",
+    "selectFirmware": "Select Firmware",
+    "choose": "Choose Firmware",
     "flash": "Flash",
-    "readingFirmware": "Reading firmware file...",
-    "uploadingFirmware": "Uploading firmware...",
-    "markingTest": "Marking image for test boot...",
-    "resetting": "Resetting device...",
-    "uploadCancelled": "Upload cancelled",
-    "steps": {
-      "reading": "Reading firmware file",
-      "readingWithSize": "Reading firmware file ({{kb}} KB)",
-      "uploading": "Uploading firmware",
-      "uploadingPercent": "Uploading firmware {{percent}}%",
-      "marking": "Marking image for test",
-      "resetting": "Resetting device"
+    "cancel": "Cancel",
+    "listImages": "List Images",
+    "transport": "Transport",
+    "noFileSelected": "No file selected",
+    "noSlotsReported": "No slots reported.",
+    "dialogFilterName": "Firmware",
+    "slot": {
+      "label": "Slot {{slot}}",
+      "labelWithImage": "Slot {{slot}} (image {{image}})",
+      "version": "Version",
+      "hash": "Hash"
     },
-    "uploadProgress": "{{sent}} / {{total}} KB"
-  },
-  "upgradeComplete": {
-    "title": "Upgrade Complete",
-    "message": "Device successfully upgraded.",
-    "version": "New version: {{version}}",
-    "done": "Done"
-  },
-  "upgradeFlow": {
-    "uploaded": "Firmware Uploaded",
-    "deviceLabel": "Device:",
-    "statusLabel": "Status:",
-    "imageConfirmed": "Image confirmed",
-    "rebootingIntoNew": "Device rebooting into new firmware",
-    "rebootHint": "The device is rebooting into the new firmware as a test. Reconnect and confirm to make it permanent, or it will revert on next reboot.",
-    "done": "Done",
-    "confirming": "Confirming...",
-    "reconnectConfirm": "Reconnect & Confirm",
-    "noUdpAddress": "No address available for UDP reconnection",
-    "failedTitle": "Upgrade Failed",
-    "retry": "Retry"
+    "ota": {
+      "logTitle": "OTA Log",
+      "empty": "No activity yet.",
+      "sessionOpened": "✓ session opened",
+      "uploadProgress": "… upload {{percent}}% ({{bytesSent}}/{{totalBytes}} B)",
+      "activating": "→ activating",
+      "activated": "✓ activated hash={{hash}}…",
+      "resetting": "→ resetting",
+      "resetSent": "✓ reset sent",
+      "reconnecting": "⟳ reconnecting ({{name}})",
+      "reconnected": "✓ reconnected ({{deviceId}})",
+      "verified": "✓ verified hash={{hash}}…",
+      "confirming": "→ confirming",
+      "confirmed": "✓ confirmed",
+      "cancelled": "✗ cancelled",
+      "complete": "✓ done",
+      "error": "✗ error: {{message}}"
+    },
+    "eta": {
+      "unknown": "—",
+      "seconds": "{{seconds}}s",
+      "minutes": "{{minutes}}m {{seconds}}s"
+    }
   },
   "frameLink": {
     "title": "FrameLink Setup",

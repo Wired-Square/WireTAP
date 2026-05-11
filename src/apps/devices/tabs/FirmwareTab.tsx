@@ -1,65 +1,110 @@
 // ui/src/apps/devices/tabs/FirmwareTab.tsx
 //
-// Firmware upgrade tab — works for either BLE-attached SMP or IP/UDP SMP. The
-// transport prop selects which ensureXxx() to call on activation; the rest
-// of the flow (image inspection → file pick → upload progress → reboot →
-// reconnect+confirm) is identical.
+// Firmware upgrade tab — driven entirely by the OtaEvent push stream.
+// No client-side wizard state: events arrive and are appended to a log;
+// terminator events (Complete / Cancelled / Error) flip `running` to false.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ArrowLeft,
-  Check,
-  Check as CheckIcon,
-  CheckCircle,
-  Copy,
-  FolderOpen,
-  Loader2,
-  RefreshCw,
-  Upload,
-  XCircle,
-} from "lucide-react";
+import type { TFunction } from "i18next";
+import { FolderOpen, HardDriveUpload, ListChecks, XCircle } from "lucide-react";
 import {
   alertDanger,
-  alertSuccess,
-  iconMd,
+  cardDefault,
+  labelSimple,
+  primaryButtonBase,
+  selectSimple,
+  stopButtonBase,
   textDanger,
   textPrimary,
   textSecondary,
 } from "../../../styles";
-import { cardDefault } from "../../../styles/cardStyles";
 import {
-  DangerButton,
-  PrimaryButton,
-  SecondaryButton,
-} from "../../../components/forms";
-import { useDevicesStore } from "../stores/devicesStore";
-import { useUpgradeStore } from "../../upgrade/stores/upgradeStore";
-import { useDeviceConnection } from "../hooks/useDeviceConnection";
-import {
-  smpCancelUpload,
-  smpConfirmImage,
-  smpListImages,
-  smpReconnectBleByName,
-  smpResetDevice,
-  smpTestImage,
-  smpUploadFirmware,
+  listImages,
+  otaCancel,
+  otaStart,
+  subscribeOtaEvents,
+  type ImageSlotInfo,
+  type OtaEvent,
+  type Transport,
 } from "../../../api/smpUpgrade";
 import { pickFileToOpen } from "../../../api/dialogs";
 
-type FirmwarePhase = "inspect" | "upload" | "flashing" | "result";
+const TERMINATOR_TYPES = new Set(["Complete", "Cancelled", "Error"]);
+const EVENT_LOG_MAX = 200;
+const HASH_PREFIX_CHARS = 12;
 
-export type FirmwareTransport = "ble" | "ip";
-
-interface FirmwareTabProps {
-  transport: FirmwareTransport;
+function renderEvent(ev: OtaEvent, t: TFunction): string {
+  switch (ev.type) {
+    case "SessionOpened":   return t("firmware.ota.sessionOpened");
+    case "UploadProgress":  return t("firmware.ota.uploadProgress", {
+      percent: ev.percent.toFixed(1),
+      bytesSent: ev.bytes_sent,
+      totalBytes: ev.total_bytes,
+    });
+    case "Activating":      return t("firmware.ota.activating");
+    case "Activated":       return t("firmware.ota.activated", { hash: ev.hash.slice(0, HASH_PREFIX_CHARS) });
+    case "Resetting":       return t("firmware.ota.resetting");
+    case "ResetSent":       return t("firmware.ota.resetSent");
+    case "Reconnecting":    return t("firmware.ota.reconnecting", { name: ev.name });
+    case "Reconnected":     return t("firmware.ota.reconnected", { deviceId: ev.device_id });
+    case "Verified":        return t("firmware.ota.verified", { hash: ev.active_hash.slice(0, HASH_PREFIX_CHARS) });
+    case "Confirming":      return t("firmware.ota.confirming");
+    case "Confirmed":       return t("firmware.ota.confirmed");
+    case "Cancelled":       return t("firmware.ota.cancelled");
+    case "Complete":        return t("firmware.ota.complete");
+    case "Error":           return t("firmware.ota.error", { message: ev.message });
+  }
 }
 
-function formatKB(bytes: number, padToBytes?: number): string {
-  const kb = Math.round(bytes / 1024).toString();
-  if (padToBytes === undefined) return kb;
-  const width = Math.round(padToBytes / 1024).toString().length;
-  return kb.padStart(width, " ");
+type UploadProgressEvent = Extract<OtaEvent, { type: "UploadProgress" }>;
+
+function UploadProgressBar({
+  progress,
+  startedAt,
+}: {
+  progress: UploadProgressEvent;
+  startedAt: number;
+}) {
+  const { t } = useTranslation("devices");
+  const elapsedSec = Math.max(0.001, (Date.now() - startedAt) / 1000);
+  const kbps = progress.bytes_sent / 1024 / elapsedSec;
+  const remaining = Math.max(0, progress.total_bytes - progress.bytes_sent);
+  const etaSec = kbps > 0 ? remaining / 1024 / kbps : Infinity;
+  const pct = Math.min(100, Math.max(0, progress.percent));
+  // Width of the byte counts is determined by the total — pad sent to
+  // match so the layout doesn't reflow chunk-by-chunk. Percentage is
+  // padded to "100.0" width (5 chars) for the same reason.
+  const totalKBStr = Math.round(progress.total_bytes / 1024).toString();
+  const sentKBStr = Math.round(progress.bytes_sent / 1024).toString().padStart(totalKBStr.length, " ");
+  const pctStr = pct.toFixed(1).padStart(5, " ");
+  const kbpsStr = kbps.toFixed(1).padStart(5, " ");
+  const etaText = !isFinite(etaSec) || etaSec < 0
+    ? t("firmware.eta.unknown")
+    : etaSec < 60
+      ? t("firmware.eta.seconds", { seconds: Math.round(etaSec) })
+      : t("firmware.eta.minutes", {
+          minutes: Math.floor(etaSec / 60),
+          seconds: Math.round(etaSec % 60),
+        });
+  return (
+    <div className={`${cardDefault} p-3 flex flex-col gap-2`}>
+      <div className="flex items-center justify-between text-xs font-mono whitespace-pre">
+        <span className={`font-medium ${textPrimary}`}>
+          {pctStr}% — {sentKBStr} / {totalKBStr} KB
+        </span>
+        <span className={textSecondary}>
+          {kbpsStr} kB/s · ETA {etaText}
+        </span>
+      </div>
+      <div className="h-2 w-full bg-[var(--bg-tertiary)] rounded overflow-hidden">
+        <div
+          className="h-full bg-[var(--accent-primary)] transition-[width] duration-150"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function SlotBadge({ label, active = true }: { label: string; active?: boolean }) {
@@ -76,566 +121,255 @@ function SlotBadge({ label, active = true }: { label: string; active?: boolean }
   );
 }
 
-export default function FirmwareTab({ transport }: FirmwareTabProps) {
+export interface Props {
+  deviceId: string;
+  availableTransports: Transport[];
+}
+
+export default function FirmwareTab({ deviceId, availableTransports }: Props) {
   const { t } = useTranslation("devices");
-  const images = useUpgradeStore((s) => s.data.images);
-  const selectedFilePath = useUpgradeStore((s) => s.data.selectedFilePath);
-  const selectedFileName = useUpgradeStore((s) => s.data.selectedFileName);
-  const selectedFileSize = useUpgradeStore((s) => s.data.selectedFileSize);
-  const uploadProgress = useUpgradeStore((s) => s.data.uploadProgress);
-  const uploadState = useUpgradeStore((s) => s.ui.uploadState);
-  const upgradeError = useUpgradeStore((s) => s.ui.error);
+  const [transport, setTransport] = useState<Transport>(
+    availableTransports[0] ?? "ble",
+  );
+  const [filePath, setFilePath] = useState<string | null>(null);
+  const fileName = filePath ? (filePath.split(/[\\/]/).pop() ?? filePath) : null;
+  const [slots, setSlots] = useState<ImageSlotInfo[] | null>(null);
+  const [events, setEvents] = useState<OtaEvent[]>([]);
+  const [progressState, setProgressState] = useState<{
+    latest: UploadProgressEvent | null;
+    startedAt: number | null;
+  }>({ latest: null, startedAt: null });
+  const [running, setRunning] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
 
-  const setImages = useUpgradeStore((s) => s.setImages);
-  const setSelectedFile = useUpgradeStore((s) => s.setSelectedFile);
-  const setUploadProgress = useUpgradeStore((s) => s.setUploadProgress);
-  const setUploadState = useUpgradeStore((s) => s.setUploadState);
-  const setUpgradeError = useUpgradeStore((s) => s.setError);
-  const setStatusMessage = useUpgradeStore((s) => s.setStatusMessage);
-  const setUpgradeConnectionState = useUpgradeStore((s) => s.setConnectionState);
+  const logRef = useRef<HTMLUListElement>(null);
 
-  const transports = useDevicesStore((s) => s.ui.transports);
-  const selectedSmpId = useDevicesStore((s) => s.data.selectedSmpId);
-
-  const { ensureBleSmp, ensureIpSmp, reconnectIpSmpWithDeadline } = useDeviceConnection();
-
-  const [phase, setPhase] = useState<FirmwarePhase>("inspect");
-  const [refreshing, setRefreshing] = useState(false);
-  const [copiedHash, setCopiedHash] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [connectError, setConnectError] = useState<string | null>(null);
-  const flashingRef = useRef(false);
-
-  const transportReady =
-    transport === "ble" ? transports.bleSmp : transports.ipSmp;
-
-  // Bring up SMP on activation, then read image slots.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        if (transport === "ble") {
-          await ensureBleSmp();
-        } else {
-          await ensureIpSmp();
+    return subscribeOtaEvents((ev) => {
+      if (ev.type === "UploadProgress") {
+        // Stamp startedAt on the first progress event (not on click —
+        // the click-to-first-byte gap includes session open and
+        // slot-erase, neither of which is part of the upload itself).
+        setProgressState((prev) => ({
+          latest: ev,
+          startedAt: prev.startedAt ?? Date.now(),
+        }));
+      } else {
+        setEvents((prev) => {
+          const next = prev.length < EVENT_LOG_MAX ? [...prev, ev] : [...prev.slice(1), ev];
+          return next;
+        });
+        if (TERMINATOR_TYPES.has(ev.type)) {
+          setRunning(false);
         }
-        if (cancelled) return;
-        try {
-          const imgs = await smpListImages();
-          if (!cancelled) setImages(imgs);
-        } catch {
-          // Non-critical on first load
-        }
-      } catch (e) {
-        if (!cancelled) setConnectError(String(e));
       }
-    })();
-    return () => { cancelled = true; };
-  }, [transport, ensureBleSmp, ensureIpSmp, setImages]);
-
-  const handleCopyHash = useCallback(async (hash: string) => {
-    try {
-      await navigator.clipboard.writeText(hash);
-      setCopiedHash(hash);
-      setTimeout(() => setCopiedHash(null), 2000);
-    } catch {
-      // Fallback — ignore
-    }
+    });
   }, []);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setUpgradeError(null);
-    try {
-      const imgs = await smpListImages();
-      setImages(imgs);
-    } catch (e) {
-      setUpgradeError(String(e));
-    } finally {
-      setRefreshing(false);
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  };
+  }, [events]);
 
-  const handleSelectFirmware = async () => {
+  async function handlePickFile() {
     try {
       const result = await pickFileToOpen({
-        filters: [{ name: "Firmware", extensions: ["bin"] }],
+        filters: [{ name: t("firmware.dialogFilterName"), extensions: ["bin"] }],
       });
       if (result) {
-        const fileName = result.split("/").pop() ?? result.split("\\").pop() ?? result;
-        setSelectedFile(result, fileName, null);
-        setPhase("upload");
+        setFilePath(result);
       }
     } catch (e) {
-      setUpgradeError(String(e));
+      setEvents((prev) => [...prev, { type: "Error", message: String(e) }]);
     }
-  };
-
-  const handleBrowse = async () => {
-    try {
-      const result = await pickFileToOpen({
-        filters: [{ name: "Firmware", extensions: ["bin"] }],
-      });
-      if (result) {
-        const fileName = result.split("/").pop() ?? result.split("\\").pop() ?? result;
-        setSelectedFile(result, fileName, null);
-      }
-    } catch (e) {
-      setUpgradeError(String(e));
-    }
-  };
-
-  const handleFlash = async () => {
-    if (!selectedFilePath || flashingRef.current) return;
-    flashingRef.current = true;
-
-    setUpgradeError(null);
-    setUploadProgress(null);
-    setPhase("flashing");
-
-    try {
-      setUploadState("reading");
-      setStatusMessage(t("upload.readingFirmware"));
-
-      setUploadState("uploading");
-      setStatusMessage(t("upload.uploadingFirmware"));
-      await smpUploadFirmware(selectedFilePath);
-
-      const { ui } = useUpgradeStore.getState();
-      if (ui.uploadState === "error") return;
-
-      setUploadState("testing");
-      setStatusMessage(t("upload.markingTest"));
-
-      const imgs = await smpListImages();
-      const pendingImage = imgs.find((img) => img.slot === 1 && img.pending);
-      if (pendingImage) {
-        const hashBytes: number[] = [];
-        for (let i = 0; i < pendingImage.hash.length; i += 2) {
-          hashBytes.push(parseInt(pendingImage.hash.slice(i, i + 2), 16));
-        }
-        await smpTestImage(hashBytes);
-      }
-
-      setUploadState("resetting");
-      setStatusMessage(t("upload.resetting"));
-      await smpResetDevice();
-
-      setPhase("result");
-    } catch (e) {
-      setUploadState("error");
-      setUpgradeError(String(e));
-      setStatusMessage(null);
-      setPhase("result");
-    } finally {
-      flashingRef.current = false;
-    }
-  };
-
-  const handleCancelFlash = async () => {
-    try { await smpCancelUpload(); } catch { /* ignore */ }
-    setUploadState("error");
-    setUpgradeError(t("upload.uploadCancelled"));
-    setStatusMessage(null);
-    flashingRef.current = false;
-  };
-
-  const handleReconnectAndConfirm = async () => {
-    setConfirming(true);
-    setUpgradeError(null);
-
-    try {
-      // The device rebooted; the prior socket is stale. Re-establish.
-      if (transport === "ip") {
-        if (!selectedSmpId) {
-          throw new Error(t("upgradeFlow.noUdpAddress"));
-        }
-        await reconnectIpSmpWithDeadline(30_000);
-      } else {
-        // Firmware test-boot rotates the device's BLE peripheral
-        // identifier, so the cached selectedBleId is stale. Reconnect by
-        // name (firmware-stable) and let the backend poll Discovery for
-        // the device's new BLE id.
-        const name = useDevicesStore.getState().data.selectedDeviceName;
-        if (!name) throw new Error("Device name missing for reconnect");
-        await smpReconnectBleByName(name, 30);
-      }
-      setUpgradeConnectionState("connected");
-
-      const imgs = await smpListImages();
-      setImages(imgs);
-      const activeImage = imgs.find((img) => img.active && !img.confirmed);
-      if (activeImage) {
-        const hashBytes: number[] = [];
-        for (let i = 0; i < activeImage.hash.length; i += 2) {
-          hashBytes.push(parseInt(activeImage.hash.slice(i, i + 2), 16));
-        }
-        await smpConfirmImage(hashBytes);
-      }
-      setUploadState("confirming");
-    } catch (e) {
-      setUpgradeError(String(e));
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  // Manual fallback when the auto Reconnect-&-Confirm flow didn't run or
-  // didn't complete (e.g. user closed the app before reboot, or the
-  // device's mDNS reappeared after the deadline). Confirms whatever
-  // active+!confirmed image the device is currently advertising.
-  const handleConfirmActive = async () => {
-    setConfirming(true);
-    setUpgradeError(null);
-    try {
-      const target = images.find((img) => img.active && !img.confirmed);
-      if (!target) throw new Error(t("inspect.nothingToConfirm"));
-      const hashBytes: number[] = [];
-      for (let i = 0; i < target.hash.length; i += 2) {
-        hashBytes.push(parseInt(target.hash.slice(i, i + 2), 16));
-      }
-      await smpConfirmImage(hashBytes);
-      const imgs = await smpListImages();
-      setImages(imgs);
-    } catch (e) {
-      setUpgradeError(String(e));
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  const handleRetryFlash = () => {
-    setUploadState("idle");
-    setUpgradeError(null);
-    setUploadProgress(null);
-    setPhase("upload");
-  };
-
-  const handleBackToInspect = () => {
-    setUploadState("idle");
-    setUpgradeError(null);
-    setUploadProgress(null);
-    setPhase("inspect");
-  };
-
-  // ── Connection failure short-circuit ─────────────────────────────────────
-  if (connectError && !transportReady) {
-    return (
-      <div className="p-4">
-        <div className={`${alertDanger} ${textDanger} text-sm`}>{connectError}</div>
-      </div>
-    );
   }
 
-  // ── Phase: flashing in progress ──────────────────────────────────────────
-  if (phase === "flashing") {
-    const steps = [
-      {
-        label: selectedFileSize !== null
-          ? t("upload.steps.readingWithSize", { kb: formatKB(selectedFileSize) })
-          : t("upload.steps.reading"),
-        done: uploadState !== "idle" && uploadState !== "reading",
-        active: uploadState === "reading",
-      },
-      {
-        label: uploadProgress
-          ? t("upload.steps.uploadingPercent", { percent: Math.round(uploadProgress.percent) })
-          : t("upload.steps.uploading"),
-        done: uploadState !== "idle" && uploadState !== "reading" && uploadState !== "uploading",
-        active: uploadState === "uploading",
-      },
-      {
-        label: t("upload.steps.marking"),
-        done: uploadState === "resetting" || uploadState === "confirming",
-        active: uploadState === "testing",
-      },
-      {
-        label: t("upload.steps.resetting"),
-        done: false,
-        active: uploadState === "resetting",
-      },
-    ];
-
-    return (
-      <div className="flex flex-col items-center gap-6 p-8 h-full">
-        <Loader2 className="w-12 h-12 text-amber-500 animate-spin" />
-        <div className="flex flex-col gap-2 w-full max-w-sm">
-          {steps.map((step, i) => (
-            <div key={i}>
-              <div className={`flex items-center gap-2 text-sm ${textPrimary}`}>
-                {step.done ? (
-                  <Check className={`${iconMd} text-green-500 shrink-0`} />
-                ) : step.active ? (
-                  <Loader2 className={`${iconMd} text-amber-500 animate-spin shrink-0`} />
-                ) : (
-                  <div className="w-4 h-4 rounded-full border border-[color:var(--border-default)] shrink-0" />
-                )}
-                <span className={step.done ? "" : step.active ? "font-medium" : textSecondary}>
-                  {step.label}
-                </span>
-              </div>
-              {i === 1 && step.active && uploadProgress && (
-                <div className="ml-6 mt-1.5 space-y-1">
-                  <div className="h-2 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-[var(--accent-primary)]"
-                      style={{ width: `${Math.round(uploadProgress.percent)}%` }}
-                    />
-                  </div>
-                  <div className={`text-xs font-mono ${textSecondary}`}>
-                    {t("upload.uploadProgress", {
-                      sent: formatKB(uploadProgress.bytes_sent, uploadProgress.total_bytes),
-                      total: formatKB(uploadProgress.total_bytes),
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        {upgradeError && (
-          <div className={`${alertDanger} ${textDanger} text-sm w-full max-w-sm`}>
-            {upgradeError}
-          </div>
-        )}
-        {uploadState === "uploading" && (
-          <DangerButton onClick={handleCancelFlash}>{t("upload.cancel")}</DangerButton>
-        )}
-      </div>
-    );
-  }
-
-  // ── Phase: post-flash result ────────────────────────────────────────────
-  if (phase === "result") {
-    const isSuccess = uploadState !== "error";
-    if (!isSuccess) {
-      return (
-        <div className="flex flex-col items-center gap-6 p-8 h-full">
-          <XCircle className="w-16 h-16 text-red-500" />
-          <div className={`text-lg font-medium ${textPrimary}`}>
-            {t("upgradeFlow.failedTitle")}
-          </div>
-          {upgradeError && (
-            <div className={`${alertDanger} w-full max-w-sm text-sm`}>{upgradeError}</div>
-          )}
-          <PrimaryButton onClick={handleRetryFlash}>{t("upgradeFlow.retry")}</PrimaryButton>
-        </div>
-      );
+  async function handleStart() {
+    if (!filePath) return;
+    setEvents([]);
+    setProgressState({ latest: null, startedAt: null });
+    setRunning(true);
+    try {
+      await otaStart({ deviceId, transport, filePath });
+    } catch (e) {
+      setEvents((prev) => [...prev, { type: "Error", message: String(e) }]);
+      setRunning(false);
     }
-    return (
-      <div className="flex flex-col items-center gap-6 p-8 h-full">
-        <CheckCircle className="w-16 h-16 text-green-500" />
-        <div className={`text-lg font-medium ${textPrimary}`}>{t("upgradeFlow.uploaded")}</div>
-        <div className={`${alertSuccess} w-full max-w-sm text-sm`}>
-          <div className="space-y-1">
-            <div>
-              <span className={textSecondary}>{t("upgradeFlow.statusLabel")}</span>{" "}
-              <span className="font-medium">
-                {uploadState === "confirming"
-                  ? t("upgradeFlow.imageConfirmed")
-                  : t("upgradeFlow.rebootingIntoNew")}
-              </span>
-            </div>
-          </div>
-        </div>
-        {uploadState !== "confirming" && (
-          <div className={`text-xs ${textSecondary} max-w-sm text-center`}>
-            {t("upgradeFlow.rebootHint")}
-          </div>
-        )}
-        {uploadState !== "confirming" && (
-          <PrimaryButton onClick={handleReconnectAndConfirm} disabled={confirming}>
-            <span className="flex items-center gap-1.5">
-              <RefreshCw className={`${iconMd} ${confirming ? "animate-spin" : ""}`} />
-              {confirming ? t("upgradeFlow.confirming") : t("upgradeFlow.reconnectConfirm")}
-            </span>
-          </PrimaryButton>
-        )}
-        {upgradeError && (
-          <div className={`${alertDanger} ${textDanger} text-sm w-full max-w-sm`}>
-            {upgradeError}
-          </div>
-        )}
-      </div>
-    );
   }
 
-  // ── Phase: upload (file picked, ready to flash) ─────────────────────────
-  if (phase === "upload") {
-    return (
-      <div className="flex flex-col gap-4 p-4 h-full">
-        <SecondaryButton onClick={handleBackToInspect}>
-          <span className="flex items-center gap-1.5">
-            <ArrowLeft className={iconMd} />
-            {t("upload.backToInspect")}
-          </span>
-        </SecondaryButton>
-
-        {selectedFileName ? (
-          <div className="flex items-center gap-3 p-3 rounded-lg border border-[color:var(--border-default)] bg-[var(--bg-surface)]">
-            <Upload className={`${iconMd} text-amber-400 shrink-0`} />
-            <div className="flex-1 min-w-0">
-              <div className={`text-sm font-medium ${textPrimary} truncate`}>
-                {selectedFileName}
-              </div>
-              {selectedFileSize !== null && (
-                <div className={`text-xs ${textSecondary}`}>
-                  {t("upload.kbSize", { kb: formatKB(selectedFileSize) })}
-                </div>
-              )}
-            </div>
-            <SecondaryButton onClick={handleBrowse}>
-              <span className="flex items-center gap-1.5">
-                <FolderOpen className={iconMd} />
-                {t("upload.browse")}
-              </span>
-            </SecondaryButton>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-8 gap-3">
-            <div className={`text-sm ${textSecondary}`}>{t("upload.noFile")}</div>
-            <PrimaryButton onClick={handleBrowse}>
-              <span className="flex items-center gap-1.5">
-                <FolderOpen className={iconMd} />
-                {t("upload.browse")}
-              </span>
-            </PrimaryButton>
-          </div>
-        )}
-
-        {upgradeError && (
-          <div className={`p-3 text-sm ${textDanger} ${alertDanger}`}>{upgradeError}</div>
-        )}
-
-        <div className="mt-auto pt-4">
-          <PrimaryButton
-            onClick={handleFlash}
-            disabled={!selectedFilePath || !transportReady}
-            className="w-full"
-          >
-            <span className="flex items-center justify-center gap-1.5">
-              <Upload className={iconMd} />
-              {t("upload.flash")}
-            </span>
-          </PrimaryButton>
-        </div>
-      </div>
-    );
+  async function handleCancel() {
+    try {
+      await otaCancel();
+    } catch (e) {
+      setEvents((prev) => [...prev, { type: "Error", message: String(e) }]);
+    }
   }
 
-  // ── Phase: inspect (default) ─────────────────────────────────────────────
+  async function handleListImages() {
+    setListError(null);
+    try {
+      const result = await listImages(deviceId, transport);
+      setSlots(result);
+    } catch (e) {
+      setListError(String(e));
+      setSlots(null);
+    }
+  }
+
   return (
-    <div className="flex flex-col gap-4 p-4 h-full">
-      <div className="flex items-center justify-between">
-        <div className={`text-sm font-medium ${textPrimary}`}>
-          {t("inspect.title")}
+    <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto">
+
+      {/* Controls */}
+      <div className={`${cardDefault} p-4 flex flex-col gap-3`}>
+
+        {/* File picker */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePickFile}
+            disabled={running}
+            className={`${primaryButtonBase} text-sm px-4 py-2 min-w-[160px] justify-center`}
+          >
+            <FolderOpen className="w-4 h-4" />
+            {t("firmware.choose")}
+          </button>
+          {fileName ? (
+            <span className={`text-sm ${textPrimary} truncate`}>{fileName}</span>
+          ) : (
+            <span className={`text-sm ${textSecondary}`}>{t("firmware.noFileSelected")}</span>
+          )}
         </div>
-        <SecondaryButton onClick={handleRefresh} disabled={refreshing || !transportReady}>
-          <span className="flex items-center gap-1.5">
-            <RefreshCw className={`${iconMd} ${refreshing ? "animate-spin" : ""}`} />
-            {t("inspect.refresh")}
-          </span>
-        </SecondaryButton>
+
+        {/* Transport selector — only when more than one available */}
+        {availableTransports.length > 1 && (
+          <div className="flex items-center gap-2">
+            <label className={`text-sm ${labelSimple}`}>{t("firmware.transport")}</label>
+            <select
+              value={transport}
+              onChange={(e) => setTransport(e.target.value as Transport)}
+              disabled={running}
+              className={`${selectSimple} w-32 py-1 px-2 text-sm`}
+            >
+              {availableTransports.map((t) => (
+                <option key={t} value={t}>{t === "ble" ? "BLE" : "UDP"}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2 pt-1">
+          {running ? (
+            <button
+              type="button"
+              onClick={handleCancel}
+              className={`${stopButtonBase} text-sm px-4 py-2 min-w-[160px] justify-center`}
+            >
+              <XCircle className="w-4 h-4" />
+              {t("firmware.cancel")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={!filePath}
+              className={`${primaryButtonBase} text-sm px-4 py-2 min-w-[160px] justify-center`}
+            >
+              <HardDriveUpload className="w-4 h-4" />
+              {t("firmware.flash")}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleListImages}
+            disabled={running}
+            className={`${primaryButtonBase} text-sm px-4 py-2 min-w-[160px] justify-center`}
+          >
+            <ListChecks className="w-4 h-4" />
+            {t("firmware.listImages")}
+          </button>
+        </div>
       </div>
 
-      {!transportReady && (
-        <div className={`flex items-center gap-2 text-sm ${textSecondary}`}>
-          <Loader2 className={`${iconMd} animate-spin`} />
-          {transport === "ble" ? t("device.connectingBleSmp") : t("device.connectingIpSmp")}
-        </div>
+      {/* Slot cards */}
+      {listError && (
+        <div className={`${alertDanger} ${textDanger} text-sm`}>{listError}</div>
       )}
-
-      {upgradeError && (
-        <div className={`${alertDanger} ${textDanger} text-sm`}>{upgradeError}</div>
-      )}
-
-      {transportReady && images.length === 0 ? (
-        <div className={`text-sm ${textSecondary} text-center py-8`}>{t("inspect.noSlots")}</div>
-      ) : (
+      {slots !== null && slots.length > 0 && (
         <div className="flex flex-col gap-2">
-          {images.map((img, idx) => (
+          {slots.map((img, idx) => (
             <div key={idx} className={`${cardDefault} p-3`}>
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-sm font-medium ${textPrimary}`}>
                   {img.image !== null
-                    ? t("inspect.slotLabelWithImage", { slot: img.slot, image: img.image })
-                    : t("inspect.slotLabel", { slot: img.slot })}
+                    ? t("firmware.slot.labelWithImage", { slot: img.slot, image: img.image })
+                    : t("firmware.slot.label", { slot: img.slot })}
                 </span>
                 <div className="flex gap-1">
-                  {img.active && <SlotBadge label={t("inspect.active")} />}
+                  {img.active    && <SlotBadge label={t("inspect.active")} />}
                   {img.confirmed && <SlotBadge label={t("inspect.confirmed")} />}
-                  {img.pending && <SlotBadge label={t("inspect.pending")} />}
-                  {img.bootable && <SlotBadge label={t("inspect.bootable")} />}
-                  {img.permanent && <SlotBadge label={t("inspect.permanent")} />}
+                  {img.pending   && <SlotBadge label={t("inspect.pending")} />}
+                  {img.bootable  && <SlotBadge label={t("inspect.bootable")} active={false} />}
+                  {img.permanent && <SlotBadge label={t("inspect.permanent")} active={false} />}
                 </div>
               </div>
               <div className={`text-xs ${textSecondary} space-y-0.5`}>
                 <div>
-                  {t("inspect.version")}{" "}
-                  <span className={`font-mono ${textPrimary}`}>{img.version || "—"}</span>
+                  {t("firmware.slot.version")}{" "}
+                  <span className={`font-mono ${textPrimary}`}>{img.version || t("firmware.eta.unknown")}</span>
                 </div>
-                <div className="font-mono flex items-center gap-1.5">
-                  <span className="font-sans">{t("inspect.hash")}</span>{" "}
-                  {img.hash ? (
-                    <>
-                      <button
-                        onClick={() => handleCopyHash(img.hash)}
-                        className={`${textPrimary} cursor-pointer hover:underline text-left break-all`}
-                        title={t("inspect.copyHashTooltip")}
-                      >
-                        {img.hash}
-                      </button>
-                      <button
-                        onClick={() => handleCopyHash(img.hash)}
-                        className="shrink-0 cursor-pointer text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
-                        title={t("inspect.copyHash")}
-                      >
-                        {copiedHash === img.hash ? (
-                          <CheckIcon className="w-3.5 h-3.5 text-green-500" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </>
-                  ) : (
-                    <span>—</span>
-                  )}
+                <div className="font-mono">
+                  <span className="font-sans">{t("firmware.slot.hash")}</span>{" "}
+                  <span className={`${textPrimary} break-all`}>{img.hash || t("firmware.eta.unknown")}</span>
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
-
-      {selectedFileName && (
-        <div className={`text-xs ${textSecondary}`}>
-          {t("inspect.selectedLabel")} <span className={textPrimary}>{selectedFileName}</span>
-          {selectedFileSize !== null && ` ${t("inspect.selectedSize", { kb: formatKB(selectedFileSize) })}`}
+      {slots !== null && slots.length === 0 && (
+        <div className={`text-sm ${textSecondary} text-center py-4`}>
+          {t("firmware.noSlotsReported")}
         </div>
       )}
 
-      <div className="mt-auto pt-4 flex justify-end gap-2">
-        {transportReady && images.some((img) => img.active && !img.confirmed) && (
-          <SecondaryButton
-            onClick={handleConfirmActive}
-            disabled={confirming}
-            className="min-w-[10rem]"
+      {progressState.latest && progressState.startedAt !== null && (
+        <UploadProgressBar progress={progressState.latest} startedAt={progressState.startedAt} />
+      )}
+
+      {/* Event log — always shown */}
+      <div className={`${cardDefault} p-3 flex flex-col gap-1`}>
+        <div className={`text-xs font-medium ${textSecondary} uppercase tracking-wide mb-1`}>
+          {t("firmware.ota.logTitle")}
+        </div>
+        {events.length === 0 ? (
+          <div className={`text-xs ${textSecondary}`}>{t("firmware.ota.empty")}</div>
+        ) : (
+          <ul
+            ref={logRef}
+            className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-xs"
           >
-            {confirming
-              ? t("inspect.confirmingActive")
-              : t("inspect.confirmActive")}
-          </SecondaryButton>
+            {events.map((ev, i) => {
+              // UploadProgress events are filtered into the bar above.
+              if (ev.type === "UploadProgress") return null;
+              const isError = ev.type === "Error" || ev.type === "Cancelled";
+              const isDone  = ev.type === "Complete";
+              return (
+                <li
+                  key={i}
+                  className={
+                    isError ? textDanger
+                    : isDone ? "text-green-500"
+                    : textSecondary
+                  }
+                >
+                  {renderEvent(ev, t)}
+                </li>
+              );
+            })}
+          </ul>
         )}
-        <PrimaryButton
-          onClick={handleSelectFirmware}
-          disabled={!transportReady}
-          className="min-w-[10rem]"
-        >
-          <span className="flex items-center justify-center gap-1.5">
-            <Upload className={iconMd} />
-            {t("inspect.selectFirmware")}
-          </span>
-        </PrimaryButton>
       </div>
     </div>
   );

@@ -59,39 +59,36 @@ export async function bleScanStop(): Promise<void> {
   await invoke("ble_scan_stop");
 }
 
-/** Connect to a BLE device by its platform-specific ID. */
+/** Warm the WiFi-prov session cache for the device. Idempotent — the
+ *  framelink-rs Discovery returns the same session handle to subsequent
+ *  operation commands. Tear-down is `releaseDevice(deviceId)`. */
 export async function bleConnect(deviceId: string): Promise<void> {
   await invoke("ble_connect", { deviceId });
 }
 
-/** Disconnect from the currently connected BLE device. */
-export async function bleDisconnect(): Promise<void> {
-  await invoke("ble_disconnect");
-}
-
-/** Delete all stored WiFi credentials on the connected device. */
-export async function bleDeleteAllCredentials(): Promise<void> {
-  await invoke("ble_delete_all_credentials");
+/** Delete all stored WiFi credentials on the device. */
+export async function bleDeleteAllCredentials(deviceId: string): Promise<void> {
+  await invoke("ble_delete_all_credentials", { deviceId });
 }
 
 /** Disconnect the device from its current WiFi network. */
-export async function bleWifiDisconnect(): Promise<void> {
-  await invoke("ble_wifi_disconnect");
+export async function bleWifiDisconnect(deviceId: string): Promise<void> {
+  await invoke("ble_wifi_disconnect", { deviceId });
 }
 
-/** Read the current WiFi state from the connected device. */
-export async function bleReadDeviceState(): Promise<DeviceWifiState> {
-  return invoke("ble_read_device_state");
+/** Read the current WiFi state from the device. */
+export async function bleReadDeviceState(deviceId: string): Promise<DeviceWifiState> {
+  return invoke("ble_read_device_state", { deviceId });
 }
 
 /** Write WiFi credentials and send the save+connect command. */
-export async function bleProvisionWifi(credentials: WifiCredentials): Promise<void> {
-  await invoke("ble_provision_wifi", { credentials });
+export async function bleProvisionWifi(deviceId: string, credentials: WifiCredentials): Promise<void> {
+  await invoke("ble_provision_wifi", { deviceId, credentials });
 }
 
-/** Subscribe to status notifications from the connected device. */
-export async function bleSubscribeStatus(): Promise<void> {
-  await invoke("ble_subscribe_status");
+/** Subscribe to status notifications from the device. */
+export async function bleSubscribeStatus(deviceId: string): Promise<void> {
+  await invoke("ble_subscribe_status", { deviceId });
 }
 
 /** Detect the host machine's current WiFi SSID (returns null on iOS). */

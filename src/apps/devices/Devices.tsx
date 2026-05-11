@@ -9,13 +9,9 @@ import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useDevicesStore } from "./stores/devicesStore";
 import { useProvisioningStore } from "../provisioning/stores/provisioningStore";
-import { useUpgradeStore } from "../upgrade/stores/upgradeStore";
-import { bleDisconnect } from "../../api/bleProvision";
-import { smpDisconnect } from "../../api/smpUpgrade";
-import { deviceScanStop } from "../../api/deviceScan";
+import { deviceScanStop, releaseDevice } from "../../api/deviceScan";
 import type { UnifiedDevice } from "../../api/deviceScan";
 import type { ProvisioningStatus } from "../../api/bleProvision";
-import type { UploadProgress } from "../../api/smpUpgrade";
 import {
   STATUS_CONNECTED,
   STATUS_ERROR,
@@ -29,17 +25,11 @@ export default function Devices() {
   const addDevice = useDevicesStore((s) => s.addDevice);
   const removeDevice = useDevicesStore((s) => s.removeDevice);
   const setScanning = useDevicesStore((s) => s.setScanning);
-  const setScreen = useDevicesStore((s) => s.setScreen);
-  const setError = useDevicesStore((s) => s.setError);
-  const resetTransports = useDevicesStore((s) => s.resetTransports);
-  const setConnectionState = useDevicesStore((s) => s.setConnectionState);
 
   const setProvisionState = useProvisioningStore((s) => s.setProvisionState);
   const setProvisionError = useProvisioningStore((s) => s.setError);
   const setStatusMessage = useProvisioningStore((s) => s.setStatusMessage);
   const setDeviceIpAddress = useProvisioningStore((s) => s.setDeviceIpAddress);
-
-  const setUploadProgress = useUpgradeStore((s) => s.setUploadProgress);
 
   useEffect(() => {
     const unlistenPromises = [
@@ -67,34 +57,6 @@ export default function Devices() {
       listen<string>("ble-provision-ip", (event) => {
         setDeviceIpAddress(event.payload);
       }),
-
-      listen<UploadProgress>("smp-upload-progress", (event) => {
-        setUploadProgress(event.payload);
-      }),
-      listen<void>("smp-upload-complete", () => {
-        // Upload complete — FirmwareTab handles the rest
-      }),
-
-      listen<string>("ble-device-disconnected", () => {
-        const { ui } = useDevicesStore.getState();
-        if (ui.screen !== "device") return;
-        resetTransports();
-        setConnectionState("idle");
-        setError("Device disconnected unexpectedly");
-        setScreen("scan");
-        useProvisioningStore.getState().reset();
-        useUpgradeStore.getState().reset();
-      }),
-      listen<string>("smp-device-disconnected", () => {
-        const { ui } = useDevicesStore.getState();
-        if (ui.screen !== "device") return;
-        resetTransports();
-        setConnectionState("idle");
-        setError("Device disconnected unexpectedly");
-        setScreen("scan");
-        useProvisioningStore.getState().reset();
-        useUpgradeStore.getState().reset();
-      }),
     ];
 
     return () => {
@@ -102,15 +64,16 @@ export default function Devices() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cleanup on unmount: stop scan, disconnect everything, reset stores.
+  // Cleanup on unmount: stop scan, release the active device once via
+  // framelink-rs (single tear-down path), reset stores.
   useEffect(() => {
     return () => {
       deviceScanStop().catch(() => {});
-      bleDisconnect().catch(() => {});
-      smpDisconnect().catch(() => {});
+      const { data } = useDevicesStore.getState();
+      if (data.selectedBleId) releaseDevice(data.selectedBleId).catch(() => {});
+      if (data.selectedSmpId) releaseDevice(data.selectedSmpId).catch(() => {});
       useDevicesStore.getState().reset();
       useProvisioningStore.getState().reset();
-      useUpgradeStore.getState().reset();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

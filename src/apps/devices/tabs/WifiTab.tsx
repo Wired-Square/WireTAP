@@ -74,6 +74,7 @@ export default function WifiTab() {
 
   const setActiveTab = useDevicesStore((s) => s.setActiveTab);
   const selectedCapabilities = useDevicesStore((s) => s.data.selectedCapabilities);
+  const selectedBleId = useDevicesStore((s) => s.data.selectedBleId);
   const transports = useDevicesStore((s) => s.ui.transports);
   const setError = useDevicesStore((s) => s.setError);
 
@@ -123,11 +124,12 @@ export default function WifiTab() {
   const canProvision = ssid.trim().length > 0 && (isOpen || passphrase.trim().length > 0);
 
   const handleDeleteAllCredentials = async () => {
+    if (!selectedBleId) return;
     setDeletingCredentials(true);
     setProvisionError(null);
     try {
-      await bleDeleteAllCredentials();
-      const state = await bleReadDeviceState();
+      await bleDeleteAllCredentials(selectedBleId);
+      const state = await bleReadDeviceState(selectedBleId);
       setDeviceSsid(state.ssid);
       setDeviceStatus(state.status);
     } catch (e) {
@@ -137,11 +139,12 @@ export default function WifiTab() {
   };
 
   const handleWifiDisconnect = async () => {
+    if (!selectedBleId) return;
     setDisconnectingWifi(true);
     setProvisionError(null);
     try {
-      await bleWifiDisconnect();
-      const state = await bleReadDeviceState();
+      await bleWifiDisconnect(selectedBleId);
+      const state = await bleReadDeviceState(selectedBleId);
       setDeviceSsid(state.ssid);
       setDeviceStatus(state.status);
     } catch (e) {
@@ -151,6 +154,7 @@ export default function WifiTab() {
   };
 
   const beginProvision = async () => {
+    if (!selectedBleId) return;
     if (!ssid.trim()) {
       setProvisionError(t("credentials.errors.ssidRequired"));
       return;
@@ -162,7 +166,7 @@ export default function WifiTab() {
 
     // Make sure BLE is still alive before kicking off.
     try {
-      await bleReadDeviceState();
+      await bleReadDeviceState(selectedBleId);
     } catch {
       setProvisionError(t("credentials.errors.connectionLost"));
       return;
@@ -179,7 +183,7 @@ export default function WifiTab() {
     setProvisionState("writing");
     setStatusMessage(t("provisioning.writingCredentials"));
     try {
-      await bleProvisionWifi({
+      await bleProvisionWifi(selectedBleId, {
         ssid,
         passphrase: isOpen ? null : passphrase || null,
         security,
@@ -298,8 +302,8 @@ export default function WifiTab() {
             <div className="flex gap-3 mt-4">
               <SecondaryButton onClick={handleRetry}>{t("device.changeWifi")}</SecondaryButton>
               {hasSmpCapability && (
-                <PrimaryButton onClick={() => setActiveTab("firmware-ble")}>
-                  {t("device.goToFirmwareBle")}
+                <PrimaryButton onClick={() => setActiveTab("firmware")}>
+                  {t("device.goToFirmware")}
                 </PrimaryButton>
               )}
             </div>

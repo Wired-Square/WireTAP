@@ -48,6 +48,7 @@ pub struct UnifiedDevice {
     pub capabilities: Vec<String>,
 }
 
+
 // ============================================================================
 // Shared Discovery handle
 // ============================================================================
@@ -171,6 +172,59 @@ pub fn canonical_device_id(device_id: String) -> DeviceId {
     }
 }
 
+/// Resolves a UI-facing device selection string to the live [`DeviceId`]
+/// held by Discovery.
+///
+/// The frontend passes either a real framelink id (`ble:<uuid>`,
+/// `mdns:udp:<instance>`) or a `"{transport}:{name}"` selection string
+/// (e.g. `"ble:WiredFlexLink-9C1C"`). This function:
+///
+/// 1. Tries the input as a canonical id — if Discovery has a live entry,
+///    returns it immediately.
+/// 2. Strips the known UI-selection prefixes to extract the device name,
+///    then finds the matching device filtered by `transport` (prevents
+///    picking the wrong-transport twin when a device advertises on both
+///    BLE and UDP).
+/// 3. Returns an error if nothing matches — the caller gets a clear
+///    diagnostic rather than a silent wrong-id failure downstream.
+pub async fn resolve_device_id(
+    raw: &str,
+    transport: Transport,
+) -> Result<DeviceId, String> {
+    let discovery = discovery_handle().await?;
+
+    // 1. Try the input as a real framelink id first.
+    let canonical = canonical_device_id(raw.to_string());
+    if discovery.get(&canonical).await.is_some() {
+        return Ok(canonical);
+    }
+
+    // 2. Strip known UI-selection prefixes to get the device name.
+    let name = raw
+        .strip_prefix("mdns:udp:")
+        .or_else(|| raw.strip_prefix("mdns:"))
+        .or_else(|| raw.strip_prefix("ble:"))
+        .or_else(|| raw.strip_prefix("udp:"))
+        .or_else(|| raw.strip_prefix("ip:"))
+        .or_else(|| raw.strip_prefix("fl:"))
+        .unwrap_or(raw);
+
+    // 3. Match by name + transport so a dual-transport device resolves to
+    //    the correct entry.
+    if let Some(device) = discovery
+        .devices()
+        .await
+        .into_iter()
+        .find(|d| d.name() == name && d.transports().contains(&transport))
+    {
+        return Ok(device.id().clone());
+    }
+
+    Err(format!(
+        "device '{name}' not in discovery for transport {transport:?} (input was '{raw}')"
+    ))
+}
+
 // ============================================================================
 // Tauri commands
 // ============================================================================
@@ -183,9 +237,6 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
     let discovery = discovery_handle().await?;
 
     let mut state = STATE.lock().await;
-    if state.forwarder.is_some() {
-        return Ok(());
-    }
 
     // Re-emit anything the scanners have already seen so the UI has a
     // populated list immediately rather than waiting for the next
@@ -194,6 +245,9 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
         let _ = app.emit("device-discovered", to_unified(&device));
     }
 
+    // Forwarder is started once and never stopped — it carries
+    // `device-disconnected` events from framelink's lease watcher.
+    if state.forwarder.is_none() {
     let app_for_events = app.clone();
     let discovery_for_events = discovery.clone();
     state.forwarder = Some(tokio::spawn(async move {
@@ -218,6 +272,13 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
         }
         tlog!("[device_scan] event stream ended");
     }));
+        tlog!("[device_scan] forwarder started");
+    }
+
+    if state.heartbeat.is_some() {
+        // Already scanning — nothing more to do.
+        return Ok(());
+    }
 
     let app_for_heartbeat = app.clone();
     let discovery_for_heartbeat = discovery;
@@ -242,26 +303,41 @@ pub async fn device_scan_start(app: AppHandle) -> Result<(), String> {
         let _ = app_for_settled.emit("device-scan-finished", ());
     }));
 
-    tlog!("[device_scan] forwarding Discovery events to frontend");
+    tlog!("[device_scan] heartbeat started");
     Ok(())
 }
 
-/// Stop forwarding Discovery events. The underlying scanners stay alive
-/// (no API to pause them) so re-starting is instant; the frontend just
-/// stops receiving heartbeats.
+/// Stop the periodic heartbeat that re-emits the device-discovered
+/// snapshot for the scan view. The Discovery event forwarder itself
+/// stays alive — `Lost` events from mDNS/BLE eviction must continue
+/// reaching the frontend after the user has navigated to a connected-
+/// device page.
 #[tauri::command]
 pub async fn device_scan_stop(_app: AppHandle) -> Result<(), String> {
     let mut state = STATE.lock().await;
-    if let Some(handle) = state.forwarder.take() {
-        handle.abort();
-    }
     if let Some(handle) = state.heartbeat.take() {
         handle.abort();
     }
     if let Some(handle) = state.settled_signal.take() {
         handle.abort();
     }
-    tlog!("[device_scan] forwarding stopped");
+    tlog!("[device_scan] heartbeat stopped (forwarder remains)");
+    Ok(())
+}
+
+/// Single point of tear-down for a device. Drops every cached
+/// `Arc<Session>` framelink-rs is holding for the id; once any
+/// in-flight operation drops its local clone, the lease's strong
+/// count falls to zero and `PeripheralLease::Drop` runs the BLE
+/// disconnect. UDP id (`mdns:udp:...`) is supported here too — the
+/// release just clears the cache entry, no link-layer disconnect
+/// needed.
+#[tauri::command]
+pub async fn release_device(device_id: String) -> Result<(), String> {
+    let id = canonical_device_id(device_id);
+    let discovery = discovery_handle().await?;
+    discovery.release_device(&id).await;
+    tlog!("[device_scan] released device {}", id);
     Ok(())
 }
 

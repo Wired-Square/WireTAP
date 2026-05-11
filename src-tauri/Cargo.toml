@@ -52,6 +52,7 @@ tokio-modbus = { version = "0.17", default-features = false, features = ["tcp"] 
 tokio-tungstenite = "0.26"
 rusqlite = { version = "0.32", features = ["bundled"] }
 futures = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # BLE scanning, mDNS discovery, the WiFi-prov GATT service, and the SMP
 # transports for firmware upgrade are all provided by framelink (which
 # vendors btleplug 0.12, mdns-sd, and mcumgr-smp internally — we don't

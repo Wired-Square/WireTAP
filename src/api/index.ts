@@ -65,7 +65,6 @@ export {
   bleScanStart,
   bleScanStop,
   bleConnect,
-  bleDisconnect,
   bleDeleteAllCredentials,
   bleWifiDisconnect,
   bleReadDeviceState,
@@ -84,19 +83,14 @@ export {
   type ProvisioningStatus,
 } from "./bleProvision";
 
-// SMP Firmware Upgrade API
+// SMP / OTA API
 export {
-  smpScanStart,
-  smpScanStop,
-  smpConnectBle,
-  smpConnectUdp,
-  smpDisconnect,
-  smpListImages,
-  smpUploadFirmware,
-  smpTestImage,
-  smpConfirmImage,
-  smpResetDevice,
-  smpCancelUpload,
+  listImages,
+  otaStart,
+  otaCancel,
+  subscribeOtaEvents,
   type ImageSlotInfo,
-  type UploadProgress,
+  type Transport,
+  type OtaStartParams,
+  type OtaEvent,
 } from "./smpUpgrade";

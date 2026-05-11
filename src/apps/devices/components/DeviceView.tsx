@@ -6,7 +6,7 @@
 // here — tabs themselves never disconnect, navigate, or reach into other
 // tabs' state.
 
-import { Bluetooth, Cable, Globe, HardDriveDownload, Wifi } from "lucide-react";
+import { Cable, HardDriveDownload, HardDriveUpload, Wifi } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { textPrimary, textSecondary } from "../../../styles";
 import { iconMd } from "../../../styles/spacing";
@@ -35,12 +35,19 @@ export default function DeviceView() {
   const selectedAddress = useDevicesStore((s) => s.data.selectedAddress);
   const selectedSmpPort = useDevicesStore((s) => s.data.selectedSmpPort);
   const selectedFrameLinkPort = useDevicesStore((s) => s.data.selectedFrameLinkPort);
+  const selectedDeviceId = useDevicesStore((s) => s.data.selectedDeviceId);
 
   const hasBle = selectedBleId != null;
   const hasIp = selectedAddress != null;
   const hasWifiProv = capabilities.includes("wifi-provision");
   const hasSmp = capabilities.includes("smp");
   const hasFrameLink = capabilities.includes("framelink");
+
+  // BLE OTA disabled pending investigation — uploads stall mid-stream.
+  // Re-add `...(hasBle && hasSmp ? ["ble" as const] : []),` when fixed.
+  const availableSmpTransports: ("ble" | "udp")[] = [
+    ...(hasIp && hasSmp && selectedSmpPort != null ? ["udp" as const] : []),
+  ];
 
   const tabs: TabSpec[] = [
     {
@@ -53,24 +60,13 @@ export default function DeviceView() {
         : t("device.unavailable.noWifiProv"),
     },
     {
-      id: "firmware-ble",
-      label: t("device.tabs.firmwareBle"),
-      icon: Bluetooth,
-      available: hasBle && hasSmp,
-      unavailableReason: !hasBle
-        ? t("device.unavailable.noBle")
-        : t("device.unavailable.noBleSmp"),
-    },
-    {
-      id: "firmware-ip",
-      label: t("device.tabs.firmwareIp"),
-      icon: Globe,
-      available: hasIp && hasSmp && selectedSmpPort != null,
-      unavailableReason: !hasIp
-        ? t("device.unavailable.noIp")
-        : !hasSmp
-          ? t("device.unavailable.noSmpService")
-          : t("device.unavailable.noSmpPort"),
+      id: "firmware",
+      label: t("device.tabs.firmware"),
+      icon: HardDriveUpload,
+      available: availableSmpTransports.length > 0,
+      unavailableReason: !hasSmp
+        ? t("device.unavailable.noSmpService")
+        : t("device.unavailable.noSmpPort"),
     },
     {
       id: "dataio",
@@ -129,10 +125,11 @@ export default function DeviceView() {
           />
         ) : activeTab === "wifi" ? (
           <WifiTab />
-        ) : activeTab === "firmware-ble" ? (
-          <FirmwareTab transport="ble" />
-        ) : activeTab === "firmware-ip" ? (
-          <FirmwareTab transport="ip" />
+        ) : activeTab === "firmware" ? (
+          <FirmwareTab
+            deviceId={selectedDeviceId ?? ""}
+            availableTransports={availableSmpTransports}
+          />
         ) : (
           <DataIoTab />
         )}

@@ -1,8 +1,9 @@
-// API wrappers for SMP firmware upgrade Tauri commands
+// SMP / OTA wrappers — thin layer over WS commands and the OtaEvent
+// push channel. All protocol logic lives in framelink-rs; this file
+// only translates between the WS wire format and the UI.
 
-import { invoke } from "@tauri-apps/api/core";
-
-// Types
+import { wsTransport } from "../services/wsTransport";
+import { MsgType } from "../services/wsProtocol";
 
 export interface ImageSlotInfo {
   slot: number;
@@ -16,85 +17,80 @@ export interface ImageSlotInfo {
   image: number | null;
 }
 
-export interface UploadProgress {
-  bytes_sent: number;
-  total_bytes: number;
-  percent: number;
-}
+export type Transport = "ble" | "udp";
 
-/** Unified device type for both BLE and mDNS-discovered devices. */
-export interface DiscoveredDevice {
-  name: string;
-  /** BLE: peripheral ID string, UDP: "udp:address:port" */
-  id: string;
-  /** "ble" or "udp" */
-  transport: "ble" | "udp";
-  /** BLE only */
-  rssi: number | null;
-  /** UDP only: IP address */
-  address: string | null;
-  /** UDP only: port number */
-  port: number | null;
-  /** mDNS service type (e.g. "_mcumgr._udp") */
-  service_type: string | null;
-}
-
-// Scanning
-
-export async function smpScanStart(): Promise<void> {
-  await invoke("smp_scan_start");
-}
-
-export async function smpScanStop(): Promise<void> {
-  await invoke("smp_scan_stop");
-}
-
-// Connection
-
-export async function smpConnectBle(deviceId: string): Promise<void> {
-  await invoke("smp_connect_ble", { deviceId });
+export interface OtaStartParams {
+  deviceId: string;
+  transport: Transport;
+  filePath: string;
+  reconnectTimeoutSecs?: number;
 }
 
 /**
- * Reconnect SMP over BLE using the device's stable local name. Use after a
- * firmware test-boot — the BLE peripheral identifier rotates across the
- * reboot, so any cached `deviceId` is stale, but the name is firmware-stable.
- * Backend polls Discovery up to `timeoutSecs` for a fresh match.
+ * Discriminated union mirroring framelink::OtaEvent plus the shim's
+ * own `Cancelled`, `Complete`, and `Error` terminators.
  */
-export async function smpReconnectBleByName(name: string, timeoutSecs: number): Promise<void> {
-  await invoke("smp_reconnect_ble_by_name", { name, timeoutSecs });
+export type OtaEvent =
+  | { type: "SessionOpened" }
+  | {
+      type: "UploadProgress";
+      bytes_sent: number;
+      total_bytes: number;
+      percent: number;
+      image_hash: string | null;
+    }
+  | { type: "Activating" }
+  | { type: "Activated"; hash: string }
+  | { type: "Resetting" }
+  | { type: "ResetSent" }
+  | { type: "Reconnecting"; name: string }
+  | { type: "Reconnected"; device_id: string }
+  | { type: "Verified"; active_hash: string }
+  | { type: "Confirming" }
+  | { type: "Confirmed" }
+  | { type: "Cancelled" }
+  | { type: "Complete" }
+  | { type: "Error"; message: string };
+
+export async function listImages(
+  deviceId: string,
+  transport: Transport,
+): Promise<ImageSlotInfo[]> {
+  return wsTransport.command<ImageSlotInfo[]>("smp.list_images", {
+    device_id: deviceId,
+    transport,
+  });
 }
 
-export async function smpConnectUdp(deviceId: string): Promise<void> {
-  await invoke("smp_connect_udp", { deviceId });
+export async function otaStart(params: OtaStartParams): Promise<void> {
+  await wsTransport.command<Record<string, never>>("smp.ota_start", {
+    device_id: params.deviceId,
+    transport: params.transport,
+    file_path: params.filePath,
+    reconnect_timeout_secs: params.reconnectTimeoutSecs ?? null,
+  });
 }
 
-export async function smpDisconnect(): Promise<void> {
-  await invoke("smp_disconnect");
+export async function otaCancel(): Promise<void> {
+  await wsTransport.command<Record<string, never>>("smp.ota_cancel", {});
 }
 
-// Image management
-
-export async function smpListImages(): Promise<ImageSlotInfo[]> {
-  return invoke("smp_list_images");
-}
-
-export async function smpUploadFirmware(filePath: string, image?: number): Promise<void> {
-  await invoke("smp_upload_firmware", { filePath, image: image ?? null });
-}
-
-export async function smpTestImage(hash: number[]): Promise<void> {
-  await invoke("smp_test_image", { hash });
-}
-
-export async function smpConfirmImage(hash: number[]): Promise<void> {
-  await invoke("smp_confirm_image", { hash });
-}
-
-export async function smpResetDevice(): Promise<void> {
-  await invoke("smp_reset_device");
-}
-
-export async function smpCancelUpload(): Promise<void> {
-  await invoke("smp_cancel_upload");
+/**
+ * Subscribe to OTA events. Returned function unsubscribes.
+ * Caller is responsible for distinguishing UI-relevant events from
+ * `Complete` / `Cancelled` / `Error` terminators (each of which means
+ * the OTA is over).
+ */
+export function subscribeOtaEvents(
+  onEvent: (event: OtaEvent) => void,
+): () => void {
+  const decoder = new TextDecoder();
+  return wsTransport.onGlobalMessage(MsgType.OtaEvent, (payload: DataView) => {
+    const text = decoder.decode(new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength));
+    try {
+      onEvent(JSON.parse(text) as OtaEvent);
+    } catch {
+      // Malformed event body; ignore.
+    }
+  });
 }

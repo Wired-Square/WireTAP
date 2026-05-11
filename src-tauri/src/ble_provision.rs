@@ -1,17 +1,16 @@
 // BLE WiFi provisioning module
 //
-// Drives `framelink::WifiProvSession` (opened via the shared
-// `Discovery` from [`crate::device_scan`]) and translates its async
-// API into the Tauri command surface the frontend already speaks:
-// `ble-provision-status`, `ble-provision-ip`, `ble-device-disconnected`.
-//
-// The new framelink session encapsulates the GATT plumbing — service
-// discovery, notification subscription, characteristic resolution —
-// so this file is now thin.
+// Drives `framelink::WifiProvSession` handles vended by
+// `framelink::Discovery` (single source of truth for BLE connection
+// state — see `device_scan` for the discovery handle). Each Tauri
+// command takes the target `device_id`, fetches the cached session
+// via `discovery.open_wifi_prov(&id)`, and runs the operation.
+// Tear-down is the unified `release_device(device_id)` command in
+// `device_scan` — there is no per-protocol `disconnect` here.
 
 use crate::device_scan::{canonical_device_id, device_scan_start, device_scan_stop, discovery_handle};
 use framelink::{
-    ProvisioningEvent as FlProvisioningEvent, WifiCredentials as FlWifiCredentials,
+    Discovery, ProvisioningEvent as FlProvisioningEvent, WifiCredentials as FlWifiCredentials,
     WifiProvSession, WifiSecurity, WifiStatus,
 };
 use futures::StreamExt;
@@ -58,17 +57,17 @@ pub struct ProvisioningStatus {
 // ============================================================================
 
 struct BleProvisionState {
-    /// Active WiFi-prov session — `None` when no `ble_connect` has happened.
-    session: Option<Arc<WifiProvSession>>,
-    /// Background task forwarding `session.watch()` events to the frontend.
+    /// Background task forwarding `session.watch()` events to the
+    /// frontend. Holds an `Arc<WifiProvSession>` clone for its
+    /// lifetime; aborted by `ble_subscribe_status` (when restarting
+    /// the watch) and by `device_scan::release_device` indirectly
+    /// (the task exits naturally once the lease is dropped and the
+    /// notify stream errors out).
     watch_task: Option<JoinHandle<()>>,
 }
 
 static STATE: Lazy<Arc<Mutex<BleProvisionState>>> = Lazy::new(|| {
-    Arc::new(Mutex::new(BleProvisionState {
-        session: None,
-        watch_task: None,
-    }))
+    Arc::new(Mutex::new(BleProvisionState { watch_task: None }))
 });
 
 // ============================================================================
@@ -99,12 +98,17 @@ fn provisioning_status_payload(status: WifiStatus) -> ProvisioningStatus {
     }
 }
 
-async fn require_session() -> Result<Arc<WifiProvSession>, String> {
-    let state = STATE.lock().await;
-    state
-        .session
-        .clone()
-        .ok_or_else(|| "No active WiFi-prov session — call ble_connect first".to_string())
+/// Resolve `device_id` to a cached `Arc<WifiProvSession>`. Opens (and
+/// caches) the session on first call for that id; subsequent calls
+/// return clones of the same `Arc`.
+async fn session_for(device_id: &str) -> Result<(Discovery, Arc<WifiProvSession>), String> {
+    let id = canonical_device_id(device_id.to_string());
+    let discovery = discovery_handle().await?;
+    let session = discovery
+        .open_wifi_prov(&id)
+        .await
+        .map_err(|e| format!("Failed to open WiFi-prov session for {id}: {e}"))?;
+    Ok((discovery, session))
 }
 
 // ============================================================================
@@ -128,39 +132,19 @@ pub async fn ble_scan_stop(app: AppHandle) -> Result<(), String> {
 // Tauri commands — connection
 // ============================================================================
 
-/// Open a WiFi-provisioning session against the given device. Replaces
-/// any previously active session.
+/// Warm the WiFi-prov session cache for `device_id`. Idempotent — the
+/// `Discovery` cache returns the same `Arc<WifiProvSession>` to
+/// subsequent operation commands. Tear-down goes through
+/// `device_scan::release_device(device_id)`.
 #[tauri::command]
 pub async fn ble_connect(_app: AppHandle, device_id: String) -> Result<(), String> {
     let id = canonical_device_id(device_id);
     let discovery = discovery_handle().await?;
-
-    let session = discovery
+    discovery
         .open_wifi_prov(&id)
         .await
         .map_err(|e| format!("Failed to open WiFi-prov session for {id}: {e}"))?;
-    let session = Arc::new(session);
-
-    let mut state = STATE.lock().await;
-    if let Some(t) = state.watch_task.take() {
-        t.abort();
-    }
-    state.session = Some(session);
-
-    tlog!("[ble_provision] WiFi-prov session opened on {}", id);
-    Ok(())
-}
-
-/// Drop the active WiFi-prov session. The BLE link disconnects unless a
-/// sibling SMP session is still holding the same lease.
-#[tauri::command]
-pub async fn ble_disconnect() -> Result<(), String> {
-    let mut state = STATE.lock().await;
-    if let Some(t) = state.watch_task.take() {
-        t.abort();
-    }
-    state.session = None;
-    tlog!("[ble_provision] WiFi-prov session dropped");
+    tlog!("[ble_provision] WiFi-prov session ready for {}", id);
     Ok(())
 }
 
@@ -169,8 +153,8 @@ pub async fn ble_disconnect() -> Result<(), String> {
 // ============================================================================
 
 #[tauri::command]
-pub async fn ble_delete_all_credentials() -> Result<(), String> {
-    let session = require_session().await?;
+pub async fn ble_delete_all_credentials(device_id: String) -> Result<(), String> {
+    let (_d, session) = session_for(&device_id).await?;
     session
         .forget()
         .await
@@ -178,8 +162,8 @@ pub async fn ble_delete_all_credentials() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn ble_wifi_disconnect() -> Result<(), String> {
-    let session = require_session().await?;
+pub async fn ble_wifi_disconnect(device_id: String) -> Result<(), String> {
+    let (_d, session) = session_for(&device_id).await?;
     session
         .disconnect()
         .await
@@ -187,8 +171,8 @@ pub async fn ble_wifi_disconnect() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn ble_read_device_state() -> Result<DeviceWifiState, String> {
-    let session = require_session().await?;
+pub async fn ble_read_device_state(device_id: String) -> Result<DeviceWifiState, String> {
+    let (_d, session) = session_for(&device_id).await?;
     let s = session
         .status()
         .await
@@ -208,9 +192,10 @@ pub async fn ble_read_device_state() -> Result<DeviceWifiState, String> {
 #[tauri::command]
 pub async fn ble_provision_wifi(
     app: AppHandle,
+    device_id: String,
     credentials: WifiCredentials,
 ) -> Result<(), String> {
-    let session = require_session().await?;
+    let (_d, session) = session_for(&device_id).await?;
     let creds = FlWifiCredentials {
         ssid: credentials.ssid,
         passphrase: credentials.passphrase,
@@ -235,11 +220,11 @@ pub async fn ble_provision_wifi(
 }
 
 /// Subscribe to live status / IP-address changes from the device until
-/// the BLE link drops or `ble_disconnect` is called. Read-only — never
+/// the BLE link drops or the device is released. Read-only — never
 /// stages new credentials.
 #[tauri::command]
-pub async fn ble_subscribe_status(app: AppHandle) -> Result<(), String> {
-    let session = require_session().await?;
+pub async fn ble_subscribe_status(app: AppHandle, device_id: String) -> Result<(), String> {
+    let (_d, session) = session_for(&device_id).await?;
 
     let mut state = STATE.lock().await;
     if let Some(t) = state.watch_task.take() {

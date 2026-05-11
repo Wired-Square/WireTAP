@@ -289,8 +289,27 @@ pub async fn dispatch_command(
         name if name.starts_with("framelink.") => {
             crate::io::framelink::rules::dispatch_framelink_command(name, params).await
         }
+        name if name.starts_with("smp.") => {
+            crate::ws::smp::dispatch(name, params).await
+        }
         _ => Err(format!("Unknown command: {op_name}")),
     }
+}
+
+/// Push an OTA event payload to all connected WS clients on the global
+/// channel. Payload is opaque JSON — the frontend decodes the
+/// discriminated union by `type` field.
+pub fn send_ota_event(event: &serde_json::Value) {
+    let server = match ws_server() {
+        Some(s) => s,
+        None => return,
+    };
+    let payload = match serde_json::to_vec(event) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let msg = protocol::encode_message(MsgType::OtaEvent, 0, &payload);
+    server.send_global(msg);
 }
 
 /// Send replay state update (global, channel 0).

@@ -1,8 +1,8 @@
 // ui/src/apps/devices/stores/devicesStore.ts
 //
 // Lightweight store for the unified Devices tab. Two screens — scan and the
-// per-device tabbed page. Per-tab data (provisioning credentials, firmware
-// upload progress, etc.) lives in provisioningStore and upgradeStore.
+// per-device tabbed page. Per-tab data (provisioning credentials) lives in
+// provisioningStore.
 
 import { create } from "zustand";
 import type { UnifiedDevice } from "../../../api/deviceScan";
@@ -15,8 +15,7 @@ export type DevicesScreen = "scan" | "device";
 
 export type DeviceTabId =
   | "wifi"
-  | "firmware-ble"
-  | "firmware-ip"
+  | "firmware"
   | "dataio";
 
 export type ConnectionState = "idle" | "connecting" | "connected";
@@ -28,10 +27,6 @@ export type ConnectionState = "idle" | "connecting" | "connected";
 export interface TransportsConnected {
   /** BLE GATT link for WiFi provisioning service. */
   bleProv: boolean;
-  /** SMP layer attached to the BLE link (either via fresh connect or attach). */
-  bleSmp: boolean;
-  /** UDP SMP transport. */
-  ipSmp: boolean;
   /** FrameLink probe completed (no persistent socket). */
   ipFrameLink: boolean;
 }
@@ -106,6 +101,13 @@ interface DevicesState {
     capabilities: string[];
   }) => void;
 
+  /**
+   * Replace the BLE id of the currently-selected device. Used after a
+   * post-OTA reconnect-by-name when the peripheral identifier rotated
+   * (e.g. T-2Can RPA workaround).
+   */
+  setSelectedBleId: (bleId: string | null) => void;
+
   // UI actions
   setScreen: (screen: DevicesScreen) => void;
   setActiveTab: (tab: DeviceTabId) => void;
@@ -133,8 +135,6 @@ const initialData = {
 
 const initialTransports: TransportsConnected = {
   bleProv: false,
-  bleSmp: false,
-  ipSmp: false,
   ipFrameLink: false,
 };
 
@@ -217,6 +217,9 @@ export const useDevicesStore = create<DevicesState>((set) => ({
         selectedCapabilities: selection.capabilities,
       },
     })),
+
+  setSelectedBleId: (bleId) =>
+    set((s) => ({ data: { ...s.data, selectedBleId: bleId } })),
 
   // ── UI actions ──
 

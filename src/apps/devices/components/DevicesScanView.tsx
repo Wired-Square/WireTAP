@@ -34,13 +34,17 @@ function pickInitialTab(
   if (via === "ble") {
     if (!m.ble) return null;
     const caps = m.ble.capabilities;
+    // Diagnostic: prefer SMP-direct when both wifi-prov and SMP are
+    // advertised, so we can isolate whether opening wifi-prov first
+    // affects subsequent SMP-side behaviour. Restore wifi preference
+    // once the question is settled.
+    if (caps.includes("smp")) return "firmware";
     if (caps.includes("wifi-provision")) return "wifi";
-    if (caps.includes("smp")) return "firmware-ble";
     if (caps.includes("framelink") && m.framelink) return "dataio";
     return null;
   }
   // via === "ip"
-  if (m.smp) return "firmware-ip";
+  if (m.smp) return "firmware";
   if (m.framelink) return "dataio";
   return null;
 }
@@ -188,7 +192,7 @@ export default function DevicesScanView() {
       frameLinkPort: isFrameLink ? port : null,
       capabilities: isFrameLink ? ["framelink"] : ["smp"],
     };
-    await enterDevice(selection, isFrameLink ? "dataio" : "firmware-ip");
+    await enterDevice(selection, isFrameLink ? "dataio" : "firmware");
   }, [manualAddress, manualPort, manualProtocol, enterDevice, setError, t]);
 
   return (

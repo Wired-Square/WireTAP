@@ -21,7 +21,6 @@ mod sessions;
 mod settings;
 #[cfg(not(target_os = "ios"))]
 mod serial_terminal;
-mod smp_upgrade;
 mod store_manager;
 mod transmit;
 mod transmit_history;
@@ -871,6 +870,17 @@ fn get_ws_config() -> Result<WsConfig, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Pipe `tracing` events from framelink (and any other crate that
+    // uses the `tracing` macros) to stderr, gated by RUST_LOG. With
+    // RUST_LOG unset, only WARN and above are shown.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
+        )
+        .with_writer(std::io::stderr)
+        .try_init();
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
@@ -1285,26 +1295,12 @@ pub fn run() {
                         ble_provision::ble_scan_start,
                         ble_provision::ble_scan_stop,
                         ble_provision::ble_connect,
-                        ble_provision::ble_disconnect,
                         ble_provision::ble_delete_all_credentials,
                         ble_provision::ble_wifi_disconnect,
                         ble_provision::ble_read_device_state,
                         ble_provision::ble_provision_wifi,
                         ble_provision::ble_subscribe_status,
                         ble_provision::ble_get_host_wifi_ssid,
-                        // SMP Firmware Upgrade API
-                        smp_upgrade::smp_scan_start,
-                        smp_upgrade::smp_scan_stop,
-                        smp_upgrade::smp_connect_ble,
-                        smp_upgrade::smp_reconnect_ble_by_name,
-                        smp_upgrade::smp_connect_udp,
-                        smp_upgrade::smp_disconnect,
-                        smp_upgrade::smp_list_images,
-                        smp_upgrade::smp_upload_firmware,
-                        smp_upgrade::smp_test_image,
-                        smp_upgrade::smp_confirm_image,
-                        smp_upgrade::smp_reset_device,
-                        smp_upgrade::smp_cancel_upload,
                         // FrameLink Device API
                         io::framelink::framelink_probe_device,
                         io::framelink::framelink_get_interface_signals,
