@@ -1943,7 +1943,7 @@ dependencies = [
 [[package]]
 name = "framelink"
 version = "0.1.1"
-source = "git+ssh://git@github.com/Wired-Square/framelink-rs.git?branch=main#fd5ba3c13d8f2c8281426c0a20340a8f8b7f35ff"
+source = "git+ssh://git@github.com/Wired-Square/framelink-rs.git?branch=main#a798f37fca71edc46c9eac80e393b86bb0d104f4"
 dependencies = [
  "async-trait",
  "bluest",

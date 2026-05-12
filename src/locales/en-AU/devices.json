@@ -103,8 +103,6 @@
     "retry": "Retry",
     "back": "Back",
     "writingCredentials": "Writing credentials to device...",
-    "waitingForWifi": "Waiting for device to connect to WiFi...",
-    "timedOut": "Timed out waiting for device to connect to WiFi",
     "steps": {
       "writingSsid": "Writing SSID",
       "writingPassphrase": "Writing passphrase",
