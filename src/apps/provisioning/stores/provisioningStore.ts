@@ -5,7 +5,7 @@ import type { BleDevice } from "../../../api/bleProvision";
 
 export type ProvisioningStep = "scan" | "credentials" | "provisioning" | "complete";
 export type ConnectionState = "idle" | "connecting" | "connected" | "disconnecting";
-export type ProvisionState = "idle" | "writing" | "waiting" | "connected" | "error";
+export type ProvisionState = "idle" | "writing" | "connected" | "error";
 
 interface ProvisioningState {
   data: {

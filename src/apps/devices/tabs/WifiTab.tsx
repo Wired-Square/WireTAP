@@ -107,19 +107,6 @@ export default function WifiTab() {
     }
   }, [provisionState]);
 
-  // Time out the "waiting" sub-phase after 30s.
-  useEffect(() => {
-    if (provisionState !== "waiting") return;
-    const timer = setTimeout(() => {
-      const current = useProvisioningStore.getState();
-      if (current.ui.provisionState === "waiting") {
-        setProvisionState("error");
-        setProvisionError(t("provisioning.timedOut"));
-      }
-    }, 30_000);
-    return () => clearTimeout(timer);
-  }, [provisionState, setProvisionState, setProvisionError, t]);
-
   const isOpen = security === SECURITY_OPEN;
   const canProvision = ssid.trim().length > 0 && (isOpen || passphrase.trim().length > 0);
 
@@ -188,9 +175,13 @@ export default function WifiTab() {
         passphrase: isOpen ? null : passphrase || null,
         security,
       });
-      tlog.info("[provision] Credentials written, waiting for device status...");
-      setProvisionState("waiting");
-      setStatusMessage(t("provisioning.waitingForWifi"));
+      tlog.info("[provision] Credentials accepted by device.");
+      // bleProvisionWifi resolves Ok only after SAVE_CONNECT-ack; commit
+      // success here if the Status::Connected notification didn't beat
+      // us through the ble-provision-status listener.
+      if (useProvisioningStore.getState().ui.provisionState === "writing") {
+        setProvisionState("connected");
+      }
     } catch (e) {
       tlog.info(`[provision] Failed: ${String(e)}`);
       setProvisionState("error");
@@ -225,7 +216,7 @@ export default function WifiTab() {
           : t("provisioning.steps.writingPassphrase"),
         done: provisionState !== "idle",
       },
-      { label: t("provisioning.steps.sendingConnect"), done: provisionState === "waiting" },
+      { label: t("provisioning.steps.sendingConnect"), done: false },
       { label: t("provisioning.steps.waitingForDevice"), done: false },
     ];
 
@@ -234,9 +225,7 @@ export default function WifiTab() {
         <Loader2 className="w-12 h-12 text-sky-500 animate-spin" />
         <div className="flex flex-col gap-2 w-full max-w-sm">
           {steps.map((step, i) => {
-            const isActive =
-              (i === 3 && provisionState === "waiting") ||
-              (i < 3 && provisionState === "writing");
+            const isActive = !step.done && provisionState === "writing";
             return (
               <div key={i} className={`flex items-center gap-2 text-sm ${textPrimary}`}>
                 {step.done ? (
@@ -257,7 +246,6 @@ export default function WifiTab() {
         {provError && (
           <div className={`${alertDanger} ${textDanger} text-sm w-full max-w-sm`}>{provError}</div>
         )}
-        {provisionState === "waiting" && <StatusIndicator statusCode={1} />}
       </div>
     );
   }

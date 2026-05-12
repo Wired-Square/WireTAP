@@ -34,12 +34,10 @@ function pickInitialTab(
   if (via === "ble") {
     if (!m.ble) return null;
     const caps = m.ble.capabilities;
-    // Diagnostic: prefer SMP-direct when both wifi-prov and SMP are
-    // advertised, so we can isolate whether opening wifi-prov first
-    // affects subsequent SMP-side behaviour. Restore wifi preference
-    // once the question is settled.
-    if (caps.includes("smp")) return "firmware";
+    // WiFi provisioning is the only BLE-side operation currently
+    // supported (BLE OTA disabled — see DeviceView availableSmpTransports).
     if (caps.includes("wifi-provision")) return "wifi";
+    if (caps.includes("smp")) return "firmware";
     if (caps.includes("framelink") && m.framelink) return "dataio";
     return null;
   }
