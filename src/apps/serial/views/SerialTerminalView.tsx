@@ -115,7 +115,7 @@ const SerialTerminalView = forwardRef<SerialTerminalHandle, Props>(
       const term = new XTerm({
         convertEol: false,
         cursorBlink: true,
-        fontFamily: '"Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
         fontSize,
         lineHeight: 1.25,
         letterSpacing: 0.5,

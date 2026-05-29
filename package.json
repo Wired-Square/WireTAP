@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@fontsource/dseg7": "^4.5.4",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/ubuntu": "^5.2.8",
     "@fontsource/ubuntu-mono": "^5.2.8",
     "@saurl/tauri-plugin-safe-area-insets-css-api": "^0.1.0",

@@ -9,6 +9,8 @@ import "@fontsource/ubuntu/500.css";
 import "@fontsource/ubuntu/700.css";
 import "@fontsource/ubuntu-mono/400.css";
 import "@fontsource/ubuntu-mono/700.css";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/700.css";
 import "@fontsource/dseg7/classic-400.css";
 import "./WireTAP.css";
 import MainLayout from "./components/MainLayout";
