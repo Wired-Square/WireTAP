@@ -25,6 +25,8 @@
     "dialog:allow-open",
     "store:default",
     "store:allow-load",
-    "store:allow-save"
+    "store:allow-save",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text"
   ]
 }

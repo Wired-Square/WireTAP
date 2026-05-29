@@ -5,6 +5,14 @@
   cursor: default;
 }
 
+/* xterm renders its own selection; restore the text cursor the global reset
+   above strips (it re-applies `default` to every descendant, incl. the row
+   spans), so mouse selection is discoverable in the Serial terminal. */
+.xterm,
+.xterm * {
+  cursor: text;
+}
+
 /* Prevent the entire webview from scrolling/bouncing on macOS */
 html, body {
   overflow: hidden;

@@ -5,6 +5,7 @@
 // then the shared SerialPortPicker as the identity control. Right-side
 // actions: Local Echo toggle + Reset.
 
+import { useState } from "react";
 import {
   Terminal as TerminalIcon,
   RotateCcw,
@@ -12,6 +13,10 @@ import {
   Eye,
   Plug,
   Unplug,
+  CopyPlus,
+  Check,
+  Minus,
+  Plus,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppTopBar from "../../../components/AppTopBar";
@@ -20,6 +25,8 @@ import SerialPortPicker, {
   type SerialPortSettings,
 } from "../../../components/SerialPortPicker";
 import type { DfuDeviceInfo } from "../utils/flasherTypes";
+import { MIN_TERMINAL_FONT, MAX_TERMINAL_FONT } from "../stores/serialStore";
+import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../constants";
 import { iconSm } from "../../../styles/spacing";
 
 interface Props {
@@ -49,6 +56,10 @@ interface Props {
   onDisconnect: () => void;
   onReset: () => void;
   onToggleLocalEcho: () => void;
+  onCopyAll: () => Promise<boolean>;
+  fontSize: number;
+  onIncreaseFont: () => void;
+  onDecreaseFont: () => void;
 }
 
 export default function SerialTopBar({
@@ -73,8 +84,20 @@ export default function SerialTopBar({
   onDisconnect,
   onReset,
   onToggleLocalEcho,
+  onCopyAll,
+  fontSize,
+  onIncreaseFont,
+  onDecreaseFont,
 }: Props) {
   const { t } = useTranslation("serial");
+  const [copiedAll, setCopiedAll] = useState(false);
+
+  const handleCopyAll = async () => {
+    if (await onCopyAll()) {
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), COPY_FEEDBACK_TIMEOUT_MS);
+    }
+  };
 
   // The Connect / Disconnect / Echo / Reset actions only apply in serial
   // mode. In DFU mode the picker is just a selector — flashing kicks off
@@ -132,6 +155,43 @@ export default function SerialTopBar({
                   <EyeOff className={iconSm} />
                 )}
                 {localEcho ? t("topBar.echoOn") : t("topBar.echoOff")}
+              </button>
+              <div className="flex items-center gap-0.5 rounded bg-[var(--bg-surface)] px-0.5">
+                <button
+                  onClick={onDecreaseFont}
+                  disabled={fontSize <= MIN_TERMINAL_FONT}
+                  className="flex items-center justify-center p-1 rounded text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={t("topBar.fontDecrease")}
+                >
+                  <Minus className={iconSm} />
+                </button>
+                <span className="text-xs tabular-nums text-center w-5 text-[color:var(--text-secondary)]">
+                  {fontSize}
+                </span>
+                <button
+                  onClick={onIncreaseFont}
+                  disabled={fontSize >= MAX_TERMINAL_FONT}
+                  className="flex items-center justify-center p-1 rounded text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={t("topBar.fontIncrease")}
+                >
+                  <Plus className={iconSm} />
+                </button>
+              </div>
+              <button
+                onClick={handleCopyAll}
+                className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded transition-colors ${
+                  copiedAll
+                    ? "bg-emerald-500/20 text-emerald-300"
+                    : "text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)]"
+                }`}
+                title={t("topBar.copyAllTooltip")}
+              >
+                {copiedAll ? (
+                  <Check className={iconSm} />
+                ) : (
+                  <CopyPlus className={iconSm} />
+                )}
+                {copiedAll ? t("topBar.copiedAll") : t("topBar.copyAll")}
               </button>
               <button
                 onClick={onReset}

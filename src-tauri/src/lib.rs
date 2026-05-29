@@ -885,7 +885,8 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init());
 
     // Keep screen on plugin for iOS (prevents screen dimming during sessions)
     #[cfg(target_os = "ios")]
@@ -1291,6 +1292,7 @@ pub fn run() {
                         // Unified Device Scan API
                         device_scan::device_scan_start,
                         device_scan::device_scan_stop,
+                        device_scan::release_device,
                         // BLE WiFi Provisioning API
                         ble_provision::ble_scan_start,
                         ble_provision::ble_scan_stop,

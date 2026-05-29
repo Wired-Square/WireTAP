@@ -33,6 +33,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
 # Keyring has no default features - must specify platform backends explicitly
 keyring = { version = "3" }
 serde = { version = "1", features = ["derive"] }

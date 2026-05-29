@@ -10,6 +10,7 @@ import Dialog from "../../components/Dialog";
 import FlexSeparator from "../../components/FlexSeparator";
 import { SecondaryButton } from "../../components/forms";
 import { useSettings } from "../../hooks/useSettings";
+import { readClipboardText, writeClipboardText } from "../../api/clipboard";
 import { cleanHex, hexToBytes, numberToHex, decodeGroups } from "./frameUtils";
 import { buttonBase, iconButtonBase, toggleButtonClass, selectionButtonClass, groupButtonClass, disabledState, caption, captionMuted, borderDivider, hoverLight, bgSurface } from "../../styles";
 import { borderDataView, bgDataView } from "../../styles/colourTokens";
@@ -245,7 +246,7 @@ export default function FrameCalculator() {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(cleanHex(hexInput));
+      await writeClipboardText(cleanHex(hexInput));
     } catch (err) {
       console.warn("Copy failed", err);
     }
@@ -253,7 +254,7 @@ export default function FrameCalculator() {
 
   const handlePaste = async () => {
     try {
-      const text = await navigator.clipboard.readText();
+      const text = await readClipboardText();
       if (text) setRawInput((prev: string) => (prev || "").concat(text));
     } catch (err) {
       console.warn("Paste failed", err);
@@ -262,7 +263,7 @@ export default function FrameCalculator() {
 
   const handleCopyValue = useCallback(async (value: string | number | bigint) => {
     try {
-      await navigator.clipboard.writeText(String(value));
+      await writeClipboardText(String(value));
     } catch (err) {
       console.warn("Copy failed", err);
     }
@@ -325,7 +326,7 @@ export default function FrameCalculator() {
 
   const handleHistoryCopyToClipboard = useCallback(async (value: string) => {
     try {
-      await navigator.clipboard.writeText(value);
+      await writeClipboardText(value);
     } catch (err) {
       console.warn("Copy failed", err);
     }
@@ -346,7 +347,7 @@ export default function FrameCalculator() {
 
   const handleHistoryCopyAll = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(history.join('\n'));
+      await writeClipboardText(history.join('\n'));
     } catch (err) {
       console.warn("Copy failed", err);
     }

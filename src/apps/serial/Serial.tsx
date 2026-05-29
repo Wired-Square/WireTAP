@@ -25,6 +25,7 @@ import {
 import { iconSm } from "../../styles/spacing";
 import { useSettings } from "../../hooks/useSettings";
 import { tlog } from "../../api/settings";
+import { writeClipboardText } from "../../api/clipboard";
 import { flasherDfuListDevices } from "../../api/flashers";
 import { useSerialStore, type SerialTab } from "./stores/serialStore";
 import { useFlasherStore } from "./stores/flasherStore";
@@ -48,6 +49,8 @@ export default function Serial() {
   const setSerialSettings = useSerialStore((s) => s.setSettings);
   const localEcho = useSerialStore((s) => s.localEcho);
   const setLocalEcho = useSerialStore((s) => s.setLocalEcho);
+  const terminalFontSize = useSerialStore((s) => s.terminalFontSize);
+  const setTerminalFontSize = useSerialStore((s) => s.setTerminalFontSize);
   const dfuDevices = useSerialStore((s) => s.dfuDevices);
   const setDfuDevices = useSerialStore((s) => s.setDfuDevices);
   const dfuSerial = useSerialStore((s) => s.dfuSerial);
@@ -146,6 +149,18 @@ export default function Serial() {
     terminalRef.current?.clear();
   }, [terminal]);
 
+  const handleCopyAll = useCallback(async (): Promise<boolean> => {
+    const text = terminalRef.current?.getText();
+    if (!text) return false;
+    try {
+      await writeClipboardText(text);
+      return true;
+    } catch (err) {
+      tlog.info(`[Serial] copy all failed: ${err}`);
+      return false;
+    }
+  }, []);
+
   // Port hand-off for any flash operation: when the unified Flash view
   // kicks off a flash, backup, erase, or chip detect, we need the port
   // exclusively. Remember whether the terminal was open at the time and
@@ -233,6 +248,10 @@ export default function Serial() {
           onDisconnect={handleDisconnect}
           onReset={() => terminal.reset()}
           onToggleLocalEcho={() => setLocalEcho(!localEcho)}
+          onCopyAll={handleCopyAll}
+          fontSize={terminalFontSize}
+          onIncreaseFont={() => setTerminalFontSize(terminalFontSize + 1)}
+          onDecreaseFont={() => setTerminalFontSize(terminalFontSize - 1)}
         />
       }
     >
@@ -276,6 +295,7 @@ export default function Serial() {
                 ref={terminalRef}
                 write={writeFn}
                 localEcho={localEcho}
+                fontSize={terminalFontSize}
               />
             )}
           </div>
