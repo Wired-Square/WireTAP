@@ -21,6 +21,7 @@ import {
 } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { Copy, ClipboardPaste, TextSelect, CopyPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import "@xterm/xterm/css/xterm.css";
@@ -134,6 +135,21 @@ const SerialTerminalView = forwardRef<SerialTerminalHandle, Props>(
       const fit = new FitAddon();
       term.loadAddon(fit);
       term.open(containerRef.current);
+
+      // xterm's default DOM renderer doesn't paint its cursor/selection overlay
+      // layers in the macOS WKWebView (text shows, but the blinking cursor and
+      // selection highlight are invisible) — works in Chromium, fails in the
+      // packaged app. The WebGL renderer draws text, cursor and selection onto a
+      // single canvas, which paints reliably across engines. Fall back to the
+      // DOM renderer if WebGL is unavailable or its GPU context is lost.
+      try {
+        const webgl = new WebglAddon();
+        webgl.onContextLoss(() => webgl.dispose());
+        term.loadAddon(webgl);
+      } catch (e) {
+        tlog.info(`[Serial] WebGL renderer unavailable, using DOM renderer: ${e}`);
+      }
+
       try {
         fit.fit();
       } catch {

@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Serial → terminal: blinking cursor and text selection now show in the packaged app**: xterm's default DOM renderer doesn't paint its cursor and selection overlay layers under the macOS WKWebView — text rendered fine, but the blinking cursor was missing and dragging (or Select all) produced no highlight, even though the selection itself was being made. It worked in a browser (`npm run dev`) because that's Chromium/regular WebKit, which masked the bug. Switched the terminal to xterm's **WebGL renderer** (`@xterm/addon-webgl`), which draws text, cursor and selection onto a single canvas that paints reliably across engines, with a fallback to the DOM renderer if WebGL is unavailable or its GPU context is lost. (`legacy-peer-deps` is set so the addon's stale `^5` peer range — it's the xterm-6 companion release — doesn't block installs.)
+
 ## [0.6.6] - 2026-05-29
 
 ### Changed
