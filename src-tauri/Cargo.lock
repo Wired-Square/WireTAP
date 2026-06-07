@@ -8709,8 +8709,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-catalog"
-version = "0.2.0"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.2.0#69d3d368c2365bce106c09daa852cfdfff3e0d96"
+version = "0.3.0"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.3.0#51f0cdc5c95f75006b83ade5ff164c7838f09128"
 dependencies = [
  "can-dbc",
  "serde",

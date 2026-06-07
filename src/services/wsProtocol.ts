@@ -33,6 +33,7 @@ export const MsgType = {
   Unsubscribe: 0x11,
   SubscribeAck: 0x12,
   SubscribeNack: 0x13,
+  DecodedSignals: 0x14,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,
@@ -211,6 +212,68 @@ export function decodeFrameBatch(
   trackAlloc("decode.frames", frames.length * 300);
   trackAlloc("decode.count", frames.length);
   return frames;
+}
+
+// ============================================================================
+// Decoded-signal batch decoder (0x14)
+//
+// Pushed alongside FrameData when a catalogue is attached to the session.
+// Decoding happens once, in Rust (the wiretap-catalog crate); the payload is
+// a UTF-8 JSON array, one entry per frame that matched a catalogue frame.
+// ============================================================================
+
+export interface DecodedSignalValue {
+  name: string;
+  /** Raw integer value (pre-scale). */
+  value: number;
+  /** Scaled numeric value (raw × factor + offset), or raw for enum/text. */
+  scaled: number;
+  /** Display string (hex digits, enum label, decoded text, timestamp, number). */
+  display: string;
+  unit?: string | null;
+}
+
+export interface DecodedMuxSelector {
+  name?: string | null;
+  value: number;
+  matchedCase?: string | null;
+  startBit: number;
+  bitLength: number;
+}
+
+export interface DecodedHeaderField {
+  name: string;
+  value: number;
+  display: string;
+  /** "hex" | "decimal". */
+  format: string;
+}
+
+export interface DecodedFrameMsg {
+  frameId: number;
+  bus: number;
+  /** Host timestamp (µs). */
+  t: number;
+  signals: DecodedSignalValue[];
+  selectors: DecodedMuxSelector[];
+  /** Header fields from the CAN id / serial header bytes. */
+  headerFields: DecodedHeaderField[];
+  /** Source address resolved from a CAN header field, if any. */
+  sourceAddress?: number | null;
+}
+
+const decodedSignalsDecoder = new TextDecoder();
+
+/** Decode a DecodedSignals batch (JSON payload) into per-frame decode results. */
+export function decodeDecodedSignals(payload: DataView): DecodedFrameMsg[] {
+  if (payload.byteLength === 0) return [];
+  const bytes = new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
+  try {
+    const parsed = JSON.parse(decodedSignalsDecoder.decode(bytes));
+    return Array.isArray(parsed) ? (parsed as DecodedFrameMsg[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 // ============================================================================

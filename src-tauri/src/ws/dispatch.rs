@@ -54,11 +54,16 @@ fn attached_catalog(session_id: &str) -> Option<Arc<wiretap_catalog::Catalog>> {
 fn encode_decoded_batch(frames: &[FrameMessage], catalog: &wiretap_catalog::Catalog) -> Vec<u8> {
     let mut out: Vec<serde_json::Value> = Vec::new();
     for f in frames {
-        let Some(frame) = catalog.frame(f.frame_id) else {
+        // decode_by_id applies frame_id_mask, looks up the frame, decodes
+        // signals/mux, and extracts header fields (CAN id / serial bytes).
+        let Some(decoded) = wiretap_catalog::decode::decode_by_id(catalog, f.frame_id, &f.bytes)
+        else {
             continue;
         };
-        let decoded = wiretap_catalog::decode::decode_frame(catalog, frame, &f.bytes);
-        if decoded.signals.is_empty() && decoded.selectors.is_empty() {
+        if decoded.signals.is_empty()
+            && decoded.selectors.is_empty()
+            && decoded.header_fields.is_empty()
+        {
             continue;
         }
         let signals: Vec<_> = decoded
@@ -87,12 +92,26 @@ fn encode_decoded_batch(frames: &[FrameMessage], catalog: &wiretap_catalog::Cata
                 })
             })
             .collect();
+        let header_fields: Vec<_> = decoded
+            .header_fields
+            .iter()
+            .map(|h| {
+                serde_json::json!({
+                    "name": h.name,
+                    "value": h.value,
+                    "display": h.display,
+                    "format": h.format,
+                })
+            })
+            .collect();
         out.push(serde_json::json!({
             "frameId": f.frame_id,
             "bus": f.bus,
             "t": f.timestamp_us,
             "signals": signals,
             "selectors": selectors,
+            "headerFields": header_fields,
+            "sourceAddress": decoded.source_address,
         }));
     }
     if out.is_empty() {
