@@ -19,6 +19,7 @@ import type { TomlNode } from "./types";
 import { findNodeByPath } from "./tree/treeUtils";
 import { formatFrameId } from "./utils";
 import { createRenderTreeNode } from "./tree/renderTreeNode";
+import { buildFrameGroups, applyProtocolFilter } from "./tree/frameGroups";
 import EditorViewRouter from "./views/EditorViewRouter";
 import TextModeView from "./views/TextModeView";
 import EmptySelectionView from "./views/EmptySelectionView";
@@ -71,8 +72,10 @@ export default function CatalogEditor() {
   const setSerialChecksum = useCatalogEditorStore((s) => s.setSerialChecksum);
   const availablePeers = useCatalogEditorStore((s) => s.ui.availablePeers);
   const setAvailablePeers = useCatalogEditorStore((s) => s.setAvailablePeers);
-  const filterByNode = useCatalogEditorStore((s) => s.ui.filterByNode);
-  const setFilterByNode = useCatalogEditorStore((s) => s.setFilterByNode);
+  const viewMode = useCatalogEditorStore((s) => s.ui.viewMode);
+  const setViewMode = useCatalogEditorStore((s) => s.setViewMode);
+  const selectedProtocol = useCatalogEditorStore((s) => s.ui.selectedProtocol);
+  const setSelectedProtocol = useCatalogEditorStore((s) => s.setSelectedProtocol);
   const openFind = useCatalogEditorStore((s) => s.openFind);
   const openTextFind = useCatalogEditorStore((s) => s.openTextFind);
   const openSuccess = useCatalogEditorStore((s) => s.openSuccess);
@@ -392,14 +395,24 @@ export default function CatalogEditor() {
     return createRenderTreeNode({
       expandedNodes,
       selectedNode,
-      filterByNode,
       onNodeClick: handleNodeClick,
       onToggleExpand: handleToggleExpand,
       formatFrameId: formatFrameIdForDisplay,
       displayFrameIdFormat,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedNodes, selectedNode, filterByNode, formatFrameIdForDisplay, displayFrameIdFormat]);
+  }, [expandedNodes, selectedNode, formatFrameIdForDisplay, displayFrameIdFormat]);
+
+  // The protocol badges narrow the displayed tree to one protocol's frames.
+  const displayTree = useMemo(
+    () => applyProtocolFilter(parsedTree, selectedProtocol),
+    [parsedTree, selectedProtocol]
+  );
+
+  const frameGroups = useMemo(
+    () => (viewMode === "tree" ? [] : buildFrameGroups(displayTree, viewMode)),
+    [displayTree, viewMode]
+  );
 
   return (
     <AppLayout
@@ -430,13 +443,15 @@ export default function CatalogEditor() {
           <CatalogTreePanel
             visible={editMode === "ui"}
             catalogPath={catalogPath}
-            parsedTree={parsedTree}
+            parsedTree={displayTree}
             renderTreeNode={renderTreeNode}
             scrollRef={treeScrollRef}
             onScroll={handleTreeScroll}
-            availablePeers={availablePeers}
-            filterByNode={filterByNode}
-            setFilterByNode={setFilterByNode}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            frameGroups={frameGroups}
+            selectedProtocol={selectedProtocol}
+            setSelectedProtocol={setSelectedProtocol}
             hasCanFrames={parsedCatalogInfo.hasCanFrames}
             hasModbusFrames={parsedCatalogInfo.hasModbusFrames}
             hasSerialFrames={parsedCatalogInfo.hasSerialFrames}
@@ -446,7 +461,6 @@ export default function CatalogEditor() {
             onAddNode={handlers.handleAddNode}
             onAddCanFrame={handlers.handleAddCanFrame}
             onAddFrame={handleAddFrameWithDefaults}
-            onEditConfig={() => openDialog("config")}
           />
         )}
 

@@ -16,13 +16,15 @@
   "tree": {
     "addNode": "Add new node",
     "addFrame": "Add new frame",
-    "configureCan": "Configure CAN settings",
-    "configureModbus": "Configure Modbus settings",
-    "configureSerial": "Configure Serial settings",
-    "filterByNode": "Filter by transmitting node",
-    "clearFilter": "Clear filter",
-    "allNodes": "All nodes",
-    "unknownNode": "Unknown",
+    "filterToProtocol": "Show only {{protocol}} frames",
+    "showAllProtocols": "Show all protocols",
+    "noProtocolConfig": "No {{protocol}} configuration defined",
+    "viewMode": {
+      "tree": "Tree",
+      "frames": "Frames",
+      "nodes": "Nodes"
+    },
+    "noFrames": "No frames in this catalog",
     "openCatalogPrompt": "Open a catalog file to view its structure",
     "emptyStructure": "No structure to display"
   },

@@ -1,13 +1,16 @@
 // ui/src/apps/catalog/layout/CatalogTreePanel.tsx
 
 import React from "react";
-import { Cable, Filter, Network, Plus, Server, UserPlus } from "lucide-react";
+import { Cable, Network, Plus, Server, UserPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconMd, iconXs } from "../../../styles/spacing";
 import { emptyStateText, emptyStateHeading } from "../../../styles/typography";
 import { iconActionButton } from "../../../styles/buttonStyles";
 import ResizableSidebar from "../../../components/ResizableSidebar";
 import type { TomlNode, ProtocolType, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig } from "../types";
+import type { CatalogViewMode, FrameGroup } from "../tree/frameGroups";
+
+const VIEW_MODES: CatalogViewMode[] = ["tree", "frames", "nodes"];
 
 export type CatalogTreePanelProps = {
   // Visibility is controlled by CatalogEditor (only show in UI mode)
@@ -21,10 +24,14 @@ export type CatalogTreePanelProps = {
   scrollRef?: React.RefObject<HTMLDivElement | null>;
   onScroll?: (scrollTop: number) => void;
 
-  availablePeers: string[];
+  viewMode: CatalogViewMode;
+  setViewMode: (mode: CatalogViewMode) => void;
+  /** Grouped frames for non-Tree view modes (empty in Tree mode). */
+  frameGroups: FrameGroup[];
 
-  filterByNode: string | null;
-  setFilterByNode: (value: string | null) => void;
+  /** Active protocol filter from the badges (null = all). */
+  selectedProtocol: ProtocolType | null;
+  setSelectedProtocol: (protocol: ProtocolType | null) => void;
 
   // Protocol detection for badges
   hasCanFrames?: boolean;
@@ -39,9 +46,6 @@ export type CatalogTreePanelProps = {
   onAddCanFrame?: () => void;
   /** Generic callback for adding any protocol frame */
   onAddFrame?: (protocol?: ProtocolType) => void;
-
-  // Unified config dialog opener
-  onEditConfig?: () => void;
 };
 
 export default function CatalogTreePanel({
@@ -51,9 +55,11 @@ export default function CatalogTreePanel({
   renderTreeNode,
   scrollRef,
   onScroll,
-  availablePeers,
-  filterByNode,
-  setFilterByNode,
+  viewMode,
+  setViewMode,
+  frameGroups,
+  selectedProtocol,
+  setSelectedProtocol,
   hasCanFrames,
   hasModbusFrames,
   hasSerialFrames,
@@ -63,19 +69,41 @@ export default function CatalogTreePanel({
   onAddNode,
   onAddCanFrame,
   onAddFrame,
-  onEditConfig,
 }: CatalogTreePanelProps) {
   const { t } = useTranslation("catalog");
   // Use generic handler if available, otherwise fall back to CAN-only
   const handleAddFrame = onAddFrame ?? onAddCanFrame;
   if (!visible) return null;
 
-  // Determine which badges to show:
-  // - Show badge if has config OR has frames for each protocol
-  const showCanBadge = !!canConfig || hasCanFrames;
-  const showModbusBadge = !!modbusConfig || hasModbusFrames;
-  const showSerialBadge = !!serialConfig || hasSerialFrames;
-  const hasAnyBadge = showCanBadge || showModbusBadge || showSerialBadge;
+  // Protocol filter badges — shown when a protocol has config or frames.
+  // Clicking one filters the tree to that protocol (toggles off when re-clicked).
+  const protocolBadges = [
+    {
+      protocol: "can" as ProtocolType,
+      show: !!canConfig || hasCanFrames,
+      Icon: Network,
+      label: "CAN",
+      configured: !!canConfig,
+      tone: "bg-[var(--status-success-bg)] text-[color:var(--text-green)] hover:bg-[var(--status-success-bg-hover)]",
+    },
+    {
+      protocol: "modbus" as ProtocolType,
+      show: !!modbusConfig || hasModbusFrames,
+      Icon: Server,
+      label: "Modbus",
+      configured: !!modbusConfig,
+      tone: "bg-[var(--status-warning-bg)] text-[color:var(--text-amber)] hover:bg-[var(--status-warning-bg-hover)]",
+    },
+    {
+      protocol: "serial" as ProtocolType,
+      show: !!serialConfig || hasSerialFrames,
+      Icon: Cable,
+      label: "Serial",
+      configured: !!serialConfig,
+      tone: "bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] hover:bg-[var(--status-purple-bg-hover)]",
+    },
+  ].filter((b) => b.show);
+  const hasAnyBadge = protocolBadges.length > 0;
 
   // Collapsed content - just the action buttons as icons
   const collapsedContent = catalogPath ? (
@@ -108,42 +136,30 @@ export default function CatalogTreePanel({
     >
       {/* Fixed header section */}
       <div className="flex-shrink-0 p-4 pb-0">
-        {/* Protocol badges */}
+        {/* Protocol filter badges */}
         {catalogPath && hasAnyBadge && (
           <div className="flex flex-wrap gap-2 mb-4">
-            {showCanBadge && (
-              <button
-                onClick={onEditConfig}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-success-bg)] text-[color:var(--text-green)] hover:bg-[var(--status-success-bg-hover)] transition-colors cursor-pointer"
-                title={canConfig ? `CAN config: ${canConfig.default_endianness}${canConfig.frame_id_mask !== undefined ? ', masked' : ''}` : t("tree.configureCan")}
-              >
-                <Network className={iconXs} />
-                CAN
-                {!canConfig && <span className="text-green-500">!</span>}
-              </button>
-            )}
-            {showModbusBadge && (
-              <button
-                onClick={onEditConfig}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-warning-bg)] text-[color:var(--text-amber)] hover:bg-[var(--status-warning-bg-hover)] transition-colors cursor-pointer"
-                title={modbusConfig ? `Modbus config: Addr ${modbusConfig.device_address}, Base ${modbusConfig.register_base}` : t("tree.configureModbus")}
-              >
-                <Server className={iconXs} />
-                Modbus
-                {!modbusConfig && <span className="text-amber-500">!</span>}
-              </button>
-            )}
-            {showSerialBadge && (
-              <button
-                onClick={onEditConfig}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--status-purple-bg)] text-[color:var(--text-purple)] hover:bg-[var(--status-purple-bg-hover)] transition-colors cursor-pointer"
-                title={serialConfig ? `Serial encoding: ${serialConfig.encoding.toUpperCase()}` : t("tree.configureSerial")}
-              >
-                <Cable className={iconXs} />
-                Serial
-                {!serialConfig && <span className="text-purple-500">!</span>}
-              </button>
-            )}
+            {protocolBadges.map(({ protocol, Icon, label, configured, tone }) => {
+              const active = selectedProtocol === protocol;
+              return (
+                <button
+                  key={protocol}
+                  onClick={() => setSelectedProtocol(active ? null : protocol)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${tone} ${
+                    active
+                      ? "ring-2 ring-inset ring-[color:currentColor]"
+                      : selectedProtocol
+                        ? "opacity-50 hover:opacity-100"
+                        : ""
+                  }`}
+                  title={active ? t("tree.showAllProtocols") : t("tree.filterToProtocol", { protocol: label })}
+                >
+                  <Icon className={iconXs} />
+                  {label}
+                  {!configured && <span title={t("tree.noProtocolConfig", { protocol: label })}>!</span>}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -164,36 +180,25 @@ export default function CatalogTreePanel({
             >
               <Plus className={iconMd} />
             </button>
-            <button
-              onClick={() => setFilterByNode(filterByNode !== null ? null : "")}
-              title={filterByNode !== null ? t("tree.clearFilter") : t("tree.filterByNode")}
-              style={{
-                backgroundColor: filterByNode !== null ? "#2563eb" : undefined,
-                color: filterByNode !== null ? "white" : undefined,
-              }}
-              className="p-2 rounded-lg transition-colors hover:opacity-90 bg-[var(--bg-surface)] text-[color:var(--text-secondary)]"
-            >
-              <Filter className={iconMd} />
-            </button>
           </div>
         )}
 
-        {/* Filter dropdown */}
-        {filterByNode !== null && catalogPath && (
-          <div className="mb-3">
-            <select
-              value={filterByNode}
-              onChange={(e) => setFilterByNode(e.target.value || null)}
-              className="w-full px-3 py-2 text-sm bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="">{t("tree.allNodes")}</option>
-              <option value="__unknown__">{t("tree.unknownNode")}</option>
-              {availablePeers.map((peer) => (
-                <option key={peer} value={peer}>
-                  {peer}
-                </option>
-              ))}
-            </select>
+        {/* View-mode selector */}
+        {catalogPath && (
+          <div className="flex mb-3 rounded-lg border border-[color:var(--border-default)] overflow-hidden text-xs">
+            {VIEW_MODES.map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`flex-1 px-2 py-1.5 transition-colors ${
+                  viewMode === mode
+                    ? "bg-[var(--accent-blue)] text-white font-medium"
+                    : "bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:bg-[var(--hover-bg)]"
+                }`}
+              >
+                {t(`tree.viewMode.${mode}`)}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -208,8 +213,23 @@ export default function CatalogTreePanel({
           <p className={`${emptyStateText} ${emptyStateHeading}`}>{t("tree.openCatalogPrompt")}</p>
         ) : parsedTree.length === 0 ? (
           <p className={`${emptyStateText} ${emptyStateHeading}`}>{t("tree.emptyStructure")}</p>
-        ) : (
+        ) : viewMode === "tree" ? (
           <div className="space-y-1">{parsedTree.map((node) => renderTreeNode(node, 0))}</div>
+        ) : frameGroups.length === 0 ? (
+          <p className={`${emptyStateText} ${emptyStateHeading}`}>{t("tree.noFrames")}</p>
+        ) : (
+          <div className="space-y-3">
+            {frameGroups.map((group) => (
+              <div key={group.label || "all"} className="space-y-1">
+                {group.label && (
+                  <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">
+                    {group.label}
+                  </div>
+                )}
+                {group.frames.map((frame) => renderTreeNode(frame, 0))}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </ResizableSidebar>

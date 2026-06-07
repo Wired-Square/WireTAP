@@ -5,7 +5,8 @@ import { tlog } from '../api/settings';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../events/registry';
 import type { CatalogSavedPayload } from '../events/registry';
-import type { CanidFields, EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig, SerialChecksumConfig } from '../apps/catalog/types';
+import type { CanidFields, EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig, SerialChecksumConfig, ProtocolType } from '../apps/catalog/types';
+import type { CatalogViewMode } from '../apps/catalog/tree/frameGroups';
 
 /** CAN header field form entry - name + field settings */
 export interface CanHeaderFieldEntry {
@@ -60,7 +61,9 @@ export interface CatalogEditorState {
 
   // UI state
   ui: {
-    filterByNode: string | null;
+    viewMode: CatalogViewMode;
+    /** Active protocol filter from the badges (null = all protocols). */
+    selectedProtocol: ProtocolType | null;
     availablePeers: string[];
     find: {
       isOpen: boolean;
@@ -183,7 +186,8 @@ export interface CatalogEditorState {
   resetExpanded: () => void;
 
   // Actions - UI
-  setFilterByNode: (filter: string | null) => void;
+  setViewMode: (mode: CatalogViewMode) => void;
+  setSelectedProtocol: (protocol: ProtocolType | null) => void;
   setAvailablePeers: (peers: string[]) => void;
 
   // Actions - Scroll
@@ -295,7 +299,8 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   },
 
   ui: {
-    filterByNode: null,
+    viewMode: 'tree',
+    selectedProtocol: null,
     availablePeers: [],
     find: {
       isOpen: false,
@@ -388,7 +393,8 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
       },
       ui: {
         ...get().ui,
-        filterByNode: null,
+        viewMode: 'tree',
+        selectedProtocol: null,
         availablePeers: [],
         dialogs: { ...initialDialogs },
         dialogPayload: { ...initialDialogPayload },
@@ -483,8 +489,11 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     })),
 
   // UI actions
-  setFilterByNode: (filter) =>
-    set((state) => ({ ui: { ...state.ui, filterByNode: filter } })),
+  setViewMode: (mode) =>
+    set((state) => ({ ui: { ...state.ui, viewMode: mode } })),
+
+  setSelectedProtocol: (protocol) =>
+    set((state) => ({ ui: { ...state.ui, selectedProtocol: protocol } })),
 
   setAvailablePeers: (peers) =>
     set((state) => ({ ui: { ...state.ui, availablePeers: peers } })),

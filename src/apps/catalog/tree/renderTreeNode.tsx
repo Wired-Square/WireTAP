@@ -6,14 +6,12 @@ import { iconMd, iconSm } from "../../../styles/spacing";
 import { hoverLight } from "../../../styles";
 import { formatFrameId as formatModbusRegister } from "../../../utils/frameIds";
 import type { TomlNode } from "../types";
-import { shouldShowNode } from "./treeUtils";
 
 export type RenderTreeNode = (node: TomlNode, depth?: number) => React.ReactNode;
 
 export type CreateRenderTreeNodeArgs = {
   expandedNodes: Set<string>;
   selectedNode: TomlNode | null;
-  filterByNode: string | null;
   onNodeClick: (node: TomlNode) => void;
   onToggleExpand: (node: TomlNode) => void;
   formatFrameId?: (id: string) => { primary: string; secondary?: string };
@@ -28,7 +26,6 @@ export type CreateRenderTreeNodeArgs = {
 export function createRenderTreeNode({
   expandedNodes,
   selectedNode,
-  filterByNode,
   onNodeClick,
   onToggleExpand,
   formatFrameId,
@@ -266,9 +263,7 @@ export function createRenderTreeNode({
 
         {hasChildren && isExpanded && (
           <div>
-            {node.children!
-              .filter((child) => shouldShowNode(child, filterByNode))
-              .map((child) => render(child, depth + 1))}
+            {node.children!.map((child) => render(child, depth + 1))}
           </div>
         )}
       </div>
