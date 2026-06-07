@@ -356,10 +356,16 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
   - `catalog.attach` `{ session_id, content }` — parse + bind a catalogue to a
     session; `catalog.detach` `{ session_id }` — unbind
 - **`DecodedSignals` push** (0x14): while a catalogue is attached,
-  `send_new_frames` decodes the same batch and pushes a parallel JSON message
-  (`[{ frameId, bus, t, signals[], selectors[] }]`). Raw `FrameData` keeps
-  flowing for Discovery/Analysis/raw-hex/Calculator; Decoder/Graph/Modbus read
-  the decoded stream. Attachments auto-detach on final unsubscribe.
+  `send_new_frames` decodes the same batch via `decode_by_id` (applying
+  `frame_id_mask`) and pushes a parallel JSON message
+  (`[{ frameId, bus, t, signals[], selectors[], headerFields[], sourceAddress }]`).
+  `sessionStore` routes it to an `onDecoded` callback (threaded through
+  `useIOSession`/`useIOSessionManager`); an app calls `catalog.attach` when it
+  loads a catalogue. Raw `FrameData` keeps flowing for
+  Discovery/Analysis/raw-hex/Calculator. **Graph and Modbus** consume the
+  decoded stream today (they no longer decode in TS); the **Decoder** cutover is
+  pending (it still decodes in TS, and keeps its mirror-validation byte-compare
+  on the raw path). Attachments auto-detach on final unsubscribe.
 
 ### Dispatch path
 
