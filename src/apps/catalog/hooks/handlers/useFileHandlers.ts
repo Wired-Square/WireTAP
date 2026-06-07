@@ -11,7 +11,8 @@ import {
   upsertModbusConfigToml,
   upsertCanConfigToml,
 } from "../../editorOps";
-import { validateMetaFields, validateCatalog, validateSerialConfig } from "../../validate";
+import { validateMetaFields, validateSerialConfig } from "../../validate";
+import { validateCatalogWs } from "../../../../api/catalog";
 import type { AppSettings } from "../../../../hooks/useSettings";
 import type { ProtocolType } from "../../types";
 
@@ -176,8 +177,8 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     if (!catalogContent) return;
 
     try {
-      // Run backend validation
-      const result = await validateCatalog(catalogContent);
+      // Run backend validation (shared wiretap-catalog crate over the WebSocket)
+      const result = await validateCatalogWs(catalogContent);
       const allErrors = [...result.errors];
 
       // Also run frontend serial config validation

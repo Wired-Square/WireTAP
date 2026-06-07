@@ -41,13 +41,6 @@ export interface ValidationResult {
   errors: ValidationError[];
 }
 
-/**
- * Validate catalog TOML syntax and structure
- */
-export async function validateCatalog(content: string): Promise<ValidationResult> {
-  return await invoke("validate_catalog", { content });
-}
-
 // ── Modbus catalogue parsing (via the shared wiretap-catalog Rust crate) ──
 // Field names match the crate's serde output; Option fields serialise as null.
 
@@ -201,15 +194,6 @@ export async function deleteCatalog(path: string): Promise<void> {
 }
 
 /**
- * Import a DBC file and convert to TOML catalog format
- * @param content - Raw DBC file content
- * @returns TOML catalog content string
- */
-export async function importDbc(content: string): Promise<string> {
-  return await invoke<string>("import_dbc", { content });
-}
-
-/**
  * Write raw bytes to a file (used for image export)
  */
 export async function saveBinaryFile(path: string, data: number[]): Promise<void> {
@@ -223,18 +207,3 @@ export async function saveBinaryFile(path: string, data: number[]): Promise<void
  */
 export type DbcMuxMode = "extended" | "flattened";
 
-/**
- * Export catalog to a file in specified format
- * @param path - Destination file path
- * @param content - TOML catalog content
- * @param format - Export format: "toml" or "dbc"
- * @param muxMode - For DBC export: "extended" (default) or "flattened"
- */
-export async function exportCatalog(
-  path: string,
-  content: string,
-  format: "toml" | "dbc",
-  muxMode?: DbcMuxMode
-): Promise<void> {
-  await invoke("export_catalog", { path, content, format, muxMode });
-}

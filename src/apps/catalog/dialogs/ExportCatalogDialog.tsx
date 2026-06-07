@@ -8,7 +8,7 @@ import { selectableOptionBox } from "../../../styles/cardStyles";
 import { secondaryButton, disabledState } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { pickFileToSave, CATALOG_FILTERS, DBC_FILTERS, HTML_FILTERS, MARKDOWN_FILTERS, TEXT_FILTERS, type DialogFilter } from "../../../api/dialogs";
-import { exportCatalog, saveCatalog, type DbcMuxMode } from "../../../api/catalog";
+import { exportDbcWs, saveCatalog, type DbcMuxMode } from "../../../api/catalog";
 import { tomlParse } from "../toml";
 import { generateCatalogReport, type CatalogReportFormat } from "../../../utils/catalogReport";
 import { useSettings } from "../../../hooks/useSettings";
@@ -132,9 +132,12 @@ export default function ExportCatalogDialog({
       }
 
       if (formatInfo.group === "data") {
-        // Export as data format (TOML or DBC) - uses Rust backend
-        const muxMode = format === "dbc" ? dbcMuxMode : undefined;
-        await exportCatalog(path, catalogContent, format as "toml" | "dbc", muxMode);
+        // Export as data format. TOML is the catalogue as-is; DBC is rendered by
+        // the shared wiretap-catalog crate over the WebSocket.
+        const output = format === "dbc"
+          ? await exportDbcWs(catalogContent, "WireTAP", dbcMuxMode)
+          : catalogContent;
+        await saveCatalog(path, output);
       } else {
         // Generate report - parse TOML and generate report content
         const catalogDoc = tomlParse(catalogContent) as CatalogDoc;

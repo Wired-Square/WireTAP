@@ -8,8 +8,6 @@ mod captures;
 mod catalog;
 mod checksums;
 mod credentials;
-mod dbc_export;
-mod dbc_import;
 mod dbquery;
 mod device_scan;
 #[cfg(not(target_os = "ios"))]
@@ -1109,14 +1107,11 @@ pub fn run() {
             catalog::save_catalog,
             catalog::save_binary_file,
             catalog::parse_modbus_catalog,
-            catalog::validate_catalog,
             catalog::test_decode_frame,
             catalog::list_catalogs,
             catalog::duplicate_catalog,
             catalog::rename_catalog,
             catalog::delete_catalog,
-            catalog::export_catalog,
-            catalog::import_dbc,
             settings::load_settings,
             settings::save_settings,
             settings::validate_directory,

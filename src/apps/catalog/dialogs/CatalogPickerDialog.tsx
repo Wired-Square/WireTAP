@@ -7,7 +7,7 @@ import { borderDivider, hoverLight, bgSurface, dialogOptionButton } from "../../
 import Dialog from "../../../components/Dialog";
 import type { CatalogMetadata } from "../../../api/catalog";
 import { pickFileToOpen, pickCatalogToSave } from "../../../api/dialogs";
-import { openCatalog, importDbc, saveCatalog } from "../../../api/catalog";
+import { openCatalog, importDbcWs, saveCatalog } from "../../../api/catalog";
 
 type Props = {
   isOpen: boolean;
@@ -51,7 +51,7 @@ export default function CatalogPickerDialog({
         if (selected.endsWith(".dbc")) {
           // Read DBC file and convert to TOML
           const dbcContent = await openCatalog(selected);
-          const tomlContent = await importDbc(dbcContent);
+          const tomlContent = await importDbcWs(dbcContent);
 
           // Derive default save path from DBC filename
           const dbcFilename = selected.split(/[/\\]/).pop() || "imported";

@@ -506,6 +506,4 @@ export function validateSerialConfig(
   return errors;
 }
 
-// Re-export validateCatalog from api for backward compatibility
-export { validateCatalog } from "../../api/catalog";
 export type { ValidationResult } from "../../api/catalog";
