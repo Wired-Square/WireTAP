@@ -354,7 +354,8 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
   - `catalog.validate` — TOML → `{ valid, errors[] }` (field-path + message)
   - `catalog.import_dbc` / `catalog.export_dbc` — DBC ↔ catalogue TOML
   - `catalog.attach` `{ session_id, content }` — parse + bind a catalogue to a
-    session; `catalog.detach` `{ session_id }` — unbind
+    session, **returning the resolved `Catalog`** so the caller builds its UI
+    model from that one parse; `catalog.detach` `{ session_id }` — unbind
 - **`DecodedSignals` push** (0x14): while a catalogue is attached,
   `send_new_frames` decodes the same batch via `decode_by_id` (applying
   `frame_id_mask`) and pushes a parallel JSON message
@@ -376,6 +377,14 @@ serial header byte-positions (`frame_id_*`, `source_address_*`, `header_fields`)
 are derived in the crate at parse time (v0.6.0+), so the adapter just renames
 them rather than re-deriving from masks. The Catalog Editor keeps its own TOML
 parser ([apps/catalog/toml.ts](../src/apps/catalog/toml.ts)) for round-tripping edits.
+
+For a session-bound app, loading a catalogue parses it **once**: the
+[`useSessionCatalog`](../src/hooks/useSessionCatalog.ts) hook (used by Decoder and
+Graph) mirrors the session's `catalogPath` into local state, then `attachAndResolve`
+(`catalogParser.ts`) calls `catalog.attach` and adapts the returned `Catalog` — so
+the same parse binds Rust decode *and* builds the UI model (it falls back to a
+model-only `loadCatalog` if attach fails). Modbus keeps a separate flow: its
+catalogue load is coupled to a poll reconnect that reinitialises the session.
 
 ### Dispatch path
 
