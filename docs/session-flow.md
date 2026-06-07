@@ -362,10 +362,14 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
   `sessionStore` routes it to an `onDecoded` callback (threaded through
   `useIOSession`/`useIOSessionManager`); an app calls `catalog.attach` when it
   loads a catalogue. Raw `FrameData` keeps flowing for
-  Discovery/Analysis/raw-hex/Calculator. **Graph and Modbus** consume the
-  decoded stream today (they no longer decode in TS); the **Decoder** cutover is
-  pending (it still decodes in TS, and keeps its mirror-validation byte-compare
-  on the raw path). Attachments auto-detach on final unsubscribe.
+  Discovery/Analysis/raw-hex/Calculator. **Decoder, Graph and Modbus** all
+  consume the decoded stream — there is no longer a TypeScript decode engine.
+  The Decoder keeps its mirror-validation byte-compare on the raw `FrameData`
+  path (it needs the raw bytes + frame timing). Attachments auto-detach on final
+  unsubscribe.
+
+Decoding lives entirely in the crate; the frontend's remaining `catalogParser.ts`
+parses TOML only for the Catalog Editor's signal pickers (not for decode).
 
 ### Dispatch path
 
