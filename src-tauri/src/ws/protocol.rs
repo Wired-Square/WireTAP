@@ -25,6 +25,10 @@ pub enum MsgType {
     Unsubscribe      = 0x11,
     SubscribeAck     = 0x12,
     SubscribeNack    = 0x13,
+    // Decoded signals pushed alongside FrameData when a catalogue is attached to
+    // the session (decode happens once, in Rust). Raw FrameData still flows for
+    // Discovery/Analysis/raw-hex/Calculator.
+    DecodedSignals   = 0x14,
     Command          = 0x20,
     CommandResponse  = 0x21,
     // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
@@ -57,6 +61,7 @@ impl TryFrom<u8> for MsgType {
             0x11 => Ok(MsgType::Unsubscribe),
             0x12 => Ok(MsgType::SubscribeAck),
             0x13 => Ok(MsgType::SubscribeNack),
+            0x14 => Ok(MsgType::DecodedSignals),
             0x20 => Ok(MsgType::Command),
             0x21 => Ok(MsgType::CommandResponse),
             0x30 => Ok(MsgType::BridgeRequest),

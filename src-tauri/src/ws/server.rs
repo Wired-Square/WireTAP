@@ -459,6 +459,7 @@ fn decrement_refcount(
                     map.remove(&sid);
                 }
                 crate::ws::dispatch::clear_frame_offset(&sid);
+                crate::ws::dispatch::detach_catalog(&sid);
             }
         }
     }

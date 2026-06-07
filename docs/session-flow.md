@@ -325,6 +325,7 @@ Per-session (channel 1..254):
 | `SessionLifecycle`  | 0x08 | State + capabilities inline; covers device-replaced, resuming, switched-to-capture |
 | `SessionInfo`       | 0x09 | Speed, subscriber count |
 | `Reconfigured`      | 0x0A | Session was reconfigured (time range, bookmark) |
+| `DecodedSignals`    | 0x14 | JSON batch of decoded signals, pushed alongside `FrameData` when a catalogue is attached (see [§ Decoded-signal stream](#decoded-signal-stream)) |
 
 Global (channel 0):
 
@@ -336,7 +337,29 @@ Global (channel 0):
 | `TestPatternState`  | 0x0D | Test pattern generator state |
 
 Control frames: `Subscribe` / `Unsubscribe` / `SubscribeAck` / `SubscribeNack`,
-plus `Heartbeat` and `Auth`.
+plus `Heartbeat` and `Auth`. Request/response RPC uses `Command` (0x20) /
+`CommandResponse` (0x21) with a correlation id — the `catalog.*` ops below ride
+this.
+
+### Decoded-signal stream
+
+Catalogue decoding is done **once, in Rust**, by the shared
+[`wiretap-catalog`](../../wiretap-lib-rs) crate — the frontend no longer
+re-decodes every frame. Two surfaces, both over this WebSocket:
+
+- **`catalog.*` commands** (request/response via `Command`/`CommandResponse`,
+  dispatched in [catalog.rs](../src-tauri/src/catalog.rs) `dispatch_catalog_command`):
+  - `catalog.parse` — TOML → resolved `Catalog` model (CAN/Serial/Modbus;
+    shorthands + mirror/copy resolved)
+  - `catalog.validate` — TOML → `{ valid, errors[] }` (field-path + message)
+  - `catalog.import_dbc` / `catalog.export_dbc` — DBC ↔ catalogue TOML
+  - `catalog.attach` `{ session_id, content }` — parse + bind a catalogue to a
+    session; `catalog.detach` `{ session_id }` — unbind
+- **`DecodedSignals` push** (0x14): while a catalogue is attached,
+  `send_new_frames` decodes the same batch and pushes a parallel JSON message
+  (`[{ frameId, bus, t, signals[], selectors[] }]`). Raw `FrameData` keeps
+  flowing for Discovery/Analysis/raw-hex/Calculator; Decoder/Graph/Modbus read
+  the decoded stream. Attachments auto-detach on final unsubscribe.
 
 ### Dispatch path
 
@@ -357,13 +380,14 @@ signal_throttle.rs — SignalThrottle::should_signal()
 ws::dispatch::send_new_frames(session_id)
       ├─ look up WS channel for session_id
       ├─ read new frames from capture_store since last offset
-      ├─ encode_frame_batch → binary FrameEnvelope stream
+      ├─ encode_frame_batch → binary FrameEnvelope stream → FrameData (0x01)
+      ├─ if catalogue attached: decode_frame batch → DecodedSignals (0x14)
       └─ send_to_channel
                     │
-        ┌───────────┼────────────┐
-        ▼           ▼            ▼
-   Discovery    Decoder      Graph
-   onFrames     onFrames     onFrames    (via sessionStore callbacks)
+        ┌───────────┼────────────┬─────────────┐
+        ▼           ▼            ▼             ▼
+   Discovery    Calculator   (FrameData)   Decoder/Graph/Modbus
+   onFrames     raw bytes      raw          DecodedSignals (decoded in Rust)
 ```
 
 The 2 Hz throttle lives in [io/signal_throttle.rs](../src-tauri/src/io/signal_throttle.rs).
@@ -382,7 +406,8 @@ delivered immediately.
 4. [`reset_frame_offset`](../src-tauri/src/ws/dispatch.rs#L74) is called so
    the client only receives frames that arrive after subscription.
 5. On `Unsubscribe` (or disconnect), the channel refcount drops; if it hits
-   zero the channel is released and frame offset cleared.
+   zero the channel is released, the frame offset cleared, and any attached
+   catalogue detached.
 
 ### What still uses Tauri events
 

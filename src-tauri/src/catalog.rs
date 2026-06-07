@@ -147,6 +147,73 @@ pub struct ValidationResult {
     pub errors: Vec<ValidationError>,
 }
 
+/// Dispatch a `catalog.*` WS command to the shared `wiretap-catalog` crate.
+/// This is the request/response half of the canonical-catalogue work: the
+/// editor and tooling parse/validate/convert over the binary WebSocket instead
+/// of duplicating the logic in TypeScript. (Live decode is a separate push
+/// stream — see `ws::dispatch`.)
+pub async fn dispatch_catalog_command(
+    op_name: &str,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let req = |key: &str| -> Result<String, String> {
+        params
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .ok_or_else(|| format!("missing '{key}' param"))
+    };
+    let content = || req("content");
+
+    match op_name {
+        // TOML → resolved Catalog model (CAN/Serial/Modbus; shorthands +
+        // mirror/copy resolved).
+        "catalog.parse" => {
+            let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
+            serde_json::to_value(cat).map_err(|e| e.to_string())
+        }
+        // TOML → field-path + message validation findings.
+        "catalog.validate" => {
+            let errors = wiretap_catalog::validate::validate(&content()?);
+            Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
+        }
+        // DBC text → catalogue TOML.
+        "catalog.import_dbc" => {
+            let toml = wiretap_catalog::dbc::convert_dbc_to_toml(&content()?)?;
+            Ok(serde_json::Value::String(toml))
+        }
+        // Attach a catalogue to a session so its frames are decoded in Rust and
+        // streamed as DecodedSignals. Params: { session_id, content }.
+        "catalog.attach" => {
+            let session_id = req("session_id")?;
+            let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
+            let frame_count = cat.frames.len();
+            crate::ws::dispatch::attach_catalog(&session_id, cat);
+            Ok(serde_json::json!({ "attached": true, "frames": frame_count }))
+        }
+        // Detach a session's catalogue (decoded stream stops). Params: { session_id }.
+        "catalog.detach" => {
+            crate::ws::dispatch::detach_catalog(&req("session_id")?);
+            Ok(serde_json::json!({ "attached": false }))
+        }
+        // Catalogue TOML → DBC text (extended | flattened mux).
+        "catalog.export_dbc" => {
+            let receiver = params
+                .get("receiver")
+                .and_then(|v| v.as_str())
+                .unwrap_or("WireTAP");
+            let mode = match params.get("muxMode").and_then(|v| v.as_str()) {
+                Some("flattened") => wiretap_catalog::dbc::MuxExportMode::Flattened,
+                _ => wiretap_catalog::dbc::MuxExportMode::Extended,
+            };
+            let dbc =
+                wiretap_catalog::dbc::render_catalog_as_dbc_with_mode(&content()?, receiver, mode)?;
+            Ok(serde_json::Value::String(dbc))
+        }
+        _ => Err(format!("Unknown catalog op: {op_name}")),
+    }
+}
+
 /// Validate catalog TOML content natively
 #[tauri::command]
 pub async fn validate_catalog(content: String) -> Result<ValidationResult, String> {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use once_cell::sync::Lazy;
 
@@ -18,6 +18,88 @@ use crate::ws::server::ws_server;
 /// Tracks how many frames have been sent over WS per session.
 static FRAME_OFFSETS: Lazy<RwLock<HashMap<String, usize>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Catalogues attached to sessions for live decode. When a session has one,
+/// [`send_new_frames`] also decodes the batch (once, in Rust) and pushes a
+/// `DecodedSignals` message — raw `FrameData` still flows for the apps that
+/// need bytes. `Arc` so we decode outside the lock. Keyed by session id.
+static ATTACHED_CATALOGS: Lazy<RwLock<HashMap<String, Arc<wiretap_catalog::Catalog>>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Attach a parsed catalogue to a session, enabling the decoded stream.
+pub fn attach_catalog(session_id: &str, catalog: wiretap_catalog::Catalog) {
+    if let Ok(mut m) = ATTACHED_CATALOGS.write() {
+        m.insert(session_id.to_string(), Arc::new(catalog));
+    }
+}
+
+/// Detach a session's catalogue (decoded stream stops). Called explicitly and
+/// on final unsubscribe.
+pub fn detach_catalog(session_id: &str) {
+    if let Ok(mut m) = ATTACHED_CATALOGS.write() {
+        m.remove(session_id);
+    }
+}
+
+fn attached_catalog(session_id: &str) -> Option<Arc<wiretap_catalog::Catalog>> {
+    ATTACHED_CATALOGS
+        .read()
+        .ok()
+        .and_then(|m| m.get(session_id).cloned())
+}
+
+/// Decode a frame batch against `catalog` into the `DecodedSignals` JSON
+/// payload (one entry per frame that has a matching catalogue frame). Returns
+/// an empty vec when nothing decoded, so the caller can skip the send.
+fn encode_decoded_batch(frames: &[FrameMessage], catalog: &wiretap_catalog::Catalog) -> Vec<u8> {
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    for f in frames {
+        let Some(frame) = catalog.frame(f.frame_id) else {
+            continue;
+        };
+        let decoded = wiretap_catalog::decode::decode_frame(catalog, frame, &f.bytes);
+        if decoded.signals.is_empty() && decoded.selectors.is_empty() {
+            continue;
+        }
+        let signals: Vec<_> = decoded
+            .signals
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "name": s.name,
+                    "value": s.value,
+                    "scaled": s.scaled,
+                    "display": s.display,
+                    "unit": s.unit,
+                })
+            })
+            .collect();
+        let selectors: Vec<_> = decoded
+            .selectors
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "name": s.name,
+                    "value": s.value,
+                    "matchedCase": s.matched_case,
+                    "startBit": s.start_bit,
+                    "bitLength": s.bit_length,
+                })
+            })
+            .collect();
+        out.push(serde_json::json!({
+            "frameId": f.frame_id,
+            "bus": f.bus,
+            "t": f.timestamp_us,
+            "signals": signals,
+            "selectors": selectors,
+        }));
+    }
+    if out.is_empty() {
+        return Vec::new();
+    }
+    serde_json::to_vec(&out).unwrap_or_default()
+}
 
 /// Read new frames from capture_store since the last send, encode as binary, and send via WS.
 /// Called from signal_frames_ready at the 2Hz throttle cadence.
@@ -61,6 +143,16 @@ pub fn send_new_frames(session_id: &str) {
     let payload = protocol::encode_frame_batch(&frames);
     let msg = protocol::encode_message(MsgType::FrameData, channel, &payload);
     server.send_to_channel(channel, msg);
+
+    // If a catalogue is attached, decode the same batch once (in Rust) and push
+    // it as a parallel DecodedSignals message — the frontend stops re-decoding.
+    if let Some(catalog) = attached_catalog(session_id) {
+        let decoded = encode_decoded_batch(&frames, &catalog);
+        if !decoded.is_empty() {
+            let dmsg = protocol::encode_message(MsgType::DecodedSignals, channel, &decoded);
+            server.send_to_channel(channel, dmsg);
+        }
+    }
 
     // Update offset — use total as a ceiling so we never fall behind a cleared capture.
     let next = new_offset.max(total);
@@ -291,6 +383,9 @@ pub async fn dispatch_command(
         }
         name if name.starts_with("smp.") => {
             crate::ws::smp::dispatch(name, params).await
+        }
+        name if name.starts_with("catalog.") => {
+            crate::catalog::dispatch_catalog_command(name, params).await
         }
         _ => Err(format!("Unknown command: {op_name}")),
     }
