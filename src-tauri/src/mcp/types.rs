@@ -142,6 +142,15 @@ pub struct ReplayIdParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct OpenSessionParams {
+    /// IO profile id to open a session for (as listed by `list_io_profiles`).
+    pub profile_id: String,
+    /// Optional explicit session id; generated (prefixed by data type) if omitted.
+    #[serde(default)]
+    pub session_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct ModbusReadParams {
     /// Session whose configured Modbus device (host/port/unit) to read from.
     pub session_id: String,

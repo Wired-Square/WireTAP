@@ -341,6 +341,8 @@ export interface AppSettings {
   mcp_server_enabled?: boolean;
   /** Second gate: when true the control (mutation) tools are registered. */
   mcp_allow_control?: boolean;
+  /** Third gate: when true the session open/stop tools are registered. */
+  mcp_allow_session_control?: boolean;
   /** Fixed localhost port the MCP server listens on (default 8787). */
   mcp_server_port?: number;
   /** Bearer token required by clients (empty = no auth). */
@@ -415,6 +417,7 @@ function normalizeSettings(
     // MCP server (both gates off by default)
     mcp_server_enabled: settings.mcp_server_enabled ?? false,
     mcp_allow_control: settings.mcp_allow_control ?? false,
+    mcp_allow_session_control: settings.mcp_allow_session_control ?? false,
     mcp_server_port: settings.mcp_server_port ?? 8787,
     mcp_server_token: settings.mcp_server_token ?? "",
   };

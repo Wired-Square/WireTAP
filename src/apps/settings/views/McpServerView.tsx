@@ -1,10 +1,10 @@
 // ui/src/apps/settings/views/McpServerView.tsx
 //
 // Settings view for the MCP server — lets an external Claude client query live
-// WireTAP runtime state. Two independent, off-by-default gates: enable the
-// server, and (separately) allow control tools.
+// WireTAP runtime state. Three independent, off-by-default gates: enable the
+// server, allow control tools, and allow session open/stop.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, RefreshCw, AlertTriangle, Check } from "lucide-react";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -13,6 +13,44 @@ import { labelDefault, helpText, inputSimple, buttonBase } from "../../../styles
 interface McpStatus {
   running: boolean;
   port: number | null;
+}
+
+/** A checkbox row with a label and help/warning text. */
+function ToggleRow({
+  label,
+  checked,
+  disabled,
+  onChange,
+  warn,
+  children,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (value: boolean) => void;
+  warn?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="flex items-start gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+          className="mt-1"
+        />
+        <div>
+          <span className={labelDefault}>{label}</span>
+          <p className={warn ? `${helpText} flex items-start gap-1` : helpText}>
+            {warn && <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />}
+            {warn ? <span>{children}</span> : children}
+          </p>
+        </div>
+      </label>
+    </div>
+  );
 }
 
 function generateToken(): string {
@@ -24,10 +62,12 @@ function generateToken(): string {
 export default function McpServerView() {
   const serverEnabled = useSettingsStore((s) => s.mcp.serverEnabled);
   const allowControl = useSettingsStore((s) => s.mcp.allowControl);
+  const allowSessionControl = useSettingsStore((s) => s.mcp.allowSessionControl);
   const serverPort = useSettingsStore((s) => s.mcp.serverPort);
   const serverToken = useSettingsStore((s) => s.mcp.serverToken);
   const setServerEnabled = useSettingsStore((s) => s.setMcpServerEnabled);
   const setAllowControl = useSettingsStore((s) => s.setMcpAllowControl);
+  const setAllowSessionControl = useSettingsStore((s) => s.setMcpAllowSessionControl);
   const setServerPort = useSettingsStore((s) => s.setMcpServerPort);
   const setServerToken = useSettingsStore((s) => s.setMcpServerToken);
 
@@ -85,57 +125,49 @@ export default function McpServerView() {
         HTTP transport. Off by default. The server binds to 127.0.0.1 only.
       </p>
 
-      {/* Enable */}
-      <div className="space-y-2">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={serverEnabled}
-            disabled={busy}
-            onChange={(e) => {
-              setServerEnabled(e.target.checked);
-              apply(e.target.checked);
-            }}
-            className="mt-1"
-          />
-          <div>
-            <span className={labelDefault}>Enable MCP server</span>
-            <p className={helpText}>
-              When on, the server listens on the port below.{" "}
-              <span className={status.running ? "text-green-500" : "text-[color:var(--text-secondary)]"}>
-                {status.running ? `Running on 127.0.0.1:${status.port}` : "Stopped"}
-              </span>
-            </p>
-          </div>
-        </label>
-      </div>
+      <ToggleRow
+        label="Enable MCP server"
+        checked={serverEnabled}
+        disabled={busy}
+        onChange={(v) => {
+          setServerEnabled(v);
+          apply(v);
+        }}
+      >
+        When on, the server listens on the port below.{" "}
+        <span className={status.running ? "text-green-500" : "text-[color:var(--text-secondary)]"}>
+          {status.running ? `Running on 127.0.0.1:${status.port}` : "Stopped"}
+        </span>
+      </ToggleRow>
 
-      {/* Allow control */}
-      <div className="space-y-2">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={allowControl}
-            disabled={busy}
-            onChange={(e) => {
-              setAllowControl(e.target.checked);
-              if (serverEnabled) apply(true);
-            }}
-            className="mt-1"
-          />
-          <div>
-            <span className={labelDefault}>Allow control tools</span>
-            <p className={`${helpText} flex items-start gap-1`}>
-              <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
-              <span>
-                Lets a connected Claude client <strong>drive</strong> the app — transmit
-                frames on the bus, stop sessions, and replay captures. Leave off for
-                read-only introspection.
-              </span>
-            </p>
-          </div>
-        </label>
-      </div>
+      <ToggleRow
+        label="Allow control tools"
+        checked={allowControl}
+        disabled={busy}
+        warn
+        onChange={(v) => {
+          setAllowControl(v);
+          if (serverEnabled) apply(true);
+        }}
+      >
+        Lets a connected Claude client <strong>drive</strong> the app — transmit frames on
+        the bus, write Modbus registers, and replay captures. Leave off for read-only
+        introspection.
+      </ToggleRow>
+
+      <ToggleRow
+        label="Allow session open/stop"
+        checked={allowSessionControl}
+        disabled={busy}
+        warn
+        onChange={(v) => {
+          setAllowSessionControl(v);
+          if (serverEnabled) apply(true);
+        }}
+      >
+        Lets a connected Claude client <strong>open and stop sessions</strong> — e.g. start a
+        Modbus session polling from a profile's catalog. Separate from the control gate above.
+      </ToggleRow>
 
       {/* Port */}
       <div className="space-y-2 max-w-xs">

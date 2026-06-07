@@ -160,6 +160,9 @@ pub struct AppSettings {
     /// Second gate: when true the control (mutation) tools are registered.
     #[serde(default = "default_mcp_allow_control")]
     pub mcp_allow_control: bool,
+    /// Third gate: when true the session lifecycle tools (open/stop session) are registered.
+    #[serde(default = "default_mcp_allow_control")]
+    pub mcp_allow_session_control: bool,
     /// Fixed localhost port the MCP server listens on.
     #[serde(default = "default_mcp_server_port")]
     pub mcp_server_port: u16,
@@ -431,6 +434,7 @@ impl Default for AppSettings {
             // MCP server (both gates off by default)
             mcp_server_enabled: default_mcp_server_enabled(),
             mcp_allow_control: default_mcp_allow_control(),
+            mcp_allow_session_control: default_mcp_allow_control(),
             mcp_server_port: default_mcp_server_port(),
             mcp_server_token: String::new(),
         }
@@ -518,6 +522,7 @@ impl AppSettings {
             // MCP server (both gates off by default)
             mcp_server_enabled: default_mcp_server_enabled(),
             mcp_allow_control: default_mcp_allow_control(),
+            mcp_allow_session_control: default_mcp_allow_control(),
             mcp_server_port: default_mcp_server_port(),
             mcp_server_token: String::new(),
         })

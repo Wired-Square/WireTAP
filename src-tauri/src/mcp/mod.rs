@@ -8,6 +8,7 @@
 //! [`bridge`].
 
 pub mod bridge;
+mod session;
 mod tools;
 mod types;
 
@@ -53,6 +54,7 @@ pub fn start(
     app: tauri::AppHandle,
     port: u16,
     allow_control: bool,
+    allow_session_control: bool,
     token: String,
 ) -> Result<(), String> {
     if is_running() {
@@ -70,7 +72,7 @@ pub fn start(
     let cancel_for_config = cancel.child_token();
 
     let service = StreamableHttpService::new(
-        move || Ok(WireTapTools::new(app.clone(), allow_control)),
+        move || Ok(WireTapTools::new(app.clone(), allow_control, allow_session_control)),
         LocalSessionManager::default().into(),
         StreamableHttpServerConfig::default().with_cancellation_token(cancel_for_config),
     );

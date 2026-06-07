@@ -899,6 +899,7 @@ fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String>
             app.clone(),
             s.mcp_server_port,
             s.mcp_allow_control,
+            s.mcp_allow_session_control,
             s.mcp_server_token.clone(),
         )?;
     }
@@ -1051,6 +1052,7 @@ pub fn run() {
                         app.handle().clone(),
                         s.mcp_server_port,
                         s.mcp_allow_control,
+                        s.mcp_allow_session_control,
                         s.mcp_server_token.clone(),
                     ) {
                         tlog!("[mcp] Failed to start: {}", e);

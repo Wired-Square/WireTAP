@@ -32,12 +32,14 @@ pub struct WireTapTools {
 }
 
 impl WireTapTools {
-    pub fn new(app: tauri::AppHandle, allow_control: bool) -> Self {
-        let tool_router = if allow_control {
-            Self::read_router() + Self::control_router()
-        } else {
-            Self::read_router()
-        };
+    pub fn new(app: tauri::AppHandle, allow_control: bool, allow_session_control: bool) -> Self {
+        let mut tool_router = Self::read_router();
+        if allow_control {
+            tool_router = tool_router + Self::control_router();
+        }
+        if allow_session_control {
+            tool_router = tool_router + Self::session_control_router();
+        }
         Self { app, tool_router }
     }
 }
@@ -355,15 +357,6 @@ impl WireTapTools {
         ok_json(result)
     }
 
-    #[tool(description = "Stop a running IO session.")]
-    async fn stop_session(
-        &self,
-        Parameters(p): Parameters<SessionIdParams>,
-    ) -> Result<CallToolResult, McpError> {
-        let state = crate::io::stop_session(&p.session_id).await.map_err(err)?;
-        ok_json(state)
-    }
-
     #[tool(description = "Replay all CAN frames from a capture through a session with original timing. Returns a replay_id.")]
     async fn replay_capture(
         &self,
@@ -452,6 +445,31 @@ impl WireTapTools {
             }
             other => Err(err(format!("register_type '{other}' is not writable (use holding or coil)"))),
         }
+    }
+}
+
+// ── Session lifecycle (only registered when mcp_allow_session_control is on) ──
+
+#[tool_router(router = session_control_router)]
+impl WireTapTools {
+    #[tool(description = "Open (create + start) a session for an IO profile. For Modbus profiles, poll groups are built from the profile's preferred catalog so it polls immediately. Returns the new session_id.")]
+    async fn open_session(
+        &self,
+        Parameters(p): Parameters<OpenSessionParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let result = super::session::open(self.app.clone(), p.profile_id, p.session_id)
+            .await
+            .map_err(err)?;
+        ok_json(result)
+    }
+
+    #[tool(description = "Stop (and destroy) a running IO session.")]
+    async fn stop_session(
+        &self,
+        Parameters(p): Parameters<SessionIdParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let state = crate::io::stop_session(&p.session_id).await.map_err(err)?;
+        ok_json(state)
     }
 }
 
