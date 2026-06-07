@@ -6,6 +6,7 @@ import { useSettings } from "../../hooks/useSettings";
 import { useGraphStore, type SignalValueEntry } from "../../stores/graphStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
+import { useSessionCatalog } from "../../hooks/useSessionCatalog";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../settings/stores/settingsStore";
@@ -338,25 +339,17 @@ export default function Graph() {
     return sess.catalogPath;
   });
 
-  // Cross-app decoder sync: when another app (or Session Manager) changes the
-  // session's catalogPath, mirror it into local state (the load/attach effect
-  // below does the parse — keeping this parse-free avoids a double parse).
-  useEffect(() => {
-    if (!sessionCatalogPath || sessionCatalogPath === catalogPath) return;
-    tlog.debug(`[Graph] session decoder changed externally → ${sessionCatalogPath}`);
-    setCatalogPath(sessionCatalogPath);
-  }, [sessionCatalogPath, catalogPath, setCatalogPath]);
-
-  // Load the model and — when a session exists — bind Rust decode, from a single
-  // parse: catalog.attach returns the resolved catalogue. Falls back to a model-
-  // only load if attach fails. Backend auto-detaches on unsubscribe.
-  useEffect(() => {
-    if (!catalogPath) return;
-    const run = sessionId
-      ? loadCatalogForSession(sessionId, catalogPath)
-      : loadCatalog(catalogPath);
-    run.catch((e) => tlog.debug(`[Graph] catalog load/attach failed: ${e}`));
-  }, [sessionId, catalogPath, loadCatalogForSession, loadCatalog]);
+  // Catalogue load/attach (mirror session path + load once per selection,
+  // binding Rust decode when a session exists). Auto-detaches on unsubscribe.
+  useSessionCatalog({
+    label: "Graph",
+    sessionId,
+    catalogPath,
+    sessionCatalogPath,
+    loadCatalog,
+    loadCatalogForSession,
+    setCatalogPath,
+  });
 
   // Auto-set session decoder from source profiles' preferred_catalog when a new session
   // starts. Fires when sessionCatalogPath transitions from undefined to null.
