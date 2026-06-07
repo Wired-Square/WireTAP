@@ -17,7 +17,7 @@ import { mergeSerialConfigForWatch } from "../../utils/sessionConfigMerge";
 import { frameKey } from "../../utils/frameKey";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { tlog } from "../../api/settings";
-import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
+import { listCatalogs, openCatalog, attachCatalog, type CatalogMetadata } from "../../api/catalog";
 import { UI_UPDATE_INTERVAL_MS, COPY_FEEDBACK_TIMEOUT_MS, REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import type { StreamEndedInfo, PlaybackPosition } from '../../api/io';
 import AppLayout from "../../components/AppLayout";
@@ -39,6 +39,7 @@ import { useDialogManager } from "../../hooks/useDialogManager";
 import { useDecoderHandlers } from "./hooks/useDecoderHandlers";
 import type { PlaybackSpeed, PlaybackState } from "../../components/TimeController";
 import type { FrameMessage } from "../../types/frame";
+import type { DecodedFrameMsg } from "../../services/wsProtocol";
 
 export default function Decoder() {
   const { t } = useTranslation("decoder");
@@ -124,6 +125,7 @@ export default function Decoder() {
   const selectAllFrames = useDecoderStore((state) => state.selectAllFrames);
   const deselectAllFrames = useDecoderStore((state) => state.deselectAllFrames);
   const decodeSignalsBatch = useDecoderStore((state) => state.decodeSignalsBatch);
+  const applyDecodedBatch = useDecoderStore((state) => state.applyDecodedBatch);
   const setIoProfile = useDecoderStore((state) => state.setIoProfile);
   const updateCurrentTime = useDecoderStore((state) => state.updateCurrentTime);
   const setCurrentFrameIndex = useDecoderStore((state) => state.setCurrentFrameIndex);
@@ -203,6 +205,7 @@ export default function Decoder() {
 
   // Use refs for store functions to avoid stale closures in setTimeout
   const decodeSignalsBatchRef = useRef(decodeSignalsBatch);
+  const applyDecodedBatchRef = useRef(applyDecodedBatch);
   const updateCurrentTimeRef = useRef(updateCurrentTime);
   const selectedFramesRef = useRef(selectedFrames);
   const frameIdFilterSetRef = useRef(frameIdFilterSet);
@@ -211,6 +214,9 @@ export default function Decoder() {
   useEffect(() => {
     decodeSignalsBatchRef.current = decodeSignalsBatch;
   }, [decodeSignalsBatch]);
+  useEffect(() => {
+    applyDecodedBatchRef.current = applyDecodedBatch;
+  }, [applyDecodedBatch]);
   useEffect(() => {
     updateCurrentTimeRef.current = updateCurrentTime;
   }, [updateCurrentTime]);
@@ -476,6 +482,12 @@ export default function Decoder() {
     }
   }, []);
 
+  // Decoded signals from the Rust decoder stream (catalogue attached). The
+  // backend already throttles these, so apply directly.
+  const handleDecoded = useCallback((decoded: DecodedFrameMsg[]) => {
+    applyDecodedBatchRef.current(decoded);
+  }, []);
+
   // Use the IO session manager hook - manages session lifecycle, ingest, multi-bus, and derived state
   const manager = useIOSessionManager({
     appName: "decoder",
@@ -485,6 +497,7 @@ export default function Decoder() {
     onIngestComplete: handleIngestComplete,
     requireFrames: true,
     onFrames: handleFrames,
+    onDecoded: handleDecoded,
     onError: handleError,
     onTimeUpdate: handleTimeUpdate,
     onSuspended: handleSessionSuspended,
@@ -607,6 +620,19 @@ export default function Decoder() {
     tlog.debug(`[Decoder] session decoder changed externally → ${sessionCatalogPath}`);
     loadCatalog(sessionCatalogPath).catch(console.error);
   }, [sessionCatalogPath, catalogPath, loadCatalog]);
+
+  // Attach the catalogue to the session so the backend decodes frames in Rust
+  // and streams them (consumed by handleDecoded). Auto-detaches on unsubscribe.
+  useEffect(() => {
+    if (!sessionId || !catalogPath) return;
+    let cancelled = false;
+    openCatalog(catalogPath)
+      .then((content) => {
+        if (!cancelled) return attachCatalog(sessionId, content);
+      })
+      .catch((e) => tlog.debug(`[Decoder] catalog.attach failed: ${e}`));
+    return () => { cancelled = true; };
+  }, [sessionId, catalogPath]);
 
   // Auto-set session decoder from source profiles' preferred_catalog when a new session
   // starts. Fires when sessionCatalogPath transitions from undefined (session not in

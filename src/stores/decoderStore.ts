@@ -47,6 +47,7 @@ import { formatFrameId } from '../utils/frameIds';
 import { decodeSignal } from '../utils/signalDecode';
 import { extractBits } from '../utils/bits';
 import type { FrameDetail, SignalDef, MuxDef } from '../types/decoder';
+import type { DecodedFrameMsg } from '../services/wsProtocol';
 import { findMatchingMuxCase } from '../utils/muxCaseMatch';
 import type { SelectionSet } from '../utils/selectionSets';
 import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
@@ -316,6 +317,7 @@ interface DecoderState {
     unmatchedFrames: UnmatchedFrame[],
     filteredFrames: FilteredFrame[]
   ) => void;
+  applyDecodedBatch: (decoded: DecodedFrameMsg[]) => void;
   addUnmatchedFrame: (frame: UnmatchedFrame) => void;
   clearUnmatchedFrames: () => void;
   addFilteredFrame: (frame: FilteredFrame) => void;
@@ -938,24 +940,21 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
     set({ decodedVersion: get().decodedVersion + 1, seenHeaderFieldValues: nextSeenValues, mirrorValidation: nextMirrorValidation });
   },
 
+  // Store raw frame bytes + run mirror validation. Signal decoding moved to
+  // Rust: decoded values arrive via applyDecodedBatch (the DecodedSignals
+  // stream). This keeps the raw byte view and the mirror-validation byte
+  // compare (which needs the raw bytes + frame timing) on the frame path.
   decodeSignalsBatch: (framesToDecode, unmatchedToAdd, filteredToAdd) => {
     if (framesToDecode.length === 0 && unmatchedToAdd.length === 0 && filteredToAdd.length === 0) {
       return;
     }
 
-    const { frames, protocol, canConfig, serialConfig, seenHeaderFieldValues, streamStartTimeSeconds, mirrorSourceMap, mirrorValidation, mirrorFuzzWindowMs } = get();
+    const { frames, protocol, canConfig, serialConfig, mirrorSourceMap, mirrorValidation, mirrorFuzzWindowMs } = get();
 
-    // Mutate module-level LRU maps in place — avoids creating new 500/2000-entry
-    // Maps every 100ms flush, which caused JSC GC pressure that crashed the WebView
-    // after ~2 hours of streaming.
     const nextDecoded = _decoded;
-    const nextDecodedPerSource = _decodedPerSource;
-    const nextSeenValues = new Map(seenHeaderFieldValues);
     const nextMirrorValidation = new Map(mirrorValidation);
-    let newStreamStartTime = streamStartTimeSeconds;
 
     // Pre-build reverse mirror map: sourceId → mirrorIds[]
-    // Converts per-frame O(mirrorSourceMap.size) scan to O(1) lookup
     const reverseMirrorMap = new Map<number, number[]>();
     for (const [mirrorId, sourceId] of mirrorSourceMap) {
       const existing = reverseMirrorMap.get(sourceId);
@@ -966,150 +965,26 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       }
     }
 
-    // Determine default byte order from catalog config
-    // CAN/serial fall back to 'little', Modbus defaults to 'big' (standard Modbus convention)
-    const defaultByteOrder: 'little' | 'big' =
-      protocol === 'modbus'
-        ? 'big'
-        : (protocol === 'can' ? canConfig?.default_byte_order : serialConfig?.default_byte_order) || 'little';
-
-    // Capture current timestamp for signals
     const now = Date.now() / 1000;
 
-    // Set stream start time if not already set
-    if (newStreamStartTime === null && framesToDecode.length > 0) {
-      newStreamStartTime = now;
-    }
-
-    // Helper to create a unique key for a signal
-    const signalKey = (signal: DecodedSignal) =>
-      signal.muxValue !== undefined ? `${signal.muxValue}:${signal.name}` : signal.name;
-
-    // Process all frames to decode
-    for (const { frameId, bytes, sourceAddress, timestamp } of framesToDecode) {
-      // Apply frame_id_mask before catalog lookup
+    for (const { frameId, bytes, timestamp } of framesToDecode) {
+      // Apply frame_id_mask before catalog lookup (header fields + signal decode
+      // now come from the Rust stream).
       let maskedFrameId = frameId;
-      const headerFields: HeaderFieldValue[] = [];
-      let effectiveSourceAddress = sourceAddress;
-
-      if (protocol === 'can' && canConfig) {
-        if (canConfig.frame_id_mask !== undefined) {
-          maskedFrameId = frameId & canConfig.frame_id_mask;
-        }
-        if (canConfig.fields) {
-          for (const [name, field] of Object.entries(canConfig.fields)) {
-            let shift = field.shift;
-            if (shift === undefined && field.mask > 0) {
-              shift = 0;
-              let m = field.mask;
-              while ((m & 1) === 0 && m > 0) {
-                shift++;
-                m >>>= 1;
-              }
-            }
-            const value = (frameId & field.mask) >>> (shift ?? 0);
-            const format = field.format ?? 'hex';
-            const display = format === 'decimal' ? String(value) : `0x${value.toString(16).toUpperCase()}`;
-            headerFields.push({ name, value, display, format });
-
-            const lowerName = name.toLowerCase();
-            if (lowerName === 'source_address' || lowerName === 'sender' || lowerName === 'source' || lowerName === 'src' || lowerName === 'sa') {
-              effectiveSourceAddress = value;
-            }
-          }
-        }
-      } else if (protocol === 'serial' && serialConfig) {
-        if (serialConfig.frame_id_mask !== undefined) {
-          maskedFrameId = frameId & serialConfig.frame_id_mask;
-        }
-        if (serialConfig.header_fields && serialConfig.header_fields.length > 0) {
-          for (const field of serialConfig.header_fields) {
-            if (field.name === 'id') continue;
-            if (field.start_byte < bytes.length) {
-              let value = 0;
-              const endByte = Math.min(field.start_byte + field.bytes, bytes.length);
-              if (field.byte_order === 'little') {
-                for (let i = field.start_byte; i < endByte; i++) {
-                  value |= bytes[i] << ((i - field.start_byte) * 8);
-                }
-              } else {
-                for (let i = field.start_byte; i < endByte; i++) {
-                  value = (value << 8) | bytes[i];
-                }
-              }
-              const shiftedMask = field.mask >>> (field.start_byte * 8);
-              value = value & shiftedMask;
-              const format = field.format ?? 'hex';
-              const display = format === 'decimal' ? String(value) : `0x${value.toString(16).toUpperCase()}`;
-              headerFields.push({ name: field.name, value, display, format });
-            }
-          }
-        }
+      if (protocol === 'can' && canConfig?.frame_id_mask !== undefined) {
+        maskedFrameId = frameId & canConfig.frame_id_mask;
+      } else if (protocol === 'serial' && serialConfig?.frame_id_mask !== undefined) {
+        maskedFrameId = frameId & serialConfig.frame_id_mask;
       }
 
       const frame = frames.get(frameKey(protocol, maskedFrameId));
       if (!frame) continue;
 
-      // Decode plain signals
-      const plainDecoded = frame.signals.map((signal, idx) => {
-        const decoded = decodeSignal(bytes, signal, signal.name || `Signal ${idx + 1}`, defaultByteOrder);
-        return {
-          name: decoded.name,
-          value: decoded.display,
-          unit: decoded.unit,
-          format: signal.format,
-          rawValue: decoded.value,
-          timestamp: now,
-        };
-      });
-
-      // Decode mux signals
-      const muxResult = frame.mux
-        ? decodeMuxSignals(bytes, frame.mux, defaultByteOrder, now)
-        : { signals: [], selectors: [] };
-
-      // Merge with existing decoded values
-      const existingFrame = nextDecoded.get(maskedFrameId);
-      const existingSignals = existingFrame?.signals || [];
-
-      const mergedSignals = new Map<string, DecodedSignal>();
-      for (const signal of existingSignals) {
-        mergedSignals.set(signalKey(signal), signal);
-      }
-      for (const signal of [...plainDecoded, ...muxResult.signals]) {
-        mergedSignals.set(signalKey(signal), signal);
-      }
-
-      const decodedFrame: DecodedFrame = {
-        signals: Array.from(mergedSignals.values()),
-        rawBytes: bytes,
-        headerFields,
-        sourceAddress: effectiveSourceAddress,
-        muxSelectors: muxResult.selectors.length > 0 ? muxResult.selectors : undefined,
-      };
-
-      nextDecoded.set(maskedFrameId, decodedFrame);
-
-      if (effectiveSourceAddress !== undefined) {
-        const perSourceKey = `${maskedFrameId}:${effectiveSourceAddress}`;
-        nextDecodedPerSource.set(perSourceKey, decodedFrame);
-      }
-
-      // Accumulate header field values
-      for (const field of headerFields) {
-        let fieldMap = nextSeenValues.get(field.name);
-        if (!fieldMap) {
-          fieldMap = new Map();
-          nextSeenValues.set(field.name, fieldMap);
-        }
-        const existing = fieldMap.get(field.value);
-        if (existing) {
-          existing.count++;
-        } else if (fieldMap.size < MAX_HEADER_FIELD_VALUES) {
-          // Only add new values if under limit (prevents unbounded growth)
-          fieldMap.set(field.value, { display: field.display, count: 1 });
-        }
-      }
+      // Store raw bytes, preserving any decoded values already received.
+      const existing = nextDecoded.get(maskedFrameId);
+      nextDecoded.set(maskedFrameId, existing
+        ? { ...existing, rawBytes: bytes }
+        : { signals: [], rawBytes: bytes, headerFields: [], sourceAddress: undefined, muxSelectors: undefined });
 
       // Mirror validation: compare bytes between mirror and source frames
       const mirrorSourceId = mirrorSourceMap.get(maskedFrameId);
@@ -1210,12 +1085,105 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       }
     }
 
-    // Single state update — version counter drives reactivity for decoded/unmatched/filtered
+    set({
+      decodedVersion: get().decodedVersion + 1,
+      mirrorValidation: nextMirrorValidation,
+    });
+  },
+
+  // Apply decoded signals from the Rust DecodedSignals stream — signals (merged
+  // by muxValue:name so each mux case persists), header fields, source address,
+  // and mux selectors. Raw bytes come from decodeSignalsBatch (the frame path);
+  // the two merge into the same _decoded entry.
+  applyDecodedBatch: (decoded: DecodedFrameMsg[]) => {
+    if (decoded.length === 0) return;
+
+    const { protocol, canConfig, serialConfig, seenHeaderFieldValues, streamStartTimeSeconds } = get();
+    const nextDecoded = _decoded;
+    const nextDecodedPerSource = _decodedPerSource;
+    const nextSeenValues = new Map(seenHeaderFieldValues);
+    let newStreamStartTime = streamStartTimeSeconds;
+    const now = Date.now() / 1000;
+    if (newStreamStartTime === null) newStreamStartTime = now;
+
+    const signalKey = (signal: DecodedSignal) =>
+      signal.muxValue !== undefined ? `${signal.muxValue}:${signal.name}` : signal.name;
+
+    for (const msg of decoded) {
+      let maskedFrameId = msg.frameId;
+      if (protocol === 'can' && canConfig?.frame_id_mask !== undefined) {
+        maskedFrameId = msg.frameId & canConfig.frame_id_mask;
+      } else if (protocol === 'serial' && serialConfig?.frame_id_mask !== undefined) {
+        maskedFrameId = msg.frameId & serialConfig.frame_id_mask;
+      }
+
+      const headerFields: HeaderFieldValue[] = msg.headerFields.map((h) => ({
+        name: h.name,
+        value: h.value,
+        display: h.display,
+        format: (h.format === 'decimal' ? 'decimal' : 'hex'),
+      }));
+      const sourceAddress = msg.sourceAddress ?? undefined;
+      const muxSelectors: MuxSelectorValue[] = msg.selectors.map((s) => ({
+        name: s.name ?? undefined,
+        value: s.value,
+        matchedCase: s.matchedCase ?? undefined,
+        startBit: s.startBit,
+        bitLength: s.bitLength,
+      }));
+
+      // Merge new signals over previously-seen ones (preserves inactive mux cases).
+      const existing = nextDecoded.get(maskedFrameId);
+      const mergedSignals = new Map<string, DecodedSignal>();
+      for (const signal of existing?.signals ?? []) {
+        mergedSignals.set(signalKey(signal), signal);
+      }
+      for (const s of msg.signals) {
+        const sig: DecodedSignal = {
+          name: s.name,
+          value: s.display,
+          unit: s.unit ?? undefined,
+          format: s.format ?? undefined,
+          rawValue: s.value,
+          muxValue: s.muxValue ?? undefined,
+          timestamp: now,
+        };
+        mergedSignals.set(signalKey(sig), sig);
+      }
+
+      const decodedFrame: DecodedFrame = {
+        signals: Array.from(mergedSignals.values()),
+        rawBytes: existing?.rawBytes ?? [],
+        headerFields,
+        sourceAddress,
+        muxSelectors: muxSelectors.length > 0 ? muxSelectors : undefined,
+      };
+      nextDecoded.set(maskedFrameId, decodedFrame);
+
+      if (sourceAddress !== undefined) {
+        nextDecodedPerSource.set(`${maskedFrameId}:${sourceAddress}`, decodedFrame);
+      }
+
+      // Accumulate header field values for the filter UI.
+      for (const field of headerFields) {
+        let fieldMap = nextSeenValues.get(field.name);
+        if (!fieldMap) {
+          fieldMap = new Map();
+          nextSeenValues.set(field.name, fieldMap);
+        }
+        const seen = fieldMap.get(field.value);
+        if (seen) {
+          seen.count++;
+        } else if (fieldMap.size < MAX_HEADER_FIELD_VALUES) {
+          fieldMap.set(field.value, { display: field.display, count: 1 });
+        }
+      }
+    }
+
     set({
       decodedVersion: get().decodedVersion + 1,
       seenHeaderFieldValues: nextSeenValues,
       streamStartTimeSeconds: newStreamStartTime,
-      mirrorValidation: nextMirrorValidation,
     });
   },
 
