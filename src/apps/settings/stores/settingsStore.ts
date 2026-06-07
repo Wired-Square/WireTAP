@@ -730,6 +730,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         smp_port: settings.smp_port ?? 1337,
         // Localisation
         language: settings.language ?? "en-AU",
+        // MCP server
+        mcp_server_enabled: settings.mcp_server_enabled ?? false,
+        mcp_allow_control: settings.mcp_allow_control ?? false,
+        mcp_allow_session_control: settings.mcp_allow_session_control ?? false,
+        mcp_server_port: settings.mcp_server_port ?? 8787,
+        mcp_server_token: settings.mcp_server_token ?? "",
       };
 
       set({
