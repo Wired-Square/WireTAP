@@ -21,6 +21,8 @@
     "wordOrder": "Word Order"
   },
   "registers": {
+    "switchToAscii": "Show raw values as ASCII",
+    "switchToHex": "Show raw values as hex",
     "columns": {
       "register": "Register",
       "type": "Type",

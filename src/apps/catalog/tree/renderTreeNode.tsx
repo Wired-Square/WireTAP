@@ -4,6 +4,7 @@ import React from "react";
 import { ChevronDown, ChevronRight, Link2, Layers } from "lucide-react";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { hoverLight } from "../../../styles";
+import { formatFrameId as formatModbusRegister } from "../../../utils/frameIds";
 import type { TomlNode } from "../types";
 import { shouldShowNode } from "./treeUtils";
 
@@ -16,6 +17,7 @@ export type CreateRenderTreeNodeArgs = {
   onNodeClick: (node: TomlNode) => void;
   onToggleExpand: (node: TomlNode) => void;
   formatFrameId?: (id: string) => { primary: string; secondary?: string };
+  displayFrameIdFormat?: "hex" | "decimal";
 };
 
 /**
@@ -30,6 +32,7 @@ export function createRenderTreeNode({
   onNodeClick,
   onToggleExpand,
   formatFrameId,
+  displayFrameIdFormat = "hex",
 }: CreateRenderTreeNodeArgs): RenderTreeNode {
   const render: RenderTreeNode = (node, depth = 0) => {
     const nodePath = node.path.join(".");
@@ -110,6 +113,27 @@ export function createRenderTreeNode({
                   {truncatedNote && (
                     <span className="tree-secondary-text text-xs italic">
                       {truncatedNote}
+                    </span>
+                  )}
+                </span>
+              );
+            })() : node.type === "modbus-frame" ? (() => {
+              const regNum = node.metadata?.registerNumber;
+              const regType = node.metadata?.registerType;
+              const address = typeof regNum === "number"
+                ? formatModbusRegister(regNum, displayFrameIdFormat)
+                : undefined;
+              return (
+                <span className="flex items-center gap-1.5">
+                  <span>{node.key}</span>
+                  {address && (
+                    <span className="tree-secondary-text text-xs">
+                      ({address})
+                    </span>
+                  )}
+                  {regType && (
+                    <span className="text-[color:var(--accent-purple)] text-xs font-medium">
+                      [{regType}]
                     </span>
                   )}
                 </span>

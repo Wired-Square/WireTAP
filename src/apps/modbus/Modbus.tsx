@@ -5,7 +5,7 @@
 // Shares session with decoder so both apps can work on the same data.
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { Server, Settings as SettingsIcon, Play, Square, Clock, Timer } from "lucide-react";
+import { Server, Settings as SettingsIcon, Play, Square, Clock, Timer, Binary, Type } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { dataViewContainer } from "../../styles";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
@@ -39,6 +39,7 @@ export default function Modbus() {
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
   const [isPolling, setIsPolling] = useState(true);
   const [timeFormat, setTimeFormat] = useState<"seconds" | "human">("human");
+  const [rawFormat, setRawFormat] = useState<"hex" | "ascii">("hex");
 
   // Modbus store
   const catalogPath = useModbusStore((s) => s.catalogPath);
@@ -330,6 +331,17 @@ export default function Modbus() {
               </button>
             ) : null}
 
+            {/* Raw value format toggle (registers tab only) */}
+            {activeTab === 'registers' && (
+              <button
+                onClick={() => setRawFormat(f => f === "hex" ? "ascii" : "hex")}
+                className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                title={rawFormat === "hex" ? t("registers.switchToAscii") : t("registers.switchToHex")}
+              >
+                {rawFormat === "hex" ? <Binary size={14} /> : <Type size={14} />}
+              </button>
+            )}
+
             {/* Time format toggle */}
             <button
               onClick={() => setTimeFormat(f => f === "human" ? "seconds" : "human")}
@@ -350,6 +362,7 @@ export default function Modbus() {
             registerVersion={registerVersion}
             displayFrameIdFormat={displayFrameIdFormat}
             timeFormat={timeFormat}
+            rawFormat={rawFormat}
           />
         )}
         {activeTab === 'config' && (

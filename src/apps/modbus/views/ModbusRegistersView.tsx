@@ -7,6 +7,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { formatFrameId } from "../../../utils/frameIds";
 import { parseFrameKey } from "../../../utils/frameKey";
+import { bytesToAscii } from "../../../utils/byteUtils";
 import { bgDataView, textPrimary, textMuted, textSecondary, borderDefault } from "../../../styles";
 import { emptyStateText, monoBody } from "../../../styles/typography";
 import { badgeSmallNeutral, badgeSmallInfo, badgeSmallSuccess, badgeSmallPurple, badgeSmallWarning } from "../../../styles/badgeStyles";
@@ -31,6 +32,13 @@ function formatDuration(ms: number, fmt: ModbusTimeFormat): string {
   return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
 }
 
+/** Format register bytes as spaced lowercase hex, or printable ASCII between pipes */
+function formatRawBytes(bytes: number[], format: "hex" | "ascii"): string {
+  return format === "ascii"
+    ? `|${bytesToAscii(bytes)}|`
+    : bytes.map(b => b.toString(16).padStart(2, '0')).join(' ');
+}
+
 /** Format a microsecond timestamp as relative time from now */
 function formatElapsed(timestampUs: number, nowMs: number, fmt: ModbusTimeFormat): string {
   const elapsedMs = nowMs - timestampUs / 1000;
@@ -45,6 +53,7 @@ interface Props {
   registerVersion: number;
   displayFrameIdFormat: "hex" | "decimal";
   timeFormat: ModbusTimeFormat;
+  rawFormat: "hex" | "ascii";
 }
 
 type RegisterRow = {
@@ -69,6 +78,7 @@ export default function ModbusRegistersView({
   registerVersion,
   displayFrameIdFormat,
   timeFormat,
+  rawFormat,
 }: Props) {
   const { t } = useTranslation("modbus");
   // Tick every second to update relative timestamps
@@ -175,7 +185,7 @@ export default function ModbusRegistersView({
               {/* Raw bytes */}
               <td className={`px-3 py-1.5 ${monoBody} ${textMuted}`}>
                 {row.registerValue
-                  ? row.registerValue.bytes.map(b => b.toString(16).padStart(2, '0')).join(' ')
+                  ? formatRawBytes(row.registerValue.bytes, rawFormat)
                   : '—'}
               </td>
 

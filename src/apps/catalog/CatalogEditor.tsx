@@ -396,9 +396,10 @@ export default function CatalogEditor() {
       onNodeClick: handleNodeClick,
       onToggleExpand: handleToggleExpand,
       formatFrameId: formatFrameIdForDisplay,
+      displayFrameIdFormat,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedNodes, selectedNode, filterByNode, formatFrameIdForDisplay]);
+  }, [expandedNodes, selectedNode, filterByNode, formatFrameIdForDisplay, displayFrameIdFormat]);
 
   return (
     <AppLayout
