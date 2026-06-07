@@ -27,72 +27,39 @@ fn generate_session_id(kind: &str) -> String {
     format!("{prefix}_mcp{}", SID_COUNTER.fetch_add(1, Ordering::Relaxed))
 }
 
-/// Convert a traditional Modbus register number (1-based, type-prefixed) to a
-/// 0-based protocol address. Mirrors `modbusPollBuilder.ts`.
-fn traditional_to_protocol(reg: i64, rt: &RegisterType) -> i64 {
-    let offset = match rt {
-        RegisterType::Coil => 1,
-        RegisterType::Discrete => 10001,
-        RegisterType::Input => 30001,
-        RegisterType::Holding => 40001,
-    };
-    (reg - offset).max(0)
+/// Map the catalogue crate's register type onto the IO layer's enum.
+fn map_register_type(rt: wiretap_catalog::modbus::RegisterType) -> RegisterType {
+    use wiretap_catalog::modbus::RegisterType as Cat;
+    match rt {
+        Cat::Input => RegisterType::Input,
+        Cat::Holding => RegisterType::Holding,
+        Cat::Coil => RegisterType::Coil,
+        Cat::Discrete => RegisterType::Discrete,
+    }
 }
 
-/// Build Modbus poll groups from a catalog's `[frame.modbus.*]` entries.
-/// Rust port of `buildPollsFromCatalog` in the frontend.
+/// Build Modbus poll groups from a catalog's `[frame.modbus.*]` entries via the
+/// shared `wiretap-catalog` crate (which also resolves the register-from-key and
+/// signal-less-register shorthands, and the `register_base` protocol address).
 fn build_modbus_polls(catalog_toml: &str) -> Result<Vec<PollGroup>, String> {
-    let v: toml::Value =
-        toml::from_str(catalog_toml).map_err(|e| format!("Failed to parse catalog: {e}"))?;
-    let meta = v.get("meta").and_then(|m| m.get("modbus"));
-    let register_base = meta
-        .and_then(|m| m.get("register_base"))
-        .and_then(|x| x.as_integer())
-        .unwrap_or(0);
-    let default_interval = meta
-        .and_then(|m| m.get("default_interval"))
-        .and_then(|x| x.as_integer())
-        .unwrap_or(1000) as u64;
-
-    let frames = match v.get("frame").and_then(|f| f.get("modbus")).and_then(|m| m.as_table()) {
-        Some(t) => t,
-        None => return Ok(vec![]),
+    use wiretap_catalog::modbus::{ManifestError, ModbusManifest};
+    let manifest = match ModbusManifest::parse(catalog_toml) {
+        Ok(m) => m,
+        // A catalogue with no Modbus frames yields no polls (not an error).
+        Err(ManifestError::NoFrames) => return Ok(vec![]),
+        Err(e) => return Err(format!("Failed to parse catalog: {e}")),
     };
-
-    let mut polls = Vec::new();
-    for (name, body) in frames {
-        if name == "config" {
-            continue;
-        }
-        let Some(body) = body.as_table() else { continue };
-        let Some(reg) = body.get("register_number").and_then(|x| x.as_integer()) else { continue };
-        let register_type = match body.get("register_type").and_then(|x| x.as_str()).unwrap_or("holding") {
-            "input" => RegisterType::Input,
-            "coil" => RegisterType::Coil,
-            "discrete" => RegisterType::Discrete,
-            _ => RegisterType::Holding,
-        };
-        let count = body.get("length").and_then(|x| x.as_integer()).unwrap_or(1).clamp(1, 65535) as u16;
-        let interval_ms = body
-            .get("tx")
-            .and_then(|t| t.get("interval_ms").or_else(|| t.get("interval")))
-            .and_then(|x| x.as_integer())
-            .map(|n| n as u64)
-            .unwrap_or(default_interval);
-        let start = if register_base == 1 {
-            traditional_to_protocol(reg, &register_type)
-        } else {
-            reg
-        };
-        polls.push(PollGroup {
-            register_type,
-            start_register: start.clamp(0, 65535) as u16,
-            count,
-            interval_ms,
-            frame_id: reg.clamp(0, u32::MAX as i64) as u32,
-        });
-    }
-    Ok(polls)
+    Ok(manifest
+        .frames
+        .iter()
+        .map(|f| PollGroup {
+            register_type: map_register_type(f.register_type),
+            start_register: manifest.protocol_address(f),
+            count: f.length,
+            interval_ms: f.interval_ms,
+            frame_id: f.register_number as u32,
+        })
+        .collect())
 }
 
 /// Touch the MCP subscriber every 10s so the heartbeat watchdog doesn't reap a

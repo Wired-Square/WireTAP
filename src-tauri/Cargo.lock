@@ -8704,6 +8704,18 @@ dependencies = [
  "toml 0.8.23",
  "tracing-subscriber",
  "windows-sys 0.59.0",
+ "wiretap-catalog",
+]
+
+[[package]]
+name = "wiretap-catalog"
+version = "0.1.0"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.1.0#c2f447e34807431dcd416161d09acacc142db2ea"
+dependencies = [
+ "serde",
+ "thiserror 2.0.18",
+ "toml 0.8.23",
+ "toml_edit 0.22.27",
 ]
 
 [[package]]
