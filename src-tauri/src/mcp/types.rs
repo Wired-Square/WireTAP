@@ -66,6 +66,12 @@ pub struct TailLogParams {
     pub lines: usize,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ReadCatalogParams {
+    /// Catalog filename (e.g. `sungrow_shx.toml`) or display name, as listed by `list_catalogs`.
+    pub name: String,
+}
+
 // ── Tier 2 (frontend bridge) ─────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]

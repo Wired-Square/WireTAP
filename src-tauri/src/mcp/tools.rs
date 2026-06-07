@@ -180,6 +180,25 @@ impl WireTapTools {
         ok_json(json!({ "available": true, "path": path.to_string_lossy(), "lines": tail }))
     }
 
+    #[tool(description = "List the decoder catalogs (TOML) in the decoder directory, with name, filename and path.")]
+    async fn list_catalogs(&self) -> Result<CallToolResult, McpError> {
+        ok_json(crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?)
+    }
+
+    #[tool(description = "Read a decoder catalog's TOML by filename or display name (resolved within the decoder directory).")]
+    async fn read_catalog(
+        &self,
+        Parameters(p): Parameters<ReadCatalogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let catalogs = crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?;
+        let cat = catalogs
+            .iter()
+            .find(|c| c.filename == p.name || c.name == p.name)
+            .ok_or_else(|| err(format!("Catalog '{}' not found — use list_catalogs", p.name)))?;
+        let toml = crate::catalog::open_catalog(cat.path.clone()).await.map_err(err)?;
+        ok_json(json!({ "name": cat.name, "filename": cat.filename, "path": cat.path, "toml": toml }))
+    }
+
     // ── Tier 2: frontend bridge ──────────────────────────────────────────────
 
     #[tool(description = "Get per-byte payload analysis (byte roles, counters, sensors, multi-byte patterns, mux) for live discovery frames. Requires the WireTAP Discovery view to be open.")]
