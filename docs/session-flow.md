@@ -371,10 +371,11 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
 Decoding lives entirely in the crate, and so does parsing: the frontend's
 `catalogParser.ts` no longer parses TOML — `loadCatalog` calls `catalog.parse`
 (Rust) and *adapts* the resolved `Catalog` to the legacy `ParsedCatalog` shape
-(camelCase → snake_case, re-deriving the serial header byte-positions the crate
-doesn't expose) for the Decoder/Graph/Query in-memory models. The Catalog
-Editor keeps its own TOML parser ([apps/catalog/toml.ts](../src/apps/catalog/toml.ts))
-for round-tripping edits.
+(camelCase → snake_case) for the Decoder/Graph/Query in-memory models. The
+serial header byte-positions (`frame_id_*`, `source_address_*`, `header_fields`)
+are derived in the crate at parse time (v0.6.0+), so the adapter just renames
+them rather than re-deriving from masks. The Catalog Editor keeps its own TOML
+parser ([apps/catalog/toml.ts](../src/apps/catalog/toml.ts)) for round-tripping edits.
 
 ### Dispatch path
 

@@ -177,31 +177,6 @@ export function findFrameByNumericId(
   return undefined;
 }
 
-/**
- * Convert mask to byte position and length.
- * Mask is a bitmask over header bytes, e.g., 0xFFFF means first 2 bytes.
- */
-function maskToBytePosition(mask: number): { startByte: number; bytes: number } | null {
-  if (!mask || mask === 0) return null;
-
-  let firstBit = -1;
-  let lastBit = -1;
-  for (let i = 0; i < 32; i++) {
-    if ((mask >> i) & 1) {
-      if (firstBit === -1) firstBit = i;
-      lastBit = i;
-    }
-  }
-
-  if (firstBit === -1) return null;
-
-  const startByte = Math.floor(firstBit / 8);
-  const endByte = Math.floor(lastBit / 8);
-  const bytes = endByte - startByte + 1;
-
-  return { startByte, bytes };
-}
-
 // =============================================================================
 // Adapter: Rust `Catalog` (camelCase) → legacy `ParsedCatalog` (snake_case)
 // =============================================================================
@@ -291,9 +266,9 @@ function adaptModbusConfig(c?: ModbusConfig): ModbusProtocolConfig | null {
 }
 
 /**
- * Map a Rust `SerialConfig` (raw masks only) to `SerialProtocolConfig`, re-deriving
- * the byte-position convenience fields (`frame_id_*`, `source_address_*`,
- * `header_fields[]`) that consumers read but the crate doesn't expose.
+ * Map a Rust `SerialConfig` to `SerialProtocolConfig`. The byte-position
+ * convenience fields (`frame_id_*`, `source_address_*`, `header_fields[]`) are
+ * derived in the crate at parse time (v0.6.0+) — here we just rename them.
  */
 function adaptSerialConfig(c?: SerialConfig): SerialProtocolConfig | null {
   if (!c) return null;
@@ -318,46 +293,22 @@ function adaptSerialConfig(c?: SerialConfig): SerialProtocolConfig | null {
     };
   }
 
-  if (c.fields && Object.keys(c.fields).length > 0) {
-    const fields: Record<string, HeaderFieldConfig> = {};
-    const headerFields: NonNullable<SerialProtocolConfig['header_fields']> = [];
+  if (c.frameIdStartByte !== undefined) out.frame_id_start_byte = c.frameIdStartByte;
+  if (c.frameIdBytes !== undefined) out.frame_id_bytes = c.frameIdBytes;
+  if (c.frameIdByteOrder) out.frame_id_byte_order = c.frameIdByteOrder;
+  if (c.sourceAddressStartByte !== undefined) out.source_address_start_byte = c.sourceAddressStartByte;
+  if (c.sourceAddressBytes !== undefined) out.source_address_bytes = c.sourceAddressBytes;
+  if (c.sourceAddressByteOrder) out.source_address_byte_order = c.sourceAddressByteOrder;
 
-    for (const [name, f] of Object.entries(c.fields)) {
-      fields[name] = {
-        mask: f.mask,
-        shift: f.shift,
-        format: f.format as HeaderFieldConfig['format'],
-        endianness: f.endianness,
-      };
-
-      const pos = maskToBytePosition(f.mask);
-      if (!pos) continue;
-
-      const byteOrder = f.endianness || 'big';
-      const format = f.format === 'decimal' ? 'decimal' : 'hex';
-      headerFields.push({
-        name,
-        mask: f.mask,
-        byte_order: byteOrder,
-        format,
-        start_byte: pos.startByte,
-        bytes: pos.bytes,
-      });
-
-      // Special handling for id and source_address fields
-      if (name === 'id') {
-        out.frame_id_start_byte = pos.startByte;
-        out.frame_id_bytes = pos.bytes;
-        out.frame_id_byte_order = byteOrder;
-      } else if (name === 'source_address') {
-        out.source_address_start_byte = pos.startByte;
-        out.source_address_bytes = pos.bytes;
-        out.source_address_byte_order = byteOrder;
-      }
-    }
-
-    out.fields = fields;
-    if (headerFields.length > 0) out.header_fields = headerFields;
+  if (c.headerFields?.length) {
+    out.header_fields = c.headerFields.map((h) => ({
+      name: h.name,
+      mask: h.mask,
+      byte_order: h.byteOrder,
+      format: h.format as 'hex' | 'decimal',
+      start_byte: h.startByte,
+      bytes: h.bytes,
+    }));
   }
 
   return Object.keys(out).length > 0 ? out : null;

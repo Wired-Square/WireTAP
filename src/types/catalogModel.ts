@@ -92,6 +92,17 @@ export interface ChecksumConfig {
   bigEndian: boolean;
 }
 
+/** A serial header field with its byte position derived from the mask at parse time. */
+export interface HeaderFieldPosition {
+  name: string;
+  mask: number;
+  byteOrder: Endianness;
+  /** `hex` or `decimal` display. */
+  format: string;
+  startByte: number;
+  bytes: number;
+}
+
 export interface SerialConfig {
   encoding?: string;
   byteOrder?: Endianness;
@@ -100,6 +111,14 @@ export interface SerialConfig {
   minFrameLength?: number;
   checksum?: ChecksumConfig;
   fields?: Record<string, HeaderField>;
+  // Derived from `fields` at parse time (byte positions of named fields).
+  frameIdStartByte?: number;
+  frameIdBytes?: number;
+  frameIdByteOrder?: Endianness;
+  sourceAddressStartByte?: number;
+  sourceAddressBytes?: number;
+  sourceAddressByteOrder?: Endianness;
+  headerFields?: HeaderFieldPosition[];
 }
 
 export interface ModbusConfig {
