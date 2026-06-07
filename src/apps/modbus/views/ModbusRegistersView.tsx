@@ -3,11 +3,12 @@
 // Register data table showing live Modbus register values with decoded signals.
 // Filtered by selectedFrames (from FramePicker).
 
-import { useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { formatFrameId } from "../../../utils/frameIds";
 import { parseFrameKey } from "../../../utils/frameKey";
 import { bytesToAscii } from "../../../utils/byteUtils";
+import { signalRegister, signalByteRange } from "../../../utils/modbusRegisters";
 import { bgDataView, textPrimary, textMuted, textSecondary, borderDefault } from "../../../styles";
 import { emptyStateText, monoBody } from "../../../styles/typography";
 import { badgeSmallNeutral, badgeSmallInfo, badgeSmallSuccess, badgeSmallPurple, badgeSmallWarning } from "../../../styles/badgeStyles";
@@ -54,6 +55,7 @@ interface Props {
   displayFrameIdFormat: "hex" | "decimal";
   timeFormat: ModbusTimeFormat;
   rawFormat: "hex" | "ascii";
+  splitRegisters: boolean;
 }
 
 type RegisterRow = {
@@ -79,6 +81,7 @@ export default function ModbusRegistersView({
   displayFrameIdFormat,
   timeFormat,
   rawFormat,
+  splitRegisters,
 }: Props) {
   const { t } = useTranslation("modbus");
   // Tick every second to update relative timestamps
@@ -120,6 +123,100 @@ export default function ModbusRegistersView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frames, selectedFrames, registerVersion, pollLookup]);
 
+  const typeBadge = (row: RegisterRow) =>
+    row.pollGroup ? (
+      <span className={TYPE_BADGE[row.pollGroup.register_type] ?? badgeSmallNeutral}>
+        {row.pollGroup.register_type}
+      </span>
+    ) : (
+      <span className={textMuted}>—</span>
+    );
+  const intervalCell = (row: RegisterRow) =>
+    row.pollGroup?.interval_ms ? formatDuration(row.pollGroup.interval_ms, timeFormat) : '—';
+  const lastUpdateCell = (row: RegisterRow) =>
+    row.registerValue ? formatElapsed(row.registerValue.timestamp, nowMs, timeFormat) : '—';
+  const decodedSpan = (value: string, unit?: string, key?: number) => (
+    <span key={key} className="whitespace-nowrap">
+      <span className="text-[color:var(--text-data-primary)]">{value}</span>
+      {unit && <span className={`ml-0.5 ${textMuted}`}>{unit}</span>}
+    </span>
+  );
+
+  // One row per frame (grouped) — the default presentation.
+  const renderFrameRow = (row: RegisterRow) => (
+    <tr
+      key={row.frameKey}
+      className="border-b border-[color:var(--border-subtle)] hover:bg-[var(--bg-hover)]"
+    >
+      <td className={`px-3 py-1.5 ${monoBody} ${textPrimary}`}>
+        {formatFrameId(row.numericId, displayFrameIdFormat)}
+        {row.frameDef.signals.length > 0 && (
+          <span className={`ml-2 ${textMuted} font-sans`}>
+            {row.frameDef.signals.length === 1
+              ? row.frameDef.signals[0].name
+              : `${row.frameDef.signals.length} signals`}
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-1.5">{typeBadge(row)}</td>
+      <td className={`px-3 py-1.5 ${monoBody} ${textMuted}`}>
+        {row.registerValue ? formatRawBytes(row.registerValue.bytes, rawFormat) : '—'}
+      </td>
+      <td className={`px-3 py-1.5 ${textPrimary}`}>
+        {row.registerValue && row.registerValue.decoded.length > 0 ? (
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {row.registerValue.decoded.map((sig, i) => decodedSpan(sig.value, sig.unit, i))}
+          </div>
+        ) : (
+          <span className={textMuted}>—</span>
+        )}
+      </td>
+      <td className={`px-3 py-1.5 text-right whitespace-nowrap ${textMuted}`}>{intervalCell(row)}</td>
+      <td className={`px-3 py-1.5 text-right whitespace-nowrap ${textMuted}`}>{lastUpdateCell(row)}</td>
+    </tr>
+  );
+
+  // Split mode: a group header per frame, then one row per signal at its real register.
+  const renderSplitGroup = (row: RegisterRow) => {
+    const bytes = row.registerValue?.bytes;
+    return (
+      <Fragment key={row.frameKey}>
+        <tr className="border-b border-[color:var(--border-subtle)] bg-[var(--bg-surface)]">
+          <td colSpan={6} className={`px-3 py-1 ${monoBody} ${textMuted}`}>
+            <span className={textSecondary}>{formatFrameId(row.numericId, displayFrameIdFormat)}</span>
+            {row.frameDef.name && <span className="ml-2 font-sans">{row.frameDef.name}</span>}
+          </td>
+        </tr>
+        {row.frameDef.signals.map((sig, i) => {
+          const reg = signalRegister(row.numericId, sig.start_bit ?? 0);
+          const { start, length } = signalByteRange(sig.start_bit ?? 0, sig.bit_length ?? 16);
+          const slice = bytes?.slice(start, start + length);
+          const dec = row.registerValue?.decoded[i];
+          return (
+            <tr
+              key={`${row.frameKey}:${i}`}
+              className="border-b border-[color:var(--border-subtle)] hover:bg-[var(--bg-hover)] border-l-2 border-l-[color:var(--accent-purple)]"
+            >
+              <td className={`px-3 py-1.5 ${monoBody} ${textPrimary}`}>
+                {formatFrameId(reg, displayFrameIdFormat)}
+                {sig.name && <span className={`ml-2 ${textMuted} font-sans`}>{sig.name}</span>}
+              </td>
+              <td className="px-3 py-1.5">{typeBadge(row)}</td>
+              <td className={`px-3 py-1.5 ${monoBody} ${textMuted}`}>
+                {slice && slice.length > 0 ? formatRawBytes(slice, rawFormat) : '—'}
+              </td>
+              <td className={`px-3 py-1.5 ${textPrimary}`}>
+                {dec ? decodedSpan(dec.value, dec.unit) : <span className={textMuted}>—</span>}
+              </td>
+              <td className={`px-3 py-1.5 text-right whitespace-nowrap ${textMuted}`}>{intervalCell(row)}</td>
+              <td className={`px-3 py-1.5 text-right whitespace-nowrap ${textMuted}`}>{lastUpdateCell(row)}</td>
+            </tr>
+          );
+        })}
+      </Fragment>
+    );
+  };
+
   if (frames.size === 0) {
     return (
       <div className={`h-full flex items-center justify-center ${bgDataView}`}>
@@ -154,74 +251,7 @@ export default function ModbusRegistersView({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.frameKey}
-              className={`border-b border-[color:var(--border-subtle)] hover:bg-[var(--bg-hover)]`}
-            >
-              {/* Register address */}
-              <td className={`px-3 py-1.5 ${monoBody} ${textPrimary}`}>
-                {formatFrameId(row.numericId, displayFrameIdFormat)}
-                {row.frameDef.signals.length > 0 && (
-                  <span className={`ml-2 ${textMuted} font-sans`}>
-                    {row.frameDef.signals.length === 1
-                      ? row.frameDef.signals[0].name
-                      : `${row.frameDef.signals.length} signals`}
-                  </span>
-                )}
-              </td>
-
-              {/* Register type badge */}
-              <td className="px-3 py-1.5">
-                {row.pollGroup ? (
-                  <span className={TYPE_BADGE[row.pollGroup.register_type] ?? badgeSmallNeutral}>
-                    {row.pollGroup.register_type}
-                  </span>
-                ) : (
-                  <span className={textMuted}>—</span>
-                )}
-              </td>
-
-              {/* Raw bytes */}
-              <td className={`px-3 py-1.5 ${monoBody} ${textMuted}`}>
-                {row.registerValue
-                  ? formatRawBytes(row.registerValue.bytes, rawFormat)
-                  : '—'}
-              </td>
-
-              {/* Decoded signals */}
-              <td className={`px-3 py-1.5 ${textPrimary}`}>
-                {row.registerValue && row.registerValue.decoded.length > 0 ? (
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                    {row.registerValue.decoded.map((sig, i) => (
-                      <span key={i} className="whitespace-nowrap">
-                        <span className="text-[color:var(--text-data-primary)]">{sig.value}</span>
-                        {sig.unit && (
-                          <span className={`ml-0.5 ${textMuted}`}>{sig.unit}</span>
-                        )}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className={textMuted}>—</span>
-                )}
-              </td>
-
-              {/* Poll interval */}
-              <td className={`px-3 py-1.5 text-right whitespace-nowrap ${textMuted}`}>
-                {row.pollGroup?.interval_ms
-                  ? formatDuration(row.pollGroup.interval_ms, timeFormat)
-                  : '—'}
-              </td>
-
-              {/* Last update */}
-              <td className={`px-3 py-1.5 text-right whitespace-nowrap ${textMuted}`}>
-                {row.registerValue
-                  ? formatElapsed(row.registerValue.timestamp, nowMs, timeFormat)
-                  : '—'}
-              </td>
-            </tr>
-          ))}
+          {rows.map((row) => splitRegisters ? renderSplitGroup(row) : renderFrameRow(row))}
         </tbody>
       </table>
     </div>

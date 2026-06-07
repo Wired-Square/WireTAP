@@ -89,6 +89,8 @@ export interface ResolvedSignal {
 export interface ResolvedFrame {
   frameId: number;
   protocol: 'can' | 'serial' | 'modbus';
+  /** TOML table name (e.g. a Modbus frame's `ems_control`), when meaningful. */
+  name?: string;
   length: number;
   transmitter?: string;
   interval?: number;
@@ -751,6 +753,7 @@ export function parseCatalogText(toml: string): ParsedCatalog {
     frameMap.set(registerNumber, {
       frameId: registerNumber,
       protocol: 'modbus',
+      name: key,
       length: lengthBytes,
       transmitter: body?.transmitter,
       interval,

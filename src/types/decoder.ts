@@ -34,6 +34,8 @@ export type MuxDef = {
 
 export type FrameDetail = {
   id: number;
+  /** TOML table name (e.g. a Modbus frame's `ems_control`), when available. */
+  name?: string;
   len: number;
   isExtended?: boolean;
   bus?: number;

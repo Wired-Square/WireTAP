@@ -322,34 +322,41 @@ function FramePicker({
               {sortedFrames.map((f) => (
                 <label
                   key={f.id}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-xs ${hoverLight} cursor-pointer`}
+                  className={`flex flex-col gap-0.5 px-3 py-1.5 text-xs ${hoverLight} cursor-pointer`}
                   style={{
                     color: f.lenMismatch ? "#f97316" : undefined,
                   }}
                   title={f.lenMismatch ? "Payload length varies across frames" : undefined}
                 >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(f.id)}
-                    onChange={() => onToggle(f.id)}
-                    className="w-3 h-3"
-                  />
-                  <span className="font-mono">{formatId(f)}</span>
-                  <span className="text-[10px] text-[color:var(--text-muted)]">
-                    [{f.len}]
-                  </span>
-                  {typeof f.bus === "number" && (
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(f.id)}
+                      onChange={() => onToggle(f.id)}
+                      className="w-3 h-3"
+                    />
+                    <span className="font-mono">{formatId(f)}</span>
                     <span className="text-[10px] text-[color:var(--text-muted)]">
-                      bus {f.bus}
+                      [{f.len}]
                     </span>
-                  )}
-                  {isMultiProtocol && f.protocol && (
-                    <span className={`text-[9px] px-1 py-0.5 rounded font-medium ${
-                      f.protocol === 'modbus' ? 'bg-amber-500/15 text-[color:var(--text-amber)]' :
-                      f.protocol === 'serial' ? 'bg-purple-500/15 text-[color:var(--text-purple)]' :
-                      'bg-blue-500/15 text-[color:var(--text-blue)]'
-                    }`}>
-                      {f.protocol.toUpperCase()}
+                    {typeof f.bus === "number" && (
+                      <span className="text-[10px] text-[color:var(--text-muted)]">
+                        bus {f.bus}
+                      </span>
+                    )}
+                    {isMultiProtocol && f.protocol && (
+                      <span className={`text-[9px] px-1 py-0.5 rounded font-medium ${
+                        f.protocol === 'modbus' ? 'bg-amber-500/15 text-[color:var(--text-amber)]' :
+                        f.protocol === 'serial' ? 'bg-purple-500/15 text-[color:var(--text-purple)]' :
+                        'bg-blue-500/15 text-[color:var(--text-blue)]'
+                      }`}>
+                        {f.protocol.toUpperCase()}
+                      </span>
+                    )}
+                  </span>
+                  {f.detail && (
+                    <span className="pl-5 text-[10px] text-[color:var(--text-muted)] font-mono leading-snug">
+                      {f.detail}
                     </span>
                   )}
                 </label>

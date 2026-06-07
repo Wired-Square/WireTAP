@@ -121,6 +121,7 @@ export const useModbusStore = create<ModbusState>((set, get) => ({
         const fk = frameKey('modbus', id);
         frameMap.set(fk, {
           id,
+          name: frame.name,
           len: frame.length,
           isExtended: false,
           bus: frame.bus,

@@ -5,10 +5,11 @@
 // Shares session with decoder so both apps can work on the same data.
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { Server, Settings as SettingsIcon, Play, Square, Clock, Timer, Binary, Type } from "lucide-react";
+import { Server, Settings as SettingsIcon, Play, Square, Clock, Timer, Binary, Type, Group, Ungroup } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { dataViewContainer } from "../../styles";
 import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
+import { signalRegister } from "../../utils/modbusRegisters";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
@@ -40,6 +41,7 @@ export default function Modbus() {
   const [isPolling, setIsPolling] = useState(true);
   const [timeFormat, setTimeFormat] = useState<"seconds" | "human">("human");
   const [rawFormat, setRawFormat] = useState<"hex" | "ascii">("hex");
+  const [splitRegisters, setSplitRegisters] = useState(false);
 
   // Modbus store
   const catalogPath = useModbusStore((s) => s.catalogPath);
@@ -211,7 +213,8 @@ export default function Modbus() {
     }
   }, [loadCatalog, sessionId, reconnectWithPolls]);
 
-  // Build FrameInfo list for FramePickerDialog (composite keys)
+  // Build FrameInfo list for FramePickerDialog (composite keys).
+  // In split mode, surface each frame's constituent registers as a detail line.
   const pickerFrameList = useMemo(
     () => Array.from(frames.entries())
       .map(([fk, f]) => ({
@@ -220,13 +223,18 @@ export default function Modbus() {
         isExtended: false,
         bus: f.bus,
         protocol: 'modbus' as const,
+        detail: splitRegisters && f.signals.length > 0
+          ? f.signals
+              .map(s => `${signalRegister(f.id, s.start_bit ?? 0)} ${s.name ?? ''}`.trim())
+              .join('  ·  ')
+          : undefined,
       }))
       .sort((a, b) => {
         const aNum = parseInt(a.id.split(':')[1]);
         const bNum = parseInt(b.id.split(':')[1]);
         return aNum - bNum;
       }),
-    [frames]
+    [frames, splitRegisters]
   );
 
   // Total register count from poll groups
@@ -331,15 +339,28 @@ export default function Modbus() {
               </button>
             ) : null}
 
-            {/* Raw value format toggle (registers tab only) */}
+            {/* Split registers + raw value format toggles (registers tab only) */}
             {activeTab === 'registers' && (
-              <button
-                onClick={() => setRawFormat(f => f === "hex" ? "ascii" : "hex")}
-                className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-                title={rawFormat === "hex" ? t("registers.switchToAscii") : t("registers.switchToHex")}
-              >
-                {rawFormat === "hex" ? <Binary size={14} /> : <Type size={14} />}
-              </button>
+              <>
+                <button
+                  onClick={() => setSplitRegisters(s => !s)}
+                  className={`p-1 rounded transition-colors hover:bg-[var(--hover-bg)] ${
+                    splitRegisters
+                      ? "text-[color:var(--accent-purple)]"
+                      : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                  }`}
+                  title={splitRegisters ? t("registers.splitOff") : t("registers.splitOn")}
+                >
+                  {splitRegisters ? <Ungroup size={14} /> : <Group size={14} />}
+                </button>
+                <button
+                  onClick={() => setRawFormat(f => f === "hex" ? "ascii" : "hex")}
+                  className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                  title={rawFormat === "hex" ? t("registers.switchToAscii") : t("registers.switchToHex")}
+                >
+                  {rawFormat === "hex" ? <Binary size={14} /> : <Type size={14} />}
+                </button>
+              </>
             )}
 
             {/* Time format toggle */}
@@ -363,6 +384,7 @@ export default function Modbus() {
             displayFrameIdFormat={displayFrameIdFormat}
             timeFormat={timeFormat}
             rawFormat={rawFormat}
+            splitRegisters={splitRegisters}
           />
         )}
         {activeTab === 'config' && (

@@ -23,6 +23,8 @@
   "registers": {
     "switchToAscii": "Show raw values as ASCII",
     "switchToHex": "Show raw values as hex",
+    "splitOn": "Split frames into individual registers",
+    "splitOff": "Group registers by frame",
     "columns": {
       "register": "Register",
       "type": "Type",

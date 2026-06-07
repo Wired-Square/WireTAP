@@ -13,6 +13,8 @@ export type FrameInfo = {
   bus?: number;
   lenMismatch?: boolean;
   protocol?: string;
+  /** Optional muted second line under the row (e.g. Modbus split-register detail). */
+  detail?: string;
 };
 
 /**
