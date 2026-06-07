@@ -13,11 +13,13 @@ import {
   decodeSessionError,
   decodeSubscribeAck,
   decodeCommandResponse,
+  decodeBridgeRequest,
   encodeAuth,
   encodeSubscribe,
   encodeUnsubscribe,
   encodeHeartbeat,
   encodeCommand,
+  encodeBridgeResponse,
   MsgType,
   HEADER_SIZE,
 } from "./wsProtocol";
@@ -29,6 +31,9 @@ interface WsConfig {
 }
 
 type MessageHandler = (payload: DataView, raw: ArrayBuffer) => void;
+
+/** A bridge method handler: receives decoded params, returns a JSON-serialisable result. */
+type BridgeMethodHandler = (params: unknown) => Promise<unknown> | unknown;
 
 class WsTransport {
   private ws: WebSocket | null = null;
@@ -57,6 +62,9 @@ class WsTransport {
 
   // Global handlers (channel 0)
   private globalHandlers: Map<number, MessageHandler[]> = new Map();
+
+  // MCP bridge method handlers (reverse RPC: Rust → frontend)
+  private bridgeHandlers: Map<string, BridgeMethodHandler> = new Map();
 
   // Reconnect state
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -257,6 +265,20 @@ class WsTransport {
     });
   }
 
+  /**
+   * Register a handler for an MCP bridge method (reverse RPC from Rust).
+   * The handler's return value is JSON-serialised and sent back as the response.
+   * Returns an unregister function.
+   */
+  registerBridgeMethod(method: string, handler: BridgeMethodHandler): () => void {
+    this.bridgeHandlers.set(method, handler);
+    return () => {
+      if (this.bridgeHandlers.get(method) === handler) {
+        this.bridgeHandlers.delete(method);
+      }
+    };
+  }
+
   /** Whether the transport is connected and authenticated. */
   get isConnected(): boolean {
     return this.connected && this.authenticated;
@@ -281,6 +303,9 @@ class WsTransport {
         return;
       case MsgType.CommandResponse:
         this.handleCommandResponse(buf);
+        return;
+      case MsgType.BridgeRequest:
+        this.handleBridgeRequest(buf);
         return;
       case MsgType.Heartbeat:
         this.ws?.send(encodeHeartbeat());
@@ -343,6 +368,26 @@ class WsTransport {
       pending.reject(new Error(error ?? "Command failed"));
     } else {
       pending.resolve(data);
+    }
+  }
+
+  private async handleBridgeRequest(buf: ArrayBuffer): Promise<void> {
+    const payload = new DataView(buf, HEADER_SIZE);
+    if (payload.byteLength < 6) return;
+    const { correlationId, method, params } = decodeBridgeRequest(payload);
+    const handler = this.bridgeHandlers.get(method);
+    if (!handler) {
+      this.ws?.send(
+        encodeBridgeResponse(correlationId, 1, `Unknown bridge method: ${method}`),
+      );
+      return;
+    }
+    try {
+      const result = await handler(params);
+      this.ws?.send(encodeBridgeResponse(correlationId, 0, JSON.stringify(result ?? null)));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.ws?.send(encodeBridgeResponse(correlationId, 1, msg));
     }
   }
 

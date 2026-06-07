@@ -1,9 +1,18 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// Global log file handle. When `Some`, `tlog!` writes to both stderr and this file.
 pub(crate) static LOG_FILE: Mutex<Option<std::fs::File>> = Mutex::new(None);
+
+/// Path of the active log file, set when file logging is initialised.
+/// Read by the MCP `tail_log` tool to surface recent diagnostics.
+pub(crate) static LOG_PATH: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// Return the path of the active log file, if file logging is enabled.
+pub(crate) fn current_log_path() -> Option<PathBuf> {
+    LOG_PATH.lock().ok().and_then(|g| g.clone())
+}
 
 /// Global log level threshold (0=Off, 1=Info, 2=Debug, 3=Verbose).
 /// Controls which frontend messages pass through `log_from_frontend`.
@@ -60,6 +69,9 @@ pub(crate) fn init_file_logging(reports_dir: &Path) -> Result<(), String> {
 
     if let Ok(mut guard) = LOG_FILE.lock() {
         *guard = Some(file);
+    }
+    if let Ok(mut guard) = LOG_PATH.lock() {
+        *guard = Some(log_path.clone());
     }
 
     // Use eprintln directly here since tlog! would try to lock LOG_FILE (which we just set)

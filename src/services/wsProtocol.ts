@@ -35,6 +35,8 @@ export const MsgType = {
   SubscribeNack: 0x13,
   Command: 0x20,
   CommandResponse: 0x21,
+  BridgeRequest: 0x30,
+  BridgeResponse: 0x31,
   Heartbeat: 0xfe,
   Auth: 0xff,
 } as const;
@@ -463,4 +465,59 @@ export function decodeCommandResponse(payload: DataView): {
     }
   }
   return { correlationId, status, data };
+}
+
+// ============================================================================
+// BridgeRequest / BridgeResponse  (0x30 / 0x31)
+//
+// Reverse RPC: the Rust backend (driven by the MCP server) asks the frontend
+// for state only it holds. The frontend computes a result and replies.
+// ============================================================================
+
+/**
+ * Decode a BridgeRequest payload (server → frontend).
+ * Payload: [correlation_id: u32 LE][method_len: u16 LE][method: UTF-8][params: JSON bytes]
+ */
+export function decodeBridgeRequest(payload: DataView): {
+  correlationId: number;
+  method: string;
+  params: unknown;
+} {
+  const correlationId = payload.getUint32(0, true);
+  const methodLen = payload.getUint16(4, true);
+  const methodBytes = new Uint8Array(payload.buffer, payload.byteOffset + 6, methodLen);
+  const method = commandDecoder.decode(methodBytes);
+  const paramsStart = 6 + methodLen;
+  let params: unknown = null;
+  if (payload.byteLength > paramsStart) {
+    const paramsBytes = new Uint8Array(
+      payload.buffer,
+      payload.byteOffset + paramsStart,
+      payload.byteLength - paramsStart,
+    );
+    try {
+      params = JSON.parse(commandDecoder.decode(paramsBytes));
+    } catch {
+      params = null;
+    }
+  }
+  return { correlationId, method, params };
+}
+
+/**
+ * Encode a BridgeResponse message (frontend → server).
+ * Payload: [correlation_id: u32 LE][status: u8 (0=ok, 1=error)][payload: JSON bytes or error string]
+ */
+export function encodeBridgeResponse(
+  correlationId: number,
+  status: number,
+  body: string,
+): ArrayBuffer {
+  const bodyBytes = commandEncoder.encode(body);
+  const payload = new Uint8Array(5 + bodyBytes.byteLength);
+  const view = new DataView(payload.buffer);
+  view.setUint32(0, correlationId, true);
+  view.setUint8(4, status);
+  payload.set(bodyBytes, 5);
+  return concat(buildHeader(MsgType.BridgeResponse, 0), payload);
 }

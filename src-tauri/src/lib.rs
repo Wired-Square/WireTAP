@@ -26,6 +26,7 @@ mod transmit;
 mod transmit_history;
 mod replay;
 mod io_test;
+mod mcp;
 pub mod ws;
 
 use std::sync::Mutex;
@@ -868,6 +869,45 @@ fn get_ws_config() -> Result<WsConfig, String> {
     })
 }
 
+// ============================================================================
+// MCP Server control
+// ============================================================================
+
+#[derive(serde::Serialize)]
+pub struct McpStatus {
+    pub running: bool,
+    pub port: Option<u16>,
+}
+
+#[tauri::command]
+fn get_mcp_status() -> McpStatus {
+    McpStatus {
+        running: crate::mcp::is_running(),
+        port: crate::mcp::running_port(),
+    }
+}
+
+/// Start or stop the MCP server, applying the current saved settings. The
+/// settings UI saves first, then calls this so port/token/control changes take
+/// effect without an app restart.
+#[tauri::command]
+fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String> {
+    crate::mcp::stop();
+    if enabled {
+        let s = settings::load_settings_sync(&app)?;
+        crate::mcp::start(
+            app.clone(),
+            s.mcp_server_port,
+            s.mcp_allow_control,
+            s.mcp_server_token.clone(),
+        )?;
+    }
+    Ok(McpStatus {
+        running: crate::mcp::is_running(),
+        port: crate::mcp::running_port(),
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Pipe `tracing` events from framelink (and any other crate that
@@ -1001,6 +1041,23 @@ pub fn run() {
                 Err(e) => {
                     tlog!("[ws] Failed to start binary transport server: {}", e);
                 }
+            }
+
+            // Start MCP server if enabled in settings (opt-in; port conflict must
+            // not crash the app, so failures are logged and swallowed).
+            match settings::load_settings_sync(app.handle()) {
+                Ok(s) if s.mcp_server_enabled => {
+                    if let Err(e) = mcp::start(
+                        app.handle().clone(),
+                        s.mcp_server_port,
+                        s.mcp_allow_control,
+                        s.mcp_server_token.clone(),
+                    ) {
+                        tlog!("[mcp] Failed to start: {}", e);
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => tlog!("[mcp] Could not load settings to start server: {}", e),
             }
 
             // Install example decoders on app startup (only copies missing files)
@@ -1310,6 +1367,9 @@ pub fn run() {
                         io::framelink::framelink_read_signal,
                         // WebSocket binary transport
                         get_ws_config,
+                        // MCP server control
+                        get_mcp_status,
+                        toggle_mcp_server,
         ]);
 
     // Handle window close events to prevent crashes on macOS 26.2+ (Tahoe)

@@ -50,3 +50,6 @@ src-tauri/gen/schemas
 # Local research notes
 docs/local/
 /src-tauri/.cargo/
+
+# Obsidian vault app config (docs live in the Google Drive vault, not here)
+.obsidian/

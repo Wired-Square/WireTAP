@@ -336,6 +336,15 @@ export interface AppSettings {
   smp_port?: number;
   /** UI language code (BCP 47, e.g. "en-AU"). Drives i18next translations. */
   language?: string;
+  // MCP server (lets an external Claude client query live runtime state)
+  /** Master gate: when true the MCP server binds and listens. */
+  mcp_server_enabled?: boolean;
+  /** Second gate: when true the control (mutation) tools are registered. */
+  mcp_allow_control?: boolean;
+  /** Fixed localhost port the MCP server listens on (default 8787). */
+  mcp_server_port?: number;
+  /** Bearer token required by clients (empty = no auth). */
+  mcp_server_token?: string;
 }
 
 /**
@@ -403,6 +412,11 @@ function normalizeSettings(
     modbus_max_register_errors: settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
     // Localisation
     language: settings.language || "en-AU",
+    // MCP server (both gates off by default)
+    mcp_server_enabled: settings.mcp_server_enabled ?? false,
+    mcp_allow_control: settings.mcp_allow_control ?? false,
+    mcp_server_port: settings.mcp_server_port ?? 8787,
+    mcp_server_token: settings.mcp_server_token ?? "",
   };
 }
 

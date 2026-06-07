@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **MCP server for live runtime introspection (opt-in)**: WireTAP can now host a local [Model Context Protocol](https://modelcontextprotocol.io) server so an external AI client (e.g. Claude Code) can query live app state — active sessions, captures and their frames, IO profiles, playback position, recent logs — and, when separately enabled, drive the app (transmit a frame, stop a session, replay a capture). The richest reverse-engineering data (per-byte payload analysis, decoded signals, the live discovery frame map) is fetched from the frontend over the existing binary WebSocket channel via a new reverse request/response path. The server speaks streamable-HTTP on `127.0.0.1` at a configurable port (default 8787) with an optional bearer token, and is governed by two independent, off-by-default switches in **Settings → MCP Server**: one to enable the server, one to allow the control tools. Read-only and localhost-bound by default.
+
 ## [0.6.7] - 2026-05-29
 
 ### Fixed

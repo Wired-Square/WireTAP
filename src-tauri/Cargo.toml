@@ -49,6 +49,13 @@ toml = "0.8"
 can-dbc = "8"
 reqwest = { version = "0.12", features = ["json"] }
 rumqttc = "0.24"
+# MCP server — exposes live runtime state to an external Claude client over a
+# localhost streamable-HTTP transport (opt-in via settings). axum hosts the
+# transport; tokio-util provides the graceful-shutdown token.
+rmcp = { version = "1.7", features = ["server", "macros", "transport-streamable-http-server"] }
+axum = "0.8"
+schemars = "1"
+tokio-util = "0.7"
 tokio-modbus = { version = "0.17", default-features = false, features = ["tcp"] }
 tokio-tungstenite = "0.26"
 rusqlite = { version = "0.32", features = ["bundled"] }

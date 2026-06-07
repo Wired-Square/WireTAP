@@ -27,6 +27,15 @@ pub fn ws_server() -> Option<&'static WsServer> {
 
 static NEXT_CONN_ID: AtomicUsize = AtomicUsize::new(1);
 
+/// Count of currently-authenticated connections. Lets the MCP bridge fast-fail
+/// when no frontend is connected rather than waiting for a request timeout.
+static AUTH_CONN_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+/// Number of authenticated WS connections (i.e. live frontend windows).
+pub fn authenticated_connection_count() -> usize {
+    AUTH_CONN_COUNT.load(Ordering::Relaxed)
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -258,6 +267,9 @@ async fn connection_manager_task(
 
                     ServerCommand::Authenticated { conn_id } => {
                         if let Some(conn) = connections.get_mut(&conn_id) {
+                            if !conn.authenticated {
+                                AUTH_CONN_COUNT.fetch_add(1, Ordering::Relaxed);
+                            }
                             conn.authenticated = true;
                             conn.last_activity = Instant::now();
                         }
@@ -336,6 +348,9 @@ async fn connection_manager_task(
 
                     ServerCommand::ConnectionClosed { conn_id } => {
                         if let Some(conn) = connections.remove(&conn_id) {
+                            if conn.authenticated {
+                                AUTH_CONN_COUNT.fetch_sub(1, Ordering::Relaxed);
+                            }
                             for ch in &conn.subscribed_channels {
                                 decrement_refcount(&mut channel_refcount, &mut channel_map, *ch);
                             }
@@ -400,6 +415,9 @@ async fn connection_manager_task(
 
                 for conn_id in timed_out {
                     if let Some(mut conn) = connections.remove(&conn_id) {
+                        if conn.authenticated {
+                            AUTH_CONN_COUNT.fetch_sub(1, Ordering::Relaxed);
+                        }
                         for ch in &conn.subscribed_channels {
                             decrement_refcount(&mut channel_refcount, &mut channel_map, *ch);
                         }
@@ -602,6 +620,20 @@ async fn connection_read_task(
                             }
                             Err(e) => {
                                 tlog!("[ws] Connection {conn_id}: invalid command payload: {e:?}");
+                            }
+                        }
+                    }
+
+                    MsgType::BridgeResponse => {
+                        if !authenticated {
+                            continue;
+                        }
+                        match super::protocol::decode_bridge_response(payload) {
+                            Ok(resp) => {
+                                crate::mcp::bridge::resolve(resp.correlation_id, resp.status, resp.payload);
+                            }
+                            Err(e) => {
+                                tlog!("[ws] Connection {conn_id}: invalid bridge response: {e:?}");
                             }
                         }
                     }

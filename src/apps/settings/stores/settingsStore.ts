@@ -26,7 +26,7 @@ import {
 } from '../../../utils/graphLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display";
+export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display" | "mcp";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
 // Buffer setting defaults — single source of truth, referenced by settingsStore and useSettings
@@ -124,6 +124,11 @@ interface AppSettings {
   transmit_max_history?: number;
   smp_port?: number;
   language?: string;
+  // MCP server
+  mcp_server_enabled?: boolean;
+  mcp_allow_control?: boolean;
+  mcp_server_port?: number;
+  mcp_server_token?: string;
   // Theme settings
   theme_mode?: ThemeMode;
   theme_bg_primary_light?: string;
@@ -340,6 +345,14 @@ interface SettingsState {
     language: string;
   };
 
+  // MCP server (external Claude client access to live runtime state)
+  mcp: {
+    serverEnabled: boolean;
+    allowControl: boolean;
+    serverPort: number;
+    serverToken: string;
+  };
+
   // UI state
   ui: {
     currentSection: SettingsSection;
@@ -430,6 +443,10 @@ interface SettingsState {
   setModbusMaxRegisterErrors: (value: number) => void;
   setSmpPort: (port: number) => void;
   setLanguage: (lang: string) => void;
+  setMcpServerEnabled: (value: boolean) => void;
+  setMcpAllowControl: (value: boolean) => void;
+  setMcpServerPort: (port: number) => void;
+  setMcpServerToken: (token: string) => void;
 }
 
 // Auto-save debounce
@@ -579,6 +596,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     modbusMaxRegisterErrors: DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
     smpPort: 1337,
     language: "en-AU",
+  },
+
+  mcp: {
+    serverEnabled: false,
+    allowControl: false,
+    serverPort: 8787,
+    serverToken: "",
   },
 
   ui: {
@@ -787,6 +811,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           smpPort: normalized.smp_port ?? 1337,
           language: normalized.language ?? "en-AU",
         },
+        mcp: {
+          serverEnabled: normalized.mcp_server_enabled ?? false,
+          allowControl: normalized.mcp_allow_control ?? false,
+          serverPort: normalized.mcp_server_port ?? 8787,
+          serverToken: normalized.mcp_server_token ?? "",
+        },
         // When migration occurred, use pre-migration profiles as original so hasUnsavedChanges() detects the diff
         originalSettings: migration.removedIds.size > 0
           ? { ...normalized, io_profiles: settings.io_profiles || [] }
@@ -862,7 +892,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (!get().hasUnsavedChanges()) return;
 
     try {
-      const { locations, ioProfiles, display, buffers, general } = get();
+      const { locations, ioProfiles, display, buffers, general, mcp } = get();
 
       const settings = {
         config_path: locations.configPath,
@@ -931,6 +961,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         smp_port: general.smpPort,
         // Localisation
         language: general.language,
+        // MCP server
+        mcp_server_enabled: mcp.serverEnabled,
+        mcp_allow_control: mcp.allowControl,
+        mcp_server_port: mcp.serverPort,
+        mcp_server_token: mcp.serverToken,
       };
 
       await saveSettingsApi(settings);
@@ -947,7 +982,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   hasUnsavedChanges: () => {
-    const { locations, ioProfiles, display, buffers, general, originalSettings } = get();
+    const { locations, ioProfiles, display, buffers, general, mcp, originalSettings } = get();
     if (!originalSettings) return false;
 
     const currentSettings = {
@@ -1016,6 +1051,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       smp_port: general.smpPort,
       // Localisation
       language: general.language,
+      // MCP server
+      mcp_server_enabled: mcp.serverEnabled,
+      mcp_allow_control: mcp.allowControl,
+      mcp_server_port: mcp.serverPort,
+      mcp_server_token: mcp.serverToken,
     };
 
     return stableStringify(currentSettings) !== stableStringify(originalSettings);
@@ -1454,6 +1494,23 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set((state) => ({
       general: { ...state.general, language: lang },
     }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setMcpServerEnabled: (value) => {
+    set((state) => ({ mcp: { ...state.mcp, serverEnabled: value } }));
+    scheduleSave(get().saveSettings);
+  },
+  setMcpAllowControl: (value) => {
+    set((state) => ({ mcp: { ...state.mcp, allowControl: value } }));
+    scheduleSave(get().saveSettings);
+  },
+  setMcpServerPort: (port) => {
+    set((state) => ({ mcp: { ...state.mcp, serverPort: port } }));
+    scheduleSave(get().saveSettings);
+  },
+  setMcpServerToken: (token) => {
+    set((state) => ({ mcp: { ...state.mcp, serverToken: token } }));
     scheduleSave(get().saveSettings);
   },
 }));

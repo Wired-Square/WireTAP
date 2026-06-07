@@ -151,6 +151,22 @@ pub struct AppSettings {
     /// UI language code (BCP 47, e.g. "en-AU"). Drives i18next translations.
     #[serde(default = "default_language")]
     pub language: String,
+
+    // MCP server — lets an external Claude client query live runtime state over
+    // a localhost HTTP transport. Both gates default off.
+    /// Master gate: when true the MCP server binds and listens.
+    #[serde(default = "default_mcp_server_enabled")]
+    pub mcp_server_enabled: bool,
+    /// Second gate: when true the control (mutation) tools are registered.
+    #[serde(default = "default_mcp_allow_control")]
+    pub mcp_allow_control: bool,
+    /// Fixed localhost port the MCP server listens on.
+    #[serde(default = "default_mcp_server_port")]
+    pub mcp_server_port: u16,
+    /// Bearer token required by clients (empty = no auth). Stored in settings so
+    /// static client config survives restarts.
+    #[serde(default)]
+    pub mcp_server_token: String,
 }
 
 fn default_display_frame_id_format() -> String {
@@ -302,6 +318,17 @@ fn default_language() -> String {
     "en-AU".to_string()
 }
 
+// MCP server defaults
+fn default_mcp_server_enabled() -> bool {
+    false
+}
+fn default_mcp_allow_control() -> bool {
+    false
+}
+fn default_mcp_server_port() -> u16 {
+    8787
+}
+
 // Decoder buffer limit defaults
 fn default_decoder_max_unmatched_frames() -> u32 {
     1000
@@ -401,6 +428,11 @@ impl Default for AppSettings {
             modbus_max_register_errors: default_modbus_max_register_errors(),
             smp_port: default_smp_port(),
             language: default_language(),
+            // MCP server (both gates off by default)
+            mcp_server_enabled: default_mcp_server_enabled(),
+            mcp_allow_control: default_mcp_allow_control(),
+            mcp_server_port: default_mcp_server_port(),
+            mcp_server_token: String::new(),
         }
     }
 }
@@ -483,6 +515,11 @@ impl AppSettings {
             modbus_max_register_errors: default_modbus_max_register_errors(),
             smp_port: default_smp_port(),
             language: default_language(),
+            // MCP server (both gates off by default)
+            mcp_server_enabled: default_mcp_server_enabled(),
+            mcp_allow_control: default_mcp_allow_control(),
+            mcp_server_port: default_mcp_server_port(),
+            mcp_server_token: String::new(),
         })
     }
 }

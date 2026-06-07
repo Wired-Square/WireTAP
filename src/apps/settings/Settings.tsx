@@ -18,6 +18,7 @@ import {
   LayoutGrid,
   Shield,
   Cpu,
+  Bot,
 } from "lucide-react";
 import { bgDataView, borderDataView } from "../../styles/colourTokens";
 import LocationsView from "./views/LocationsView";
@@ -30,6 +31,7 @@ import BookmarksView from "./views/BookmarksView";
 import SelectionSetsView from "./views/SelectionSetsView";
 import GraphLayoutsView from "./views/GraphLayoutsView";
 import PrivacyView from "./views/PrivacyView";
+import McpServerView from "./views/McpServerView";
 import Devices from "../devices/Devices";
 import IOProfileDialog from "./dialogs/IOProfileDialog";
 import EditCatalogDialog from "./dialogs/EditCatalogDialog";
@@ -257,6 +259,7 @@ export default function Settings() {
     { id: "devices", label: t("sidebar.devices"), icon: Cpu },
     { id: "general", label: t("sidebar.general"), icon: Cog },
     { id: "graph-layouts", label: t("sidebar.graphLayouts"), icon: LayoutGrid },
+    { id: "mcp", label: "MCP Server", icon: Bot },
     { id: "privacy", label: t("sidebar.privacy"), icon: Shield },
     { id: "selection-sets", label: t("sidebar.selectionSets"), icon: Star },
     // Hide Storage on iOS - custom directory paths aren't supported
@@ -378,6 +381,8 @@ export default function Settings() {
               onChangeTelemetryEnabled={setTelemetryEnabled}
             />
           )}
+
+          {currentSection === "mcp" && <McpServerView />}
 
           {/* Data IO Section */}
           {currentSection === "data-io" && (

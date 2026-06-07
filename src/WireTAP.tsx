@@ -21,6 +21,7 @@ import { useSettingsStore } from "./apps/settings/stores/settingsStore";
 import { checkRecoveryOccurred } from "./api/io";
 import { checkCandorMigration, tlog } from "./api/settings";
 import { initWsTransport } from "./services/wsTransport";
+import { initMcpBridge } from "./services/mcpBridge";
 import "./services/memoryDiag"; // Memory diagnostic counters
 import type { CandorMigrationInfo } from "./api/settings";
 import ErrorDialog from "./dialogs/ErrorDialog";
@@ -116,6 +117,7 @@ export default function WireTAP() {
   useEffect(() => {
     if (settingsLoaded) {
       initWsTransport();
+      initMcpBridge();
     }
   }, [settingsLoaded]);
 

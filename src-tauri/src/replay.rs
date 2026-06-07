@@ -98,6 +98,18 @@ pub async fn io_start_replay(
     speed: f64,
     loop_replay: bool,
 ) -> Result<(), String> {
+    start_replay(session_id, replay_id, frames, speed, loop_replay).await
+}
+
+/// Core replay implementation, callable without an `AppHandle`.
+/// Used by both the Tauri command above and the MCP `replay_capture` tool.
+pub async fn start_replay(
+    session_id: String,
+    replay_id: String,
+    frames: Vec<ReplayFrame>,
+    speed: f64,
+    loop_replay: bool,
+) -> Result<(), String> {
     if frames.is_empty() {
         return Err("No frames to replay".to_string());
     }

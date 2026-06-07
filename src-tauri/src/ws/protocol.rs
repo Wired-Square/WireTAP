@@ -27,6 +27,9 @@ pub enum MsgType {
     SubscribeNack    = 0x13,
     Command          = 0x20,
     CommandResponse  = 0x21,
+    // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
+    BridgeRequest    = 0x30,
+    BridgeResponse   = 0x31,
     Heartbeat        = 0xFE,
     Auth             = 0xFF,
 }
@@ -56,6 +59,8 @@ impl TryFrom<u8> for MsgType {
             0x13 => Ok(MsgType::SubscribeNack),
             0x20 => Ok(MsgType::Command),
             0x21 => Ok(MsgType::CommandResponse),
+            0x30 => Ok(MsgType::BridgeRequest),
+            0x31 => Ok(MsgType::BridgeResponse),
             0xFE => Ok(MsgType::Heartbeat),
             0xFF => Ok(MsgType::Auth),
             other => Err(ProtocolError::InvalidMsgType(other)),
@@ -668,6 +673,45 @@ pub fn encode_command_response(correlation_id: u32, status: u8, payload: &[u8]) 
     out.push(status);
     out.extend_from_slice(payload);
     out
+}
+
+// ============================================================================
+// BridgeRequest / BridgeResponse  (0x30 / 0x31)
+//
+// Reverse RPC so the Rust backend (driven by the MCP server) can ask the
+// frontend for state it alone holds (payload analysis, decoded signals).
+//
+// BridgeRequest payload (server → frontend):
+//   [correlation_id: u32 LE][method_len: u16 LE][method: UTF-8][params: JSON bytes]
+//
+// BridgeResponse payload (frontend → server):
+//   [correlation_id: u32 LE][status: u8 (0=ok, 1=error)][payload: JSON bytes or error string]
+// ============================================================================
+
+pub fn encode_bridge_request(correlation_id: u32, method: &str, params: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(6 + method.len() + params.len());
+    out.extend_from_slice(&correlation_id.to_le_bytes());
+    out.extend_from_slice(&(method.len() as u16).to_le_bytes());
+    out.extend_from_slice(method.as_bytes());
+    out.extend_from_slice(params);
+    out
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct BridgeResponseMsg {
+    pub correlation_id: u32,
+    pub status: u8,
+    pub payload: Vec<u8>,
+}
+
+pub fn decode_bridge_response(payload: &[u8]) -> Result<BridgeResponseMsg, ProtocolError> {
+    if payload.len() < 5 {
+        return Err(ProtocolError::InsufficientData { needed: 5, available: payload.len() });
+    }
+    let correlation_id = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+    let status = payload[4];
+    let body = payload[5..].to_vec();
+    Ok(BridgeResponseMsg { correlation_id, status, payload: body })
 }
 
 #[cfg(test)]
@@ -1339,5 +1383,45 @@ mod tests {
     #[test]
     fn subscribe_nack_empty_error() {
         assert!(encode_subscribe_nack("").is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // 0x30 / 0x31 Bridge request / response
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn bridge_request_layout() {
+        let payload = encode_bridge_request(7, "discovery.analysis", br#"{"a":1}"#);
+        assert_eq!(u32::from_le_bytes(payload[0..4].try_into().unwrap()), 7);
+        let method_len = u16::from_le_bytes(payload[4..6].try_into().unwrap()) as usize;
+        assert_eq!(method_len, "discovery.analysis".len());
+        let method = std::str::from_utf8(&payload[6..6 + method_len]).unwrap();
+        assert_eq!(method, "discovery.analysis");
+        assert_eq!(&payload[6 + method_len..], br#"{"a":1}"#);
+    }
+
+    #[test]
+    fn bridge_response_round_trip_ok() {
+        let payload = encode_command_response(42, 0, br#"{"ok":true}"#);
+        let msg = decode_bridge_response(&payload).unwrap();
+        assert_eq!(msg.correlation_id, 42);
+        assert_eq!(msg.status, 0);
+        assert_eq!(msg.payload, br#"{"ok":true}"#);
+    }
+
+    #[test]
+    fn bridge_response_error_status() {
+        let payload = encode_command_response(1, 1, b"boom");
+        let msg = decode_bridge_response(&payload).unwrap();
+        assert_eq!(msg.status, 1);
+        assert_eq!(msg.payload, b"boom");
+    }
+
+    #[test]
+    fn bridge_response_too_short_returns_error() {
+        assert_eq!(
+            decode_bridge_response(&[0u8; 4]),
+            Err(ProtocolError::InsufficientData { needed: 5, available: 4 })
+        );
     }
 }
