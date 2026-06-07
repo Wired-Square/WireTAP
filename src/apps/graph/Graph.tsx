@@ -28,11 +28,10 @@ import CandidateSignalsDialog from "./dialogs/CandidateSignalsDialog";
 import HypothesisExplorerDialog from "./dialogs/HypothesisExplorerDialog";
 import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
 import { useDialogManager } from "../../hooks/useDialogManager";
-import { decodeSignal } from "../../utils/signalDecode";
 import { extractBits } from "../../utils/bits";
-import { findMatchingMuxCase } from "../../utils/muxCaseMatch";
+import { openCatalog, attachCatalog } from "../../api/catalog";
 import type { FrameMessage } from "../../types/frame";
-import type { MuxDef } from "../../types/decoder";
+import type { DecodedFrameMsg } from "../../services/wsProtocol";
 
 export default function Graph() {
   const { t } = useTranslation("graph");
@@ -62,9 +61,7 @@ export default function Graph() {
 
   // Store selectors
   const catalogPath = useGraphStore((s) => s.catalogPath);
-  const frames = useGraphStore((s) => s.frames);
   const ioProfile = useGraphStore((s) => s.ioProfile);
-  const defaultByteOrder = useGraphStore((s) => s.defaultByteOrder);
   const frameIdMask = useGraphStore((s) => s.frameIdMask);
 
   // Store actions
@@ -151,20 +148,22 @@ export default function Graph() {
     pushSignalValuesRef.current(values);
   }, []);
 
-  // Refs for frame handling to avoid stale closures
-  const framesRef = useRef(frames);
-  const defaultByteOrderRef = useRef(defaultByteOrder);
-  const frameIdMaskRef = useRef(frameIdMask);
+  // Schedule a flush of buffered values if one isn't already pending.
+  const scheduleFlush = useCallback(() => {
+    if (!flushScheduledRef.current && pendingValuesRef.current.length > 0) {
+      flushScheduledRef.current = true;
+      setTimeout(flushPendingValues, UI_UPDATE_INTERVAL_MS);
+    }
+  }, [flushPendingValues]);
 
-  useEffect(() => { framesRef.current = frames; }, [frames]);
-  useEffect(() => { defaultByteOrderRef.current = defaultByteOrder; }, [defaultByteOrder]);
+  // Refs for frame handling to avoid stale closures. Catalog signal decode
+  // moved to Rust (handleDecoded), so only the frame-id mask is needed here.
+  const frameIdMaskRef = useRef(frameIdMask);
   useEffect(() => { frameIdMaskRef.current = frameIdMask; }, [frameIdMask]);
 
   const handleFrames = useCallback((receivedFrames: FrameMessage[]) => {
     if (!receivedFrames || receivedFrames.length === 0) return;
 
-    const catalogFrames = framesRef.current;
-    const byteOrder = defaultByteOrderRef.current;
     const mask = frameIdMaskRef.current;
     const store = useGraphStore.getState();
 
@@ -253,67 +252,36 @@ export default function Graph() {
         }
       }
 
-      // Catalog-based decode
-      const frame = catalogFrames.get(maskedFrameId);
-      if (!frame) continue;
+      // Catalog-based signal decode is no longer done here — it happens once in
+      // Rust and arrives via the DecodedSignals stream (see handleDecoded).
+    }
 
-      // Decode all signals in this frame
-      for (const signal of frame.signals) {
-        if (!signal.name) continue;
-        const decoded = decodeSignal(f.bytes, signal, signal.name, byteOrder);
-        // Only graph numeric values (skip hex, ascii, enum-only)
-        if (typeof decoded.scaled === 'number' && isFinite(decoded.scaled)) {
+    scheduleFlush();
+  }, [scheduleFlush]);
+
+  // Catalog-decoded signals from the Rust decoder (DecodedSignals stream). The
+  // stream already flattens mux-case signals into `signals`, so there's no
+  // separate mux handling here. Replaces the former TS catalog decode.
+  const handleDecoded = useCallback((decoded: DecodedFrameMsg[]) => {
+    const mask = frameIdMaskRef.current;
+    const store = useGraphStore.getState();
+    for (const msg of decoded) {
+      const timestamp = msg.t / 1_000_000;
+      const maskedFrameId = mask !== undefined ? (msg.frameId & mask) : msg.frameId;
+      store.recordFrameId(maskedFrameId);
+      for (const s of msg.signals) {
+        if (Number.isFinite(s.scaled)) {
           pendingValuesRef.current.push({
             frameId: maskedFrameId,
-            signalName: decoded.name,
-            value: decoded.scaled,
+            signalName: s.name,
+            value: s.scaled,
             timestamp,
           });
         }
       }
-
-      // Decode mux signals if present
-      if (frame.mux) {
-        decodeMuxForGraph(f.bytes, frame.mux, maskedFrameId, byteOrder, timestamp);
-      }
     }
-
-    if (!flushScheduledRef.current && pendingValuesRef.current.length > 0) {
-      flushScheduledRef.current = true;
-      setTimeout(flushPendingValues, UI_UPDATE_INTERVAL_MS);
-    }
-  }, [flushPendingValues]);
-
-  // Helper for recursive mux decoding
-  const decodeMuxForGraph = useCallback((
-    bytes: number[],
-    mux: MuxDef,
-    frameId: number,
-    byteOrder: 'big' | 'little',
-    timestamp: number,
-  ) => {
-    const selectorValue = extractBits(bytes, mux.start_bit, mux.bit_length, byteOrder, false);
-    const matchingKey = findMatchingMuxCase(selectorValue, Object.keys(mux.cases));
-    if (!matchingKey) return;
-
-    const activeCase = mux.cases[matchingKey];
-    for (const signal of activeCase.signals) {
-      if (!signal.name) continue;
-      const decoded = decodeSignal(bytes, signal, signal.name, byteOrder);
-      if (typeof decoded.scaled === 'number' && isFinite(decoded.scaled)) {
-        pendingValuesRef.current.push({
-          frameId,
-          signalName: decoded.name,
-          value: decoded.scaled,
-          timestamp,
-        });
-      }
-    }
-
-    if (activeCase.mux) {
-      decodeMuxForGraph(bytes, activeCase.mux, frameId, byteOrder, timestamp);
-    }
-  }, []);
+    scheduleFlush();
+  }, [scheduleFlush]);
 
   const handleError = useCallback((error: string) => {
     console.error("Graph stream error:", error);
@@ -326,6 +294,7 @@ export default function Graph() {
     store: { ioProfile, setIoProfile },
     requireFrames: true,
     onFrames: handleFrames,
+    onDecoded: handleDecoded,
     onError: handleError,
     setPlaybackSpeed: setPlaybackSpeed as (speed: number) => void,
     onBeforeWatch: clearData,
@@ -375,6 +344,20 @@ export default function Graph() {
     tlog.debug(`[Graph] session decoder changed externally → ${sessionCatalogPath}`);
     loadCatalog(sessionCatalogPath).catch(console.error);
   }, [sessionCatalogPath, catalogPath, loadCatalog]);
+
+  // Attach the catalogue to the session so the backend decodes its frames in
+  // Rust and streams them (consumed by handleDecoded). Backend auto-detaches on
+  // unsubscribe, so we only need to (re)attach when the session or catalog changes.
+  useEffect(() => {
+    if (!sessionId || !catalogPath) return;
+    let cancelled = false;
+    openCatalog(catalogPath)
+      .then((content) => {
+        if (!cancelled) return attachCatalog(sessionId, content);
+      })
+      .catch((e) => tlog.debug(`[Graph] catalog.attach failed: ${e}`));
+    return () => { cancelled = true; };
+  }, [sessionId, catalogPath]);
 
   // Auto-set session decoder from source profiles' preferred_catalog when a new session
   // starts. Fires when sessionCatalogPath transitions from undefined to null.

@@ -57,6 +57,7 @@ import {
   type RawBytesPayload,
 } from "../api/io";
 import type { FrameMessage } from "../types/frame";
+import type { DecodedFrameMsg } from "../services/wsProtocol";
 
 // ============================================================================
 // Local Session State Type
@@ -176,6 +177,8 @@ export interface UseIOSessionOptions {
   requireFrames?: boolean;
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
+  /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
+  onDecoded?: (decoded: DecodedFrameMsg[]) => void;
   /** Callback when raw bytes are received (serial byte streams) */
   onBytes?: (payload: RawBytesPayload) => void;
   /** Callback on error */
@@ -337,6 +340,7 @@ export function useIOSession(
     profileId: profileIdOption,
     requireFrames,
     onFrames,
+    onDecoded,
     onBytes,
     onError,
     onTimeUpdate,
@@ -402,6 +406,7 @@ export function useIOSession(
   // Store callbacks in refs to keep them current
   const callbacksRef = useRef({
     onFrames,
+    onDecoded,
     onBytes,
     onError,
     onTimeUpdate,
@@ -418,6 +423,7 @@ export function useIOSession(
   useEffect(() => {
     callbacksRef.current = {
       onFrames,
+      onDecoded,
       onBytes,
       onError,
       onTimeUpdate,
@@ -431,7 +437,7 @@ export function useIOSession(
       onSourceReplaced,
       onDestroyed,
     };
-  }, [onFrames, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onSourceReplaced, onDestroyed]);
+  }, [onFrames, onDecoded, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onSourceReplaced, onDestroyed]);
 
   // ---- Register subscriber ID with focusStore so Visual tab can display it ----
   useEffect(() => {
@@ -717,6 +723,7 @@ export function useIOSession(
         console.log(`[useIOSession:${appName}] calling registerCallbacks...`);
         registerCallbacks(effectiveSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
+          onDecoded: (decoded) => callbacksRef.current.onDecoded?.(decoded),
           onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
           onError: (error) => callbacksRef.current.onError?.(error),
           onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
@@ -1117,6 +1124,7 @@ export function useIOSession(
         // Re-register callbacks after reinitialize
         registerCallbacks(targetSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
+          onDecoded: (decoded) => callbacksRef.current.onDecoded?.(decoded),
           onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
           onError: (error) => callbacksRef.current.onError?.(error),
           onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),
@@ -1221,6 +1229,7 @@ export function useIOSession(
       // Re-register callbacks
       registerCallbacks(targetSessionId, subscriberIdRef.current, {
         onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
+        onDecoded: (decoded) => callbacksRef.current.onDecoded?.(decoded),
         onBytes: (payload) => callbacksRef.current.onBytes?.(payload),
         onError: (error) => callbacksRef.current.onError?.(error),
         onTimeUpdate: (position) => callbacksRef.current.onTimeUpdate?.(position),

@@ -61,6 +61,8 @@ import {
   MsgType,
   HEADER_SIZE,
   decodeFrameBatch,
+  decodeDecodedSignals,
+  type DecodedFrameMsg,
   decodeSessionState,
   decodeStreamEnded,
   decodeSessionError,
@@ -254,6 +256,8 @@ export type SessionReconfiguredPayload = Record<string, never>;
 /** Callbacks for a session - stored per subscriber in the frontend */
 export interface SessionCallbacks {
   onFrames?: (frames: FrameMessage[]) => void;
+  /** Decoded signals streamed from the Rust decoder (when a catalogue is attached). */
+  onDecoded?: (decoded: DecodedFrameMsg[]) => void;
   onBytes?: (payload: RawBytesPayload) => void;
   onError?: (error: string) => void;
   onTimeUpdate?: (position: PlaybackPosition) => void;
@@ -469,6 +473,16 @@ async function setupSessionEventSubscribers(
         if (frames.length > 0) {
           trackAlloc("session.onFrames", frames.length * 300);
           invokeCallbacks(eventListeners, "onFrames", frames);
+        }
+      })
+    );
+
+    // DecodedSignals (0x14) — decoded in Rust when a catalogue is attached
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.DecodedSignals, (payload) => {
+        const decoded = decodeDecodedSignals(payload);
+        if (decoded.length > 0) {
+          invokeCallbacks(eventListeners, "onDecoded", decoded);
         }
       })
     );

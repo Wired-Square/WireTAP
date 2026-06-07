@@ -10,6 +10,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useIOSession, type UseIOSessionOptions, type UseIOSessionResult } from "./useIOSession";
+import type { DecodedFrameMsg } from "../services/wsProtocol";
 import type { StreamEndedInfo as IngestStreamEndedInfo } from "../api/io";
 import { tlog } from "../api/settings";
 import {
@@ -117,6 +118,8 @@ export interface UseIOSessionManagerOptions {
   requireFrames?: boolean;
   /** Callback when frames are received */
   onFrames?: (frames: FrameMessage[]) => void;
+  /** Callback when decoded signals arrive (Rust decoder; catalogue attached) */
+  onDecoded?: (decoded: DecodedFrameMsg[]) => void;
   /** Callback when raw bytes are received (serial byte streams) */
   onBytes?: (payload: RawBytesPayload) => void;
   /** Callback on error */
@@ -367,6 +370,7 @@ export function useIOSessionManager(
     onIngestComplete,
     requireFrames,
     onFrames: onFramesProp,
+    onDecoded,
     onBytes,
     onError,
     onTimeUpdate,
@@ -628,6 +632,7 @@ export function useIOSessionManager(
     profileName: ioProfileName,
     requireFrames,
     onFrames: handleFrames,
+    onDecoded,
     onBytes,
     onError,
     onTimeUpdate,
