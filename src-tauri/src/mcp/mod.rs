@@ -16,10 +16,11 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use axum::extract::{Request, State};
-use axum::http::{StatusCode, header::AUTHORIZATION};
+use axum::http::{Method, StatusCode, header::AUTHORIZATION};
 use axum::middleware::Next;
 use axum::response::Response;
 use once_cell::sync::Lazy;
+use tauri::Emitter;
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
@@ -71,16 +72,17 @@ pub fn start(
     let cancel_for_shutdown = cancel.clone();
     let cancel_for_config = cancel.child_token();
 
+    let app_for_mw = app.clone();
     let service = StreamableHttpService::new(
         move || Ok(WireTapTools::new(app.clone(), allow_control, allow_session_control)),
         LocalSessionManager::default().into(),
         StreamableHttpServerConfig::default().with_cancellation_token(cancel_for_config),
     );
 
-    let token_arc = Arc::new(token);
+    let mw = McpMiddleware { token: Arc::new(token), app: app_for_mw };
     let router = axum::Router::new()
         .nest_service("/mcp", service)
-        .layer(axum::middleware::from_fn_with_state(token_arc, auth_middleware));
+        .layer(axum::middleware::from_fn_with_state(mw, mcp_middleware));
 
     tauri::async_runtime::spawn(async move {
         let listener = match tokio::net::TcpListener::from_std(std_listener) {
@@ -115,22 +117,61 @@ pub fn stop() {
     }
 }
 
-/// Bearer-token gate. Skipped when no token is configured. Localhost-only bind
-/// plus this token are the security boundary for the (otherwise read-only) API.
-async fn auth_middleware(
-    State(expected): State<Arc<String>>,
+#[derive(Clone)]
+struct McpMiddleware {
+    /// Bearer token clients must present (empty = no auth).
+    token: Arc<String>,
+    app: tauri::AppHandle,
+}
+
+/// Bearer-token gate plus connection logging. Localhost-only bind + this token
+/// are the security boundary for the (otherwise read-only) API. After auth, the
+/// `initialize` handshake (a POST with no `mcp-session-id`) and session
+/// termination (`DELETE`) are surfaced as a `mcp-connection` event so the
+/// session log can show MCP clients connecting and disconnecting.
+async fn mcp_middleware(
+    State(mw): State<McpMiddleware>,
     req: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    if expected.is_empty() {
-        return Ok(next.run(req).await);
+    if !mw.token.is_empty() {
+        let ok = req
+            .headers()
+            .get(AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v == format!("Bearer {}", mw.token.as_str()))
+            .unwrap_or(false);
+        if !ok {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
     }
-    let provided = req
+
+    let method = req.method().clone();
+    let req_session = req
         .headers()
-        .get(AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
-    match provided {
-        Some(v) if v == format!("Bearer {}", expected.as_str()) => Ok(next.run(req).await),
-        _ => Err(StatusCode::UNAUTHORIZED),
+        .get("mcp-session-id")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    let resp = next.run(req).await;
+
+    let emit = |event: &str, session_id: String| {
+        let _ = mw
+            .app
+            .emit("mcp-connection", serde_json::json!({ "event": event, "session_id": session_id }));
+    };
+    if method == Method::POST && req_session.is_none() && resp.status().is_success() {
+        // initialize handshake → a new client connected
+        let sid = resp
+            .headers()
+            .get("mcp-session-id")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        emit("connected", sid);
+    } else if method == Method::DELETE {
+        emit("disconnected", req_session.unwrap_or_default());
     }
+
+    Ok(resp)
 }

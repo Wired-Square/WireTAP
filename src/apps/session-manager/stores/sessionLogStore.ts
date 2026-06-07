@@ -36,7 +36,9 @@ export type SessionLogEventType =
   | "buffer-created"
   | "buffer-changed"
   | "device-connected"
-  | "device-probe";
+  | "device-probe"
+  | "mcp-connected"
+  | "mcp-disconnected";
 
 /** A single log entry */
 export interface LogEntry {
@@ -225,6 +227,8 @@ export const EVENT_TYPE_LABELS: Record<SessionLogEventType, string> = {
   "buffer-changed": "Buffer",
   "device-connected": "Connected",
   "device-probe": "Probe",
+  "mcp-connected": "MCP Connect",
+  "mcp-disconnected": "MCP Disconnect",
 };
 
 /** Badge classes for event types (using standard badge styles) */
@@ -246,6 +250,8 @@ export const EVENT_TYPE_COLOURS: Record<SessionLogEventType, string> = {
   "buffer-changed": badgeSmallInfo,
   "device-connected": badgeSmallSuccess,
   "device-probe": badgeSmallInfo,
+  "mcp-connected": badgeSmallPurple,
+  "mcp-disconnected": badgeSmallNeutral,
 };
 
 /** All event types for filter dropdown */
@@ -267,4 +273,6 @@ export const ALL_EVENT_TYPES: SessionLogEventType[] = [
   "buffer-changed",
   "device-connected",
   "device-probe",
+  "mcp-connected",
+  "mcp-disconnected",
 ];

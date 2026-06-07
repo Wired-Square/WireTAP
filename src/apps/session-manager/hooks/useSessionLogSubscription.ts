@@ -108,6 +108,7 @@ export function useSessionLogSubscription(): void {
   const perSessionListenersRef = useRef<Map<string, UnlistenFn[]>>(new Map());
   const globalUnlistenRef = useRef<UnlistenFn | null>(null);
   const deviceProbeUnlistenRef = useRef<UnlistenFn | null>(null);
+  const mcpConnUnlistenRef = useRef<UnlistenFn | null>(null);
   // Track effect instance to handle React StrictMode double-mount
   const effectInstanceRef = useRef(0);
 
@@ -216,6 +217,28 @@ export function useSessionLogSubscription(): void {
       }
     });
 
+    // Listen to MCP connection events (global, not session-scoped)
+    listen<{ event: string; session_id: string }>("mcp-connection", (event) => {
+      if (!isCurrentInstance()) return;
+      const p = event.payload;
+      const connected = p.event === "connected";
+      const sid = p.session_id ? ` (${p.session_id.slice(0, 8)})` : "";
+      useSessionLogStore.getState().addEntry({
+        eventType: connected ? "mcp-connected" : "mcp-disconnected",
+        sessionId: null,
+        profileId: null,
+        profileName: null,
+        appName: "mcp",
+        details: connected ? `MCP client connected${sid}` : `MCP client disconnected${sid}`,
+      });
+    }).then((unlisten) => {
+      if (isCurrentInstance()) {
+        mcpConnUnlistenRef.current = unlisten;
+      } else {
+        unlisten();
+      }
+    });
+
     // Set up listeners for any sessions that already exist
     listActiveSessions().then((sessions) => {
       if (!isCurrentInstance()) return;
@@ -232,6 +255,8 @@ export function useSessionLogSubscription(): void {
       globalUnlistenRef.current = null;
       deviceProbeUnlistenRef.current?.();
       deviceProbeUnlistenRef.current = null;
+      mcpConnUnlistenRef.current?.();
+      mcpConnUnlistenRef.current = null;
       for (const sessionId of perSessionListeners.keys()) {
         cleanupPerSessionListeners(sessionId, perSessionListeners);
       }
