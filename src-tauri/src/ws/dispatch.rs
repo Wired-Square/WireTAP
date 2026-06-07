@@ -76,6 +76,8 @@ fn encode_decoded_batch(frames: &[FrameMessage], catalog: &wiretap_catalog::Cata
                     "scaled": s.scaled,
                     "display": s.display,
                     "unit": s.unit,
+                    "muxValue": s.mux_value,
+                    "format": s.format,
                 })
             })
             .collect();

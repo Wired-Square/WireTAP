@@ -231,6 +231,10 @@ export interface DecodedSignalValue {
   /** Display string (hex digits, enum label, decoded text, timestamp, number). */
   display: string;
   unit?: string | null;
+  /** Selector value of this signal's mux, when it came from a mux case. */
+  muxValue?: number | null;
+  /** Declared signal format (enum/hex/ascii/utf8/unix_time), if any. */
+  format?: string | null;
 }
 
 export interface DecodedMuxSelector {
