@@ -17,6 +17,12 @@ fn default_lines() -> usize {
 fn default_speed() -> f64 {
     1.0
 }
+fn default_register_type() -> String {
+    "holding".to_string()
+}
+fn default_one() -> u16 {
+    1
+}
 
 // ── Tier 1 (Rust-native) ────────────────────────────────────────────────────
 
@@ -133,4 +139,31 @@ pub struct ReplayCaptureParams {
 pub struct ReplayIdParams {
     /// Replay ID (returned by `replay_capture`).
     pub replay_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ModbusReadParams {
+    /// Session whose configured Modbus device (host/port/unit) to read from.
+    pub session_id: String,
+    /// Register type: `holding`, `input`, `coil`, or `discrete` (default holding).
+    #[serde(default = "default_register_type")]
+    pub register_type: String,
+    /// Protocol-level start address (0-based).
+    pub address: u16,
+    /// Number of registers/coils to read (default 1).
+    #[serde(default = "default_one")]
+    pub count: u16,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ModbusWriteParams {
+    /// Session whose configured Modbus device (host/port/unit) to write to.
+    pub session_id: String,
+    /// Writable register type: `holding` or `coil` (default holding).
+    #[serde(default = "default_register_type")]
+    pub register_type: String,
+    /// Protocol-level start address (0-based).
+    pub address: u16,
+    /// Values to write — registers 0-65535; coils use 0/1. One value → single write, many → multi.
+    pub values: Vec<u16>,
 }

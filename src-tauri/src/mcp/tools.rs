@@ -5,8 +5,12 @@
 //! tools are only merged into the router when `mcp_allow_control` is on.
 
 use std::collections::HashSet;
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+
+use tokio_modbus::client::tcp;
+use tokio_modbus::prelude::*;
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -44,6 +48,79 @@ fn err(message: impl Into<String>) -> McpError {
 
 fn ok_json<T: serde::Serialize>(value: T) -> Result<CallToolResult, McpError> {
     Ok(CallToolResult::success(vec![Content::json(value)?]))
+}
+
+/// Shape a tokio-modbus read result (values, device exception, or IO error) into a tool result.
+fn modbus_read_json<T, E1, E2>(
+    rt: &str,
+    address: u16,
+    count: u16,
+    r: Result<Result<Vec<T>, E1>, E2>,
+) -> Result<CallToolResult, McpError>
+where
+    T: serde::Serialize,
+    E1: std::fmt::Display,
+    E2: std::fmt::Display,
+{
+    match r {
+        Ok(Ok(values)) => ok_json(json!({"ok":true,"register_type":rt,"address":address,"count":count,"values":values})),
+        Ok(Err(exc)) => ok_json(json!({"ok":false,"register_type":rt,"address":address,"exception":exc.to_string()})),
+        Err(e) => Err(err(format!("Modbus IO error reading {rt} {address}: {e}"))),
+    }
+}
+
+/// Shape a tokio-modbus write result (success, device exception, or IO error) into a tool result.
+fn modbus_write_json<W, R, E1, E2>(
+    rt: &str,
+    address: u16,
+    written: W,
+    r: Result<Result<R, E1>, E2>,
+) -> Result<CallToolResult, McpError>
+where
+    W: serde::Serialize,
+    E1: std::fmt::Display,
+    E2: std::fmt::Display,
+{
+    match r {
+        Ok(Ok(_)) => ok_json(json!({"ok":true,"register_type":rt,"address":address,"written":written})),
+        Ok(Err(exc)) => ok_json(json!({"ok":false,"register_type":rt,"address":address,"exception":exc.to_string()})),
+        Err(e) => Err(err(format!("Modbus IO error writing {rt} {address}: {e}"))),
+    }
+}
+
+/// Open a transient Modbus TCP connection to the device behind a session's
+/// source profile. NB: opens a second connection alongside the running poller —
+/// single-connection devices may contend.
+async fn connect_session_modbus(
+    app: &tauri::AppHandle,
+    session_id: &str,
+) -> Result<tokio_modbus::client::Context, McpError> {
+    let profile_id = crate::sessions::get_session_profile_ids(session_id)
+        .into_iter()
+        .next()
+        .ok_or_else(|| err(format!("Session '{session_id}' has no source profile")))?;
+    let settings = crate::settings::load_settings_sync(app).map_err(err)?;
+    let profile = settings
+        .io_profiles
+        .iter()
+        .find(|p| p.id == profile_id)
+        .ok_or_else(|| err(format!("Profile '{profile_id}' not found")))?;
+    let conn = &profile.connection;
+    let host = conn.get("host").and_then(|v| v.as_str()).unwrap_or("127.0.0.1");
+    let port = conn
+        .get("port")
+        .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_i64().map(|n| n as u16)))
+        .unwrap_or(502);
+    let unit_id = conn
+        .get("unit_id")
+        .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_i64().map(|n| n as u8)))
+        .unwrap_or(1);
+    let addr: SocketAddr = format!("{host}:{port}")
+        .parse()
+        .map_err(|e| err(format!("Invalid Modbus address {host}:{port}: {e}")))?;
+    tcp::connect_slave(addr, Slave(unit_id))
+        .await
+        .map_err(|e| err(format!("Connect to {addr} (unit {unit_id}) failed: {e}")))
 }
 
 /// Forward a Tier 2 request to the frontend over the bridge and wrap the result.
@@ -199,6 +276,23 @@ impl WireTapTools {
         ok_json(json!({ "name": cat.name, "filename": cat.filename, "path": cat.path, "toml": toml }))
     }
 
+    #[tool(description = "Live one-off Modbus read of a register/coil block from a session's configured device. Returns the values, or the exact device exception (e.g. 'Server device failure'). Opens a transient connection — may contend with the running poller on single-connection devices.")]
+    async fn modbus_read(
+        &self,
+        Parameters(p): Parameters<ModbusReadParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut ctx = connect_session_modbus(&self.app, &p.session_id).await?;
+        let (a, c) = (p.address, p.count.max(1));
+        let rt = p.register_type.to_lowercase();
+        match rt.as_str() {
+            "holding" => modbus_read_json(&rt, a, c, ctx.read_holding_registers(a, c).await),
+            "input" => modbus_read_json(&rt, a, c, ctx.read_input_registers(a, c).await),
+            "coil" => modbus_read_json(&rt, a, c, ctx.read_coils(a, c).await),
+            "discrete" => modbus_read_json(&rt, a, c, ctx.read_discrete_inputs(a, c).await),
+            other => Err(err(format!("Unknown register_type '{other}' (use holding/input/coil/discrete)"))),
+        }
+    }
+
     // ── Tier 2: frontend bridge ──────────────────────────────────────────────
 
     #[tool(description = "Get per-byte payload analysis (byte roles, counters, sensors, multi-byte patterns, mux) for live discovery frames. Requires the WireTAP Discovery view to be open.")]
@@ -326,6 +420,38 @@ impl WireTapTools {
     ) -> Result<CallToolResult, McpError> {
         crate::replay::io_stop_replay(p.replay_id.clone()).await.map_err(err)?;
         ok_json(json!({ "stopped": p.replay_id }))
+    }
+
+    #[tool(description = "Live Modbus write to holding registers or coils on a session's configured device. Returns success or the exact device exception. Opens a transient connection — may contend with the running poller.")]
+    async fn modbus_write(
+        &self,
+        Parameters(p): Parameters<ModbusWriteParams>,
+    ) -> Result<CallToolResult, McpError> {
+        if p.values.is_empty() {
+            return Err(err("No values to write".to_string()));
+        }
+        let mut ctx = connect_session_modbus(&self.app, &p.session_id).await?;
+        let a = p.address;
+        match p.register_type.to_lowercase().as_str() {
+            "holding" => {
+                let r = if p.values.len() == 1 {
+                    ctx.write_single_register(a, p.values[0]).await
+                } else {
+                    ctx.write_multiple_registers(a, &p.values).await
+                };
+                modbus_write_json("holding", a, &p.values, r)
+            }
+            "coil" => {
+                let bits: Vec<bool> = p.values.iter().map(|v| *v != 0).collect();
+                let r = if bits.len() == 1 {
+                    ctx.write_single_coil(a, bits[0]).await
+                } else {
+                    ctx.write_multiple_coils(a, &bits).await
+                };
+                modbus_write_json("coil", a, &bits, r)
+            }
+            other => Err(err(format!("register_type '{other}' is not writable (use holding or coil)"))),
+        }
     }
 }
 
