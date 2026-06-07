@@ -7,9 +7,9 @@ import { create } from 'zustand';
 import { tlog } from '../../../api/settings';
 import { openCatalog, parseModbusCatalog, type ModbusManifest } from '../../../api/catalog';
 import { buildPollsFromCatalog, type ModbusPollGroup } from '../../../utils/modbusPollBuilder';
-import { decodeSignal } from '../../../utils/signalDecode';
 import { frameKey } from '../../../utils/frameKey';
 import type { FrameMessage } from '../../../types/frame';
+import type { DecodedFrameMsg } from '../../../services/wsProtocol';
 import type { SignalDef, FrameDetail } from '../../../types/decoder';
 import type { ModbusProtocolConfig, ResolvedFrame, ResolvedSignal } from '../../../utils/catalogParser';
 
@@ -124,6 +124,7 @@ interface ModbusState {
   // Actions
   loadCatalog: (path: string) => Promise<void>;
   processFrames: (frames: FrameMessage[]) => void;
+  applyDecoded: (decoded: DecodedFrameMsg[]) => void;
   setTransportMode: (mode: ModbusTransportMode) => void;
   setRtuConfig: (config: Partial<ModbusRtuConfig>) => void;
   setIoProfile: (profile: string | null) => void;
@@ -206,6 +207,9 @@ export const useModbusStore = create<ModbusState>((set, get) => ({
     }
   },
 
+  // Store the raw register bytes per frame. Decoding happens once in Rust and
+  // arrives via the DecodedSignals stream (see applyDecoded) — this keeps the
+  // Raw column live and preserves any decoded values already received.
   processFrames: (incomingFrames: FrameMessage[]) => {
     const { frames } = get();
     if (frames.size === 0) return;
@@ -219,21 +223,46 @@ export const useModbusStore = create<ModbusState>((set, get) => ({
       const frameDef = frames.get(fk);
       if (!frameDef) continue;
 
-      // Decode signals — Modbus defaults to big-endian
-      const decoded: DecodedSignalValue[] = frameDef.signals.map((signal, idx) => {
-        const result = decodeSignal(f.bytes, signal, signal.name || `Signal ${idx + 1}`, 'big');
-        return {
-          name: result.name,
-          value: result.display,
-          unit: result.unit,
-          rawValue: result.value,
-        };
-      });
-
+      const prev = _registerValues.get(fk);
       _registerValues.set(fk, {
         bytes: f.bytes,
-        decoded,
+        decoded: prev?.decoded ?? [],
         timestamp: f.timestamp_us,
+        pollIntervalMs: frameDef.interval,
+      });
+      changed = true;
+    }
+
+    if (changed) {
+      set({ registerVersion: get().registerVersion + 1 });
+    }
+  },
+
+  // Apply decoded signals from the Rust decoder stream, merging onto whatever
+  // raw bytes are already stored for each register.
+  applyDecoded: (decoded: DecodedFrameMsg[]) => {
+    const { frames } = get();
+    if (frames.size === 0) return;
+
+    let changed = false;
+
+    for (const msg of decoded) {
+      const fk = frameKey('modbus', msg.frameId);
+      const frameDef = frames.get(fk);
+      if (!frameDef) continue;
+
+      const values: DecodedSignalValue[] = msg.signals.map((s) => ({
+        name: s.name,
+        value: s.display,
+        unit: s.unit ?? undefined,
+        rawValue: s.value,
+      }));
+
+      const prev = _registerValues.get(fk);
+      _registerValues.set(fk, {
+        bytes: prev?.bytes ?? [],
+        decoded: values,
+        timestamp: msg.t,
         pollIntervalMs: frameDef.interval,
       });
       changed = true;

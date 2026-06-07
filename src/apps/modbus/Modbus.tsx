@@ -16,7 +16,7 @@ import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useModbusStore } from "./stores/modbusStore";
 import { pauseSourcePolling, resumeSourcePolling } from "../../api/io";
-import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
+import { listCatalogs, openCatalog, attachCatalog, type CatalogMetadata } from "../../api/catalog";
 import { tlog } from "../../api/settings";
 import AppLayout from "../../components/AppLayout";
 import IoSourcePickerDialog from "../../dialogs/IoSourcePickerDialog";
@@ -26,6 +26,7 @@ import ModbusTopBar from "./views/ModbusTopBar";
 import ModbusRegistersView from "./views/ModbusRegistersView";
 import ModbusConfigView from "./views/ModbusConfigView";
 import type { FrameMessage } from "../../types/frame";
+import type { DecodedFrameMsg } from "../../services/wsProtocol";
 
 export default function Modbus() {
   const { t } = useTranslation("modbus");
@@ -64,9 +65,14 @@ export default function Modbus() {
   const deselectAllFrames = useModbusStore((s) => s.deselectAllFrames);
   const clearState = useModbusStore((s) => s.clearState);
 
-  // Frame handler
+  // Frame handler — keeps the raw register bytes (Raw column); decoded values
+  // arrive separately via the Rust DecodedSignals stream (handleDecoded).
   const handleFrames = useCallback((incomingFrames: FrameMessage[]) => {
     useModbusStore.getState().processFrames(incomingFrames);
+  }, []);
+
+  const handleDecoded = useCallback((decoded: DecodedFrameMsg[]) => {
+    useModbusStore.getState().applyDecoded(decoded);
   }, []);
 
   const handleError = useCallback((error: string) => {
@@ -80,6 +86,7 @@ export default function Modbus() {
     store: { ioProfile, setIoProfile },
     requireFrames: true,
     onFrames: handleFrames,
+    onDecoded: handleDecoded,
     onError: handleError,
     onBeforeWatch: clearState,
     onBeforeMultiWatch: clearState,
@@ -197,6 +204,19 @@ export default function Modbus() {
       });
     }
   }, [sessionCatalogPath, catalogPath, loadCatalog]);
+
+  // Attach the catalogue to the session so the backend decodes registers in Rust
+  // and streams them (consumed by handleDecoded). Auto-detaches on unsubscribe.
+  useEffect(() => {
+    if (!sessionId || !catalogPath) return;
+    let cancelled = false;
+    openCatalog(catalogPath)
+      .then((content) => {
+        if (!cancelled) return attachCatalog(sessionId, content);
+      })
+      .catch((e) => tlog.debug(`[Modbus] catalog.attach failed: ${e}`));
+    return () => { cancelled = true; };
+  }, [sessionId, catalogPath]);
 
   // Handle catalog selection from picker
   const handleCatalogSelect = useCallback(async (path: string) => {
