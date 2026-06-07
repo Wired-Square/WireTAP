@@ -46,6 +46,62 @@ export async function validateCatalog(content: string): Promise<ValidationResult
   return await invoke("validate_catalog", { content });
 }
 
+// ── Modbus catalogue parsing (via the shared wiretap-catalog Rust crate) ──
+// Field names match the crate's serde output; Option fields serialise as null.
+
+export type ModbusEndianness = "big" | "little";
+export type ModbusSignalFormat = "ascii" | "utf8" | "hex" | "enum" | "unix_time" | "other";
+
+export interface ModbusManifestSignal {
+  name: string;
+  start_bit: number;
+  bit_length: number;
+  factor?: number | null;
+  offset?: number | null;
+  unit?: string | null;
+  signed: boolean;
+  format?: ModbusSignalFormat | null;
+  /** Byte order (the crate's field; maps to the frontend's `endianness`). */
+  byte_order?: ModbusEndianness | null;
+  word_order?: ModbusEndianness | null;
+  /** Value→label map (the crate serialises `enum_map` as `enum`). */
+  enum?: Record<string, string> | null;
+}
+
+export interface ModbusManifestFrame {
+  name: string;
+  register_number: number;
+  register_type: "input" | "holding" | "coil" | "discrete";
+  /** Register count (not bytes). */
+  length: number;
+  interval_ms: number;
+  disabled: boolean;
+  signals: ModbusManifestSignal[];
+}
+
+export interface ModbusManifestMeta {
+  device_address: number;
+  register_base: number;
+  default_interval?: number | null;
+  default_byte_order?: ModbusEndianness | null;
+  default_word_order?: ModbusEndianness | null;
+}
+
+export interface ModbusManifest {
+  meta: ModbusManifestMeta;
+  frames: ModbusManifestFrame[];
+}
+
+/**
+ * Parse a Modbus catalogue via the shared `wiretap-catalog` crate. The two
+ * authoring shorthands — register-from-key (`[frame.modbus.0x32F9]`) and
+ * signal-less register (frame-level `format`/`factor`/…) — are resolved in
+ * Rust, so frames arrive with explicit register numbers and synthesised signals.
+ */
+export async function parseModbusCatalog(content: string): Promise<ModbusManifest> {
+  return await invoke<ModbusManifest>("parse_modbus_catalog", { content });
+}
+
 /**
  * Test decode a frame using catalog definitions
  */

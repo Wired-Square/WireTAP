@@ -3,6 +3,22 @@
 
 import type { ModbusConfig, ValidationError } from "../types";
 import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
+import { parseCanIdToNumber } from "../utils";
+
+/** True when a frame key is itself a register address (decimal or 0x-hex). */
+export function isRegisterKey(key: string): boolean {
+  return parseCanIdToNumber(key) !== null;
+}
+
+/** A Modbus frame's register comes from a numeric key OR an explicit
+ *  `register_number`; with neither it's incomplete. Single source of truth for
+ *  the form's inline warning and the save-time validation. */
+export function modbusNeedsRegisterNumber(key: string, config: ModbusConfig): boolean {
+  return !isRegisterKey(key) && config.register_number == null;
+}
+
+export const MODBUS_REGISTER_REQUIRED_MESSAGE =
+  "Name isn't a register — enter a register number, or name the frame by its register (e.g. 2581 or 0x32F9).";
 
 const modbusHandler: ProtocolHandler<ModbusConfig> = {
   type: "modbus",
@@ -45,7 +61,7 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
       },
       config: {
         protocol: "modbus",
-        register_number: value.register_number ?? 0,
+        register_number: value.register_number,
         device_address: deviceAddress ?? 1,
         register_type: value.register_type ?? "holding",
         register_base: registerBase,
@@ -61,8 +77,11 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
   serializeFrame: (_key, base, config, omitInherited) => {
     const obj: Record<string, any> = {};
 
-    // Register number is always required
-    obj.register_number = config.register_number;
+    // Register number is optional: write it only when set. When omitted, a
+    // numeric frame key (`[frame.modbus.2581]`) supplies the register.
+    if (config.register_number != null) {
+      obj.register_number = config.register_number;
+    }
 
     // Only include device_address if not inherited
     if (!omitInherited?.deviceAddress) {
@@ -112,14 +131,16 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
   validateConfig: (config, _existingKeys = [], _originalKey) => {
     const errors: ValidationError[] = [];
 
-    // Validate register number
-    if (config.register_number === undefined || config.register_number === null) {
-      errors.push({ field: "register_number", message: "Register number is required" });
-    } else if (!Number.isInteger(config.register_number) || config.register_number < 0 || config.register_number > 65535) {
-      errors.push({
-        field: "register_number",
-        message: "Register number must be 0-65535",
-      });
+    // Register number is optional (a numeric frame key supplies it). Validate
+    // the range only when one is given; the "non-numeric key AND no register
+    // number" case is checked at save time, where the frame key is known.
+    if (
+      config.register_number != null &&
+      (!Number.isInteger(config.register_number) ||
+        config.register_number < 0 ||
+        config.register_number > 65535)
+    ) {
+      errors.push({ field: "register_number", message: "Register number must be 0-65535" });
     }
 
     // Validate device address
@@ -158,13 +179,12 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
 
   getDefaultConfig: () => ({
     protocol: "modbus",
-    register_number: 0,
     device_address: 1,
     register_type: "holding",
   }),
 
   getFrameDisplayId: (config) => {
-    return `Reg ${config.register_number}`;
+    return config.register_number != null ? `Reg ${config.register_number}` : "Reg (from name)";
   },
 
   getFrameDisplaySecondary: (config) => {
@@ -172,9 +192,10 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
   },
 
   getFrameKey: (config) => {
-    // For Modbus, the key is typically a friendly name, not derived from config
-    // This is used when creating new frames
-    return `register_${config.register_number}`;
+    // Fallback only — the editor passes the user's chosen key (a register like
+    // `2581`/`0x32F9`, or a friendly name) through to the upsert. This is used
+    // by legacy callers that don't supply a key.
+    return config.register_number != null ? `${config.register_number}` : "new_register";
   },
 };
 

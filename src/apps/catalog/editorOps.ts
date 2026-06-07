@@ -546,6 +546,9 @@ export interface UpsertFrameParams {
   protocol: ProtocolType;
   base: BaseFrameFields;
   config: ProtocolConfig;
+  /** The TOML key for this frame (the user's chosen name/register). Falls back
+   *  to the handler's `getFrameKey(config)` when not supplied. */
+  key?: string;
   /** Original key if editing (to handle renames) */
   originalKey?: string;
   /** Which fields are inherited (omit from TOML) */
@@ -571,7 +574,7 @@ export interface UpsertFrameParams {
  * Protocol handlers serialize their config to TOML-compatible objects.
  */
 export function upsertFrameToml(toml: string, params: UpsertFrameParams): string {
-  const { protocol, base, config, originalKey, omitInherited, initialSignals } = params;
+  const { protocol, base, config, key, originalKey, omitInherited, initialSignals } = params;
 
   const handler = protocolRegistry.get(protocol);
   if (!handler) {
@@ -582,8 +585,9 @@ export function upsertFrameToml(toml: string, params: UpsertFrameParams): string
   const frame = ensureObject(parsed, "frame");
   const protocolSection = ensureObject(frame, protocol);
 
-  // Get the key for this frame from the handler
-  const newKey = normalizeKeySegment(handler.getFrameKey(config));
+  // Prefer the caller-supplied key (the user's chosen name/register); fall back
+  // to the handler deriving one from config for legacy callers.
+  const newKey = normalizeKeySegment(key?.trim() || handler.getFrameKey(config));
   const oldKey = originalKey ? normalizeKeySegment(originalKey) : null;
 
   // Check if this is a new frame (no existing data)

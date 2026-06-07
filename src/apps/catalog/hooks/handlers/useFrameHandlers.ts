@@ -27,8 +27,9 @@ import {
   validateCommonFrameFields,
 } from "../../validate";
 import { protocolRegistry } from "../../protocols";
+import { modbusNeedsRegisterNumber, MODBUS_REGISTER_REQUIRED_MESSAGE } from "../../protocols/modbus";
 import type { FrameEditFields } from "../../views/FrameEditView";
-import type { ProtocolType, CANConfig, SerialConfig } from "../../types";
+import type { ProtocolType, CANConfig, SerialConfig, ModbusConfig } from "../../types";
 
 export interface UseFrameHandlersParams {
   // CAN frame editing (legacy)
@@ -287,7 +288,7 @@ export function useFrameHandlers({
         modbusFrameKey = node.key;
         config = {
           protocol: "modbus" as const,
-          register_number: node.metadata?.registerNumber ?? 0,
+          register_number: node.metadata?.registerNumber,
           device_address: node.metadata?.deviceAddress ?? 1,
           register_type: node.metadata?.registerType ?? "holding",
         };
@@ -361,6 +362,16 @@ export function useFrameHandlers({
     );
 
     const allErrors = [...configErrors, ...commonErrors];
+
+    // Modbus: the register comes from either an explicit register_number or a
+    // numeric frame key. A non-numeric name with no register number is invalid.
+    if (
+      frameFields.protocol === "modbus" &&
+      modbusNeedsRegisterNumber(frameKey, frameFields.config as ModbusConfig)
+    ) {
+      allErrors.push({ field: "register_number", message: MODBUS_REGISTER_REQUIRED_MESSAGE });
+    }
+
     if (allErrors.length > 0) {
       setValidation(allErrors);
       return;
@@ -386,6 +397,7 @@ export function useFrameHandlers({
         protocol: frameFields.protocol,
         base: frameFields.base,
         config: frameFields.config,
+        key: frameKey,
         originalKey: editingFrameOriginalKey ?? undefined,
         omitInherited: {
           length: frameFields.isLengthInherited,

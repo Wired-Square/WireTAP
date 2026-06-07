@@ -2,6 +2,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { ModbusConfig } from "../../types";
+import { isRegisterKey, modbusNeedsRegisterNumber, MODBUS_REGISTER_REQUIRED_MESSAGE } from "../../protocols/modbus";
 import { caption, textMedium, focusRing } from "../../../../styles";
 
 export type ModbusConfigSectionProps = {
@@ -27,6 +28,10 @@ export default function ModbusConfigSection({
   defaultRegisterBase,
 }: ModbusConfigSectionProps) {
   const { t } = useTranslation("catalog");
+  // The register comes from a numeric frame key OR an explicit register number.
+  // A non-numeric name with no register number is incomplete — warn.
+  const keyIsRegister = isRegisterKey(frameKey);
+  const needsRegisterNumber = modbusNeedsRegisterNumber(frameKey, config);
   return (
     <div className="space-y-4">
       {/* Frame Key (friendly name) - Required */}
@@ -46,25 +51,35 @@ export default function ModbusConfigSection({
         </p>
       </div>
 
-      {/* Register Number - Required */}
+      {/* Register Number — optional when the frame name is itself a register */}
       <div>
         <label className={`block ${textMedium} mb-2`}>
-          {t("protocolEditors.modbusRegisterNumberLabel")} <span className="text-red-500">{t("protocolEditors.modbusRegisterNumberRequired")}</span>
+          {t("protocolEditors.modbusRegisterNumberLabel")}
         </label>
         <input
           type="number"
           min="0"
           max="65535"
-          value={config.register_number}
-          onChange={(e) =>
-            onChange({ ...config, register_number: parseInt(e.target.value) || 0 })
-          }
+          value={config.register_number ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            const n = Number.parseInt(v, 10);
+            onChange({ ...config, register_number: v === "" || Number.isNaN(n) ? undefined : n });
+          }}
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-          placeholder={t("protocolEditors.modbusRegisterNumberPlaceholder")}
+          placeholder={keyIsRegister ? `${parseInt(frameKey)} (from name)` : t("protocolEditors.modbusRegisterNumberPlaceholder")}
         />
-        <p className={`${caption} mt-1`}>
-          {t("protocolEditors.modbusRegisterNumberHint")}
-        </p>
+        {needsRegisterNumber ? (
+          <p className="mt-1 text-xs text-[color:var(--text-amber)]">
+            ⚠ {MODBUS_REGISTER_REQUIRED_MESSAGE}
+          </p>
+        ) : (
+          <p className={`${caption} mt-1`}>
+            {keyIsRegister
+              ? "Optional — taken from the frame name. Set a value only to override it."
+              : t("protocolEditors.modbusRegisterNumberHint")}
+          </p>
+        )}
       </div>
 
       {/* Device Address - Required (but can be inherited) */}

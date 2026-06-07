@@ -97,7 +97,9 @@ export interface CANConfig {
 /** Modbus protocol configuration */
 export interface ModbusConfig {
   protocol: "modbus";
-  register_number: number;       // Starting register address
+  /** Starting register address. Optional: when omitted, it's derived from a
+   *  numeric frame key (`[frame.modbus.2581]` / `[frame.modbus.0x32F9]`). */
+  register_number?: number;
   device_address: number;        // Modbus slave address (1-247)
   register_type?: "holding" | "input" | "coil" | "discrete";
   register_base?: 0 | 1;         // 0-based or 1-based addressing (some manufacturers differ)
