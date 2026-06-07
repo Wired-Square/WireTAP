@@ -30,29 +30,6 @@ pub async fn save_binary_file(path: String, data: Vec<u8>) -> Result<(), String>
         .map_err(|e| format!("Failed to write file: {}", e))
 }
 
-/// Parse a Modbus catalogue via the shared `wiretap-catalog` crate and return
-/// the resolved model (the two authoring shorthands — register-from-key and
-/// signal-less-register — are applied here, so the frontend receives explicit
-/// register numbers and synthesised signals). Decoding stays in the frontend,
-/// which builds its poll groups + decodes from this resolved model.
-///
-/// A catalogue with no `[frame.modbus.*]` frames returns an empty manifest
-/// (not an error) so non-Modbus catalogues are handled gracefully.
-#[tauri::command]
-pub async fn parse_modbus_catalog(
-    content: String,
-) -> Result<wiretap_catalog::modbus::ModbusManifest, String> {
-    use wiretap_catalog::modbus::{ManifestError, ModbusManifest, ModbusMeta};
-    match ModbusManifest::parse(&content) {
-        Ok(m) => Ok(m),
-        Err(ManifestError::NoFrames) => Ok(ModbusManifest {
-            meta: ModbusMeta::default(),
-            frames: Vec::new(),
-        }),
-        Err(e) => Err(e.to_string()),
-    }
-}
-
 /// Dispatch a `catalog.*` WS command to the shared `wiretap-catalog` crate.
 /// This is the request/response half of the canonical-catalogue work: the
 /// editor and tooling parse/validate/convert over the binary WebSocket instead

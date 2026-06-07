@@ -1106,7 +1106,6 @@ pub fn run() {
             catalog::open_catalog,
             catalog::save_catalog,
             catalog::save_binary_file,
-            catalog::parse_modbus_catalog,
             catalog::test_decode_frame,
             catalog::list_catalogs,
             catalog::duplicate_catalog,

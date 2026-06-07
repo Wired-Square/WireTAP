@@ -5,7 +5,8 @@
 
 import { create } from 'zustand';
 import { tlog } from '../../../api/settings';
-import { openCatalog, parseModbusCatalog, type ModbusManifest } from '../../../api/catalog';
+import { openCatalog, parseCatalog } from '../../../api/catalog';
+import type { Catalog } from '../../../types/catalogModel';
 import { buildPollsFromCatalog, type ModbusPollGroup } from '../../../utils/modbusPollBuilder';
 import { frameKey } from '../../../utils/frameKey';
 import type { FrameMessage } from '../../../types/frame';
@@ -14,44 +15,44 @@ import type { SignalDef, FrameDetail } from '../../../types/decoder';
 import type { ModbusProtocolConfig, ResolvedFrame, ResolvedSignal } from '../../../utils/catalogParser';
 
 /**
- * Convert the resolved Modbus manifest (from the `parse_modbus_catalog` Rust
- * command, with both authoring shorthands already applied) into the
- * `ResolvedFrame` map the rest of the store consumes. The only field rename is
- * the crate's `byte_order` → the frontend's `endianness`; `length` (register
- * count) becomes a byte length to match `catalogParser`.
+ * Convert the resolved unified catalogue (from the shared `wiretap-catalog`
+ * crate via the `catalog.parse` WS command, with both Modbus authoring
+ * shorthands already applied) into the `ResolvedFrame` map the rest of the
+ * store consumes. Maps the crate's camelCase model onto the frontend's
+ * snake_case `ResolvedSignal`; `Frame.length` is already a byte length.
  */
-function manifestToModbusFrames(
-  manifest: ModbusManifest,
+function catalogToModbusFrames(
+  cat: Catalog,
 ): { frames: Map<number, ResolvedFrame>; modbusConfig: ModbusProtocolConfig } {
-  const m = manifest.meta;
+  const m = cat.modbus;
   const modbusConfig: ModbusProtocolConfig = {
-    device_address: m.device_address,
-    register_base: m.register_base === 1 ? 1 : 0,
-    default_interval: m.default_interval ?? undefined,
-    default_byte_order: m.default_byte_order ?? undefined,
-    default_word_order: m.default_word_order ?? undefined,
+    device_address: m?.deviceAddress,
+    register_base: m?.registerBase === 1 ? 1 : 0,
+    default_interval: m?.defaultInterval,
+    default_byte_order: m?.defaultByteOrder,
+    default_word_order: m?.defaultWordOrder,
   };
   const frames = new Map<number, ResolvedFrame>();
-  for (const f of manifest.frames) {
-    const isCoil = f.register_type === 'coil' || f.register_type === 'discrete';
-    frames.set(f.register_number, {
-      frameId: f.register_number,
+  for (const f of cat.frames) {
+    if (f.protocol !== 'modbus') continue;
+    frames.set(f.frameId, {
+      frameId: f.frameId,
       protocol: 'modbus',
       name: f.name,
-      length: isCoil ? Math.ceil(f.length / 8) : f.length * 2,
-      interval: f.interval_ms,
-      modbusRegisterType: f.register_type,
-      modbusRegisterCount: f.length,
+      length: f.length,
+      interval: f.interval,
+      modbusRegisterType: f.modbusRegisterType,
+      modbusRegisterCount: f.modbusRegisterCount,
       signals: f.signals.map((s): ResolvedSignal => ({
         name: s.name,
-        start_bit: s.start_bit,
-        bit_length: s.bit_length,
+        start_bit: s.startBit,
+        bit_length: s.bitLength,
         signed: s.signed,
-        endianness: s.byte_order ?? undefined,
-        word_order: s.word_order ?? undefined,
-        factor: s.factor ?? undefined,
-        offset: s.offset ?? undefined,
-        unit: s.unit ?? undefined,
+        endianness: s.endianness,
+        word_order: s.wordOrder,
+        factor: s.factor,
+        offset: s.offset,
+        unit: s.unit,
         format: s.format && s.format !== 'other' ? s.format : undefined,
         enum: (s.enum ?? undefined) as Record<number, string> | undefined,
       })),
@@ -156,11 +157,12 @@ export const useModbusStore = create<ModbusState>((set, get) => ({
 
   loadCatalog: async (path: string) => {
     try {
-      // Parse via the shared Rust crate so the register-from-key and
-      // signal-less-register shorthands are resolved before we build anything.
+      // Parse via the shared Rust crate (catalog.parse over the WS) so the
+      // register-from-key and signal-less-register shorthands are resolved
+      // before we build anything.
       const content = await openCatalog(path);
-      const manifest = await parseModbusCatalog(content);
-      const { frames: resolvedFrames, modbusConfig } = manifestToModbusFrames(manifest);
+      const cat = await parseCatalog(content);
+      const { frames: resolvedFrames, modbusConfig } = catalogToModbusFrames(cat);
 
       // Build poll groups from Modbus frames
       const polls = buildPollsFromCatalog(resolvedFrames, modbusConfig);
