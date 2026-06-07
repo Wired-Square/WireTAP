@@ -17,7 +17,7 @@ import { mergeSerialConfigForWatch } from "../../utils/sessionConfigMerge";
 import { frameKey } from "../../utils/frameKey";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { tlog } from "../../api/settings";
-import { listCatalogs, openCatalog, attachCatalog, type CatalogMetadata } from "../../api/catalog";
+import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { UI_UPDATE_INTERVAL_MS, COPY_FEEDBACK_TIMEOUT_MS, REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import type { StreamEndedInfo, PlaybackPosition } from '../../api/io';
 import AppLayout from "../../components/AppLayout";
@@ -130,6 +130,8 @@ export default function Decoder() {
   const updateCurrentTime = useDecoderStore((state) => state.updateCurrentTime);
   const setCurrentFrameIndex = useDecoderStore((state) => state.setCurrentFrameIndex);
   const loadCatalog = useDecoderStore((state) => state.loadCatalog);
+  const loadCatalogForSession = useDecoderStore((state) => state.loadCatalogForSession);
+  const setCatalogPath = useDecoderStore((state) => state.setCatalogPath);
   const setStartTime = useDecoderStore((state) => state.setStartTime);
   const setEndTime = useDecoderStore((state) => state.setEndTime);
   const toggleShowRawBytes = useDecoderStore((state) => state.toggleShowRawBytes);
@@ -614,25 +616,24 @@ export default function Decoder() {
   });
 
   // Cross-app decoder sync: when another app (or Session Manager) changes the
-  // session's catalogPath to a non-null value, load it locally.
+  // session's catalogPath, mirror it into local state (the load/attach effect
+  // below does the parse — keeping this effect parse-free avoids a double parse).
   useEffect(() => {
     if (!sessionCatalogPath || sessionCatalogPath === catalogPath) return;
     tlog.debug(`[Decoder] session decoder changed externally → ${sessionCatalogPath}`);
-    loadCatalog(sessionCatalogPath).catch(console.error);
-  }, [sessionCatalogPath, catalogPath, loadCatalog]);
+    setCatalogPath(sessionCatalogPath);
+  }, [sessionCatalogPath, catalogPath, setCatalogPath]);
 
-  // Attach the catalogue to the session so the backend decodes frames in Rust
-  // and streams them (consumed by handleDecoded). Auto-detaches on unsubscribe.
+  // Load the model and — when a session exists — bind Rust decode, from a single
+  // parse: catalog.attach returns the resolved catalogue. Falls back to a model-
+  // only load if attach fails. Backend auto-detaches on unsubscribe.
   useEffect(() => {
-    if (!sessionId || !catalogPath) return;
-    let cancelled = false;
-    openCatalog(catalogPath)
-      .then((content) => {
-        if (!cancelled) return attachCatalog(sessionId, content);
-      })
-      .catch((e) => tlog.debug(`[Decoder] catalog.attach failed: ${e}`));
-    return () => { cancelled = true; };
-  }, [sessionId, catalogPath]);
+    if (!catalogPath) return;
+    const run = sessionId
+      ? loadCatalogForSession(sessionId, catalogPath)
+      : loadCatalog(catalogPath);
+    run.catch((e) => tlog.debug(`[Decoder] catalog load/attach failed: ${e}`));
+  }, [sessionId, catalogPath, loadCatalogForSession, loadCatalog]);
 
   // Auto-set session decoder from source profiles' preferred_catalog when a new session
   // starts. Fires when sessionCatalogPath transitions from undefined (session not in
@@ -649,17 +650,9 @@ export default function Decoder() {
     )] as string[];
 
     if (preferredCatalogs.length === 1) {
+      // Set the session decoder; the load/attach effect parses + binds it.
       const path = buildCatalogPath(preferredCatalogs[0], decoderDir);
-      if (catalogPath === path) {
-        // Catalog already loaded locally (e.g. session was reinitialised with polls).
-        // Just carry the path to the new session without reloading or reinitialising.
-        tlog.debug(`[Decoder] preferred decoder already loaded → ${path}`);
-      } else {
-        tlog.debug(`[Decoder] auto-loading preferred decoder → ${path}`);
-        loadCatalog(path).catch((err) => {
-          console.warn("[Decoder] Failed to auto-load preferred decoder:", err);
-        });
-      }
+      tlog.debug(`[Decoder] preferred decoder → ${path}`);
       useSessionStore.getState().setSessionCatalogPath(sessionId, path);
     } else if (preferredCatalogs.length > 1) {
       tlog.debug(`[Decoder] multiple preferred decoders: ${preferredCatalogs.join(", ")}`);
@@ -710,7 +703,6 @@ export default function Decoder() {
     setEndTime,
     updateCurrentTime,
     setCurrentFrameIndex,
-    loadCatalog,
     clearDecoded,
     clearUnmatchedFrames,
     clearFilteredFrames,
@@ -934,11 +926,13 @@ export default function Decoder() {
             }
           }
 
-          // Only reload if this decoder is using that catalog
+          // Only reload if this decoder is using that catalog. The path is
+          // unchanged, so re-parse explicitly (re-attaching when bound to a session).
           if (catalogPath && savedPath === catalogPath) {
             setCatalogNotification('Catalog updated');
             try {
-              await loadCatalog(savedPath);
+              const sid = session.sessionId;
+              await (sid ? loadCatalogForSession(sid, savedPath) : loadCatalog(savedPath));
             } catch (error) {
               console.error('Failed to reload catalog:', error);
             }
@@ -955,7 +949,7 @@ export default function Decoder() {
     return () => {
       unlistenPromise.then((unlisten) => unlisten());
     };
-  }, [catalogPath, loadCatalog, decoderDir]);
+  }, [catalogPath, loadCatalog, loadCatalogForSession, session.sessionId, decoderDir]);
 
   // Clear frames when catalog's frame ID config changes while streaming.
   // The frontend now extracts frame IDs from raw bytes using the catalog config,
@@ -1205,9 +1199,10 @@ export default function Decoder() {
         catalogs={catalogs}
         selectedPath={catalogPath}
         onSelect={(path: string) => {
-          handlers.handleCatalogChange(path);
+          // Set the path; the load/attach effect parses + binds it once.
           const sid = session.sessionId;
           if (sid) useSessionStore.getState().setSessionCatalogPath(sid, path);
+          else setCatalogPath(path);
         }}
         title={t("catalogPicker.title")}
       />
@@ -1243,8 +1238,9 @@ export default function Decoder() {
         options={decoderConflictOptions}
         onSelect={(filename) => {
           const path = buildCatalogPath(filename, decoderDir);
-          loadCatalog(path).catch(console.error);
+          // The load/attach effect parses + binds once the path is set.
           if (sessionId) useSessionStore.getState().setSessionCatalogPath(sessionId, path);
+          else setCatalogPath(path);
         }}
         onSkip={() => {
           // User chose "None" — no decoder for this session

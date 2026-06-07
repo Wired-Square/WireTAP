@@ -29,7 +29,6 @@ import HypothesisExplorerDialog from "./dialogs/HypothesisExplorerDialog";
 import DecoderConflictDialog, { type DecoderConflictOption } from "../../dialogs/DecoderConflictDialog";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { extractBits } from "../../utils/bits";
-import { openCatalog, attachCatalog } from "../../api/catalog";
 import type { FrameMessage } from "../../types/frame";
 import type { DecodedFrameMsg } from "../../services/wsProtocol";
 
@@ -68,6 +67,8 @@ export default function Graph() {
   const initFromSettings = useGraphStore((s) => s.initFromSettings);
   const setIoProfile = useGraphStore((s) => s.setIoProfile);
   const loadCatalog = useGraphStore((s) => s.loadCatalog);
+  const loadCatalogForSession = useGraphStore((s) => s.loadCatalogForSession);
+  const setCatalogPath = useGraphStore((s) => s.setCatalogPath);
   const pushSignalValues = useGraphStore((s) => s.pushSignalValues);
   const clearData = useGraphStore((s) => s.clearData);
   const setPlaybackSpeed = useGraphStore((s) => s.setPlaybackSpeed);
@@ -338,26 +339,24 @@ export default function Graph() {
   });
 
   // Cross-app decoder sync: when another app (or Session Manager) changes the
-  // session's catalogPath to a non-null value, load it locally.
+  // session's catalogPath, mirror it into local state (the load/attach effect
+  // below does the parse — keeping this parse-free avoids a double parse).
   useEffect(() => {
     if (!sessionCatalogPath || sessionCatalogPath === catalogPath) return;
     tlog.debug(`[Graph] session decoder changed externally → ${sessionCatalogPath}`);
-    loadCatalog(sessionCatalogPath).catch(console.error);
-  }, [sessionCatalogPath, catalogPath, loadCatalog]);
+    setCatalogPath(sessionCatalogPath);
+  }, [sessionCatalogPath, catalogPath, setCatalogPath]);
 
-  // Attach the catalogue to the session so the backend decodes its frames in
-  // Rust and streams them (consumed by handleDecoded). Backend auto-detaches on
-  // unsubscribe, so we only need to (re)attach when the session or catalog changes.
+  // Load the model and — when a session exists — bind Rust decode, from a single
+  // parse: catalog.attach returns the resolved catalogue. Falls back to a model-
+  // only load if attach fails. Backend auto-detaches on unsubscribe.
   useEffect(() => {
-    if (!sessionId || !catalogPath) return;
-    let cancelled = false;
-    openCatalog(catalogPath)
-      .then((content) => {
-        if (!cancelled) return attachCatalog(sessionId, content);
-      })
-      .catch((e) => tlog.debug(`[Graph] catalog.attach failed: ${e}`));
-    return () => { cancelled = true; };
-  }, [sessionId, catalogPath]);
+    if (!catalogPath) return;
+    const run = sessionId
+      ? loadCatalogForSession(sessionId, catalogPath)
+      : loadCatalog(catalogPath);
+    run.catch((e) => tlog.debug(`[Graph] catalog load/attach failed: ${e}`));
+  }, [sessionId, catalogPath, loadCatalogForSession, loadCatalog]);
 
   // Auto-set session decoder from source profiles' preferred_catalog when a new session
   // starts. Fires when sessionCatalogPath transitions from undefined to null.
@@ -373,11 +372,9 @@ export default function Graph() {
     )] as string[];
 
     if (preferredCatalogs.length === 1) {
+      // Set the session decoder; the load/attach effect parses + binds it.
       const path = buildCatalogPath(preferredCatalogs[0], decoderDir);
-      tlog.debug(`[Graph] auto-loading preferred decoder → ${path}`);
-      loadCatalog(path).catch((err) => {
-        console.warn("[Graph] Failed to auto-load preferred decoder:", err);
-      });
+      tlog.debug(`[Graph] preferred decoder → ${path}`);
       useSessionStore.getState().setSessionCatalogPath(sessionId, path);
     } else if (preferredCatalogs.length > 1) {
       tlog.debug(`[Graph] multiple preferred decoders: ${preferredCatalogs.join(", ")}`);
@@ -464,10 +461,11 @@ export default function Graph() {
   }, [loadSavedLayouts]);
 
   // ── Dialog handlers ──
-  const handleCatalogChange = useCallback(async (path: string) => {
-    await loadCatalog(path);
+  // Set the catalogue path; the load/attach effect parses + binds it once.
+  const handleCatalogChange = useCallback((path: string) => {
     if (sessionId) useSessionStore.getState().setSessionCatalogPath(sessionId, path);
-  }, [loadCatalog, sessionId]);
+    else setCatalogPath(path);
+  }, [sessionId, setCatalogPath]);
 
   const openPanelConfig = useCallback((panelId: string) => {
     setConfiguringPanelId(panelId);
@@ -593,8 +591,9 @@ export default function Graph() {
         options={decoderConflictOptions}
         onSelect={(filename) => {
           const path = buildCatalogPath(filename, decoderDir);
-          loadCatalog(path).catch(console.error);
+          // The load/attach effect parses + binds once the path is set.
           if (sessionId) useSessionStore.getState().setSessionCatalogPath(sessionId, path);
+          else setCatalogPath(path);
         }}
         onSkip={() => {
           // User chose "None" — no decoder for this session

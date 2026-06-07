@@ -6,7 +6,7 @@
 // serial header byte-positions the crate doesn't expose.
 
 import { openCatalogAtPath } from '../apps/catalog/io';
-import { parseCatalog } from '../api/catalog';
+import { parseCatalog, attachCatalog } from '../api/catalog';
 import type { Confidence, SignalFormat, Endianness } from '../types/catalog';
 import type { MuxDef, MuxCaseDef, SignalDef } from '../types/decoder';
 import type {
@@ -347,5 +347,16 @@ export function catalogToResolved(catalog: Catalog, rawToml: string): ParsedCata
 export async function loadCatalog(path: string): Promise<ParsedCatalog> {
   const content = await openCatalogAtPath(path);
   const catalog = await parseCatalog(content);
+  return catalogToResolved(catalog, content);
+}
+
+/**
+ * Bind a catalogue to a session for Rust decode AND resolve its UI model from
+ * the same parse: `catalog.attach` returns the resolved Catalog, so this reads
+ * the file and parses once (vs. a separate `loadCatalog` + attach).
+ */
+export async function attachAndResolve(sessionId: string, path: string): Promise<ParsedCatalog> {
+  const content = await openCatalogAtPath(path);
+  const { catalog } = await attachCatalog(sessionId, content);
   return catalogToResolved(catalog, content);
 }

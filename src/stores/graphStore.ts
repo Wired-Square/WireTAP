@@ -4,8 +4,8 @@ import { create } from 'zustand';
 import { tlog } from '../api/settings';
 import type { FrameDetail, SignalDef, MuxDef } from '../types/decoder';
 import type { Confidence } from '../types/catalog';
-import type { CanProtocolConfig } from '../utils/catalogParser';
-import { loadCatalog as loadCatalogFromPath } from '../utils/catalogParser';
+import type { CanProtocolConfig, ParsedCatalog } from '../utils/catalogParser';
+import { loadCatalog as loadCatalogFromPath, attachAndResolve } from '../utils/catalogParser';
 
 import type { SerialFrameConfig } from '../utils/frameExport';
 import {
@@ -248,7 +248,14 @@ interface GraphState {
   candidateRegistry: Map<string, HypothesisParams>;
 
   // ── Actions ──
+  /** Parse-only load (no session bind). */
   loadCatalog: (path: string) => Promise<void>;
+  /** Attach to a session for Rust decode AND load the model from that one parse. */
+  loadCatalogForSession: (sessionId: string, path: string) => Promise<void>;
+  /** Build the in-memory model from an already-resolved catalogue. */
+  applyParsedCatalog: (catalog: ParsedCatalog, path: string) => void;
+  /** Track the active catalogue path without parsing. */
+  setCatalogPath: (path: string | null) => void;
   initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
   setIoProfile: (profile: string | null) => void;
   setPlaybackSpeed: (speed: number) => void;
@@ -320,9 +327,22 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   // ── Actions ──
 
   loadCatalog: async (path: string) => {
-    try {
-      const catalog = await loadCatalogFromPath(path);
+    get().applyParsedCatalog(await loadCatalogFromPath(path), path);
+  },
 
+  loadCatalogForSession: async (sessionId: string, path: string) => {
+    try {
+      get().applyParsedCatalog(await attachAndResolve(sessionId, path), path);
+    } catch (e) {
+      tlog.info(`[graphStore] catalog attach failed, loading model only: ${e}`);
+      await get().loadCatalog(path);
+    }
+  },
+
+  setCatalogPath: (path: string | null) => set({ catalogPath: path }),
+
+  applyParsedCatalog: (catalog: ParsedCatalog, path: string) => {
+    try {
       // Convert ParsedCatalog frames to FrameDetail format
       const frameMap = new Map<number, FrameDetail>();
       for (const [id, frame] of catalog.frames) {

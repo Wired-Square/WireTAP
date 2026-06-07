@@ -57,7 +57,6 @@ export interface UseDecoderHandlersParams {
   setEndTime: (time: string) => void;
   updateCurrentTime: (time: number) => void;
   setCurrentFrameIndex: (index: number) => void;
-  loadCatalog: (path: string) => Promise<void>;
   clearDecoded: () => void;
   clearUnmatchedFrames: () => void;
   clearFilteredFrames: () => void;
@@ -176,7 +175,6 @@ export function useDecoderHandlers(params: UseDecoderHandlersParams): DecoderHan
 
   // Catalog handlers (catalog change, clear data)
   const catalogHandlers = useDecoderCatalogHandlers({
-    loadCatalog: params.loadCatalog,
     clearDecoded: params.clearDecoded,
     clearUnmatchedFrames: params.clearUnmatchedFrames,
     clearFilteredFrames: params.clearFilteredFrames,

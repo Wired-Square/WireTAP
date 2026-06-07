@@ -49,7 +49,7 @@ import type { DecodedFrameMsg } from '../services/wsProtocol';
 import type { SelectionSet } from '../utils/selectionSets';
 import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
-import { loadCatalog as loadCatalogFromPath, parseCanId } from '../utils/catalogParser';
+import { loadCatalog as loadCatalogFromPath, attachAndResolve, parseCanId, type ParsedCatalog } from '../utils/catalogParser';
 import { frameKey } from '../utils/frameKey';
 
 
@@ -226,7 +226,14 @@ interface DecoderState {
   scrollPositions: Record<string, number>;
 
   // Actions - Catalog
+  /** Parse-only load (no session bind). Use for Query / before a session exists. */
   loadCatalog: (path: string) => Promise<void>;
+  /** Attach to a session for Rust decode AND load the model from that one parse. */
+  loadCatalogForSession: (sessionId: string, path: string) => Promise<void>;
+  /** Build the in-memory model from an already-resolved catalogue. */
+  applyParsedCatalog: (catalog: ParsedCatalog, path: string) => void;
+  /** Track the active catalogue path without parsing (mirrors session changes). */
+  setCatalogPath: (path: string | null) => void;
   initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
 
   // Actions - Frame management
@@ -329,10 +336,25 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
 
   // Catalog actions
   loadCatalog: async (path: string) => {
-    try {
-      // Use common catalog parser API
-      const catalog = await loadCatalogFromPath(path);
+    get().applyParsedCatalog(await loadCatalogFromPath(path), path);
+  },
 
+  loadCatalogForSession: async (sessionId: string, path: string) => {
+    try {
+      // catalog.attach binds Rust decode AND returns the resolved catalogue, so
+      // the model comes from the same parse.
+      get().applyParsedCatalog(await attachAndResolve(sessionId, path), path);
+    } catch (e) {
+      // If attach fails, still load the model so the UI works without decode.
+      tlog.info(`[decoderStore] catalog attach failed, loading model only: ${e}`);
+      await get().loadCatalog(path);
+    }
+  },
+
+  setCatalogPath: (path: string | null) => set({ catalogPath: path }),
+
+  applyParsedCatalog: (catalog: ParsedCatalog, path: string) => {
+    try {
       // Convert ParsedCatalog to decoder's FrameDetail format
       // Use composite keys (e.g. "can:256", "modbus:5013")
       const proto = catalog.protocol;

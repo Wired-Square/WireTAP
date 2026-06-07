@@ -71,8 +71,11 @@ pub async fn dispatch_catalog_command(
             let session_id = req("session_id")?;
             let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
             let frame_count = cat.frames.len();
+            // Return the resolved Catalog so the caller can feed its UI model from
+            // this one parse instead of a separate catalog.parse round-trip.
+            let catalog = serde_json::to_value(&cat).map_err(|e| e.to_string())?;
             crate::ws::dispatch::attach_catalog(&session_id, cat);
-            Ok(serde_json::json!({ "attached": true, "frames": frame_count }))
+            Ok(serde_json::json!({ "attached": true, "frames": frame_count, "catalog": catalog }))
         }
         // Detach a session's catalogue (decoded stream stops). Params: { session_id }.
         "catalog.detach" => {

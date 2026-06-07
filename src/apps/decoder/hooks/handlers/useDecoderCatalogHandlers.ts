@@ -1,13 +1,12 @@
 // ui/src/apps/decoder/hooks/handlers/useDecoderCatalogHandlers.ts
 //
-// Catalog-related handlers for Decoder: catalog change, clear data by active tab.
+// Catalog-related handlers for Decoder: clear data by active tab. (Catalogue
+// loading/binding is driven by the load/attach effect in Decoder.tsx.)
 
 import { useCallback } from "react";
-import { withAppError } from "../../../../utils/appError";
 
 export interface UseDecoderCatalogHandlersParams {
   // Store actions
-  loadCatalog: (path: string) => Promise<void>;
   clearDecoded: () => void;
   clearUnmatchedFrames: () => void;
   clearFilteredFrames: () => void;
@@ -17,22 +16,11 @@ export interface UseDecoderCatalogHandlersParams {
 }
 
 export function useDecoderCatalogHandlers({
-  loadCatalog,
   clearDecoded,
   clearUnmatchedFrames,
   clearFilteredFrames,
   activeTab,
 }: UseDecoderCatalogHandlersParams) {
-  // Handle catalog change
-  const handleCatalogChange = useCallback(
-    async (path: string) => {
-      if (path) {
-        await withAppError("Catalog Error", "Failed to load catalog.", () => loadCatalog(path));
-      }
-    },
-    [loadCatalog]
-  );
-
   // Clear handler based on active tab
   const handleClear = useCallback(() => {
     switch (activeTab) {
@@ -49,7 +37,6 @@ export function useDecoderCatalogHandlers({
   }, [activeTab, clearDecoded, clearUnmatchedFrames, clearFilteredFrames]);
 
   return {
-    handleCatalogChange,
     handleClear,
   };
 }

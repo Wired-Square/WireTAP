@@ -66,7 +66,7 @@ export async function validateCatalogWs(content: string): Promise<ValidationResu
 export async function attachCatalog(
   sessionId: string,
   content: string,
-): Promise<{ attached: boolean; frames: number }> {
+): Promise<{ attached: boolean; frames: number; catalog: Catalog }> {
   return await wsTransport.command("catalog.attach", { session_id: sessionId, content });
 }
 
