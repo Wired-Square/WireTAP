@@ -6,6 +6,7 @@
 import { useTranslation } from "react-i18next";
 import type { CatalogMetadata } from "../api/catalog";
 import { buttonBase } from "../styles/buttonStyles";
+import { findCatalogByPath } from "../utils/catalogUtils";
 
 export interface CatalogButtonProps {
   catalogs: CatalogMetadata[];
@@ -13,19 +14,13 @@ export interface CatalogButtonProps {
   onClick: () => void;
 }
 
-/** Normalise path separators for cross-platform comparison (Windows uses backslashes) */
-const normalisePath = (p: string) => p.replace(/\\/g, "/");
-
 export default function CatalogButton({
   catalogs,
   catalogPath,
   onClick,
 }: CatalogButtonProps) {
   const { t } = useTranslation("common");
-  const normalisedCatalogPath = catalogPath ? normalisePath(catalogPath) : null;
-  const selectedCatalog = catalogs.find(
-    (c) => normalisePath(c.path) === normalisedCatalogPath
-  );
+  const selectedCatalog = findCatalogByPath(catalogs, catalogPath);
   const hasCatalog = !!selectedCatalog;
   const catalogName = selectedCatalog?.name || t("catalogButton.noCatalog");
 

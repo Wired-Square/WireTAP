@@ -434,6 +434,17 @@
   },
   "ioSourcePicker": {
     "title": "Data Source",
+    "tabs": {
+      "sessions": "Sessions",
+      "captures": "Captures",
+      "devices": "Devices"
+    },
+    "decoder": {
+      "label": "Decoder",
+      "none": "No decoder",
+      "clear": "Remove decoder",
+      "pickerTitle": "Select Decoder"
+    },
     "filter": "Filter",
     "framing": "Framing",
     "options": "Options",

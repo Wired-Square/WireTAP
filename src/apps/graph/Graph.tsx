@@ -546,6 +546,8 @@ export default function Graph() {
         onSelect={setIoProfile}
         autoImport={autoImportRef.current}
         onAutoImportConsumed={() => { autoImportRef.current = false; }}
+        defaultCatalogPath={catalogPath}
+        onCatalogSelect={setCatalogPath}
       />
 
       <SignalPickerDialog

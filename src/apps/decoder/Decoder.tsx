@@ -1198,6 +1198,8 @@ export default function Decoder() {
         allowMultiSelect={true}
         autoImport={autoImportRef.current}
         onAutoImportConsumed={() => { autoImportRef.current = false; }}
+        defaultCatalogPath={catalogPath}
+        onCatalogSelect={setCatalogPath}
       />
 
       <SpeedPickerDialog

@@ -6,6 +6,7 @@ import type { IOProfile } from "../../hooks/useSettings";
 import type { Session } from "../../stores/sessionStore";
 import type { ActiveSessionInfo, ProfileUsageInfo } from "../../api/io";
 import { CSV_EXTERNAL_ID, isRealtimeProfile, isMultiSourceCapable } from "./utils";
+import SourceTabs, { type SourceTab } from "./SourceTabs";
 import { badgeSmallNeutral, badgeSmallSuccess, badgeSmallWarning, badgeSmallPurple, badgeSmallInfo } from "../../styles/badgeStyles";
 import { iconMd, iconSm, iconXs, flexRowGap2 } from "../../styles/spacing";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
@@ -62,10 +63,16 @@ type Props = {
   allowMultiSelect?: boolean;
   /** Profile usage info - which sessions are using each profile */
   profileUsage?: Map<string, ProfileUsageInfo>;
-  /** Content to render after the Active Sessions section (e.g., CaptureList) */
+  /** Content to render in the Captures tab body (e.g., CaptureList) */
   renderAfterSessions?: ReactNode;
   /** Map of buffer ID to display name (for resolving buffer source names in active sessions) */
   captureNames?: Map<string, string>;
+  /** Active tab in the source picker */
+  activeTab: SourceTab;
+  /** Called when the active tab changes */
+  onTabChange: (tab: SourceTab) => void;
+  /** Number of orphaned captures (for the Captures tab badge) */
+  captureCount?: number;
 };
 
 export default function SourceList({
@@ -89,6 +96,9 @@ export default function SourceList({
   profileUsage,
   renderAfterSessions,
   captureNames,
+  activeTab,
+  onTabChange,
+  captureCount = 0,
 }: Props) {
   const { t } = useTranslation("dialogs");
   // All profiles are read profiles now (mode field removed), separate by type
@@ -102,11 +112,6 @@ export default function SourceList({
   const isCsvSelected = checkedSourceId === CSV_EXTERNAL_ID;
   const checkedProfile = checkedSourceId && checkedSourceId !== CSV_EXTERNAL_ID
     ? readProfiles.find((p) => p.id === checkedSourceId) || null
-    : null;
-
-  // Check if selected reader is a multi-source session
-  const checkedMultiSourceSession = checkedSourceId
-    ? activeMultiSourceSessions.find((s) => s.sessionId === checkedSourceId) || null
     : null;
 
   // Get bus number from profile connection config
@@ -123,125 +128,41 @@ export default function SourceList({
     return readProfiles.find((p) => p.id === sessionId) || null;
   };
 
-  // When a single source is selected (not multi-bus) and not loading, show collapsed view
-  // Multi-bus mode (checkedSourceIds.length > 0) always shows full list
-  if (checkedSourceId && checkedSourceIds.length === 0 && !isLoading) {
-    // Determine display name and subtitle based on selection type
-    let displayName: string;
-    let subtitle: string;
-    let icon: ReactNode = null;
-
-    // Session type detection for styling
-    const isCaptureSession = checkedMultiSourceSession?.sourceType === "capture";
-    const isMultiSource = checkedMultiSourceSession?.sourceType === "realtime";
-
-    if (isCsvSelected) {
-      displayName = t("ioSourcePicker.sources.csv");
-      subtitle = t("ioSourcePicker.sources.csvImport");
-    } else if (isCaptureSession && checkedMultiSourceSession) {
-      // Buffer session — show buffer ID + source name from buffer metadata
-      displayName = checkedMultiSourceSession.sessionId;
-      const storageBackend = getCaptureStorageLabel(checkedMultiSourceSession.sourceType);
-      // Resolve buffer name from metadata (e.g., "f_bc38de") via captureId or sourceProfileIds
-      const captureId = checkedMultiSourceSession.captureId
-        ?? (checkedMultiSourceSession.sourceProfileIds ?? [])[0];
-      const captureName = captureId ? captureNames?.get(captureId) : undefined;
-      const profileName = captureName || storageBackend;
-      subtitle = `└─ ${profileName} (${storageBackend})`;
-      icon = <Database className={`${iconMd} text-[color:var(--text-cyan)]`} />;
-    } else if (isMultiSource && checkedMultiSourceSession) {
-      // Multi-source session - show session ID as name, sources with bus mappings below
-      displayName = checkedMultiSourceSession.sessionId;
-      const sourceDetails = checkedMultiSourceSession.brokerConfigs
-        ?.map((c) => {
-          const name = c.displayName || c.profileId;
-          const enabledMappings = c.busMappings.filter((m) => m.enabled);
-          if (enabledMappings.length === 0) {
-            return name;
-          }
-          const mappingStr = enabledMappings
-            .map((m) => `${m.deviceBus}→${m.outputBus}`)
-            .join(", ");
-          return `${name} (${mappingStr})`;
-        })
-        .join(" + ") || "";
-      subtitle = sourceDetails ? `└─ ${sourceDetails}` : "";
-      icon = <GitMerge className={`${iconMd} text-[color:var(--text-purple)]`} />;
-    } else if (checkedMultiSourceSession) {
-      // Other session types (e.g., single-source recorded sessions like PostgreSQL)
-      displayName = checkedMultiSourceSession.sessionId;
-      const profile = getProfileForSession(checkedMultiSourceSession.sessionId);
-      const profileName = profile?.name || checkedMultiSourceSession.sourceType;
-      const deviceKind = profile?.kind || checkedMultiSourceSession.sourceType;
-      subtitle = `└─ ${profileName} (${deviceKind})`;
-      icon = <Database className={`${iconMd} text-[color:var(--text-green)]`} />;
-    } else if (checkedProfile) {
-      displayName = checkedProfile.name;
-      subtitle = checkedProfile.kind;
-    } else {
-      displayName = t("ioSourcePicker.sources.unknown");
-      subtitle = checkedSourceId;
-    }
-
-    // Styling: purple for multi-source, cyan for buffer, green for recorded, blue for profiles
-    const bgClass = isMultiSource
-      ? "bg-[var(--status-purple-bg)] border border-[color:var(--status-purple-border)]"
-      : isCaptureSession
-      ? "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
-      : checkedMultiSourceSession
-      ? "bg-[var(--status-success-bg)] border border-[color:var(--status-success-border)]"
-      : "bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]";
-    const indicatorClass = isMultiSource
-      ? "border-[color:var(--text-purple)]"
-      : isCaptureSession
-      ? "border-[color:var(--text-cyan)]"
-      : checkedMultiSourceSession
-      ? "border-[color:var(--text-green)]"
-      : "border-[color:var(--status-info-text)]";
-    const dotClass = isMultiSource
-      ? "bg-[var(--text-purple)]"
-      : isCaptureSession
-      ? "bg-[var(--text-cyan)]"
-      : checkedMultiSourceSession
-      ? "bg-[var(--text-green)]"
-      : "bg-[var(--status-info-text)]";
-    const changeClass = isMultiSource
-      ? "text-[color:var(--text-purple)]"
-      : isCaptureSession
-      ? "text-[color:var(--text-cyan)]"
-      : checkedMultiSourceSession
-      ? "text-[color:var(--text-green)]"
-      : "text-[color:var(--status-info-text)]";
+  // Collapsed single-source card — rendered in the active tab body once a
+  // profile (or CSV) is selected. Active-session selections highlight in place
+  // above the tabs instead, so they don't collapse here.
+  const renderCollapsedSource = (): ReactNode => {
+    // Only CSV or a real profile reach here (active sessions never collapse).
+    const displayName = isCsvSelected
+      ? t("ioSourcePicker.sources.csv")
+      : checkedProfile?.name ?? t("ioSourcePicker.sources.unknown");
+    const subtitle = isCsvSelected
+      ? t("ioSourcePicker.sources.csvImport")
+      : checkedProfile?.kind ?? checkedSourceId ?? "";
 
     return (
-      <div className={borderDivider}>
+      <div>
         <div className={`px-4 py-2 bg-[var(--bg-surface)] ${sectionHeader}`}>
           {t("ioSourcePicker.sources.source")}
         </div>
         <div className="px-3 py-2">
           <button
             onClick={() => onSelectSource(null)}
-            className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors hover:brightness-95 ${bgClass}`}
+            className="w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors hover:brightness-95 bg-[var(--status-info-bg)] border border-[color:var(--status-info-border)]"
           >
-            {icon || (
-              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${indicatorClass}`}>
-                <div className={`w-2 h-2 rounded-full ${dotClass}`} />
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <span className={`${textMedium} truncate`}>
-                {displayName}
-              </span>
-              <div className={`${caption} text-[color:var(--text-muted)]`}>
-                {subtitle}
-              </div>
+            <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center border-[color:var(--status-info-text)]">
+              <div className="w-2 h-2 rounded-full bg-[var(--status-info-text)]" />
             </div>
-            <span className={`text-xs ${changeClass}`}>{t("ioSourcePicker.sources.change")}</span>
+            <div className="flex-1 min-w-0">
+              <span className={`${textMedium} truncate`}>{displayName}</span>
+              <div className={`${caption} text-[color:var(--text-muted)]`}>{subtitle}</div>
+            </div>
+            <span className="text-xs text-[color:var(--status-info-text)]">{t("ioSourcePicker.sources.change")}</span>
           </button>
         </div>
       </div>
     );
-  }
+  };
 
   // Filter active sessions to show joinable ones (running, starting, paused, or stopped)
   const joinableSessions = activeMultiSourceSessions.filter(
@@ -323,84 +244,92 @@ export default function SourceList({
     }
   };
 
-  return (
-    <div className={borderDivider}>
-      {/* Active Sessions (all types combined - join existing) */}
-      {joinableSessions.length > 0 && onSelectMultiSourceSession && (
+  // Which tab does the current single-source selection belong to? Active-session
+  // selections highlight in place above the tabs and never collapse.
+  const isActiveSessionSelected =
+    !!checkedSourceId && joinableSessions.some((s) => s.sessionId === checkedSourceId);
+  const selectionTab: SourceTab | null = isCsvSelected
+    ? "captures"
+    : checkedProfile
+    ? isRealtimeProfile(checkedProfile)
+      ? "devices"
+      : "captures"
+    : null;
+
+  // Sessions tab holds joinable active sessions.
+  const showSessionsTab = joinableSessions.length > 0 && !!onSelectMultiSourceSession;
+  // Captures tab holds SQLite captures + recorded DB sources + CSV import.
+  const showCapturesTab =
+    !!renderAfterSessions || (!hideRecorded && recordedProfiles.length > 0) || !hideExternal;
+  const showDevicesTab = realtimeProfiles.length > 0;
+  const availableTabs = [
+    showSessionsTab && "sessions",
+    showCapturesTab && "captures",
+    showDevicesTab && "devices",
+  ].filter(Boolean) as SourceTab[];
+  const effectiveTab: SourceTab = availableTabs.includes(activeTab)
+    ? activeTab
+    : availableTabs[0] ?? "devices";
+
+  const showCollapsed =
+    !!checkedSourceId &&
+    checkedSourceIds.length === 0 &&
+    !isLoading &&
+    !isActiveSessionSelected &&
+    selectionTab !== null &&
+    selectionTab === effectiveTab;
+
+  const tabDefs = [
+    {
+      id: "sessions" as const,
+      label: t("ioSourcePicker.tabs.sessions"),
+      icon: <Play className={iconXs} />,
+      count: joinableSessions.length,
+    },
+    {
+      id: "captures" as const,
+      label: t("ioSourcePicker.tabs.captures"),
+      icon: <Database className={iconXs} />,
+      count: captureCount + recordedProfiles.length,
+    },
+    {
+      id: "devices" as const,
+      label: t("ioSourcePicker.tabs.devices"),
+      icon: <Wifi className={iconXs} />,
+      count: realtimeProfiles.length,
+    },
+  ].filter((tab) => availableTabs.includes(tab.id));
+
+  // ── Captures tab body: CaptureList slot + recorded DB sources + CSV import ──
+  const capturesBody = (
+    <>
+      {renderAfterSessions}
+
+      {!hideRecorded && recordedProfiles.length > 0 && (
         <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
-            <Play className={iconXs} />
-            <span>{t("ioSourcePicker.sources.activeSessions")}</span>
-            <span className={badgeSmallSuccess}>{joinableSessions.length}</span>
+            <Database className={iconXs} />
+            <span>{t("ioSourcePicker.sources.recorded")}</span>
           </div>
           <div className="px-3 pb-2 space-y-1">
-            {joinableSessions.map((session) => {
-              const isSelected = checkedSourceId === session.sessionId;
-              const info = getSessionDisplayInfo(session);
-              const IconComponent = info.icon;
-
-              return (
-                <button
-                  key={session.sessionId}
-                  onClick={() => onSelectMultiSourceSession(session.sessionId)}
-                  className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
-                    isSelected ? info.bgSelected : info.bgHover
-                  }`}
-                >
-                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                    isSelected ? info.indicatorColour : "border-[color:var(--border-default)]"
-                  }`}>
-                    {isSelected && (
-                      <div className={`w-2 h-2 rounded-full ${info.dotColour}`} />
-                    )}
-                  </div>
-                  <IconComponent className={`${iconMd} flex-shrink-0 ${info.iconColour}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className={`${textMedium} truncate flex items-center gap-2`}>
-                      <span>{info.displayName}</span>
-                      {session.state !== "stopped" && session.sourceType !== "capture" && (
-                        <Radio className={`${iconXs} text-green-500 animate-pulse`} />
-                      )}
-                    </div>
-                    <div className={`${caption} flex items-center gap-2`}>
-                      {session.state === "stopped" ? (
-                        <span className={badgeSmallWarning}>{t("ioSourcePicker.sources.stopped")}</span>
-                      ) : session.state === "paused" && session.sourceType === "capture" ? (
-                        <span className={badgeSmallInfo}>{t("ioSourcePicker.sources.paused")}</span>
-                      ) : session.sourceType === "capture" ? (
-                        <span className={badgeSmallInfo}>{t("ioSourcePicker.sources.playing")}</span>
-                      ) : (
-                        <span className={badgeSmallSuccess}>{t("ioSourcePicker.sources.live")}</span>
-                      )}
-                      <span>{info.subtitle}</span>
-                      {/* Show buffer info if available */}
-                      {session.captureId && (
-                        <>
-                          <span className="text-[color:var(--text-muted)]">·</span>
-                          <span className="text-[color:var(--text-cyan)]">
-                            {t("ioSourcePicker.sources.framesCount", { count: session.captureFrameCount?.toLocaleString() ?? "?" })}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    {/* Show source details with bus mappings */}
-                    {info.sourceDetails && (
-                      <div className={`${caption} text-[color:var(--text-muted)] truncate mt-0.5`}>
-                        └─ {info.sourceDetails}
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+            {recordedProfiles.map((profile) => (
+              <SourceButton
+                key={profile.id}
+                profile={profile}
+                isChecked={checkedSourceId === profile.id}
+                isDefault={profile.id === defaultId}
+                isLoading={isLoading}
+                isLive={isProfileLive?.(profile.id) ?? false}
+                sessionState={getSessionForProfile?.(profile.id)?.ioState}
+                onSelect={onSelectSource}
+                usageInfo={profileUsage?.get(profile.id)}
+                isRealtime={false}
+              />
+            ))}
           </div>
         </div>
       )}
 
-      {/* Slot for CaptureList (rendered between Active Sessions and source lists) */}
-      {renderAfterSessions}
-
-      {/* External Sources */}
       {!hideExternal && (
         <div className="border-b border-[color:var(--border-default)]">
           <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
@@ -434,99 +363,154 @@ export default function SourceList({
           </div>
         </div>
       )}
+    </>
+  );
 
-      {/* Recorded Sources */}
-      {!hideRecorded && recordedProfiles.length > 0 && (
-        <div className="border-b border-[color:var(--border-default)]">
-          <div className={`px-4 py-1.5 ${captionMuted} flex items-center gap-1.5`}>
-            <Database className={iconXs} />
-            <span>{t("ioSourcePicker.sources.recorded")}</span>
-          </div>
-          <div className="px-3 pb-2 space-y-1">
-            {recordedProfiles.map((profile) => (
+  // ── Devices tab body: real-time sources ──
+  const devicesBody = realtimeProfiles.length > 0 && (
+    <div className="border-b border-[color:var(--border-default)]">
+      <div className={`px-4 py-1.5 ${captionMuted} flex items-center justify-between`}>
+        <div className="flex items-center gap-1.5">
+          <Wifi className={iconXs} />
+          <span>{t("ioSourcePicker.sources.realtime")}</span>
+          {isMultiBusMode && (
+            <span className={badgeSmallPurple}>
+              <GitMerge className={`${iconXs} inline mr-1`} />
+              {t("ioSourcePicker.sources.busesCount", { count: checkedSourceIds.length })}
+            </span>
+          )}
+        </div>
+      </div>
+      {validationError && (
+        <div className="mx-3 mb-2 px-3 py-2 text-xs text-[color:var(--status-danger-text)] bg-[var(--status-danger-bg)] border border-[color:var(--status-danger-border)] rounded-lg flex items-center gap-2">
+          <AlertCircle className={`${iconMd} flex-shrink-0`} />
+          <span>{validationError}</span>
+        </div>
+      )}
+      <div className="px-3 pb-2 space-y-1">
+        {realtimeProfiles.map((profile) => {
+          const canMultiSelect = allowMultiSelect && isMultiSourceCapable(profile);
+          const isProfileChecked = canMultiSelect
+            ? checkedSourceIds.includes(profile.id)
+            : checkedSourceId === profile.id;
+          const disabledStatus = disabledProfiles?.get(profile.id);
+          const isDisabledForTransmit = disabledStatus && !disabledStatus.canTransmit;
+          const isDisabled = isDisabledForTransmit;
+          const disabledReason = isDisabledForTransmit ? disabledStatus?.reason : undefined;
+
+          // Handler: multi-source-capable profiles toggle, others select exclusively
+          const handleSelect = canMultiSelect && onToggleSource
+            ? () => onToggleSource(profile.id)
+            : onSelectSource;
+
+          const usage = profileUsage?.get(profile.id);
+
+          return (
+            <div key={profile.id}>
               <SourceButton
-                key={profile.id}
                 profile={profile}
-                isChecked={checkedSourceId === profile.id}
-                isDefault={profile.id === defaultId}
+                isChecked={isProfileChecked}
+                isDefault={false}
                 isLoading={isLoading}
                 isLive={isProfileLive?.(profile.id) ?? false}
                 sessionState={getSessionForProfile?.(profile.id)?.ioState}
-                onSelect={onSelectSource}
-                usageInfo={profileUsage?.get(profile.id)}
-                isRealtime={false}
+                onSelect={handleSelect}
+                useCheckbox={canMultiSelect}
+                busNumber={getBusNumber(profile)}
+                isDisabled={isDisabled}
+                disabledReason={disabledReason}
+                usageInfo={usage}
+                isRealtime
               />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Real-time Sources */}
-      {realtimeProfiles.length > 0 && (
-        <div className="border-b border-[color:var(--border-default)]">
-          <div className={`px-4 py-1.5 ${captionMuted} flex items-center justify-between`}>
-            <div className="flex items-center gap-1.5">
-              <Wifi className={iconXs} />
-              <span>{t("ioSourcePicker.sources.realtime")}</span>
-              {isMultiBusMode && (
-                <span className={badgeSmallPurple}>
-                  <GitMerge className={`${iconXs} inline mr-1`} />
-                  {t("ioSourcePicker.sources.busesCount", { count: checkedSourceIds.length })}
-                </span>
-              )}
+              {/* Render extra content (e.g., bus config) inline below selected profile */}
+              {isProfileChecked && renderProfileExtra?.(profile.id)}
             </div>
-          </div>
-          {/* Validation error */}
-          {validationError && (
-            <div className="mx-3 mb-2 px-3 py-2 text-xs text-[color:var(--status-danger-text)] bg-[var(--status-danger-bg)] border border-[color:var(--status-danger-border)] rounded-lg flex items-center gap-2">
-              <AlertCircle className={`${iconMd} flex-shrink-0`} />
-              <span>{validationError}</span>
-            </div>
-          )}
-          <div className="px-3 pb-2 space-y-1">
-            {realtimeProfiles.map((profile) => {
-              const canMultiSelect = allowMultiSelect && isMultiSourceCapable(profile);
-              const isProfileChecked = canMultiSelect
-                ? checkedSourceIds.includes(profile.id)
-                : checkedSourceId === profile.id;
-              const disabledStatus = disabledProfiles?.get(profile.id);
-              const isDisabledForTransmit = disabledStatus && !disabledStatus.canTransmit;
-              const isDisabled = isDisabledForTransmit;
-              const disabledReason = isDisabledForTransmit ? disabledStatus?.reason : undefined;
+          );
+        })}
+      </div>
+    </div>
+  );
 
-              // Handler: multi-source-capable profiles toggle, others select exclusively
-              const handleSelect = canMultiSelect && onToggleSource
-                ? () => onToggleSource(profile.id)
-                : onSelectSource;
+  // ── Sessions tab body: joinable active sessions ──
+  const sessionsBody = (
+    <div className="border-b border-[color:var(--border-default)]">
+      <div className="px-3 pt-2 pb-2 space-y-1">
+        {joinableSessions.map((session) => {
+          const isSelected = checkedSourceId === session.sessionId;
+          const info = getSessionDisplayInfo(session);
+          const IconComponent = info.icon;
 
-              // Get usage info for this profile
-              const usage = profileUsage?.get(profile.id);
-
-              return (
-                <div key={profile.id}>
-                  <SourceButton
-                    profile={profile}
-                    isChecked={isProfileChecked}
-                    isDefault={false}
-                    isLoading={isLoading}
-                    isLive={isProfileLive?.(profile.id) ?? false}
-                    sessionState={getSessionForProfile?.(profile.id)?.ioState}
-                    onSelect={handleSelect}
-                    useCheckbox={canMultiSelect}
-                    busNumber={getBusNumber(profile)}
-                    isDisabled={isDisabled}
-                    disabledReason={disabledReason}
-                    usageInfo={usage}
-                    isRealtime
-                  />
-                  {/* Render extra content (e.g., bus config) inline below selected profile */}
-                  {isProfileChecked && renderProfileExtra?.(profile.id)}
+          return (
+            <button
+              key={session.sessionId}
+              onClick={() => onSelectMultiSourceSession?.(session.sessionId)}
+              className={`w-full px-3 py-2 flex items-center gap-3 text-left rounded-lg transition-colors ${
+                isSelected ? info.bgSelected : info.bgHover
+              }`}
+            >
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                isSelected ? info.indicatorColour : "border-[color:var(--border-default)]"
+              }`}>
+                {isSelected && (
+                  <div className={`w-2 h-2 rounded-full ${info.dotColour}`} />
+                )}
+              </div>
+              <IconComponent className={`${iconMd} flex-shrink-0 ${info.iconColour}`} />
+              <div className="flex-1 min-w-0">
+                <div className={`${textMedium} truncate flex items-center gap-2`}>
+                  <span>{info.displayName}</span>
+                  {session.state !== "stopped" && session.sourceType !== "capture" && (
+                    <Radio className={`${iconXs} text-green-500 animate-pulse`} />
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+                <div className={`${caption} flex items-center gap-2`}>
+                  {session.state === "stopped" ? (
+                    <span className={badgeSmallWarning}>{t("ioSourcePicker.sources.stopped")}</span>
+                  ) : session.state === "paused" && session.sourceType === "capture" ? (
+                    <span className={badgeSmallInfo}>{t("ioSourcePicker.sources.paused")}</span>
+                  ) : session.sourceType === "capture" ? (
+                    <span className={badgeSmallInfo}>{t("ioSourcePicker.sources.playing")}</span>
+                  ) : (
+                    <span className={badgeSmallSuccess}>{t("ioSourcePicker.sources.live")}</span>
+                  )}
+                  <span>{info.subtitle}</span>
+                  {session.captureId && (
+                    <>
+                      <span className="text-[color:var(--text-muted)]">·</span>
+                      <span className="text-[color:var(--text-cyan)]">
+                        {t("ioSourcePicker.sources.framesCount", { count: session.captureFrameCount?.toLocaleString() ?? "?" })}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {info.sourceDetails && (
+                  <div className={`${caption} text-[color:var(--text-muted)] truncate mt-0.5`}>
+                    └─ {info.sourceDetails}
+                  </div>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={borderDivider}>
+      {/* Tabs (only when more than one tab is relevant) */}
+      {tabDefs.length > 1 && (
+        <SourceTabs tabs={tabDefs} activeTab={effectiveTab} onTabChange={onTabChange} />
       )}
+
+      {/* Tab body — collapsed selected-source card, or the active tab's list */}
+      {showCollapsed
+        ? renderCollapsedSource()
+        : effectiveTab === "sessions"
+        ? sessionsBody
+        : effectiveTab === "captures"
+        ? capturesBody
+        : devicesBody}
 
       {readProfiles.length === 0 && !isCsvSelected && (
         <div className="p-4 text-sm text-[color:var(--text-muted)]">

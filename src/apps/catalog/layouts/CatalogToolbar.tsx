@@ -7,6 +7,7 @@ import { disabledState } from "../../../styles";
 import { buttonBase, iconButtonBase, toggleButtonClass } from "../../../styles/buttonStyles";
 import type { EditMode } from "../types";
 import type { CatalogMetadata } from "../../../api/catalog";
+import { findCatalogByPath } from "../../../utils/catalogUtils";
 import AppTopBar from "../../../components/AppTopBar";
 
 export type CatalogToolbarProps = {
@@ -43,10 +44,7 @@ export default function CatalogToolbar({
 }: CatalogToolbarProps) {
   const { t } = useTranslation("catalog");
   // Get catalog display info
-  // Normalise path separators for cross-platform comparison (Windows uses backslashes)
-  const normalisePath = (p: string) => p.replace(/\\/g, '/');
-  const normalisedCatalogPath = catalogPath ? normalisePath(catalogPath) : null;
-  const selectedCatalog = catalogs.find((c) => normalisePath(c.path) === normalisedCatalogPath);
+  const selectedCatalog = findCatalogByPath(catalogs, catalogPath);
   const catalogName = selectedCatalog?.name || catalogPath?.split("/").pop() || t("toolbar.noCatalog");
 
   // Validation button styling

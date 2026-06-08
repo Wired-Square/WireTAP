@@ -14,7 +14,9 @@ import {
   hoverLight,
   roundedDefault,
 } from "../styles";
-import { getReaderProtocols, type IOProfile } from "../hooks/useSettings";
+import { getReaderProtocols, useSettings, type IOProfile } from "../hooks/useSettings";
+import { listCatalogs, type CatalogMetadata } from "../api/catalog";
+import { buildCatalogPath } from "../utils/catalogUtils";
 import { buildDefaultBusMappings, isMultiBusProfile } from "../utils/profileTraits";
 import { useSessionStore } from "../stores/sessionStore";
 import { pickCsvFilesToOpen } from "../api/dialogs";
@@ -46,13 +48,17 @@ import {
   type Protocol,
   type TemporalMode,
   type ProfileUsageInfo,
+  type FramingEncoding,
 } from '../api/io';
+import { loadCatalog } from "../utils/catalogParser";
 import { getAllFavorites, type TimeRangeFavorite } from "../utils/favorites";
 import type { TimeBounds } from "../components/TimeBoundsInput";
 
 // Import extracted components
 import { CaptureList } from "./io-source-picker";
 import { SourceList } from "./io-source-picker";
+import { DecoderPicker } from "./io-source-picker";
+import type { SourceTab } from "./io-source-picker";
 import { LoadOptions } from "./io-source-picker";
 import { FramingOptions, FilterOptions } from "./io-source-picker";
 import { ActionButtons } from "./io-source-picker";
@@ -106,10 +112,19 @@ export interface LoadOptions {
   busOverride?: number;
   /** Per-interface framing config (for serial profiles in multi-bus mode) - map from profile ID to framing config */
   perInterfaceFraming?: Map<string, InterfaceFramingConfig>;
+  /** Catalogue path to attach to the new session (decoder picker) */
+  catalogPath?: string | null;
 }
 
 // Stable empty array to avoid re-renders when selectedIds is not provided
 const EMPTY_SELECTED_IDS: string[] = [];
+
+// Map a catalogue's serial `encoding` to the picker's framing dropdown value.
+// Only encodings the dropdown can represent are mapped (others leave framing as-is).
+const CATALOG_ENCODING_TO_FRAMING: Record<string, FramingEncoding> = {
+  slip: "slip",
+  raw: "raw",
+};
 
 type Props = {
   /** Dialog mode: "streaming" shows Connect/Load, "connect" shows just Connect */
@@ -170,6 +185,10 @@ type Props = {
   autoImport?: boolean;
   /** Called after autoImport has been consumed so the parent can reset the flag. */
   onAutoImportConsumed?: () => void;
+  /** Initial decoder catalogue path (seeds the decoder picker from the host app). */
+  defaultCatalogPath?: string | null;
+  /** Called when the decoder catalogue selection changes (lets the host app mirror it). */
+  onCatalogSelect?: (path: string | null) => void;
 };
 
 export default function IoSourcePickerDialog({
@@ -205,8 +224,11 @@ export default function IoSourcePickerDialog({
   onConnect,
   autoImport,
   onAutoImportConsumed,
+  defaultCatalogPath = null,
+  onCatalogSelect,
 }: Props) {
   const { t } = useTranslation("dialogs");
+  const { settings } = useSettings();
   // Use stable empty array when selectedIds is not provided (avoids re-renders)
   const selectedIds = selectedIdsProp ?? EMPTY_SELECTED_IDS;
 
@@ -233,6 +255,16 @@ export default function IoSourcePickerDialog({
   // Multi-capture state
   const [captures, setCaptures] = useState<CaptureMetadata[]>([]);
   const [selectedCaptureId, setSelectedCaptureId] = useState<string | null>(null);
+
+  // Source tab (Captures | Devices) — smart default set on open
+  const [activeTab, setActiveTab] = useState<SourceTab>("devices");
+
+  // Decoder picker: catalogue list + the catalogue to attach to the new session
+  const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
+  const [selectedCatalogPath, setSelectedCatalogPath] = useState<string | null>(defaultCatalogPath);
+  // Once the user picks or clears a decoder, stop auto-filling from a source's
+  // preferred catalogue (so a deliberate clear isn't undone). Reset on open.
+  const decoderUserTouchedRef = useRef(false);
   // (Buffer bus config now uses shared deviceBusConfigMap / singleBusOverrideMap via probeDevice)
 
   // Internal load state (used when external state not provided)
@@ -275,6 +307,12 @@ export default function IoSourcePickerDialog({
   const [singleBusOverrideMap, setSingleBusOverrideMap] = useState<Map<string, number>>(new Map());
   // Per-profile framing config (for serial profiles in multi-bus mode)
   const [framingConfigMap, setFramingConfigMap] = useState<Map<string, InterfaceFramingConfig>>(new Map());
+  // Serial framing declared by the selected decoder's catalogue (drives the
+  // framing dropdown for serial sources). Null when the decoder has no framing.
+  const [catalogSerialEncoding, setCatalogSerialEncoding] = useState<FramingEncoding | null>(null);
+  // Serial profiles whose framing the user changed by hand — excluded from the
+  // catalogue-driven framing sync so a manual choice isn't overwritten.
+  const framingUserTouchedRef = useRef<Set<string>>(new Set());
   // Track which profiles have been probed to avoid duplicate probes (refs don't trigger re-renders)
   const probedProfilesRef = useRef<Set<string>>(new Set());
   // Tracks whether the user has clicked "Change" to expand the collapsed view (prevents re-collapsing)
@@ -285,6 +323,12 @@ export default function IoSourcePickerDialog({
   // and clobbers `hasUserExpandedRef`, causing the collapsed view to re-snap
   // back after clicking "Change".
   const didInitForOpenRef = useRef(false);
+
+  // Tab smart-default tracking: whether the user has manually picked a tab, and
+  // whether the open had an explicit source selection (suppresses the auto
+  // "Sessions" default). Reset on each open in the init effect.
+  const tabUserPickedRef = useRef(false);
+  const hasExplicitSelectionRef = useRef(false);
 
   // Active multi-source sessions (for sharing between apps)
   const [activeMultiSourceSessions, setActiveMultiSourceSessions] = useState<ActiveSessionInfo[]>([]);
@@ -473,6 +517,22 @@ export default function IoSourcePickerDialog({
       }
       setImportError(null);
 
+      // Seed the decoder picker from the host app's current catalogue.
+      setSelectedCatalogPath(defaultCatalogPath);
+      decoderUserTouchedRef.current = false;
+      framingUserTouchedRef.current = new Set();
+
+      // Smart default tab. Provisional choice from the current selection:
+      // Captures for a capture/recorded (DB) source, else Devices. The
+      // Sessions default is applied separately once active sessions load.
+      tabUserPickedRef.current = false;
+      hasExplicitSelectionRef.current = !!initialReaderId;
+      const selProfile = initialReaderId
+        ? ioProfiles.find((p) => p.id === initialReaderId)
+        : undefined;
+      const isRecordedSel = selProfile ? !isRealtimeProfile(selProfile) : false;
+      setActiveTab(isCaptureProfileId(initialReaderId) || isRecordedSel ? "captures" : "devices");
+
       // Initialize multi-bus selection state
       if (selectedIds.length > 0) {
         setCheckedReaderIds(selectedIds);
@@ -498,6 +558,103 @@ export default function IoSourcePickerDialog({
   // changes, which would re-collapse the picker after the user clicks Change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Fetch available catalogues for the decoder picker when the dialog opens.
+  useEffect(() => {
+    if (!isOpen) return;
+    const decoderDir = settings?.decoder_dir;
+    if (!decoderDir) return;
+    listCatalogs(decoderDir).then(setCatalogs).catch(console.error);
+  }, [isOpen, settings?.decoder_dir]);
+
+  // Record a manual tab pick so the Sessions auto-default stops fighting the user.
+  const handleTabChange = useCallback((tab: SourceTab) => {
+    tabUserPickedRef.current = true;
+    setActiveTab(tab);
+  }, []);
+
+  // Default to the Sessions tab once active sessions load — when the user hasn't
+  // picked a tab and either nothing was explicitly selected or the selection is
+  // one of those sessions.
+  useEffect(() => {
+    if (!isOpen || tabUserPickedRef.current) return;
+    if (activeMultiSourceSessions.length === 0) return;
+    const selectedIsSession = activeMultiSourceSessions.some((s) => s.sessionId === selectedId);
+    if (selectedIsSession || !hasExplicitSelectionRef.current) {
+      setActiveTab("sessions");
+    }
+  }, [isOpen, activeMultiSourceSessions, selectedId]);
+
+  // Apply the decoder picker selection (and mirror it into the host app).
+  const handleCatalogSelect = useCallback((path: string | null) => {
+    decoderUserTouchedRef.current = true;
+    setSelectedCatalogPath(path);
+    onCatalogSelect?.(path);
+  }, [onCatalogSelect]);
+
+  // Auto-fill the decoder footer from the selected source's preferred catalogue
+  // when no decoder has been set yet. Only fires for a single unique preferred
+  // catalogue across the selection (conflicts are left to the host app's flow).
+  useEffect(() => {
+    if (decoderUserTouchedRef.current) return; // user set/cleared it — don't override
+    const decoderDir = settings?.decoder_dir;
+    if (!decoderDir) return;
+    const ids = checkedSourceIds.length > 0
+      ? checkedSourceIds
+      : checkedSourceId ? [checkedSourceId] : [];
+    const preferred = [...new Set(
+      ids.map((id) => readProfiles.find((p) => p.id === id)?.preferred_catalog).filter(Boolean)
+    )] as string[];
+    if (preferred.length === 1) {
+      // Fill only when nothing is set yet — the functional updater reads the
+      // current value without depending on it, so it never fights a manual clear.
+      setSelectedCatalogPath((cur) => cur ?? buildCatalogPath(preferred[0], decoderDir));
+    }
+  }, [checkedSourceId, checkedSourceIds, readProfiles, settings?.decoder_dir]);
+
+  // Read the selected decoder's serial framing so it can drive the framing
+  // dropdown for serial sources (a decoder that specifies e.g. SLIP framing).
+  useEffect(() => {
+    if (!selectedCatalogPath) {
+      setCatalogSerialEncoding(null);
+      return;
+    }
+    let cancelled = false;
+    loadCatalog(selectedCatalogPath)
+      .then((parsed) => {
+        if (cancelled) return;
+        setCatalogSerialEncoding(CATALOG_ENCODING_TO_FRAMING[parsed.serialConfig?.encoding ?? ""] ?? null);
+      })
+      .catch(() => { if (!cancelled) setCatalogSerialEncoding(null); });
+    return () => { cancelled = true; };
+  }, [selectedCatalogPath]);
+
+  // Apply the decoder's serial framing to the selected serial source(s) so the
+  // on-screen framing selection reflects the decoder. Skips profiles the user
+  // framed by hand.
+  useEffect(() => {
+    if (!catalogSerialEncoding) return;
+    const ids = checkedSourceIds.length > 0
+      ? checkedSourceIds
+      : checkedSourceId ? [checkedSourceId] : [];
+    const serialIds = ids.filter(
+      (id) => !framingUserTouchedRef.current.has(id)
+        && readProfiles.find((p) => p.id === id)?.kind === "serial"
+    );
+    if (serialIds.length === 0) return;
+    setFramingConfigMap((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const id of serialIds) {
+        const cur = prev.get(id);
+        if (cur?.encoding !== catalogSerialEncoding) {
+          next.set(id, { ...cur, encoding: catalogSerialEncoding });
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [catalogSerialEncoding, checkedSourceId, checkedSourceIds, readProfiles]);
 
   // Auto-import mode: immediately open file picker when triggered from menu
   useEffect(() => {
@@ -962,6 +1119,11 @@ export default function IoSourcePickerDialog({
     // Add filter configuration for serial sources
     if (minFrameLength > 0) {
       opts.minFrameLength = minFrameLength;
+    }
+
+    // Attach the decoder chosen in the picker
+    if (selectedCatalogPath) {
+      opts.catalogPath = selectedCatalogPath;
     }
 
     console.log("[buildLoadOptions] Built options:", opts);
@@ -1516,6 +1678,9 @@ export default function IoSourcePickerDialog({
             checkedSourceIds={checkedSourceIds}
             defaultId={defaultId}
             isLoading={isLoading}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            captureCount={captures.length}
             captureNames={new Map(captures.map((b) => [b.id, b.name]))}
             onSelectSource={(id) => {
               if (id === null) {
@@ -1625,6 +1790,7 @@ export default function IoSourcePickerDialog({
                   profileKind={profileKind}
                   framingConfig={interfaceFraming}
                   onFramingChange={(config) => {
+                    framingUserTouchedRef.current.add(profileId);
                     setFramingConfigMap((prev) => new Map(prev).set(profileId, config));
                   }}
                   configLocked={configLocked}
@@ -1711,6 +1877,12 @@ export default function IoSourcePickerDialog({
             </>
           )}
         </div>
+
+        <DecoderPicker
+          catalogs={catalogs}
+          catalogPath={selectedCatalogPath}
+          onSelect={handleCatalogSelect}
+        />
 
         <ActionButtons
           mode={mode}

@@ -386,6 +386,16 @@ the same parse binds Rust decode *and* builds the UI model (it falls back to a
 model-only `loadCatalog` if attach fails). Modbus keeps a separate flow: its
 catalogue load is coupled to a poll reconnect that reinitialises the session.
 
+**One-step decoder from the Data Source picker.** The picker
+([IoSourcePickerDialog.tsx](../src/dialogs/IoSourcePickerDialog.tsx)) has a Decoder
+footer that attaches a catalogue *as the session is created*: the chosen path rides
+through `LoadOptions.catalogPath` and `useIOSessionManager` sets it on the new
+session via `setSessionCatalogPath` (the cross-app channel), so a decode-aware app's
+`useSessionCatalog` mirror then binds it — no second step. It auto-fills from the
+selected source's `preferred_catalog`, and when the chosen catalogue declares serial
+framing the picker parses it (`loadCatalog`) and reflects that encoding in the
+source's framing dropdown, so the framing is explicit before connecting.
+
 **Live serial reframing.** Serial framing (SLIP/Modbus-RTU/delimiter) is applied
 by the backend read loop ([io/serial/reader.rs](../src-tauri/src/io/serial/reader.rs)),
 so a source connected *before* its catalogue starts in `Raw` mode — raw bytes, no

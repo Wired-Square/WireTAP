@@ -27,6 +27,8 @@ export interface DialogLoadOptions {
   busOverride?: number;
   busMappings?: Map<string, import("../api/io").BusMapping[]>;
   perInterfaceFraming?: Map<string, import("../dialogs/io-source-picker").InterfaceFramingConfig>;
+  /** Catalogue path to attach to the new session (decoder picker) */
+  catalogPath?: string | null;
 }
 
 /** Configuration for the IO picker handlers hook */

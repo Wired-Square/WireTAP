@@ -35,6 +35,11 @@ import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-p
 import { isMultiSourceCapable, buildDefaultBusMappings } from "../utils/profileTraits";
 import { WINDOW_EVENTS } from "../events/registry";
 
+/** Attach the decoder chosen in the picker to a freshly-created session (cross-app). */
+function attachSessionCatalog(sessionId: string, catalogPath?: string | null): void {
+  if (catalogPath) useSessionStore.getState().setSessionCatalogPath(sessionId, catalogPath);
+}
+
 /**
  * Generate a unique session ID for recorded sources.
  * Pattern: t_{shortId}
@@ -90,6 +95,9 @@ export interface LoadOptions {
   sessionIdOverride?: string;
   /** Modbus TCP poll groups as JSON string (catalog-derived, for modbus_tcp profiles) */
   modbusPollsJson?: string;
+  /** Catalogue path to attach to the new session (decoder picker) — set on the
+   *  session's catalogPath so decode-aware apps bind it via useSessionCatalog. */
+  catalogPath?: string | null;
 }
 
 /** Store interface for apps that manage ioProfile in their store */
@@ -867,6 +875,8 @@ export function useIOSessionManager(
     setMultiSessionId(sessionId);
     setIoProfile(sessionId);
     setIsDetached(false);
+
+    attachSessionCatalog(sessionId, opts.catalogPath);
   }, [appName, profileNamesMap, setMultiBusProfiles, setOutputBusToSource, setIoProfile]);
 
   // Join existing multi-source session
@@ -945,6 +955,8 @@ export function useIOSessionManager(
       setMultiBusProfiles([]);
       setIoProfile(sessionId);
       setSourceProfileId(profileId);
+
+      attachSessionCatalog(sessionId, opts.catalogPath);
     } else {
       // Multi-source path (1 or more realtime profiles)
       if (profileIds.length === 1) {
@@ -1085,6 +1097,8 @@ export function useIOSessionManager(
         setMultiBusProfiles([]);
         setIoProfile(sessionId);
         setSourceProfileId(profileId);
+
+        attachSessionCatalog(sessionId, opts.catalogPath);
       } else {
         // Multi-source path with speed=0
         await startMultiBusSession(profileIds, {
