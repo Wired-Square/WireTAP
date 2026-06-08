@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter};
 
+use crate::io::periodic::Cadence;
 use crate::io::{self, CanTransmitFrame, IOCapabilities, SignalThrottle};
 use crate::settings::{load_settings, IOProfile};
 
@@ -397,7 +398,7 @@ pub async fn io_start_repeat_transmit(
         let mut throttle = SignalThrottle::new();
 
         // Write this frame's transmit result to SQLite and throttle the UI notification.
-        let write_and_notify = |_app: &AppHandle, result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> (bool, Option<String>) {
+        let write_and_notify = |result: &Result<crate::io::TransmitResult, String>, throttle: &mut SignalThrottle| -> (bool, Option<String>) {
             let (success, error) = match result {
                 Ok(r) => (r.success, r.error.clone()),
                 Err(e) => (false, Some(e.clone())),
@@ -419,46 +420,12 @@ pub async fn io_start_repeat_transmit(
             (success, error)
         };
 
-        // First transmit - do this before starting interval timer so startup delays
-        // don't affect the regular interval timing
-        if cancel_flag_clone.load(Ordering::Relaxed) {
-            return;
-        }
-
-        let (result, should_stop) = do_transmit(&session_id_clone, &frame).await;
-        let (_, error) = write_and_notify(&app, &result, &mut throttle);
-
-        if should_stop {
-            let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-            tlog!(
-                "[io_transmit] Stopping repeat for '{}' due to permanent error: {}",
-                queue_id_for_task, reason
-            );
-            let _ = app.emit("repeat-stopped", RepeatStoppedEvent {
-                queue_id: queue_id_for_task.clone(),
-                reason,
-            });
-            crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-            return;
-        }
-
-        // Now start the interval timer for subsequent transmits
-        let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_millis(interval_ms));
-        // Skip the first tick which fires immediately
-        interval_timer.tick().await;
-
-        loop {
-            // Wait for next interval tick first
-            interval_timer.tick().await;
-
-            // Check cancel flag
-            if cancel_flag_clone.load(Ordering::Relaxed) {
-                break;
-            }
-
-            // Transmit with retry for transient errors
+        // Fire immediately, then once per interval. Cadence handles the cancel
+        // check; subsequent ticks aren't skewed by the first transmit's latency.
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        while cadence.next().await.is_some() {
             let (result, should_stop) = do_transmit(&session_id_clone, &frame).await;
-            let (_, error) = write_and_notify(&app, &result, &mut throttle);
+            let (_, error) = write_and_notify(&result, &mut throttle);
 
             // Stop on permanent errors (device gone, session invalid)
             if should_stop {
@@ -573,44 +540,9 @@ pub async fn io_start_serial_repeat_transmit(
             error
         };
 
-        // First transmit - do this before starting interval timer so startup delays
-        // don't affect the regular interval timing
-        if cancel_flag_clone.load(Ordering::Relaxed) {
-            return;
-        }
-
-        let (result, should_stop) = do_serial_transmit(&session_id_clone, &bytes).await;
-        let error = write_and_notify(&result, &mut throttle);
-
-        if should_stop {
-            let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-            tlog!(
-                "[io_transmit] Stopping serial repeat for '{}' due to permanent error: {}",
-                queue_id_for_task, reason
-            );
-            let _ = app.emit("repeat-stopped", RepeatStoppedEvent {
-                queue_id: queue_id_for_task.clone(),
-                reason,
-            });
-            crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-            return;
-        }
-
-        // Now start the interval timer for subsequent transmits
-        let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_millis(interval_ms));
-        // Skip the first tick which fires immediately
-        interval_timer.tick().await;
-
-        loop {
-            // Wait for next interval tick first
-            interval_timer.tick().await;
-
-            // Check cancel flag
-            if cancel_flag_clone.load(Ordering::Relaxed) {
-                break;
-            }
-
-            // Transmit with retry for transient errors
+        // Fire immediately, then once per interval (see io_start_repeat_transmit).
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        while cadence.next().await.is_some() {
             let (result, should_stop) = do_serial_transmit(&session_id_clone, &bytes).await;
             let error = write_and_notify(&result, &mut throttle);
 
@@ -716,45 +648,11 @@ pub async fn io_start_repeat_group(
             error
         };
 
-        // First group cycle - do this before starting interval timer so startup delays
-        // don't affect the regular interval timing
-        if cancel_flag_clone.load(Ordering::Relaxed) {
-            return;
-        }
-
-        for frame in &frames {
-            let (result, should_stop) = do_transmit(&session_id_clone, frame).await;
-            let error = write_frame(frame, &result, &mut throttle);
-
-            if should_stop {
-                let reason = error.unwrap_or_else(|| "Permanent error".to_string());
-                tlog!(
-                    "[io_transmit] Stopping group repeat for '{}' due to permanent error: {}",
-                    group_id_for_task, reason
-                );
-                let _ = app.emit("repeat-stopped", RepeatStoppedEvent {
-                    queue_id: group_id_for_task.clone(),
-                    reason,
-                });
-                crate::ws::dispatch::send_transmit_updated(crate::transmit_history::count());
-                return;
-            }
-        }
-
-        // Now start the interval timer for subsequent cycles
-        let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_millis(interval_ms));
-        // Skip the first tick which fires immediately
-        interval_timer.tick().await;
-
-        'outer: loop {
-            // Wait for next cycle first
-            interval_timer.tick().await;
-
-            // Check cancel flag before sending
-            if cancel_flag_clone.load(Ordering::Relaxed) {
-                break;
-            }
-
+        // Fire the first cycle immediately, then one cycle per interval
+        // (see io_start_repeat_transmit). All frames in a cycle are sent
+        // back-to-back; the interval spaces the cycles.
+        let mut cadence = Cadence::new(interval_ms, cancel_flag_clone, None);
+        'outer: while cadence.next().await.is_some() {
             // Send all frames in sequence (no delays between them)
             for frame in &frames {
                 // Transmit with retry for transient errors

@@ -7,6 +7,7 @@
 // Core modules
 pub mod codec; // Frame codec trait and implementations
 mod error;
+pub(crate) mod periodic; // Shared cadence primitive for interval-driven loops
 mod signal_throttle;
 pub use signal_throttle::SignalThrottle;
 pub mod post_session;

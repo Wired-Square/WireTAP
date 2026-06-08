@@ -21,11 +21,11 @@ use std::sync::{
 };
 use tauri::AppHandle;
 use tokio::sync::Mutex;
-use tokio::time::{Duration, interval};
 use tokio_modbus::client::{self, tcp};
 use tokio_modbus::prelude::*;
 
 use crate::capture_store::{self, CaptureKind};
+use crate::io::periodic::Cadence;
 use crate::io::{
     emit_device_connected, emit_session_error, emit_stream_ended, now_us, signal_frames_ready,
     FrameMessage, IOCapabilities, IOSource, IOState, Protocol, SignalThrottle,
@@ -261,7 +261,7 @@ fn spawn_poll_task(
     max_register_errors: u32,
 ) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
-        let mut timer = interval(Duration::from_millis(poll.interval_ms));
+        let mut cadence = Cadence::new(poll.interval_ms, cancel_flag, Some(pause_flag));
         let type_name = match poll.register_type {
             RegisterType::Holding => "holding",
             RegisterType::Input => "input",
@@ -277,18 +277,7 @@ fn spawn_poll_task(
             session_id, type_name, poll.start_register, poll.count, poll.interval_ms, poll.frame_id
         );
 
-        loop {
-            timer.tick().await;
-
-            if cancel_flag.load(Ordering::Relaxed) {
-                break;
-            }
-
-            // Skip reads while paused (poll task stays alive, timer keeps ticking)
-            if pause_flag.load(Ordering::Relaxed) {
-                continue;
-            }
-
+        while cadence.next().await.is_some() {
             let mut ctx = ctx.lock().await;
 
             // tokio-modbus read methods return Result<Result<Vec<T>, Exception>>

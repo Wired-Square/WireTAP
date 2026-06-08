@@ -580,6 +580,19 @@ method using a `TransmitPayload` enum. The Transmit app chooses its view from
 protocols → `SerialTransmitView`) and gates the send itself on
 `tx_frames` / `tx_bytes`.
 
+**Interval-driven loops share one cadence.** Repeating transmits (`io_start_repeat_transmit`,
+the serial and group variants in [transmit.rs](../src-tauri/src/transmit.rs)) and
+Modbus register polling (the poll task in
+[io/broker/spawner.rs](../src-tauri/src/io/broker/spawner.rs), and the standalone
+[io/modbus_tcp/reader.rs](../src-tauri/src/io/modbus_tcp/reader.rs)) are the same
+skeleton — fire immediately, then once per interval, stopping on a cancel flag and
+skipping ticks while paused — differing only in the per-tick body (a transmit logs a
+`TransmitResult`; a poll emits a `FrameMessage` into the rx stream). That timing
+triad lives in one place, `Cadence` ([io/periodic.rs](../src-tauri/src/io/periodic.rs)):
+callers write `while cadence.next().await.is_some() { … }`. Modbus RTU keeps its own
+sequential scheduler — half-duplex means requests must be strictly ordered, which a
+per-task interval can't express.
+
 ---
 
 ## 10. Key files
@@ -609,6 +622,7 @@ protocols → `SerialTransmitView`) and gates the send itself on
 | [src-tauri/src/io/traits.rs](../src-tauri/src/io/traits.rs) | `InterfaceTraits`, `SessionDataStreams`, validation/merge |
 | [src-tauri/src/io/broker/](../src-tauri/src/io/broker/) | `IOBroker` — source aggregator / merge task |
 | [src-tauri/src/io/signal_throttle.rs](../src-tauri/src/io/signal_throttle.rs) | 2 Hz per-signal rate limiter |
+| [src-tauri/src/io/periodic.rs](../src-tauri/src/io/periodic.rs) | `Cadence` — shared interval/cancel/pause primitive for repeat-transmit and Modbus polling |
 | [src-tauri/src/io/post_session.rs](../src-tauri/src/io/post_session.rs) | 10 s TTL cache for post-session fetches |
 | [src-tauri/src/ws/server.rs](../src-tauri/src/ws/server.rs) | WS server, channel allocation, auth |
 | [src-tauri/src/ws/protocol.rs](../src-tauri/src/ws/protocol.rs) | Binary message format, `MsgType`, `encode_frame_batch` |

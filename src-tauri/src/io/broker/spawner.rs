@@ -18,6 +18,7 @@ use crate::io::gvret::{run_gvret_tcp_source, BusMapping};
 #[cfg(not(target_os = "ios"))]
 use crate::io::gvret::run_gvret_usb_source;
 use crate::io::modbus_tcp::{PollGroup, RegisterType};
+use crate::io::periodic::Cadence;
 use crate::io::{now_us, FrameMessage};
 #[cfg(not(target_os = "ios"))]
 use crate::io::serial::{parse_profile_for_source, run_source as run_serial_source};
@@ -1086,7 +1087,7 @@ async fn run_modbus_poll_task(
     pause_flag: Arc<AtomicBool>,
     tx: mpsc::Sender<SourceMessage>,
 ) {
-    let mut timer = interval(Duration::from_millis(poll.interval_ms));
+    let mut cadence = Cadence::new(poll.interval_ms, stop_flag, Some(pause_flag));
     let type_name = match poll.register_type {
         RegisterType::Holding => "holding",
         RegisterType::Input => "input",
@@ -1101,18 +1102,7 @@ async fn run_modbus_poll_task(
         source_idx, type_name, poll.start_register, poll.count, poll.interval_ms, poll.frame_id, output_bus
     );
 
-    loop {
-        timer.tick().await;
-
-        if stop_flag.load(Ordering::Relaxed) {
-            break;
-        }
-
-        // Skip reads while paused (task stays alive, timer keeps ticking)
-        if pause_flag.load(Ordering::Relaxed) {
-            continue;
-        }
-
+    while cadence.next().await.is_some() {
         let mut ctx = ctx.lock().await;
 
         // tokio-modbus read methods return Result<Result<Vec<T>, Exception>>
