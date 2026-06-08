@@ -70,7 +70,7 @@ framelink = { git = "ssh://git@github.com/Wired-Square/framelink-rs.git", branch
 # CAN, Serial and Modbus; shared with the ESS add-on. Pinned by tag; a local
 # `.cargo/config.toml` paths override points at a sibling checkout for the dev
 # loop (same pattern as framelink).
-wiretap-catalog = { git = "ssh://git@github.com/Wired-Square/wiretap-lib-rs.git", tag = "v0.6.0" }
+wiretap-catalog = { git = "ssh://git@github.com/Wired-Square/wiretap-lib-rs.git", tag = "v0.6.2" }
 # Desktop-only dependencies (serial/USB/keepawake not available on iOS)
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 serialport = "4.3"
