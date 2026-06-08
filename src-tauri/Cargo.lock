@@ -8863,8 +8863,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-catalog"
-version = "0.6.2"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.6.2#554374901dda120323a3068cab905e01c51823e5"
+version = "0.7.1"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.7.1#fec8eb5ab4937820c1a466e46dc0b4f86f4f44bb"
 dependencies = [
  "can-dbc",
  "rust_decimal",
@@ -8872,6 +8872,16 @@ dependencies = [
  "thiserror 2.0.18",
  "toml 0.8.23",
  "toml_edit 0.22.27",
+ "wiretap-decode",
+]
+
+[[package]]
+name = "wiretap-decode"
+version = "0.7.1"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.7.1#fec8eb5ab4937820c1a466e46dc0b4f86f4f44bb"
+dependencies = [
+ "rust_decimal",
+ "serde",
 ]
 
 [[package]]
