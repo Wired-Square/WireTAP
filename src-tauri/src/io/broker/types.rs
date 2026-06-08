@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::io::gvret::BusMapping;
 use crate::io::modbus_tcp::PollGroup;
-use crate::io::types::TransmitSender;
+use crate::io::types::{ControlSender, TransmitSender};
 
 /// Modbus interface role in a multi-source session
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -89,3 +89,6 @@ pub(super) struct TransmitRoute {
 
 /// Shared transmit channels by source index
 pub(super) type TransmitChannels = Arc<Mutex<HashMap<usize, TransmitSender>>>;
+
+/// Shared control channels by source index (live framing changes; serial only)
+pub(super) type ControlChannels = Arc<Mutex<HashMap<usize, ControlSender>>>;

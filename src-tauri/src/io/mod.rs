@@ -11,7 +11,7 @@ mod signal_throttle;
 pub use signal_throttle::SignalThrottle;
 pub mod post_session;
 pub mod traits; // InterfaceTraits validation
-mod types;
+pub(crate) mod types;
 
 // Recorded sources (capture, csv, postgres)
 mod recorded;
@@ -510,6 +510,12 @@ pub trait IOSource: Send + Sync {
     /// an error for unsupported variants.
     fn transmit(&self, _payload: &TransmitPayload) -> Result<TransmitResult, String> {
         Err("This device does not support transmission".to_string())
+    }
+
+    /// Change serial framing on a running session in place (serial broker only).
+    /// Default implementation returns an error.
+    fn set_framing(&self, _req: types::SetFramingRequest) -> Result<(), String> {
+        Err("This session does not support changing framing".to_string())
     }
 
     /// Get current state
@@ -2588,6 +2594,26 @@ pub async fn transmit_frame(session_id: &str, frame: &CanTransmitFrame) -> Resul
 /// Transmit raw serial bytes through a session (convenience wrapper)
 pub async fn transmit_serial(session_id: &str, bytes: &[u8]) -> Result<TransmitResult, String> {
     session_transmit(session_id, &TransmitPayload::RawBytes(bytes.to_vec())).await
+}
+
+/// Change serial framing on a running session in place (no device reconnect),
+/// then broadcast the updated capabilities (rx_frames flips when framing turns
+/// a Raw byte stream into framed messages). Returns the new capabilities.
+pub async fn set_framing(
+    session_id: &str,
+    req: types::SetFramingRequest,
+) -> Result<IOCapabilities, String> {
+    let sessions = IO_SESSIONS.lock().await;
+    let session = sessions
+        .get(session_id)
+        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    session.source.set_framing(req)?;
+    let capabilities = session.source.capabilities();
+    let state = session.source.state();
+    drop(sessions);
+
+    crate::ws::dispatch::send_session_lifecycle_scoped(session_id, &state, &capabilities);
+    Ok(capabilities)
 }
 
 // ============================================================================

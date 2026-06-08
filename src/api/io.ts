@@ -5,6 +5,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { FrameMessage } from "../types/frame";
+import type { SerialFrameConfig } from "../utils/frameExport";
 
 // ============================================================================
 // Interface Traits
@@ -262,6 +263,28 @@ export async function getIOSessionCapabilities(
   sessionId: string
 ): Promise<IOCapabilities | null> {
   return invoke("get_reader_session_capabilities", { session_id: sessionId });
+}
+
+/**
+ * Change serial framing on a running session in place (no device reconnect).
+ * The backend swaps the source's framer and re-broadcasts capabilities (rx_frames
+ * flips when a Raw byte stream starts being framed). Returns the new capabilities.
+ */
+export async function setFraming(
+  sessionId: string,
+  serial: SerialFrameConfig,
+): Promise<IOCapabilities> {
+  return invoke("io_set_framing", {
+    session_id: sessionId,
+    encoding: serial.encoding ?? "raw",
+    frame_id_start_byte: serial.frame_id_start_byte,
+    frame_id_bytes: serial.frame_id_bytes,
+    frame_id_big_endian: serial.frame_id_byte_order !== "little",
+    source_address_start_byte: serial.source_address_start_byte,
+    source_address_bytes: serial.source_address_bytes,
+    source_address_big_endian: serial.source_address_byte_order !== "little",
+    min_frame_length: serial.min_frame_length,
+  });
 }
 
 /**

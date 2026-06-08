@@ -34,6 +34,10 @@ pub enum SourceMessage {
     Error(usize, String),
     /// Transmit channel is ready (source_index, transmit_sender)
     TransmitReady(usize, TransmitSender),
+    /// Control channel is ready (source_index, control_sender) — serial only,
+    /// for live framing changes.
+    #[cfg_attr(target_os = "ios", allow(dead_code))]
+    ControlReady(usize, ControlSender),
     /// Source connected successfully (source_index, device_type, address, bus_number)
     Connected(usize, String, String, Option<u8>),
 }
@@ -52,4 +56,29 @@ pub struct TransmitRequest {
 
 /// Sender type for transmit requests (sync-safe)
 pub type TransmitSender = std_mpsc::SyncSender<TransmitRequest>;
+
+// ============================================================================
+// Control Types (live framing changes)
+// ============================================================================
+
+/// A live framing change for a running serial source. Carries primitives only
+/// (no serial-only types) so the shared broker can hold/dispatch it on every
+/// platform; the serial reader rebuilds the `FramingEncoding`/`FrameIdConfig`.
+#[derive(Clone, Debug)]
+pub struct SetFramingRequest {
+    /// `slip` | `modbus_rtu` | `delimiter` | `raw` | … (anything not a real
+    /// framer resolves to raw, matching `parse_profile_for_source`).
+    pub encoding: String,
+    pub frame_id_start_byte: Option<i32>,
+    pub frame_id_bytes: Option<u8>,
+    pub frame_id_big_endian: bool,
+    pub source_address_start_byte: Option<i32>,
+    pub source_address_bytes: Option<u8>,
+    pub source_address_big_endian: bool,
+    pub min_frame_length: usize,
+    pub emit_raw_bytes: bool,
+}
+
+/// Sender type for control requests (sync-safe), mirroring `TransmitSender`.
+pub type ControlSender = std_mpsc::SyncSender<SetFramingRequest>;
 

@@ -1251,6 +1251,7 @@ pub fn run() {
             // IO session-based transmit
             transmit::io_transmit_can_frame,
             transmit::io_transmit_serial,
+            transmit::io_set_framing,
             transmit::get_io_session_capabilities,
             transmit::io_start_repeat_transmit,
             transmit::io_stop_repeat_transmit,

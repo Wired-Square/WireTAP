@@ -88,6 +88,25 @@ pub struct SerialSourceConfig {
     pub emit_raw_bytes: bool,
 }
 
+/// Build a [`FramingEncoding`] from an encoding name using defaults, for live
+/// framing changes that carry no profile context. Mirrors the `match` in
+/// [`parse_profile_for_source`] (anything that isn't a real framer → `Raw`).
+pub fn framing_from_str(encoding: &str) -> FramingEncoding {
+    match encoding {
+        "slip" => FramingEncoding::Slip,
+        "modbus_rtu" => FramingEncoding::ModbusRtu {
+            device_address: None,
+            validate_crc: true,
+        },
+        "delimiter" => FramingEncoding::Delimiter {
+            delimiter: vec![0x0A],
+            max_length: 1024,
+            include_delimiter: false,
+        },
+        _ => FramingEncoding::Raw,
+    }
+}
+
 /// Parse an IOProfile into a SerialSourceConfig, applying session-level overrides.
 ///
 /// Returns `None` if the port is not specified in the profile.

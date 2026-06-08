@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use super::spawner::run_source_reader;
-use super::types::{SourceConfig, TransmitChannels};
+use super::types::{ControlChannels, SourceConfig, TransmitChannels};
 use super::{MergeCommand, VirtualBusCommand, VirtualBusControls, VirtualCmdTx};
 use crate::settings;
 use crate::capture_store::{self, TimestampedByte};
@@ -38,6 +38,7 @@ pub(super) async fn run_merge_task(
     mut rx: mpsc::Receiver<SourceMessage>,
     tx: mpsc::Sender<SourceMessage>,
     transmit_channels: TransmitChannels,
+    control_channels: ControlChannels,
     virtual_bus_controls: VirtualBusControls,
     mut merge_cmd_rx: mpsc::UnboundedReceiver<MergeCommand>,
     virtual_cmd_txs: Arc<Mutex<HashMap<usize, VirtualCmdTx>>>,
@@ -152,6 +153,12 @@ pub(super) async fn run_merge_task(
                         tlog!("[IOBroker] Source {} transmit channel ready", source_idx);
                         if let Ok(mut channels) = transmit_channels.lock() {
                             channels.insert(source_idx, tx_sender);
+                        }
+                    }
+                    Some(SourceMessage::ControlReady(source_idx, control_sender)) => {
+                        tlog!("[IOBroker] Source {} control channel ready", source_idx);
+                        if let Ok(mut channels) = control_channels.lock() {
+                            channels.insert(source_idx, control_sender);
                         }
                     }
                     Some(SourceMessage::Connected(source_idx, device_type, address, bus_number)) => {

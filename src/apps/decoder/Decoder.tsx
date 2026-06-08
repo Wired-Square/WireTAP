@@ -21,6 +21,7 @@ import { tlog } from "../../api/settings";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
 import { UI_UPDATE_INTERVAL_MS, COPY_FEEDBACK_TIMEOUT_MS, REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import type { StreamEndedInfo, PlaybackPosition } from '../../api/io';
+import { setFraming } from '../../api/io';
 import AppLayout from "../../components/AppLayout";
 import DecoderTopBar from "./views/DecoderTopBar";
 import DecoderFramesView from "./views/DecoderFramesView";
@@ -944,31 +945,51 @@ export default function Decoder() {
     };
   }, [catalogPath, loadCatalog, loadCatalogForSession, session.sessionId, decoderDir]);
 
-  // Clear frames when catalog's frame ID config changes while streaming.
-  // The frontend now extracts frame IDs from raw bytes using the catalog config,
-  // so we don't need to restart the session - just clear old frames that had wrong IDs.
+  // React to the serial catalogue config changing while streaming.
   const prevSerialConfigRef = useRef(serialConfig);
   useEffect(() => {
     const prevConfig = prevSerialConfigRef.current;
     prevSerialConfigRef.current = serialConfig;
 
-    // Check if frame ID extraction config has changed
+    if (!isStreaming) return;
+
+    // Framing (encoding) is applied by the backend's serial read loop. If the
+    // encoding becomes available or changes mid-stream (e.g. a serial catalogue
+    // is loaded after connecting), tell the backend to reframe in place — same
+    // session, the attached catalogue keeps decoding. Falls back to a full
+    // re-watch if the live swap fails. (Without this the source stays Raw and
+    // never produces frames to decode.)
+    const encodingChanged = prevConfig?.encoding !== serialConfig?.encoding;
+    const sid = session.sessionId;
+    if (isRealtime && encodingChanged && serialConfig?.encoding && sid) {
+      tlog.debug(`[Decoder] serial encoding → ${serialConfig.encoding} while streaming; reframing in place`);
+      setFraming(sid, serialConfig).catch((e) => {
+        tlog.info(`[Decoder] live set-framing failed (${e}); re-watching`);
+        const profileIds = ioProfiles.length > 0
+          ? ioProfiles
+          : sourceProfileId ? [sourceProfileId] : [];
+        if (profileIds.length > 0) {
+          watchSource(profileIds, mergeSerialConfigForWatch(serialConfig, { speed: playbackSpeed }))
+            .catch((err) => tlog.info(`[Decoder] serial re-watch failed: ${err}`));
+        }
+      });
+      return;
+    }
+
+    // Frame-id-only change (same framing): the frontend re-extracts frame IDs
+    // from the already-framed bytes, so just clear stale frames — no re-watch.
     const frameIdConfigChanged =
       prevConfig?.frame_id_start_byte !== serialConfig?.frame_id_start_byte ||
       prevConfig?.frame_id_bytes !== serialConfig?.frame_id_bytes ||
       prevConfig?.frame_id_byte_order !== serialConfig?.frame_id_byte_order ||
       prevConfig?.frame_id_mask !== serialConfig?.frame_id_mask;
-
     const hasFrameIdConfig = serialConfig?.frame_id_start_byte !== undefined || serialConfig?.frame_id_bytes !== undefined;
 
-    // When frame ID config changes while streaming, clear old frames (they have wrong IDs)
-    // New frames will be processed correctly by handleFrames using the catalog config
-    if (isStreaming && frameIdConfigChanged && hasFrameIdConfig) {
-      console.log('[Decoder] Serial config changed while streaming, clearing frames for re-extraction');
+    if (frameIdConfigChanged && hasFrameIdConfig) {
       clearFrames();
       clearUnmatchedFrames();
     }
-  }, [serialConfig, isStreaming, clearFrames, clearUnmatchedFrames]);
+  }, [serialConfig, isStreaming, isRealtime, session.sessionId, ioProfiles, sourceProfileId, watchSource, playbackSpeed, clearFrames, clearUnmatchedFrames]);
 
   // Window close is handled by Rust (lib.rs on_window_event) to prevent crashes
   // on macOS 26.2+ (Tahoe). The Rust handler stops the session and waits for

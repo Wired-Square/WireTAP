@@ -24,7 +24,7 @@ use super::slcan::encode_transmit_frame as encode_slcan_frame;
 #[cfg(target_os = "linux")]
 use super::socketcan::{encode_frame as encode_socketcan_frame, EncodedFrame};
 use super::traits::{get_traits_for_profile_kind, validate_session_traits};
-use super::types::{SourceMessage, TransmitRequest};
+use super::types::{SetFramingRequest, SourceMessage, TransmitRequest};
 use super::{
     CanTransmitFrame, IOCapabilities, IOSource, IOState, InterfaceTraits, SessionDataStreams,
     TransmitPayload, TransmitResult, VirtualBusState, emit_capture_changed,
@@ -36,7 +36,7 @@ use super::gs_usb::encode_frame as encode_gs_usb_frame;
 
 use merge::run_merge_task;
 pub use types::{ModbusRole, SourceConfig};
-use types::{TransmitChannels, TransmitRoute};
+use types::{ControlChannels, TransmitChannels, TransmitRoute};
 
 // ============================================================================
 // Virtual Bus Control (shared with generator tasks)
@@ -108,6 +108,11 @@ pub struct IOBroker {
     transmit_routes: HashMap<u8, TransmitRoute>,
     /// Transmit channels by source index (populated when sources connect)
     transmit_channels: TransmitChannels,
+    /// Control channels by source index for live framing changes (serial only)
+    control_channels: ControlChannels,
+    /// Live framing-encoding overrides by source index (set via `set_framing`),
+    /// consulted by `combined_capabilities` so `rx_frames` reflects the change.
+    framing_overrides: Arc<Mutex<HashMap<usize, String>>>,
     /// Derived session traits from all interfaces
     session_traits: InterfaceTraits,
     /// Whether this session emits raw bytes (for serial sources without framing)
@@ -141,6 +146,48 @@ impl IOBroker {
             .ok_or_else(|| "Session not running — cannot resume source".to_string())?;
         tx.send(MergeCommand::ResumeSource(profile_id.to_string()))
             .map_err(|e| format!("Failed to send resume-source command: {}", e))?;
+        Ok(())
+    }
+
+    /// Change serial framing on every serial source in place (no reconnect).
+    /// Records the new encoding so `combined_capabilities` reflects `rx_frames`,
+    /// then signals each serial reader to swap its framer.
+    pub fn set_framing(&self, req: SetFramingRequest) -> Result<(), String> {
+        {
+            let channels = self
+                .control_channels
+                .lock()
+                .map_err(|e| format!("Failed to lock control channels: {}", e))?;
+            if channels.is_empty() {
+                return Err("Session has no serial source to set framing on".to_string());
+            }
+            let mut overrides = self
+                .framing_overrides
+                .lock()
+                .map_err(|e| format!("Failed to lock framing overrides: {}", e))?;
+            for (idx, sender) in channels.iter() {
+                overrides.insert(*idx, req.encoding.clone());
+                let _ = sender.try_send(req.clone());
+            }
+        }
+
+        // If framing is now on, the source starts producing frames. A session
+        // that began bytes-only (Raw) has no frame capture, so those frames would
+        // be dropped (and never streamed/decoded). Create one on demand — mirrors
+        // the `has_framing` branch in `start()`. (matches `framing_from_str`.)
+        let framing_on = matches!(req.encoding.as_str(), "slip" | "modbus_rtu" | "delimiter");
+        if framing_on
+            && capture_store::get_session_frame_capture_id(&self.session_id).is_none()
+        {
+            let capture_id =
+                capture_store::create_capture(CaptureKind::Frames, self.session_id.clone());
+            let _ = capture_store::set_capture_owner(&capture_id, &self.session_id);
+            emit_capture_changed(&self.session_id);
+            tlog!(
+                "[IOBroker] Created frame capture {} for session {} after live framing change",
+                capture_id, self.session_id
+            );
+        }
         Ok(())
     }
 
@@ -242,6 +289,8 @@ impl IOBroker {
             tx,
             transmit_routes,
             transmit_channels: Arc::new(Mutex::new(HashMap::new())),
+            control_channels: Arc::new(Mutex::new(HashMap::new())),
+            framing_overrides: Arc::new(Mutex::new(HashMap::new())),
             session_traits,
             emits_raw_bytes,
             virtual_bus_controls: Arc::new(Mutex::new(HashMap::new())),
@@ -288,10 +337,17 @@ impl IOBroker {
             .collect();
         buses.sort();
 
-        // Emits frames if any source is non-serial, or if any serial source has framing
-        let rx_frames = self.sources.iter().any(|s| {
-            s.profile_kind != "serial"
-                || s.framing_encoding.as_deref().map_or(false, |f| f != "raw")
+        // Emits frames if any source is non-serial, or if any serial source has
+        // framing — honouring a live `set_framing` override over the static config.
+        let overrides = self.framing_overrides.lock().ok();
+        let rx_frames = self.sources.iter().enumerate().any(|(idx, s)| {
+            let framing = overrides
+                .as_ref()
+                .and_then(|o| o.get(&idx))
+                .map(String::as_str)
+                .or(s.framing_encoding.as_deref())
+                .unwrap_or("raw");
+            s.profile_kind != "serial" || framing != "raw"
         });
 
         IOCapabilities {
@@ -515,8 +571,11 @@ impl IOSource for IOBroker {
         // Emit capture-changed after all capture operations are complete
         emit_capture_changed(&self.session_id);
 
-        // Clear any stale transmit channels from previous run
+        // Clear any stale transmit/control channels from previous run
         if let Ok(mut channels) = self.transmit_channels.lock() {
+            channels.clear();
+        }
+        if let Ok(mut channels) = self.control_channels.lock() {
             channels.clear();
         }
 
@@ -527,6 +586,7 @@ impl IOSource for IOBroker {
         let pause_flag = self.pause_flag.clone();
         let tx = self.tx.clone();
         let transmit_channels = self.transmit_channels.clone();
+        let control_channels = self.control_channels.clone();
         let emits_raw_bytes = self.emits_raw_bytes;
 
         // Take the receiver - we'll use it in the merge task
@@ -564,6 +624,7 @@ impl IOSource for IOBroker {
                 rx,
                 tx,
                 transmit_channels,
+                control_channels,
                 virtual_bus_controls,
                 merge_cmd_rx,
                 virtual_cmd_txs,
@@ -627,6 +688,10 @@ impl IOSource for IOBroker {
             TransmitPayload::CanFrame(frame) => self.transmit_can_frame(frame),
             TransmitPayload::RawBytes(bytes) => self.transmit_raw_bytes(bytes),
         }
+    }
+
+    fn set_framing(&self, req: SetFramingRequest) -> Result<(), String> {
+        IOBroker::set_framing(self, req)
     }
 
     fn state(&self) -> IOState {

@@ -15,7 +15,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use crate::io::gvret::{apply_bus_mapping, BusMapping};
-use crate::io::types::{ByteEntry, SourceMessage, TransmitRequest};
+use crate::io::types::{ByteEntry, SetFramingRequest, SourceMessage, TransmitRequest};
 use crate::io::{now_us, FrameMessage};
 
 // Re-export Parity for external use
@@ -94,6 +94,12 @@ pub async fn run_source(
         .send(SourceMessage::TransmitReady(source_idx, transmit_tx))
         .await;
 
+    // Create control channel (live framing changes)
+    let (control_tx, control_rx) = std_mpsc::sync_channel::<SetFramingRequest>(8);
+    let _ = tx
+        .send(SourceMessage::ControlReady(source_idx, control_tx))
+        .await;
+
     // Get the output bus from the first enabled mapping (for raw bytes)
     let output_bus = bus_mappings
         .iter()
@@ -121,6 +127,13 @@ pub async fn run_source(
 
     let blocking_handle = tokio::task::spawn_blocking(move || {
         let mut framer = SerialFramer::new(framing_encoding);
+        // Framing config is mutable so a live `SetFraming` control message can
+        // swap it without reconnecting the port (see the control poll below).
+        let mut frame_id_config = frame_id_config;
+        let mut source_address_config = source_address_config;
+        let mut min_frame_length = min_frame_length;
+        let mut emit_raw_bytes = emit_raw_bytes;
+        let mut has_framing = has_framing;
         let mut buf = [0u8; 256];
 
         while !stop_flag_clone.load(Ordering::SeqCst) {
@@ -137,6 +150,34 @@ pub async fn run_source(
                     }
                 };
                 let _ = req.result_tx.send(result);
+            }
+
+            // Check for live framing changes (non-blocking). Swaps the framer in
+            // place — the old framer's partial buffer is dropped; the device
+            // re-syncs on the next boundary in the new encoding.
+            while let Ok(req) = control_rx.try_recv() {
+                let new_framing = super::utils::framing_from_str(&req.encoding);
+                has_framing = !matches!(new_framing, FramingEncoding::Raw);
+                framer = SerialFramer::new(new_framing);
+                let mk_cfg = |start: Option<i32>, bytes: Option<u8>, big_endian: bool| {
+                    start.map(|start_byte| FrameIdConfig {
+                        start_byte,
+                        num_bytes: bytes.unwrap_or(1),
+                        big_endian,
+                    })
+                };
+                frame_id_config = mk_cfg(req.frame_id_start_byte, req.frame_id_bytes, req.frame_id_big_endian);
+                source_address_config = mk_cfg(
+                    req.source_address_start_byte,
+                    req.source_address_bytes,
+                    req.source_address_big_endian,
+                );
+                min_frame_length = req.min_frame_length;
+                emit_raw_bytes = req.emit_raw_bytes;
+                tlog!(
+                    "[serial] Source {} framing updated → {} (has_framing: {})",
+                    source_idx, req.encoding, has_framing
+                );
             }
 
             // Read data

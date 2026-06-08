@@ -257,6 +257,37 @@ pub async fn get_io_session_capabilities(session_id: String) -> Result<Option<IO
     Ok(io::get_session_capabilities(&session_id).await)
 }
 
+/// Change serial framing on a running session in place (no device reconnect).
+/// Used by the Decoder when a serial catalogue is selected mid-stream so the
+/// source starts SLIP-framing without a re-watch. Returns the updated capabilities.
+#[tauri::command(rename_all = "snake_case")]
+#[allow(clippy::too_many_arguments)]
+pub async fn io_set_framing(
+    session_id: String,
+    encoding: String,
+    frame_id_start_byte: Option<i32>,
+    frame_id_bytes: Option<u8>,
+    frame_id_big_endian: Option<bool>,
+    source_address_start_byte: Option<i32>,
+    source_address_bytes: Option<u8>,
+    source_address_big_endian: Option<bool>,
+    min_frame_length: Option<usize>,
+) -> Result<IOCapabilities, String> {
+    let req = crate::io::types::SetFramingRequest {
+        encoding,
+        frame_id_start_byte,
+        frame_id_bytes,
+        frame_id_big_endian: frame_id_big_endian.unwrap_or(true),
+        source_address_start_byte,
+        source_address_bytes,
+        source_address_big_endian: source_address_big_endian.unwrap_or(true),
+        min_frame_length: min_frame_length.unwrap_or(0),
+        // Keep raw bytes flowing (matches mergeSerialConfigForWatch).
+        emit_raw_bytes: true,
+    };
+    io::set_framing(&session_id, req).await
+}
+
 // ============================================================================
 // IO Session Repeat Transmit
 // ============================================================================

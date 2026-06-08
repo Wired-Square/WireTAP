@@ -386,6 +386,21 @@ the same parse binds Rust decode *and* builds the UI model (it falls back to a
 model-only `loadCatalog` if attach fails). Modbus keeps a separate flow: its
 catalogue load is coupled to a poll reconnect that reinitialises the session.
 
+**Live serial reframing.** Serial framing (SLIP/Modbus-RTU/delimiter) is applied
+by the backend read loop ([io/serial/reader.rs](../src-tauri/src/io/serial/reader.rs)),
+so a source connected *before* its catalogue starts in `Raw` mode — raw bytes, no
+frames, nothing to decode. Selecting a serial catalogue mid-stream calls the
+**`io_set_framing`** command ([transmit.rs](../src-tauri/src/transmit.rs)), which
+swaps the running source's framer **in place** via a per-source control channel
+(`SourceMessage::ControlReady`, mirroring the transmit path) — same session, no
+device reopen, and the attached catalogue keeps decoding (no re-attach). The broker
+records a framing override so `combined_capabilities` flips `rx_frames` true (pushed
+as a `SessionLifecycle` update), and creates a frame capture on demand (a bytes-only
+session has none) so the now-framed messages land, stream and decode. The Decoder
+calls it from [`useSessionCatalog`](../src/hooks/useSessionCatalog.ts)'s sibling
+serial-config effect when the encoding first appears, falling back to a full
+re-watch if the live swap fails.
+
 ### Dispatch path
 
 ```
