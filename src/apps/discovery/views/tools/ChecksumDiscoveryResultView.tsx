@@ -9,7 +9,7 @@ import { cardDefault } from "../../../../styles/cardStyles";
 import { caption, emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from "../../../../styles/typography";
 import { borderDivider, hoverLight, bgSurface, textPrimary, textSecondary, textMuted } from "../../../../styles";
 import { useDiscoveryStore } from "../../../../stores/discoveryStore";
-import { useSettings, getDisplayFrameIdFormat } from "../../../../hooks/useSettings";
+import { useFrameIdFormat } from "../../../../hooks/useFrameIdFormat";
 import { formatFrameId } from "../../../../utils/frameIds";
 import { COPY_FEEDBACK_TIMEOUT_MS } from "../../../../constants";
 import type { ChecksumCandidate } from "../../../../utils/analysis/checksumDiscovery";
@@ -22,7 +22,7 @@ type Props = {
 export default function ChecksumDiscoveryResultView({ embedded = false, onClose }: Props) {
   const { t } = useTranslation("discovery");
   const results = useDiscoveryStore((s) => s.toolbox.checksumDiscoveryResults);
-  const { settings } = useSettings();
+  const { effective: frameIdFormat } = useFrameIdFormat();
 
   if (!results) {
     return (
@@ -88,7 +88,7 @@ export default function ChecksumDiscoveryResultView({ embedded = false, onClose 
                 key={frameId}
                 frameId={frameId}
                 candidates={candidates}
-                frameIdFormat={getDisplayFrameIdFormat(settings)}
+                frameIdFormat={frameIdFormat}
               />
             );
           })

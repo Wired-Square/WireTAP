@@ -8,7 +8,8 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Server, Settings as SettingsIcon, Play, Square, Clock, Timer, Binary, Type, Group, Ungroup } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { dataViewContainer } from "../../styles";
-import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/useSettings";
+import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { signalRegister } from "../../utils/modbusRegisters";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
@@ -28,10 +29,10 @@ import ModbusConfigView from "./views/ModbusConfigView";
 import type { FrameMessage } from "../../types/frame";
 import type { DecodedFrameMsg } from "../../services/wsProtocol";
 
-export default function Modbus() {
+function ModbusInner() {
   const { t } = useTranslation("modbus");
   const { settings } = useSettings();
-  const displayFrameIdFormat = getDisplayFrameIdFormat();
+  const { effective: displayFrameIdFormat } = useFrameIdFormat();
   const decoderDir = settings?.decoder_dir ?? null;
 
   // Dialog state
@@ -449,10 +450,11 @@ export default function Modbus() {
         selectedFrames={selectedFrames}
         onToggleFrame={toggleFrameSelection}
         onBulkSelect={() => {}}
-        displayFrameIdFormat={displayFrameIdFormat}
         onSelectAll={selectAllFrames}
         onDeselectAll={deselectAllFrames}
       />
     </AppLayout>
   );
 }
+
+export default withFrameIdFormat(ModbusInner);

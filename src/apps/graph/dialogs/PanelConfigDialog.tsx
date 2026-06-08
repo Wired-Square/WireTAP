@@ -9,7 +9,7 @@ import { iconButtonHover, iconButtonDanger } from "../../../styles/buttonStyles"
 import Dialog from "../../../components/Dialog";
 import { useGraphStore, getSignalLabel, getConfidenceColour } from "../../../stores/graphStore";
 import { useSettings } from "../../../hooks/useSettings";
-import { formatFrameId } from "../../../utils/frameIds";
+import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 
 interface Props {
   isOpen: boolean;
@@ -21,6 +21,7 @@ interface Props {
 
 export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSignals, onReplaceSignal }: Props) {
   const { t } = useTranslation("graph");
+  const { format: formatFrameId } = useFrameIdFormat();
   const panels = useGraphStore((s) => s.panels);
   const updatePanel = useGraphStore((s) => s.updatePanel);
   const updateSignalColour = useGraphStore((s) => s.updateSignalColour);
@@ -216,7 +217,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                   <option value="">{t("panelConfig.fields.selectFrameId")}</option>
                   {sortedFrameIds.map((id) => (
                     <option key={id} value={String(id)}>
-                      {formatFrameId(id)} ({id})
+                      {formatFrameId(id)}
                     </option>
                   ))}
                 </select>

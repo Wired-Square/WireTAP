@@ -155,6 +155,7 @@ export default function GraphTopBar({
     <AppTopBar
       icon={BarChart3}
       iconColour="text-pink-400"
+      frameIdFormat
       ioSession={{
         ioProfile,
         ioProfiles,

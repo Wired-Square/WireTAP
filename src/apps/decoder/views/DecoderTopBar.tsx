@@ -167,6 +167,7 @@ export default function DecoderTopBar({
     <AppTopBar
       icon={Activity}
       iconColour="text-[color:var(--text-green)]"
+      frameIdFormat
       ioSession={{
         ioProfile,
         ioProfiles,

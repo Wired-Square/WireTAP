@@ -92,6 +92,7 @@ export default function TransmitTopBar({
     <AppTopBar
       icon={Send}
       iconColour="text-red-500"
+      frameIdFormat
       ioSession={{
         ioProfile,
         ioProfiles,

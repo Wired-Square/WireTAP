@@ -266,7 +266,7 @@ Every panel renders its top bar through
 flexible row containing five logical slots, in order:
 
 ```
-[icon] [title?] | [identity picker] [secondary pickers] [custom children] | [actions]
+[icon] [title?] | [identity picker] [secondary pickers] [ID format] [custom children] | [actions]
        FlexSeparator (between icon/title and the rest)
                                                        FlexSeparator (only if actions)
 ```
@@ -281,6 +281,8 @@ flexible row containing five logical slots, in order:
   `<FrameLinkDevicePicker>`).
 - **Secondary pickers** — `framePicker` and `catalog` props drive the
   shared frame-and-catalog buttons that several apps use.
+- **ID format** — pass `frameIdFormat` (boolean) to render the shared
+  per-panel frame-id "Flip" toggle (see *Frame ID display format* below).
 - **Custom children** — anything the app needs between the picker and
   the right-side actions (e.g. Discovery's Toolbox button).
 - **Actions** — right-aligned action buttons (Save, Export, Refresh,
@@ -305,6 +307,41 @@ wrapper:
 - accepts a flat props object,
 - composes `AppTopBar` once,
 - keeps `Rules.tsx` (or equivalent) free of inline JSX.
+
+### Frame ID display format
+
+Never read `display_frame_id_format` from settings to render a frame id,
+and never thread a `displayFrameIdFormat` prop down a tree. Frame-id
+rendering is centralised in
+[useFrameIdFormat.tsx](../src/hooks/useFrameIdFormat.tsx): the global
+setting is the *default*, and each panel may override it locally
+(Auto → Dec → Hex) via the top-bar toggle. The override is ephemeral per
+panel instance.
+
+To make a panel honour the format:
+
+1. Wrap the app's default export so its tree (top bar + content) shares
+   one override scope:
+
+   ```tsx
+   function FooInner() { /* … */ }
+   export default withFrameIdFormat(FooInner);
+   ```
+
+2. Pass `frameIdFormat` to the panel's `AppTopBar` to render the toggle.
+3. Render ids through the context, not `formatFrameId` directly:
+
+   ```tsx
+   const { format } = useFrameIdFormat();   // format(id, isExtended?)
+   // …
+   {format(frame.frame_id, frame.is_extended)}
+   ```
+
+   For non-JSX display (clipboard copy, panel titles) read `effective`
+   and call the `formatFrameId` util with it. The shared `FrameDataTable`
+   and `FramePicker` already consume the context, so apps using them get
+   the override for free. `getSaveFrameIdFormat` / `save_frame_id_format`
+   is a *separate* concern (catalog export) and is unaffected.
 
 ## Main view container
 

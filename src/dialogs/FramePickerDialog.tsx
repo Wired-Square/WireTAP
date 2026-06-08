@@ -16,7 +16,6 @@ type Props = {
   selectedFrames: Set<string>;
   onToggleFrame: (id: string) => void;
   onBulkSelect: (bus: number | null, select: boolean) => void;
-  displayFrameIdFormat: "hex" | "decimal";
   onSelectAll?: () => void;
   onDeselectAll?: () => void;
   activeSelectionSetId?: string | null;
@@ -35,7 +34,6 @@ export default function FramePickerDialog({
   selectedFrames,
   onToggleFrame,
   onBulkSelect,
-  displayFrameIdFormat,
   onSelectAll,
   onDeselectAll,
   activeSelectionSetId,
@@ -68,7 +66,6 @@ export default function FramePickerDialog({
             selected={selectedFrames}
             onToggle={onToggleFrame}
             onBulkSelect={onBulkSelect}
-            displayFrameIdFormat={displayFrameIdFormat}
             onSelectAll={onSelectAll}
             onDeselectAll={onDeselectAll}
             activeSelectionSetId={activeSelectionSetId}

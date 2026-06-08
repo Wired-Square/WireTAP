@@ -76,6 +76,7 @@ export default function ModbusTopBar({
     <AppTopBar
       icon={Server}
       iconColour="text-amber-400"
+      frameIdFormat
       ioSession={{
         ioProfile,
         ioProfiles,

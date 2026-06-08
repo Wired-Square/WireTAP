@@ -306,7 +306,6 @@ export default function FilteredTabContent({
       )}
       <FrameDataTable
         frames={displayFrames}
-        displayFrameIdFormat={displayFrameIdFormat}
         formatTime={formatTime}
         showRef={showRefColumn}
         showAscii={showAsciiColumn}

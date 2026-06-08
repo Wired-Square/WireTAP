@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
+import { useSettings, getSaveFrameIdFormat } from "../../hooks/useSettings";
+import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
 import { useFocusStore } from "../../stores/focusStore";
 import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
@@ -33,7 +34,7 @@ import CatalogPickerDialog from "./dialogs/CatalogPickerDialog";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
 import { openCatalogAtPath } from "./io";
 
-export default function CatalogEditor() {
+function CatalogEditorInner() {
   const { t } = useTranslation("catalog");
   // Zustand store selectors
   const catalogPath = useCatalogEditorStore((s) => s.file.path);
@@ -123,7 +124,7 @@ export default function CatalogEditor() {
 
   // Load settings
   const { settings } = useSettings();
-  const displayFrameIdFormat = getDisplayFrameIdFormat(settings);
+  const { effective: displayFrameIdFormat } = useFrameIdFormat();
   const saveFrameIdFormat = getSaveFrameIdFormat(settings);
 
   // Form state management
@@ -707,3 +708,5 @@ export default function CatalogEditor() {
     </AppLayout>
   );
 }
+
+export default withFrameIdFormat(CatalogEditorInner);

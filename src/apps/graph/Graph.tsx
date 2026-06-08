@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
+import { withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useGraphStore, type SignalValueEntry } from "../../stores/graphStore";
 import { useIOSessionManager } from "../../hooks/useIOSessionManager";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
@@ -33,7 +34,7 @@ import { extractBits } from "../../utils/bits";
 import type { FrameMessage } from "../../types/frame";
 import type { DecodedFrameMsg } from "../../services/wsProtocol";
 
-export default function Graph() {
+function GraphInner() {
   const { t } = useTranslation("graph");
   const { settings } = useSettings();
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
@@ -597,3 +598,5 @@ export default function Graph() {
     </AppLayout>
   );
 }
+
+export default withFrameIdFormat(GraphInner);

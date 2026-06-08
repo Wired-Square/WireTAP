@@ -124,8 +124,6 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
     );
   }, [rows]);
 
-  const displayFrameIdFormat = settings?.display_frame_id_format === "decimal" ? "decimal" : "hex";
-
   const handleExport = useCallback(async () => {
     if (totalCount === 0) return;
     setIsExporting(true);
@@ -257,7 +255,6 @@ export default function TransmitHistoryView({ sessionId }: TransmitHistoryViewPr
           {/* Frame table — matches Discovery Frames styling */}
           <FrameDataTable
             frames={frameRows}
-            displayFrameIdFormat={displayFrameIdFormat}
             formatTime={formatTimestamp}
             showCalculator={false}
             showRef={false}

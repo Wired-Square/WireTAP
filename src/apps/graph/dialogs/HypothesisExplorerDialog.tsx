@@ -13,7 +13,7 @@ import { useGraphStore } from "../../../stores/graphStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
 import type { PayloadAnalysisResult } from "../../../utils/analysis/payloadAnalysis";
 import { generateHypotheses, type HypothesisConfig } from "../../../utils/hypothesisRanking";
-import { formatFrameId } from "../../../utils/frameIds";
+import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 
 interface Props {
   isOpen: boolean;
@@ -35,6 +35,7 @@ const scoreBadgeCls = (score: number) => {
 
 export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
   const { t } = useTranslation("graph");
+  const { format: formatFrameId } = useFrameIdFormat();
   const discoveredFrameIds = useGraphStore((s) => s.discoveredFrameIds);
   const addPanel = useGraphStore((s) => s.addPanel);
   const updatePanel = useGraphStore((s) => s.updatePanel);
@@ -246,7 +247,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     <option value="">{t("hypothesis.fields.selectFrameId")}</option>
                     {sortedFrameIds.map((id) => (
                       <option key={id} value={String(id)}>
-                        {formatFrameId(id)} ({id})
+                        {formatFrameId(id)}
                       </option>
                     ))}
                   </select>

@@ -8,6 +8,7 @@ import { ChevronRight, ListFilter, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IOSessionControls, type IOSessionControlsProps } from "./SessionControls";
 import CatalogButton from "./CatalogButton";
+import FrameIdFormatToggle from "./FrameIdFormatToggle";
 import FlexSeparator from "./FlexSeparator";
 import { buttonBase } from "../styles/buttonStyles";
 import { iconLg, iconSm, paddingAppBarX } from "../styles/spacing";
@@ -69,6 +70,11 @@ export interface AppTopBarProps {
   /** If provided, renders a CatalogButton after frame picker */
   catalog?: CatalogSectionProps;
 
+  // === Frame ID Format Toggle (optional) ===
+  /** If true, renders the per-panel frame-id format "Flip" toggle. Must be
+   *  mounted inside a FrameIdFormatProvider. */
+  frameIdFormat?: boolean;
+
   // === Custom Content ===
   /** Content rendered after standard sections, before actions */
   children?: ReactNode;
@@ -120,6 +126,7 @@ export default function AppTopBar({
   ioSession,
   framePicker,
   catalog,
+  frameIdFormat,
   children,
   actions,
 }: AppTopBarProps) {
@@ -209,6 +216,9 @@ export default function AppTopBar({
             />
           </>
         )}
+
+        {/* Frame ID format toggle (if enabled) */}
+        {frameIdFormat && <FrameIdFormatToggle />}
 
         {/* Custom content */}
         {children}

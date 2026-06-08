@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { useSettings, getDisplayFrameIdFormat, getSaveFrameIdFormat } from "../../hooks/useSettings";
+import { useSettings, getSaveFrameIdFormat } from "../../hooks/useSettings";
+import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers';
 import { useMenuSessionControl } from '../../hooks/useMenuSessionControl';
@@ -45,7 +46,7 @@ import { formatFilenameDate } from "../../utils/timeFormat";
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { getFavoritesForProfile } from "../../utils/favorites";
 
-export default function Discovery() {
+function DiscoveryInner() {
   const { t, i18n } = useTranslation("discovery");
   const { settings } = useSettings();
 
@@ -221,7 +222,7 @@ export default function Discovery() {
     useDiscoveryToolboxStore.getState().openInfoView(fim);
   }, []);
 
-  const displayFrameIdFormat = getDisplayFrameIdFormat(settings);
+  const { effective: displayFrameIdFormat } = useFrameIdFormat();
   const displayTimeFormat = settings?.display_time_format ?? "human";
   const saveFrameIdFormat = getSaveFrameIdFormat(settings);
   const decoderDir = settings?.decoder_dir ?? "";
@@ -1244,7 +1245,6 @@ export default function Discovery() {
         selectedFrames={selectedFrames}
         onToggleFrame={toggleFrameSelection}
         onBulkSelect={bulkSelectBus}
-        displayFrameIdFormat={displayFrameIdFormat}
         onSelectAll={selectAllFrames}
         onDeselectAll={deselectAllFrames}
         activeSelectionSetId={activeSelectionSetId}
@@ -1285,3 +1285,5 @@ export default function Discovery() {
     </AppLayout>
   );
 }
+
+export default withFrameIdFormat(DiscoveryInner);

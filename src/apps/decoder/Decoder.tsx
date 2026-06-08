@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { listen, emit } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
-import { useSettings, getDisplayFrameIdFormat } from "../../hooks/useSettings";
+import { useSettings } from "../../hooks/useSettings";
+import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useDecoderStore, getDecodedFrames, getDecodedPerSource, getUnmatchedFrames, getFilteredFrames } from "../../stores/decoderStore";
 import { useIOSessionManager, type SessionReconfigurationInfo } from '../../hooks/useIOSessionManager';
 import { useIOSourcePickerHandlers } from '../../hooks/useIOSourcePickerHandlers';
@@ -43,7 +44,7 @@ import type { PlaybackSpeed, PlaybackState } from "../../components/TimeControll
 import type { FrameMessage } from "../../types/frame";
 import type { DecodedFrameMsg } from "../../services/wsProtocol";
 
-export default function Decoder() {
+function DecoderInner() {
   const { t } = useTranslation("decoder");
   const { settings } = useSettings();
   const [catalogNotification, setCatalogNotification] = useState<string | null>(null);
@@ -157,7 +158,7 @@ export default function Decoder() {
   const scrollPositions = useDecoderStore((state) => state.scrollPositions);
   const setScrollPosition = useDecoderStore((state) => state.setScrollPosition);
 
-  const displayIdFormat = getDisplayFrameIdFormat(settings || undefined);
+  const { effective: displayIdFormat } = useFrameIdFormat();
   const displayTimeFormat = settings?.display_time_format ?? "human";
   const decoderDir = settings?.decoder_dir ?? "";
 
@@ -1169,7 +1170,6 @@ export default function Decoder() {
         selectedFrames={selectedFrames}
         onToggleFrame={toggleFrameSelection}
         onBulkSelect={bulkSelectBus}
-        displayFrameIdFormat={displayIdFormat}
         onSelectAll={selectAllFrames}
         onDeselectAll={deselectAllFrames}
         activeSelectionSetId={activeSelectionSetId}
@@ -1265,3 +1265,5 @@ export default function Decoder() {
     </AppLayout>
   );
 }
+
+export default withFrameIdFormat(DecoderInner);

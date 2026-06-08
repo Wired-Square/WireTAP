@@ -129,6 +129,12 @@
     "selectCatalog": "Select catalog",
     "noCatalog": "No catalog"
   },
+  "frameIdFormat": {
+    "auto": "Auto",
+    "hex": "Hex",
+    "dec": "Dec",
+    "tooltip": "Frame ID format for this panel — click to flip Auto → Dec → Hex. Auto follows the global setting ({{default}})."
+  },
   "baudRate": {
     "placeholder": "Baud rate",
     "custom": "Custom...",

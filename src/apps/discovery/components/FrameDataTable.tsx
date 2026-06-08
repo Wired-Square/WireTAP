@@ -4,7 +4,7 @@
 // Optimised for streaming: SVG sprites, event delegation, stable keys.
 
 import { ReactNode, useMemo, forwardRef, useRef, useEffect, useCallback, type MouseEvent } from 'react';
-import { formatFrameId as formatId } from '../../../utils/frameIds';
+import { useFrameIdFormat } from '../../../hooks/useFrameIdFormat';
 import { sendHexDataToCalculator } from '../../../utils/windowCommunication';
 import { bytesToHex, bytesToAscii } from '../../../utils/byteUtils';
 import { formatHumanUs } from '../../../utils/timeFormat';
@@ -49,8 +49,6 @@ export interface FrameRow {
 export interface FrameDataTableProps {
   /** Frames to display */
   frames: FrameRow[];
-  /** Format for frame ID display */
-  displayFrameIdFormat: 'hex' | 'decimal';
   /** Format time display - callback receives current and previous timestamp */
   formatTime: (timestampUs: number, prevTimestampUs: number | null) => ReactNode;
   /** Whether to show source address column */
@@ -163,7 +161,6 @@ function DefaultBytes({ frame }: { frame: FrameRow }) {
 
 const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   frames,
-  displayFrameIdFormat,
   formatTime,
   showSourceAddress = false,
   onBookmark,
@@ -190,6 +187,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
   statusHeader = '',
   useLocalTimezone = false,
 }, ref) => {
+  const { format: formatId } = useFrameIdFormat();
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (ref as React.RefObject<HTMLDivElement>) || internalRef;
   const wasAtBottom = useRef(true);
@@ -362,7 +360,7 @@ const FrameDataTable = forwardRef<HTMLDivElement, FrameDataTableProps>(({
                 </td>
                 {showId && (
                   <td className={`px-2 py-0.5 text-right ${frame.incomplete ? textDataOrange : textDataYellow} ${cellHighlight}`}>
-                    {formatId(frame.frame_id, displayFrameIdFormat, frame.is_extended)}
+                    {formatId(frame.frame_id, frame.is_extended)}
                     {frame.incomplete && <span className={`ml-1 ${textDataOrange}`}>?</span>}
                   </td>
                 )}

@@ -656,7 +656,6 @@ export default function FramedDataView({ frames, onAccept, onApplyIdMapping, onC
       {/* Frame Table */}
       <FrameDataTable
         frames={processedFrames}
-        displayFrameIdFormat="hex"
         formatTime={formatTime}
         showSourceAddress={hasSourceAddresses}
         sourceByteCount={srcConfig?.numBytes ?? 2}

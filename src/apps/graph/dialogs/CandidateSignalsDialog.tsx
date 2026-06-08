@@ -9,7 +9,7 @@ import Dialog from "../../../components/Dialog";
 import { useGraphStore } from "../../../stores/graphStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
 import type { PayloadAnalysisResult, ByteRole } from "../../../utils/analysis/payloadAnalysis";
-import { formatFrameId } from "../../../utils/frameIds";
+import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 
 interface Props {
   isOpen: boolean;
@@ -32,6 +32,7 @@ const SIGNAL_COLOURS = [
 
 export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
   const { t } = useTranslation("graph");
+  const { format: formatFrameId } = useFrameIdFormat();
   const discoveredFrameIds = useGraphStore((s) => s.discoveredFrameIds);
   const addPanel = useGraphStore((s) => s.addPanel);
   const updatePanel = useGraphStore((s) => s.updatePanel);
@@ -185,7 +186,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                   <option value="">{t("candidates.fields.selectFrameId")}</option>
                   {sortedFrameIds.map((id) => (
                     <option key={id} value={String(id)}>
-                      {formatFrameId(id)} ({id})
+                      {formatFrameId(id)}
                     </option>
                   ))}
                 </select>

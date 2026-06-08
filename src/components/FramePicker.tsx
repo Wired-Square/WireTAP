@@ -7,6 +7,7 @@ import { iconSm } from "../styles/spacing";
 import { labelSmall, captionMuted, emptyStateText } from "../styles/typography";
 import { hoverLight } from "../styles";
 import { formatFrameId } from "../utils/frameIds";
+import { useFrameIdFormat } from "../hooks/useFrameIdFormat";
 import { parseFrameKey } from "../utils/frameKey";
 import type { FrameInfo } from "../types/common";
 import type { SelectionSet } from "../utils/selectionSets";
@@ -22,7 +23,6 @@ type Props = {
   selected: Set<string>;
   onToggle: (id: string) => void;
   onBulkSelect: (bus: number | null, select: boolean) => void;
-  displayFrameIdFormat: "hex" | "decimal";
   actions?: React.ReactNode;
   onSelectAll?: () => void;
   onDeselectAll?: () => void;
@@ -49,7 +49,6 @@ function FramePicker({
   selected,
   onToggle,
   onBulkSelect,
-  displayFrameIdFormat,
   actions,
   onSelectAll,
   onDeselectAll,
@@ -64,6 +63,7 @@ function FramePicker({
   noInnerScroll = false,
 }: Props) {
   const { t } = useTranslation("common");
+  const { effective: displayFrameIdFormat } = useFrameIdFormat();
   const sortedFrames = useMemo(
     () => [...frames].sort((a, b) => {
       const aId = parseFrameKey(a.id).frameId;

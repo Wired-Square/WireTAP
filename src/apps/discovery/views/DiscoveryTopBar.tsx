@@ -147,6 +147,7 @@ export default function DiscoveryTopBar({
     <AppTopBar
       icon={Search}
       iconColour="text-[color:var(--text-purple)]"
+      frameIdFormat
       ioSession={{
         ioProfile,
         ioProfiles,

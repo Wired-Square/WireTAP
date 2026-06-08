@@ -64,6 +64,7 @@ export default function CatalogToolbar({
     <AppTopBar
       icon={FileText}
       iconColour="text-[color:var(--accent-primary)]"
+      frameIdFormat
       actions={
         <>
           {/* Settings Button */}

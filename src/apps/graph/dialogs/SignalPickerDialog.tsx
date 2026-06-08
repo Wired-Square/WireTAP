@@ -7,7 +7,7 @@ import { iconSm } from "../../../styles/spacing";
 import { bgSurface, borderDivider, textSecondary, hoverLight, inputSimple, primaryButtonBase } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useGraphStore } from "../../../stores/graphStore";
-import { formatFrameId } from "../../../utils/frameIds";
+import { useFrameIdFormat } from "../../../hooks/useFrameIdFormat";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
 
 /** Key used to identify a signal selection. */
@@ -26,6 +26,7 @@ interface Props {
 
 export default function SignalPickerDialog({ isOpen, onClose, panelId, replacingSignalIndex, onReplaceDone }: Props) {
   const { t } = useTranslation("graph");
+  const { format: formatFrameId } = useFrameIdFormat();
   const frames = useGraphStore((s) => s.frames);
   const panels = useGraphStore((s) => s.panels);
   const addSignalToPanel = useGraphStore((s) => s.addSignalToPanel);
@@ -221,7 +222,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
                         <ChevronRight className={`${iconSm} text-[color:var(--text-muted)]`} />
                       )}
                       <span className="text-sm font-mono font-medium text-[color:var(--text-primary)]">
-                        {formatFrameId(frameId, "hex")}
+                        {formatFrameId(frameId)}
                       </span>
                       <span className={`text-xs ${textSecondary}`}>
                         {t("signalPicker.signalsCount", { count: numericSignals.length })}

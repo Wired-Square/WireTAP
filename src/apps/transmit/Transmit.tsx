@@ -13,6 +13,7 @@ import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useSettings, type IOProfile } from "../../hooks/useSettings";
+import { withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useTransmitHandlers } from "./hooks/useTransmitHandlers";
 import { useTransmitHistorySubscription } from "./hooks/useTransmitHistorySubscription";
 import {
@@ -79,7 +80,7 @@ function getTransmitStatus(p: IOProfile): { canTransmit: boolean; reason?: strin
 // Component
 // ============================================================================
 
-export default function Transmit() {
+function TransmitInner() {
   const { t } = useTranslation("transmit");
   // Settings for IO profiles
   const { settings } = useSettings();
@@ -425,3 +426,5 @@ export default function Transmit() {
     </AppLayout>
   );
 }
+
+export default withFrameIdFormat(TransmitInner);

@@ -1271,7 +1271,6 @@ function DiscoveryFramesView({
           <FrameDataTable
             ref={scrollRef}
             frames={visibleFrames}
-            displayFrameIdFormat={displayFrameIdFormat}
             formatTime={formatTime}
             onBookmark={onBookmark}
             emptyMessage={
