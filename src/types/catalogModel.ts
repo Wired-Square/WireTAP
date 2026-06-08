@@ -30,6 +30,10 @@ export interface Signal {
   confidence?: Confidence;
   /** True when inherited from a mirror/copy source. Omitted when false. */
   inherited?: boolean;
+  /** Modbus-specific: the signal's own register number (synthesised by the crate). */
+  modbusRegister?: number;
+  /** Modbus-specific: how many registers/coils the signal spans. */
+  modbusRegisterCount?: number;
 }
 
 export interface MuxCase {

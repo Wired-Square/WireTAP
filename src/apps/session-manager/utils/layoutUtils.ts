@@ -15,7 +15,7 @@ const START_X = 50;
 const START_Y = 50;
 
 /** Session-aware panel IDs that should appear as app nodes */
-const SESSION_AWARE_PANELS = new Set(["discovery", "decoder", "transmit", "query", "graph", "modbus"]);
+const SESSION_AWARE_PANELS = new Set(["discovery", "decoder", "transmit", "query", "graph"]);
 
 // Custom node type that allows our typed data
 interface FlowNode<T = unknown> {

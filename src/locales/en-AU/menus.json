@@ -3,7 +3,6 @@
     "discovery": "Discovery",
     "decoder": "Decoder",
     "transmit": "Transmit",
-    "modbus": "Modbus",
     "serial": "Serial",
     "graph": "Graph",
     "frameCalculator": "Calculator",

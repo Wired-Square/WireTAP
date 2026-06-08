@@ -96,6 +96,10 @@ export interface ResolvedSignal {
   enum?: Record<number, string>;
   confidence?: Confidence;
   _inherited?: boolean;
+  /** Modbus-specific: the signal's own register number (synthesised by the crate). */
+  modbus_register?: number;
+  /** Modbus-specific: how many registers/coils the signal spans. */
+  modbus_register_count?: number;
 }
 
 export interface ResolvedFrame {
@@ -196,6 +200,8 @@ function adaptSignal(s: Signal): ResolvedSignal {
     format: s.format as SignalFormat | undefined,
     enum: s.enum as Record<number, string> | undefined,
     confidence: s.confidence as Confidence | undefined,
+    modbus_register: s.modbusRegister,
+    modbus_register_count: s.modbusRegisterCount,
   };
   // The crate omits `inherited` when false; surface it only when true.
   if (s.inherited) out._inherited = true;

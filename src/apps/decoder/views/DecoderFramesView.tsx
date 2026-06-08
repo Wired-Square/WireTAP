@@ -308,6 +308,20 @@ function navigateToCatalogFrame(frameId: number) {
 // Minimum time between flashes (ms) - ensures consistent flash rate across all frames
 const MIN_FLASH_INTERVAL = 500;
 
+// Badge styling per Modbus register type (only used for Modbus catalogues).
+const MODBUS_TYPE_BADGE: Record<'holding' | 'input' | 'coil' | 'discrete', string> = {
+  holding: badgeDarkPanelInfo,
+  input: badgeDarkPanelSuccess,
+  coil: badgeDarkPanelCyan,
+  discrete: badgeDarkPanelPurple,
+};
+
+/** A Modbus signal's register, as "13019" or a span "13021–13022". */
+function modbusRegisterLabel(reg: number, count: number | undefined, fmt: "hex" | "decimal"): string {
+  const end = count && count > 1 ? `–${formatFrameId(reg + count - 1, fmt)}` : "";
+  return `${formatFrameId(reg, fmt)}${end}`;
+}
+
 function FrameCard({
   frame,
   decodedFrame,
@@ -576,6 +590,19 @@ function FrameCard({
       >
         <span className="font-mono">{renderFrameId(frame.id, frame.isExtended)}</span>
         <span className={caption}>len {frame.len}</span>
+        {/* Modbus register adornments (modbusRegisterType only set for Modbus catalogues) */}
+        {frame.modbusRegisterType && (
+          <>
+            <span className={MODBUS_TYPE_BADGE[frame.modbusRegisterType]}>
+              {frame.modbusRegisterType}
+            </span>
+            {frame.interval !== undefined && (
+              <span className={caption} title="Poll interval">
+                {frame.interval >= 1000 ? `${(frame.interval / 1000).toFixed(1)}s` : `${frame.interval}ms`}
+              </span>
+            )}
+          </>
+        )}
         {/* Mirror frame badge */}
         {frame.mirrorOf && (
           <span className={badgeDarkPanelCyan} title={`Inherits signals from frame ${frame.mirrorOf}`}>
@@ -741,6 +768,11 @@ function FrameCard({
                   >
                     {decoded.name}
                   </span>
+                  {signalDef?.modbus_register !== undefined && (
+                    <span className={`${caption} font-mono`} title="Modbus register">
+                      {modbusRegisterLabel(signalDef.modbus_register, signalDef.modbus_register_count, displayFrameIdFormat)}
+                    </span>
+                  )}
                   {signalDef?._inherited && (
                     <span
                       className={`${caption} italic flex items-center gap-1 ${

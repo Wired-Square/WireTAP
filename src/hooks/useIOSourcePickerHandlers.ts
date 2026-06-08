@@ -43,10 +43,10 @@ export interface UseIOSourcePickerHandlersOptions {
   onMultiBusSet?: (profileIds: string[]) => void;
   /** Optional callback when joining a session */
   onJoinSession?: (sessionId: string, sourceProfileIds?: string[]) => void;
-  /** Callback before starting single-source connect or load (for app-specific setup like serial/framing config) */
-  onBeforeStart?: (profileId: string, options: DialogLoadOptions, mode: "connect" | "load") => void;
+  /** Callback before starting single-source connect or load (for app-specific setup like serial/framing config, or loading a catalogue to build Modbus poll groups). May be async — it is awaited before options are merged and the watch starts. */
+  onBeforeStart?: (profileId: string, options: DialogLoadOptions, mode: "connect" | "load") => void | Promise<void>;
   /** Callback before starting multi-source connect or load */
-  onBeforeMultiStart?: (profileIds: string[], options: DialogLoadOptions, mode: "connect" | "load") => void;
+  onBeforeMultiStart?: (profileIds: string[], options: DialogLoadOptions, mode: "connect" | "load") => void | Promise<void>;
 }
 
 /** Props to pass to IoSourcePickerDialog */
@@ -100,17 +100,21 @@ export function useIOSourcePickerHandlers({
   const handleDialogStart = useCallback(
     async (profileIds: string[], closeDialogFlag: boolean, options: DialogLoadOptions) => {
       const mode = closeDialogFlag ? "connect" : "load";
-      const mergedOptions = mergeOptions ? mergeOptions(options) : options;
 
       await withAppError(
         closeDialogFlag ? "Connect Error" : "Load Error",
         closeDialogFlag ? "Failed to start session" : "Failed to start load",
         async () => {
           if (profileIds.length === 1) {
-            onBeforeStart?.(profileIds[0], options, mode);
+            await onBeforeStart?.(profileIds[0], options, mode);
           } else {
-            onBeforeMultiStart?.(profileIds, options, mode);
+            await onBeforeMultiStart?.(profileIds, options, mode);
           }
+
+          // Merge AFTER onBeforeStart so app-specific setup it performs (e.g.
+          // loading a Modbus catalogue to build poll groups) is reflected in the
+          // merged options — the session then starts WITH polls, not pollless.
+          const mergedOptions = mergeOptions ? mergeOptions(options) : options;
 
           if (closeDialogFlag) {
             await watchSource(profileIds, mergedOptions);

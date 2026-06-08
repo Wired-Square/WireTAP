@@ -17,6 +17,10 @@ export type SignalDef = {
   confidence?: Confidence;
   /** True if this signal is inherited from a mirror source frame */
   _inherited?: boolean;
+  /** Modbus-specific: the signal's own register number (synthesised by the catalog crate). */
+  modbus_register?: number;
+  /** Modbus-specific: how many registers/coils the signal spans. */
+  modbus_register_count?: number;
 };
 
 export type MuxCaseDef = {
@@ -44,6 +48,8 @@ export type FrameDetail = {
   mux?: MuxDef;
   /** Expected transmission interval in milliseconds */
   interval?: number;
+  /** Modbus register type (only set for Modbus catalogues) — drives the register badge */
+  modbusRegisterType?: 'holding' | 'input' | 'coil' | 'discrete';
   /** Frame ID this frame mirrors (inherits signals from) */
   mirrorOf?: string;
   /** Frame ID this frame copies metadata from */

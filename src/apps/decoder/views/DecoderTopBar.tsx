@@ -1,6 +1,6 @@
 // ui/src/apps/decoder/views/DecoderTopBar.tsx
 
-import { Activity, Glasses, Trash2, Users, User, Filter, Eye, EyeOff, Type } from "lucide-react";
+import { Activity, Glasses, Trash2, Users, User, Filter, Eye, EyeOff, Type, Play, Square, Server } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm, iconMd } from "../../../styles/spacing";
 import type { CatalogMetadata } from "../../../api/catalog";
@@ -106,7 +106,27 @@ type Props = {
 
   // Frame ID filter (for coloring the filter button when active)
   frameIdFilter?: string;
+
+  // Modbus mode (present only when the catalogue protocol is 'modbus') — shows
+  // poll controls + a register-count badge. Grouped as one object to match the
+  // ioSession/framePicker/catalog prop-grouping convention.
+  modbus?: {
+    /** Number of poll groups derived from the catalogue */
+    pollGroupCount: number;
+    /** Total registers across all poll groups */
+    registerCount: number;
+    /** Whether the source is actively polling (vs paused) */
+    isPolling: boolean;
+    onPause?: () => void;
+    onResume?: () => void;
+    /** Start polling from a stopped state (re-issues watchSource with poll groups) */
+    onStart?: () => void;
+  };
 };
+
+const POLL_BTN_BASE = "flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors";
+const POLL_BTN_RED = `${POLL_BTN_BASE} bg-red-600/20 text-red-400 hover:bg-red-600/30`;
+const POLL_BTN_GREEN = `${POLL_BTN_BASE} bg-green-600/20 text-green-400 hover:bg-green-600/30`;
 
 export default function DecoderTopBar({
   catalogs,
@@ -155,8 +175,19 @@ export default function DecoderTopBar({
   showAsciiGutter = false,
   onToggleAsciiGutter,
   frameIdFilter = '',
+  modbus,
 }: Props) {
   const { t } = useTranslation("decoder");
+
+  // Resolve the single poll-control button for the current Modbus state.
+  const pollButton = !modbus ? null
+    : modbus.isPolling && isStreaming && modbus.onPause
+      ? { onClick: modbus.onPause, Icon: Square, label: t("modbus.pause"), title: t("modbus.pausePolling"), cls: POLL_BTN_RED }
+    : isStreaming && !modbus.isPolling && modbus.onResume
+      ? { onClick: modbus.onResume, Icon: Play, label: t("modbus.poll"), title: t("modbus.resumePolling"), cls: POLL_BTN_GREEN }
+    : !isStreaming && modbus.pollGroupCount > 0 && modbus.onStart
+      ? { onClick: modbus.onStart, Icon: Play, label: t("modbus.poll"), title: t("modbus.startPolling"), cls: POLL_BTN_GREEN }
+    : null;
   // Filter button state
   const hasFilters = minFrameLength > 0 || frameIdFilter.trim() !== '';
   const filterParts: string[] = [];
@@ -209,6 +240,24 @@ export default function DecoderTopBar({
         onOpen: onOpenCatalogPicker,
       }}
     >
+      {/* Modbus poll control + register count */}
+      {modbus && (
+        <>
+          {pollButton && (
+            <button onClick={pollButton.onClick} className={pollButton.cls} title={pollButton.title}>
+              <pollButton.Icon size={10} fill="currentColor" />
+              {pollButton.label}
+            </button>
+          )}
+          {modbus.pollGroupCount > 0 && (
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)]">
+              <Server size={10} />
+              {t("modbus.pollRegisterCount", { polls: modbus.pollGroupCount, registers: modbus.registerCount })}
+            </span>
+          )}
+        </>
+      )}
+
       {/* Raw bytes toggle */}
       {onToggleRawBytes && (
         <button

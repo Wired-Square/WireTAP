@@ -28,5 +28,13 @@
     "minLengthHelp": "Frames shorter than this will be filtered out and shown in the Filtered tab. Set to 0 to disable length filtering.",
     "apply": "Apply",
     "clearAll": "Clear All"
+  },
+  "modbus": {
+    "pause": "Pause",
+    "poll": "Poll",
+    "pausePolling": "Pause polling",
+    "resumePolling": "Resume polling",
+    "startPolling": "Start polling",
+    "pollRegisterCount": "{{polls}} polls · {{registers}} regs"
   }
 }

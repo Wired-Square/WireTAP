@@ -49,7 +49,8 @@ import type { DecodedFrameMsg } from '../services/wsProtocol';
 import type { SelectionSet } from '../utils/selectionSets';
 import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
-import { loadCatalog as loadCatalogFromPath, attachAndResolve, parseCanId, type ParsedCatalog } from '../utils/catalogParser';
+import { loadCatalog as loadCatalogFromPath, attachAndResolve, parseCanId, type ParsedCatalog, type ModbusProtocolConfig } from '../utils/catalogParser';
+import { buildPollsFromCatalog, type ModbusPollGroup } from '../utils/modbusPollBuilder';
 import { frameKey } from '../utils/frameKey';
 
 
@@ -180,6 +181,16 @@ interface DecoderState {
   /** Fuzz window for mirror validation (ms) - frames must arrive within this window to compare */
   mirrorFuzzWindowMs: number;
 
+  // Modbus polling config — populated only when the catalog protocol is 'modbus'.
+  // The register data itself flows through the normal decode pipeline (_decoded);
+  // these drive poll-group injection into watchSource and the register adornments.
+  /** Poll groups derived from the Modbus catalog (empty for non-modbus). */
+  pollGroups: ModbusPollGroup[];
+  /** JSON-serialised poll groups for watchSource; null when no modbus polls. */
+  modbusPollsJson: string | null;
+  /** Modbus protocol meta from the catalog (null for non-modbus). */
+  modbusConfig: ModbusProtocolConfig | null;
+
   // Decoding state (actual data lives in module-level mutables — see getters above)
   /** Version counter for decoded data — bumped on every decode batch.
    *  Components subscribe to this for reactivity and read data via getter functions. */
@@ -306,6 +317,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
   mirrorSourceMap: new Map(),
   mirrorValidation: new Map(),
   mirrorFuzzWindowMs: 1000, // 1 second - generous to handle batching and varying frame rates
+  pollGroups: [],
+  modbusPollsJson: null,
+  modbusConfig: null,
   decodedVersion: 0,
   ioProfile: null,
   showRawBytes: false,
@@ -372,6 +386,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
           signals: frame.signals as SignalDef[],
           mux: frame.mux,
           interval: frame.interval,
+          modbusRegisterType: frame.modbusRegisterType,
           mirrorOf: frame.mirrorOf,
           copyFrom: frame.copyFrom,
         });
@@ -483,6 +498,15 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         }
       }
 
+      // Build Modbus poll groups (empty for non-modbus catalogues). Done here so
+      // the poll config is computed in the same parse transaction that sets
+      // frames/protocol — it can never drift, and switching to a non-modbus
+      // catalogue clears stale modbus state.
+      const pollGroups = catalog.protocol === 'modbus'
+        ? buildPollsFromCatalog(catalog.frames, catalog.modbusConfig)
+        : [];
+      const modbusPollsJson = pollGroups.length > 0 ? JSON.stringify(pollGroups) : null;
+
       set({
         frames: frameMap,
         selectedFrames: newSelected,
@@ -492,6 +516,9 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         canConfig,
         serialConfig,
         mirrorSourceMap,
+        pollGroups,
+        modbusPollsJson,
+        modbusConfig: catalog.modbusConfig,
       });
     } catch (e) {
       tlog.info(`[decoderStore] Failed to load catalog: ${e}`);

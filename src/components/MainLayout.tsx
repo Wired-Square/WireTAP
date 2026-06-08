@@ -484,7 +484,7 @@ export default function MainLayout() {
 
   // Disable all session + bookmark menu items when a non-session panel is focused.
   // Session-aware panels manage their own state via useMenuSessionControl.
-  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "modbus", "query", "graph"]));
+  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "graph"]));
   const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
 
   useEffect(() => {

@@ -363,7 +363,7 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
   `sessionStore` routes it to an `onDecoded` callback (threaded through
   `useIOSession`/`useIOSessionManager`); an app calls `catalog.attach` when it
   loads a catalogue. Raw `FrameData` keeps flowing for
-  Discovery/Analysis/raw-hex/Calculator. **Decoder, Graph and Modbus** all
+  Discovery/Analysis/raw-hex/Calculator. **Decoder and Graph** both
   consume the decoded stream — there is no longer a TypeScript decode engine.
   The Decoder keeps its mirror-validation byte-compare on the raw `FrameData`
   path (it needs the raw bytes + frame timing). Attachments auto-detach on final
@@ -383,8 +383,13 @@ For a session-bound app, loading a catalogue parses it **once**: the
 Graph) mirrors the session's `catalogPath` into local state, then `attachAndResolve`
 (`catalogParser.ts`) calls `catalog.attach` and adapts the returned `Catalog` — so
 the same parse binds Rust decode *and* builds the UI model (it falls back to a
-model-only `loadCatalog` if attach fails). Modbus keeps a separate flow: its
-catalogue load is coupled to a poll reconnect that reinitialises the session.
+model-only `loadCatalog` if attach fails). Modbus is handled by the Decoder
+itself (there is no separate Modbus app): when a Modbus catalogue is involved the
+Decoder builds its poll groups *before* the watch — an awaited `onBeforeStart` in
+the IO picker pre-loads the catalogue so the session is created **with** polls in
+a single connection (rather than starting pollless and reconnecting, which broke
+single-connection devices). A catalogue change mid-stream reinitialises the same
+session id with the new polls.
 
 **One-step decoder from the Data Source picker.** The picker
 ([IoSourcePickerDialog.tsx](../src/dialogs/IoSourcePickerDialog.tsx)) has a Decoder
@@ -436,7 +441,7 @@ ws::dispatch::send_new_frames(session_id)
                     │
         ┌───────────┼────────────┬─────────────┐
         ▼           ▼            ▼             ▼
-   Discovery    Calculator   (FrameData)   Decoder/Graph/Modbus
+   Discovery    Calculator   (FrameData)   Decoder/Graph
    onFrames     raw bytes      raw          DecodedSignals (decoded in Rust)
 ```
 

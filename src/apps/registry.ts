@@ -15,7 +15,6 @@ import {
   Search,
   Activity,
   Send,
-  Server,
   DatabaseZap,
   BarChart3,
   Workflow,
@@ -70,13 +69,6 @@ const visualConfig = {
     bgColour: "hover:bg-pink-500/10",
     watermarkBg: "bg-pink-500/10 hover:bg-pink-500/20",
     load: () => import("./graph/Graph"),
-  },
-  modbus: {
-    icon: Server,
-    colour: "text-amber-400",
-    bgColour: "hover:bg-amber-500/10",
-    watermarkBg: "bg-amber-500/10 hover:bg-amber-500/20",
-    load: () => import("./modbus/Modbus"),
   },
   serial: {
     icon: Terminal,
