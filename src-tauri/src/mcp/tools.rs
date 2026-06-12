@@ -19,6 +19,7 @@ use rmcp::{ErrorData as McpError, ServerHandler, tool, tool_handler, tool_router
 use serde_json::json;
 
 use super::types::*;
+use crate::analysis::QuerySource;
 
 /// Counter for generating unique replay IDs without a clock/RNG.
 static REPLAY_SEQ: AtomicU64 = AtomicU64::new(1);
@@ -32,13 +33,25 @@ pub struct WireTapTools {
 }
 
 impl WireTapTools {
-    pub fn new(app: tauri::AppHandle, allow_control: bool, allow_session_control: bool) -> Self {
+    pub fn new(
+        app: tauri::AppHandle,
+        allow_control: bool,
+        allow_session_control: bool,
+        allow_catalog_write: bool,
+        allow_catalog_modify: bool,
+    ) -> Self {
         let mut tool_router = Self::read_router();
         if allow_control {
             tool_router = tool_router + Self::control_router();
         }
         if allow_session_control {
             tool_router = tool_router + Self::session_control_router();
+        }
+        if allow_catalog_write {
+            tool_router = tool_router + Self::catalog_write_router();
+        }
+        if allow_catalog_modify {
+            tool_router = tool_router + Self::catalog_modify_router();
         }
         Self { app, tool_router }
     }
@@ -50,6 +63,56 @@ fn err(message: impl Into<String>) -> McpError {
 
 fn ok_json<T: serde::Serialize>(value: T) -> Result<CallToolResult, McpError> {
     Ok(CallToolResult::success(vec![Content::json(value)?]))
+}
+
+/// Convert an optional RFC3339 time bound to capture-timeline microseconds.
+fn us(s: &Option<String>) -> Option<i64> {
+    s.as_deref().and_then(crate::analysis::iso_to_micros)
+}
+
+/// Widen an optional row limit to the i64 the capture engines take.
+fn lim(l: Option<u32>) -> Option<i64> {
+    l.map(|v| v as i64)
+}
+
+/// Resolve a catalog filename to an absolute path under the decoder directory.
+/// Rejects path separators / traversal and ensures a `.toml` suffix. Returns the
+/// path and whether it already exists.
+fn resolve_catalog_path(
+    app: &tauri::AppHandle,
+    filename: &str,
+) -> Result<(std::path::PathBuf, bool), McpError> {
+    let name = filename.trim();
+    if name.is_empty() {
+        return Err(err("Catalog filename is empty"));
+    }
+    if name.contains('/') || name.contains('\\') || name.contains("..") {
+        return Err(err(format!(
+            "Invalid catalog filename '{name}' — must be a bare name with no path separators"
+        )));
+    }
+    let name = if name.to_lowercase().ends_with(".toml") {
+        name.to_string()
+    } else {
+        format!("{name}.toml")
+    };
+    let settings = crate::settings::load_settings_sync(app).map_err(err)?;
+    let path = std::path::PathBuf::from(&settings.decoder_dir).join(&name);
+    let exists = path.exists();
+    Ok((path, exists))
+}
+
+/// Validate catalog TOML; on findings, return an error embedding them (no write).
+fn validate_or_reject(content: &str) -> Result<(), McpError> {
+    let findings = wiretap_catalog::validate::validate(content);
+    if findings.is_empty() {
+        return Ok(());
+    }
+    let detail = serde_json::to_string(&findings).unwrap_or_default();
+    Err(err(format!(
+        "Catalog validation failed ({} issue(s)) — not written: {detail}",
+        findings.len()
+    )))
 }
 
 /// Shape a tokio-modbus read result (values, device exception, or IO error) into a tool result.
@@ -278,6 +341,15 @@ impl WireTapTools {
         ok_json(json!({ "name": cat.name, "filename": cat.filename, "path": cat.path, "toml": toml }))
     }
 
+    #[tool(description = "Validate catalog TOML without writing it. Returns { valid, errors: [{field, message}] } — a dry run for create_catalog/update_catalog.")]
+    async fn validate_catalog(
+        &self,
+        Parameters(p): Parameters<ValidateCatalogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let errors = wiretap_catalog::validate::validate(&p.content);
+        ok_json(json!({ "valid": errors.is_empty(), "errors": errors }))
+    }
+
     #[tool(description = "Live one-off Modbus read of a register/coil block from a session's configured device. Returns the values, or the exact device exception (e.g. 'Server device failure'). Opens a transient connection — may contend with the running poller on single-connection devices.")]
     async fn modbus_read(
         &self,
@@ -319,6 +391,186 @@ impl WireTapTools {
         Parameters(p): Parameters<DiscoveryAnalysisParams>,
     ) -> Result<CallToolResult, McpError> {
         bridge_call("live.frameMap", p).await
+    }
+
+    // ── Headless analysis levers (capture OR postgres) ───────────────────────
+
+    #[tool(description = "Per-frame-id rollup (count, first/last timestamp, max dlc, extended) for a capture (capture_id) or postgres profile (profile_id). Headless — no view needed. Use to see which frame ids exist and how often.")]
+    async fn frame_inventory(
+        &self,
+        Parameters(p): Parameters<FrameInventoryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let rows = crate::analysis::frame_inventory(&self.app, &src, p.start_time, p.end_time)
+            .await
+            .map_err(err)?;
+        ok_json(json!({ "frames": rows.len(), "inventory": rows }))
+    }
+
+    #[tool(description = "Per-byte analysis of one frame id over sampled payloads: distinct values, min/max, change count and role (static/counter/sensor). Headless equivalent of the Discovery byte analysis. Source is capture_id or profile_id.")]
+    async fn frame_byte_profile(
+        &self,
+        Parameters(p): Parameters<ByteProfileParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let profile =
+            crate::analysis::byte_profile(&self.app, &src, p.frame_id, p.is_extended, p.sample_limit)
+                .await
+                .map_err(err)?;
+        ok_json(profile)
+    }
+
+    #[tool(description = "Diff a decoder catalog against a data source (capture_id or profile_id): present/missing catalog frames, uncatalogued data frame ids, and a high/medium/low/unset signal confidence rollup. Set include_byte_roles=true to also sample per-byte static/varying roles for each present frame (heavier — one sampling query per frame).")]
+    async fn catalog_coverage(
+        &self,
+        Parameters(p): Parameters<CatalogCoverageParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let src = crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)?;
+        let report = crate::analysis::catalog_coverage(
+            &self.app,
+            &src,
+            &p.catalog,
+            p.include_byte_roles,
+            p.sample_limit,
+            p.start_time,
+            p.end_time,
+        )
+        .await
+        .map_err(err)?;
+        ok_json(report)
+    }
+
+    // ── Exposed analytical engines (dispatch capture vs postgres) ────────────
+
+    #[tool(description = "Find timestamps where one payload byte of a frame changed value. Source: capture_id or profile_id.")]
+    async fn query_byte_changes(
+        &self,
+        Parameters(p): Parameters<ByteQueryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+            QuerySource::Postgres(pid) => {
+                crate::dbquery::db_query_byte_changes(
+                    self.app.clone(), pid, p.frame_id, p.byte_index, p.is_extended,
+                    p.start_time, p.end_time, p.limit, None,
+                ).await
+            }
+            QuerySource::Capture(cid) => crate::capturequery::capture_query_byte_changes(
+                cid, p.frame_id, p.byte_index, p.is_extended, us(&p.start_time), us(&p.end_time), lim(p.limit),
+            ),
+        };
+        ok_json(r.map_err(err)?)
+    }
+
+    #[tool(description = "Find timestamps where a frame's full payload changed (with the changed byte indices). Source: capture_id or profile_id.")]
+    async fn query_frame_changes(
+        &self,
+        Parameters(p): Parameters<FrameQueryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+            QuerySource::Postgres(pid) => {
+                crate::dbquery::db_query_frame_changes(
+                    self.app.clone(), pid, p.frame_id, p.is_extended, p.start_time, p.end_time, p.limit, None,
+                ).await
+            }
+            QuerySource::Capture(cid) => crate::capturequery::capture_query_frame_changes(
+                cid, p.frame_id, p.is_extended, us(&p.start_time), us(&p.end_time), lim(p.limit),
+            ),
+        };
+        ok_json(r.map_err(err)?)
+    }
+
+    #[tool(description = "Histogram of values at one byte index of a frame (value → count, percentage). Source: capture_id or profile_id.")]
+    async fn query_distribution(
+        &self,
+        Parameters(p): Parameters<ByteQueryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+            QuerySource::Postgres(pid) => {
+                crate::dbquery::db_query_distribution(
+                    self.app.clone(), pid, p.frame_id, p.byte_index, p.is_extended, p.start_time, p.end_time, None,
+                ).await
+            }
+            QuerySource::Capture(cid) => crate::capturequery::capture_query_distribution(
+                cid, p.frame_id, p.byte_index, p.is_extended, us(&p.start_time), us(&p.end_time),
+            ),
+        };
+        ok_json(r.map_err(err)?)
+    }
+
+    #[tool(description = "Find gaps longer than gap_threshold_ms in a frame's arrival times. Source: capture_id or profile_id.")]
+    async fn query_gap_analysis(
+        &self,
+        Parameters(p): Parameters<GapQueryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+            QuerySource::Postgres(pid) => {
+                crate::dbquery::db_query_gap_analysis(
+                    self.app.clone(), pid, p.frame_id, p.is_extended, p.gap_threshold_ms,
+                    p.start_time, p.end_time, p.limit, None,
+                ).await
+            }
+            QuerySource::Capture(cid) => crate::capturequery::capture_query_gap_analysis(
+                cid, p.frame_id, p.is_extended, p.gap_threshold_ms, us(&p.start_time), us(&p.end_time), lim(p.limit),
+            ),
+        };
+        ok_json(r.map_err(err)?)
+    }
+
+    #[tool(description = "Frame arrival frequency bucketed by bucket_size_ms (min/max/avg interval per bucket). Source: capture_id or profile_id.")]
+    async fn query_frequency(
+        &self,
+        Parameters(p): Parameters<FrequencyQueryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+            QuerySource::Postgres(pid) => {
+                crate::dbquery::db_query_frequency(
+                    self.app.clone(), pid, p.frame_id, p.is_extended, p.bucket_size_ms,
+                    p.start_time, p.end_time, p.limit, None,
+                ).await
+            }
+            QuerySource::Capture(cid) => crate::capturequery::capture_query_frequency(
+                cid, p.frame_id, p.is_extended, p.bucket_size_ms, us(&p.start_time), us(&p.end_time), lim(p.limit),
+            ),
+        };
+        ok_json(r.map_err(err)?)
+    }
+
+    #[tool(description = "First and last occurrence (timestamp + payload) and total count for a frame. Source: capture_id or profile_id.")]
+    async fn query_first_last(
+        &self,
+        Parameters(p): Parameters<FrameQueryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+            QuerySource::Postgres(pid) => {
+                crate::dbquery::db_query_first_last(
+                    self.app.clone(), pid, p.frame_id, p.is_extended, p.start_time, p.end_time, None,
+                ).await
+            }
+            QuerySource::Capture(cid) => crate::capturequery::capture_query_first_last(
+                cid, p.frame_id, p.is_extended, us(&p.start_time), us(&p.end_time),
+            ),
+        };
+        ok_json(r.map_err(err)?)
+    }
+
+    #[tool(description = "Group a frame's payloads by a mux selector byte and compute per-byte (and optional 16-bit word) statistics per mux case. Source: capture_id or profile_id.")]
+    async fn query_mux_statistics(
+        &self,
+        Parameters(p): Parameters<MuxQueryParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let r = match crate::analysis::resolve(p.capture_id, p.profile_id).map_err(err)? {
+            QuerySource::Postgres(pid) => {
+                crate::dbquery::db_query_mux_statistics(
+                    self.app.clone(), pid, p.frame_id, p.mux_selector_byte, p.is_extended,
+                    p.include_16bit, p.payload_length, p.start_time, p.end_time, p.limit, None,
+                ).await
+            }
+            QuerySource::Capture(cid) => crate::capturequery::capture_query_mux_statistics(
+                cid, p.frame_id, p.mux_selector_byte, p.is_extended, p.include_16bit, p.payload_length,
+                us(&p.start_time), us(&p.end_time), lim(p.limit),
+            ),
+        };
+        ok_json(r.map_err(err)?)
     }
 }
 
@@ -470,6 +722,54 @@ impl WireTapTools {
     ) -> Result<CallToolResult, McpError> {
         let state = crate::io::stop_session(&p.session_id).await.map_err(err)?;
         ok_json(state)
+    }
+}
+
+// ── Catalog write tools (registered when mcp_allow_catalog_write is on) ───────
+
+#[tool_router(router = catalog_write_router)]
+impl WireTapTools {
+    #[tool(description = "Create a NEW decoder catalog file in the decoder directory. Validates the TOML first and refuses if the file already exists (use update_catalog to overwrite). Requires the catalog-write MCP permission.")]
+    async fn create_catalog(
+        &self,
+        Parameters(p): Parameters<CreateCatalogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let (path, exists) = resolve_catalog_path(&self.app, &p.filename)?;
+        if exists {
+            return Err(err(format!(
+                "Catalog '{}' already exists — use update_catalog to overwrite",
+                p.filename
+            )));
+        }
+        validate_or_reject(&p.content)?;
+        crate::catalog::save_catalog(path.to_string_lossy().into_owned(), p.content)
+            .await
+            .map_err(err)?;
+        ok_json(json!({ "created": true, "path": path.to_string_lossy() }))
+    }
+}
+
+// ── Catalog modify tools (registered when mcp_allow_catalog_modify is on) ─────
+
+#[tool_router(router = catalog_modify_router)]
+impl WireTapTools {
+    #[tool(description = "Overwrite an EXISTING decoder catalog (by filename or display name). Validates the TOML first and refuses if no such catalog exists (use create_catalog for a new file). Requires the catalog-modify MCP permission.")]
+    async fn update_catalog(
+        &self,
+        Parameters(p): Parameters<UpdateCatalogParams>,
+    ) -> Result<CallToolResult, McpError> {
+        // Resolve an existing catalog by filename or display name.
+        let catalogs = crate::catalog::list_catalogs(self.app.clone()).await.map_err(err)?;
+        let want = p.filename.trim();
+        let cat = catalogs
+            .iter()
+            .find(|c| c.filename == want || c.name == want || c.filename == format!("{want}.toml"))
+            .ok_or_else(|| {
+                err(format!("Catalog '{want}' not found — use create_catalog for a new file"))
+            })?;
+        validate_or_reject(&p.content)?;
+        crate::catalog::save_catalog(cat.path.clone(), p.content).await.map_err(err)?;
+        ok_json(json!({ "updated": true, "filename": cat.filename, "path": cat.path }))
     }
 }
 

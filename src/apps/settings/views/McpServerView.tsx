@@ -1,6 +1,6 @@
 // ui/src/apps/settings/views/McpServerView.tsx
 //
-// Settings view for the MCP server — lets an external Claude client query live
+// Settings view for the MCP server — lets an external MCP client query live
 // WireTAP runtime state. Three independent, off-by-default gates: enable the
 // server, allow control tools, and allow session open/stop.
 
@@ -68,6 +68,10 @@ export default function McpServerView() {
   const setServerEnabled = useSettingsStore((s) => s.setMcpServerEnabled);
   const setAllowControl = useSettingsStore((s) => s.setMcpAllowControl);
   const setAllowSessionControl = useSettingsStore((s) => s.setMcpAllowSessionControl);
+  const allowCatalogWrite = useSettingsStore((s) => s.mcp.allowCatalogWrite);
+  const allowCatalogModify = useSettingsStore((s) => s.mcp.allowCatalogModify);
+  const setAllowCatalogWrite = useSettingsStore((s) => s.setMcpAllowCatalogWrite);
+  const setAllowCatalogModify = useSettingsStore((s) => s.setMcpAllowCatalogModify);
   const setServerPort = useSettingsStore((s) => s.setMcpServerPort);
   const setServerToken = useSettingsStore((s) => s.setMcpServerToken);
 
@@ -121,7 +125,7 @@ export default function McpServerView() {
       <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">MCP Server</h2>
       <p className={helpText}>
         Exposes live WireTAP runtime state (sessions, captures, frame data, payload
-        analysis and decoded signals) to an external Claude client over a localhost
+        analysis and decoded signals) to an external MCP client over a localhost
         HTTP transport. Off by default. The server binds to 127.0.0.1 only.
       </p>
 
@@ -150,7 +154,7 @@ export default function McpServerView() {
           if (serverEnabled) apply(true);
         }}
       >
-        Lets a connected Claude client <strong>drive</strong> the app — transmit frames on
+        Lets a connected MCP client <strong>drive</strong> the app — transmit frames on
         the bus, write Modbus registers, and replay captures. Leave off for read-only
         introspection.
       </ToggleRow>
@@ -165,8 +169,36 @@ export default function McpServerView() {
           if (serverEnabled) apply(true);
         }}
       >
-        Lets a connected Claude client <strong>open and stop sessions</strong> — e.g. start a
+        Lets a connected MCP client <strong>open and stop sessions</strong> — e.g. start a
         Modbus session polling from a profile's catalog. Separate from the control gate above.
+      </ToggleRow>
+
+      <ToggleRow
+        label="Allow catalog create (new files)"
+        checked={allowCatalogWrite}
+        disabled={busy}
+        warn
+        onChange={(v) => {
+          setAllowCatalogWrite(v);
+          if (serverEnabled) apply(true);
+        }}
+      >
+        Lets a connected MCP client <strong>create new decoder catalogues</strong> in the
+        decoder directory. Validated before writing; cannot overwrite an existing file.
+      </ToggleRow>
+
+      <ToggleRow
+        label="Allow catalog modify (overwrite existing)"
+        checked={allowCatalogModify}
+        disabled={busy}
+        warn
+        onChange={(v) => {
+          setAllowCatalogModify(v);
+          if (serverEnabled) apply(true);
+        }}
+      >
+        Lets a connected MCP client <strong>overwrite existing decoder catalogues</strong>.
+        Validated before writing. Separate from the create gate above.
       </ToggleRow>
 
       {/* Port */}
@@ -241,7 +273,8 @@ export default function McpServerView() {
 
       {/* Connection snippet */}
       <div className="space-y-2 max-w-2xl">
-        <label className={labelDefault}>Connect Claude Code</label>
+        <label className={labelDefault}>Connect an MCP client</label>
+        <p className={helpText}>Example for Claude Code:</p>
         <div className="flex items-start gap-2">
           <pre className="flex-1 text-xs font-mono whitespace-pre-wrap break-all bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded p-3 text-[color:var(--text-primary)]">
             {addCommand}

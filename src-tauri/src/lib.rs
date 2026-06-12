@@ -1,5 +1,6 @@
 #[macro_use]
 pub(crate) mod logging;
+mod analysis;
 mod ble_provision;
 mod capture_db;
 mod capturequery;
@@ -898,6 +899,8 @@ fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String>
             s.mcp_server_port,
             s.mcp_allow_control,
             s.mcp_allow_session_control,
+            s.mcp_allow_catalog_write,
+            s.mcp_allow_catalog_modify,
             s.mcp_server_token.clone(),
         )?;
     }
@@ -1051,6 +1054,8 @@ pub fn run() {
                         s.mcp_server_port,
                         s.mcp_allow_control,
                         s.mcp_allow_session_control,
+                        s.mcp_allow_catalog_write,
+                        s.mcp_allow_catalog_modify,
                         s.mcp_server_token.clone(),
                     ) {
                         tlog!("[mcp] Failed to start: {}", e);

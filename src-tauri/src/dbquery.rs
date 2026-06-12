@@ -542,6 +542,115 @@ fn get_profile_password(profile: &IOProfile) -> Option<String> {
     }
 }
 
+/// Connect to a PostgreSQL profile and return a ready client. Spawns the
+/// connection driver task. Shared by the headless analysis queries.
+async fn connect_profile(
+    app: &AppHandle,
+    profile_id: &str,
+) -> Result<tokio_postgres::Client, String> {
+    let settings = load_settings(app.clone())
+        .await
+        .map_err(|e| format!("Failed to load settings: {}", e))?;
+    let profile = find_profile(&settings, profile_id)
+        .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
+    if profile.kind != "postgres" {
+        return Err("Profile is not a PostgreSQL profile".to_string());
+    }
+    let conn_str = build_connection_string(&profile, get_profile_password(&profile));
+    let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
+        .await
+        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            tlog!("PostgreSQL connection error: {}", e);
+        }
+    });
+    Ok(client)
+}
+
+/// Per-frame-id rollup for a PostgreSQL source: (frame_id, is_extended, count,
+/// first_us, last_us, max_dlc). Time bounds are optional RFC3339 strings.
+pub async fn db_frame_inventory(
+    app: &AppHandle,
+    profile_id: &str,
+    start_time: Option<String>,
+    end_time: Option<String>,
+) -> Result<Vec<(u32, bool, i64, i64, i64, u8)>, String> {
+    let client = connect_profile(app, profile_id).await?;
+
+    let mut sql = String::from(
+        "SELECT id, extended, COUNT(*)::int8 AS cnt, \
+         (EXTRACT(EPOCH FROM MIN(ts)) * 1000000)::float8 AS first_us, \
+         (EXTRACT(EPOCH FROM MAX(ts)) * 1000000)::float8 AS last_us, \
+         MAX(dlc)::int4 AS max_dlc \
+         FROM public.can_frame",
+    );
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = Vec::new();
+    let mut idx = 1;
+    if start_time.is_some() || end_time.is_some() {
+        sql.push_str(" WHERE 1=1");
+    }
+    if let Some(ref s) = start_time {
+        sql.push_str(&format!(" AND ts >= (${}::text)::timestamptz", idx));
+        idx += 1;
+        params.push(s);
+    }
+    if let Some(ref e) = end_time {
+        sql.push_str(&format!(" AND ts < (${}::text)::timestamptz", idx));
+        params.push(e);
+    }
+    sql.push_str(" GROUP BY id, extended ORDER BY id, extended");
+
+    let rows = client
+        .query(sql.as_str(), &params)
+        .await
+        .map_err(|e| format!("Inventory query failed: {}", e))?;
+
+    Ok(rows
+        .iter()
+        .map(|r| {
+            let id: i32 = r.get("id");
+            let extended: bool = r.get("extended");
+            let cnt: i64 = r.get("cnt");
+            let first_us: f64 = r.get("first_us");
+            let last_us: f64 = r.get("last_us");
+            let max_dlc: i32 = r.get("max_dlc");
+            (id as u32, extended, cnt, first_us as i64, last_us as i64, max_dlc as u8)
+        })
+        .collect())
+}
+
+/// Fetch up to `limit` raw payloads for one frame id from a PostgreSQL source,
+/// in timestamp order. Used for headless per-byte analysis.
+pub async fn db_fetch_frame_payloads(
+    app: &AppHandle,
+    profile_id: &str,
+    frame_id: u32,
+    is_extended: Option<bool>,
+    limit: u32,
+) -> Result<Vec<Vec<u8>>, String> {
+    let client = connect_profile(app, profile_id).await?;
+    let frame_id_i32 = frame_id as i32;
+
+    let mut sql = String::from("SELECT data_bytes FROM public.can_frame WHERE id = $1::int4");
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32];
+    let ext_bool: bool;
+    if let Some(ext) = is_extended {
+        ext_bool = ext;
+        sql.push_str(" AND extended = $2::bool");
+        params.push(&ext_bool);
+    }
+    // Sample the most recent N (current behaviour) rather than the oldest — on a
+    // multi-month archive the first rows are a stale, biased window.
+    sql.push_str(&format!(" ORDER BY ts DESC LIMIT {}", limit));
+
+    let rows = client
+        .query(sql.as_str(), &params)
+        .await
+        .map_err(|e| format!("Payload fetch failed: {}", e))?;
+    Ok(rows.iter().map(|r| r.get::<_, Vec<u8>>("data_bytes")).collect())
+}
+
 /// Query for byte changes in a specific frame
 ///
 /// Returns a list of timestamps where the specified byte changed value.

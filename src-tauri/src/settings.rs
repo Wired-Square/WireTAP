@@ -152,7 +152,7 @@ pub struct AppSettings {
     #[serde(default = "default_language")]
     pub language: String,
 
-    // MCP server — lets an external Claude client query live runtime state over
+    // MCP server — lets an external MCP client query live runtime state over
     // a localhost HTTP transport. Both gates default off.
     /// Master gate: when true the MCP server binds and listens.
     #[serde(default = "default_mcp_server_enabled")]
@@ -163,6 +163,14 @@ pub struct AppSettings {
     /// Third gate: when true the session lifecycle tools (open/stop session) are registered.
     #[serde(default = "default_mcp_allow_control")]
     pub mcp_allow_session_control: bool,
+    /// Catalog gate: when true the `create_catalog` tool (write a new catalog file)
+    /// is registered. Independent of the control gate.
+    #[serde(default = "default_mcp_allow_control")]
+    pub mcp_allow_catalog_write: bool,
+    /// Catalog gate: when true the `update_catalog` tool (overwrite an existing
+    /// catalog file) is registered. Independent of the control gate.
+    #[serde(default = "default_mcp_allow_control")]
+    pub mcp_allow_catalog_modify: bool,
     /// Fixed localhost port the MCP server listens on.
     #[serde(default = "default_mcp_server_port")]
     pub mcp_server_port: u16,
@@ -435,6 +443,8 @@ impl Default for AppSettings {
             mcp_server_enabled: default_mcp_server_enabled(),
             mcp_allow_control: default_mcp_allow_control(),
             mcp_allow_session_control: default_mcp_allow_control(),
+            mcp_allow_catalog_write: default_mcp_allow_control(),
+            mcp_allow_catalog_modify: default_mcp_allow_control(),
             mcp_server_port: default_mcp_server_port(),
             mcp_server_token: String::new(),
         }
@@ -523,6 +533,8 @@ impl AppSettings {
             mcp_server_enabled: default_mcp_server_enabled(),
             mcp_allow_control: default_mcp_allow_control(),
             mcp_allow_session_control: default_mcp_allow_control(),
+            mcp_allow_catalog_write: default_mcp_allow_control(),
+            mcp_allow_catalog_modify: default_mcp_allow_control(),
             mcp_server_port: default_mcp_server_port(),
             mcp_server_token: String::new(),
         })

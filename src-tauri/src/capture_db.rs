@@ -553,6 +553,57 @@ pub fn get_frame_info(capture_id: &str) -> Result<Vec<CaptureFrameInfo>, String>
     Ok(result)
 }
 
+/// Per-frame-id rollup for a capture: (frame_id, is_extended, count, first_us,
+/// last_us, max_dlc). Optional time bounds in microseconds. Mirrors the postgres
+/// `db_frame_inventory` shape so callers can treat both sources uniformly.
+pub fn frame_inventory(
+    capture_id: &str,
+    start_us: Option<i64>,
+    end_us: Option<i64>,
+) -> Result<Vec<(u32, bool, i64, i64, i64, u8)>, String> {
+    let guard = DB.lock().unwrap();
+    let conn = guard.as_ref().ok_or("Database not initialised")?;
+
+    let mut sql = String::from(
+        "SELECT frame_id, is_extended, COUNT(*) AS cnt, \
+         MIN(timestamp_us) AS first_us, MAX(timestamp_us) AS last_us, MAX(dlc) AS max_dlc \
+         FROM frames WHERE capture_id = ?1",
+    );
+    let mut bind: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(capture_id.to_string())];
+    let mut idx = 2;
+    if let Some(s) = start_us {
+        sql.push_str(&format!(" AND timestamp_us >= ?{}", idx));
+        bind.push(Box::new(s));
+        idx += 1;
+    }
+    if let Some(e) = end_us {
+        sql.push_str(&format!(" AND timestamp_us < ?{}", idx));
+        bind.push(Box::new(e));
+    }
+    sql.push_str(" GROUP BY frame_id, is_extended ORDER BY frame_id, is_extended");
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| format!("Failed to prepare: {}", e))?;
+    let refs: Vec<&dyn rusqlite::types::ToSql> = bind.iter().map(|b| b.as_ref()).collect();
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(refs), |row| {
+            Ok((
+                row.get::<_, i64>("frame_id")? as u32,
+                row.get::<_, i64>("is_extended")? != 0,
+                row.get::<_, i64>("cnt")?,
+                row.get::<_, i64>("first_us")?,
+                row.get::<_, i64>("last_us")?,
+                row.get::<_, i64>("max_dlc")? as u8,
+            ))
+        })
+        .map_err(|e| format!("Failed to query: {}", e))?;
+
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r.map_err(|e| format!("Failed to read row: {}", e))?);
+    }
+    Ok(out)
+}
+
 /// Find the offset (row count) for a given timestamp, optionally filtered by frame IDs.
 pub fn find_offset_for_timestamp(
     capture_id: &str,

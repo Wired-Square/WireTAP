@@ -128,6 +128,8 @@ interface AppSettings {
   mcp_server_enabled?: boolean;
   mcp_allow_control?: boolean;
   mcp_allow_session_control?: boolean;
+  mcp_allow_catalog_write?: boolean;
+  mcp_allow_catalog_modify?: boolean;
   mcp_server_port?: number;
   mcp_server_token?: string;
   // Theme settings
@@ -346,11 +348,13 @@ interface SettingsState {
     language: string;
   };
 
-  // MCP server (external Claude client access to live runtime state)
+  // MCP server (external MCP client access to live runtime state)
   mcp: {
     serverEnabled: boolean;
     allowControl: boolean;
     allowSessionControl: boolean;
+    allowCatalogWrite: boolean;
+    allowCatalogModify: boolean;
     serverPort: number;
     serverToken: string;
   };
@@ -448,6 +452,8 @@ interface SettingsState {
   setMcpServerEnabled: (value: boolean) => void;
   setMcpAllowControl: (value: boolean) => void;
   setMcpAllowSessionControl: (value: boolean) => void;
+  setMcpAllowCatalogWrite: (value: boolean) => void;
+  setMcpAllowCatalogModify: (value: boolean) => void;
   setMcpServerPort: (port: number) => void;
   setMcpServerToken: (token: string) => void;
 }
@@ -605,6 +611,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     serverEnabled: false,
     allowControl: false,
     allowSessionControl: false,
+    allowCatalogWrite: false,
+    allowCatalogModify: false,
     serverPort: 8787,
     serverToken: "",
   },
@@ -734,6 +742,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         mcp_server_enabled: settings.mcp_server_enabled ?? false,
         mcp_allow_control: settings.mcp_allow_control ?? false,
         mcp_allow_session_control: settings.mcp_allow_session_control ?? false,
+        mcp_allow_catalog_write: settings.mcp_allow_catalog_write ?? false,
+        mcp_allow_catalog_modify: settings.mcp_allow_catalog_modify ?? false,
         mcp_server_port: settings.mcp_server_port ?? 8787,
         mcp_server_token: settings.mcp_server_token ?? "",
       };
@@ -825,6 +835,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           serverEnabled: normalized.mcp_server_enabled ?? false,
           allowControl: normalized.mcp_allow_control ?? false,
           allowSessionControl: normalized.mcp_allow_session_control ?? false,
+          allowCatalogWrite: normalized.mcp_allow_catalog_write ?? false,
+          allowCatalogModify: normalized.mcp_allow_catalog_modify ?? false,
           serverPort: normalized.mcp_server_port ?? 8787,
           serverToken: normalized.mcp_server_token ?? "",
         },
@@ -976,6 +988,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         mcp_server_enabled: mcp.serverEnabled,
         mcp_allow_control: mcp.allowControl,
         mcp_allow_session_control: mcp.allowSessionControl,
+        mcp_allow_catalog_write: mcp.allowCatalogWrite,
+        mcp_allow_catalog_modify: mcp.allowCatalogModify,
         mcp_server_port: mcp.serverPort,
         mcp_server_token: mcp.serverToken,
       };
@@ -1520,6 +1534,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   setMcpAllowSessionControl: (value) => {
     set((state) => ({ mcp: { ...state.mcp, allowSessionControl: value } }));
+    scheduleSave(get().saveSettings);
+  },
+  setMcpAllowCatalogWrite: (value) => {
+    set((state) => ({ mcp: { ...state.mcp, allowCatalogWrite: value } }));
+    scheduleSave(get().saveSettings);
+  },
+  setMcpAllowCatalogModify: (value) => {
+    set((state) => ({ mcp: { ...state.mcp, allowCatalogModify: value } }));
     scheduleSave(get().saveSettings);
   },
   setMcpServerPort: (port) => {

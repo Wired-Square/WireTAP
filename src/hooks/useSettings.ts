@@ -336,13 +336,17 @@ export interface AppSettings {
   smp_port?: number;
   /** UI language code (BCP 47, e.g. "en-AU"). Drives i18next translations. */
   language?: string;
-  // MCP server (lets an external Claude client query live runtime state)
+  // MCP server (lets an external MCP client query live runtime state)
   /** Master gate: when true the MCP server binds and listens. */
   mcp_server_enabled?: boolean;
   /** Second gate: when true the control (mutation) tools are registered. */
   mcp_allow_control?: boolean;
   /** Third gate: when true the session open/stop tools are registered. */
   mcp_allow_session_control?: boolean;
+  /** Catalog gate: when true the create_catalog tool (write new catalogs) is registered. */
+  mcp_allow_catalog_write?: boolean;
+  /** Catalog gate: when true the update_catalog tool (overwrite catalogs) is registered. */
+  mcp_allow_catalog_modify?: boolean;
   /** Fixed localhost port the MCP server listens on (default 8787). */
   mcp_server_port?: number;
   /** Bearer token required by clients (empty = no auth). */
@@ -418,6 +422,8 @@ function normalizeSettings(
     mcp_server_enabled: settings.mcp_server_enabled ?? false,
     mcp_allow_control: settings.mcp_allow_control ?? false,
     mcp_allow_session_control: settings.mcp_allow_session_control ?? false,
+    mcp_allow_catalog_write: settings.mcp_allow_catalog_write ?? false,
+    mcp_allow_catalog_modify: settings.mcp_allow_catalog_modify ?? false,
     mcp_server_port: settings.mcp_server_port ?? 8787,
     mcp_server_token: settings.mcp_server_token ?? "",
   };

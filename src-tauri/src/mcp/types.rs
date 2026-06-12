@@ -176,3 +176,213 @@ pub struct ModbusWriteParams {
     /// Values to write — registers 0-65535; coils use 0/1. One value → single write, many → multi.
     pub values: Vec<u16>,
 }
+
+// ── Catalog write/validate ───────────────────────────────────────────────────
+
+/// Validate catalog TOML without writing it (read-only dry run).
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ValidateCatalogParams {
+    /// Full catalog TOML to validate.
+    pub content: String,
+}
+
+/// Create a new catalog file (gated by the catalog-write permission).
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct CreateCatalogParams {
+    /// Target filename within the decoder directory (a `.toml` suffix is added
+    /// if missing). Must be a bare name — no path separators.
+    pub filename: String,
+    /// Full catalog TOML to write.
+    pub content: String,
+}
+
+/// Overwrite an existing catalog file (gated by the catalog-modify permission).
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UpdateCatalogParams {
+    /// Existing catalog filename (or display name) to overwrite.
+    pub filename: String,
+    /// Full catalog TOML to write.
+    pub content: String,
+}
+
+// ── Analysis levers (work against a capture OR a postgres profile) ───────────
+
+fn default_sample_limit() -> u32 {
+    5000
+}
+fn default_coverage_sample() -> u32 {
+    2000
+}
+fn default_payload_length() -> u8 {
+    8
+}
+fn default_bucket_ms() -> u32 {
+    1000
+}
+
+/// Per-frame-id rollup (count, first/last, dlc) for a capture or postgres source.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct FrameInventoryParams {
+    /// Capture ID (mutually exclusive with `profile_id`).
+    #[serde(default)]
+    pub capture_id: Option<String>,
+    /// PostgreSQL profile ID (mutually exclusive with `capture_id`).
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    /// Optional RFC3339 lower time bound (inclusive).
+    #[serde(default)]
+    pub start_time: Option<String>,
+    /// Optional RFC3339 upper time bound (exclusive).
+    #[serde(default)]
+    pub end_time: Option<String>,
+}
+
+/// Per-byte static/counter/sensor roles for one frame id.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ByteProfileParams {
+    #[serde(default)]
+    pub capture_id: Option<String>,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    /// Frame id (decimal) to profile.
+    pub frame_id: u32,
+    /// Restrict to standard (false) or extended (true) frames; omit for both.
+    #[serde(default)]
+    pub is_extended: Option<bool>,
+    /// Max payloads to sample (default 5000).
+    #[serde(default = "default_sample_limit")]
+    pub sample_limit: u32,
+}
+
+/// Diff a decoder catalog against a data source + confidence rollup.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct CatalogCoverageParams {
+    #[serde(default)]
+    pub capture_id: Option<String>,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    /// Catalog filename or display name (as listed by `list_catalogs`).
+    pub catalog: String,
+    /// Attach per-byte static/varying roles for each present frame (default false
+    /// — this samples payloads per frame, which is heavy on a large archive).
+    #[serde(default)]
+    pub include_byte_roles: bool,
+    /// Payloads to sample per frame when byte roles are enabled (default 2000).
+    #[serde(default = "default_coverage_sample")]
+    pub sample_limit: u32,
+    #[serde(default)]
+    pub start_time: Option<String>,
+    #[serde(default)]
+    pub end_time: Option<String>,
+}
+
+// ── Exposed analytical engines (capture OR postgres) ─────────────────────────
+
+/// Base params for a per-frame analytical query (frame_changes, first_last).
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct FrameQueryParams {
+    #[serde(default)]
+    pub capture_id: Option<String>,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    /// Frame id (decimal).
+    pub frame_id: u32,
+    #[serde(default)]
+    pub is_extended: Option<bool>,
+    /// RFC3339 lower bound (inclusive).
+    #[serde(default)]
+    pub start_time: Option<String>,
+    /// RFC3339 upper bound (exclusive).
+    #[serde(default)]
+    pub end_time: Option<String>,
+    /// Max rows to return.
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Per-byte query (byte_changes, distribution).
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct ByteQueryParams {
+    #[serde(default)]
+    pub capture_id: Option<String>,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    pub frame_id: u32,
+    /// Byte index (0-based) within the payload.
+    pub byte_index: u8,
+    #[serde(default)]
+    pub is_extended: Option<bool>,
+    #[serde(default)]
+    pub start_time: Option<String>,
+    #[serde(default)]
+    pub end_time: Option<String>,
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Mux statistics query.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct MuxQueryParams {
+    #[serde(default)]
+    pub capture_id: Option<String>,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    pub frame_id: u32,
+    /// Byte index used as the mux selector.
+    pub mux_selector_byte: u8,
+    /// Also compute 16-bit word stats (LE & BE) per offset.
+    #[serde(default)]
+    pub include_16bit: bool,
+    /// Payload length to analyse (default 8).
+    #[serde(default = "default_payload_length")]
+    pub payload_length: u8,
+    #[serde(default)]
+    pub is_extended: Option<bool>,
+    #[serde(default)]
+    pub start_time: Option<String>,
+    #[serde(default)]
+    pub end_time: Option<String>,
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Gap analysis query.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct GapQueryParams {
+    #[serde(default)]
+    pub capture_id: Option<String>,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    pub frame_id: u32,
+    /// Report gaps longer than this many milliseconds.
+    pub gap_threshold_ms: f64,
+    #[serde(default)]
+    pub is_extended: Option<bool>,
+    #[serde(default)]
+    pub start_time: Option<String>,
+    #[serde(default)]
+    pub end_time: Option<String>,
+    #[serde(default)]
+    pub limit: Option<u32>,
+}
+
+/// Frequency query.
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct FrequencyQueryParams {
+    #[serde(default)]
+    pub capture_id: Option<String>,
+    #[serde(default)]
+    pub profile_id: Option<String>,
+    pub frame_id: u32,
+    /// Time bucket width in milliseconds (default 1000).
+    #[serde(default = "default_bucket_ms")]
+    pub bucket_size_ms: u32,
+    #[serde(default)]
+    pub is_extended: Option<bool>,
+    #[serde(default)]
+    pub start_time: Option<String>,
+    #[serde(default)]
+    pub end_time: Option<String>,
+    #[serde(default)]
+    pub limit: Option<u32>,
+}

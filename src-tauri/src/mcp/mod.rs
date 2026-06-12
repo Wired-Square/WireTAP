@@ -1,7 +1,7 @@
 // Copyright 2026 Wired Square Pty Ltd
 // SPDX-License-Identifier: Apache-2.0
 
-//! MCP server — exposes live WireTAP runtime state to an external Claude client
+//! MCP server — exposes live WireTAP runtime state to an external MCP client
 //! over a localhost streamable-HTTP transport. Opt-in via settings; read-only
 //! unless `mcp_allow_control` is also enabled. Hosted in Rust (the only layer an
 //! external client can reach); Tier 2 tools reach frontend-only state via
@@ -56,6 +56,8 @@ pub fn start(
     port: u16,
     allow_control: bool,
     allow_session_control: bool,
+    allow_catalog_write: bool,
+    allow_catalog_modify: bool,
     token: String,
 ) -> Result<(), String> {
     if is_running() {
@@ -74,7 +76,15 @@ pub fn start(
 
     let app_for_mw = app.clone();
     let service = StreamableHttpService::new(
-        move || Ok(WireTapTools::new(app.clone(), allow_control, allow_session_control)),
+        move || {
+            Ok(WireTapTools::new(
+                app.clone(),
+                allow_control,
+                allow_session_control,
+                allow_catalog_write,
+                allow_catalog_modify,
+            ))
+        },
         LocalSessionManager::default().into(),
         StreamableHttpServerConfig::default().with_cancellation_token(cancel_for_config),
     );
