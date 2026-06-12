@@ -57,6 +57,8 @@ type Props = {
   hideExternal?: boolean;
   /** Hide the Recorded Sources section - for transmit mode */
   hideRecorded?: boolean;
+  /** Hide the Sessions tab (joinable live sessions) - for recorded-only pickers like Query */
+  hideSessions?: boolean;
   /** Validation error for incompatible selection */
   validationError?: string | null;
   /** Allow multi-select mode (default: true for real-time CAN interfaces) */
@@ -91,6 +93,7 @@ export default function SourceList({
   disabledProfiles,
   hideExternal = false,
   hideRecorded = false,
+  hideSessions = false,
   validationError,
   allowMultiSelect = true,
   profileUsage,
@@ -257,7 +260,7 @@ export default function SourceList({
     : null;
 
   // Sessions tab holds joinable active sessions.
-  const showSessionsTab = joinableSessions.length > 0 && !!onSelectMultiSourceSession;
+  const showSessionsTab = !hideSessions && joinableSessions.length > 0 && !!onSelectMultiSourceSession;
   // Captures tab holds SQLite captures + recorded DB sources + CSV import.
   const showCapturesTab =
     !!renderAfterSessions || (!hideRecorded && recordedProfiles.length > 0) || !hideExternal;

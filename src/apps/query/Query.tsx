@@ -7,8 +7,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "../../hooks/useSettings";
-import { useIOSessionManager } from "../../hooks/useIOSessionManager";
+import { useIOSessionManager, isCaptureProfileId } from "../../hooks/useIOSessionManager";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
+import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useMenuSessionControl } from "../../hooks/useMenuSessionControl";
 import { useQueryStore } from "./stores/queryStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -21,7 +22,6 @@ import type { FrameMessage } from "../../types/frame";
 import type { PlaybackPosition } from "../../api/io";
 import type { CatalogMetadata } from "../../api/catalog";
 import { listCatalogs } from "../../api/catalog";
-import { listCaptures, type CaptureMetadata } from "../../api/capture";
 
 import { getFavoritesForProfile, type TimeRangeFavorite } from "../../utils/favorites";
 import { loadCatalog } from "../../utils/catalogParser";
@@ -38,7 +38,7 @@ import ErrorDialog from "../../dialogs/ErrorDialog";
 import CatalogPickerDialog from "../../dialogs/CatalogPickerDialog";
 import AddBookmarkDialog from "../../dialogs/AddBookmarkDialog";
 
-export default function Query() {
+function QueryInner() {
   const { t } = useTranslation("query");
   const { settings } = useSettings();
 
@@ -63,23 +63,8 @@ export default function Query() {
   // Favourites state (bookmarks)
   const [favourites, setFavourites] = useState<TimeRangeFavorite[]>([]);
 
-  // Buffer sources state
-  const [captures, setCaptures] = useState<CaptureMetadata[]>([]);
-  const [selectedCaptureId, setSelectedCaptureId] = useState<string | null>(null);
-
-  // Load available captures on mount
-  useEffect(() => {
-    const loadCaptures = async () => {
-      try {
-        const all = await listCaptures();
-        // Only show frame captures with data
-        setCaptures(all.filter((b) => b.kind === "frames" && b.count > 0));
-      } catch (e) {
-        console.error("Failed to load captures:", e);
-      }
-    };
-    loadCaptures();
-  }, []);
+  // Per-panel frame ID display format (Auto/Hex/Dec toggle in the top bar)
+  const { effective: displayIdFormat } = useFrameIdFormat();
 
   // Time bounds state (for query filtering)
   const [timeBounds, setTimeBounds] = useState<TimeBounds>({
@@ -184,6 +169,7 @@ export default function Query() {
     stopWatch,
     ioProfileName,
     sourceProfileId,
+    isCaptureMode,
     isStreaming,
     isPaused,
     isStopped,
@@ -194,6 +180,12 @@ export default function Query() {
     watchFrameCount,
     watchUniqueFrameCount,
   } = manager;
+
+  // The query source is derived from the session: a capture replay sets
+  // sourceProfileId to the capture id (isCaptureMode), otherwise it's a postgres
+  // profile. Queries target whichever is set — they are mutually exclusive.
+  const captureId = isCaptureMode && isCaptureProfileId(sourceProfileId) ? sourceProfileId : null;
+  const profileId = captureId ? null : sourceProfileId;
 
   // Subscribe to session's catalogPath. Returns undefined when session doesn't exist
   // in the store yet, null when it exists with no decoder, or a string path.
@@ -238,15 +230,8 @@ export default function Query() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionCatalogPath, session.sessionId, sourceProfileId]);
 
-  // Determine active source — postgres profile or buffer (mutually exclusive)
-  const hasSource = !!sourceProfileId || !!selectedCaptureId;
-
-  // Clear buffer selection when a postgres profile is selected, and vice versa
-  useEffect(() => {
-    if (sourceProfileId && selectedCaptureId) {
-      setSelectedCaptureId(null);
-    }
-  }, [sourceProfileId, selectedCaptureId]);
+  // Determine active source — a capture replay or a postgres profile
+  const hasSource = !!sourceProfileId;
 
   // Load favourites when source profile changes
   useEffect(() => {
@@ -379,10 +364,10 @@ export default function Query() {
 
   // Protocol badge for data source
   const protocolBadges: ProtocolBadge[] = useMemo(() => {
-    if (selectedCaptureId) return [{ label: t("protocols.capture"), color: "amber" as const }];
-    if (sourceProfileId) return [{ label: t("protocols.postgres"), color: "blue" as const }];
+    if (captureId) return [{ label: t("protocols.capture"), color: "amber" as const }];
+    if (profileId) return [{ label: t("protocols.postgres"), color: "blue" as const }];
     return [];
-  }, [sourceProfileId, selectedCaptureId]);
+  }, [captureId, profileId]);
 
   return (
     <AppLayout
@@ -419,14 +404,13 @@ export default function Query() {
       >
         {activeTab === "query" && (
           <QueryBuilderPanel
-            profileId={sourceProfileId}
-            captureId={selectedCaptureId}
+            profileId={profileId}
+            captureId={captureId}
             disabled={!hasSource}
             favourites={favourites}
             timeBounds={timeBounds}
             onTimeBoundsChange={handleTimeBoundsChangeWrapper}
-            captures={captures}
-            onSelectCapture={setSelectedCaptureId}
+            displayIdFormat={displayIdFormat}
           />
         )}
         {activeTab === "queue" && (
@@ -445,19 +429,20 @@ export default function Query() {
           />
         )}
         {activeTab === "stats" && (
-          selectedCaptureId
+          captureId
             ? <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                 <p className="text-xs text-[color:var(--text-muted)]">
-                  Stats are only available for PostgreSQL sources.
+                  {t("stats.postgresOnly")}
                 </p>
               </div>
-            : <StatsPanel profileId={sourceProfileId} />
+            : <StatsPanel profileId={profileId} />
         )}
       </AppTabView>
 
-      {/* IO Session Picker Dialog - connect mode for database selection */}
+      {/* Data Source picker — captures (replay) and PostgreSQL profiles only */}
       <IoSourcePickerDialog
         mode="connect"
+        hideSessions
         {...ioPickerProps}
         isOpen={dialogs.ioSessionPicker.isOpen}
         onClose={() => dialogs.ioSessionPicker.close()}
@@ -499,3 +484,5 @@ export default function Query() {
     </AppLayout>
   );
 }
+
+export default withFrameIdFormat(QueryInner);

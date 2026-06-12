@@ -62,6 +62,7 @@ export default function QueryTopBar({
     <AppTopBar
       icon={DatabaseZap}
       iconColour="text-[color:var(--text-amber)]"
+      frameIdFormat
       ioSession={{
         ioProfile,
         ioProfiles,

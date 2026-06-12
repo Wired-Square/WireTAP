@@ -171,6 +171,8 @@ type Props = {
   onJoinSession?: (sessionId: string, sourceProfileIds?: string[]) => void;
   /** Hide captures section (for transmit-only mode) */
   hideCaptures?: boolean;
+  /** Hide the Sessions tab (joinable live sessions) - for recorded-only pickers like Query */
+  hideSessions?: boolean;
   /** Enable multi-select mode for real-time profiles */
   allowMultiSelect?: boolean;
   /** Map of profile ID to disabled status with reason (for transmit mode) */
@@ -217,6 +219,7 @@ export default function IoSourcePickerDialog({
   loadError: externalLoadError,
   onJoinSession,
   hideCaptures = false,
+  hideSessions = false,
   allowMultiSelect = false,
   disabledProfiles,
   onSkip,
@@ -577,13 +580,13 @@ export default function IoSourcePickerDialog({
   // picked a tab and either nothing was explicitly selected or the selection is
   // one of those sessions.
   useEffect(() => {
-    if (!isOpen || tabUserPickedRef.current) return;
+    if (!isOpen || tabUserPickedRef.current || hideSessions) return;
     if (activeMultiSourceSessions.length === 0) return;
     const selectedIsSession = activeMultiSourceSessions.some((s) => s.sessionId === selectedId);
     if (selectedIsSession || !hasExplicitSelectionRef.current) {
       setActiveTab("sessions");
     }
-  }, [isOpen, activeMultiSourceSessions, selectedId]);
+  }, [isOpen, activeMultiSourceSessions, selectedId, hideSessions]);
 
   // Apply the decoder picker selection (and mirror it into the host app).
   const handleCatalogSelect = useCallback((path: string | null) => {
@@ -1803,6 +1806,7 @@ export default function IoSourcePickerDialog({
             disabledProfiles={disabledProfiles}
             hideExternal={hideCaptures}
             hideRecorded={hideCaptures}
+            hideSessions={hideSessions}
             profileUsage={profileUsage}
             renderAfterSessions={!hideCaptures ? (
               <CaptureList

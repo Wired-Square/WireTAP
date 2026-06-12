@@ -63,6 +63,9 @@ export interface TimeBoundsInputProps {
   bookmarks?: TimeRangeFavorite[];
   /** Whether to show the bookmark dropdown (default: true) */
   showBookmarks?: boolean;
+  /** Whether to show the max-frames cap (default: true). Hidden where a separate
+   *  result-limit control owns the cap (e.g. the Query builder). */
+  showMaxFrames?: boolean;
   /** Whether the component is disabled */
   disabled?: boolean;
 }
@@ -72,6 +75,7 @@ export default function TimeBoundsInput({
   onChange,
   bookmarks = [],
   showBookmarks = true,
+  showMaxFrames = true,
   disabled = false,
 }: TimeBoundsInputProps) {
   const { t } = useTranslation("common");
@@ -269,18 +273,20 @@ export default function TimeBoundsInput({
       </div>
 
       {/* Max frames input */}
-      <div>
-        <label className={`block ${caption} mb-1`}>{t("timeBounds.maxFrames")}</label>
-        <input
-          type="number"
-          min={1}
-          placeholder={t("timeBounds.noLimitPlaceholder")}
-          value={value.maxFrames ?? ""}
-          onChange={handleMaxFramesChange}
-          disabled={disabled}
-          className={inputClasses}
-        />
-      </div>
+      {showMaxFrames && (
+        <div>
+          <label className={`block ${caption} mb-1`}>{t("timeBounds.maxFrames")}</label>
+          <input
+            type="number"
+            min={1}
+            placeholder={t("timeBounds.noLimitPlaceholder")}
+            value={value.maxFrames ?? ""}
+            onChange={handleMaxFramesChange}
+            disabled={disabled}
+            className={inputClasses}
+          />
+        </div>
+      )}
     </div>
   );
 }

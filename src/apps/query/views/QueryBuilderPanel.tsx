@@ -1,11 +1,13 @@
 // src/apps/query/views/QueryBuilderPanel.tsx
 //
 // Query configuration panel. Users select query type, frame ID, byte index,
-// and context window settings. Supports favourite-based time bounds.
+// and context window settings. Supports favourite-based time bounds. The source
+// (a SQLite capture or a PostgreSQL profile) is chosen via the shared Data Source
+// picker in the top bar, not here.
 
 import { useCallback, useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ListPlus, HardDrive } from "lucide-react";
+import { ListPlus, ChevronRight, ChevronDown } from "lucide-react";
 import {
   useQueryStore,
   QUERY_TYPE_INFO,
@@ -16,13 +18,35 @@ import {
 import type { ResolvedSignal } from "../../../utils/catalogParser";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import type { TimeRangeFavorite } from "../../../utils/favorites";
-import type { CaptureMetadata } from "../../../api/capture";
+import type { FrameIdFormat } from "../../../hooks/useSettings";
+import { formatFrameId, formatFrameIdInput, parseFrameId } from "../../../utils/frameIds";
 import TimeBoundsInput, { type TimeBounds } from "../../../components/TimeBoundsInput";
 import { primaryButtonBase, buttonBase } from "../../../styles/buttonStyles";
-import { inputBase } from "../../../styles/inputStyles";
 import { labelSmallMuted, monoBody } from "../../../styles/typography";
 import { iconSm, flexRowGap2 } from "../../../styles/spacing";
-import { bgSurface, borderDefault, textSecondary, textMuted } from "../../../styles/colourTokens";
+import { focusRing, bgSurface, borderDefault, textSecondary, textMuted } from "../../../styles/colourTokens";
+
+// Compact form controls tuned to the Decoder data-view density. Width is applied
+// at each call site so narrow numeric fields can opt out of the full width.
+const fieldClass =
+  `h-8 px-2 text-sm rounded border box-border bg-[var(--bg-primary)] border-[color:var(--border-default)] text-[color:var(--text-primary)] transition-colors ${focusRing} disabled:opacity-50 disabled:cursor-not-allowed`;
+const sectionCard = `${bgSurface} ${borderDefault} rounded-lg p-2`;
+const sectionLabel = `text-xs font-medium ${textSecondary}`;
+
+/**
+ * Editable frame-id text bound to a store value. Re-formats when the store value
+ * or the active display format changes, without clobbering what the user is
+ * mid-typing (a text that already parses to the store value is left alone).
+ */
+function useFrameIdField(storeValue: number, format: FrameIdFormat) {
+  const [text, setText] = useState(() => formatFrameIdInput(storeValue, format));
+  useEffect(() => {
+    const parsed = parseFrameId(text, format);
+    if (parsed === null || parsed !== storeValue) setText(formatFrameIdInput(storeValue, format));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeValue, format]);
+  return [text, setText] as const;
+}
 
 interface Props {
   profileId: string | null;
@@ -31,8 +55,8 @@ interface Props {
   favourites: TimeRangeFavorite[];
   timeBounds: TimeBounds;
   onTimeBoundsChange: (bounds: TimeBounds) => void;
-  captures?: CaptureMetadata[];
-  onSelectCapture?: (captureId: string | null) => void;
+  /** Active frame-id display format (Auto/Hex/Dec toggle in the top bar) */
+  displayIdFormat: FrameIdFormat;
 }
 
 export default function QueryBuilderPanel({
@@ -42,8 +66,7 @@ export default function QueryBuilderPanel({
   favourites,
   timeBounds,
   onTimeBoundsChange,
-  captures = [],
-  onSelectCapture,
+  displayIdFormat,
 }: Props) {
   const { t } = useTranslation("query");
   // Store selectors
@@ -62,6 +85,12 @@ export default function QueryBuilderPanel({
   const setContextWindow = useQueryStore((s) => s.setContextWindow);
   const enqueueQuery = useQueryStore((s) => s.enqueueQuery);
   const setSelectedSignal = useQueryStore((s) => s.setSelectedSignal);
+
+  // Format/parse a frame id using the active display format.
+  const fmtId = useCallback(
+    (id: number, isExtended?: boolean) => formatFrameId(id, displayIdFormat, isExtended),
+    [displayIdFormat]
+  );
 
   // Catalog-derived data: sorted frames list
   const catalogFrames = useMemo(() => {
@@ -106,26 +135,15 @@ export default function QueryBuilderPanel({
         }
       }
       // Try parsing as numeric
-      const parsed = mirrorOf.startsWith("0x")
-        ? parseInt(mirrorOf, 16)
-        : parseInt(mirrorOf, 10);
-      return isNaN(parsed) ? null : parsed;
+      return parseFrameId(mirrorOf, "auto");
     },
     [parsedCatalog]
   );
 
-  // Local state for frame ID input (allows free typing)
-  const [frameIdText, setFrameIdText] = useState(
-    `0x${queryParams.frameId.toString(16).toUpperCase()}`
-  );
-
-  // Local state for mirror frame ID inputs
-  const [mirrorFrameIdText, setMirrorFrameIdText] = useState(
-    `0x${queryParams.mirrorFrameId.toString(16).toUpperCase()}`
-  );
-  const [sourceFrameIdText, setSourceFrameIdText] = useState(
-    `0x${queryParams.sourceFrameId.toString(16).toUpperCase()}`
-  );
+  // Frame ID text inputs (allow free typing; re-format on store/format change).
+  const [frameIdText, setFrameIdText] = useFrameIdField(queryParams.frameId, displayIdFormat);
+  const [mirrorFrameIdText, setMirrorFrameIdText] = useFrameIdField(queryParams.mirrorFrameId, displayIdFormat);
+  const [sourceFrameIdText, setSourceFrameIdText] = useFrameIdField(queryParams.sourceFrameId, displayIdFormat);
 
   // Local state for pattern search (hex string like "AA ?? BB")
   const [patternText, setPatternText] = useState("");
@@ -133,44 +151,25 @@ export default function QueryBuilderPanel({
   // Local state for result limit (allows per-query override)
   const [limitOverride, setLimitOverride] = useState(queryResultLimit);
 
-  // Sync local state when store changes externally
-  useEffect(() => {
-    const storeHex = `0x${queryParams.frameId.toString(16).toUpperCase()}`;
-    // Only sync if the parsed values differ (to avoid overwriting user input)
-    const currentParsed = frameIdText.startsWith("0x")
-      ? parseInt(frameIdText, 16)
-      : parseInt(frameIdText, 10);
-    if (isNaN(currentParsed) || currentParsed !== queryParams.frameId) {
-      setFrameIdText(storeHex);
-    }
-  }, [queryParams.frameId]);
-
-  // Sync mirror frame ID text
-  useEffect(() => {
-    const storeHex = `0x${queryParams.mirrorFrameId.toString(16).toUpperCase()}`;
-    const currentParsed = mirrorFrameIdText.startsWith("0x")
-      ? parseInt(mirrorFrameIdText, 16)
-      : parseInt(mirrorFrameIdText, 10);
-    if (isNaN(currentParsed) || currentParsed !== queryParams.mirrorFrameId) {
-      setMirrorFrameIdText(storeHex);
-    }
-  }, [queryParams.mirrorFrameId]);
-
-  // Sync source frame ID text
-  useEffect(() => {
-    const storeHex = `0x${queryParams.sourceFrameId.toString(16).toUpperCase()}`;
-    const currentParsed = sourceFrameIdText.startsWith("0x")
-      ? parseInt(sourceFrameIdText, 16)
-      : parseInt(sourceFrameIdText, 10);
-    if (isNaN(currentParsed) || currentParsed !== queryParams.sourceFrameId) {
-      setSourceFrameIdText(storeHex);
-    }
-  }, [queryParams.sourceFrameId]);
+  // SQL preview is collapsed by default to keep the form compact.
+  const [sqlOpen, setSqlOpen] = useState(false);
 
   // Sync limit override when settings change
   useEffect(() => {
     setLimitOverride(queryResultLimit);
   }, [queryResultLimit]);
+
+  // Commit a frame-id text input to the store on a valid parse.
+  const handleFrameIdInput = useCallback(
+    (setText: (s: string) => void, key: "frameId" | "mirrorFrameId" | "sourceFrameId") =>
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setText(value);
+        const id = parseFrameId(value, displayIdFormat);
+        if (id !== null) updateQueryParams({ [key]: id });
+      },
+    [displayIdFormat, updateQueryParams]
+  );
 
   // Handle pattern text change — parse "AA ?? BB" into pattern + mask arrays
   const handlePatternTextChange = useCallback(
@@ -215,23 +214,6 @@ export default function QueryBuilderPanel({
     [setQueryType]
   );
 
-  // Handle frame ID change - update local state immediately, store on valid parse
-  const handleFrameIdChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setFrameIdText(value);
-
-      // Support hex (0x...) or decimal
-      const frameId = value.startsWith("0x")
-        ? parseInt(value, 16)
-        : parseInt(value, 10);
-      if (!isNaN(frameId) && frameId >= 0) {
-        updateQueryParams({ frameId });
-      }
-    },
-    [updateQueryParams]
-  );
-
   // Handle byte index change
   const handleByteIndexChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -262,10 +244,10 @@ export default function QueryBuilderPanel({
         const isExtended = frame?.isExtended ?? false;
         updateQueryParams({ frameId, isExtended });
         setSelectedSignal(null); // Clear signal when frame changes
-        setFrameIdText(`0x${frameId.toString(16).toUpperCase()}`);
+        setFrameIdText(formatFrameIdInput(frameId, displayIdFormat));
       }
     },
-    [updateQueryParams, setSelectedSignal, parsedCatalog]
+    [updateQueryParams, setSelectedSignal, parsedCatalog, displayIdFormat, setFrameIdText]
   );
 
   // Handle catalog signal selection
@@ -291,36 +273,6 @@ export default function QueryBuilderPanel({
     [currentFrameSignals, queryParams.frameId, setSelectedSignal]
   );
 
-  // Handle mirror frame ID change (manual input)
-  const handleMirrorFrameIdChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setMirrorFrameIdText(value);
-      const frameId = value.startsWith("0x")
-        ? parseInt(value, 16)
-        : parseInt(value, 10);
-      if (!isNaN(frameId) && frameId >= 0) {
-        updateQueryParams({ mirrorFrameId: frameId });
-      }
-    },
-    [updateQueryParams]
-  );
-
-  // Handle source frame ID change (manual input)
-  const handleSourceFrameIdChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      setSourceFrameIdText(value);
-      const frameId = value.startsWith("0x")
-        ? parseInt(value, 16)
-        : parseInt(value, 10);
-      if (!isNaN(frameId) && frameId >= 0) {
-        updateQueryParams({ sourceFrameId: frameId });
-      }
-    },
-    [updateQueryParams]
-  );
-
   // Handle mirror frame selection from catalog
   const handleCatalogMirrorFrameChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -341,12 +293,12 @@ export default function QueryBuilderPanel({
         sourceFrameId: sourceFrameId ?? 0,
         isExtended,
       });
-      setMirrorFrameIdText(`0x${mirrorFrameId.toString(16).toUpperCase()}`);
+      setMirrorFrameIdText(formatFrameIdInput(mirrorFrameId, displayIdFormat));
       if (sourceFrameId !== null) {
-        setSourceFrameIdText(`0x${sourceFrameId.toString(16).toUpperCase()}`);
+        setSourceFrameIdText(formatFrameIdInput(sourceFrameId, displayIdFormat));
       }
     },
-    [mirrorFrames, getMirrorSourceId, updateQueryParams, parsedCatalog]
+    [mirrorFrames, getMirrorSourceId, updateQueryParams, parsedCatalog, displayIdFormat, setMirrorFrameIdText, setSourceFrameIdText]
   );
 
   // Handle tolerance change
@@ -396,8 +348,14 @@ export default function QueryBuilderPanel({
   const showGapAnalysis = queryType === "gap_analysis";
   const showFrequency = queryType === "frequency";
   const showPatternSearch = queryType === "pattern_search";
-  // These types don't need a frame ID input (or use their own specialised inputs)
-  const hideFrameId = showMirrorValidation || showPatternSearch;
+
+  // Frame-id label/placeholder follow the active display format.
+  const isHex = displayIdFormat === "hex";
+  const frameIdLabel = t("builder.frameIdManual", {
+    type: t(isHex ? "builder.frameIdTypeHex" : "builder.frameIdTypeDecimal"),
+  });
+  const frameIdPlaceholder = t(isHex ? "builder.frameIdPlaceholderHex" : "builder.frameIdPlaceholderDecimal");
+  const byteIndexLabel = selectedSignal ? t("builder.byteIndexFromSignal") : t("builder.byteIndex");
 
   // Handle limit override change
   // Mux statistics scans raw frames for aggregation, so allow a higher ceiling
@@ -691,32 +649,208 @@ LIMIT ${limitOverride.toLocaleString()}
     return `-- Query type "${queryType}" not yet implemented`;
   }, [queryType, queryParams, timeBounds, limitOverride, isBufferSource]);
 
+  // ── Reusable field fragments ──
+
+  const extendedCheckbox = (
+    <label className={`${flexRowGap2} h-8 ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
+      <input
+        type="checkbox"
+        checked={queryParams.isExtended === true}
+        onChange={handleExtendedChange}
+        disabled={disabled}
+        className="disabled:cursor-not-allowed"
+      />
+      {t("builder.extended")}
+    </label>
+  );
+
+  // Byte index field, reused by the catalog and manual frame selectors.
+  const byteIndexField = (
+    <div className={hasCatalogFrames ? undefined : "w-24"}>
+      <label className={labelSmallMuted}>{byteIndexLabel}</label>
+      <input
+        type="number"
+        min={0}
+        max={63}
+        value={queryParams.byteIndex}
+        onChange={handleByteIndexChange}
+        disabled={disabled || !!selectedSignal}
+        className={`${fieldClass} w-full mt-1`}
+      />
+    </div>
+  );
+
+  // Frame selector: a catalog dropdown when a catalog is loaded, else manual entry.
+  const frameSelector = hasCatalogFrames ? (
+    <div className="space-y-2">
+      <div>
+        <label className={labelSmallMuted}>{t("builder.frame")}</label>
+        <select
+          value={queryParams.frameId}
+          onChange={handleCatalogFrameChange}
+          disabled={disabled}
+          className={`${fieldClass} w-full mt-1`}
+        >
+          {catalogFrames.map(({ id, frame }) => (
+            <option key={id} value={id}>
+              {fmtId(id, frame.isExtended)}
+              {frame.transmitter ? ` — ${frame.transmitter}` : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Signal Picker (for byte_changes / distribution) */}
+      {showByteIndex && currentFrameSignals.length > 0 && (
+        <div>
+          <label className={labelSmallMuted}>{t("builder.signal")}</label>
+          <select
+            value={selectedSignal?.signalName ?? ""}
+            onChange={handleCatalogSignalChange}
+            disabled={disabled}
+            className={`${fieldClass} w-full mt-1`}
+          >
+            <option value="">{t("builder.selectSignalOrByte")}</option>
+            {currentFrameSignals
+              .filter((s) => s.name && s.start_bit !== undefined)
+              .map((signal) => (
+                <option key={signal.name} value={signal.name}>
+                  {signal.name}
+                  {signal.unit ? ` (${signal.unit})` : ""}
+                  {t("builder.signalOption", { byte: Math.floor((signal.start_bit ?? 0) / 8) })}
+                </option>
+              ))}
+          </select>
+          {selectedSignal && (
+            <p className={`text-xs ${textMuted} mt-1`}>
+              {t("builder.signalPosition", { startBit: selectedSignal.startBit, bitLength: selectedSignal.bitLength, byteIndex: selectedSignal.byteIndex })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Byte Index (catalog mode — stacked under the signal picker) */}
+      {showByteIndex && byteIndexField}
+    </div>
+  ) : (
+    // Manual entry — frame id, byte index and extended on one line.
+    <div className="flex gap-2 items-end">
+      <div className="flex-1">
+        <label className={labelSmallMuted}>{frameIdLabel}</label>
+        <input
+          type="text"
+          value={frameIdText}
+          onChange={handleFrameIdInput(setFrameIdText, "frameId")}
+          disabled={disabled}
+          placeholder={frameIdPlaceholder}
+          className={`${fieldClass} w-full mt-1`}
+        />
+      </div>
+      {showByteIndex && byteIndexField}
+      {extendedCheckbox}
+    </div>
+  );
+
+  // Query-type-specific parameters, rendered once regardless of catalog vs manual.
+  const queryTypeParams = (
+    <>
+      {/* Mux Statistics Parameters */}
+      {showMuxStatistics && (
+        <div className="space-y-2">
+          <div>
+            <label className={labelSmallMuted}>{t("builder.muxSelectorByte")}</label>
+            <input
+              type="number"
+              min={0}
+              max={7}
+              value={queryParams.muxSelectorByte}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 0 && v < 64) updateQueryParams({ muxSelectorByte: v });
+              }}
+              disabled={disabled}
+              className={`${fieldClass} w-full mt-1`}
+            />
+          </div>
+          <div>
+            <label className={labelSmallMuted}>{t("builder.payloadLength")}</label>
+            <input
+              type="number"
+              min={1}
+              max={64}
+              value={queryParams.payloadLength}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 1 && v <= 64) updateQueryParams({ payloadLength: v });
+              }}
+              disabled={disabled}
+              className={`${fieldClass} w-full mt-1`}
+            />
+          </div>
+          <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
+            <input
+              type="checkbox"
+              checked={queryParams.include16Bit}
+              onChange={(e) => updateQueryParams({ include16Bit: e.target.checked })}
+              disabled={disabled}
+              className="disabled:cursor-not-allowed"
+            />
+            {t("builder.include16Bit")}
+          </label>
+        </div>
+      )}
+
+      {/* Gap Analysis Parameters */}
+      {showGapAnalysis && (
+        <div>
+          <label className={labelSmallMuted}>{t("builder.gapThreshold")}</label>
+          <div className={`${flexRowGap2} mt-1`}>
+            <input
+              type="number"
+              min={1}
+              max={60000}
+              value={queryParams.gapThresholdMs}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 1) updateQueryParams({ gapThresholdMs: v });
+              }}
+              disabled={disabled}
+              className={`${fieldClass} w-24`}
+            />
+            <span className={`text-xs ${textMuted}`}>{t("builder.gapHint")}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Frequency Parameters */}
+      {showFrequency && (
+        <div>
+          <label className={labelSmallMuted}>{t("builder.bucketSize")}</label>
+          <div className={`${flexRowGap2} mt-1`}>
+            <input
+              type="number"
+              min={10}
+              max={60000}
+              step={100}
+              value={queryParams.bucketSizeMs}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 10) updateQueryParams({ bucketSizeMs: v });
+              }}
+              disabled={disabled}
+              className={`${fieldClass} w-24`}
+            />
+            <span className={`text-xs ${textMuted}`}>{t("builder.bucketHint")}</span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="flex flex-col h-full">
       {/* Scrollable form content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {/* Buffer Source Selector (shown when captures are available) */}
-        {captures.length > 0 && (
-          <div>
-            <label className={labelSmallMuted}>{t("builder.captureSource")}</label>
-            <div className={`${flexRowGap2} mt-1`}>
-              <HardDrive className={`${iconSm} ${textSecondary} flex-shrink-0`} />
-              <select
-                value={captureId ?? ""}
-                onChange={(e) => onSelectCapture?.(e.target.value || null)}
-                className={`${inputBase} flex-1`}
-              >
-                <option value="">{profileId ? t("builder.usingPostgres") : t("builder.selectCapture")}</option>
-                {captures.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {t("builder.captureOption", { name: b.name, count: b.count.toLocaleString() })}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
         {/* Query Type */}
         <div>
           <label className={labelSmallMuted}>{t("builder.queryType")}</label>
@@ -724,7 +858,7 @@ LIMIT ${limitOverride.toLocaleString()}
             value={queryType}
             onChange={handleQueryTypeChange}
             disabled={disabled}
-            className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`${fieldClass} w-full mt-1`}
           >
             {Object.entries(QUERY_TYPE_INFO).map(([key, info]) => (
               <option key={key} value={key}>
@@ -735,44 +869,42 @@ LIMIT ${limitOverride.toLocaleString()}
           <p className={`text-xs ${textSecondary} mt-1`}>{queryInfo.description}</p>
         </div>
 
-        {/* Mirror Validation Parameters */}
+        {/* Parameters — vary by query type */}
         {showMirrorValidation ? (
           <div className="space-y-2">
             {/* Mirror Frame Selection - Catalog picker or manual */}
             {mirrorFrames.length > 0 ? (
-              <>
-                <div>
-                  <label className={labelSmallMuted}>{t("builder.mirrorFrame")}</label>
-                  <select
-                    value={queryParams.mirrorFrameId}
-                    onChange={handleCatalogMirrorFrameChange}
-                    disabled={disabled}
-                    className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <option value={0}>{t("builder.selectMirror")}</option>
-                    {mirrorFrames.map(({ id, frame }) => {
-                      // Resolve source frame info for display
-                      const sourceId = frame.mirrorOf ? getMirrorSourceId(frame.mirrorOf) : null;
-                      const sourceFrame = sourceId !== null ? parsedCatalog?.frames.get(sourceId) : null;
-                      const sourceInfo = sourceId !== null
-                        ? ` → 0x${sourceId.toString(16).toUpperCase().padStart(3, "0")}${sourceFrame?.transmitter ? ` — ${sourceFrame.transmitter}` : ""}`
-                        : "";
-                      return (
-                        <option key={id} value={id}>
-                          0x{id.toString(16).toUpperCase().padStart(3, "0")}
-                          {frame.transmitter ? ` — ${frame.transmitter}` : ""}
-                          {sourceInfo}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  {queryParams.mirrorFrameId > 0 && (
-                    <p className={`text-xs ${textMuted} mt-1`}>
-                      {t("builder.mirrorsTo", { id: queryParams.sourceFrameId.toString(16).toUpperCase().padStart(3, "0") })}
-                    </p>
-                  )}
-                </div>
-              </>
+              <div>
+                <label className={labelSmallMuted}>{t("builder.mirrorFrame")}</label>
+                <select
+                  value={queryParams.mirrorFrameId}
+                  onChange={handleCatalogMirrorFrameChange}
+                  disabled={disabled}
+                  className={`${fieldClass} w-full mt-1`}
+                >
+                  <option value={0}>{t("builder.selectMirror")}</option>
+                  {mirrorFrames.map(({ id, frame }) => {
+                    // Resolve source frame info for display
+                    const sourceId = frame.mirrorOf ? getMirrorSourceId(frame.mirrorOf) : null;
+                    const sourceFrame = sourceId !== null ? parsedCatalog?.frames.get(sourceId) : null;
+                    const sourceInfo = sourceId !== null
+                      ? ` → ${fmtId(sourceId, sourceFrame?.isExtended)}${sourceFrame?.transmitter ? ` — ${sourceFrame.transmitter}` : ""}`
+                      : "";
+                    return (
+                      <option key={id} value={id}>
+                        {fmtId(id, frame.isExtended)}
+                        {frame.transmitter ? ` — ${frame.transmitter}` : ""}
+                        {sourceInfo}
+                      </option>
+                    );
+                  })}
+                </select>
+                {queryParams.mirrorFrameId > 0 && (
+                  <p className={`text-xs ${textMuted} mt-1`}>
+                    {t("builder.mirrorsTo", { id: fmtId(queryParams.sourceFrameId) })}
+                  </p>
+                )}
+              </div>
             ) : (
               <>
                 {/* Manual mirror frame ID inputs */}
@@ -782,21 +914,12 @@ LIMIT ${limitOverride.toLocaleString()}
                     <input
                       type="text"
                       value={mirrorFrameIdText}
-                      onChange={handleMirrorFrameIdChange}
+                      onChange={handleFrameIdInput(setMirrorFrameIdText, "mirrorFrameId")}
                       disabled={disabled}
-                      placeholder={t("builder.mirrorPlaceholder")}
-                      className={`${inputBase} flex-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                      placeholder={frameIdPlaceholder}
+                      className={`${fieldClass} flex-1`}
                     />
-                    <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
-                      <input
-                        type="checkbox"
-                        checked={queryParams.isExtended === true}
-                        onChange={handleExtendedChange}
-                        disabled={disabled}
-                        className="disabled:cursor-not-allowed"
-                      />
-                      {t("builder.extended")}
-                    </label>
+                    {extendedCheckbox}
                   </div>
                 </div>
                 <div>
@@ -804,10 +927,10 @@ LIMIT ${limitOverride.toLocaleString()}
                   <input
                     type="text"
                     value={sourceFrameIdText}
-                    onChange={handleSourceFrameIdChange}
+                    onChange={handleFrameIdInput(setSourceFrameIdText, "sourceFrameId")}
                     disabled={disabled}
-                    placeholder={t("builder.sourcePlaceholder")}
-                    className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                    placeholder={frameIdPlaceholder}
+                    className={`${fieldClass} w-full mt-1`}
                   />
                 </div>
               </>
@@ -823,7 +946,7 @@ LIMIT ${limitOverride.toLocaleString()}
                   value={queryParams.toleranceMs}
                   onChange={handleToleranceChange}
                   disabled={disabled}
-                  className={`${inputBase} w-20 disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className={`${fieldClass} w-20`}
                 />
                 <span className={`text-xs ${textMuted}`}>{t("builder.toleranceHint")}</span>
               </div>
@@ -831,327 +954,33 @@ LIMIT ${limitOverride.toLocaleString()}
           </div>
         ) : showPatternSearch ? (
           /* Pattern Search — no frame ID, just a hex pattern input */
-          <div className="space-y-2">
-            <div>
-              <label className={labelSmallMuted}>{t("builder.bytePattern")}</label>
-              <input
-                type="text"
-                value={patternText}
-                onChange={handlePatternTextChange}
-                disabled={disabled}
-                placeholder={t("builder.patternPlaceholder")}
-                className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed font-mono`}
-              />
-              <p className={`text-xs ${textMuted} mt-1`}>
-                {queryParams.pattern.length > 0
-                  ? t("builder.patternStats", { bytes: queryParams.pattern.length, wildcards: queryParams.patternMask.filter((m) => m === 0).length })
-                  : t("builder.patternHint")}
-              </p>
-            </div>
+          <div>
+            <label className={labelSmallMuted}>{t("builder.bytePattern")}</label>
+            <input
+              type="text"
+              value={patternText}
+              onChange={handlePatternTextChange}
+              disabled={disabled}
+              placeholder={t("builder.patternPlaceholder")}
+              className={`${fieldClass} w-full mt-1 font-mono`}
+            />
+            <p className={`text-xs ${textMuted} mt-1`}>
+              {queryParams.pattern.length > 0
+                ? t("builder.patternStats", { bytes: queryParams.pattern.length, wildcards: queryParams.patternMask.filter((m) => m === 0).length })
+                : t("builder.patternHint")}
+            </p>
           </div>
         ) : (
-          /* Frame Selection - Catalog picker or manual input */
-          hasCatalogFrames ? (
-            <div className="space-y-2">
-              {/* Catalog Frame Picker */}
-              <div>
-                <label className={labelSmallMuted}>{t("builder.frame")}</label>
-                <select
-                  value={queryParams.frameId}
-                  onChange={handleCatalogFrameChange}
-                  disabled={disabled}
-                  className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {catalogFrames.map(({ id, frame }) => (
-                    <option key={id} value={id}>
-                      0x{id.toString(16).toUpperCase().padStart(3, "0")}
-                      {frame.transmitter ? ` — ${frame.transmitter}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Signal Picker (for byte_changes / distribution) */}
-              {showByteIndex && currentFrameSignals.length > 0 && (
-                <div>
-                  <label className={labelSmallMuted}>{t("builder.signal")}</label>
-                  <select
-                    value={selectedSignal?.signalName ?? ""}
-                    onChange={handleCatalogSignalChange}
-                    disabled={disabled}
-                    className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    <option value="">{t("builder.selectSignalOrByte")}</option>
-                    {currentFrameSignals
-                      .filter((s) => s.name && s.start_bit !== undefined)
-                      .map((signal) => (
-                        <option key={signal.name} value={signal.name}>
-                          {signal.name}
-                          {signal.unit ? ` (${signal.unit})` : ""}
-                          {t("builder.signalOption", { byte: Math.floor((signal.start_bit ?? 0) / 8) })}
-                        </option>
-                      ))}
-                  </select>
-                  {selectedSignal && (
-                    <p className={`text-xs ${textMuted} mt-1`}>
-                      {t("builder.signalPosition", { startBit: selectedSignal.startBit, bitLength: selectedSignal.bitLength, byteIndex: selectedSignal.byteIndex })}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Byte Index - shown when no signal selected or no signals available */}
-              {showByteIndex && (
-                <div>
-                  <label className={labelSmallMuted}>
-                    {selectedSignal ? t("builder.byteIndexFromSignal") : t("builder.byteIndex")}
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={63}
-                    value={queryParams.byteIndex}
-                    onChange={handleByteIndexChange}
-                    disabled={disabled || !!selectedSignal}
-                    className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                  />
-                </div>
-              )}
-
-              {/* Mux Statistics Parameters */}
-              {showMuxStatistics && (
-                <div className="space-y-2">
-                  <div>
-                    <label className={labelSmallMuted}>{t("builder.muxSelectorByte")}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={7}
-                      value={queryParams.muxSelectorByte}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 0 && v < 64) updateQueryParams({ muxSelectorByte: v });
-                      }}
-                      disabled={disabled}
-                      className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelSmallMuted}>{t("builder.payloadLength")}</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={64}
-                      value={queryParams.payloadLength}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 1 && v <= 64) updateQueryParams({ payloadLength: v });
-                      }}
-                      disabled={disabled}
-                      className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                  </div>
-                  <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={queryParams.include16Bit}
-                      onChange={(e) => updateQueryParams({ include16Bit: e.target.checked })}
-                      disabled={disabled}
-                      className="disabled:cursor-not-allowed"
-                    />
-                    {t("builder.include16Bit")}
-                  </label>
-                </div>
-              )}
-
-              {/* Gap Analysis Parameters */}
-              {showGapAnalysis && (
-                <div>
-                  <label className={labelSmallMuted}>{t("builder.gapThreshold")}</label>
-                  <div className={`${flexRowGap2} mt-1`}>
-                    <input
-                      type="number"
-                      min={1}
-                      max={60000}
-                      value={queryParams.gapThresholdMs}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 1) updateQueryParams({ gapThresholdMs: v });
-                      }}
-                      disabled={disabled}
-                      className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                    <span className={`text-xs ${textMuted}`}>{t("builder.gapHint")}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Frequency Parameters */}
-              {showFrequency && (
-                <div>
-                  <label className={labelSmallMuted}>{t("builder.bucketSize")}</label>
-                  <div className={`${flexRowGap2} mt-1`}>
-                    <input
-                      type="number"
-                      min={10}
-                      max={60000}
-                      step={100}
-                      value={queryParams.bucketSizeMs}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 10) updateQueryParams({ bucketSizeMs: v });
-                      }}
-                      disabled={disabled}
-                      className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                    <span className={`text-xs ${textMuted}`}>{t("builder.bucketHint")}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Manual Frame ID Input */}
-              {!hideFrameId && (
-              <div>
-                <label className={labelSmallMuted}>{t("builder.frameIdManual")}</label>
-                <div className={`${flexRowGap2} mt-1`}>
-                  <input
-                    type="text"
-                    value={frameIdText}
-                    onChange={handleFrameIdChange}
-                    disabled={disabled}
-                    placeholder={t("builder.frameIdPlaceholder")}
-                    className={`${inputBase} flex-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                  />
-                  <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={queryParams.isExtended === true}
-                      onChange={handleExtendedChange}
-                      disabled={disabled}
-                      className="disabled:cursor-not-allowed"
-                    />
-                    {t("builder.extended")}
-                  </label>
-                </div>
-              </div>
-              )}
-
-              {/* Byte Index (for byte_changes / distribution) */}
-              {showByteIndex && (
-                <div>
-                  <label className={labelSmallMuted}>{t("builder.byteIndex")}</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={63}
-                    value={queryParams.byteIndex}
-                    onChange={handleByteIndexChange}
-                    disabled={disabled}
-                    className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                  />
-                </div>
-              )}
-
-              {/* Mux Statistics Parameters */}
-              {showMuxStatistics && (
-                <div className="space-y-2">
-                  <div>
-                    <label className={labelSmallMuted}>{t("builder.muxSelectorByte")}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={7}
-                      value={queryParams.muxSelectorByte}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 0 && v < 64) updateQueryParams({ muxSelectorByte: v });
-                      }}
-                      disabled={disabled}
-                      className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelSmallMuted}>{t("builder.payloadLength")}</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={64}
-                      value={queryParams.payloadLength}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 1 && v <= 64) updateQueryParams({ payloadLength: v });
-                      }}
-                      disabled={disabled}
-                      className={`${inputBase} w-full mt-1 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                  </div>
-                  <label className={`${flexRowGap2} ${textSecondary} text-xs ${disabled ? "opacity-50" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={queryParams.include16Bit}
-                      onChange={(e) => updateQueryParams({ include16Bit: e.target.checked })}
-                      disabled={disabled}
-                      className="disabled:cursor-not-allowed"
-                    />
-                    {t("builder.include16Bit")}
-                  </label>
-                </div>
-              )}
-
-              {/* Gap Analysis Parameters */}
-              {showGapAnalysis && (
-                <div>
-                  <label className={labelSmallMuted}>{t("builder.gapThreshold")}</label>
-                  <div className={`${flexRowGap2} mt-1`}>
-                    <input
-                      type="number"
-                      min={1}
-                      max={60000}
-                      value={queryParams.gapThresholdMs}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 1) updateQueryParams({ gapThresholdMs: v });
-                      }}
-                      disabled={disabled}
-                      className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                    <span className={`text-xs ${textMuted}`}>{t("builder.gapHint")}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Frequency Parameters */}
-              {showFrequency && (
-                <div>
-                  <label className={labelSmallMuted}>{t("builder.bucketSize")}</label>
-                  <div className={`${flexRowGap2} mt-1`}>
-                    <input
-                      type="number"
-                      min={10}
-                      max={60000}
-                      step={100}
-                      value={queryParams.bucketSizeMs}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 10) updateQueryParams({ bucketSizeMs: v });
-                      }}
-                      disabled={disabled}
-                      className={`${inputBase} w-24 disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                    <span className={`text-xs ${textMuted}`}>{t("builder.bucketHint")}</span>
-                  </div>
-                </div>
-              )}
-            </>
-          )
+          <div className="space-y-2">
+            {frameSelector}
+            {queryTypeParams}
+          </div>
         )}
 
         {/* Context Window */}
-        <div className={`${bgSurface} ${borderDefault} rounded-lg p-2`}>
+        <div className={sectionCard}>
           <div className={`${flexRowGap2} mb-1`}>
-            <label className={`text-xs font-medium ${textSecondary}`}>{t("builder.contextWindow")}</label>
+            <label className={sectionLabel}>{t("builder.contextWindow")}</label>
             <span className={`text-xs ${textMuted}`}>{t("builder.contextHint")}</span>
           </div>
 
@@ -1184,7 +1013,7 @@ LIMIT ${limitOverride.toLocaleString()}
                     value={contextWindow.beforeMs}
                     onChange={handleContextBeforeChange}
                     disabled={disabled}
-                    className={`${inputBase} w-full text-xs disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`${fieldClass} w-full`}
                   />
                   <span className={`text-xs ${textMuted}`}>{t("builder.ms")}</span>
                 </div>
@@ -1198,7 +1027,7 @@ LIMIT ${limitOverride.toLocaleString()}
                     value={contextWindow.afterMs}
                     onChange={handleContextAfterChange}
                     disabled={disabled}
-                    className={`${inputBase} w-full text-xs disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`${fieldClass} w-full`}
                   />
                   <span className={`text-xs ${textMuted}`}>{t("builder.ms")}</span>
                 </div>
@@ -1208,27 +1037,39 @@ LIMIT ${limitOverride.toLocaleString()}
         </div>
 
         {/* Time Bounds */}
-        <div className={`${bgSurface} ${borderDefault} rounded-lg p-2`}>
-          <label className={`text-xs font-medium ${textSecondary} mb-2 block`}>{t("builder.timeBounds")}</label>
+        <div className={sectionCard}>
+          <label className={`${sectionLabel} mb-2 block`}>{t("builder.timeBounds")}</label>
           <TimeBoundsInput
             value={timeBounds}
             onChange={onTimeBoundsChange}
             bookmarks={favourites}
             showBookmarks={true}
+            showMaxFrames={false}
             disabled={disabled}
           />
         </div>
 
-        {/* SQL Query Preview */}
-        <div className={`${bgSurface} ${borderDefault} rounded-lg p-2`}>
-          <label className={`text-xs font-medium ${textSecondary} mb-1 block`}>{t("builder.sqlPreview")}</label>
-          <textarea
-            readOnly
-            value={sqlPreview}
-            className={`${monoBody} text-xs w-full p-2 rounded border ${borderDefault} ${bgSurface} ${textSecondary} resize-none`}
-            rows={5}
-            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
-          />
+        {/* SQL Query Preview — collapsible to keep the form compact */}
+        <div className={sectionCard}>
+          <button
+            type="button"
+            onClick={() => setSqlOpen((o) => !o)}
+            className={`${flexRowGap2} ${sectionLabel} w-full`}
+            aria-expanded={sqlOpen}
+            aria-label={t("builder.sqlPreviewToggle")}
+          >
+            {sqlOpen ? <ChevronDown className={iconSm} /> : <ChevronRight className={iconSm} />}
+            {t("builder.sqlPreview")}
+          </button>
+          {sqlOpen && (
+            <textarea
+              readOnly
+              value={sqlPreview}
+              className={`${monoBody} text-xs w-full mt-2 p-2 rounded border ${borderDefault} bg-[var(--bg-primary)] ${textSecondary} resize-none`}
+              rows={8}
+              onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+            />
+          )}
         </div>
       </div>
 
@@ -1245,7 +1086,7 @@ LIMIT ${limitOverride.toLocaleString()}
             value={limitOverride}
             onChange={handleLimitChange}
             disabled={disabled}
-            className={`${inputBase} ${showMuxStatistics ? "w-32" : "w-24"} text-xs text-center disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`${fieldClass} ${showMuxStatistics ? "w-32" : "w-24"} text-center`}
           />
           <span className={`text-xs ${textMuted}`}>{t("builder.rows")}</span>
         </div>
