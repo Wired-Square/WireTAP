@@ -1658,6 +1658,7 @@ export default function IoSourcePickerDialog({
           <h2 className={h3}>{t("ioSourcePicker.title")}</h2>
           <button
             onClick={onClose}
+            aria-label={t("common:actions.close")}
             className={`p-1 ${roundedDefault} ${hoverLight} transition-colors`}
           >
             <X className={iconLg} />

@@ -40,6 +40,7 @@ export default function DecoderInfoDialog({ isOpen, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
+            aria-label={t("common:actions.close")}
             className={`p-1 rounded ${hoverLight} transition-colors`}
           >
             <X className={iconLg} />

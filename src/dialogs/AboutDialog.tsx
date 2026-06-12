@@ -32,6 +32,7 @@ export default function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           <h2 className={h1}>{t("about.title")}</h2>
           <button
             onClick={onClose}
+            aria-label={t("common:actions.close")}
             className={`p-1 ${hoverLight} ${roundedDefault} transition-colors`}
           >
             <X className={`${iconLg} text-slate-500`} />

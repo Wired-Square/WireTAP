@@ -1001,6 +1001,7 @@ function DiscoveryFramesView({
     <div className="flex items-center gap-1">
       <button
         onClick={toggleShowRefColumn}
+        aria-pressed={showRefColumn}
         className={tabBarIconToggle(showRefColumn)}
         title={showRefColumn ? 'Hide # column' : 'Show # column'}
       >
@@ -1008,6 +1009,7 @@ function DiscoveryFramesView({
       </button>
       <button
         onClick={toggleShowBusColumn}
+        aria-pressed={showBusColumn}
         className={tabBarIconToggle(showBusColumn, "cyan")}
         title={showBusColumn ? 'Hide Bus column' : 'Show Bus column'}
       >
@@ -1015,6 +1017,7 @@ function DiscoveryFramesView({
       </button>
       <button
         onClick={toggleShowAsciiColumn}
+        aria-pressed={showAsciiColumn}
         className={tabBarIconToggle(showAsciiColumn, "yellow")}
         title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
       >
@@ -1031,6 +1034,7 @@ function DiscoveryFramesView({
             setFindOpen(true);
           }
         }}
+        aria-pressed={findOpen}
         className={tabBarIconToggle(findOpen)}
         title={findOpen ? 'Close find (Escape)' : 'Find in frames (⌘F)'}
       >
@@ -1054,6 +1058,7 @@ function DiscoveryFramesView({
         <>
           <button
             onClick={() => setRenderFrozen(!renderFrozen)}
+            aria-pressed={renderFrozen}
             className={tabBarIconToggle(renderFrozen, "blue")}
             title={renderFrozen ? t("framesView.actions.unfreezeDisplay") : t("framesView.actions.freezeDisplay")}
           >

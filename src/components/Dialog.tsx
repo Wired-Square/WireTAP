@@ -62,6 +62,8 @@ export default function Dialog({
       onMouseDown={handleBackdropMouseDown}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className={`${bgSurface} rounded-xl shadow-2xl ${maxWidth} w-full`}
         onMouseDown={(e) => e.stopPropagation()}
       >

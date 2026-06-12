@@ -13,6 +13,19 @@
   cursor: text;
 }
 
+/* Keyboard-only focus indicator. focus-visible keeps mouse clicks clean while
+   giving every interactive element a visible ring during keyboard navigation. */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
 /* Prevent the entire webview from scrolling/bouncing on macOS */
 html, body {
   overflow: hidden;

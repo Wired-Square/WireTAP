@@ -160,12 +160,15 @@ export default function DataViewTabBar({
       )}
 
       {/* Tabs */}
+      <div role="tablist" className="contents">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
 
         return (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={isActive}
             onClick={() => onTabChange(tab.id)}
             onContextMenu={tab.closeable ? (e) => handleTabContextMenu(e, tab.id) : undefined}
             className={dataViewTabClass(isActive, tab.hasIndicator)}
@@ -182,6 +185,7 @@ export default function DataViewTabBar({
           </button>
         );
       })}
+      </div>
 
       {/* Spacer */}
       <div className="flex-1" />

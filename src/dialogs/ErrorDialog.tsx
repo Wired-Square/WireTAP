@@ -51,6 +51,7 @@ export default function ErrorDialog({
           </div>
           <button
             onClick={onClose}
+            aria-label={t("common:actions.close")}
             className="text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] transition-colors"
           >
             <X className={iconLg} />

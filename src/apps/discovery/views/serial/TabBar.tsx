@@ -113,6 +113,7 @@ export default function TabBar({
       {/* Column visibility toggles */}
       <button
         onClick={toggleShowBusColumn}
+        aria-pressed={showBusColumn}
         className={tabBarIconToggle(showBusColumn, "cyan")}
         title={showBusColumn ? t("serial.hideBus") : t("serial.showBus")}
       >
@@ -120,6 +121,7 @@ export default function TabBar({
       </button>
       <button
         onClick={toggleShowAsciiColumn}
+        aria-pressed={showAsciiColumn}
         className={tabBarIconToggle(showAsciiColumn, "yellow")}
         title={showAsciiColumn ? t("serial.hideAscii") : t("serial.showAscii")}
       >
@@ -142,6 +144,7 @@ export default function TabBar({
       {emitsRawBytes && (
         <button
           onClick={onOpenFramingDialog}
+          aria-pressed={!!framingConfig}
           className={tabBarChipToggle(!!framingConfig, "blue")}
           title={t("serial.configureFraming")}
         >
@@ -154,6 +157,7 @@ export default function TabBar({
       {activeTab === 'framed' && (
         <button
           onClick={onOpenFilterDialog}
+          aria-pressed={minFrameLength > 0}
           className={tabBarChipToggle(minFrameLength > 0, "amber")}
           title={t("serial.configureFilters")}
         >

@@ -147,6 +147,7 @@ export default function SelectionSetPickerDialog({
           <button
             type="button"
             onClick={onClose}
+            aria-label={t("common:actions.close")}
             className={`p-1 rounded text-[color:var(--text-muted)] hover:text-[color:var(--text-secondary)] ${hoverLight}`}
           >
             <X className={iconLg} />
