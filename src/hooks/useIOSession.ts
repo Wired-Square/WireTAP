@@ -557,7 +557,7 @@ export function useIOSession(
           }
         }
       } catch (e) {
-        console.log(`[useIOSession:${appName}] Failed to query backend state:`, e);
+        tlog.debug(`[useIOSession:${appName}] Failed to query backend state: ${e}`);
         // Session may not exist yet - that's fine, openSession will create it
       }
 
@@ -667,30 +667,29 @@ export function useIOSession(
     // BUT we need to update currentSessionIdRef so that cleanup for the OLD session
     // will properly run (it checks if currentSession === cleanupSession to detect StrictMode)
     if (!effectiveSessionId) {
-      console.log(`[useIOSession:${appName}] no effectiveSessionId, updating currentSessionIdRef to null and skipping`);
+      tlog.debug(`[useIOSession:${appName}] no effectiveSessionId, updating currentSessionIdRef to null and skipping`);
       currentSessionIdRef.current = null;
       return;
     }
 
     if (initializingRef.current && initializingSessionIdRef.current === effectiveSessionId) {
-      console.log(`[useIOSession:${appName}] already initializing session '${effectiveSessionId}', skipping`);
+      tlog.debug(`[useIOSession:${appName}] already initializing session '${effectiveSessionId}', skipping`);
       return;
     }
 
     const reinitValue = reinitializingSessions.get(effectiveSessionId);
     if (reinitValue === true) {
       // Reinitialize in progress - skip
-      console.log(`[useIOSession:${appName}] reinitializing in progress for session '${effectiveSessionId}', skipping effect setup`);
+      tlog.debug(`[useIOSession:${appName}] reinitializing in progress for session '${effectiveSessionId}', skipping effect setup`);
       return;
     }
     if (typeof reinitValue === "number" && Date.now() - reinitValue < REINITIALIZE_GRACE_PERIOD_MS) {
       // Within grace period after reinitialize - skip since reinitialize already set up state
-      console.log(`[useIOSession:${appName}] within reinitialize grace period for session '${effectiveSessionId}', skipping effect setup`);
+      tlog.debug(`[useIOSession:${appName}] within reinitialize grace period for session '${effectiveSessionId}', skipping effect setup`);
       return;
     }
 
-    console.log(`[useIOSession:${appName}] ========== MOUNT/EFFECT ==========`);
-    console.log(`[useIOSession:${appName}]   effectiveSessionId: ${effectiveSessionId}`);
+    tlog.debug(`[useIOSession:${appName}] mount/effect: effectiveSessionId=${effectiveSessionId}`);
 
     // Reset setup complete flag at start of each effect run
     setupCompleteRef.current = false;
@@ -698,20 +697,20 @@ export function useIOSession(
     const setup = async () => {
       initializingRef.current = true;
       initializingSessionIdRef.current = effectiveSessionId;
-      console.log(`[useIOSession:${appName}] setup() starting...`);
+      tlog.debug(`[useIOSession:${appName}] setup() starting...`);
 
       try {
         // Open session (creates if not exists, joins if exists)
         // This also registers this subscriber with the Rust backend
-        console.log(`[useIOSession:${appName}] calling openSession...`);
+        tlog.debug(`[useIOSession:${appName}] calling openSession...`);
         await openSession(effectiveSessionId, effectiveProfileName, subscriberIdRef.current, appName, {
           requireFrames,
         });
-        console.log(`[useIOSession:${appName}] openSession completed`);
+        tlog.debug(`[useIOSession:${appName}] openSession completed`);
 
         // Check if component was unmounted during async work
         if (!isMountedRef.current) {
-          console.log(`[useIOSession:${appName}] component unmounted during openSession, cleaning up`);
+          tlog.debug(`[useIOSession:${appName}] component unmounted during openSession, cleaning up`);
           // Unregister from Rust since we registered during openSession
           leaveSession(effectiveSessionId, subscriberIdRef.current).catch(() => {});
           initializingRef.current = false;
@@ -720,7 +719,7 @@ export function useIOSession(
         }
 
         // Register callbacks with the frontend store for event routing
-        console.log(`[useIOSession:${appName}] calling registerCallbacks...`);
+        tlog.debug(`[useIOSession:${appName}] calling registerCallbacks...`);
         registerCallbacks(effectiveSessionId, subscriberIdRef.current, {
           onFrames: (frames) => callbacksRef.current.onFrames?.(frames),
           onDecoded: (decoded) => callbacksRef.current.onDecoded?.(decoded),
@@ -736,7 +735,7 @@ export function useIOSession(
           onResuming: (payload) => callbacksRef.current.onResuming?.(payload),
           onSourceReplaced: (payload) => callbacksRef.current.onSourceReplaced?.(payload),
         });
-        console.log(`[useIOSession:${appName}] registerCallbacks completed`);
+        tlog.debug(`[useIOSession:${appName}] registerCallbacks completed`);
 
         // Initialize local state after session is created/joined
         // This ensures we have state even if the state tracking effect ran first
@@ -760,7 +759,7 @@ export function useIOSession(
               speed: null,
               playbackPosition: null,
             });
-            console.log(`[useIOSession:${appName}] local state initialized: ioState=${getStateType(state)}`);
+            tlog.debug(`[useIOSession:${appName}] local state initialized: ioState=${getStateType(state)}`);
           }
         } catch (e) {
           console.warn(`[useIOSession:${appName}] Failed to initialize local state:`, e);
@@ -769,9 +768,9 @@ export function useIOSession(
         // Mark setup as complete and track current session
         setupCompleteRef.current = true;
         sessionCreatedAtRef.current = Date.now();
-        console.log(`[useIOSession:${appName}] setup() - updating currentSessionIdRef from '${currentSessionIdRef.current}' to '${effectiveSessionId}'`);
+        tlog.debug(`[useIOSession:${appName}] setup() - updating currentSessionIdRef from '${currentSessionIdRef.current}' to '${effectiveSessionId}'`);
         currentSessionIdRef.current = effectiveSessionId;
-        console.log(`[useIOSession:${appName}] setup() complete, setupComplete=true, currentSessionIdRef='${currentSessionIdRef.current}'`);
+        tlog.debug(`[useIOSession:${appName}] setup() complete, setupComplete=true, currentSessionIdRef='${currentSessionIdRef.current}'`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         tlog.info(`[useIOSession:${appName}] setup() failed: ${msg}`);
@@ -791,12 +790,9 @@ export function useIOSession(
     setup();
 
     return () => {
-      console.log(`[useIOSession:${appName}] ========== CLEANUP ==========`);
-      console.log(`[useIOSession:${appName}]   effectiveSessionId: ${effectiveSessionId}`);
-      console.log(`[useIOSession:${appName}]   currentSessionIdRef: ${currentSessionIdRef.current}`);
-      console.log(`[useIOSession:${appName}]   setupCompleteRef.current: ${setupCompleteRef.current}`);
-      console.log(`[useIOSession:${appName}]   isMountedRef.current: ${isMountedRef.current}`);
-      console.log(`[useIOSession:${appName}]   cleanup triggered at:`, new Error().stack);
+      tlog.debug(
+        `[useIOSession:${appName}] cleanup: session=${effectiveSessionId}, currentRef=${currentSessionIdRef.current}, setupComplete=${setupCompleteRef.current}, mounted=${isMountedRef.current}`,
+      );
 
       // Mark component as unmounted immediately
       isMountedRef.current = false;
@@ -825,23 +821,23 @@ export function useIOSession(
           //
           // Use currentSessionIdRef to check what session the component is CURRENTLY using,
           // not what session was used when this cleanup was created.
-          console.log(`[useIOSession:${appName}] cleanup timeout - isMounted=${isMountedRef.current}, currentSession=${currentSessionIdRef.current}, cleanupSession=${sessionId}`);
+          tlog.debug(`[useIOSession:${appName}] cleanup timeout - isMounted=${isMountedRef.current}, currentSession=${currentSessionIdRef.current}, cleanupSession=${sessionId}`);
           if (isMountedRef.current && currentSessionIdRef.current === sessionId) {
-            console.log(`[useIOSession:${appName}] skipping cleanup - component remounted with same session`);
+            tlog.debug(`[useIOSession:${appName}] skipping cleanup - component remounted with same session`);
             return;
           }
 
-          console.log(`[useIOSession:${appName}] proceeding with cleanup for session '${sessionId}'...`);
+          tlog.debug(`[useIOSession:${appName}] proceeding with cleanup for session '${sessionId}'...`);
 
           // Clear frontend callbacks
           clearCallbacks(sessionId, listenerId);
 
           // Unregister from Rust backend - Rust will destroy session if last subscriber
-          console.log(`[useIOSession:${appName}] calling leaveSession('${sessionId}', '${listenerId}')...`);
+          tlog.debug(`[useIOSession:${appName}] calling leaveSession('${sessionId}', '${listenerId}')...`);
           leaveSession(sessionId, listenerId).catch(() => {});
         }, 100);
       } else {
-        console.log(`[useIOSession:${appName}] setup not complete, skipping cleanup`);
+        tlog.debug(`[useIOSession:${appName}] setup not complete, skipping cleanup`);
       }
     };
   }, [
@@ -856,35 +852,35 @@ export function useIOSession(
 
   // Action wrappers - all use effectiveSessionId directly
   const start = useCallback(async () => {
-    console.log(`[useIOSession:${appName}] start() called, effectiveSessionId=${effectiveSessionId}`);
+    tlog.debug(`[useIOSession:${appName}] start() called, effectiveSessionId=${effectiveSessionId}`);
     if (!effectiveSessionId) {
-      console.log(`[useIOSession:${appName}] start() - no effectiveSessionId, returning`);
+      tlog.debug(`[useIOSession:${appName}] start() - no effectiveSessionId, returning`);
       return;
     }
     try {
-      console.log(`[useIOSession:${appName}] start() - calling startSession...`);
+      tlog.debug(`[useIOSession:${appName}] start() - calling startSession...`);
       await startSession(effectiveSessionId);
-      console.log(`[useIOSession:${appName}] start() - startSession completed`);
+      tlog.debug(`[useIOSession:${appName}] start() - startSession completed`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.log(`[useIOSession:${appName}] start() - ERROR: ${msg}`);
+      tlog.debug(`[useIOSession:${appName}] start() - ERROR: ${msg}`);
       callbacksRef.current.onError?.(msg);
     }
   }, [appName, effectiveSessionId, startSession]);
 
   const stop = useCallback(async () => {
-    console.log(`[useIOSession:${appName}] stop() called, effectiveSessionId=${effectiveSessionId}, currentSessionIdRef=${currentSessionIdRef.current}`);
+    tlog.debug(`[useIOSession:${appName}] stop() called, effectiveSessionId=${effectiveSessionId}, currentSessionIdRef=${currentSessionIdRef.current}`);
     if (!effectiveSessionId) {
-      console.log(`[useIOSession:${appName}] stop() - no effectiveSessionId, returning`);
+      tlog.debug(`[useIOSession:${appName}] stop() - no effectiveSessionId, returning`);
       return;
     }
     try {
-      console.log(`[useIOSession:${appName}] stop() - calling stopSession...`);
+      tlog.debug(`[useIOSession:${appName}] stop() - calling stopSession...`);
       await stopSession(effectiveSessionId);
-      console.log(`[useIOSession:${appName}] stop() - stopSession complete`);
+      tlog.debug(`[useIOSession:${appName}] stop() - stopSession complete`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.log(`[useIOSession:${appName}] stop() - ERROR: ${msg}`);
+      tlog.debug(`[useIOSession:${appName}] stop() - ERROR: ${msg}`);
       if (!msg.includes("not found")) {
         callbacksRef.current.onError?.(msg);
       }
@@ -892,22 +888,20 @@ export function useIOSession(
   }, [appName, effectiveSessionId, stopSession]);
 
   const leave = useCallback(async () => {
-    console.log(`[useIOSession:${appName}] leave() called, effectiveSessionId=${effectiveSessionId}, currentSessionIdRef=${currentSessionIdRef.current}`);
-    console.log(`[useIOSession:${appName}] leave() triggered from:`, new Error().stack);
+    tlog.debug(`[useIOSession:${appName}] leave() called, effectiveSessionId=${effectiveSessionId}, currentSessionIdRef=${currentSessionIdRef.current}`);
     if (!effectiveSessionId) {
-      console.log(`[useIOSession:${appName}] leave() - no effectiveSessionId, returning`);
       return;
     }
     // Prevent multiple concurrent leave calls
     if (isLeavingRef.current) {
-      console.log(`[useIOSession:${appName}] leave() - already leaving, skipping`);
+      tlog.debug(`[useIOSession:${appName}] leave() - already leaving, skipping`);
       return;
     }
     // Prevent immediate leave after session creation (click-through protection)
     // This prevents accidental leave when dialog closes and click propagates
     const timeSinceCreation = Date.now() - sessionCreatedAtRef.current;
     if (timeSinceCreation < 500) {
-      console.log(`[useIOSession:${appName}] leave() - session just created (${timeSinceCreation}ms ago), skipping to prevent click-through`);
+      tlog.debug(`[useIOSession:${appName}] leave() - session just created (${timeSinceCreation}ms ago), skipping to prevent click-through`);
       return;
     }
     isLeavingRef.current = true;
@@ -915,16 +909,16 @@ export function useIOSession(
       // First, mark subscriber as inactive in Rust so it stops receiving frames immediately
       // This is done before clearing callbacks to prevent race conditions
       try {
-        console.log(`[useIOSession:${appName}] leave() - marking subscriber inactive...`);
+        tlog.debug(`[useIOSession:${appName}] leave() - marking subscriber inactive...`);
         await setSessionSubscriberActive(effectiveSessionId, subscriberIdRef.current, false);
       } catch {
         // Ignore - session may not exist
       }
-      console.log(`[useIOSession:${appName}] leave() - clearing callbacks...`);
+      tlog.debug(`[useIOSession:${appName}] leave() - clearing callbacks...`);
       clearCallbacks(effectiveSessionId, subscriberIdRef.current);
-      console.log(`[useIOSession:${appName}] leave() - calling leaveSession...`);
+      tlog.debug(`[useIOSession:${appName}] leave() - calling leaveSession...`);
       await leaveSession(effectiveSessionId, subscriberIdRef.current);
-      console.log(`[useIOSession:${appName}] leave() - complete`);
+      tlog.debug(`[useIOSession:${appName}] leave() - complete`);
     } finally {
       isLeavingRef.current = false;
     }
@@ -985,14 +979,12 @@ export function useIOSession(
 
   const setTimeRange = useCallback(
     async (start?: string, end?: string) => {
-      console.log("[useIOSession:setTimeRange] Called with start:", start, "end:", end, "sessionId:", effectiveSessionId);
+      tlog.debug(`[useIOSession:setTimeRange] start=${start}, end=${end}, sessionId=${effectiveSessionId}`);
       if (!effectiveSessionId) {
-        console.warn("[useIOSession:setTimeRange] No effectiveSessionId, skipping");
         return;
       }
       try {
         await setSessionTimeRange(effectiveSessionId, start, end);
-        console.log("[useIOSession:setTimeRange] setSessionTimeRange completed");
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error("[useIOSession:setTimeRange] Error:", msg);
@@ -1076,13 +1068,13 @@ export function useIOSession(
       // When not provided (same-session reinit), effectiveProfileName is correct.
       const targetProfileName = newProfileId || effectiveProfileName;
 
-      console.log(`[useIOSession:${appName}] reinitialize() - targetSessionId=${targetSessionId}, targetProfileId=${targetProfileId}, currentSession=${currentSessionIdRef.current}, profileName=${targetProfileName}`);
+      tlog.debug(`[useIOSession:${appName}] reinitialize() - targetSessionId=${targetSessionId}, targetProfileId=${targetProfileId}, currentSession=${currentSessionIdRef.current}, profileName=${targetProfileName}`);
 
       try {
         // If switching to a different session, leave the old one first
         const oldSessionId = currentSessionIdRef.current;
         if (oldSessionId && oldSessionId !== targetSessionId) {
-          console.log(`[useIOSession:${appName}] reinitialize() - switching sessions, leaving old session '${oldSessionId}'`);
+          tlog.debug(`[useIOSession:${appName}] reinitialize() - switching sessions, leaving old session '${oldSessionId}'`);
           // Clear callbacks for old session
           clearCallbacks(oldSessionId, subscriberIdRef.current);
           // Leave old session (Rust will destroy if we were the last subscriber)
@@ -1117,9 +1109,9 @@ export function useIOSession(
         );
 
         // Update current session ref with the actual session ID (may differ from profile ID)
-        console.log(`[useIOSession:${appName}] reinitialize() - updating currentSessionIdRef from '${currentSessionIdRef.current}' to '${targetSessionId}'`);
+        tlog.debug(`[useIOSession:${appName}] reinitialize() - updating currentSessionIdRef from '${currentSessionIdRef.current}' to '${targetSessionId}'`);
         currentSessionIdRef.current = targetSessionId;
-        console.log(`[useIOSession:${appName}] reinitialize() - currentSessionIdRef is now '${currentSessionIdRef.current}'`);
+        tlog.debug(`[useIOSession:${appName}] reinitialize() - currentSessionIdRef is now '${currentSessionIdRef.current}'`);
 
         // Re-register callbacks after reinitialize
         registerCallbacks(targetSessionId, subscriberIdRef.current, {
@@ -1163,14 +1155,14 @@ export function useIOSession(
             // immediately, even before React commits the state update
             expectedStateRef.current = { sessionId: targetSessionId, state: newState };
             setLocalState(newState);
-            console.log(`[useIOSession:${appName}] reinitialize() - local state updated: ioState=${getStateType(state)}`);
+            tlog.debug(`[useIOSession:${appName}] reinitialize() - local state updated: ioState=${getStateType(state)}`);
           }
         } catch (e) {
           console.warn(`[useIOSession:${appName}] reinitialize() - failed to update local state:`, e);
         }
 
         // Mark setup as complete for the new session
-        console.log(`[useIOSession:${appName}] reinitialize() - setting setupCompleteRef=true for session ${targetSessionId}`);
+        tlog.debug(`[useIOSession:${appName}] reinitialize() - setting setupCompleteRef=true for session ${targetSessionId}`);
         setupCompleteRef.current = true;
         sessionCreatedAtRef.current = Date.now();
       } catch (e) {

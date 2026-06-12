@@ -622,7 +622,9 @@ pub trait IOSource: Send + Sync {
 
 /// Heartbeat timeout - listeners that haven't sent a heartbeat in this time are considered stale.
 /// Set to 30s (up from 10s) to tolerate WKWebView timer throttling during display sleep.
-const HEARTBEAT_TIMEOUT_SECS: u64 = 30;
+/// The WS connection timeout in ws/server.rs is derived from this (2x) so the socket
+/// outlives IO suspension and a display-sleep wake resumes without a resubscribe.
+pub const HEARTBEAT_TIMEOUT_SECS: u64 = 30;
 /// How often to check for stale subscribers
 const HEARTBEAT_CHECK_INTERVAL_SECS: u64 = 5;
 /// Grace period before destroying a session after all listeners go stale.

@@ -408,8 +408,12 @@ async fn connection_manager_task(
                 let msg = Message::Binary(heartbeat.into());
 
                 // Collect IDs of timed-out connections
+                // 2x the IO subscriber timeout: the socket must outlive IO
+                // suspension so a display-sleep wake resumes on the same
+                // connection without a reconnect/resubscribe round trip.
+                let conn_timeout = Duration::from_secs(2 * crate::io::HEARTBEAT_TIMEOUT_SECS);
                 let timed_out: Vec<usize> = connections.iter()
-                    .filter(|(_, conn)| conn.authenticated && now.duration_since(conn.last_activity) > Duration::from_secs(60))
+                    .filter(|(_, conn)| conn.authenticated && now.duration_since(conn.last_activity) > conn_timeout)
                     .map(|(id, _)| *id)
                     .collect();
 
@@ -422,7 +426,7 @@ async fn connection_manager_task(
                             decrement_refcount(&mut channel_refcount, &mut channel_map, *ch);
                         }
                         let _ = conn.sender.close().await;
-                        tlog!("[ws] Connection {conn_id} timed out (no activity for 60s)");
+                        tlog!("[ws] Connection {conn_id} timed out (no activity for {}s)", conn_timeout.as_secs());
                     }
                 }
 

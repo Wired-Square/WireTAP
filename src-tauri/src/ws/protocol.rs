@@ -584,46 +584,42 @@ pub fn encode_subscribe_nack(error: &str) -> Vec<u8> {
 // ============================================================================
 
 pub fn encode_frame_batch(frames: &[crate::io::FrameMessage]) -> Vec<u8> {
-    let mut out = Vec::new();
+    // Encode straight into one pre-sized buffer — this runs per send cycle at
+    // full frame rate, so avoid the per-frame Vec/clone churn of building
+    // CanFrame/FrameEnvelope intermediates. Worst case per frame: envelope
+    // header + 4-byte id/register prefix + payload.
+    let mut out = Vec::with_capacity(
+        frames.iter().map(|f| ENVELOPE_HEADER_SIZE + 4 + f.bytes.len()).sum(),
+    );
     for frame in frames {
         let direction_tx = frame.direction.as_deref() == Some("tx");
 
-        let (frame_type, inner_data) = if frame.is_fd || frame.protocol == "canfd" {
-            let cf = CanFdFrame {
-                id: frame.frame_id,
-                is_extended: frame.is_extended,
-                brs: false,
-                direction_tx,
-                payload: frame.bytes.clone(),
-            };
-            (FrameType::CanFd, cf.encode())
+        // Same id_flags word for CAN 2.0 and CAN-FD (rtr/brs bit unset on the wire).
+        let id_flags = (frame.frame_id & 0x1FFF_FFFF)
+            | if frame.is_extended  { 1 << 29 } else { 0 }
+            | if direction_tx       { 1 << 31 } else { 0 };
+
+        // 4-byte LE prefix preceding the payload inside the envelope data:
+        // CAN id_flags, Modbus register number, none for serial/raw.
+        let (frame_type, prefix) = if frame.is_fd || frame.protocol == "canfd" {
+            (FrameType::CanFd, Some(id_flags))
         } else if frame.protocol == "can" {
-            let cf = CanFrame {
-                id: frame.frame_id,
-                is_extended: frame.is_extended,
-                is_rtr: false,
-                direction_tx,
-                payload: frame.bytes.clone(),
-            };
-            (FrameType::Can, cf.encode())
+            (FrameType::Can, Some(id_flags))
         } else if frame.protocol == "modbus" {
-            // Encode frame_id as 4-byte LE prefix (register number), followed by raw bytes
-            let mut data = Vec::with_capacity(4 + frame.bytes.len());
-            data.extend_from_slice(&frame.frame_id.to_le_bytes());
-            data.extend_from_slice(&frame.bytes);
-            (FrameType::Modbus, data)
+            (FrameType::Modbus, Some(frame.frame_id))
         } else {
-            // serial and anything else — raw bytes
-            (FrameType::Serial, frame.bytes.clone())
+            (FrameType::Serial, None)
         };
 
-        let envelope = FrameEnvelope {
-            timestamp_us: frame.timestamp_us,
-            bus: frame.bus,
-            frame_type,
-            data: inner_data,
-        };
-        out.extend_from_slice(&envelope.encode());
+        let data_len = prefix.map_or(0, |_| 4) + frame.bytes.len();
+        out.extend_from_slice(&frame.timestamp_us.to_le_bytes());
+        out.push(frame.bus);
+        out.extend_from_slice(&(frame_type as u16).to_le_bytes());
+        out.push(data_len as u8);
+        if let Some(p) = prefix {
+            out.extend_from_slice(&p.to_le_bytes());
+        }
+        out.extend_from_slice(&frame.bytes);
     }
     out
 }

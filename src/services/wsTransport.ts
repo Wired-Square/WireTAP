@@ -49,7 +49,11 @@ class WsTransport {
   // Pending subscribe promises
   private pendingSubscribes: Map<
     string,
-    { resolve: (channel: number) => void; reject: (err: Error) => void }
+    {
+      resolve: (channel: number) => void;
+      reject: (err: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
   > = new Map();
 
   // Message handlers: Map<channel, Map<msgType, handler[]>>
@@ -154,16 +158,20 @@ class WsTransport {
       return this.sessionToChannel.get(sessionId)!;
     }
 
+    if (!this.ws) {
+      return Promise.reject(new Error("Subscribe failed: not connected"));
+    }
+
     return new Promise((resolve, reject) => {
-      this.pendingSubscribes.set(sessionId, { resolve, reject });
-      this.ws?.send(encodeSubscribe(sessionId));
-      // Timeout after 5 seconds
-      setTimeout(() => {
+      // Timeout after 5 seconds; cleared when SubscribeAck/Nack settles the promise
+      const timer = setTimeout(() => {
         if (this.pendingSubscribes.has(sessionId)) {
           this.pendingSubscribes.delete(sessionId);
           reject(new Error("Subscribe timeout"));
         }
       }, 5000);
+      this.pendingSubscribes.set(sessionId, { resolve, reject, timer });
+      this.ws?.send(encodeSubscribe(sessionId));
     });
   }
 
@@ -351,6 +359,7 @@ class WsTransport {
 
     const pending = this.pendingSubscribes.get(sessionId);
     if (pending) {
+      clearTimeout(pending.timer);
       pending.resolve(channel);
       this.pendingSubscribes.delete(sessionId);
     }
@@ -397,6 +406,7 @@ class WsTransport {
 
     // Reject the first pending subscribe (SubscribeNack doesn't carry session ID)
     for (const [sid, pending] of this.pendingSubscribes) {
+      clearTimeout(pending.timer);
       pending.reject(new Error(error));
       this.pendingSubscribes.delete(sid);
       break;
