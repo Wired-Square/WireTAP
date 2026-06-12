@@ -2,6 +2,20 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Accessibility: keyboard focus indicators and ARIA semantics**: the app had almost no focus styling or screen-reader structure. A single global `:focus-visible` rule (accent-colour outline) now gives every button, link, input, select and tab a visible keyboard-focus ring without per-component churn ([src/WireTAP.css](src/WireTAP.css)); the shared `DataViewTabBar` that backs every data app's tab strip gained `role="tablist"`/`role="tab"` + `aria-selected`, the shared `Dialog` container gained `role="dialog"` + `aria-modal`, the icon-only close buttons across eleven dialogs gained an `aria-label` (reusing the `common:actions.close` string), and the Discovery tab-bar column/find/freeze/framing toggles gained `aria-pressed`. [src/components/DataViewTabBar.tsx](src/components/DataViewTabBar.tsx), [src/components/Dialog.tsx](src/components/Dialog.tsx).
+
+### Changed
+
+- **Frame ID format toggle sits beside the app icon**: the per-panel Auto/Dec/Hex flip control moved from after the catalogue picker to between the app icon and the session controls in the shared top bar, so it lands in the same place across every app that enables it (Decoder, Graph, Discovery, Transmit, Modbus, Catalog). Its default label is shortened from `Auto · HEX` to just `Auto` and the label span is fixed-width, so cycling the three states never reflows the neighbouring top-bar items; the generic `#` (Hash) glyph becomes `Binary` (stacked 1s/0s), which reads as "number representation" rather than a bare hash. [src/components/AppTopBar.tsx](src/components/AppTopBar.tsx), [src/components/FrameIdFormatToggle.tsx](src/components/FrameIdFormatToggle.tsx).
+
+- **Theme-token colour sweep — fixes light-theme breakage on Windows WebView**: hardcoded neutral Tailwind colours (`bg-gray-700`, `text-gray-200`, `border-gray-600`, `bg-indigo-600`, …) assumed a dark theme and rendered wrong under the light theme on Windows WebView, where `dark:` variants don't apply. They're replaced with CSS-variable tokens across the shared components (`ToolbarSelect`, `FilterOptionsPanel`, `FramingOptionsPanel`, `ProtocolBadge`, `DataViewTabBar`, `DataViewPaginationToolbar`, `FlashNotification`, `LogoMenu`) and the Discovery, Transmit, Graph and Session-manager views (34 files). Three new shared styles remove repeated literal chains: `indigoButton`/`indigoButtonCompact` (the Rules accent button, previously copy-pasted across 16 call sites), `tabBarIconToggle`/`tabBarChipToggle` (the duplicated Discovery tab-bar toggles), and a `placeholderMuted` token for themed input placeholders. Constant-colour affordances (status dots, react-flow handles, saturated colour-on-white buttons) are intentionally left as-is. [src/styles/buttonStyles.ts](src/styles/buttonStyles.ts), [src/styles/colourTokens.ts](src/styles/colourTokens.ts).
+
+- **WebSocket frame batch encodes without per-frame allocations; transport housekeeping**: `encode_frame_batch` — which runs once per send cycle at full frame rate — now writes straight into one pre-sized buffer instead of building `CanFrame`/`FrameEnvelope` intermediates, removing 2–3 heap allocations per frame on the hot path (wire output is byte-identical, covered by the existing round-trip tests). The WS *connection* timeout is now derived as `2 × HEARTBEAT_TIMEOUT_SECS` rather than a free-floating `60s` literal, making explicit that the socket must outlive a suspended IO session so a display-sleep wake resumes on the same connection. On the frontend, the `wsTransport` subscribe timeout is cleared when SubscribeAck/Nack settles (and fails fast when disconnected instead of hanging the full 5s), and leftover `console.log` debugging in `useIOSession` became `tlog.debug`. [src-tauri/src/ws/protocol.rs](src-tauri/src/ws/protocol.rs), [src-tauri/src/ws/server.rs](src-tauri/src/ws/server.rs), [src/services/wsTransport.ts](src/services/wsTransport.ts), [docs/session-flow.md](docs/session-flow.md).
+
 ## [0.7.0] - 2026-06-08
 
 ### Changed

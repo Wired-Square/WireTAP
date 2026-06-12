@@ -544,7 +544,7 @@ Each app registers a unique `subscriberId`. The Rust side tracks them in
 
 ## 8. Heartbeats, suspension, eviction
 
-Defined in [io/mod.rs:616-624](../src-tauri/src/io/mod.rs#L616-L624):
+Defined in [io/mod.rs:627-633](../src-tauri/src/io/mod.rs#L627-L633):
 
 ```
 HEARTBEAT_TIMEOUT_SECS          = 30   // subscriber is stale after 30s silence
@@ -569,6 +569,12 @@ The 30-second stale threshold (up from 10s) is tuned for WKWebView timer
 throttling during display sleep. Frontend heartbeats ride the WebSocket as
 `Heartbeat` (0xFE) control frames; if the WS connection is down the frontend
 falls back to polling via an `invoke` command.
+
+The WebSocket *connection* itself times out separately, at
+`2 × HEARTBEAT_TIMEOUT_SECS` ([ws/server.rs](../src-tauri/src/ws/server.rs)) —
+deliberately longer than the subscriber timeout, so the socket outlives a
+suspended session and a display-sleep wake resumes on the same connection
+without re-subscribing.
 
 ---
 
