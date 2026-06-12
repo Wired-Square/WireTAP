@@ -13,6 +13,7 @@ import { iconMd } from "../../../styles/spacing";
 import { SecondaryButton } from "../../../components/forms";
 import { useDevicesStore } from "../stores/devicesStore";
 import { useDeviceConnection } from "../hooks/useDeviceConnection";
+import ResolutionToggle from "./ResolutionToggle";
 
 export default function DeviceHeader() {
   const { t } = useTranslation("devices");
@@ -51,6 +52,7 @@ export default function DeviceHeader() {
           <div className={`text-xs ${textSecondary} truncate`}>{selectedAddress}</div>
         )}
       </div>
+      <ResolutionToggle />
     </div>
   );
 }

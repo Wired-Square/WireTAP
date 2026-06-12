@@ -22,9 +22,20 @@ import {
   deviceScanStart,
   deviceScanStop,
 } from "../../../api/deviceScan";
+import { framelinkProbeDevice } from "../../../api/framelink";
+import {
+  registryList,
+  registrySetManual,
+  registryRemove,
+  type DeviceRegistryEntry,
+} from "../../../api/deviceRegistry";
+import RegisteredDeviceRow from "./RegisteredDeviceRow";
 
 const STALE_PRUNE_MS = 4000;
 const STALE_PRUNE_INTERVAL_MS = 1000;
+/** FrameLink-TCP port — the only transport that reports a device_id, so a
+ * manual add probes it to learn the device's real identity. */
+const FRAMELINK_DEFAULT_PORT = 120;
 
 /** Pick which tab to land on, given a device and the chosen transport. */
 function pickInitialTab(
@@ -92,6 +103,23 @@ export default function DevicesScanView() {
   const [manualPort, setManualPort] = useState(() =>
     String(useSettingsStore.getState().general.smpPort),
   );
+
+  // Registered devices come from the framelink-rs registry — they exist
+  // independently of any live scan, so they're loaded directly and never
+  // stale-pruned.
+  const [registered, setRegistered] = useState<DeviceRegistryEntry[]>([]);
+  const refreshRegistered = useCallback(async () => {
+    try {
+      setRegistered(await registryList());
+    } catch {
+      /* registry unreadable — leave the list as-is */
+    }
+  }, []);
+
+  // Load registered devices on mount.
+  useEffect(() => {
+    void refreshRegistered();
+  }, [refreshRegistered]);
 
   // Auto-scan on mount, stop on unmount
   useEffect(() => {
@@ -180,18 +208,67 @@ export default function DevicesScanView() {
     }
 
     const isFrameLink = manualProtocol === "framelink";
+    // The device_id is only obtainable over FrameLink-TCP, so probe it (at
+    // the entered port for FrameLink, or the default 120 for SMP) to learn
+    // the device's real identity, then register the manual address under it.
+    // A device pinned manually is registered so it persists, reappears in
+    // the scan list, and is reached by its stored host on every transport.
+    const frameLinkPort = isFrameLink ? port : FRAMELINK_DEFAULT_PORT;
+    let deviceId: string;
+    try {
+      const probe = await framelinkProbeDevice(address, frameLinkPort, 5);
+      if (!probe.device_id) {
+        setError(t("scan.errors.manualNoDeviceId", { address }));
+        return;
+      }
+      deviceId = probe.device_id;
+      await registrySetManual(deviceId, address, {
+        framelinkPort: frameLinkPort,
+        smpPort: isFrameLink ? undefined : port,
+      });
+      void refreshRegistered();
+    } catch (e) {
+      setError(t("scan.errors.manualProbeFailed", { address, error: String(e) }));
+      return;
+    }
+
     const selection = {
-      id: isFrameLink ? `fl:${address}` : `udp:${address}`,
-      name: address,
+      id: deviceId,
+      name: deviceId,
       bleId: null,
       address,
       smpId: null,
       smpPort: isFrameLink ? null : port,
-      frameLinkPort: isFrameLink ? port : null,
-      capabilities: isFrameLink ? ["framelink"] : ["smp"],
+      frameLinkPort,
+      capabilities: isFrameLink ? ["framelink"] : ["framelink", "smp"],
     };
     await enterDevice(selection, isFrameLink ? "dataio" : "firmware");
-  }, [manualAddress, manualPort, manualProtocol, enterDevice, setError, t]);
+  }, [manualAddress, manualPort, manualProtocol, enterDevice, refreshRegistered, setError, t]);
+
+  const handleRegisteredConnect = useCallback(async (entry: DeviceRegistryEntry) => {
+    const selection = {
+      id: entry.device_id,
+      name: entry.device_id,
+      bleId: null,
+      address: entry.host,
+      smpId: null,
+      smpPort: entry.smp_port,
+      frameLinkPort: entry.framelink_port,
+      capabilities: ["framelink", "smp"],
+    };
+    // A registered device is reachable over UDP (SMP) and TCP (FrameLink) at
+    // its stored host; land on Firmware, where OTA is the common intent.
+    await enterDevice(selection, "firmware");
+  }, [enterDevice]);
+
+  const handleRegisteredRemove = useCallback(async (entry: DeviceRegistryEntry) => {
+    try {
+      await registryRemove(entry.device_id);
+      void refreshRegistered();
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [refreshRegistered, setError]);
 
   return (
     <div className="flex flex-col gap-4 p-4 h-full">
@@ -225,6 +302,25 @@ export default function DevicesScanView() {
       )}
 
       <div className="flex flex-col gap-2 overflow-y-auto flex-1">
+        {registered.length > 0 && (
+          <>
+            <div className={`text-xs font-medium uppercase tracking-wide ${textSecondary}`}>
+              {t("registered.heading")}
+            </div>
+            {registered.map((entry) => (
+              <RegisteredDeviceRow
+                key={entry.device_id}
+                entry={entry}
+                onConnect={handleRegisteredConnect}
+                onRemove={handleRegisteredRemove}
+                busy={false}
+              />
+            ))}
+            <div className={`text-xs font-medium uppercase tracking-wide ${textSecondary} mt-2`}>
+              {t("registered.scanHeading")}
+            </div>
+          </>
+        )}
         {mergedDevices.map((device) => (
           <MergedDeviceCard
             key={device.name}

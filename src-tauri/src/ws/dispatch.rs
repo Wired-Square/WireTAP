@@ -402,6 +402,9 @@ pub async fn dispatch_command(
         name if name.starts_with("framelink.") => {
             crate::io::framelink::rules::dispatch_framelink_command(name, params).await
         }
+        name if name.starts_with("registry.") => {
+            crate::io::framelink::registry::dispatch_registry_command(name, params).await
+        }
         name if name.starts_with("smp.") => {
             crate::ws::smp::dispatch(name, params).await
         }
