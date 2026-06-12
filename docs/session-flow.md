@@ -576,6 +576,31 @@ deliberately longer than the subscriber timeout, so the socket outlives a
 suspended session and a display-sleep wake resumes on the same connection
 without re-subscribing.
 
+### Wake lock
+
+The same watchdog tick runs `update_wake_lock`. The machine is kept awake while
+**either** a `Running` session has a live subscriber **or** any capture is
+actively recording (`capture_store::has_streaming_captures()` — true while a
+capture is in `streaming_ids`). The capture clause matters: closing the last
+panel drops the subscribers but the source keeps recording, so the lock must
+stay held independent of UI subscribers, otherwise the display sleeps mid-capture
+(see WebView recovery below). The lock is released when neither holds, or when
+both wake settings (`prevent_idle_sleep`, `keep_display_awake`) are off.
+
+### WebView health probe & recovery (macOS)
+
+While a session has been suspended longer than `PROBE_START_DELAY_SECS`, the
+watchdog pings the dashboard webview each tick and expects a `webview_health_pong`
+invoke back. After `PROBE_MAX_MISSES` (6) consecutive misses it concludes macOS
+has jettisoned the WKWebView content process and triggers recovery: it navigates
+the window to the **root URL captured at startup** (`DASHBOARD_ROOT_URL`). It must
+*not* read the live `window.url()` here — wry's getter unwraps `URL()` (now
+`None`) and panics on the Cocoa main thread, uncatchable from the watchdog task
+and fatal to the app; `navigate()` to a known URL string is panic-free and is
+what relaunches the content process. Keeping the wake lock held during an active
+capture (above) prevents the display sleep that triggers the jettison in the
+first place.
+
 ---
 
 ## 9. Transmit

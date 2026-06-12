@@ -131,6 +131,16 @@ pub fn list_capture_ids() -> Vec<String> {
     registry.captures.keys().cloned().collect()
 }
 
+/// Whether any capture is currently receiving live appends — i.e. a recording is
+/// in progress. True independent of whether a UI panel is watching the session,
+/// so the wake lock can stay held while an unwatched capture keeps recording.
+pub fn has_streaming_captures() -> bool {
+    CAPTURE_REGISTRY
+        .read()
+        .map(|r| !r.streaming_ids.is_empty())
+        .unwrap_or(false)
+}
+
 // ============================================================================
 // Public API - Capture Creation & Management
 // ============================================================================

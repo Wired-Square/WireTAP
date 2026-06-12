@@ -4,6 +4,12 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The wake lock now holds while a capture is recording, not only while a panel is watching**: the machine was kept awake only while a session was `Running` *and had a UI subscriber*, so closing or suspending the last panel dropped the wake lock even though the source kept recording into its capture. The display was then free to sleep mid-capture — which on macOS can get the WebView content process jettisoned, interrupting the recording. `update_wake_lock` now also holds the lock whenever any capture is actively streaming (`capture_store::has_streaming_captures()`), independent of subscribers. [src-tauri/src/io/mod.rs](src-tauri/src/io/mod.rs), [src-tauri/src/capture_store.rs](src-tauri/src/capture_store.rs).
+
+- **WebView recovery no longer crashes the app when macOS jettisons the content process**: while a session is suspended (e.g. during display sleep), macOS can reclaim the WKWebView content process; the watchdog's health probe correctly detects this (no pongs) and triggers a reload — but the reload first read `window.url()` to derive the root to navigate to, and wry's url getter unwraps `URL()` (now `None`) and panics. That panic fires on the Cocoa main thread, where the recovery task's `catch_unwind` can't reach it, so instead of recovering, the whole app aborted. The dashboard root URL is now captured **once at startup** (while the content process is alive) and recovery navigates straight to it via `navigate()`, which never touches the dead getter and is what relaunches the content process. [src-tauri/src/io/mod.rs](src-tauri/src/io/mod.rs).
+
 ### Added
 
 - **Accessibility: keyboard focus indicators and ARIA semantics**: the app had almost no focus styling or screen-reader structure. A single global `:focus-visible` rule (accent-colour outline) now gives every button, link, input, select and tab a visible keyboard-focus ring without per-component churn ([src/WireTAP.css](src/WireTAP.css)); the shared `DataViewTabBar` that backs every data app's tab strip gained `role="tablist"`/`role="tab"` + `aria-selected`, the shared `Dialog` container gained `role="dialog"` + `aria-modal`, the icon-only close buttons across eleven dialogs gained an `aria-label` (reusing the `common:actions.close` string), and the Discovery tab-bar column/find/freeze/framing toggles gained `aria-pressed`. [src/components/DataViewTabBar.tsx](src/components/DataViewTabBar.tsx), [src/components/Dialog.tsx](src/components/Dialog.tsx).

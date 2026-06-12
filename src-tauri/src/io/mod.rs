@@ -790,10 +790,17 @@ async fn update_wake_lock() {
 
     // Check if any session is actively running with listeners
     let sessions = IO_SESSIONS.lock().await;
-    let any_active = sessions.values().any(|session| {
+    let any_watched = sessions.values().any(|session| {
         matches!(session.source.state(), IOState::Running) && !session.subscribers.is_empty()
     });
     drop(sessions);
+
+    // A capture that is actively recording keeps the machine awake even with no
+    // UI subscribers. Otherwise closing or suspending the last panel drops the
+    // wake lock mid-capture, the display sleeps, and on macOS the WebView content
+    // process can be jettisoned — interrupting the recording and crashing the app
+    // on the recovery path.
+    let any_active = any_watched || crate::capture_store::has_streaming_captures();
 
     // Update wake lock based on session state
     if let Ok(mut guard) = WAKE_LOCK.lock() {
@@ -852,6 +859,15 @@ const PROBE_MAX_MISSES: u64 = 6;
 
 /// App handle for the watchdog to access WebView windows.
 static APP_HANDLE: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+/// Root URL of the dashboard webview, captured once at startup while the content
+/// process is known-alive. Recovery navigates here instead of reading the live
+/// `webview.url()` getter: once macOS jettisons the content process, wry's getter
+/// unwraps `URL()` == None and panics — and that panic lands on the Cocoa main
+/// thread, where the recovery task's `catch_unwind` cannot reach it, so it takes
+/// the whole app down. `navigate()` to a known URL string never touches the dead
+/// getter and is exactly what relaunches the content process.
+static DASHBOARD_ROOT_URL: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 /// WebView health probing state.
 struct WebViewHealthState {
@@ -995,32 +1011,23 @@ async fn trigger_webview_recovery(app: &AppHandle) {
     // Small delay to let any in-flight IPC settle
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-    // Navigate to the app root (fresh navigation, safer than reload())
-    // Wrap in catch_unwind because wry can panic with unwrap() on None
-    // when the WKWebView content process has been jettisoned by macOS.
+    // Navigate to the root URL captured at startup (fresh navigation, safer than
+    // reload()). We deliberately do NOT read window.url() here: on a jettisoned
+    // content process wry's url() getter unwraps URL() == None and panics on the
+    // Cocoa main thread — uncatchable from this task and fatal to the app.
+    // navigate() with a known URL string never touches the dead getter and is
+    // what relaunches the content process.
     if let Some(window) = app.get_webview_window("dashboard") {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            match window.url() {
-                Ok(current_url) => {
-                    let mut root_url = current_url.clone();
-                    root_url.set_path("/");
-                    root_url.set_query(None);
-                    root_url.set_fragment(None);
-                    match window.navigate(root_url) {
-                        Ok(()) => tlog!("[webview recovery] navigate() succeeded"),
-                        Err(e) => tlog!("[webview recovery] navigate() failed: {}", e),
-                    }
-                }
-                Err(e) => {
-                    tlog!("[webview recovery] Failed to get current URL: {} — trying tauri://localhost", e);
-                    if let Ok(fallback) = "tauri://localhost/".parse() {
-                        let _ = window.navigate(fallback);
-                    }
-                }
-            }
-        }));
-        if result.is_err() {
-            tlog!("[webview recovery] WebView navigate panicked (content process gone) — recovery not possible");
+        let target = DASHBOARD_ROOT_URL
+            .get()
+            .cloned()
+            .unwrap_or_else(|| "tauri://localhost/".to_string());
+        match target.parse() {
+            Ok(url) => match window.navigate(url) {
+                Ok(()) => tlog!("[webview recovery] navigate() to {} succeeded", target),
+                Err(e) => tlog!("[webview recovery] navigate() to {} failed: {}", target, e),
+            },
+            Err(e) => tlog!("[webview recovery] could not parse recovery URL '{}': {}", target, e),
         }
     } else {
         tlog!("[webview recovery] No dashboard window found");
@@ -1788,6 +1795,27 @@ async fn log_session_status() {
 /// This runs in the background and periodically cleans up stale subscribers,
 /// probes WebView health, and logs session status.
 pub fn start_heartbeat_watchdog(app: AppHandle) {
+    // Capture the dashboard root URL once, now, while the content process is
+    // alive — recovery reuses it instead of calling the live url() getter (which
+    // panics on a jettisoned content process). This runs on the main thread
+    // during setup, so the catch_unwind here genuinely guards wry's url() unwrap.
+    if let Some(window) = app.get_webview_window("dashboard") {
+        let captured = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            window.url().ok().map(|mut u| {
+                u.set_path("/");
+                u.set_query(None);
+                u.set_fragment(None);
+                u.to_string()
+            })
+        }))
+        .ok()
+        .flatten();
+        if let Some(root) = captured {
+            tlog!("[webview recovery] Captured dashboard root URL: {}", root);
+            let _ = DASHBOARD_ROOT_URL.set(root);
+        }
+    }
+
     APP_HANDLE.set(app).ok();
     tauri::async_runtime::spawn(async {
         let cleanup_interval = std::time::Duration::from_secs(HEARTBEAT_CHECK_INTERVAL_SECS);
