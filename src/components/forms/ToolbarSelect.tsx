@@ -1,9 +1,9 @@
 // ui/src/components/forms/ToolbarSelect.tsx
 //
-// A select component styled for dark toolbars (data view bars, etc.)
+// A select component styled for toolbars (data view bars, etc.)
 
 import { SelectHTMLAttributes, forwardRef } from 'react';
-import { disabledState, focusRingThin } from "../../styles";
+import { bgDataInput, borderDataView, disabledState, focusRingThin, textDataPrimary } from "../../styles";
 import { toolbarElementHeight } from '../../styles/inputStyles';
 
 export interface ToolbarSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
@@ -12,8 +12,8 @@ export interface ToolbarSelectProps extends Omit<SelectHTMLAttributes<HTMLSelect
 }
 
 /**
- * Select component for dark toolbar contexts.
- * Matches the dark theme used in data view toolbars.
+ * Select component for toolbar contexts.
+ * Uses CSS variable tokens so it tracks the active theme.
  */
 const ToolbarSelect = forwardRef<HTMLSelectElement, ToolbarSelectProps>(
   ({ variant = 'default', className = '', children, ...props }, ref) => {
@@ -22,7 +22,7 @@ const ToolbarSelect = forwardRef<HTMLSelectElement, ToolbarSelectProps>(
       small: 'px-1.5 py-0.5 text-xs',
     };
 
-    const baseClasses = `rounded border border-gray-600 bg-gray-700 text-gray-200 ${focusRingThin} ${toolbarElementHeight} ${disabledState}`;
+    const baseClasses = `rounded border ${borderDataView} ${bgDataInput} ${textDataPrimary} ${focusRingThin} ${toolbarElementHeight} ${disabledState}`;
 
     return (
       <select

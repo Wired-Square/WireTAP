@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textSecondary, textTertiary } from "../../../styles";
+import { textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { TransformerDescriptor } from "../../../api/framelinkRules";
@@ -73,7 +73,7 @@ export default function TransformersView() {
       <div className="flex justify-end mb-1">
         <button
           onClick={() => setDialogOpen(true)}
-          className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+          className={indigoButtonCompact}
         >
           <Plus className={iconMd} /> {t("transformers.add")}
         </button>

@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Sparkles, ChevronRight } from "lucide-react";
 import { iconLg, iconSm } from "../../../styles/spacing";
-import { bgSurface, borderDivider, hoverLight, inputSimple, selectSimple, primaryButtonBase } from "../../../styles";
+import { bgSurface, borderDivider, checkboxDefault, hoverLight, inputSimple, selectSimple, primaryButtonBase } from "../../../styles";
 import Dialog from "../../../components/Dialog";
 import { useGraphStore } from "../../../stores/graphStore";
 import { useDiscoveryToolboxStore } from "../../../stores/discoveryToolboxStore";
@@ -273,7 +273,7 @@ export default function CandidateSignalsDialog({ isOpen, onClose }: Props) {
                     type="checkbox"
                     checked={useAnalysisHints}
                     onChange={(e) => setUseAnalysisHints(e.target.checked)}
-                    className="rounded border-gray-500"
+                    className={checkboxDefault}
                   />
                   <span className="text-xs text-[color:var(--text-secondary)]">
                     {t("candidates.fields.useHints")}

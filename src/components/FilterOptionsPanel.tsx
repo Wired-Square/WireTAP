@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { caption, captionMuted } from "../styles/typography";
-import { bgSurface, textDataMuted, textDataSecondary } from "../styles";
+import { bgDataInput, bgSurface, borderDataView, textDataMuted, textDataPrimary, textDataSecondary } from "../styles";
 
 /** Filter configuration */
 export interface FilterConfig {
@@ -59,7 +59,7 @@ export default function FilterOptionsPanel({
             value={minLength}
             onChange={(e) => handleMinLengthChange(Number(e.target.value))}
             disabled={disabled}
-            className="w-full mt-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white disabled:opacity-50"
+            className={`w-full mt-1 px-3 py-2 ${bgDataInput} border ${borderDataView} rounded ${textDataPrimary} disabled:opacity-50`}
             min={0}
           />
           <span className={`text-xs mt-1 block ${textDataMuted}`}>

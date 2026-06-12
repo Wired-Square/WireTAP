@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Trash2, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { formatHexId } from "../utils/formatHex";
@@ -64,7 +64,7 @@ export default function UserSignalsView() {
       <div className="flex items-center mb-2">
         <button
           onClick={() => setDialogOpen(true)}
-          className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+          className={indigoButtonCompact}
         >
           <Plus className={iconMd} /> {t("userSignals.add")}
         </button>

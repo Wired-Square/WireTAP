@@ -143,7 +143,7 @@ export default function DataViewPaginationToolbar({
         <select
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className={`text-xs px-2 py-1 rounded border border-gray-600 ${bgDataInput} ${textDataPrimary}`}
+          className={`text-xs px-2 py-1 rounded border ${borderDataView} ${bgDataInput} ${textDataPrimary}`}
           title={t("pagination.rowsPerPage")}
         >
           {pageSizeOptions.map((opt) => (

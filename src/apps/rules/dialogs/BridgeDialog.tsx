@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Plus, Trash2, HelpCircle } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, indigoButton } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { nextAvailableId } from "../utils/framelinkConstants";
@@ -409,7 +409,7 @@ export default function BridgeDialog({
         </button>
         <button
           onClick={handleSubmit}
-          className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+          className={indigoButton}
         >
           {bidirectional ? t("bridgeDialog.submitTwo") : t("bridgeDialog.submitOne")}
         </button>

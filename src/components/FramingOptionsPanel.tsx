@@ -11,7 +11,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { hexToBytes, bytesToHex } from "../utils/byteUtils";
-import { toggleCardClass, toggleChipClass, bgDataInput, borderDataView, textDataSecondary, caption, captionMuted, bgSurface } from "../styles";
+import { toggleCardClass, toggleChipClass, bgDataInput, borderDataView, textDataPrimary, textDataSecondary, caption, captionMuted, bgSurface } from "../styles";
 
 // Re-export for backwards compatibility (used by other components)
 export { hexToBytes, bytesToHex };
@@ -170,7 +170,7 @@ export default function FramingOptionsPanel({
                 value={delimiterHex}
                 onChange={(e) => handleDelimiterChange(e.target.value)}
                 disabled={disabled}
-                className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded text-white disabled:opacity-50`}
+                className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded ${textDataPrimary} disabled:opacity-50`}
                 placeholder={t("framingOptions.delimiterPlaceholder")}
               />
             </label>
@@ -181,7 +181,7 @@ export default function FramingOptionsPanel({
                 value={maxLength}
                 onChange={(e) => handleMaxLengthChange(Number(e.target.value))}
                 disabled={disabled}
-                className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded text-white disabled:opacity-50`}
+                className={`w-full mt-1 px-3 py-1.5 ${bgDataInput} border ${borderDataView} rounded ${textDataPrimary} disabled:opacity-50`}
               />
             </label>
           </div>

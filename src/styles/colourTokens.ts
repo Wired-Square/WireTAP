@@ -175,6 +175,9 @@ export const textDataPlaceholder = "text-[color:var(--text-secondary)] opacity-6
 /** Disabled/inactive data text — pair with a themed accent for active state */
 export const textDataDisabled = "text-[color:var(--text-muted)] opacity-50";
 
+/** Input placeholder text - muted via CSS variable so it tracks the theme */
+export const placeholderMuted = "placeholder:text-[color:var(--text-muted)]";
+
 // =============================================================================
 // Hover States - use brightness filter for cross-platform support
 // =============================================================================

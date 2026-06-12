@@ -9,7 +9,7 @@ import { useReducer, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import type { SignalDefDescriptor } from "../../../api/framelinkRules";
-import { textPrimary, textSecondary } from "../../../styles";
+import { textPrimary, textSecondary, indigoButton, disabledState } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import {
@@ -366,7 +366,7 @@ export default function FrameDefEditor({
         <button
           onClick={handleSave}
           disabled={saveDisabled}
-          className="px-4 py-1.5 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className={`${indigoButton} ${disabledState}`}
         >
           {t("frameDefEditor.save")}
         </button>

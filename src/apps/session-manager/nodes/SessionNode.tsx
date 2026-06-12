@@ -6,7 +6,7 @@ import { Handle, Position } from "@xyflow/react";
 import { Radio, Pause, Square, AlertCircle, Users, Database } from "lucide-react";
 import type { ActiveSessionInfo } from "../../../api/io";
 import { iconSm, iconXs } from "../../../styles/spacing";
-import { textDataCyan, textDataDisabled } from "../../../styles/colourTokens";
+import { textDataCyan, textDataDisabled, textMuted } from "../../../styles/colourTokens";
 
 export interface SessionNodeData {
   session: ActiveSessionInfo;
@@ -145,7 +145,7 @@ function SessionNode({ data, selected }: SessionNodeProps) {
               position={Position.Left}
               className="!w-3 !h-3 !bg-cyan-800 !border-2 !border-dashed !border-cyan-600 !opacity-40 !relative !transform-none !top-0 !left-0"
             />
-            <span className="text-[10px] font-mono text-gray-600 opacity-40">
+            <span className={`text-[10px] font-mono ${textMuted} opacity-40`}>
               {nextInputBus}
             </span>
           </div>

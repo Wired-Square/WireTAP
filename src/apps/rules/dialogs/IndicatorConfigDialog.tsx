@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, indigoButton } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import ColourPicker from "../components/ColourPicker";
 import { cssToBrgb } from "../utils/brgbColour";
@@ -421,7 +421,7 @@ export default function IndicatorConfigDialog({
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
+            className={`${indigoButton} disabled:opacity-50`}
           >
             {submitting ? t("indicatorConfigDialog.configuring") : t("indicatorConfigDialog.apply")}
           </button>

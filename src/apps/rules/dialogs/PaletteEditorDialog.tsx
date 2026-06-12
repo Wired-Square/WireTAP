@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary, borderDefault } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, borderDefault, indigoButton } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import ColourPicker from "../components/ColourPicker";
@@ -244,7 +244,7 @@ export default function PaletteEditorDialog({
         <button
           onClick={handleUpload}
           disabled={!selectedPalette || uploading || entries.length === 0}
-          className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
+          className={`${indigoButton} disabled:opacity-50`}
         >
           {uploading ? t("paletteDialog.uploading") : t("paletteDialog.upload")}
         </button>

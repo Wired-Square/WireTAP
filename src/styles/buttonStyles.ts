@@ -57,6 +57,42 @@ export function toggleButtonClass(isActive: boolean, activeColor: "purple" | "ye
   return `${baseClasses} bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95`;
 }
 
+/** Active colours for data view tab bar toggles - constant colours, legible in both themes */
+const tabBarToggleColours = {
+  gray: "bg-gray-600 text-white hover:bg-gray-500",
+  cyan: "bg-cyan-600 text-white hover:bg-cyan-500",
+  yellow: "bg-yellow-600 text-white hover:bg-yellow-500",
+  blue: "bg-blue-600 text-white hover:bg-blue-500",
+  amber: "bg-amber-600 text-white hover:bg-amber-500",
+};
+
+const tabBarToggleInactive =
+  "bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95";
+
+/**
+ * Compact icon-only toggle for data view tab bars (p-1.5 sizing)
+ * @param isActive - Whether the toggle is currently active
+ */
+export function tabBarIconToggle(
+  isActive: boolean,
+  activeColour: keyof typeof tabBarToggleColours = "gray",
+): string {
+  return `p-1.5 rounded transition-colors ${isActive ? tabBarToggleColours[activeColour] : tabBarToggleInactive}`;
+}
+
+/**
+ * Labelled chip toggle for data view tab bars (icon + short label)
+ * @param isActive - Whether the toggle is currently active
+ */
+export function tabBarChipToggle(
+  isActive: boolean,
+  activeColour: keyof typeof tabBarToggleColours = "blue",
+): string {
+  return `flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+    isActive ? tabBarToggleColours[activeColour] : tabBarToggleInactive
+  }`;
+}
+
 /**
  * Play/Resume button - green background
  * Use for: Start/Resume playback actions
@@ -95,6 +131,20 @@ export const pauseButtonCompact =
  */
 export const stopButtonCompact =
   "flex items-center gap-2 px-2 py-1 rounded-lg transition-colors bg-red-600 text-white hover:bg-red-700 disabled:bg-[var(--bg-surface)] disabled:text-[color:var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed";
+
+/**
+ * Rules accent (indigo) - dialog primary action
+ * Use for: Save/confirm buttons in rules app dialogs
+ */
+export const indigoButton =
+  "px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white";
+
+/**
+ * Rules accent (indigo) - compact add/action chip
+ * Use for: Add buttons in rules app view toolbars
+ */
+export const indigoButtonCompact =
+  "flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white";
 
 /**
  * Primary action button - blue background

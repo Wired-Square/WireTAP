@@ -16,7 +16,7 @@ import {
   RawBytesViewDialog,
 } from './serial';
 import SerialAnalysisResultView from './tools/SerialAnalysisResultView';
-import { textWarning } from '../../../styles/colourTokens';
+import { borderDataView, textWarning } from '../../../styles/colourTokens';
 import { emptyStateContainer, emptyStateText, emptyStateHeading, emptyStateDescription } from '../../../styles/typography';
 
 interface SerialDiscoveryViewProps {
@@ -208,7 +208,7 @@ export default function SerialDiscoveryView({ isStreaming = false, displayTimeFo
   }, [activeTab, serialFramingResults, serialPayloadResults, setActiveTab]);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border border-gray-700">
+    <div className={`flex flex-col flex-1 min-h-0 overflow-hidden rounded-lg border ${borderDataView}`}>
       {/* Tab Bar with Controls */}
       <TabBar
         activeTab={activeTab}

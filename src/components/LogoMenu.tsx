@@ -95,8 +95,7 @@ export default function LogoMenu({ onPanelClick }: LogoMenuProps) {
       {availableUpdate && (
         <button
           onClick={handleUpdateClick}
-          className="flex items-center gap-1 transition-colors"
-          style={{ backgroundColor: '#2563eb', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 500 }}
+          className="flex items-center gap-1 transition-colors bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded-md text-xs font-medium"
           title={t("logo.updateAvailable", { version: availableUpdate.version })}
         >
           <ArrowUpCircle className={iconMd} />

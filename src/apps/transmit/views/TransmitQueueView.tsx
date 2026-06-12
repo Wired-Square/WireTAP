@@ -17,6 +17,7 @@ import {
   textDataSecondary,
   hoverDataRow,
   focusBorder,
+  placeholderMuted,
 } from "../../../styles/colourTokens";
 import {
   badgeColorClass,
@@ -425,7 +426,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                       onChange={(e) => handleGroupChange(item.id, e.target.value)}
                       disabled={item.isRepeating || isGroupRepeating}
                       placeholder={t("queue.groupPlaceholder")}
-                      className={`w-20 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} ${focusBorder} disabled:opacity-50 placeholder:text-gray-600`}
+                      className={`w-20 ${bgDataInput} ${textDataPrimary} text-xs rounded px-1.5 py-1 border ${borderDataView} ${focusBorder} disabled:opacity-50 ${placeholderMuted}`}
                       title={t("queue.groupTooltip")}
                     />
                   </td>
@@ -438,7 +439,7 @@ export default function TransmitQueueView({ outputBusToSource }: TransmitQueueVi
                         checked={item.enabled}
                         onChange={() => toggleQueueEnabled(item.id)}
                         disabled={item.isRepeating || isGroupRepeating}
-                        className="h-3.5 w-3.5 rounded border-gray-600 bg-transparent accent-blue-500 cursor-pointer disabled:cursor-not-allowed"
+                        className={`h-3.5 w-3.5 rounded ${borderDataView} bg-transparent accent-[var(--accent-primary)] cursor-pointer disabled:cursor-not-allowed`}
                         title={item.enabled ? t("queue.actions.disableItem") : t("queue.actions.enableItem")}
                       />
                       {isOrphaned && activeSession && (

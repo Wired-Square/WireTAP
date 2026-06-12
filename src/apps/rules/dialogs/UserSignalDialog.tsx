@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Plus, Trash2 } from "lucide-react";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, indigoButton } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import { RESERVED_SIGNAL_ID_START } from "../utils/framelinkConstants";
@@ -318,7 +318,7 @@ export default function UserSignalDialog({
         </button>
         <button
           onClick={handleSubmit}
-          className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+          className={indigoButton}
         >
           {t("userSignalDialog.submit")}
         </button>

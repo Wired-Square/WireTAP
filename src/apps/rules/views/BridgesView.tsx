@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, Trash2, ToggleLeft, ToggleRight, Plus } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import type { BridgeDescriptor } from "../../../api/framelinkRules";
@@ -59,7 +59,7 @@ export default function BridgesView() {
       <div className="flex justify-end mb-1">
         <button
           onClick={() => setDialogOpen(true)}
-          className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+          className={indigoButtonCompact}
         >
           <Plus className={iconMd} /> {t("bridges.add")}
         </button>

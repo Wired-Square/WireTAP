@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { Loader2, RefreshCw, Palette } from "lucide-react";
 import { useRulesStore } from "../stores/rulesStore";
-import { textPrimary, textSecondary, textTertiary } from "../../../styles";
+import { textPrimary, textSecondary, textTertiary, indigoButtonCompact } from "../../../styles";
 import { cardDefault, cardPadding } from "../../../styles/cardStyles";
 import { iconMd } from "../../../styles/spacing";
 import IndicatorSprite, { IndicatorSpriteDefs } from "../components/IndicatorSprite";
@@ -59,7 +59,7 @@ export default function IndicatorsView() {
       <div className="flex justify-end gap-2 mb-1">
         <button
           onClick={() => setPaletteOpen(true)}
-          className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+          className={indigoButtonCompact}
         >
           <Palette className={iconMd} /> {t("indicators.paletteEditor")}
         </button>

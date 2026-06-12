@@ -41,7 +41,7 @@ export default function FlashNotification({
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="text-white hover:text-gray-200 transition-colors"
+            className="text-white hover:opacity-80 transition-opacity"
             aria-label="Dismiss"
           >
             <svg

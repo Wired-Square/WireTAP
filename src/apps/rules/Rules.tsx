@@ -18,7 +18,7 @@ import {
   borderDataView,
   dataViewContainer,
 } from "../../styles";
-import { dataViewTabClass } from "../../styles/buttonStyles";
+import { dataViewTabClass, indigoButton } from "../../styles/buttonStyles";
 import RulesTopBar, { type RulesActiveState } from "./views/RulesTopBar";
 import {
   useFrameLinkDeviceLiveness,
@@ -244,7 +244,7 @@ export default function Rules() {
             <button
               type="button"
               onClick={() => connectDevice(device.host, device.port, device.label)}
-              className="mt-3 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white"
+              className={`mt-3 ${indigoButton}`}
             >
               {t("states.retry", "Retry")}
             </button>

@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { X, FlaskConical, ChevronRight, ChevronLeft, CheckSquare, Square, ChevronsUp } from "lucide-react";
 import { iconSm, iconLg } from "../../../styles/spacing";
 import {
-  bgSurface, borderDivider, hoverLight, inputSimple,
+  bgSurface, borderDivider, checkboxDefault, hoverLight, inputSimple,
   selectSimple, primaryButtonBase, textSecondary,
 } from "../../../styles";
 import Dialog from "../../../components/Dialog";
@@ -309,7 +309,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                       type="checkbox"
                       checked={byteAligned}
                       onChange={(e) => setByteAligned(e.target.checked)}
-                      className="rounded border-gray-500"
+                      className={checkboxDefault}
                     />
                     <span className="text-[10px] text-[color:var(--text-muted)]">
                       {t("hypothesis.fields.byteAligned")}
@@ -351,7 +351,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                   type="checkbox"
                   checked={signed}
                   onChange={(e) => setSigned(e.target.checked)}
-                  className="rounded border-gray-500"
+                  className={checkboxDefault}
                 />
                 <span className="text-xs text-[color:var(--text-secondary)]">
                   {t("hypothesis.fields.signed")}
@@ -365,7 +365,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                     type="checkbox"
                     checked={useAnalysisHints}
                     onChange={(e) => setUseAnalysisHints(e.target.checked)}
-                    className="rounded border-gray-500"
+                    className={checkboxDefault}
                   />
                   <span className="text-xs text-[color:var(--text-secondary)]">
                     {t("hypothesis.fields.useHints")}
@@ -477,7 +477,7 @@ export default function HypothesisExplorerDialog({ isOpen, onClose }: Props) {
                       type="checkbox"
                       checked={selectedCandidates.has(c.signalName)}
                       readOnly
-                      className="rounded border-gray-500 pointer-events-none"
+                      className={`${checkboxDefault} pointer-events-none`}
                     />
                     <span className="text-[color:var(--text-primary)] font-mono truncate flex-1">
                       {c.signalName}

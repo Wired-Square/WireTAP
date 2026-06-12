@@ -10,6 +10,7 @@ import ProtocolBadge, { type StreamingStatus } from './ProtocolBadge';
 import ContextMenu from './ContextMenu';
 import {
   bgDataToolbar,
+  bgSurface,
   borderDataView,
 } from '../styles';
 import { iconXs } from '../styles/spacing';
@@ -146,9 +147,9 @@ export default function DataViewTabBar({
 
       {/* Frame index display (for debugging/playback position) */}
       {frameIndex != null && (
-        <div className={`flex items-center gap-1 ml-2 px-1.5 py-0.5 bg-gray-700/50 rounded text-xs font-mono ${textDataSecondary}`}>
+        <div className={`flex items-center gap-1 ml-2 px-1.5 py-0.5 ${bgSurface} rounded text-xs font-mono ${textDataSecondary}`}>
           <span>Frame</span>
-          <span className="text-gray-200">{(frameIndex + 1).toLocaleString()}</span>
+          <span className={textDataPrimary}>{(frameIndex + 1).toLocaleString()}</span>
           {totalFrames != null && (
             <>
               <span>/</span>

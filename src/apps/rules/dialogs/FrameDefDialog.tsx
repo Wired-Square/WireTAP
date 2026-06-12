@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Dialog from "../../../components/Dialog";
 import { inputSimple, labelDefault } from "../../../styles/inputStyles";
-import { textPrimary, textSecondary } from "../../../styles";
+import { textPrimary, textSecondary, indigoButton } from "../../../styles";
 import { panelFooter } from "../../../styles/cardStyles";
 import type { FrameHeader } from "../utils/bitGrid";
 import { nextAvailableId } from "../utils/framelinkConstants";
@@ -202,7 +202,7 @@ export default function FrameDefDialog({
         </button>
         <button
           onClick={handleSubmit}
-          className="px-4 py-2 text-sm font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white"
+          className={indigoButton}
         >
           {t("frameDefDialog.submit")}
         </button>

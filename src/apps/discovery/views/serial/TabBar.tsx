@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Layers, Filter, Settings, Network, FileText } from 'lucide-react';
 import { iconSm, iconXs } from '../../../../styles/spacing';
-import { bgSurface, textSecondary } from '../../../../styles';
+import { bgSurface, tabBarChipToggle, tabBarIconToggle, textSecondary } from '../../../../styles';
 import { DiscoveryTabBar, type TabDefinition } from '../../components';
 import type { FramingConfig } from '../../../../stores/discoveryStore';
 import { TOOL_TAB_CONFIG } from '../../../../stores/discoveryToolboxStore';
@@ -113,22 +113,14 @@ export default function TabBar({
       {/* Column visibility toggles */}
       <button
         onClick={toggleShowBusColumn}
-        className={`p-1.5 rounded transition-colors ${
-          showBusColumn
-            ? 'bg-cyan-600 text-white hover:bg-cyan-500'
-            : `${bgSurface} ${textSecondary} hover:brightness-95`
-        }`}
+        className={tabBarIconToggle(showBusColumn, "cyan")}
         title={showBusColumn ? t("serial.hideBus") : t("serial.showBus")}
       >
         <Network className={iconSm} />
       </button>
       <button
         onClick={toggleShowAsciiColumn}
-        className={`p-1.5 rounded transition-colors ${
-          showAsciiColumn
-            ? 'bg-yellow-600 text-white hover:bg-yellow-500'
-            : `${bgSurface} ${textSecondary} hover:brightness-95`
-        }`}
+        className={tabBarIconToggle(showAsciiColumn, "yellow")}
         title={showAsciiColumn ? t("serial.hideAscii") : t("serial.showAscii")}
       >
         <FileText className={iconSm} />
@@ -150,11 +142,7 @@ export default function TabBar({
       {emitsRawBytes && (
         <button
           onClick={onOpenFramingDialog}
-          className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-            framingConfig
-              ? 'bg-blue-600 text-white hover:bg-blue-500'
-              : `${bgSurface} ${textSecondary} hover:brightness-95`
-          }`}
+          className={tabBarChipToggle(!!framingConfig, "blue")}
           title={t("serial.configureFraming")}
         >
           <Layers className={iconXs} />
@@ -166,11 +154,7 @@ export default function TabBar({
       {activeTab === 'framed' && (
         <button
           onClick={onOpenFilterDialog}
-          className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-            minFrameLength > 0
-              ? 'bg-amber-600 text-white hover:bg-amber-500'
-              : `${bgSurface} ${textSecondary} hover:brightness-95`
-          }`}
+          className={tabBarChipToggle(minFrameLength > 0, "amber")}
           title={t("serial.configureFilters")}
         >
           <Filter className={iconXs} />

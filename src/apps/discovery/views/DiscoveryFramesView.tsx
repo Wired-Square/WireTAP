@@ -19,7 +19,7 @@ import MessageOrderResultView from "./tools/MessageOrderResultView";
 import ChecksumDiscoveryResultView from "./tools/ChecksumDiscoveryResultView";
 import ModbusScanResultView from "./tools/ModbusScanResultView";
 import FilteredTabContent from "./FilteredTabContent";
-import { bgDataView, bgSurface, textDataSecondary, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
+import { bgDataView, bgSurface, tabBarIconToggle, textDataSecondary, textMuted, textPrimary, textSecondary, borderDefault } from "../../../styles";
 import type { FrameMessage } from "../../../types/frame";
 import { keyOf, parseFrameKey } from "../../../utils/frameKey";
 import type { IOCapabilities } from "../../../api/io";
@@ -1001,33 +1001,21 @@ function DiscoveryFramesView({
     <div className="flex items-center gap-1">
       <button
         onClick={toggleShowRefColumn}
-        className={`p-1.5 rounded transition-colors ${
-          showRefColumn
-            ? 'bg-gray-600 text-white hover:bg-gray-500'
-            : `${bgSurface} ${textSecondary} hover:brightness-95`
-        }`}
+        className={tabBarIconToggle(showRefColumn)}
         title={showRefColumn ? 'Hide # column' : 'Show # column'}
       >
         <Hash className={iconSm} />
       </button>
       <button
         onClick={toggleShowBusColumn}
-        className={`p-1.5 rounded transition-colors ${
-          showBusColumn
-            ? 'bg-cyan-600 text-white hover:bg-cyan-500'
-            : `${bgSurface} ${textSecondary} hover:brightness-95`
-        }`}
+        className={tabBarIconToggle(showBusColumn, "cyan")}
         title={showBusColumn ? 'Hide Bus column' : 'Show Bus column'}
       >
         <Network className={iconSm} />
       </button>
       <button
         onClick={toggleShowAsciiColumn}
-        className={`p-1.5 rounded transition-colors ${
-          showAsciiColumn
-            ? 'bg-yellow-600 text-white hover:bg-yellow-500'
-            : `${bgSurface} ${textSecondary} hover:brightness-95`
-        }`}
+        className={tabBarIconToggle(showAsciiColumn, "yellow")}
         title={showAsciiColumn ? 'Hide ASCII column' : 'Show ASCII column'}
       >
         <FileText className={iconSm} />
@@ -1043,11 +1031,7 @@ function DiscoveryFramesView({
             setFindOpen(true);
           }
         }}
-        className={`p-1.5 rounded transition-colors ${
-          findOpen
-            ? 'bg-gray-600 text-white hover:bg-gray-500'
-            : `${bgSurface} ${textSecondary} hover:brightness-95`
-        }`}
+        className={tabBarIconToggle(findOpen)}
         title={findOpen ? 'Close find (Escape)' : 'Find in frames (⌘F)'}
       >
         <Search className={iconSm} />
@@ -1070,11 +1054,7 @@ function DiscoveryFramesView({
         <>
           <button
             onClick={() => setRenderFrozen(!renderFrozen)}
-            className={`p-1.5 rounded transition-colors ${
-              renderFrozen
-                ? 'bg-blue-600 text-white hover:bg-blue-500'
-                : `${bgSurface} ${textSecondary} hover:brightness-95`
-            }`}
+            className={tabBarIconToggle(renderFrozen, "blue")}
             title={renderFrozen ? t("framesView.actions.unfreezeDisplay") : t("framesView.actions.freezeDisplay")}
           >
             <Snowflake className={iconSm} />

@@ -218,14 +218,14 @@ export default function ByteExtractionDialog({
                 onClear();
                 onClose();
               }}
-              className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 rounded"
+              className="px-4 py-2 text-sm bg-red-600 hover:bg-red-500 text-white rounded"
             >
               {t("serial.clear")}
             </button>
           ) : (
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm bg-gray-600 hover:bg-gray-500 rounded"
+              className={`px-4 py-2 text-sm ${bgSurface} ${textSecondary} hover:brightness-95 rounded`}
             >
               {t("modbusScan.cancel")}
             </button>

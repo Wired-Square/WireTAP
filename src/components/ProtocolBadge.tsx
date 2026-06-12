@@ -5,7 +5,7 @@
 
 import { History } from "lucide-react";
 import { iconXs } from "../styles/spacing";
-import { textDataSecondary } from "../styles";
+import { bgSurface, textDataSecondary } from "../styles";
 
 // ============================================================================
 // Types
@@ -80,8 +80,8 @@ export default function ProtocolBadge({
     <button
       onClick={onClick}
       disabled={!onClick}
-      className={`flex items-center gap-1.5 px-2 py-1 rounded bg-gray-700/50 ${
-        onClick ? "hover:bg-gray-600/50 cursor-pointer" : "cursor-default"
+      className={`flex items-center gap-1.5 px-2 py-1 rounded ${bgSurface} ${
+        onClick ? "hover:brightness-95 cursor-pointer" : "cursor-default"
       }`}
       title={isRecorded ? "Recorded data source" : "Live data source"}
     >
