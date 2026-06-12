@@ -90,12 +90,13 @@ export interface AppTopBarProps {
  * Renders sections in this order:
  * 1. Icon (+ title if provided)
  * 2. FlexSeparator
- * 3. IOSessionControls (if `ioSession` provided)
- * 4. ChevronRight + FramePickerButton (if `framePicker` provided)
- * 5. ChevronRight + CatalogButton (if `catalog` provided)
- * 6. Children (custom content)
- * 7. FlexSeparator
- * 8. Actions
+ * 3. FrameIdFormatToggle (if `frameIdFormat` enabled)
+ * 4. IOSessionControls (if `ioSession` provided)
+ * 5. ChevronRight + FramePickerButton (if `framePicker` provided)
+ * 6. ChevronRight + CatalogButton (if `catalog` provided)
+ * 7. Children (custom content)
+ * 8. FlexSeparator
+ * 9. Actions
  *
  * @example
  * ```tsx
@@ -148,6 +149,9 @@ export default function AppTopBar({
 
         {/* Separator after icon/title */}
         <FlexSeparator />
+
+        {/* Frame ID format toggle — sits between the app icon and the session controls */}
+        {frameIdFormat && <FrameIdFormatToggle />}
 
         {/* IO Session Controls (if provided) */}
         {ioSession && (
@@ -216,9 +220,6 @@ export default function AppTopBar({
             />
           </>
         )}
-
-        {/* Frame ID format toggle (if enabled) */}
-        {frameIdFormat && <FrameIdFormatToggle />}
 
         {/* Custom content */}
         {children}
