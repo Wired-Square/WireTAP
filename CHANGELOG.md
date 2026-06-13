@@ -2,6 +2,18 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **A mixed-generation `buffers.db` no longer kills the capture store on every launch**: the buffer→capture migration assumed an all-legacy schema, aborted on a database where a pre-rename build had re-created `buffer_metadata` beside already-renamed tables, and the rollback made every subsequent launch fail identically — captures and Discovery were silently dead. The baseline now migrates each object on its own evidence. [src-tauri/src/capture_db.rs](src-tauri/src/capture_db.rs).
+
+### Added
+
+- **Recorded schema migrations for the capture database**: `buffers.db` changes are versioned, audited and run-once. See [docs/capture-db-migrations.md](docs/capture-db-migrations.md).
+
+- **Backend startup failures are surfaced in the UI** via the `app.startup_errors` WS command and a sticky error toast, instead of a single stderr line.
+
 ## [0.7.1] - 2026-06-12
 
 ### Fixed

@@ -31,6 +31,22 @@ pub mod ws;
 use std::sync::Mutex;
 #[cfg(not(target_os = "ios"))]
 use tauri::menu::*;
+
+/// Setup-time component failures, surfaced to the UI via the
+/// `app.startup_errors` WS command — a subsystem that dies at startup must
+/// not be silent.
+static STARTUP_ERRORS: once_cell::sync::Lazy<Mutex<Vec<String>>> =
+    once_cell::sync::Lazy::new(|| Mutex::new(Vec::new()));
+
+pub(crate) fn record_startup_error(msg: String) {
+    if let Ok(mut errors) = STARTUP_ERRORS.lock() {
+        errors.push(msg);
+    }
+}
+
+pub(crate) fn startup_errors() -> Vec<String> {
+    STARTUP_ERRORS.lock().map(|e| e.clone()).unwrap_or_default()
+}
 use tauri::{AppHandle, Emitter, Manager, State};
 #[cfg(not(target_os = "ios"))]
 use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent, Wry};
@@ -988,10 +1004,17 @@ pub fn run() {
                     .unwrap_or(true);
                 if let Err(e) = capture_db::initialise(&data_dir, clear_on_start) {
                     tlog!("[setup] Failed to initialise capture database: {}", e);
+                    record_startup_error(format!(
+                        "Capture database failed to initialise: {e}. Captures, Discovery \
+                         and capture playback will not work until this is resolved."
+                    ));
                 }
 
                 if let Err(e) = transmit_history::initialise(&data_dir) {
                     tlog!("[setup] Failed to initialise transmit history database: {}", e);
+                    record_startup_error(format!(
+                        "Transmit history database failed to initialise: {e}."
+                    ));
                 }
 
                 // Hydrate the capture registry from SQLite.

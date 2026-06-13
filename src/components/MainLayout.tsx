@@ -16,6 +16,8 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { storeGet, storeSet } from "../api/store";
+import { getStartupErrors } from "../api/appStatus";
+import FlashNotification from "./FlashNotification";
 import { icon2xl } from "../styles/spacing";
 import { bgPrimary, textPrimary, textSecondary, textTertiary } from "../styles/colourTokens";
 import { launcherButton, launcherButtonLabel, launcherGrid } from "../styles/buttonStyles";
@@ -249,6 +251,32 @@ export default function MainLayout() {
 
   // Persist and restore window geometry (size + position) across restarts
   useWindowPersistence(windowLabel);
+
+  // Backend setup-time failures (dead capture store, …) must be shown, not
+  // buried in the log. Retried because the WS transport may still be
+  // connecting when the layout first mounts (command() rejects rather than
+  // queues when disconnected). Primary window only — every window mounts a
+  // MainLayout, and N copies of the same toast help nobody.
+  const [startupErrors, setStartupErrors] = useState<string[]>([]);
+  useEffect(() => {
+    if (isDynamicWindow) return;
+    let cancelled = false;
+    const fetchErrors = (attempt: number) => {
+      getStartupErrors()
+        .then((errors) => {
+          if (!cancelled && errors.length > 0) setStartupErrors(errors);
+        })
+        .catch(() => {
+          if (!cancelled && attempt < 5) {
+            setTimeout(() => fetchErrors(attempt + 1), 2000);
+          }
+        });
+    };
+    fetchErrors(0);
+    return () => {
+      cancelled = true;
+    };
+  }, [isDynamicWindow]);
 
   // Load saved layout on mount
   useEffect(() => {
@@ -576,6 +604,14 @@ export default function MainLayout() {
           prefixHeaderActionsComponent={PrefixHeaderActions}
         />
       </div>
+      {startupErrors.length > 0 && (
+        <FlashNotification
+          message={startupErrors.join(" — ")}
+          type="error"
+          duration={0}
+          onDismiss={() => setStartupErrors([])}
+        />
+      )}
     </div>
   );
 }

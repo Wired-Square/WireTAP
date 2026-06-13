@@ -3,6 +3,9 @@
 // Multi-capture registry for storing captured data.
 // Metadata lives in RAM; bulk frame/byte data lives in SQLite (capture_db).
 // Supports multiple named captures, each typed as either Frames or Bytes.
+//
+// Schema changes to buffers.db MUST be recorded migrations — see
+// docs/capture-db-migrations.md. Never issue ad-hoc DDL from this file.
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
