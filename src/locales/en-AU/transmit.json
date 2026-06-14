@@ -94,6 +94,8 @@
   },
   "queue": {
     "emptyHeading": "Queue Empty",
+    "agentBadge": "Agent",
+    "agentRepeat": "This repeat was started by an MCP agent",
     "stopAllTooltip": "Stop all repeats",
     "stopAllLabel": "Stop All",
     "clearTooltip": "Clear queue",

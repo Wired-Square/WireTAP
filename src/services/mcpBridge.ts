@@ -1,6 +1,5 @@
 // src/services/mcpBridge.ts
 //
-// SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Wired Square Pty Ltd
 //
 // Registers the MCP bridge methods — the frontend side of the reverse RPC the

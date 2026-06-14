@@ -1,6 +1,7 @@
 #[macro_use]
 pub(crate) mod logging;
 mod analysis;
+mod app_registry;
 mod ble_provision;
 mod capture_db;
 mod capturequery;

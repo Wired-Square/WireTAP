@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 //! MCP server — exposes live WireTAP runtime state to an external MCP client
 //! over a localhost streamable-HTTP transport. Opt-in via settings; read-only

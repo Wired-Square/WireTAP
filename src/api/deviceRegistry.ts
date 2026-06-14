@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // Device registry — WS command wrappers over the framelink-rs registry.
 // The registry is the single source of truth for which devices exist and

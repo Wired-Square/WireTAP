@@ -2506,7 +2506,6 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
 }
 
 /// Check if a session exists
-#[allow(dead_code)]
 pub async fn session_exists(session_id: &str) -> bool {
     let sessions = IO_SESSIONS.lock().await;
     sessions.contains_key(session_id)

@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 import { textPrimary, textSecondary, textTertiary } from "../../../styles";
 import { type PlacedSignal, BYTE_ORDER_LE } from "../utils/bitGrid";

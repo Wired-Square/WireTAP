@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // Top-level editor view for frame definitions. Wires together the BitGrid,
 // SignalList, and SignalProperties components with a useReducer-based state

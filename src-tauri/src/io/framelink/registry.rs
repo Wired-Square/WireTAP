@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // WS command surface for the framelink-rs device registry. The registry
 // (single source of truth, owned by the library at the platform config dir)

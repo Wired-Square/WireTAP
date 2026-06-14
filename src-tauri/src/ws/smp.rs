@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 //! WS dispatch surface for SMP/OTA. Two read-only RPCs (`list_images`,
 //! `ota_cancel`) and one fire-and-forget `ota_start` that drives

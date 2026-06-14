@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 import { useEffect, useMemo, useCallback, useState } from "react";
 import { Workflow, Loader2 } from "lucide-react";

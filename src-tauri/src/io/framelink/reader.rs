@@ -1,5 +1,4 @@
 // Copyright (c) 2026, Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // FrameLink source reader — subscribes to the shared connection for a device
 // and forwards frames matching this source's bus mappings to the merge task.

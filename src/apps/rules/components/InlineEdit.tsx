@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 import { useState, useRef, useEffect } from "react";
 import { inputSimple } from "../../../styles/inputStyles";

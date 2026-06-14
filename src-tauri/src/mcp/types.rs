@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 //! Parameter structs for the MCP tools. Each derives `Deserialize` (rmcp parses
 //! the tool-call arguments into it) and `JsonSchema` (rmcp publishes the schema
@@ -30,6 +29,16 @@ fn default_one() -> u16 {
 pub struct SessionIdParams {
     /// Session ID (as returned by `list_sessions`).
     pub session_id: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct AttachSourceParams {
+    /// Session ID (as returned by `list_sessions`).
+    pub session_id: String,
+    /// Which source-aware tab to attach the session to, e.g. `discovery`,
+    /// `decoder`, `transmit`, `query`, or `graph` (the tabs declaring
+    /// `sessionAware` in the app registry).
+    pub panel: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -119,6 +128,34 @@ pub struct TransmitFrameParams {
     /// CAN-FD frame.
     #[serde(default)]
     pub is_fd: bool,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RepeatTransmitStartParams {
+    /// Session ID to transmit through (must be a transmit-capable session).
+    pub session_id: String,
+    /// CAN frame id (decimal).
+    pub frame_id: u32,
+    /// Payload bytes (0-8 for classic CAN, up to 64 for CAN-FD).
+    pub data: Vec<u8>,
+    /// Extended (29-bit) frame id.
+    #[serde(default)]
+    pub is_extended: bool,
+    /// Bus number. A frame sent to a serial bus is framed onto that interface,
+    /// matching the one-shot `transmit_frame` behaviour.
+    #[serde(default)]
+    pub bus: u8,
+    /// CAN-FD frame.
+    #[serde(default)]
+    pub is_fd: bool,
+    /// Repeat interval in milliseconds (>= 1). 250 ≈ 4 Hz.
+    pub interval_ms: u64,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct RepeatTransmitStopParams {
+    /// The `queue_id` returned by `repeat_transmit_start`.
+    pub queue_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

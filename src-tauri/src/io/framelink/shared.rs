@@ -1,5 +1,4 @@
 // Copyright (c) 2026, Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // FrameLink connection manager. FrameLink devices accept exactly one TCP
 // client, so all operations — session streaming AND signal read/write — must

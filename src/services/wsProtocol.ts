@@ -29,11 +29,13 @@ export const MsgType = {
   ReplayState: 0x0c,
   TestPatternState: 0x0d,
   OtaEvent: 0x0e,
+  RepeatEvent: 0x0f,
   Subscribe: 0x10,
   Unsubscribe: 0x11,
   SubscribeAck: 0x12,
   SubscribeNack: 0x13,
   DecodedSignals: 0x14,
+  AttachToPanel: 0x15,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,
@@ -264,6 +266,13 @@ export interface DecodedFrameMsg {
   headerFields: DecodedHeaderField[];
   /** Source address resolved from a CAN header field, if any. */
   sourceAddress?: number | null;
+}
+
+const wsJsonDecoder = new TextDecoder();
+
+/** Decode a global JSON-payload WS message (4-byte header + UTF-8 JSON) into a typed object. */
+export function decodeWsJson<T>(raw: ArrayBuffer): T {
+  return JSON.parse(wsJsonDecoder.decode(new Uint8Array(raw, HEADER_SIZE))) as T;
 }
 
 const decodedSignalsDecoder = new TextDecoder();

@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // SVG indicator sprite inspired by WireTAP logo — rounded square outer,
 // filled inner section. Defined as SVG symbol for reuse via <use>.

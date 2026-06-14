@@ -5,9 +5,7 @@
 // that signals new rows have been written to the SQLite history database.
 
 import { useEffect } from "react";
-import { listen } from "@tauri-apps/api/event";
 import { useTransmitStore } from "../../../stores/transmitStore";
-import type { RepeatStoppedEvent } from "../../../api/transmit";
 import { wsTransport } from "../../../services/wsTransport";
 import { MsgType, HEADER_SIZE, decodeTransmitUpdated } from "../../../services/wsProtocol";
 
@@ -20,11 +18,10 @@ const sharedTextDecoder = new TextDecoder();
  * - TransmitUpdated (0x0B): SQLite rows written — refetch count
  * - ReplayState (0x0C): Replay lifecycle/progress — full state in JSON payload
  *
- * Tauri events (global, staying on Tauri):
- * - `repeat-stopped`: Repeating transmission stopped (transmit queues only)
+ * Repeat-transmit lifecycle (MsgType.RepeatEvent) is handled window-globally by
+ * useRepeatQueueEvents, not here.
  */
 export function useTransmitHistorySubscription(): void {
-  const markRepeatStopped = useTransmitStore((s) => s.markRepeatStopped);
   const handleReplayLifecycle = useTransmitStore((s) => s.handleReplayLifecycle);
   const updateReplayProgress = useTransmitStore((s) => s.updateReplayProgress);
 
@@ -59,21 +56,8 @@ export function useTransmitHistorySubscription(): void {
       );
     }
 
-    // Tauri: repeat-stopped (stays on Tauri — infrequent, needs queue_id payload)
-    const unlistenStopped = listen<RepeatStoppedEvent>(
-      "repeat-stopped",
-      (event) => {
-        const data = event.payload;
-        console.warn(
-          `[Transmit] Repeat stopped for ${data.queue_id}: ${data.reason}`
-        );
-        markRepeatStopped(data.queue_id);
-      }
-    );
-
     return () => {
       for (const fn of unlistenFns) fn();
-      unlistenStopped.then((fn) => fn());
     };
-  }, [markRepeatStopped, handleReplayLifecycle, updateReplayProgress]);
+  }, [handleReplayLifecycle, updateReplayProgress]);
 }

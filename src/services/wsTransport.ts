@@ -1,6 +1,5 @@
 // src/services/wsTransport.ts
 //
-// SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Wired Square Pty Ltd
 //
 // Singleton WebSocket transport service. Manages connection lifecycle,

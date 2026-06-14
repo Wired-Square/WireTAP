@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // Indicator tab — discovers LED indicators via the backend (which uses
 // framelink::board::discover_leds from the library) and provides controls

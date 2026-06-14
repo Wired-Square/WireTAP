@@ -30,6 +30,9 @@ import {
   openPanel,
 } from "../utils/windowCommunication";
 import { useWindowPersistence } from "../hooks/useWindowPersistence";
+import { useRepeatQueueEvents } from "../hooks/useRepeatQueueEvents";
+import { useSessionRosterSync } from "../hooks/useSessionRosterSync";
+import { useAttachSourceEvents } from "../hooks/useAttachSourceEvents";
 import {
   getOpenMainWindows,
   addOpenMainWindow,
@@ -39,7 +42,7 @@ import {
 import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuState } from "../api";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
-import { apps, menuApps, menuGroupOrder, type AppEntry, type PanelId } from "../apps/registry";
+import { apps, menuApps, menuGroupOrder, sessionAwarePanelIds, type AppEntry, type PanelId } from "../apps/registry";
 import type { LucideIcon } from "lucide-react";
 const logo = "/logo.svg";
 
@@ -251,6 +254,16 @@ export default function MainLayout() {
 
   // Persist and restore window geometry (size + position) across restarts
   useWindowPersistence(windowLabel);
+
+  // Mirror repeat-transmit lifecycle (e.g. agent-started repeats) from the WS
+  // push channel into the transmit queue, opening the Transmit panel on start.
+  useRepeatQueueEvents();
+
+  // Adopt backend (incl. agent-created) sessions into the store as known-only.
+  useSessionRosterSync();
+
+  // Let an agent surface a session in a source-aware tab on request.
+  useAttachSourceEvents();
 
   // Backend setup-time failures (dead capture store, …) must be shown, not
   // buried in the log. Retried because the WS transport may still be
@@ -511,12 +524,11 @@ export default function MainLayout() {
   }, [handlePanelClick]);
 
   // Disable all session + bookmark menu items when a non-session panel is focused.
-  // Session-aware panels manage their own state via useMenuSessionControl.
-  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "graph"]));
+  // Session-aware panels (declared in apps.json) manage their own state via useMenuSessionControl.
   const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
 
   useEffect(() => {
-    const hasSession = focusedPanelId !== null && SESSION_AWARE_PANELS.current.has(focusedPanelId);
+    const hasSession = focusedPanelId !== null && sessionAwarePanelIds.has(focusedPanelId);
     if (!hasSession) {
       updateMenuState({
         hasSession: false,
