@@ -58,8 +58,12 @@ enable = false
 # TIP: Use environment variable PG_DSN instead to avoid storing credentials here.
 dsn = "postgresql://candor:SECRET_PASSWORD@HOST:5432/candor"
 
-# Qualified name of the ingest function. This function receives each frame's
-# fields as parameters. See wiretap-server.py for the expected signature.
+# Insert mechanism. "copy" (default) streams batches via PostgreSQL COPY —
+# the fastest bulk path. "function" is the legacy per-row ingest function
+# call, kept for rollback to pre-TimescaleDB schemas.
+write_mode = "copy"
+
+# Qualified name of the ingest function. Only used when write_mode = "function".
 func = "public.ingest_can_frame"
 
 # Number of frames to batch before writing. Higher values improve throughput
@@ -106,6 +110,53 @@ cache_max_mb = 1000
 # worker thread is busy draining old cached frames and new frames accumulate.
 # Lower values are more conservative; 50% gives ample headroom before overflow.
 queue_flush_pct = 50
+
+[ingest]
+# Binary TCP ingest API for microcontroller-class capture devices (ESP32 etc.)
+# pushing CAN frame batches over the network. See docs/ingest-protocol.md for
+# the wire format. Requires [postgres].enable = true — ingested frames flow
+# through the same batcher, COPY writer and disk cache as local SocketCAN
+# frames. Leave [server].iface empty for an ingest-only deployment with no
+# local CAN hardware.
+enable = false
+
+# Listen address and port for ingest clients.
+host = "0.0.0.0"
+port = 9323
+
+# Shared authentication token sent by clients in their HELLO message.
+# Empty string disables auth. TIP: use the WIRETAP_INGEST_TOKEN environment
+# variable instead to avoid storing the token here.
+token = "CHANGE_ME"
+
+# Expected client keepalive (PING) interval in seconds. Clients silent for
+# three times this long are dropped.
+keepalive_secs = 30
+
+# Maximum frames per batch message. Larger batches amortise overhead but
+# need more client RAM (a full 256-frame classic-CAN batch is ~4.6 KB).
+max_batch_frames = 256
+
+[forward]
+# Forward captured frames to a WireTAP backend gateway over the binary ingest
+# protocol instead of writing to PostgreSQL directly. Mutually exclusive with
+# [postgres].enable — turn on only one. Frames flow through the same batcher
+# and SQLite disk-cache as the Postgres path, so a gateway outage caches
+# locally and drains in order on reconnect. GVRET live bridging is unaffected.
+enable = false
+
+# Gateway address (the backend's binary ingest listener, default port 9323).
+host = "backend.local"
+port = 9323
+
+# API key with the "ingest" role. TIP: use the WIRETAP_FORWARD_TOKEN
+# environment variable instead of storing it here.
+api_key = "CHANGE_ME"
+
+# Target capture database. Empty uses the gateway's default database; a name
+# the gateway doesn't know is auto-created (when the gateway permits it), so a
+# new server can provision its own capture database on first connect.
+database = ""
 
 [logging]
 # Log level: DEBUG, INFO, WARNING, ERROR

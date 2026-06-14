@@ -7,6 +7,7 @@ mod capturequery;
 mod capture_store;
 mod captures;
 mod catalog;
+mod apiclient;
 mod checksums;
 mod credentials;
 mod dbquery;
@@ -1340,6 +1341,11 @@ pub fn run() {
             dbquery::db_query_activity,
             dbquery::db_cancel_backend,
             dbquery::db_terminate_backend,
+            // WireTAP backend API (wiretap profiles)
+            apiclient::api_list_databases,
+            apiclient::api_create_database,
+            apiclient::api_test_connection,
+            apiclient::api_import_capture,
             capturequery::capture_query_byte_changes,
             capturequery::capture_query_frame_changes,
             capturequery::capture_query_mirror_validation,

@@ -539,7 +539,8 @@
       "rename": "Rename buffer",
       "unpinTooltip": "Unpin capture (will be cleared on restart)",
       "pinTooltip": "Pin capture (survives restart)",
-      "delete": "Delete capture"
+      "delete": "Delete capture",
+      "sendToBackend": "Send to backend"
     }
   }
 }

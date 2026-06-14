@@ -52,6 +52,7 @@ To use gs_usb, flash your CANable with [candleLight firmware](https://github.com
 
 - Live CAN hardware (GVRET, slcan, gs_usb, SocketCAN)
 - PostgreSQL database (historical replay with speed control)
+- WireTAP backend gateway (historical replay + analysis over its HTTP API, no direct database access)
 - CSV file import
 - In-memory buffer replay
 
@@ -70,10 +71,20 @@ See [tools/gs_usb_cli/README.md](tools/gs_usb_cli/README.md) for build and usage
 A GVRET-compatible TCP server for Linux that bridges SocketCAN interfaces to TCP clients. Deploy on a Raspberry Pi or any Linux system with CAN hardware to:
 
 - Stream live CAN data to the WireTAP desktop app over the network
-- Optionally log all frames to PostgreSQL for historical analysis
+- Optionally log all frames to PostgreSQL for historical analysis, or forward them to a WireTAP backend over the binary ingest protocol
 - Support multiple CAN interfaces and CAN FD
 
 See [tools/wiretap-server/README.md](tools/wiretap-server/README.md) for setup instructions.
+
+### [WireTAP Backend](tools/wiretap-backend/)
+
+A Dockerised TimescaleDB + API gateway that owns the long-term capture database, so nothing connects to PostgreSQL directly. Microcontroller capture devices, the WireTAP Server, and the desktop app all authenticate with API keys instead of database credentials:
+
+- Binary TCP ingest (devices and forward mode) and an HTTP query API (desktop), one database per capture with auto-create
+- A built-in admin UI for API keys, databases, live ingest sessions and activity
+- Optional pgBackRest backups; an [ingest protocol](docs/ingest-protocol.md) for writing MCU firmware
+
+See [tools/wiretap-backend/README.md](tools/wiretap-backend/README.md) for setup and the archive-migration runbook.
 
 ## Tech Stack
 

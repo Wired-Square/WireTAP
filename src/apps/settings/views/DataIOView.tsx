@@ -127,6 +127,17 @@ const renderConnectionSummary = (profile: IOProfile, t: TFunction) => {
     );
   }
 
+  if (profile.kind === "wiretap") {
+    const url = c.url || "http://localhost:8423";
+    const db = c.database || "wiretap";
+    return (
+      <div className="flex flex-wrap gap-2">
+        <SummaryBadge label={s("url")} value={url} />
+        <SummaryBadge label={s("db")} value={db} />
+      </div>
+    );
+  }
+
   if (profile.kind === "gvret_tcp") {
     const host = c.host || "192.168.1.100";
     const port = c.port || "23";

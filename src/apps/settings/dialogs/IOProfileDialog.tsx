@@ -91,6 +91,7 @@ export default function IOProfileDialog({
   // Check password storage status (only mqtt and postgres have password fields)
   const conn = profileForm.connection;
   const isPasswordSecurelyStored = !!('_password_stored' in conn && conn._password_stored);
+  const isApiKeySecurelyStored = !!('_api_key_stored' in conn && conn._api_key_stored);
   // Legacy password exists if there's a password in the original profile that isn't marked as securely stored
   const origConn = originalProfile?.connection;
   const hasLegacyPassword = !!(
@@ -492,6 +493,7 @@ export default function IOProfileDialog({
               {availableKinds.includes("modbus_tcp") && <option value="modbus_tcp">{t("ioProfileDialog.kinds.modbus_tcp")}</option>}
               {availableKinds.includes("mqtt") && <option value="mqtt">{t("ioProfileDialog.kinds.mqtt")}</option>}
               {availableKinds.includes("postgres") && <option value="postgres">{t("ioProfileDialog.kinds.postgres")}</option>}
+              {availableKinds.includes("wiretap") && <option value="wiretap">{t("ioProfileDialog.kinds.wiretap")}</option>}
               {availableKinds.includes("serial") && <option value="serial">{t("ioProfileDialog.kinds.serial")}</option>}
               {availableKinds.includes("slcan") && <option value="slcan">{t("ioProfileDialog.kinds.slcan")}</option>}
               {availableKinds.includes("socketcan") && <option value="socketcan">{t("ioProfileDialog.kinds.socketcan")}</option>}
@@ -781,6 +783,57 @@ export default function IOProfileDialog({
               </FormField>
 
               {/* Note: Framing for serial_raw is handled client-side in Discovery mode */}
+
+              <FormField label={t("ioProfileDialog.postgres.defaultSpeed")} variant="default">
+                <Select
+                  variant="default"
+                  value={profileForm.connection.default_speed || "1"}
+                  onChange={(e) => onUpdateConnectionField("default_speed", e.target.value)}
+                >
+                  <option value="0.25">{t("ioProfileDialog.postgres.speeds.025")}</option>
+                  <option value="0.5">{t("ioProfileDialog.postgres.speeds.05")}</option>
+                  <option value="1">{t("ioProfileDialog.postgres.speeds.1")}</option>
+                  <option value="2">{t("ioProfileDialog.postgres.speeds.2")}</option>
+                  <option value="10">{t("ioProfileDialog.postgres.speeds.10")}</option>
+                  <option value="30">{t("ioProfileDialog.postgres.speeds.30")}</option>
+                  <option value="60">{t("ioProfileDialog.postgres.speeds.60")}</option>
+                  <option value="0">{t("ioProfileDialog.postgres.speeds.noLimit")}</option>
+                </Select>
+              </FormField>
+            </div>
+          )}
+
+          {/* WireTAP Backend (HTTP API) */}
+          {profileForm.kind === "wiretap" && (
+            <div className={`${spaceYDefault} border-t ${borderDefault} pt-6`}>
+              <h3 className={h3}>{t("ioProfileDialog.wiretap.title")}</h3>
+              <p className={caption}>{t("ioProfileDialog.wiretap.description")}</p>
+
+              <FormField label={t("ioProfileDialog.wiretap.url")} variant="default">
+                <Input
+                  variant="default"
+                  value={profileForm.connection.url || ""}
+                  onChange={(e) => onUpdateConnectionField("url", e.target.value)}
+                  placeholder={t("ioProfileDialog.wiretap.urlPlaceholder")}
+                />
+              </FormField>
+
+              <SecurePasswordField
+                label={t("ioProfileDialog.wiretap.apiKey")}
+                value={profileForm.connection.api_key || ""}
+                onChange={(value) => onUpdateConnectionField("api_key", value)}
+                isSecurelyStored={isApiKeySecurelyStored}
+                hasLegacyPassword={false}
+              />
+
+              <FormField label={t("ioProfileDialog.wiretap.database")} variant="default">
+                <Input
+                  variant="default"
+                  value={profileForm.connection.database || ""}
+                  onChange={(e) => onUpdateConnectionField("database", e.target.value)}
+                  placeholder={t("ioProfileDialog.wiretap.databasePlaceholder")}
+                />
+              </FormField>
 
               <FormField label={t("ioProfileDialog.postgres.defaultSpeed")} variant="default">
                 <Select

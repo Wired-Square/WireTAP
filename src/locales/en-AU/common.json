@@ -226,5 +226,18 @@
     "searchModeTooltipBoth": "Search ID and Data columns",
     "searchModeTooltipId": "Search ID column",
     "searchModeTooltipData": "Search Data column"
+  },
+  "sendToBackend": {
+    "title": "Send capture to backend",
+    "description": "Upload \"{{name}}\" to a WireTAP backend for permanent storage.",
+    "noProfiles": "No WireTAP backend profiles configured. Add one in Settings → Data I/O first.",
+    "profile": "Backend profile",
+    "database": "Target database",
+    "newDatabase": "Create a new database",
+    "invalidName": "Use lowercase letters, digits and underscores; must start with a letter.",
+    "upload": "Upload",
+    "starting": "Starting upload…",
+    "progress": "Uploaded {{sent}} of {{total}} frames",
+    "done": "Uploaded {{count}} frames to {{database}}."
   }
 }

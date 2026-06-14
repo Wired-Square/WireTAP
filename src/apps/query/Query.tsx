@@ -15,6 +15,7 @@ import { useQueryStore } from "./stores/queryStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../settings/stores/settingsStore";
 import { buildCatalogPath } from "../../utils/catalogUtils";
+import { getIOKindLabel } from "../../utils/ioKindLabel";
 
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useQueryHandlers } from "./hooks/useQueryHandlers";
@@ -128,9 +129,13 @@ function QueryInner() {
   }, [catalogPath, setParsedCatalog]);
 
 
-  // Filter profiles to postgres only
+  // Filter profiles to database-backed kinds (direct PostgreSQL or the
+  // WireTAP backend API — both answer the same analytical queries).
   const postgresProfiles = useMemo(
-    () => (settings?.io_profiles ?? []).filter((p) => p.kind === "postgres"),
+    () =>
+      (settings?.io_profiles ?? []).filter(
+        (p) => p.kind === "postgres" || p.kind === "wiretap"
+      ),
     [settings?.io_profiles]
   );
 
@@ -365,7 +370,13 @@ function QueryInner() {
   // Protocol badge for data source
   const protocolBadges: ProtocolBadge[] = useMemo(() => {
     if (captureId) return [{ label: t("protocols.capture"), color: "amber" as const }];
-    if (profileId) return [{ label: t("protocols.postgres"), color: "blue" as const }];
+    if (profileId) {
+      const profile = (settings?.io_profiles ?? []).find((p) => p.id === profileId);
+      const label = profile?.kind === "wiretap"
+        ? getIOKindLabel("wiretap")
+        : t("protocols.postgres");
+      return [{ label, color: "blue" as const }];
+    }
     return [];
   }, [captureId, profileId]);
 

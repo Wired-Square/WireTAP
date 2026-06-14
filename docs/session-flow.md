@@ -70,6 +70,7 @@ with `multi_source: false` cannot be combined with others.
 | FrameLink         | [io/framelink/](../src-tauri/src/io/framelink/) | realtime | (per rule) | ✓ | ✗        | ✓     |
 | Virtual device    | [io/virtual_device/](../src-tauri/src/io/virtual_device/) | realtime | can\|serial | loopback | loopback | ✓ |
 | PostgreSQL        | [io/recorded/postgres.rs](../src-tauri/src/io/recorded/postgres.rs) | recorded | can | ✗ | ✗ | ✗ |
+| WireTAP backend   | [io/recorded/backend_api.rs](../src-tauri/src/io/recorded/backend_api.rs) | recorded | can | ✗ | ✗ | ✗ |
 | Capture replay    | [io/recorded/capture.rs](../src-tauri/src/io/recorded/capture.rs) | capture | (inherited) | ✗ | ✗ | ✗ |
 
 ¹ Framed serial (SLIP, Modbus RTU, delimiter) emits frames, not raw bytes.

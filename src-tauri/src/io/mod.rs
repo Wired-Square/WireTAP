@@ -39,6 +39,7 @@ pub use recorded::{
     Delimiter, SequenceGap, TimestampUnit,
 };
 pub use recorded::{PostgresConfig, PostgresSource, PostgresSourceOptions, PostgresSourceType};
+pub use recorded::{BackendApiConfig, BackendApiSource, BackendApiSourceOptions};
 
 // Re-export codec types (platform-specific codecs are conditionally exported from codec.rs)
 #[allow(unused_imports)]

@@ -5,11 +5,11 @@
 import type { IOProfile } from '../apps/settings/stores/settingsStore';
 
 /** Profile kinds that support time range filtering for bookmarks */
-const TIME_RANGE_CAPABLE_KINDS = ['postgres'] as const;
+const TIME_RANGE_CAPABLE_KINDS = ['postgres', 'wiretap'] as const;
 
 /**
  * Filter profiles to only those that support time range queries.
- * Currently only PostgreSQL profiles support this capability.
+ * PostgreSQL and WireTAP backend profiles support this capability.
  */
 export function getTimeRangeCapableProfiles(profiles: IOProfile[]): IOProfile[] {
   return profiles.filter(p =>

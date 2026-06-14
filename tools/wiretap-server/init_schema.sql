@@ -1,8 +1,16 @@
 -- wiretap-schema-postgres.sql
--- Version: 20260113
--- Schema for raw CAN frames + decoded signals
+-- Version: 20260612
+-- Schema for raw CAN frames + decoded signals (TimescaleDB hypertable)
+--
+-- Requires the timescaledb extension (PostgreSQL 14+):
+--   - add timescaledb to shared_preload_libraries and restart Postgres
+--   - CREATE EXTENSION needs superuser
+-- Existing pre-TimescaleDB databases should be migrated with
+-- migrate_to_timescale.py rather than re-running this file.
 
 SET client_min_messages = NOTICE;
+
+CREATE EXTENSION IF NOT EXISTS timescaledb;
 
 -- ----------------------------------------
 -- Helper: safe byte accessor for bytea
@@ -16,48 +24,86 @@ $$;
 -- ----------------------------------------
 -- Raw Frames
 -- ----------------------------------------
+-- Notes vs the pre-TimescaleDB schema:
+--   - no row_id: nothing reads it, and a serial PK fights hypertable
+--     partitioning (a PK must include the partition column)
+--   - no stored id_hex/data_hex: redundant storage (100+ GB/year);
+--     the convenience views below compute them on the fly
 CREATE TABLE IF NOT EXISTS public.can_frame (
-  row_id      BIGSERIAL   PRIMARY KEY,
   ts          timestamptz NOT NULL,               -- message/kernel receive time
-  ingest_ts   timestamptz NOT NULL DEFAULT now(), -- ingest time 
+  ingest_ts   timestamptz NOT NULL DEFAULT now(), -- ingest time
   id          integer     NOT NULL,               -- arbitration id (decimal)
-  id_hex      text GENERATED ALWAYS AS (          -- derived from id + extended
-                  lpad(upper(to_hex(id)),
-                  CASE WHEN extended THEN 8 ELSE 3 END, '0')
-               ) STORED,
   extended    boolean     NOT NULL,               -- 11-bit if false or 29-bit if true
-  dlc         smallint    NOT NULL                 -- data length (0..8 for Classic CAN or 0..64 for FD)
+  dlc         smallint    NOT NULL                -- data length (0..8 for Classic CAN or 0..64 for FD)
                 CHECK (dlc >= 0 AND dlc <= 64),
   is_fd       boolean     NOT NULL,               -- CAN FD flag
   data_bytes  bytea       NOT NULL,               -- raw payload
-  data_hex    text GENERATED ALWAYS AS (          -- derived from data_bytes
-                  upper(encode(data_bytes, 'hex'))
-               ) STORED,
   bus         integer     NOT NULL DEFAULT 0,     -- gvret bus id
   dir         text        NOT NULL DEFAULT 'rx'   -- gvret frame direction (rx/tx)
                 CHECK (dir IN ('rx', 'tx'))
 );
 
--- Helpful indexes (time- and id-oriented, DESC for "recent first" queries)
-CREATE INDEX IF NOT EXISTS idx_can_frame_ts
-  ON public.can_frame (ts DESC);
+-- 1-day chunks: ~5-10M rows/chunk at typical capture rates, good
+-- chunk exclusion for hour/day analysis windows, ~365 chunks/year.
+SELECT create_hypertable('public.can_frame', 'ts',
+  chunk_time_interval => INTERVAL '1 day', if_not_exists => TRUE);
+
+-- The hypertable provides a (ts) index per chunk automatically; the only
+-- other predicate used by WireTAP is per-arbitration-id over time.
 CREATE INDEX IF NOT EXISTS idx_can_frame_id_ts
   ON public.can_frame (id, ts DESC);
-CREATE INDEX IF NOT EXISTS idx_can_frame_id_extended_ts
-  ON public.can_frame (id, extended, ts DESC);
-CREATE INDEX IF NOT EXISTS idx_can_frame_id_ts_row_id_desc
-  ON public.can_frame (id, ts DESC, row_id DESC);
-CREATE INDEX IF NOT EXISTS idx_can_frame_iface_ts
-  ON public.can_frame (bus, ts DESC);
-CREATE INDEX IF NOT EXISTS idx_can_frame_dir_ts
-  ON public.can_frame (dir, ts DESC);
+
+-- Columnar compression: frames of one arbitration id are highly
+-- self-similar, so segment by id and order by ts (delta-of-delta).
+ALTER TABLE public.can_frame SET (
+  timescaledb.compress,
+  timescaledb.compress_segmentby = 'id',
+  timescaledb.compress_orderby   = 'ts'
+);
+
+-- Compress chunks once they are comfortably past any plausible
+-- outage + disk-cache drain window (late writes land uncompressed).
+SELECT add_compression_policy('public.can_frame',
+  compress_after => INTERVAL '7 days', if_not_exists => TRUE);
+
+-- Optional retention: uncomment to discard frames older than 24 months.
+-- SELECT add_retention_policy('public.can_frame', INTERVAL '24 months');
+
+-- ----------------------------------------
+-- Hourly rollup (continuous aggregate)
+-- ----------------------------------------
+-- Makes frame inventory / catalog coverage near-instant instead of
+-- scanning the raw table. Maintained incrementally by a background job;
+-- materialized_only = false folds in the not-yet-materialised tail.
+CREATE MATERIALIZED VIEW IF NOT EXISTS public.can_frame_hourly
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+SELECT
+  time_bucket(INTERVAL '1 hour', ts) AS bucket,
+  id, extended, bus,
+  count(*)  AS frame_count,
+  min(ts)   AS first_ts,
+  max(ts)   AS last_ts,
+  max(dlc)  AS max_dlc
+FROM public.can_frame
+GROUP BY 1, 2, 3, 4
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('public.can_frame_hourly',
+  start_offset      => INTERVAL '3 hours',
+  end_offset        => INTERVAL '1 hour',
+  schedule_interval => INTERVAL '30 minutes',
+  if_not_exists     => TRUE);
 
 -- ----------------------------------------
 -- Convenience view: expose b0..b7
 -- ----------------------------------------
 CREATE OR REPLACE VIEW public.can_frame_bytes AS
 SELECT
-  row_id, ts, ingest_ts, id, id_hex, extended, dlc, is_fd, data_bytes, data_hex, bus, dir,
+  ts, ingest_ts, id,
+  lpad(upper(to_hex(id)), CASE WHEN extended THEN 8 ELSE 3 END, '0') AS id_hex,
+  extended, dlc, is_fd, data_bytes,
+  upper(encode(data_bytes, 'hex')) AS data_hex,
+  bus, dir,
   public.get_byte_safe(data_bytes, 0)  AS b0,
   public.get_byte_safe(data_bytes, 1)  AS b1,
   public.get_byte_safe(data_bytes, 2)  AS b2,
@@ -73,7 +119,11 @@ FROM public.can_frame;
 -- ----------------------------------------
 CREATE OR REPLACE VIEW public.can_fd_frame_bytes AS
 SELECT
-  row_id, ts, ingest_ts, id, id_hex, extended, dlc, is_fd, data_bytes, data_hex, bus, dir,
+  ts, ingest_ts, id,
+  lpad(upper(to_hex(id)), CASE WHEN extended THEN 8 ELSE 3 END, '0') AS id_hex,
+  extended, dlc, is_fd, data_bytes,
+  upper(encode(data_bytes, 'hex')) AS data_hex,
+  bus, dir,
   public.get_byte_safe(data_bytes, 0)  AS b0,
   public.get_byte_safe(data_bytes, 1)  AS b1,
   public.get_byte_safe(data_bytes, 2)  AS b2,
@@ -141,9 +191,16 @@ SELECT
 FROM public.can_frame;
 
 -- ----------------------------------------
--- Import function
+-- Import function (legacy)
 -- ----------------------------------------
-CREATE OR REPLACE FUNCTION public.ingest_can_frame(
+-- Kept for compatibility with older wiretap-server deployments
+-- ([postgres].write_mode = "function"). New deployments use COPY directly.
+-- Signature change from the pre-TimescaleDB schema: RETURNS void (row_id
+-- no longer exists), so the old definition must be dropped first.
+DROP FUNCTION IF EXISTS public.ingest_can_frame(
+  timestamptz, boolean, boolean, integer, text, smallint, bytea, integer, text
+);
+CREATE FUNCTION public.ingest_can_frame(
   _ts timestamptz,
   _extended boolean,
   _is_fd boolean,
@@ -153,11 +210,10 @@ CREATE OR REPLACE FUNCTION public.ingest_can_frame(
   _data_bytes bytea DEFAULT NULL,
   _bus integer DEFAULT 0,
   _dir text DEFAULT 'rx'
-) RETURNS bigint
+) RETURNS void
 LANGUAGE plpgsql AS $$
 DECLARE
   v_id integer;
-  v_row_id bigint;
 BEGIN
   -- Exactly one of id / id_hex must be provided
   IF (_id IS NULL) = (_id_hex IS NULL) THEN
@@ -178,10 +234,7 @@ BEGIN
   INSERT INTO public.can_frame
     (ts, id, extended, dlc, is_fd, data_bytes, bus, dir)
   VALUES
-    (_ts, v_id, _extended, _dlc, _is_fd, _data_bytes, _bus, _dir)
-  RETURNING row_id INTO v_row_id;
-
-  RETURN v_row_id;
+    (_ts, v_id, _extended, _dlc, _is_fd, _data_bytes, _bus, _dir);
 END $$;
 
 -- ----------------------------------------
@@ -219,7 +272,7 @@ CREATE INDEX IF NOT EXISTS events_key_idx
 -- ----------------------------------------
 GRANT USAGE ON SCHEMA public TO candor;
 GRANT INSERT, SELECT ON TABLE public.can_frame TO candor;
-GRANT USAGE ON SEQUENCE public.can_frame_row_id_seq TO candor;
+GRANT SELECT ON public.can_frame_hourly TO candor;
 GRANT EXECUTE ON FUNCTION public.ingest_can_frame(
   timestamptz, boolean, boolean, integer, text, smallint, bytea, integer, text
 ) TO candor;

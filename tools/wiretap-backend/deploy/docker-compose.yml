@@ -1,0 +1,49 @@
+name: wiretap-backend
+
+# Portable production deployment for the WireTAP backend. Runs on any Docker
+# host — a generic NAS, a VM, or a TrueNAS SCALE Custom App.
+#
+# Unlike ../docker-compose.yml (which BUILDS the image and is meant for dev),
+# this references a PREBUILT image so it works on hosts that can't build (e.g.
+# the TrueNAS app system). Build and distribute the image first — see
+# deploy/README.md. Database backups are left to the host (ZFS snapshots on
+# TrueNAS); the pgBackRest sidecar is intentionally omitted.
+#
+# Configure via a .env file beside this one (see .env.example).
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    command: postgres -c shared_preload_libraries=timescaledb
+    volumes:
+      # Bind-mount so the data lives on a host dataset (ZFS-snapshottable on
+      # TrueNAS) rather than an opaque Docker volume.
+      - ${WIRETAP_DATA:-./data}/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    restart: unless-stopped
+    # Not published — all access goes through the backend API. For a one-off
+    # archive migration, temporarily add:
+    # ports: ["127.0.0.1:5432:5432"]
+
+  backend:
+    image: ${WIRETAP_IMAGE:-wiretap-backend:latest}
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      WIRETAP_ADMIN_KEY: ${WIRETAP_ADMIN_KEY:-}
+      WIRETAP_PG_HOST: timescaledb
+      WIRETAP_DEFAULT_DB: ${WIRETAP_DEFAULT_DB:-wiretap}
+      WIRETAP_AUTO_CREATE: ${WIRETAP_AUTO_CREATE:-true}
+      RUST_LOG: ${RUST_LOG:-wiretap_backend=info}
+    ports:
+      - "${WIRETAP_HTTP_PORT:-8423}:8423"    # HTTP API + /admin UI
+      - "${WIRETAP_INGEST_PORT:-9323}:9323"  # binary ingest (MCUs, Pi forward mode)
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped

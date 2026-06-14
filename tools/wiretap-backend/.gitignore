@@ -1,0 +1,6 @@
+target/
+.env
+docker-compose.override.yml
+admin-ui/node_modules/
+admin-ui/dist/
+admin-ui/*.tsbuildinfo

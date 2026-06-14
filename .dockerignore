@@ -1,0 +1,8 @@
+# Build context allowlist for tools/wiretap-backend/Dockerfile (context = repo
+# root, so the embedded init_schema.sql is reachable). Everything else stays out.
+*
+!tools/wiretap-backend
+tools/wiretap-backend/target
+tools/wiretap-backend/admin-ui/node_modules
+tools/wiretap-backend/admin-ui/dist
+!tools/wiretap-server/init_schema.sql

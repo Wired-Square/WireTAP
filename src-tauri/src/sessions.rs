@@ -23,7 +23,8 @@ use crate::{
         MqttConfig, MqttSource,
         VirtualDeviceConfig, VirtualSource, VirtualInterfaceConfig, VirtualTrafficType,
         ModbusRole, IOBroker, SourceConfig,
-        PostgresConfig, PostgresSource, PostgresSourceOptions, PostgresSourceType,
+        BackendApiConfig, BackendApiSource, BackendApiSourceOptions, PostgresConfig,
+        PostgresSource, PostgresSourceOptions, PostgresSourceType,
         CanTransmitFrame, TransmitResult,
         emit_device_probe, DeviceProbePayload,
         set_wake_settings as io_set_wake_settings,
@@ -618,6 +619,58 @@ pub async fn create_reader_session(
                 options,
             ))
         }
+        "wiretap" => {
+            let config = BackendApiConfig {
+                base_url: profile
+                    .connection
+                    .get("url")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| "WireTAP backend URL is required".to_string())?
+                    .trim_end_matches('/')
+                    .to_string(),
+                api_key: get_secure_credential(&profile, "api_key").unwrap_or_default(),
+                database: profile
+                    .connection
+                    .get("database")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("wiretap")
+                    .to_string(),
+            };
+
+            let start_from_profile =
+                profile.connection.get("start").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let end_from_profile =
+                profile.connection.get("end").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let limit_from_profile = profile
+                .connection
+                .get("limit")
+                .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())));
+
+            let options = BackendApiSourceOptions {
+                start: start_time.or(start_from_profile),
+                end: end_time.or(end_from_profile),
+                limit: limit.or(limit_from_profile),
+                speed: speed.unwrap_or_else(|| {
+                    profile
+                        .connection
+                        .get("speed")
+                        .and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                        .unwrap_or(0.0)
+                }),
+                batch_size: profile
+                    .connection
+                    .get("batch_size")
+                    .and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                    .unwrap_or(1000) as i32,
+            };
+
+            Box::new(BackendApiSource::new(
+                app.clone(),
+                session_id.clone(),
+                config,
+                options,
+            ))
+        }
         "modbus_tcp" => {
             let host = profile
                 .connection
@@ -860,7 +913,7 @@ pub async fn create_reader_session(
     // Playback sources (postgres) should NOT auto-start because frames would be emitted
     // before the frontend has registered its listener and set up event handlers.
     // The frontend will call start_reader_session after registering the listener.
-    let is_playback_source = matches!(profile.kind.as_str(), "postgres");
+    let is_playback_source = matches!(profile.kind.as_str(), "postgres" | "wiretap");
 
     if result.is_new && !is_playback_source {
         tlog!("[create_reader_session] Auto-starting new session '{}' (device type: {})", session_id, profile.kind);

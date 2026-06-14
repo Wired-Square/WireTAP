@@ -1324,7 +1324,7 @@ export function useIOSessionManager(
     // Set default speed from the selected profile if it has one (non-capture only)
     if (profileId && !isCaptureProfileId(profileId)) {
       const profile = ioProfiles.find((p) => p.id === profileId);
-      if (profile && profile.kind === "postgres" && profile.connection?.default_speed) {
+      if (profile && (profile.kind === "postgres" || profile.kind === "wiretap") && profile.connection?.default_speed) {
         const defaultSpeed = parseFloat(profile.connection.default_speed);
         setPlaybackSpeedProp?.(defaultSpeed);
       }

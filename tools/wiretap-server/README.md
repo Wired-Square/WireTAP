@@ -122,7 +122,7 @@ dsn = "postgresql://candor:password@localhost:5432/candor"
 ./wiretap-server.py -C my-config.toml --iface can0,can1
 
 # Use environment variable for PostgreSQL DSN (avoids storing password in config)
-export PG_DSN="postgresql://candor:secret@dbhost:5432/candor"
+export PG_DSN="postgresql://wiretap:secret@dbhost:5432/candor"
 ./wiretap-server.py -C my-config.toml
 ```
 
@@ -157,7 +157,7 @@ Restart=on-failure
 RestartSec=5
 
 # Optional: Set PostgreSQL DSN via environment
-# Environment=PG_DSN=postgresql://candor:secret@localhost:5432/candor
+# Environment=PG_DSN=postgresql://wiretap:secret@localhost:5432/wiretap
 
 [Install]
 WantedBy=multi-user.target
@@ -305,13 +305,27 @@ CREATE DATABASE candor OWNER candor;
 \q
 ```
 
-### 3. Initialize the Schema
+### 3. Install TimescaleDB
+
+The schema stores frames in a TimescaleDB hypertable (1-day chunks, columnar
+compression segmented by arbitration id) — long-term archives compress
+roughly 10–20× and stay fast to query. Install the extension for your
+PostgreSQL version (packages exist for Debian/Ubuntu/Raspberry Pi OS,
+see https://docs.timescale.com/self-hosted/latest/install/), then:
+
+```bash
+# Add to postgresql.conf (then restart PostgreSQL):
+#   shared_preload_libraries = 'timescaledb'
+sudo systemctl restart postgresql
+```
+
+### 4. Initialize the Schema
 
 ```bash
 sudo -u postgres psql -d candor -f init_schema.sql
 ```
 
-### 4. Configure the Server
+### 5. Configure the Server
 
 Update your config file:
 
@@ -327,6 +341,61 @@ Or use an environment variable:
 
 ```bash
 export PG_DSN="postgresql://candor:your-secure-password@localhost:5432/candor"
+```
+
+### Migrating an Existing Archive into a TimescaleDB Backend
+
+`migrate_to_timescale.py` copies an existing `can_frame` table into a
+TimescaleDB hypertable on **another** server — typically a legacy archive
+into the WireTAP backend container, whose database already has the hypertable
+schema. It works day-by-day: bulk-copy (binary COPY), validate each day by
+row count + checksum on both ends, record progress for resumability, and
+compress the target chunk. Re-run any time — completed days are skipped. The
+slimmed target drops the redundant stored hex columns and unused indexes, so
+expect the on-disk size to fall by an order of magnitude.
+
+Switch new writes to the backend first (e.g. the Pi's `[forward]` mode) so the
+source archive is static during the move.
+
+```bash
+SRC=postgresql://user:pass@old-host:5432/candor
+TGT=postgresql://postgres:pass@127.0.0.1:5432/wiretap   # backend container
+
+./migrate_to_timescale.py --source-dsn "$SRC" --target-dsn "$TGT"
+./migrate_to_timescale.py --source-dsn "$SRC" --target-dsn "$TGT" --status
+```
+
+The script needs `psycopg2` (`pip install psycopg2-binary`) and network access
+to both databases. The container's Postgres isn't published by default — either
+run the script on the compose network or temporarily uncomment
+`127.0.0.1:5432:5432` in `tools/wiretap-backend/docker-compose.yml`.
+
+## Binary Ingest API (Microcontroller Clients)
+
+The server can also accept CAN frames over a compact binary TCP protocol,
+designed for microcontroller capture devices (ESP32, STM32, …) that can't
+speak PostgreSQL directly. Frames arrive in CRC-checked, ACKed batches
+(~18 bytes per classic frame) and flow through the same batcher, COPY
+writer and disk cache as local SocketCAN frames. Devices without a wall
+clock can send relative timestamps. See
+[docs/ingest-protocol.md](../../docs/ingest-protocol.md) for the wire format.
+
+```toml
+[ingest]
+enable = true
+port = 9323
+token = "CHANGE_ME"   # or env WIRETAP_INGEST_TOKEN
+```
+
+Set `[server].iface = ""` to run an ingest-only deployment (no local CAN
+hardware). Test connectivity with the reference client:
+
+```bash
+# Loopback protocol self-test (no PostgreSQL needed):
+./test_ingest_client.py
+
+# Send synthetic batches to a live server:
+./test_ingest_client.py --host pi.local --port 9323 --token SECRET
 ```
 
 ## Connecting from WireTAP Desktop
@@ -407,10 +476,12 @@ sudo journalctl -u wiretap-server.service -n 50
 usage: wiretap-server.py [-h] [-C CONFIG] [--iface IFACE] [--bus-offset N]
                         [--host HOST] [--port PORT] [--echo] [--colour]
                         [--default-dir DIR] [--can-fd] [--pg-enable]
-                        [--pg-dsn DSN] [--pg-func FUNC] [--pg-batch-size N]
-                        [--pg-flush-interval SEC] [--pg-queue-size N]
-                        [--pg-dir DIR] [--log-level LEVEL]
-                        [--stats-interval SEC]
+                        [--pg-dsn DSN] [--pg-write-mode MODE] [--pg-func FUNC]
+                        [--pg-batch-size N] [--pg-flush-interval SEC]
+                        [--pg-queue-size N] [--pg-dir DIR]
+                        [--ingest-enable] [--ingest-host HOST]
+                        [--ingest-port PORT] [--ingest-token TOKEN]
+                        [--log-level LEVEL] [--stats-interval SEC]
 
 Options:
   -C, --config CONFIG     Path to TOML config file
@@ -423,6 +494,10 @@ Options:
   --can-fd                Enable CAN FD support
   --pg-enable             Enable PostgreSQL ingest
   --pg-dsn DSN            PostgreSQL connection string
+  --pg-write-mode MODE    Insert mechanism: copy (default) or function
+  --ingest-enable         Enable the binary TCP ingest listener
+  --ingest-port PORT      Ingest listen port (default 9323)
+  --ingest-token TOKEN    Shared auth token (or WIRETAP_INGEST_TOKEN env)
   --log-level LEVEL       Log level (DEBUG, INFO, WARNING, ERROR)
 ```
 

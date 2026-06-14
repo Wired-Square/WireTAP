@@ -91,6 +91,10 @@ pub async fn db_cancel_query(query_id: String) -> Result<(), String> {
         // Remove from running queries
         unregister_query(&query_id).await;
         Ok(())
+    } else if crate::apiclient::cancel_query(&query_id).await {
+        // In-flight query against a wiretap (HTTP) profile
+        tlog!("[dbquery] Cancelled API query: {}", query_id);
+        Ok(())
     } else {
         Err(format!("Query not found: {}", query_id))
     }
@@ -542,6 +546,13 @@ fn get_profile_password(profile: &IOProfile) -> Option<String> {
     }
 }
 
+/// Return the profile if it is an API-backed "wiretap" profile, so callers
+/// that otherwise use `connect_profile` can dispatch to the HTTP client.
+async fn profile_if_wiretap(app: &AppHandle, profile_id: &str) -> Option<IOProfile> {
+    let settings = load_settings(app.clone()).await.ok()?;
+    find_profile(&settings, profile_id).filter(|p| p.kind == "wiretap")
+}
+
 /// Connect to a PostgreSQL profile and return a ready client. Spawns the
 /// connection driver task. Shared by the headless analysis queries.
 async fn connect_profile(
@@ -568,6 +579,30 @@ async fn connect_profile(
     Ok(client)
 }
 
+/// True when the hourly continuous aggregate (see init_schema.sql) exists on
+/// this database. Probed per connection — it is a sub-millisecond catalog
+/// lookup and keeps the app working against non-TimescaleDB databases.
+async fn rollup_available(client: &tokio_postgres::Client) -> bool {
+    client
+        .query_one(
+            "SELECT to_regclass('public.can_frame_hourly') IS NOT NULL",
+            &[],
+        )
+        .await
+        .map(|r| r.get::<_, bool>(0))
+        .unwrap_or(false)
+}
+
+fn inventory_row(r: &tokio_postgres::Row) -> (u32, bool, i64, i64, i64, u8) {
+    let id: i32 = r.get("id");
+    let extended: bool = r.get("extended");
+    let cnt: i64 = r.get("cnt");
+    let first_us: f64 = r.get("first_us");
+    let last_us: f64 = r.get("last_us");
+    let max_dlc: i32 = r.get("max_dlc");
+    (id as u32, extended, cnt, first_us as i64, last_us as i64, max_dlc as u8)
+}
+
 /// Per-frame-id rollup for a PostgreSQL source: (frame_id, is_extended, count,
 /// first_us, last_us, max_dlc). Time bounds are optional RFC3339 strings.
 pub async fn db_frame_inventory(
@@ -576,7 +611,29 @@ pub async fn db_frame_inventory(
     start_time: Option<String>,
     end_time: Option<String>,
 ) -> Result<Vec<(u32, bool, i64, i64, i64, u8)>, String> {
+    if let Some(profile) = profile_if_wiretap(app, profile_id).await {
+        return crate::apiclient::frame_inventory(&profile, start_time, end_time).await;
+    }
     let client = connect_profile(app, profile_id).await?;
+
+    // Full-archive inventory (no time bounds) reads the hourly continuous
+    // aggregate when present — near-instant instead of scanning the raw
+    // table. Time-bounded inventories stay on the raw table for exact edges.
+    if start_time.is_none() && end_time.is_none() && rollup_available(&client).await {
+        let rows = client
+            .query(
+                "SELECT id, extended, sum(frame_count)::int8 AS cnt, \
+                 (EXTRACT(EPOCH FROM min(first_ts)) * 1000000)::float8 AS first_us, \
+                 (EXTRACT(EPOCH FROM max(last_ts)) * 1000000)::float8 AS last_us, \
+                 max(max_dlc)::int4 AS max_dlc \
+                 FROM public.can_frame_hourly \
+                 GROUP BY id, extended ORDER BY id, extended",
+                &[],
+            )
+            .await
+            .map_err(|e| format!("Inventory rollup query failed: {}", e))?;
+        return Ok(rows.iter().map(inventory_row).collect());
+    }
 
     let mut sql = String::from(
         "SELECT id, extended, COUNT(*)::int8 AS cnt, \
@@ -606,18 +663,7 @@ pub async fn db_frame_inventory(
         .await
         .map_err(|e| format!("Inventory query failed: {}", e))?;
 
-    Ok(rows
-        .iter()
-        .map(|r| {
-            let id: i32 = r.get("id");
-            let extended: bool = r.get("extended");
-            let cnt: i64 = r.get("cnt");
-            let first_us: f64 = r.get("first_us");
-            let last_us: f64 = r.get("last_us");
-            let max_dlc: i32 = r.get("max_dlc");
-            (id as u32, extended, cnt, first_us as i64, last_us as i64, max_dlc as u8)
-        })
-        .collect())
+    Ok(rows.iter().map(inventory_row).collect())
 }
 
 /// Fetch up to `limit` raw payloads for one frame id from a PostgreSQL source,
@@ -629,6 +675,9 @@ pub async fn db_fetch_frame_payloads(
     is_extended: Option<bool>,
     limit: u32,
 ) -> Result<Vec<Vec<u8>>, String> {
+    if let Some(profile) = profile_if_wiretap(app, profile_id).await {
+        return crate::apiclient::fetch_frame_payloads(&profile, frame_id, is_extended, limit).await;
+    }
     let client = connect_profile(app, profile_id).await?;
     let frame_id_i32 = frame_id as i32;
 
@@ -686,6 +735,9 @@ pub async fn db_query_byte_changes(
         profile.id, profile.kind, profile.name);
     tlog!("[dbquery] Profile connection config: {:?}", profile.connection);
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::byte_changes(&profile, frame_id, byte_index, is_extended, start_time, end_time, limit, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -861,6 +913,9 @@ pub async fn db_query_frame_changes(
         profile.id, profile.kind, profile.name);
     tlog!("[dbquery] Profile connection config: {:?}", profile.connection);
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::frame_changes(&profile, frame_id, is_extended, start_time, end_time, limit, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -1046,6 +1101,9 @@ pub async fn db_query_mirror_validation(
     tlog!("[dbquery] Found profile: id='{}', kind='{}', name='{}'",
         profile.id, profile.kind, profile.name);
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::mirror_validation(&profile, mirror_frame_id, source_frame_id, is_extended, tolerance_ms, start_time, end_time, limit, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -1240,6 +1298,9 @@ pub async fn db_query_activity(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::activity(&profile).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -1342,6 +1403,9 @@ pub async fn db_cancel_backend(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::signal_backend(&profile, pid, false).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -1391,6 +1455,9 @@ pub async fn db_terminate_backend(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::signal_backend(&profile, pid, true).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -1450,6 +1517,9 @@ pub async fn db_query_mux_statistics(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::mux_statistics(&profile, frame_id, mux_selector_byte, is_extended, include_16bit, payload_length, start_time, end_time, limit, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -1470,79 +1540,175 @@ pub async fn db_query_mux_statistics(
         }
     });
 
-    // Build SQL to fetch mux value + raw payload
+    // All aggregation happens in SQL — only per-case statistics cross the
+    // wire, not raw payloads. The shared source subquery samples the first
+    // `result_limit` frames in time order (deterministic across the three
+    // statements) so cost stays bounded on very busy IDs.
     let frame_id_i32 = frame_id as i32;
-    let mux_byte_i32 = mux_selector_byte as i32;
+    let mux = mux_selector_byte as i32;
+    let plen = payload_length as i32;
 
-    let mut param_idx = 1;
-    let frame_id_param = param_idx;
-    param_idx += 1;
-    let mux_byte_param = param_idx;
-    param_idx += 1;
-
-    let mut query = format!(
-        r#"SELECT
-            public.get_byte_safe(data_bytes, ${}::int4) as mux_value,
-            data_bytes
-        FROM public.can_frame
-        WHERE id = ${}::int4"#,
-        mux_byte_param, frame_id_param
+    let mut src = String::from(
+        "SELECT data_bytes FROM public.can_frame WHERE id = $1::int4",
     );
-
-    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32, &mux_byte_i32];
+    let mut param_idx = 2;
+    let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32];
 
     let is_extended_bool: bool;
     if let Some(ext) = is_extended {
         is_extended_bool = ext;
-        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        src.push_str(&format!(" AND extended = ${}::bool", param_idx));
         param_idx += 1;
         params.push(&is_extended_bool);
     }
 
     if let Some(ref start) = start_time {
-        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        src.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
         param_idx += 1;
         params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
     }
     if let Some(ref end) = end_time {
-        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
-        // param_idx not needed after last use
+        src.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
         params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
     }
 
-    // No ORDER BY — rows arrive in natural (time) order so the LIMIT samples
-    // evenly across all mux cases rather than exhausting case 0 first.
-    query.push_str(&format!(" LIMIT {}", result_limit));
+    src.push_str(&format!(
+        " AND octet_length(data_bytes) > {} ORDER BY ts LIMIT {}",
+        mux, result_limit
+    ));
 
-    tlog!("[dbquery] mux_statistics query:\n{}", query);
+    // Query 1: frame count per mux case
+    let count_query = format!(
+        "SELECT public.get_byte_safe(data_bytes, {mux})::int4 AS mux_value, \
+         COUNT(*)::int8 AS frame_count \
+         FROM ({src}) s GROUP BY 1 ORDER BY 1"
+    );
 
-    let rows = client
-        .query(&query, &params)
+    // Query 2: per-byte stats per mux case for bytes after the selector
+    let byte_query = format!(
+        "SELECT public.get_byte_safe(data_bytes, {mux})::int4 AS mux_value, \
+         b.idx::int4 AS byte_index, \
+         MIN(public.get_byte_safe(data_bytes, b.idx))::int4 AS min, \
+         MAX(public.get_byte_safe(data_bytes, b.idx))::int4 AS max, \
+         AVG(public.get_byte_safe(data_bytes, b.idx))::float8 AS avg, \
+         COUNT(DISTINCT public.get_byte_safe(data_bytes, b.idx))::int8 AS distinct_count, \
+         COUNT(public.get_byte_safe(data_bytes, b.idx))::int8 AS sample_count \
+         FROM ({src}) s \
+         CROSS JOIN generate_series({start_b}, {end_b}) AS b(idx) \
+         GROUP BY 1, 2 \
+         HAVING COUNT(public.get_byte_safe(data_bytes, b.idx)) > 0 \
+         ORDER BY 1, 2",
+        start_b = mux + 1,
+        end_b = plen - 1,
+    );
+
+    tlog!("[dbquery] mux_statistics byte query:\n{}", byte_query);
+
+    let count_rows = client
+        .query(&count_query, &params)
         .await
         .map_err(|e| {
             let err = format!("Query failed: {}", e);
             tlog!("[dbquery] {}", err);
             err
         })?;
+    let byte_rows = client
+        .query(&byte_query, &params)
+        .await
+        .map_err(|e| format!("Byte stats query failed: {}", e))?;
 
-    // Unregister before processing (query is done)
-    unregister_query(&query_id).await;
-
-    let rows_scanned = rows.len();
-    tlog!("[dbquery] mux_statistics: {} rows fetched", rows_scanned);
-
-    // Group payloads by mux value
-    let mut payloads_by_mux: BTreeMap<u16, Vec<Vec<u8>>> = BTreeMap::new();
-    for row in &rows {
+    let mut cases: BTreeMap<u16, MuxCaseStats> = BTreeMap::new();
+    let mut total_frames: u64 = 0;
+    for row in &count_rows {
         let mux_value: i32 = row.get("mux_value");
-        let data_bytes: Vec<u8> = row.get("data_bytes");
-        payloads_by_mux
-            .entry(mux_value as u16)
-            .or_default()
-            .push(data_bytes);
+        let frame_count: i64 = row.get("frame_count");
+        total_frames += frame_count as u64;
+        cases.insert(
+            mux_value as u16,
+            MuxCaseStats {
+                mux_value: mux_value as u16,
+                frame_count: frame_count as u64,
+                byte_stats: Vec::new(),
+                word16_stats: Vec::new(),
+            },
+        );
     }
 
-    let result = compute_mux_statistics(&payloads_by_mux, include_16bit, mux_selector_byte, payload_length);
+    for row in &byte_rows {
+        let mux_value: i32 = row.get("mux_value");
+        if let Some(case) = cases.get_mut(&(mux_value as u16)) {
+            case.byte_stats.push(BytePositionStats {
+                byte_index: row.get::<_, i32>("byte_index") as u8,
+                min: row.get::<_, i32>("min") as u8,
+                max: row.get::<_, i32>("max") as u8,
+                avg: row.get("avg"),
+                distinct_count: row.get::<_, i64>("distinct_count") as u32,
+                sample_count: row.get::<_, i64>("sample_count") as u64,
+            });
+        }
+    }
+
+    // Query 3 (optional): 16-bit words from adjacent byte pairs, LE and BE
+    if include_16bit {
+        let word_query = format!(
+            "SELECT mux_value::int4, start_byte::int4, \
+             MIN(le_val)::int4 AS le_min, MAX(le_val)::int4 AS le_max, \
+             AVG(le_val)::float8 AS le_avg, COUNT(DISTINCT le_val)::int8 AS le_distinct, \
+             MIN(be_val)::int4 AS be_min, MAX(be_val)::int4 AS be_max, \
+             AVG(be_val)::float8 AS be_avg, COUNT(DISTINCT be_val)::int8 AS be_distinct \
+             FROM (SELECT public.get_byte_safe(data_bytes, {mux}) AS mux_value, \
+                   w.idx AS start_byte, \
+                   public.get_byte_safe(data_bytes, w.idx) | \
+                   (public.get_byte_safe(data_bytes, w.idx + 1) << 8) AS le_val, \
+                   (public.get_byte_safe(data_bytes, w.idx) << 8) | \
+                   public.get_byte_safe(data_bytes, w.idx + 1) AS be_val \
+                   FROM ({src}) s \
+                   CROSS JOIN generate_series({start_b}, {end_b}, 2) AS w(idx)) t \
+             GROUP BY 1, 2 \
+             HAVING COUNT(le_val) > 0 \
+             ORDER BY 1, 2",
+            start_b = mux + 1,
+            end_b = plen - 2,
+        );
+
+        let word_rows = client
+            .query(&word_query, &params)
+            .await
+            .map_err(|e| format!("Word stats query failed: {}", e))?;
+
+        for row in &word_rows {
+            let mux_value: i32 = row.get("mux_value");
+            if let Some(case) = cases.get_mut(&(mux_value as u16)) {
+                let start_byte = row.get::<_, i32>("start_byte") as u8;
+                case.word16_stats.push(Word16Stats {
+                    start_byte,
+                    endianness: "le".to_string(),
+                    min: row.get::<_, i32>("le_min") as u16,
+                    max: row.get::<_, i32>("le_max") as u16,
+                    avg: row.get("le_avg"),
+                    distinct_count: row.get::<_, i64>("le_distinct") as u32,
+                });
+                case.word16_stats.push(Word16Stats {
+                    start_byte,
+                    endianness: "be".to_string(),
+                    min: row.get::<_, i32>("be_min") as u16,
+                    max: row.get::<_, i32>("be_max") as u16,
+                    avg: row.get("be_avg"),
+                    distinct_count: row.get::<_, i64>("be_distinct") as u32,
+                });
+            }
+        }
+    }
+
+    // Unregister before assembling (queries are done)
+    unregister_query(&query_id).await;
+
+    let rows_scanned = total_frames as usize;
+    let result = MuxStatisticsResult {
+        mux_byte: mux_selector_byte,
+        total_frames,
+        cases: cases.into_values().collect(),
+    };
     let elapsed = query_start.elapsed();
 
     tlog!("[dbquery] mux_statistics: {} cases, {} total frames in {}ms",
@@ -1583,6 +1749,9 @@ pub async fn db_query_first_last(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::first_last(&profile, frame_id, is_extended, start_time, end_time, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -1737,6 +1906,9 @@ pub async fn db_query_frequency(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::frequency(&profile, frame_id, is_extended, bucket_size_ms, start_time, end_time, limit, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -1768,37 +1940,47 @@ pub async fn db_query_frequency(
 
     let frame_id_i32 = frame_id as i32;
 
-    // Build query to fetch timestamps ordered
-    let mut param_idx = 1;
-    let frame_id_param = param_idx;
-    param_idx += 1;
-
-    let mut query = format!(
-        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us FROM public.can_frame WHERE id = ${}::int4",
-        frame_id_param
-    );
-
+    // Intervals (LAG) and bucket statistics are computed in SQL — only one
+    // row per bucket crosses the wire instead of every timestamp. The source
+    // subquery keeps the old sampling semantics (first `result_limit` frames
+    // in time order). Bucketing by trunc(timestamp_us / bucket_us) matches
+    // the previous Rust implementation exactly.
+    let mut src = String::from("SELECT ts FROM public.can_frame WHERE id = $1::int4");
+    let mut param_idx = 2;
     let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32];
 
     let is_extended_bool: bool;
     if let Some(ext) = is_extended {
         is_extended_bool = ext;
-        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        src.push_str(&format!(" AND extended = ${}::bool", param_idx));
         param_idx += 1;
         params.push(&is_extended_bool);
     }
 
     if let Some(ref start) = start_time {
-        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        src.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
         param_idx += 1;
         params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
     }
     if let Some(ref end) = end_time {
-        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
+        src.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
         params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
     }
 
-    query.push_str(&format!(" ORDER BY ts LIMIT {}", result_limit));
+    src.push_str(&format!(" ORDER BY ts LIMIT {}", result_limit));
+
+    let bucket_us = bucket_size_ms as i64 * 1000;
+    let query = format!(
+        "SELECT (trunc((EXTRACT(EPOCH FROM ts) * 1000000) / {bucket_us}) * {bucket_us})::float8 AS bucket_start_us, \
+         COUNT(*)::int8 AS frame_count, \
+         MIN(dt_us)::float8 AS min_interval_us, \
+         MAX(dt_us)::float8 AS max_interval_us, \
+         AVG(dt_us)::float8 AS avg_interval_us \
+         FROM (SELECT ts, EXTRACT(EPOCH FROM ts - LAG(ts) OVER (ORDER BY ts)) * 1000000 AS dt_us \
+               FROM ({src}) f) s \
+         WHERE dt_us IS NOT NULL \
+         GROUP BY 1 ORDER BY 1"
+    );
 
     tlog!("[dbquery] frequency query:\n{}", query);
 
@@ -1807,48 +1989,22 @@ pub async fn db_query_frequency(
         .await
         .map_err(|e| format!("Query failed: {}", e))?;
 
-    let rows_scanned = rows.len();
-    tlog!("[dbquery] frequency: {} rows fetched", rows_scanned);
-
-    // Extract timestamps
-    let timestamps: Vec<i64> = rows
-        .iter()
-        .map(|row| {
-            let ts: f64 = row.get("timestamp_us");
-            ts as i64
-        })
-        .collect();
-
-    // Compute intervals and bucket them
-    let bucket_us = bucket_size_ms as i64 * 1000;
-    let mut buckets: BTreeMap<i64, Vec<f64>> = BTreeMap::new();
-
-    for i in 1..timestamps.len() {
-        let interval_us = (timestamps[i] - timestamps[i - 1]) as f64;
-        // Bucket based on the second timestamp (the one that created the interval)
-        let bucket_start = (timestamps[i] / bucket_us) * bucket_us;
-        buckets.entry(bucket_start).or_default().push(interval_us);
-    }
-
-    // Compute statistics per bucket
     let mut results = Vec::new();
-    for (bucket_start, intervals) in &buckets {
-        let frame_count = intervals.len() as i64;
-        let min_interval_us = intervals.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max_interval_us = intervals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let avg_interval_us: f64 = intervals.iter().sum::<f64>() / frame_count as f64;
-
+    let mut rows_scanned: usize = 0;
+    for row in &rows {
+        let frame_count: i64 = row.get("frame_count");
+        rows_scanned += frame_count as usize;
         results.push(FrequencyBucket {
-            bucket_start_us: *bucket_start,
+            bucket_start_us: row.get::<_, f64>("bucket_start_us") as i64,
             frame_count,
-            min_interval_us,
-            max_interval_us,
-            avg_interval_us,
+            min_interval_us: row.get("min_interval_us"),
+            max_interval_us: row.get("max_interval_us"),
+            avg_interval_us: row.get("avg_interval_us"),
         });
     }
 
     let execution_time_ms = query_start.elapsed().as_millis() as u64;
-    tlog!("[dbquery] frequency: frame=0x{:X} ext={:?} | {} buckets from {} timestamps, {}ms",
+    tlog!("[dbquery] frequency: frame=0x{:X} ext={:?} | {} buckets from {} intervals, {}ms",
         frame_id, is_extended, results.len(), rows_scanned, execution_time_ms);
 
     unregister_query(&query_id).await;
@@ -1889,6 +2045,9 @@ pub async fn db_query_distribution(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::distribution(&profile, frame_id, byte_index, is_extended, start_time, end_time, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -2032,6 +2191,9 @@ pub async fn db_query_gap_analysis(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::gap_analysis(&profile, frame_id, is_extended, gap_threshold_ms, start_time, end_time, limit, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }
@@ -2063,37 +2225,40 @@ pub async fn db_query_gap_analysis(
 
     let frame_id_i32 = frame_id as i32;
 
-    // Build query to fetch all timestamps ordered
-    let mut param_idx = 1;
-    let frame_id_param = param_idx;
-    param_idx += 1;
-
-    let mut query = format!(
-        "SELECT (EXTRACT(EPOCH FROM ts) * 1000000)::float8 as timestamp_us FROM public.can_frame WHERE id = ${}::int4",
-        frame_id_param
-    );
-
+    // Gaps are found in SQL (LAG + threshold filter) — only the gaps that
+    // exceed the threshold cross the wire, instead of every timestamp.
+    let mut src = String::from("SELECT ts FROM public.can_frame WHERE id = $1::int4");
+    let mut param_idx = 2;
     let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = vec![&frame_id_i32];
 
     let is_extended_bool: bool;
     if let Some(ext) = is_extended {
         is_extended_bool = ext;
-        query.push_str(&format!(" AND extended = ${}::bool", param_idx));
+        src.push_str(&format!(" AND extended = ${}::bool", param_idx));
         param_idx += 1;
         params.push(&is_extended_bool);
     }
 
     if let Some(ref start) = start_time {
-        query.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
+        src.push_str(&format!(" AND ts >= (${}::text)::timestamptz", param_idx));
         param_idx += 1;
         params.push(start as &(dyn tokio_postgres::types::ToSql + Sync));
     }
     if let Some(ref end) = end_time {
-        query.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
+        src.push_str(&format!(" AND ts < (${}::text)::timestamptz", param_idx));
         params.push(end as &(dyn tokio_postgres::types::ToSql + Sync));
     }
 
-    query.push_str(" ORDER BY ts");
+    let threshold_param = format!("{:?}", gap_threshold_ms); // f64 -> SQL literal
+    let query = format!(
+        "SELECT (EXTRACT(EPOCH FROM prev_ts) * 1000000)::float8 AS gap_start_us, \
+         (EXTRACT(EPOCH FROM ts) * 1000000)::float8 AS gap_end_us, \
+         (EXTRACT(EPOCH FROM ts - prev_ts) * 1000)::float8 AS duration_ms \
+         FROM (SELECT ts, LAG(ts) OVER (ORDER BY ts) AS prev_ts FROM ({src}) f) s \
+         WHERE prev_ts IS NOT NULL \
+         AND (EXTRACT(EPOCH FROM ts - prev_ts) * 1000)::float8 > {threshold_param} \
+         ORDER BY duration_ms DESC LIMIT {result_limit}"
+    );
 
     tlog!("[dbquery] gap_analysis query:\n{}", query);
 
@@ -2103,35 +2268,14 @@ pub async fn db_query_gap_analysis(
         .map_err(|e| format!("Query failed: {}", e))?;
 
     let rows_scanned = rows.len();
-    tlog!("[dbquery] gap_analysis: {} rows fetched", rows_scanned);
-
-    // Extract timestamps and find gaps exceeding threshold
-    let threshold_us = gap_threshold_ms * 1000.0;
-    let mut results: Vec<GapResult> = Vec::new();
-
-    let mut prev_ts: Option<i64> = None;
-    for row in &rows {
-        let ts: f64 = row.get("timestamp_us");
-        let ts_i64 = ts as i64;
-
-        if let Some(prev) = prev_ts {
-            let gap_us = (ts_i64 - prev) as f64;
-            if gap_us > threshold_us {
-                results.push(GapResult {
-                    gap_start_us: prev,
-                    gap_end_us: ts_i64,
-                    duration_ms: gap_us / 1000.0,
-                });
-            }
-        }
-        prev_ts = Some(ts_i64);
-    }
-
-    // Sort by duration descending (longest gaps first)
-    results.sort_by(|a, b| b.duration_ms.partial_cmp(&a.duration_ms).unwrap_or(std::cmp::Ordering::Equal));
-
-    // Apply limit
-    results.truncate(result_limit);
+    let results: Vec<GapResult> = rows
+        .iter()
+        .map(|row| GapResult {
+            gap_start_us: row.get::<_, f64>("gap_start_us") as i64,
+            gap_end_us: row.get::<_, f64>("gap_end_us") as i64,
+            duration_ms: row.get("duration_ms"),
+        })
+        .collect();
 
     let execution_time_ms = query_start.elapsed().as_millis() as u64;
     tlog!("[dbquery] gap_analysis: frame=0x{:X} ext={:?} threshold={}ms | {} gaps found, {}ms",
@@ -2184,6 +2328,9 @@ pub async fn db_query_pattern_search(
     let profile = find_profile(&settings, &profile_id)
         .ok_or_else(|| format!("Profile not found: {}", profile_id))?;
 
+    if profile.kind == "wiretap" {
+        return crate::apiclient::pattern_search(&profile, pattern, pattern_mask, start_time, end_time, limit, query_id).await;
+    }
     if profile.kind != "postgres" {
         return Err("Profile is not a PostgreSQL profile".to_string());
     }

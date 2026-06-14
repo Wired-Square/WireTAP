@@ -8,6 +8,8 @@ Optionally ingests frames to PostgreSQL for logging and analysis.
 """
 
 import argparse
+import hmac
+import io
 import logging
 import os
 import select
@@ -19,12 +21,18 @@ import tomllib
 import time
 import threading
 import sys
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from queue import Queue, Full, Empty
 from typing import Dict, List, Optional, Tuple
 
-from pyroute2 import IPRoute
+# pyroute2 is Linux-only and needed solely for bitrate detection; tolerate
+# its absence so ingest-only deployments and the test suite work anywhere
+try:
+    from pyroute2 import IPRoute
+except ImportError:
+    IPRoute = None
 
 log = logging.getLogger("wiretap")
 
@@ -77,6 +85,8 @@ def _colour_yellow(s: str, enable: bool) -> str:
 
 def detect_bitrates(iface="can0", default=500000):
     """Detect nominal and data bitrates for a CAN interface via netlink."""
+    if IPRoute is None:
+        return default, 0
     ipr = IPRoute()
     try:
         idx = ipr.link_lookup(ifname=iface)[0]
@@ -360,12 +370,16 @@ class PostgresWriter:
         cache_path: Optional[str] = None,
         cache_max_mb: int = 1000,
         queue_flush_pct: int = 50,
+        write_mode: str = "copy",
     ):
         if not dsn:
             raise ValueError("Postgres DSN is required")
+        if write_mode not in ("copy", "function"):
+            raise ValueError(f"Unknown write_mode: {write_mode}")
 
         self.dsn = dsn
         self.func = ingest_func
+        self.write_mode = write_mode
         self.batch_size = int(batch_size)
         self.flush_interval = float(flush_interval)
         self.default_dir = default_dir
@@ -478,18 +492,43 @@ class PostgresWriter:
         # Set statement timeout so blocked writes fail fast and trigger disk cache fallback
         # 10 seconds should be generous for normal batch inserts
         self._cur.execute("SET statement_timeout = '10s'")
-        # Use execute_values for batch inserts - much faster than executemany
-        # Template matches the row tuple order from enqueue()
-        self._sql = (
-            f"SELECT {self.func}(v._ts, v._extended, v._is_fd, v._id, v._id_hex, "
-            "v._dlc, v._data_bytes, v._bus, v._dir) FROM (VALUES %s) "
-            "AS v(_ts, _extended, _is_fd, _id, _id_hex, _dlc, _data_bytes, _bus, _dir)"
-        )
-        self._template = (
-            "(%s::timestamptz, %s::boolean, %s::boolean, %s::integer, %s::text, "
-            "%s::smallint, %s::bytea, %s::integer, %s::text)"
-        )
-        self._log.info("connected")
+        if self.write_mode == "function":
+            # Legacy path: execute_values calling the ingest function per row.
+            # Template matches the row tuple order from enqueue()
+            self._sql = (
+                f"SELECT {self.func}(v._ts, v._extended, v._is_fd, v._id, v._id_hex, "
+                "v._dlc, v._data_bytes, v._bus, v._dir) FROM (VALUES %s) "
+                "AS v(_ts, _extended, _is_fd, _id, _id_hex, _dlc, _data_bytes, _bus, _dir)"
+            )
+            self._template = (
+                "(%s::timestamptz, %s::boolean, %s::boolean, %s::integer, %s::text, "
+                "%s::smallint, %s::bytea, %s::integer, %s::text)"
+            )
+        self._log.info("connected (write_mode=%s)", self.write_mode)
+
+    def _write_batch(self, batch: List[tuple]):
+        """Write one batch to PostgreSQL and commit (COPY or legacy function)."""
+        if self.write_mode == "copy":
+            buf = io.StringIO()
+            for ts_dt, extended, is_fd, arb_id, _id_hex, dlc, data, bus, dir_ in batch:
+                buf.write(
+                    f"{ts_dt.isoformat()}\t{arb_id}\t{'t' if extended else 'f'}\t"
+                    f"{dlc}\t{'t' if is_fd else 'f'}\t\\\\x{data.hex()}\t{bus}\t{dir_}\n"
+                )
+            buf.seek(0)
+            self._cur.copy_expert(
+                "COPY public.can_frame "
+                "(ts, id, extended, dlc, is_fd, data_bytes, bus, dir) FROM STDIN",
+                buf,
+            )
+        else:
+            self._execute_values(self._cur, self._sql, batch, template=self._template)
+        self._conn.commit()
+
+    def _keep_alive(self):
+        """Called on idle (no frames to write) to keep the connection fresh.
+        Overridable by sinks; the Postgres path commits the open transaction."""
+        self._conn.commit()
 
     def _close_conn(self):
         try:
@@ -536,8 +575,7 @@ class PostgresWriter:
                     self._log.debug("read_batch returned %d ids, %d rows", len(ids), len(batch))
                     if batch:
                         self._log.debug("executing batch insert for %d cached frames", len(batch))
-                        self._execute_values(self._cur, self._sql, batch, template=self._template)
-                        self._conn.commit()
+                        self._write_batch(batch)
                         self._disk_cache.delete_batch(ids)
                         self.count_written += len(batch)
                         self.count_cache_recovered += len(batch)
@@ -576,11 +614,10 @@ class PostgresWriter:
                         batch.append(item)
 
                 if not batch:
-                    self._conn.commit()  # keep xact fresh
+                    self._keep_alive()  # keep connection fresh while idle
                     continue
 
-                self._execute_values(self._cur, self._sql, batch, template=self._template)
-                self._conn.commit()
+                self._write_batch(batch)
                 self.count_written += len(batch)
 
             except Exception as e:
@@ -676,8 +713,7 @@ class PostgresWriter:
         # Try PostgreSQL first
         if getattr(self, "_conn", None):
             try:
-                self._execute_values(self._cur, self._sql, remaining, template=self._template)
-                self._conn.commit()
+                self._write_batch(remaining)
                 self.count_written += len(remaining)
                 self._log.info("shutdown: flushed %d frames to database", len(remaining))
                 self._close_conn()
@@ -775,6 +811,447 @@ class PostgresWriter:
                 size, cap, self.count_dropped
             )
             self._last_full_log = now
+
+
+# ---------------------------------------------------------------------------
+# WireTAP binary ingest protocol (see docs/ingest-protocol.md)
+# ---------------------------------------------------------------------------
+INGEST_PROTO_VERSION = 1
+INGEST_MAGIC = b"WTAP"
+
+MSG_HELLO     = 0x01
+MSG_BATCH     = 0x02
+MSG_PING      = 0x03
+MSG_HELLO_ACK = 0x81
+MSG_ACK       = 0x82
+MSG_PONG      = 0x83
+
+HELLO_FLAG_TIME_RELATIVE = 0x01
+
+HELLO_OK           = 0
+HELLO_BAD_AUTH     = 1
+HELLO_BAD_VERSION  = 2
+HELLO_BAD_DATABASE = 3
+
+ACK_OK         = 0
+ACK_CRC        = 1
+ACK_MALFORMED  = 2
+ACK_OVERLOADED = 3
+
+INGEST_RECORD_HEADER = struct.Struct("<IIBB")  # delta_ts_us, id_flags, bus, len
+INGEST_ID_EXTENDED = 1 << 29
+INGEST_ID_FD       = 1 << 30
+INGEST_ID_TX       = 1 << 31
+INGEST_ID_ARB_MASK = 0x1FFFFFFF
+
+
+class IngestClient:
+    """Per-connection state for one binary ingest client."""
+
+    def __init__(self, conn: socket.socket):
+        self.conn = conn
+        try:
+            self.addr = conn.getpeername()
+        except OSError:
+            self.addr = ("?", 0)
+        self.buf = bytearray()
+        self.authed = False
+        self.time_relative = False
+        self.database = ""
+        self.last_rx = time.monotonic()
+
+
+class IngestTcpServer:
+    """
+    TCP listener for the WireTAP binary ingest protocol: length-prefixed,
+    CRC-checked frame batches from microcontroller-class clients, fed into
+    the shared PostgresWriter queue (which owns batching, COPY and the
+    SQLite disk cache). Runs its own select() loop on a daemon thread so
+    ingest-only deployments need no local CAN hardware.
+    """
+
+    def __init__(self, host: str, port: int, token: str,
+                 pg_writer: PostgresWriter, keepalive_secs: float = 30.0,
+                 max_batch_frames: int = 256):
+        if pg_writer is None:
+            raise ValueError("ingest server requires PostgreSQL ingest to be enabled")
+        self.token = (token or "").encode()
+        self.pg_writer = pg_writer
+        self.keepalive_secs = float(keepalive_secs)
+        self.max_batch_frames = int(max_batch_frames)
+        self._log = log.getChild("ingest")
+        self.count_frames = 0
+        self.count_batches = 0
+
+        self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.srv.bind((host, port))
+        self.srv.listen(8)
+        self.srv.setblocking(False)
+        self.clients: Dict[socket.socket, IngestClient] = {}
+
+        self._log.info("Ingest listening on %s:%d (auth %s)",
+                       host, port, "required" if self.token else "disabled")
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    # ---- framing ----
+    def _send(self, client: IngestClient, mtype: int, body: bytes = b""):
+        payload = bytes([mtype]) + body
+        msg = (len(payload).to_bytes(2, "little") + payload
+               + (zlib.crc32(payload) & 0xFFFFFFFF).to_bytes(4, "little"))
+        try:
+            client.conn.sendall(msg)
+        except OSError:
+            self._drop(client.conn)
+
+    def _send_ack(self, client: IngestClient, seq: int, status: int):
+        cap = self.pg_writer.q.maxsize or 1
+        pct = min(100, int(self.pg_writer.q.qsize() / cap * 100))
+        self._send(client, MSG_ACK, struct.pack("<IBB", seq, status, pct))
+
+    # ---- main loop ----
+    def _run(self):
+        while True:
+            try:
+                rlist, _, _ = select.select(
+                    [self.srv] + list(self.clients.keys()), [], [], 0.5)
+            except OSError:
+                # A socket died between selects; prune and retry
+                self._prune_closed()
+                continue
+
+            for fd in rlist:
+                if fd is self.srv:
+                    self._accept()
+                else:
+                    self._recv(fd)
+
+            self._drop_idle()
+
+    def _accept(self):
+        try:
+            conn, addr = self.srv.accept()
+        except OSError:
+            return
+        conn.setblocking(False)
+        self.clients[conn] = IngestClient(conn)
+        self._log.info("Ingest client %s:%d connected", addr[0], addr[1])
+
+    def _drop(self, conn: socket.socket):
+        client = self.clients.pop(conn, None)
+        if client:
+            self._log.info("Ingest client %s:%d disconnected",
+                           client.addr[0], client.addr[1])
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+    def _prune_closed(self):
+        for conn in list(self.clients.keys()):
+            if conn.fileno() < 0:
+                self.clients.pop(conn, None)
+
+    def _drop_idle(self):
+        deadline = time.monotonic() - self.keepalive_secs * 3
+        for conn, client in list(self.clients.items()):
+            if client.last_rx < deadline:
+                self._log.warning("Ingest client %s:%d timed out",
+                                  client.addr[0], client.addr[1])
+                self._drop(conn)
+
+    def _recv(self, conn: socket.socket):
+        client = self.clients.get(conn)
+        if client is None:
+            return
+        try:
+            chunk = conn.recv(65536)
+        except BlockingIOError:
+            return
+        except OSError:
+            self._drop(conn)
+            return
+        if not chunk:
+            self._drop(conn)
+            return
+
+        client.last_rx = time.monotonic()
+        client.buf.extend(chunk)
+
+        while True:
+            if len(client.buf) < 2:
+                return
+            length = int.from_bytes(client.buf[0:2], "little")
+            if length < 1:
+                self._log.warning("Ingest client %s:%d sent bogus length, dropping",
+                                  client.addr[0], client.addr[1])
+                self._drop(conn)
+                return
+            total = 2 + length + 4
+            if len(client.buf) < total:
+                return
+            payload = bytes(client.buf[2:2 + length])
+            crc = int.from_bytes(client.buf[2 + length:total], "little")
+            del client.buf[:total]
+            crc_ok = (zlib.crc32(payload) & 0xFFFFFFFF) == crc
+            if not self._handle(client, payload[0], payload[1:], crc_ok):
+                return  # client dropped mid-parse
+
+    # ---- message handling ----
+    def _handle(self, client: IngestClient, mtype: int, body: bytes,
+                crc_ok: bool) -> bool:
+        if not crc_ok:
+            # Best effort: let a corrupt BATCH be retried by seq
+            if mtype == MSG_BATCH and len(body) >= 4:
+                seq, = struct.unpack_from("<I", body, 0)
+                self._send_ack(client, seq, ACK_CRC)
+            return True
+
+        if mtype == MSG_HELLO:
+            return self._handle_hello(client, body)
+        if mtype == MSG_PING:
+            self._send(client, MSG_PONG)
+            return True
+        if mtype == MSG_BATCH:
+            if not client.authed:
+                self._drop(client.conn)
+                return False
+            return self._handle_batch(client, body)
+        # Unknown type: ignore (forward compatibility)
+        return True
+
+    def _handle_hello(self, client: IngestClient, body: bytes) -> bool:
+        now_us = int(time.time() * 1_000_000)
+        ack = lambda status: self._send(
+            client, MSG_HELLO_ACK,
+            struct.pack("<BBQ", status, INGEST_PROTO_VERSION, now_us))
+
+        if len(body) < 7 or body[0:4] != INGEST_MAGIC:
+            self._drop(client.conn)
+            return False
+        version, flags, token_len = body[4], body[5], body[6]
+        token = bytes(body[7:7 + token_len])
+        # Optional database field (absent for minimal clients = default db).
+        # This standalone server writes to its single configured DSN, so the
+        # field is recorded for logging only; routing/auto-create is a
+        # WireTAP backend gateway feature (see docs/ingest-protocol.md).
+        db_off = 7 + token_len
+        database = ""
+        if len(body) > db_off:
+            db_len = body[db_off]
+            database = bytes(body[db_off + 1:db_off + 1 + db_len]).decode(
+                "ascii", errors="replace")
+
+        if version != INGEST_PROTO_VERSION:
+            ack(HELLO_BAD_VERSION)
+            self._drop(client.conn)
+            return False
+        if self.token and not hmac.compare_digest(token, self.token):
+            self._log.warning("Ingest client %s:%d failed auth",
+                              client.addr[0], client.addr[1])
+            ack(HELLO_BAD_AUTH)
+            self._drop(client.conn)
+            return False
+
+        client.authed = True
+        client.time_relative = bool(flags & HELLO_FLAG_TIME_RELATIVE)
+        client.database = database
+        if database:
+            self._log.info("Ingest client %s:%d requested database '%s' "
+                           "(single-DSN server: writing to configured database)",
+                           client.addr[0], client.addr[1], database)
+        ack(HELLO_OK)
+        return True
+
+    def _handle_batch(self, client: IngestClient, body: bytes) -> bool:
+        if len(body) < 14:
+            self._drop(client.conn)
+            return False
+        seq, base_ts_us, count = struct.unpack_from("<IQH", body, 0)
+
+        if count > self.max_batch_frames:
+            self._send_ack(client, seq, ACK_MALFORMED)
+            return True
+
+        # Refuse the batch outright when the queue is nearly full so the
+        # client retries later, rather than silently dropping frames.
+        cap = self.pg_writer.q.maxsize or 0
+        if cap and self.pg_writer.q.qsize() >= cap * 0.99:
+            self._send_ack(client, seq, ACK_OVERLOADED)
+            return True
+
+        records = []
+        offset = 14
+        for _ in range(count):
+            if len(body) < offset + INGEST_RECORD_HEADER.size:
+                self._send_ack(client, seq, ACK_MALFORMED)
+                return True
+            delta_us, id_flags, bus, plen = INGEST_RECORD_HEADER.unpack_from(
+                body, offset)
+            offset += INGEST_RECORD_HEADER.size
+            if plen > 64 or len(body) < offset + plen:
+                self._send_ack(client, seq, ACK_MALFORMED)
+                return True
+            records.append((delta_us, id_flags, bus, body[offset:offset + plen]))
+            offset += plen
+
+        # TIME_RELATIVE: deltas are from an arbitrary client epoch (e.g. boot
+        # time). Stamp the last record with the arrival time and back-date
+        # the rest by their delta differences.
+        if client.time_relative and records:
+            base_ts_us = int(time.time() * 1_000_000) - records[-1][0]
+
+        for delta_us, id_flags, bus, payload in records:
+            extended = bool(id_flags & INGEST_ID_EXTENDED)
+            is_fd = bool(id_flags & INGEST_ID_FD)
+            arb = id_flags & INGEST_ID_ARB_MASK
+            dlc = len_to_dlc(len(payload)) if is_fd else min(len(payload), 8)
+            self.pg_writer.enqueue(
+                ts=(base_ts_us + delta_us) / 1_000_000.0,
+                can_id=arb | (CAN_EFF_FLAG if extended else 0),
+                dlc=dlc,
+                data=payload,
+                bus=bus,
+                dir_="tx" if id_flags & INGEST_ID_TX else "rx",
+                is_fd=is_fd,
+            )
+
+        self.count_frames += len(records)
+        self.count_batches += 1
+        self._send_ack(client, seq, ACK_OK)
+        return True
+
+
+def _encode_ingest_message(mtype: int, body: bytes = b"") -> bytes:
+    """Frame one outbound ingest message: len u16 | type u8 | body | crc32 u32."""
+    payload = bytes([mtype]) + body
+    return (len(payload).to_bytes(2, "little") + payload
+            + (zlib.crc32(payload) & 0xFFFFFFFF).to_bytes(4, "little"))
+
+
+class ForwardSink(PostgresWriter):
+    """
+    Frame sink that forwards to a WireTAP backend gateway over the binary
+    ingest protocol (docs/ingest-protocol.md) instead of writing to Postgres.
+
+    Subclasses PostgresWriter to reuse its queue, batching worker, SQLite
+    disk-cache resilience, overflow handling and stats verbatim — only the
+    three connection-specific methods are overridden. A failed ACK / dropped
+    socket raises, which engages the inherited disk-cache fallback and ordered
+    drain on reconnect, exactly as for a Postgres outage.
+    """
+
+    # Protocol caps one BATCH message at 256 records
+    MAX_BATCH = 256
+
+    def __init__(self, host: str, port: int, api_key: str, database: str, **kwargs):
+        # Set connection attrs BEFORE super().__init__ — the base constructor
+        # starts the worker thread, which calls our _connect() immediately.
+        self.host = host
+        self.port = port
+        self.api_key = api_key.encode()
+        self.database = database
+        self._seq = 0
+        self._rxbuf = bytearray()
+        # dsn is unused (base requires non-empty); pass a descriptive sentinel
+        super().__init__(dsn=f"forward://{host}:{port}", **kwargs)
+
+    def _connect(self):
+        sock = socket.create_connection((self.host, self.port), timeout=10.0)
+        sock.settimeout(10.0)
+        # HELLO: magic, version, flags (absolute timestamps), token, database
+        body = (INGEST_MAGIC + bytes([INGEST_PROTO_VERSION, 0, len(self.api_key)])
+                + self.api_key + bytes([len(self.database)]) + self.database.encode())
+        sock.sendall(_encode_ingest_message(MSG_HELLO, body))
+        mtype, ack = self._recv_message(sock)
+        if mtype != MSG_HELLO_ACK:
+            sock.close()
+            raise RuntimeError("forward: no HELLO_ACK from gateway")
+        status = ack[0] if ack else 0xFF
+        if status != HELLO_OK:
+            sock.close()
+            raise RuntimeError(f"forward: HELLO rejected (status={status})")
+        self._conn = sock
+        self._log.info("connected (forward -> %s:%d db=%s)",
+                       self.host, self.port, self.database or "<default>")
+
+    def _keep_alive(self):
+        # Idle PING keeps the gateway from dropping us on the keepalive timer
+        try:
+            self._conn.sendall(_encode_ingest_message(MSG_PING))
+            mtype, _ = self._recv_message(self._conn)
+            if mtype != MSG_PONG:
+                raise RuntimeError("forward: unexpected idle reply")
+        except OSError as e:
+            raise RuntimeError(f"forward: keepalive failed: {e}")
+
+    def _close_conn(self):
+        try:
+            if getattr(self, "_conn", None):
+                self._conn.close()
+        except Exception:
+            pass
+        self._conn = None
+        self._rxbuf.clear()
+
+    def _write_batch(self, batch):
+        """Send a batch as one or more BATCH messages, blocking for each ACK."""
+        for chunk_start in range(0, len(batch), self.MAX_BATCH):
+            chunk = batch[chunk_start:chunk_start + self.MAX_BATCH]
+            self._send_chunk(chunk)
+
+    def _send_chunk(self, chunk):
+        # Absolute timestamps: base = first record's epoch us, deltas from it
+        base_us = int(chunk[0][0].timestamp() * 1_000_000)
+        records = bytearray()
+        for ts_dt, extended, is_fd, arb_id, _id_hex, _dlc, data, bus, dir_ in chunk:
+            id_flags = arb_id & INGEST_ID_ARB_MASK
+            if extended:
+                id_flags |= INGEST_ID_EXTENDED
+            if is_fd:
+                id_flags |= INGEST_ID_FD
+            if dir_ == "tx":
+                id_flags |= INGEST_ID_TX
+            delta = max(0, int(ts_dt.timestamp() * 1_000_000) - base_us)
+            payload = bytes(data[:64])
+            records += INGEST_RECORD_HEADER.pack(delta & 0xFFFFFFFF, id_flags,
+                                                 int(bus) & 0xFF, len(payload))
+            records += payload
+
+        self._seq = (self._seq + 1) & 0xFFFFFFFF
+        seq = self._seq
+        header = struct.pack("<IQH", seq, base_us, len(chunk))
+        self._conn.sendall(_encode_ingest_message(MSG_BATCH, header + bytes(records)))
+
+        mtype, body = self._recv_message(self._conn)
+        if mtype != MSG_ACK or len(body) < 6:
+            raise RuntimeError("forward: malformed ACK")
+        ack_seq, status, _queue_pct = struct.unpack("<IBB", body[:6])
+        if status == ACK_OK:
+            return
+        if status == ACK_OVERLOADED:
+            # Backpressure: raise so the worker backs off and caches
+            raise RuntimeError("forward: gateway overloaded")
+        raise RuntimeError(f"forward: batch nacked (seq={ack_seq} status={status})")
+
+    def _recv_message(self, sock):
+        """Read one framed message from sock; returns (type, body)."""
+        while True:
+            if len(self._rxbuf) >= 2:
+                length = int.from_bytes(self._rxbuf[0:2], "little")
+                total = 2 + length + 4
+                if len(self._rxbuf) >= total:
+                    payload = bytes(self._rxbuf[2:2 + length])
+                    crc = int.from_bytes(self._rxbuf[2 + length:total], "little")
+                    del self._rxbuf[:total]
+                    if (zlib.crc32(payload) & 0xFFFFFFFF) != crc:
+                        raise RuntimeError("forward: bad CRC from gateway")
+                    return payload[0], payload[1:]
+            chunk = sock.recv(4096)
+            if not chunk:
+                raise RuntimeError("forward: gateway closed connection")
+            self._rxbuf.extend(chunk)
 
 
 class GVRETClient:
@@ -1299,6 +1776,7 @@ def apply_config_overrides(args: argparse.Namespace, cfg: dict) -> argparse.Name
         for cfg_key, arg_key in {
             "dsn": "pg_dsn",
             "func": "pg_func",
+            "write_mode": "pg_write_mode",
             "batch_size": "pg_batch_size",
             "flush_interval": "pg_flush_interval",
             "queue_size": "pg_queue_size",
@@ -1309,6 +1787,30 @@ def apply_config_overrides(args: argparse.Namespace, cfg: dict) -> argparse.Name
         }.items():
             if cfg_key in postgres_conf:
                 setattr(args, arg_key, postgres_conf[cfg_key])
+
+    ingest_conf = cfg.get("ingest", {})
+    for cfg_key, arg_key in {
+        "enable": "ingest_enable",
+        "host": "ingest_host",
+        "port": "ingest_port",
+        "token": "ingest_token",
+        "keepalive_secs": "ingest_keepalive_secs",
+        "max_batch_frames": "ingest_max_batch_frames",
+    }.items():
+        if cfg_key in ingest_conf:
+            setattr(args, arg_key, ingest_conf[cfg_key])
+
+    forward_conf = cfg.get("forward", {})
+    if forward_conf.get("enable") is True:
+        args.forward_enable = True
+    for cfg_key, arg_key in {
+        "host": "forward_host",
+        "port": "forward_port",
+        "api_key": "forward_api_key",
+        "database": "forward_database",
+    }.items():
+        if cfg_key in forward_conf:
+            setattr(args, arg_key, forward_conf[cfg_key])
 
     logging_conf = cfg.get("logging", {})
     if "level" in logging_conf:
@@ -1368,7 +1870,10 @@ def build_parser():
         help="Postgres DSN, e.g. postgresql://user:pass@host:5432/db")
     ap.add_argument(
         "--pg-func", default="public.ingest_can_frame",
-        help="Qualified ingest function name")
+        help="Qualified ingest function name (write-mode 'function' only)")
+    ap.add_argument(
+        "--pg-write-mode", default="copy", choices=["copy", "function"],
+        help="Insert mechanism: COPY (default, fastest) or legacy ingest function")
     ap.add_argument(
         "--pg-batch-size", type=int, default=500,
         help="DB batch size (default 500)")
@@ -1390,6 +1895,39 @@ def build_parser():
     ap.add_argument(
         "--pg-queue-flush-pct", type=int, default=50,
         help="Flush queue to disk when this full (default: 50%%)")
+
+    # Binary ingest API (microcontroller clients)
+    ap.add_argument(
+        "--ingest-enable", action="store_true",
+        help="Enable the binary TCP ingest listener (requires --pg-enable)")
+    ap.add_argument(
+        "--ingest-host", default="0.0.0.0",
+        help="Ingest listen address (default: 0.0.0.0)")
+    ap.add_argument(
+        "--ingest-port", type=int, default=9323,
+        help="Ingest listen port (default: 9323)")
+    ap.add_argument(
+        "--ingest-token", default=None,
+        help="Shared auth token (or WIRETAP_INGEST_TOKEN env; empty disables auth)")
+    ap.add_argument(
+        "--ingest-keepalive-secs", type=float, default=30.0,
+        help="Expected client keepalive interval; clients silent for 3x are dropped")
+    ap.add_argument(
+        "--ingest-max-batch-frames", type=int, default=256,
+        help="Maximum frames per ingest batch (default: 256)")
+
+    # Forward mode (push frames to a WireTAP backend gateway)
+    ap.add_argument(
+        "--forward-enable", action="store_true",
+        help="Forward frames to a WireTAP backend gateway (mutually exclusive with --pg-enable)")
+    ap.add_argument("--forward-host", default="127.0.0.1", help="Gateway host")
+    ap.add_argument("--forward-port", type=int, default=9323, help="Gateway ingest port")
+    ap.add_argument(
+        "--forward-api-key", default=None,
+        help="Gateway API key (or WIRETAP_FORWARD_TOKEN env)")
+    ap.add_argument(
+        "--forward-database", default="",
+        help="Target capture database (empty = gateway default; auto-created if permitted)")
 
     # Config file (TOML)
     ap.add_argument("-C", "--config", help="Path to TOML config file that OVERRIDES CLI options")
@@ -1426,7 +1964,15 @@ def main():
         if env_cache:
             args.pg_cache_path = env_cache
 
-    # Optional Postgres writer
+    # Forward token from env if not configured
+    if not args.forward_api_key:
+        args.forward_api_key = os.getenv("WIRETAP_FORWARD_TOKEN", "")
+
+    if args.pg_enable and args.forward_enable:
+        log.error("[postgres] and [forward] are mutually exclusive — enable only one")
+        sys.exit(2)
+
+    # Frame sink: direct Postgres (COPY) or forward to a backend gateway
     pg_writer = None
     if args.pg_enable:
         if not args.pg_dsn:
@@ -1435,6 +1981,22 @@ def main():
         pg_writer = PostgresWriter(
             dsn=args.pg_dsn,
             ingest_func=args.pg_func,
+            write_mode=args.pg_write_mode,
+            batch_size=args.pg_batch_size,
+            flush_interval=args.pg_flush_interval,
+            queue_max=args.pg_queue_size,
+            default_dir=(args.pg_dir or args.default_dir),
+            stats_interval=args.stats_interval,
+            cache_path=args.pg_cache_path,
+            cache_max_mb=args.pg_cache_max_mb,
+            queue_flush_pct=args.pg_queue_flush_pct,
+        )
+    elif args.forward_enable:
+        pg_writer = ForwardSink(
+            host=args.forward_host,
+            port=args.forward_port,
+            api_key=args.forward_api_key,
+            database=args.forward_database,
             batch_size=args.pg_batch_size,
             flush_interval=args.pg_flush_interval,
             queue_max=args.pg_queue_size,
@@ -1445,19 +2007,45 @@ def main():
             queue_flush_pct=args.pg_queue_flush_pct,
         )
 
-    try:
-        server = CanTcpServer(
-            iface=args.iface,
-            host=args.host,
-            port=args.port,
-            bus_offset=args.bus_offset,
-            echo_console=args.echo_console,
+    # Optional binary ingest listener (microcontroller clients)
+    if args.ingest_enable:
+        if not pg_writer:
+            log.error("--ingest-enable requires PostgreSQL ingest (--pg-enable)")
+            sys.exit(2)
+        token = args.ingest_token
+        if token is None:
+            token = os.getenv("WIRETAP_INGEST_TOKEN", "")
+        IngestTcpServer(
+            host=args.ingest_host,
+            port=args.ingest_port,
+            token=token,
             pg_writer=pg_writer,
-            default_dir=(args.pg_dir or args.default_dir),
-            can_fd=args.can_fd,
+            keepalive_secs=args.ingest_keepalive_secs,
+            max_batch_frames=args.ingest_max_batch_frames,
         )
-        server.colour = args.colour
-        server.run()
+
+    try:
+        if str(args.iface).strip():
+            server = CanTcpServer(
+                iface=args.iface,
+                host=args.host,
+                port=args.port,
+                bus_offset=args.bus_offset,
+                echo_console=args.echo_console,
+                pg_writer=pg_writer,
+                default_dir=(args.pg_dir or args.default_dir),
+                can_fd=args.can_fd,
+            )
+            server.colour = args.colour
+            server.run()
+        elif args.ingest_enable:
+            # Ingest-only deployment: no local CAN hardware needed
+            log.info("No CAN interfaces configured; running ingest-only")
+            while True:
+                time.sleep(3600)
+        else:
+            log.error("No CAN interfaces configured and ingest disabled; nothing to do")
+            sys.exit(2)
     except KeyboardInterrupt:
         log.info("Shutting down")
     except Exception as e:

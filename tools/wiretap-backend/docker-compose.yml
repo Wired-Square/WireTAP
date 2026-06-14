@@ -1,0 +1,66 @@
+name: wiretap-backend
+
+services:
+  timescaledb:
+    build: ./db
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    # archive_mode on from day one so enabling pgBackRest later needs no
+    # restart; /bin/true recycles WAL until the backup sidecar takes over.
+    command: >
+      postgres -c shared_preload_libraries=timescaledb
+               -c archive_mode=on
+               -c archive_command=/bin/true
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgbackrest-repo:/var/lib/pgbackrest
+      - pgsocket:/var/run/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    restart: unless-stopped
+    # Postgres is NOT published — all access goes through the backend API.
+    # For one-off host admin (psql, migration), uncomment:
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: tools/wiretap-backend/Dockerfile
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      WIRETAP_ADMIN_KEY: ${WIRETAP_ADMIN_KEY:-}
+      WIRETAP_PG_HOST: timescaledb
+      WIRETAP_DEFAULT_DB: ${WIRETAP_DEFAULT_DB:-wiretap}
+      WIRETAP_AUTO_CREATE: ${WIRETAP_AUTO_CREATE:-true}
+      RUST_LOG: ${RUST_LOG:-wiretap_backend=info}
+    ports:
+      - "8423:8423"   # HTTP API + /admin UI
+      - "9323:9323"   # binary ingest (MCUs, Pi forward mode)
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: scheduled pgBackRest backups. Start with:
+  #   docker compose --profile backup up -d
+  pgbackrest:
+    profiles: ["backup"]
+    build: ./db
+    entrypoint: ["/usr/local/bin/backup-loop.sh"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgbackrest-repo:/var/lib/pgbackrest
+      - pgsocket:/var/run/postgresql
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  pgbackrest-repo:
+  pgsocket:

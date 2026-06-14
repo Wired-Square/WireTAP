@@ -23,7 +23,7 @@ import {
 // Profile Kind Type
 // ============================================================================
 
-export type ProfileKindId = 'mqtt' | 'postgres' | 'gvret_tcp' | 'gvret_usb' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp' | 'virtual' | 'framelink';
+export type ProfileKindId = 'mqtt' | 'postgres' | 'wiretap' | 'gvret_tcp' | 'gvret_usb' | 'serial' | 'slcan' | 'socketcan' | 'gs_usb' | 'modbus_tcp' | 'virtual' | 'framelink';
 
 // ============================================================================
 // Connection Interfaces (per profile kind)
@@ -53,6 +53,15 @@ export interface PostgresConnection {
   source_type?: 'can_frame' | 'modbus_frame' | 'serial_frame' | 'serial_raw';
   default_speed?: string;
   framing_mode?: string;
+}
+
+/** Connection to a WireTAP backend gateway (HTTP API, not direct Postgres) */
+export interface WiretapConnection {
+  url?: string;
+  database?: string;
+  api_key?: string;
+  _api_key_stored?: boolean;
+  default_speed?: string;
 }
 
 /** Interface configuration for GVRET devices */
@@ -178,6 +187,7 @@ export interface VirtualConnection {
 export interface ConnectionTypeMap {
   mqtt: MqttConnection;
   postgres: PostgresConnection;
+  wiretap: WiretapConnection;
   gvret_tcp: GvretTcpConnection;
   gvret_usb: GvretUsbConnection;
   serial: SerialConnection;

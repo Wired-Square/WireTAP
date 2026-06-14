@@ -4,7 +4,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, FileText, Trash2, Archive, Pencil, Database, Pin, PinOff } from "lucide-react";
+import { Check, FileText, Trash2, Archive, Pencil, Database, Pin, PinOff, UploadCloud } from "lucide-react";
 import { iconMd, iconSm, iconXs } from "../../styles/spacing";
 import { badgeSmallInfo } from "../../styles/badgeStyles";
 import { sectionHeader, caption, captionMuted, textMedium } from "../../styles/typography";
@@ -13,6 +13,7 @@ import type { CaptureMetadata } from "../../api/capture";
 import { useSessionStore } from "../../stores/sessionStore";
 import DeviceBusConfig from "./DeviceBusConfig";
 import type { BusMapping } from "../../api/io";
+import SendCaptureToBackendDialog from "../SendCaptureToBackendDialog";
 
 type Props = {
   captures: CaptureMetadata[];
@@ -58,6 +59,7 @@ export default function CaptureList({
   const { t } = useTranslation("dialogs");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [uploadCapture, setUploadCapture] = useState<CaptureMetadata | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Focus input when entering rename mode
@@ -198,6 +200,16 @@ export default function CaptureList({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  setUploadCapture(capture);
+                }}
+                className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                title={t("ioSourcePicker.captures.sendToBackend")}
+              >
+                <UploadCloud className={iconSm} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                   startRename(capture);
                 }}
                 className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
@@ -245,6 +257,14 @@ export default function CaptureList({
           );
         })}
       </div>
+      {uploadCapture && (
+        <SendCaptureToBackendDialog
+          isOpen={true}
+          onClose={() => setUploadCapture(null)}
+          captureId={uploadCapture.id}
+          captureName={uploadCapture.name}
+        />
+      )}
     </div>
   );
 }
