@@ -7,6 +7,7 @@ mod capturequery;
 mod capture_store;
 mod captures;
 mod catalog;
+mod dashboard;
 mod checksums;
 mod credentials;
 mod dbquery;
@@ -901,6 +902,8 @@ fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String>
             s.mcp_allow_session_control,
             s.mcp_allow_catalog_write,
             s.mcp_allow_catalog_modify,
+            s.mcp_allow_dashboard_write,
+            s.mcp_allow_ui_control,
             s.mcp_server_token.clone(),
         )?;
     }
@@ -1056,6 +1059,8 @@ pub fn run() {
                         s.mcp_allow_session_control,
                         s.mcp_allow_catalog_write,
                         s.mcp_allow_catalog_modify,
+                        s.mcp_allow_dashboard_write,
+                        s.mcp_allow_ui_control,
                         s.mcp_server_token.clone(),
                     ) {
                         tlog!("[mcp] Failed to start: {}", e);
@@ -1116,6 +1121,9 @@ pub fn run() {
             catalog::duplicate_catalog,
             catalog::rename_catalog,
             catalog::delete_catalog,
+            dashboard::list_dashboards,
+            dashboard::open_dashboard,
+            dashboard::save_dashboard,
             settings::load_settings,
             settings::save_settings,
             settings::validate_directory,

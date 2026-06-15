@@ -72,6 +72,10 @@ export default function McpServerView() {
   const allowCatalogModify = useSettingsStore((s) => s.mcp.allowCatalogModify);
   const setAllowCatalogWrite = useSettingsStore((s) => s.setMcpAllowCatalogWrite);
   const setAllowCatalogModify = useSettingsStore((s) => s.setMcpAllowCatalogModify);
+  const allowDashboardWrite = useSettingsStore((s) => s.mcp.allowDashboardWrite);
+  const allowUiControl = useSettingsStore((s) => s.mcp.allowUiControl);
+  const setAllowDashboardWrite = useSettingsStore((s) => s.setMcpAllowDashboardWrite);
+  const setAllowUiControl = useSettingsStore((s) => s.setMcpAllowUiControl);
   const setServerPort = useSettingsStore((s) => s.setMcpServerPort);
   const setServerToken = useSettingsStore((s) => s.setMcpServerToken);
 
@@ -199,6 +203,35 @@ export default function McpServerView() {
       >
         Lets a connected MCP client <strong>overwrite existing decoder catalogues</strong>.
         Validated before writing. Separate from the create gate above.
+      </ToggleRow>
+
+      <ToggleRow
+        label="Allow dashboard write"
+        checked={allowDashboardWrite}
+        disabled={busy}
+        warn
+        onChange={(v) => {
+          setAllowDashboardWrite(v);
+          if (serverEnabled) apply(true);
+        }}
+      >
+        Lets a connected MCP client <strong>create or overwrite dashboard files</strong>
+        (visualisers) in the dashboards directory. The JSON shape is validated; any embedded
+        custom-widget code is stored opaque and only ever runs later inside the sandboxed worker.
+      </ToggleRow>
+
+      <ToggleRow
+        label="Allow UI control (open panels)"
+        checked={allowUiControl}
+        disabled={busy}
+        warn
+        onChange={(v) => {
+          setAllowUiControl(v);
+          if (serverEnabled) apply(true);
+        }}
+      >
+        Lets a connected MCP client <strong>open or focus an app/panel</strong> in the running
+        window — e.g. open a dashboard it just authored. Requires the WireTAP window to be open.
       </ToggleRow>
 
       {/* Port */}

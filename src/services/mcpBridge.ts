@@ -14,6 +14,10 @@ import type { LastFrameData } from "../stores/discoveryFrameStore";
 import { getDecodedFrames } from "../stores/decoderStore";
 import { analyzePayloadsWithMuxDetection } from "../utils/analysis/payloadAnalysis";
 import type { FrameMessage } from "../types/frame";
+import { openPanel } from "../utils/windowCommunication";
+import { openDashboard } from "../api/dashboards";
+import { parseDashboard } from "../utils/dashboards";
+import { useGraphStore } from "../stores/graphStore";
 
 // Bounds so a huge live buffer can't produce an enormous MCP response.
 const MAX_FRAME_IDS = 64;
@@ -113,9 +117,29 @@ function liveFrameMap(params: unknown) {
   return { frameCount: Object.keys(frames).length, frames };
 }
 
+/** ui.openPanel — open/focus an app/panel in the running window; optionally load
+ *  a dashboard artifact first. The frontend side of the MCP `open_app` tool. */
+async function uiOpenPanel(params: unknown) {
+  const p = (params ?? {}) as { panelId?: string; args?: unknown };
+  const panelId = p.panelId || "dashboard";
+  // `args` may arrive as an object or (depending on the MCP client) a JSON string.
+  let args = p.args;
+  if (typeof args === "string") {
+    try { args = JSON.parse(args); } catch { args = undefined; }
+  }
+  const dashboardPath = (args as { dashboardPath?: string } | undefined)?.dashboardPath;
+  if (dashboardPath) {
+    const json = await openDashboard(dashboardPath);
+    useGraphStore.getState().loadDashboard(parseDashboard(json));
+  }
+  openPanel(panelId);
+  return { opened: true, panelId, loadedDashboard: !!dashboardPath };
+}
+
 /** Register all MCP bridge methods. Call once at app startup. */
 export function initMcpBridge(): void {
   wsTransport.registerBridgeMethod("discovery.analysis", discoveryAnalysis);
   wsTransport.registerBridgeMethod("decoder.signals", decoderSignals);
   wsTransport.registerBridgeMethod("live.frameMap", liveFrameMap);
+  wsTransport.registerBridgeMethod("ui.openPanel", uiOpenPanel);
 }

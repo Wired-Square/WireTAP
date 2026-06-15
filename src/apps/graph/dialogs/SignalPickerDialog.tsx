@@ -22,14 +22,17 @@ interface Props {
   /** When set, the picker is in "replace" mode for the signal at this index */
   replacingSignalIndex?: number | null;
   onReplaceDone?: () => void;
+  /** Standalone mode (no target panel): only offers "Add as Instruments". */
+  instrumentsMode?: boolean;
 }
 
-export default function SignalPickerDialog({ isOpen, onClose, panelId, replacingSignalIndex, onReplaceDone }: Props) {
+export default function SignalPickerDialog({ isOpen, onClose, panelId, replacingSignalIndex, onReplaceDone, instrumentsMode }: Props) {
   const { t } = useTranslation("graph");
   const { format: formatFrameId } = useFrameIdFormat();
   const frames = useGraphStore((s) => s.frames);
   const panels = useGraphStore((s) => s.panels);
   const addSignalToPanel = useGraphStore((s) => s.addSignalToPanel);
+  const addSignalsAsInstruments = useGraphStore((s) => s.addSignalsAsInstruments);
   const removeSignalFromPanel = useGraphStore((s) => s.removeSignalFromPanel);
   const replaceSignalSource = useGraphStore((s) => s.replaceSignalSource);
 
@@ -56,6 +59,12 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
       setSelectedKeys(new Set(keys));
       setUnitMap(new Map(panel.signals.map((s) => [signalKey(s.frameId, s.signalName), s.unit])));
       setReplacementTarget(null);
+    }
+    if (isOpen && instrumentsMode) {
+      // Standalone mode has no panel to snapshot — start from an empty selection.
+      setInitialKeys(new Set());
+      setSelectedKeys(new Set());
+      setUnitMap(new Map());
     }
     if (!isOpen) {
       setExpandedFrames(new Set());
@@ -132,6 +141,22 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
     onClose();
   }, [panel, isReplaceMode, replacingSignal, replacementTarget, selectedKeys, initialKeys, unitMap, addSignalToPanel, removeSignalFromPanel, replaceSignalSource, onReplaceDone, onClose]);
 
+  const newSelectionCount = useMemo(
+    () => Array.from(selectedKeys).filter((k) => !initialKeys.has(k)).length,
+    [selectedKeys, initialKeys],
+  );
+
+  const handleAddInstruments = useCallback(() => {
+    const sigs: Array<{ frameId: number; signalName: string; unit?: string }> = [];
+    for (const key of selectedKeys) {
+      if (initialKeys.has(key)) continue;
+      const [fid, ...rest] = key.split(":");
+      sigs.push({ frameId: Number(fid), signalName: rest.join(":"), unit: unitMap.get(key) });
+    }
+    if (sigs.length) addSignalsAsInstruments(sigs);
+    onClose();
+  }, [selectedKeys, initialKeys, unitMap, addSignalsAsInstruments, onClose]);
+
   const toggleFrame = (frameId: number) => {
     setExpandedFrames((prev) => {
       const next = new Set(prev);
@@ -144,7 +169,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
     });
   };
 
-  if (!panel) {
+  if (!panel && !instrumentsMode) {
     return (
       <Dialog isOpen={isOpen} onBackdropClick={onClose} maxWidth="max-w-md">
         <div className={`${bgSurface} rounded-xl shadow-xl p-4`}>
@@ -163,7 +188,7 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
         {/* Header */}
         <div className={`p-4 ${borderDivider}`}>
           <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">
-            {isReplaceMode ? t("signalPicker.titleReplace") : t("signalPicker.titleSelect")}
+            {isReplaceMode ? t("signalPicker.titleReplace") : instrumentsMode ? t("signalPicker.titleInstruments") : t("signalPicker.titleSelect")}
           </h2>
           {isReplaceMode && replacingSignal && (
             <p className={`text-xs ${textSecondary} mt-0.5`}>
@@ -300,12 +325,26 @@ export default function SignalPickerDialog({ isOpen, onClose, panelId, replacing
           >
             {t("signalPicker.cancel")}
           </button>
-          <button
-            onClick={handleOk}
-            className={`${primaryButtonBase} px-4`}
-          >
-            {t("signalPicker.ok")}
-          </button>
+          {!isReplaceMode && (
+            <button
+              onClick={handleAddInstruments}
+              disabled={newSelectionCount === 0}
+              title={t("signalPicker.addInstrumentsHint")}
+              className={instrumentsMode
+                ? `${primaryButtonBase} px-4 disabled:opacity-40 disabled:cursor-not-allowed`
+                : `px-4 py-2 rounded text-sm font-medium text-[color:var(--text-primary)] bg-[var(--bg-primary)] border border-[var(--border-default)] ${hoverLight} disabled:opacity-40 disabled:cursor-not-allowed transition-colors`}
+            >
+              {t("signalPicker.addInstruments")}
+            </button>
+          )}
+          {!instrumentsMode && (
+            <button
+              onClick={handleOk}
+              className={`${primaryButtonBase} px-4`}
+            >
+              {t("signalPicker.ok")}
+            </button>
+          )}
         </div>
       </div>
     </Dialog>

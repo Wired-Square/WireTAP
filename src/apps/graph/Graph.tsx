@@ -19,7 +19,7 @@ import { UI_UPDATE_INTERVAL_MS } from "../../constants";
 import { catalogFilenameFromPath } from "../../utils/graphLayouts";
 import { onStoreChanged } from "../../api/store";
 import AppLayout from "../../components/AppLayout";
-import GraphTopBar from "./views/GraphTopBar";
+import DashboardTopBar from "./views/DashboardTopBar";
 import GraphGrid from "./views/GraphGrid";
 import CodeView from "../../components/CodeView";
 import CatalogPickerDialog from "../../dialogs/CatalogPickerDialog";
@@ -44,6 +44,7 @@ function GraphInner() {
 
   // Replace signal mode
   const [replacingSignalIndex, setReplacingSignalIndex] = useState<number | null>(null);
+  const [instrumentsMode, setInstrumentsMode] = useState(false);
 
   // Raw view mode
   const [rawViewMode, setRawViewMode] = useState(false);
@@ -177,23 +178,22 @@ function GraphInner() {
       // Record all seen frame IDs (for flow/heatmap frame pickers)
       store.recordFrameId(maskedFrameId);
 
-      // Raw byte ingestion for flow/heatmap panels
+      // Raw byte ingestion for flow/bitfield (per-byte series) and heatmap (bit-change counts)
       for (const panel of store.panels) {
-        if ((panel.type === 'flow' || panel.type === 'heatmap') && panel.targetFrameId === maskedFrameId) {
-          if (panel.type === 'flow') {
-            const count = panel.byteCount ?? 8;
-            for (let i = 0; i < Math.min(count, f.bytes.length); i++) {
-              pendingValuesRef.current.push({
-                frameId: maskedFrameId,
-                signalName: `byte[${i}]`,
-                value: f.bytes[i],
-                timestamp,
-              });
-            }
+        if (panel.targetFrameId !== maskedFrameId) continue;
+        if (panel.type === 'flow' || panel.type === 'bitfield') {
+          const count = panel.byteCount ?? 8;
+          for (let i = 0; i < Math.min(count, f.bytes.length); i++) {
+            pendingValuesRef.current.push({
+              frameId: maskedFrameId,
+              signalName: `byte[${i}]`,
+              value: f.bytes[i],
+              timestamp,
+            });
           }
-          if (panel.type === 'heatmap') {
-            store.recordBitChanges(maskedFrameId, f.bytes);
-          }
+        }
+        if (panel.type === 'heatmap') {
+          store.recordBitChanges(maskedFrameId, f.bytes);
         }
       }
 
@@ -292,7 +292,7 @@ function GraphInner() {
 
   // ── Session manager ──
   const manager = useIOSessionManager({
-    appName: "graph",
+    appName: "dashboard",
     ioProfiles: settings?.io_profiles ?? [],
     store: { ioProfile, setIoProfile },
     requireFrames: true,
@@ -343,7 +343,7 @@ function GraphInner() {
   // Catalogue load/attach (mirror session path + load once per selection,
   // binding Rust decode when a session exists). Auto-detaches on unsubscribe.
   useSessionCatalog({
-    label: "Graph",
+    label: "Dashboard",
     sessionId,
     catalogPath,
     sessionCatalogPath,
@@ -396,7 +396,7 @@ function GraphInner() {
 
   // ── Menu session control ──
   useMenuSessionControl({
-    panelId: "graph",
+    panelId: "dashboard",
     sessionState: {
       profileName: ioProfileName ?? null,
       isStreaming,
@@ -480,10 +480,17 @@ function GraphInner() {
     dialogs.signalPicker.open();
   }, [dialogs]);
 
+  const handleOpenInstruments = useCallback(() => {
+    setConfiguringPanelId(null);
+    setReplacingSignalIndex(null);
+    setInstrumentsMode(true);
+    dialogs.signalPicker.open();
+  }, [dialogs]);
+
   return (
     <AppLayout
       topBar={
-        <GraphTopBar
+        <DashboardTopBar
           ioProfile={ioProfile}
           ioProfiles={settings?.io_profiles ?? []}
           multiBusProfiles={sessionId ? multiBusProfiles : []}
@@ -511,6 +518,7 @@ function GraphInner() {
           catalogFilename={catalogFilenameFromPath(catalogPath)}
           rawViewMode={rawViewMode}
           onToggleRawView={handleToggleRawView}
+          onOpenInstruments={handleOpenInstruments}
           onOpenCandidates={() => dialogs.candidateSignals.open()}
           onOpenHypothesisExplorer={() => dialogs.hypothesisExplorer.open()}
         />
@@ -556,11 +564,16 @@ function GraphInner() {
         onClose={() => {
           dialogs.signalPicker.close();
           setReplacingSignalIndex(null);
-          dialogs.panelConfig.open();
+          if (instrumentsMode) {
+            setInstrumentsMode(false); // standalone: don't bounce back to panel config
+          } else {
+            dialogs.panelConfig.open();
+          }
         }}
         panelId={configuringPanelId}
         replacingSignalIndex={replacingSignalIndex}
         onReplaceDone={() => setReplacingSignalIndex(null)}
+        instrumentsMode={instrumentsMode}
       />
 
       <PanelConfigDialog

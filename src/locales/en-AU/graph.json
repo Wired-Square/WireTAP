@@ -1,6 +1,7 @@
 {
   "topBar": {
     "addPanel": "Add panel",
+    "addInstruments": "Add catalog signals as instruments",
     "manageLayouts": "Manage layouts",
     "candidates": "Generate candidate signal panels",
     "switchToGrid": "Switch to Grid View",
@@ -17,11 +18,20 @@
       "list": "List",
       "flow": "Flow View",
       "heatmap": "Bit Heatmap",
-      "histogram": "Histogram"
+      "histogram": "Histogram",
+      "iconState": "Indicator",
+      "rotary": "Rotary / Wheel",
+      "levelBar": "Level Bar",
+      "bitfield": "Bitfield",
+      "rawCanvas": "Custom Canvas",
+      "customSvg": "Custom SVG"
     },
     "layouts": {
       "saveCurrent": "Save Current Layout",
       "save": "Save",
+      "saveFile": "File",
+      "saveFileHint": "Save as a shareable .dashboard.json file",
+      "dashboardFiles": "Dashboard files",
       "namePlaceholder": "Layout name",
       "noLayouts": "No saved layouts"
     },
@@ -53,7 +63,7 @@
     "placeholder": "Paste a graph layout JSON here…"
   },
   "catalogPicker": {
-    "title": "Select Graph Catalog"
+    "title": "Select Dashboard Catalog"
   },
   "hypothesis": {
     "title": "Hypothesis Explorer",
@@ -142,7 +152,13 @@
       "noFrames": "Start a session to discover frame IDs",
       "byteCount": "Byte Count (1–8)",
       "binCount": "Bin Count (5–200)",
-      "signals": "Signals"
+      "signals": "Signals",
+      "svgMode": "SVG Mode",
+      "svgModeScene": "Declarative scene",
+      "svgModeScript": "Script (returns SVG markup)",
+      "canvasCode": "Draw function (ctx, { signals, width, height, time, dt })",
+      "svgCode": "SVG function (signals, { width, height, time, dt }) → markup",
+      "customCodeHint": "Runs sandboxed in a Web Worker (no DOM, Tauri, or network). Bound signals are passed as the signals array, in order."
     },
     "actions": {
       "dragReorder": "Drag to reorder",
@@ -168,6 +184,9 @@
     "signalsCount_one": "{{count}} signal",
     "signalsCount_other": "{{count}} signals",
     "cancel": "Cancel",
-    "ok": "OK"
+    "ok": "OK",
+    "titleInstruments": "Add Instruments",
+    "addInstruments": "Add as Instruments",
+    "addInstrumentsHint": "Create a pre-configured widget panel for each selected signal (using its catalog display hint, or inferred from its range/enum)"
   }
 }

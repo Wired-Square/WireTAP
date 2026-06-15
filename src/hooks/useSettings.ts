@@ -347,6 +347,10 @@ export interface AppSettings {
   mcp_allow_catalog_write?: boolean;
   /** Catalog gate: when true the update_catalog tool (overwrite catalogs) is registered. */
   mcp_allow_catalog_modify?: boolean;
+  /** Dashboard gate: when true the create_dashboard tool is registered. */
+  mcp_allow_dashboard_write?: boolean;
+  /** UI gate: when true the open_app tool (open/focus a panel) is registered. */
+  mcp_allow_ui_control?: boolean;
   /** Fixed localhost port the MCP server listens on (default 8787). */
   mcp_server_port?: number;
   /** Bearer token required by clients (empty = no auth). */
@@ -424,6 +428,8 @@ function normalizeSettings(
     mcp_allow_session_control: settings.mcp_allow_session_control ?? false,
     mcp_allow_catalog_write: settings.mcp_allow_catalog_write ?? false,
     mcp_allow_catalog_modify: settings.mcp_allow_catalog_modify ?? false,
+    mcp_allow_dashboard_write: settings.mcp_allow_dashboard_write ?? false,
+    mcp_allow_ui_control: settings.mcp_allow_ui_control ?? false,
     mcp_server_port: settings.mcp_server_port ?? 8787,
     mcp_server_token: settings.mcp_server_token ?? "",
   };

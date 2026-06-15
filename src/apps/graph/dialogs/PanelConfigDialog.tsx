@@ -41,6 +41,8 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
   const [targetFrameId, setTargetFrameId] = useState("");
   const [byteCount, setByteCount] = useState("8");
   const [histogramBins, setHistogramBins] = useState("20");
+  const [code, setCode] = useState("");
+  const [svgMode, setSvgMode] = useState<"scene" | "script">("scene");
 
   const sortedFrameIds = useMemo(
     () => Array.from(discoveredFrameIds).sort((a, b) => a - b),
@@ -61,6 +63,8 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
       setTargetFrameId(panel.targetFrameId != null ? String(panel.targetFrameId) : "");
       setByteCount(String(panel.byteCount ?? 8));
       setHistogramBins(String(panel.histogramBins ?? 20));
+      setCode(panel.widgetConfig?.rawCanvas?.code ?? panel.widgetConfig?.customSvg?.code ?? "");
+      setSvgMode(panel.widgetConfig?.customSvg?.mode ?? "scene");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelId]);
@@ -100,12 +104,18 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
       minValue: parseFloat(minValue) || 0,
       maxValue: parseFloat(maxValue) || 100,
       ...(panel.type === "gauge" ? { primarySignalIndex: parseInt(primarySignalIndex, 10) || 0 } : {}),
-      ...((panel.type === "flow" || panel.type === "heatmap") ? {
+      ...((panel.type === "flow" || panel.type === "heatmap" || panel.type === "bitfield") ? {
         targetFrameId: targetFrameId ? parseInt(targetFrameId, 10) : undefined,
         byteCount: Math.max(1, Math.min(8, parseInt(byteCount, 10) || 8)),
       } : {}),
       ...(panel.type === "histogram" ? {
         histogramBins: Math.max(5, Math.min(200, parseInt(histogramBins, 10) || 20)),
+      } : {}),
+      ...(panel.type === "raw-canvas" ? {
+        widgetConfig: { ...panel.widgetConfig, rawCanvas: { ...panel.widgetConfig?.rawCanvas, code } },
+      } : {}),
+      ...(panel.type === "custom-svg" ? {
+        widgetConfig: { ...panel.widgetConfig, customSvg: { ...panel.widgetConfig?.customSvg, mode: svgMode, code } },
       } : {}),
     });
     onClose();
@@ -150,8 +160,8 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
             />
           </div>
 
-          {/* Gauge range (only for gauge panels) */}
-          {panel.type === "gauge" && (
+          {/* Value range (gauge, rotary, level bar) */}
+          {(panel.type === "gauge" || panel.type === "rotary" || panel.type === "level-bar") && (
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
@@ -202,8 +212,8 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
             </div>
           )}
 
-          {/* Frame ID picker (flow + heatmap panels) */}
-          {(panel.type === "flow" || panel.type === "heatmap") && (
+          {/* Frame ID picker (flow + heatmap + bitfield panels) */}
+          {(panel.type === "flow" || panel.type === "heatmap" || panel.type === "bitfield") && (
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
@@ -227,7 +237,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
                   </p>
                 )}
               </div>
-              {panel.type === "flow" && (
+              {(panel.type === "flow" || panel.type === "bitfield") && (
                 <div>
                   <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
                     {t("panelConfig.fields.byteCount")}
@@ -264,8 +274,51 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
             </div>
           )}
 
+          {/* Custom widget code (raw-canvas + scripted custom-svg) */}
+          {(panel.type === "raw-canvas" || panel.type === "custom-svg") && (
+            <div className="space-y-2">
+              {panel.type === "custom-svg" && (
+                <div>
+                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                    {t("panelConfig.fields.svgMode")}
+                  </label>
+                  <select
+                    value={svgMode}
+                    onChange={(e) => setSvgMode(e.target.value as "scene" | "script")}
+                    className={`${selectSimple} w-full`}
+                  >
+                    <option value="scene">{t("panelConfig.fields.svgModeScene")}</option>
+                    <option value="script">{t("panelConfig.fields.svgModeScript")}</option>
+                  </select>
+                </div>
+              )}
+              {(panel.type === "raw-canvas" || svgMode === "script") && (
+                <div>
+                  <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
+                    {panel.type === "raw-canvas"
+                      ? t("panelConfig.fields.canvasCode")
+                      : t("panelConfig.fields.svgCode")}
+                  </label>
+                  <textarea
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    rows={8}
+                    spellCheck={false}
+                    className={`${inputSimple} w-full font-mono text-xs`}
+                    placeholder={panel.type === "raw-canvas"
+                      ? "(ctx, { signals, width, height, time, dt }) => {\n  ctx.fillStyle = '#3b82f6';\n  ctx.fillRect(0, 0, signals[0] ?? 0, height);\n}"
+                      : "(signals, { width, height, time, dt }) =>\n  `<circle cx=50 cy=50 r=${signals[0] ?? 0} fill=\"#3b82f6\" />`"}
+                  />
+                  <p className="text-[10px] text-[color:var(--text-muted)] mt-1">
+                    {t("panelConfig.fields.customCodeHint")}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Signals — drag reorder, colour, display name, replace */}
-          {panel.type !== "flow" && panel.type !== "heatmap" && panel.signals.length > 0 && (
+          {panel.type !== "flow" && panel.type !== "heatmap" && panel.type !== "bitfield" && panel.signals.length > 0 && (
             <div>
               <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-2">
                 {t("panelConfig.fields.signals")}
@@ -385,7 +438,7 @@ export default function PanelConfigDialog({ isOpen, onClose, panelId, onAddSigna
 
           {/* Action buttons */}
           <div className="flex gap-2">
-            {onAddSignals && panel.type !== "flow" && panel.type !== "heatmap" && (
+            {onAddSignals && panel.type !== "flow" && panel.type !== "heatmap" && panel.type !== "bitfield" && (
               <button
                 onClick={() => onAddSignals(panel.id)}
                 className={`${iconButtonHover} flex items-center gap-1.5 px-3 py-2 rounded text-sm text-[color:var(--text-secondary)] border border-[var(--border-default)]`}

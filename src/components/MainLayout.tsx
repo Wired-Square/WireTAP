@@ -124,6 +124,10 @@ const components = Object.fromEntries(
   apps.map((a) => [a.id, makePanelComponent(a.load)]),
 ) as Record<PanelId, ReturnType<typeof makePanelComponent>>;
 
+// Back-compat: the Dashboard app was formerly "graph". Persisted Dockview
+// layouts may still reference a "graph" component — alias it so they restore.
+(components as Record<string, ReturnType<typeof makePanelComponent>>).graph = components.dashboard;
+
 // Watermark component shown when no panels are open
 function Watermark(_props: IWatermarkPanelProps) {
   const { t } = useTranslation("menus");
@@ -484,7 +488,7 @@ export default function MainLayout() {
 
   // Disable all session + bookmark menu items when a non-session panel is focused.
   // Session-aware panels manage their own state via useMenuSessionControl.
-  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "graph"]));
+  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "dashboard", "graph"]));
   const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
 
   useEffect(() => {

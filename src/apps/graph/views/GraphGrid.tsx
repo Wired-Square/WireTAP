@@ -3,14 +3,9 @@
 import { GridLayout, useContainerWidth, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import { useTranslation } from "react-i18next";
-import { useGraphStore, type LayoutItem } from "../../../stores/graphStore";
+import { useGraphStore, type LayoutItem, type GraphPanel } from "../../../stores/graphStore";
 import PanelWrapper from "./panels/PanelWrapper";
-import LineChartPanel from "./panels/line-chart/LineChartPanel";
-import GaugePanel from "./panels/gauge/GaugePanel";
-import ListPanel from "./panels/list/ListPanel";
-import FlowViewPanel from "./panels/flow/FlowViewPanel";
-import HeatmapPanel from "./panels/heatmap/HeatmapPanel";
-import HistogramPanel from "./panels/histogram/HistogramPanel";
+import { getWidget, FALLBACK_WIDGET } from "../widgets/registry";
 import { useCallback, useMemo, useRef } from "react";
 import { emptyStateContainer, emptyStateText } from "../../../styles/typography";
 import { buildPanelCsv, buildFlowPanelCsv } from "../utils/graphExport";
@@ -198,6 +193,14 @@ export default function GraphGrid({ onOpenPanelConfig }: Props) {
     return ref;
   }, []);
 
+  const renderWidget = useCallback((panel: GraphPanel) => {
+    const def = getWidget(panel.type);
+    const Comp = def?.component ?? FALLBACK_WIDGET;
+    if (def?.surface === "canvas") return <Comp panel={panel} canvasRef={getCanvasRefForPanel(panel.id)} />;
+    if (def?.surface === "svg") return <Comp panel={panel} svgRef={getSvgRefForPanel(panel.id)} />;
+    return <Comp panel={panel} />;
+  }, [getCanvasRefForPanel, getSvgRefForPanel]);
+
   const rglLayout = useMemo(
     () => layout.map((l) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h })),
     [layout],
@@ -212,9 +215,6 @@ export default function GraphGrid({ onOpenPanelConfig }: Props) {
       </div>
     );
   }
-
-  // Determine which export options are available per panel type
-  const hasCsv = (type: string) => type === 'line-chart' || type === 'flow' || type === 'histogram';
 
   return (
     <div ref={containerRef} className="h-full overflow-auto p-2">
@@ -231,23 +231,11 @@ export default function GraphGrid({ onOpenPanelConfig }: Props) {
               <PanelWrapper
                 panel={panel}
                 onOpenPanelConfig={() => onOpenPanelConfig(panel.id)}
-                onExport={hasCsv(panel.type) ? () => handleExport(panel.id) : undefined}
+                onExport={getWidget(panel.type)?.supportsCsv ? () => handleExport(panel.id) : undefined}
                 onExportPng={() => handleExportPng(panel.id)}
                 onExportSvg={() => handleExportSvg(panel.id)}
               >
-                {panel.type === "line-chart" ? (
-                  <LineChartPanel panel={panel} canvasRef={getCanvasRefForPanel(panel.id)} />
-                ) : panel.type === "gauge" ? (
-                  <GaugePanel panel={panel} svgRef={getSvgRefForPanel(panel.id)} />
-                ) : panel.type === "flow" ? (
-                  <FlowViewPanel panel={panel} canvasRef={getCanvasRefForPanel(panel.id)} />
-                ) : panel.type === "heatmap" ? (
-                  <HeatmapPanel panel={panel} svgRef={getSvgRefForPanel(panel.id)} />
-                ) : panel.type === "histogram" ? (
-                  <HistogramPanel panel={panel} canvasRef={getCanvasRefForPanel(panel.id)} />
-                ) : (
-                  <ListPanel panel={panel} />
-                )}
+                {renderWidget(panel)}
               </PanelWrapper>
             </div>
           ))}

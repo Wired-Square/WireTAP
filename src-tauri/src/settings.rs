@@ -171,6 +171,14 @@ pub struct AppSettings {
     /// catalog file) is registered. Independent of the control gate.
     #[serde(default = "default_mcp_allow_control")]
     pub mcp_allow_catalog_modify: bool,
+    /// Dashboard gate: when true the `create_dashboard`/`update_dashboard` tools
+    /// (write dashboard artifacts) are registered. Independent of the control gate.
+    #[serde(default = "default_mcp_allow_control")]
+    pub mcp_allow_dashboard_write: bool,
+    /// UI gate: when true the `open_app` tool (open/focus an app/panel, e.g. a
+    /// dashboard, in the running window) is registered. Independent of the control gate.
+    #[serde(default = "default_mcp_allow_control")]
+    pub mcp_allow_ui_control: bool,
     /// Fixed localhost port the MCP server listens on.
     #[serde(default = "default_mcp_server_port")]
     pub mcp_server_port: u16,
@@ -445,6 +453,8 @@ impl Default for AppSettings {
             mcp_allow_session_control: default_mcp_allow_control(),
             mcp_allow_catalog_write: default_mcp_allow_control(),
             mcp_allow_catalog_modify: default_mcp_allow_control(),
+            mcp_allow_dashboard_write: default_mcp_allow_control(),
+            mcp_allow_ui_control: default_mcp_allow_control(),
             mcp_server_port: default_mcp_server_port(),
             mcp_server_token: String::new(),
         }
@@ -535,6 +545,8 @@ impl AppSettings {
             mcp_allow_session_control: default_mcp_allow_control(),
             mcp_allow_catalog_write: default_mcp_allow_control(),
             mcp_allow_catalog_modify: default_mcp_allow_control(),
+            mcp_allow_dashboard_write: default_mcp_allow_control(),
+            mcp_allow_ui_control: default_mcp_allow_control(),
             mcp_server_port: default_mcp_server_port(),
             mcp_server_token: String::new(),
         })

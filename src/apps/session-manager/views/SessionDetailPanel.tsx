@@ -393,7 +393,7 @@ function SessionDetails({
       {/* Connect unconnected apps */}
       {onConnectApp && openPanelIds && (() => {
         const connectedApps = new Set(session.subscribers.map((l) => (l.app_name || l.subscriber_id).toLowerCase()));
-        const SESSION_AWARE = ["discovery", "decoder", "transmit", "query", "graph"];
+        const SESSION_AWARE = ["discovery", "decoder", "transmit", "query", "dashboard"];
         const unconnected = openPanelIds.filter(
           (id) => SESSION_AWARE.includes(id) && !connectedApps.has(id)
         );

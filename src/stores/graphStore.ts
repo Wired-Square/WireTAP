@@ -16,13 +16,20 @@ import {
   type GraphLayout,
 } from '../utils/graphLayouts';
 import { storeGet, storeSet, storeDelete } from '../api/store';
+import { WIDGET_META } from '../apps/graph/widgets/widgetMeta';
+import type { WidgetConfig } from '../apps/graph/widgets/configTypes';
+import { widgetForSignal } from '../apps/graph/widgets/autoWidget';
+import { parseDisplayHints, type DisplayHint } from '../apps/graph/widgets/displayHints';
+import type { DashboardFileContent } from '../utils/dashboards';
 
 // ─────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────
 
 /** Type of visualisation panel */
-export type PanelType = 'line-chart' | 'gauge' | 'list' | 'flow' | 'heatmap' | 'histogram';
+export type PanelType =
+  | 'line-chart' | 'gauge' | 'list' | 'flow' | 'heatmap' | 'histogram'
+  | 'icon-state' | 'rotary' | 'level-bar' | 'bitfield' | 'raw-canvas' | 'custom-svg';
 
 /** Colour palette for signal lines */
 const SIGNAL_COLOURS = [
@@ -107,6 +114,8 @@ export interface GraphPanel {
   byteCount?: number;
   /** Histogram: number of bins (default 20) */
   histogramBins?: number;
+  /** Per-widget config; shape depends on panel.type (see widget definitions). */
+  widgetConfig?: WidgetConfig;
 }
 
 /** react-grid-layout layout item */
@@ -170,6 +179,26 @@ function generatePanelId(): string {
   return `panel_${Date.now()}_${panelCounter++}`;
 }
 
+/** Recursively search a frame (incl. mux cases) for a signal's definition. */
+function findSignalDef(frame: FrameDetail, name: string): SignalDef | undefined {
+  const direct = frame.signals.find((s) => s.name === name);
+  if (direct) return direct;
+  return frame.mux ? findMuxSignalDef(frame.mux, name) : undefined;
+}
+
+function findMuxSignalDef(mux: MuxDef, name: string): SignalDef | undefined {
+  for (const caseKey of Object.keys(mux.cases)) {
+    const c = mux.cases[caseKey];
+    const sig = c.signals.find((s) => s.name === name);
+    if (sig) return sig;
+    if (c.mux) {
+      const nested = findMuxSignalDef(c.mux, name);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
 /** Recursively search mux cases for a signal's confidence */
 function findMuxSignalConfidence(mux: MuxDef, signalName: string): Confidence | undefined {
   for (const caseKey of Object.keys(mux.cases)) {
@@ -220,6 +249,8 @@ interface GraphState {
   defaultByteOrder: 'big' | 'little';
   /** Frame ID mask for catalog lookup */
   frameIdMask: number | undefined;
+  /** Per-signal display hints from the catalog, keyed "frameId:signalName". */
+  displayHints: Map<string, DisplayHint>;
 
   // ── IO Session ──
   ioProfile: string | null;
@@ -263,10 +294,12 @@ interface GraphState {
 
   // Panel management
   addPanel: (type: PanelType) => string;
+  /** Add each signal as its own pre-configured instrument panel (display hint → widget). */
+  addSignalsAsInstruments: (signals: Array<{ frameId: number; signalName: string; unit?: string }>) => void;
   clonePanel: (panelId: string) => void;
   removePanel: (panelId: string) => void;
   removeAllPanels: () => void;
-  updatePanel: (panelId: string, updates: Partial<Pick<GraphPanel, 'title' | 'minValue' | 'maxValue' | 'primarySignalIndex' | 'targetFrameId' | 'byteCount' | 'histogramBins'>>) => void;
+  updatePanel: (panelId: string, updates: Partial<Pick<GraphPanel, 'title' | 'minValue' | 'maxValue' | 'primarySignalIndex' | 'targetFrameId' | 'byteCount' | 'histogramBins' | 'widgetConfig' | 'signals'>>) => void;
   addSignalToPanel: (panelId: string, frameId: number, signalName: string, unit?: string) => void;
   removeSignalFromPanel: (panelId: string, frameId: number, signalName: string) => void;
   updateSignalColour: (panelId: string, frameId: number, signalName: string, colour: string) => void;
@@ -284,6 +317,8 @@ interface GraphState {
   loadSavedLayouts: () => Promise<void>;
   saveCurrentLayout: (name: string) => Promise<void>;
   loadLayout: (layout: GraphLayout) => void;
+  /** Load a standalone dashboard artifact (same set as loadLayout). */
+  loadDashboard: (dashboard: DashboardFileContent) => void;
   deleteSavedLayout: (id: string) => Promise<void>;
   restoreLastSession: () => Promise<void>;
 
@@ -309,6 +344,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   serialConfig: null,
   defaultByteOrder: 'little',
   frameIdMask: undefined,
+  displayHints: new Map(),
 
   ioProfile: null,
   playbackSpeed: 1,
@@ -396,6 +432,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         serialConfig,
         defaultByteOrder,
         frameIdMask,
+        displayHints: parseDisplayHints(catalog.rawToml),
       });
     } catch (e) {
       tlog.info(`[graphStore] Failed to load catalog: ${e}`);
@@ -427,38 +464,23 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     // Find the next available Y position
     const maxY = layout.reduce((max, item) => Math.max(max, item.y + item.h), 0);
 
-    const defaultTitles: Record<PanelType, string> = {
-      'line-chart': 'Line Chart',
-      'gauge': 'Gauge',
-      'list': 'List',
-      'flow': 'Flow View',
-      'heatmap': 'Bit Heatmap',
-      'histogram': 'Histogram',
-    };
+    const meta = WIDGET_META[type];
 
     const newPanel: GraphPanel = {
       id,
       type,
-      title: defaultTitles[type],
+      title: meta?.defaultConfig.title ?? 'Panel',
       signals: [],
       minValue: 0,
       maxValue: 100,
-    };
-
-    const defaultSizes: Record<PanelType, { w: number; h: number }> = {
-      'line-chart': { w: 6, h: 3 },
-      'gauge': { w: 3, h: 3 },
-      'list': { w: 3, h: 3 },
-      'flow': { w: 6, h: 3 },
-      'heatmap': { w: 3, h: 3 },
-      'histogram': { w: 4, h: 3 },
+      ...meta?.defaultConfig,
     };
 
     const newLayoutItem: LayoutItem = {
       i: id,
       x: 0,
       y: maxY,
-      ...defaultSizes[type],
+      ...(meta?.defaultSize ?? { w: 4, h: 3 }),
     };
 
     set({
@@ -467,6 +489,46 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     });
     scheduleAutoSave();
     return id;
+  },
+
+  addSignalsAsInstruments: (entries) => {
+    const { panels, layout, frames, displayHints } = get();
+    const newPanels = [...panels];
+    const newLayout = [...layout];
+
+    // Flow panels left-to-right across the 12-col grid, wrapping to new rows.
+    let x = 0;
+    let rowY = newLayout.reduce((m, it) => Math.max(m, it.y + it.h), 0);
+    let rowH = 0;
+
+    for (const { frameId, signalName, unit } of entries) {
+      const frame = frames.get(frameId);
+      const def = frame ? findSignalDef(frame, signalName) : undefined;
+      const meta = { unit: unit ?? def?.unit, min: def?.min, max: def?.max, enum: def?.enum, format: def?.format };
+      const hint = displayHints.get(makeSignalKey(frameId, signalName));
+      const widget = widgetForSignal(meta, hint);
+
+      const size = WIDGET_META[widget.type]?.defaultSize ?? { w: 3, h: 3 };
+      if (x + size.w > 12) { x = 0; rowY += rowH; rowH = 0; }
+
+      const confidence = def?.confidence ?? (frame?.mux ? findMuxSignalConfidence(frame.mux, signalName) : undefined);
+      const id = generatePanelId();
+      newPanels.push({
+        id,
+        type: widget.type,
+        title: signalName,
+        signals: [{ frameId, signalName, unit: meta.unit, colour: SIGNAL_COLOURS[0], confidence }],
+        minValue: widget.minValue ?? 0,
+        maxValue: widget.maxValue ?? 100,
+        ...(widget.widgetConfig ? { widgetConfig: widget.widgetConfig } : {}),
+      });
+      newLayout.push({ i: id, x, y: rowY, ...size });
+      x += size.w;
+      rowH = Math.max(rowH, size.h);
+    }
+
+    set({ panels: newPanels, layout: newLayout });
+    scheduleAutoSave();
   },
 
   clonePanel: (panelId) => {
@@ -558,8 +620,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const newSignal: SignalRef = { frameId, signalName, unit, colour, confidence };
 
     // Auto-set title to first signal name when panel still has its default title
-    const isDefaultTitle = panel.title === 'Gauge' || panel.title === 'Line Chart' || panel.title === 'List'
-      || panel.title === 'Flow View' || panel.title === 'Bit Heatmap' || panel.title === 'Histogram';
+    const isDefaultTitle = Object.values(WIDGET_META).some((m) => m.defaultConfig.title === panel.title);
     const newTitle = (panel.signals.length === 0 && isDefaultTitle) ? signalName : panel.title;
 
     set({
@@ -758,6 +819,20 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         : new Map(),
     });
     scheduleAutoSave();
+  },
+
+  loadDashboard: (dashboard) => {
+    const now = Date.now();
+    get().loadLayout({
+      id: 'dashboard',
+      name: dashboard.name || 'Dashboard',
+      catalogFilename: dashboard.catalogFilename || '',
+      panels: dashboard.panels,
+      layout: dashboard.layout,
+      candidateRegistry: dashboard.candidateRegistry,
+      createdAt: dashboard.createdAt ?? now,
+      updatedAt: dashboard.updatedAt ?? now,
+    });
   },
 
   deleteSavedLayout: async (id) => {

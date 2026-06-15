@@ -16,7 +16,7 @@ import {
   Activity,
   Send,
   DatabaseZap,
-  BarChart3,
+  Gauge,
   Workflow,
   FileText,
   Calculator,
@@ -63,8 +63,8 @@ const visualConfig = {
     watermarkBg: "bg-red-500/10 hover:bg-red-500/20",
     load: () => import("./transmit/Transmit"),
   },
-  graph: {
-    icon: BarChart3,
+  dashboard: {
+    icon: Gauge,
     colour: "text-pink-400",
     bgColour: "hover:bg-pink-500/10",
     watermarkBg: "bg-pink-500/10 hover:bg-pink-500/20",

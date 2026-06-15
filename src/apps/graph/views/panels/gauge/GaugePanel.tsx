@@ -3,8 +3,9 @@
 import { useRef, useEffect } from "react";
 import { useGraphStore, getConfidenceColour, type GraphPanel } from "../../../../../stores/graphStore";
 import { useSettings } from "../../../../../hooks/useSettings";
-import { emptyStateContainer, emptyStateText } from "../../../../../styles/typography";
 import { formatValue } from "../../../utils/graphFormat";
+import { polarToCartesian, describeArc } from "../../../widgets/svgArc";
+import WidgetEmpty from "../../../widgets/WidgetEmpty";
 import PanelTooltip from "../PanelTooltip";
 
 interface Props {
@@ -19,22 +20,6 @@ const GAUGE_END_ANGLE = 495;    // lower-right (225 + 270)
 const GAUGE_SWEEP = GAUGE_END_ANGLE - GAUGE_START_ANGLE;
 const LABEL_OFFSET = 14;
 const ARC_GAP = 3;              // gap between concentric arcs
-
-function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return {
-    x: cx + r * Math.cos(rad),
-    y: cy + r * Math.sin(rad),
-  };
-}
-
-function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
-  const start = polarToCartesian(cx, cy, r, endAngle);
-  const end = polarToCartesian(cx, cy, r, startAngle);
-  const sweep = endAngle - startAngle;
-  const largeArc = sweep > 180 ? 1 : 0;
-  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
-}
 
 export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
   const signalCount = panel.signals.length;
@@ -94,11 +79,7 @@ export default function GaugePanel({ panel, svgRef: svgRefProp }: Props) {
   const displayValue = formatValue(primaryValue);
 
   if (signalCount === 0) {
-    return (
-      <div className={emptyStateContainer}>
-        <p className={emptyStateText}>Click + to add a signal</p>
-      </div>
-    );
+    return <WidgetEmpty>Click + to add a signal</WidgetEmpty>;
   }
 
   return (

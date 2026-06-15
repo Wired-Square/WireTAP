@@ -1,6 +1,6 @@
-// ui/src/apps/graph/views/GraphTopBar.tsx
+// ui/src/apps/graph/views/DashboardTopBar.tsx
 
-import { BarChart3, Plus, LineChart, Gauge, List, Save, Layout, X, AlertTriangle, Glasses, Waves, Grid3X3, BarChart2, Sparkles, FlaskConical, Trash2 } from "lucide-react";
+import { Gauge, Plus, Save, Layout, X, AlertTriangle, Glasses, Sparkles, FlaskConical, Trash2, Wand2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppTopBar from "../../../components/AppTopBar";
 import { iconButtonBase, iconButtonHoverDanger, toggleButtonClass } from "../../../styles/buttonStyles";
@@ -8,8 +8,12 @@ import { inputBase } from "../../../styles/inputStyles";
 import { iconSm, iconMd } from "../../../styles/spacing";
 import { textSecondary } from "../../../styles/colourTokens";
 import { useGraphStore } from "../../../stores/graphStore";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import type { PanelType } from "../../../stores/graphStore";
+import { WIDGET_LIST } from "../widgets/registry";
+import { listDashboards, openDashboard, saveDashboard, type DashboardFile } from "../../../api/dashboards";
+import { buildDashboard, parseDashboard, dashboardFilename } from "../../../utils/dashboards";
+import { catalogFilenameFromPath } from "../../../utils/graphLayouts";
 import type { GraphLayout } from "../../../utils/graphLayouts";
 import type { IOProfile } from "../../../types/common";
 import type { CatalogMetadata } from "../../../api/catalog";
@@ -61,9 +65,12 @@ interface Props {
   // Candidate signals
   onOpenCandidates?: () => void;
   onOpenHypothesisExplorer?: () => void;
+
+  // Auto-instruments from catalog signals
+  onOpenInstruments?: () => void;
 }
 
-export default function GraphTopBar({
+export default function DashboardTopBar({
   ioProfile,
   ioProfiles,
   multiBusProfiles,
@@ -93,6 +100,7 @@ export default function GraphTopBar({
   onToggleRawView,
   onOpenCandidates,
   onOpenHypothesisExplorer,
+  onOpenInstruments,
 }: Props) {
   const { t } = useTranslation("graph");
   const addPanel = useGraphStore((s) => s.addPanel);
@@ -112,6 +120,28 @@ export default function GraphTopBar({
   const layoutMenuRef = useRef<HTMLDivElement>(null);
   const [saveName, setSaveName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [dashboardFiles, setDashboardFiles] = useState<DashboardFile[]>([]);
+
+  const refreshDashboardFiles = () => listDashboards().then(setDashboardFiles).catch(() => setDashboardFiles([]));
+  useEffect(() => { if (layoutMenuOpen) refreshDashboardFiles(); }, [layoutMenuOpen]);
+
+  const handleSaveDashboardFile = async () => {
+    const name = saveName.trim();
+    if (!name) return;
+    const { panels, layout, catalogPath, candidateRegistry } = useGraphStore.getState();
+    const dashboard = buildDashboard(name, catalogFilenameFromPath(catalogPath), panels, layout, candidateRegistry, Date.now());
+    await saveDashboard(dashboardFilename(name), JSON.stringify(dashboard, null, 2));
+    setSaveName("");
+    setIsSaving(false);
+    setLayoutMenuOpen(false);
+    refreshDashboardFiles();
+  };
+
+  const handleOpenDashboardFile = async (file: DashboardFile) => {
+    const json = await openDashboard(file.path);
+    useGraphStore.getState().loadDashboard(parseDashboard(json));
+    setLayoutMenuOpen(false);
+  };
 
   // Close menus on outside click
   useEffect(() => {
@@ -153,7 +183,7 @@ export default function GraphTopBar({
 
   return (
     <AppTopBar
-      icon={BarChart3}
+      icon={Gauge}
       iconColour="text-pink-400"
       frameIdFormat
       ioSession={{
@@ -198,34 +228,33 @@ export default function GraphTopBar({
         </button>
         {addMenuOpen && (
           <div className={menuContainer}>
-            <button onClick={() => handleAddPanel('line-chart')} className={menuItem}>
-              <LineChart className={iconSm} />
-              {t("topBar.panelTypes.lineChart")}
-            </button>
-            <button onClick={() => handleAddPanel('gauge')} className={menuItem}>
-              <Gauge className={iconSm} />
-              {t("topBar.panelTypes.gauge")}
-            </button>
-            <button onClick={() => handleAddPanel('list')} className={menuItem}>
-              <List className={iconSm} />
-              {t("topBar.panelTypes.list")}
-            </button>
-            <div className="my-1 border-t border-[var(--border-default)]" />
-            <button onClick={() => handleAddPanel('flow')} className={menuItem}>
-              <Waves className={iconSm} />
-              {t("topBar.panelTypes.flow")}
-            </button>
-            <button onClick={() => handleAddPanel('heatmap')} className={menuItem}>
-              <Grid3X3 className={iconSm} />
-              {t("topBar.panelTypes.heatmap")}
-            </button>
-            <button onClick={() => handleAddPanel('histogram')} className={menuItem}>
-              <BarChart2 className={iconSm} />
-              {t("topBar.panelTypes.histogram")}
-            </button>
+            {WIDGET_LIST.map((w, i) => {
+              const Icon = w.icon;
+              const newGroup = i > 0 && WIDGET_LIST[i - 1].category !== w.category;
+              return (
+                <Fragment key={w.type}>
+                  {newGroup && <div className="my-1 border-t border-[var(--border-default)]" />}
+                  <button onClick={() => handleAddPanel(w.type)} className={menuItem}>
+                    <Icon className={iconSm} />
+                    {t(w.displayName)}
+                  </button>
+                </Fragment>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Auto-add catalog signals as pre-configured instruments */}
+      {onOpenInstruments && (
+        <button
+          onClick={onOpenInstruments}
+          className={iconButtonBase}
+          title={t("topBar.addInstruments")}
+        >
+          <Wand2 className={iconMd} />
+        </button>
+      )}
 
       {/* Layouts button with dropdown */}
       <div ref={layoutMenuRef} className="relative">
@@ -271,6 +300,14 @@ export default function GraphTopBar({
                   className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {t("topBar.layouts.save")}
+                </button>
+                <button
+                  onClick={handleSaveDashboardFile}
+                  disabled={!saveName.trim()}
+                  title={t("topBar.layouts.saveFileHint")}
+                  className="text-xs px-2 py-1 bg-[var(--bg-primary)] border border-[var(--border-default)] text-[color:var(--text-primary)] rounded hover:bg-[var(--hover-bg)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {t("topBar.layouts.saveFile")}
                 </button>
               </div>
             )}
@@ -320,6 +357,21 @@ export default function GraphTopBar({
                 </div>
               );
             })}
+
+            {/* Dashboard files (shareable *.dashboard.json) */}
+            {dashboardFiles.length > 0 && (
+              <>
+                <div className="border-t border-[var(--border-default)] my-1" />
+                <div className={`px-3 py-1 text-[10px] font-medium ${textSecondary}`}>
+                  {t("topBar.layouts.dashboardFiles")}
+                </div>
+                {dashboardFiles.map((file) => (
+                  <button key={file.path} onClick={() => handleOpenDashboardFile(file)} className={`${menuItem} w-full`}>
+                    <span className="truncate flex-1 text-left">{file.name}</span>
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>

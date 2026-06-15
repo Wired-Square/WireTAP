@@ -205,6 +205,27 @@ pub struct UpdateCatalogParams {
     pub content: String,
 }
 
+/// Write a dashboard artifact (gated by the dashboard-write permission).
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct DashboardParams {
+    /// Target filename in the dashboards dir (a `.dashboard.json` suffix is added
+    /// if missing). Must be a bare name — no path separators.
+    pub filename: String,
+    /// Full dashboard JSON (schema `wiretap.dashboard/1`).
+    pub content: String,
+}
+
+/// Open (or focus) an app/panel in the running window (gated by the ui-control permission).
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct OpenAppParams {
+    /// App/panel id, e.g. "dashboard", "discovery", "decoder", "query".
+    pub panel_id: String,
+    /// Optional args passed to the frontend handler (e.g. `{ "dashboardPath": "…" }`
+    /// to load a dashboard before opening the panel).
+    #[serde(default)]
+    pub args: Option<serde_json::Value>,
+}
+
 // ── Analysis levers (work against a capture OR a postgres profile) ───────────
 
 fn default_sample_limit() -> u32 {

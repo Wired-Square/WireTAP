@@ -7,6 +7,7 @@ import { Trash2, Settings2, Copy, Maximize2, ChevronsRight, BarChart2, Download,
 import { iconSm } from "../../../../styles/spacing";
 import { iconButtonHover } from "../../../../styles/buttonStyles";
 import { useGraphStore, type GraphPanel } from "../../../../stores/graphStore";
+import { getWidget } from "../../widgets/registry";
 
 /** Menu-item toggle styling for active toggles in the dropdown. */
 function menuToggle(isActive: boolean, colour: "blue" | "purple"): string {
@@ -43,7 +44,7 @@ export default function PanelWrapper({ panel, onOpenPanelConfig, onExport, onExp
   const setFollowMode = useGraphStore((s) => s.setFollowMode);
   const toggleStats = useGraphStore((s) => s.toggleStats);
 
-  const hasTimeSeriesControls = panel.type === "line-chart" || panel.type === "flow";
+  const hasTimeSeriesControls = getWidget(panel.type)?.dataShape === "timeseries";
   const followMode = panel.followMode !== false;
 
   // -- Hover menu state --

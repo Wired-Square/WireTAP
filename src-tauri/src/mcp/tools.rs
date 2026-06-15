@@ -39,6 +39,8 @@ impl WireTapTools {
         allow_session_control: bool,
         allow_catalog_write: bool,
         allow_catalog_modify: bool,
+        allow_dashboard_write: bool,
+        allow_ui_control: bool,
     ) -> Self {
         let mut tool_router = Self::read_router();
         if allow_control {
@@ -52,6 +54,12 @@ impl WireTapTools {
         }
         if allow_catalog_modify {
             tool_router = tool_router + Self::catalog_modify_router();
+        }
+        if allow_dashboard_write {
+            tool_router = tool_router + Self::dashboard_write_router();
+        }
+        if allow_ui_control {
+            tool_router = tool_router + Self::ui_control_router();
         }
         Self { app, tool_router }
     }
@@ -770,6 +778,65 @@ impl WireTapTools {
         validate_or_reject(&p.content)?;
         crate::catalog::save_catalog(cat.path.clone(), p.content).await.map_err(err)?;
         ok_json(json!({ "updated": true, "filename": cat.filename, "path": cat.path }))
+    }
+}
+
+// ── Dashboard write tools (registered when mcp_allow_dashboard_write is on) ────
+
+/// Validate a dashboard JSON string (schema + panel widget types). The embedded
+/// custom-widget `code` is NEVER executed here — it is stored opaque and only
+/// ever runs later inside the frontend's sandboxed worker.
+fn validate_dashboard_or_reject(content: &str) -> Result<(), McpError> {
+    let value: serde_json::Value =
+        serde_json::from_str(content).map_err(|e| err(format!("Dashboard is not valid JSON: {e}")))?;
+    if value.get("schema").and_then(|s| s.as_str()) != Some("wiretap.dashboard/1") {
+        return Err(err("Dashboard 'schema' must be \"wiretap.dashboard/1\""));
+    }
+    let panels = value
+        .get("panels")
+        .and_then(|p| p.as_array())
+        .ok_or_else(|| err("Dashboard must have a 'panels' array"))?;
+    if value.get("layout").and_then(|l| l.as_array()).is_none() {
+        return Err(err("Dashboard must have a 'layout' array"));
+    }
+    const KNOWN: &[&str] = &[
+        "line-chart", "gauge", "list", "flow", "heatmap", "histogram",
+        "icon-state", "rotary", "level-bar", "bitfield", "raw-canvas", "custom-svg",
+    ];
+    for p in panels {
+        let ty = p.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        if !KNOWN.contains(&ty) {
+            return Err(err(format!("Dashboard panel has unknown widget type: {ty:?}")));
+        }
+    }
+    Ok(())
+}
+
+#[tool_router(router = dashboard_write_router)]
+impl WireTapTools {
+    #[tool(description = "Create or overwrite a dashboard artifact (*.dashboard.json, schema \"wiretap.dashboard/1\") in the dashboards directory. Validates the JSON shape and that every panel type is a known widget. Any embedded custom-widget code is stored opaque and only ever runs later inside the frontend's sandboxed worker — it is NOT executed here. Requires the dashboard-write MCP permission.")]
+    async fn create_dashboard(
+        &self,
+        Parameters(p): Parameters<DashboardParams>,
+    ) -> Result<CallToolResult, McpError> {
+        validate_dashboard_or_reject(&p.content)?;
+        let settings = crate::settings::load_settings_sync(&self.app).map_err(err)?;
+        let path = crate::dashboard::write_dashboard(&settings.decoder_dir, &p.filename, &p.content)
+            .map_err(err)?;
+        ok_json(json!({ "saved": true, "path": path }))
+    }
+}
+
+// ── UI control tools (registered when mcp_allow_ui_control is on) ─────────────
+
+#[tool_router(router = ui_control_router)]
+impl WireTapTools {
+    #[tool(description = "Open (or focus) an app/panel in the running WireTAP window, e.g. \"dashboard\", \"discovery\", \"decoder\", \"query\". Pass args like { \"dashboardPath\": \"…\" } to load a dashboard before opening it. Requires an open WireTAP window and the ui-control MCP permission.")]
+    async fn open_app(
+        &self,
+        Parameters(p): Parameters<OpenAppParams>,
+    ) -> Result<CallToolResult, McpError> {
+        bridge_call("ui.openPanel", json!({ "panelId": p.panel_id, "args": p.args })).await
     }
 }
 

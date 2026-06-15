@@ -92,6 +92,8 @@ export interface ResolvedSignal {
   factor?: number;
   offset?: number;
   unit?: string;
+  min?: number;
+  max?: number;
   format?: SignalFormat;
   enum?: Record<number, string>;
   confidence?: Confidence;
@@ -197,6 +199,8 @@ function adaptSignal(s: Signal): ResolvedSignal {
     factor: s.factor,
     offset: s.offset,
     unit: s.unit,
+    min: s.min,
+    max: s.max,
     format: s.format as SignalFormat | undefined,
     enum: s.enum as Record<number, string> | undefined,
     confidence: s.confidence as Confidence | undefined,
