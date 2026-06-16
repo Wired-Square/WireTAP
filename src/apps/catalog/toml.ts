@@ -46,51 +46,9 @@ function sortedMuxCaseKeysLocal(muxObj: Record<string, unknown>): string[] {
   return sortMuxCaseKeys(keys);
 }
 
-/**
- * Stringify with quoting fixes for TOML table headers like:
- * [canid.0x123] -> [canid."0x123"]
- *
- * Keys starting with digits or containing special chars must be quoted per TOML spec
- *
- * Also converts hex marker strings ("__HEX__0xFF00") to actual hex literals (0xFF00)
- */
-export function tomlStringify(obj: any): string {
-  let toml = TOML.stringify(obj);
-
-  // Quote table headers with numeric-like keys
-  toml = toml.replace(/\[([^\]]+)\]/g, (_match, path) => {
-    const parts = path.split(".");
-    const quotedParts = parts.map((part: string) => {
-      if (part.startsWith('"') && part.endsWith('"')) return part;
-      if (/^[0-9]/.test(part) || part.startsWith("0x")) {
-        return `"${part}"`;
-      }
-      return part;
-    });
-    return `[${quotedParts.join(".")}]`;
-  });
-
-  // Convert hex marker strings to actual hex literals
-  // Matches: mask = "__HEX__0xFF00" -> mask = 0xFF00
-  // Also handles single quotes: mask = '__HEX__0xFF00' -> mask = 0xFF00
-  toml = toml.replace(/["']__HEX__(0x[0-9A-Fa-f]+)["']/g, '$1');
-
-  // Convert decimal mask values to hex format (skip values already in hex)
-  // This ensures masks are always displayed as hex in the TOML output
-  // Matches: mask = 65535 -> mask = 0xFFFF
-  // Does NOT match: mask = 0xFFFF (already hex)
-  toml = toml.replace(/((?:mask|frame_id_mask)\s*=\s*)(\d+)(?!\s*x)/g, (_match, prefix, numStr) => {
-    // Skip if this looks like part of a hex number (the \d+ matched just "0" from "0x...")
-    if (numStr === '0') {
-      // Check if there's an 'x' following - if so, it's already hex, don't transform
-      return _match;
-    }
-    const num = parseInt(numStr, 10);
-    return `${prefix}0x${num.toString(16).toUpperCase()}`;
-  });
-
-  return toml;
-}
+// Catalogue writes go through the Rust `catalog.edit` path (comment-preserving
+// toml_edit); there is no longer a TS serialiser. `tomlParse` remains the
+// read-only path that feeds the UI tree.
 
 export function tomlParse(text: string): any {
   return TOML.parse(text);

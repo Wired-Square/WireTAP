@@ -59,6 +59,37 @@ export async function validateCatalogWs(content: string): Promise<ValidationResu
 }
 
 /**
+ * Apply one comment-/formatting-preserving edit in Rust (the `wiretap-catalog`
+ * crate, via `toml_edit`) and return the new TOML. `op` is an `EditOp` payload
+ * (see editorOps.ts); only the targeted entry changes, comments survive.
+ */
+export async function editCatalog(content: string, op: Record<string, unknown>): Promise<string> {
+  return await wsTransport.command<string>("catalog.edit", { content, ...op });
+}
+
+/** One line of a {@link CatalogDiff}. */
+export interface DiffLine {
+  kind: "context" | "add" | "remove";
+  text: string;
+  oldLine: number | null;
+  newLine: number | null;
+}
+
+/** Result of {@link diffCatalog}: a dirty flag plus the unified line diff. */
+export interface CatalogDiff {
+  dirty: boolean;
+  lines: DiffLine[];
+}
+
+/**
+ * Diff the working buffer against the last-saved baseline in Rust. Drives both
+ * the unsaved-changes indicator and the Text-mode diff view from one source.
+ */
+export async function diffCatalog(current: string, baseline: string): Promise<CatalogDiff> {
+  return await wsTransport.command<CatalogDiff>("catalog.diff", { current, baseline });
+}
+
+/**
  * Attach a catalogue to a session so the backend decodes its frames in Rust and
  * streams them as `DecodedSignals` (consumed by Decoder/Dashboard/Modbus). Returns
  * the number of frames bound.

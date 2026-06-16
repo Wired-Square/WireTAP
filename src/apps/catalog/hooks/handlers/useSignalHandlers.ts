@@ -124,7 +124,7 @@ export function useSignalHandlers({
     setEditingSignal(true);
   };
 
-  const handleSaveSignal = () => {
+  const handleSaveSignal = async () => {
     if (!currentIdForSignal) return;
 
     const errors = validateSignalFields(signalFields);
@@ -134,7 +134,7 @@ export function useSignalHandlers({
     }
 
     try {
-      const newContent = upsertSignalToml(catalogContent, currentSignalPath, signalFields, editingSignalIndex);
+      const newContent = await upsertSignalToml(catalogContent, currentSignalPath, signalFields, editingSignalIndex);
       setToml(newContent);
       setEditingSignal(false);
       clearValidation();
@@ -144,10 +144,10 @@ export function useSignalHandlers({
     }
   };
 
-  const handleDeleteSignal = (idKey: string, signalIndex: number, signalsParentPath?: string[]) => {
+  const handleDeleteSignal = async (idKey: string, signalIndex: number, signalsParentPath?: string[]) => {
     try {
       const parent = signalsParentPath ?? ["frame", "can", idKey];
-      const newContent = deleteSignalToml(catalogContent, parent, signalIndex);
+      const newContent = await deleteSignalToml(catalogContent, parent, signalIndex);
       setToml(newContent);
     } catch (error) {
       console.error("Failed to delete signal:", error);
@@ -168,7 +168,7 @@ export function useSignalHandlers({
     openDialog("editChecksum");
   };
 
-  const handleSaveChecksum = (checksumData: ChecksumData, checksumsParentPath: string[], editingIndex: number | null) => {
+  const handleSaveChecksum = async (checksumData: ChecksumData, checksumsParentPath: string[], editingIndex: number | null) => {
     const errors = validateChecksumFields(checksumData);
     if (errors.length > 0) {
       setValidation(errors);
@@ -176,7 +176,7 @@ export function useSignalHandlers({
     }
 
     try {
-      const newContent = upsertChecksumToml(catalogContent, checksumsParentPath, checksumData, editingIndex);
+      const newContent = await upsertChecksumToml(catalogContent, checksumsParentPath, checksumData, editingIndex);
       setToml(newContent);
       closeDialog("editChecksum");
       clearValidation();
@@ -203,14 +203,14 @@ export function useSignalHandlers({
     openDialog("deleteChecksum");
   };
 
-  const confirmDeleteChecksum = () => {
+  const confirmDeleteChecksum = async () => {
     const checksumToDelete = dialogPayload.checksumToDelete as
       | { idKey: string; index: number; checksumsParentPath: string[] }
       | null;
     if (!checksumToDelete) return;
 
     try {
-      const newContent = deleteChecksumToml(
+      const newContent = await deleteChecksumToml(
         catalogContent,
         checksumToDelete.checksumsParentPath,
         checksumToDelete.index

@@ -96,8 +96,87 @@ pub async fn dispatch_catalog_command(
                 wiretap_catalog::dbc::render_catalog_as_dbc_with_mode(&content()?, receiver, mode)?;
             Ok(serde_json::Value::String(dbc))
         }
+        // Comment-/formatting-preserving in-place edit. Params: { content, op, ...opArgs }.
+        // `op` + args deserialise into wiretap_catalog::edit::EditOp (the stray
+        // `content` key is ignored); returns the new TOML text.
+        "catalog.edit" => {
+            let text = content()?;
+            let op: wiretap_catalog::edit::EditOp = serde_json::from_value(params.clone())
+                .map_err(|e| format!("invalid edit op: {e}"))?;
+            let next = wiretap_catalog::edit::apply_edit(&text, op)?;
+            Ok(serde_json::Value::String(next))
+        }
+        // Line diff of the working buffer against the last-saved baseline. Drives
+        // both the unsaved-changes indicator and the Text-mode diff view from one
+        // Rust-computed source. Params: { current, baseline }.
+        "catalog.diff" => {
+            let current = req("current")?;
+            let baseline = req("baseline")?;
+            Ok(diff_lines_json(&baseline, &current))
+        }
         _ => Err(format!("Unknown catalog op: {op_name}")),
     }
+}
+
+/// A unified line diff (baseline → current) plus a `dirty` flag, as JSON for the
+/// editor. Full-context: every line is emitted as `context` | `add` | `remove`
+/// with 1-based old/new line numbers for the gutter.
+fn diff_lines_json(baseline: &str, current: &str) -> serde_json::Value {
+    let a: Vec<&str> = baseline.split('\n').collect();
+    let b: Vec<&str> = current.split('\n').collect();
+    serde_json::json!({
+        "dirty": baseline != current,
+        "lines": lcs_diff(&a, &b),
+    })
+}
+
+fn diff_row(kind: &str, text: &str, old_line: Option<usize>, new_line: Option<usize>) -> serde_json::Value {
+    serde_json::json!({ "kind": kind, "text": text, "oldLine": old_line, "newLine": new_line })
+}
+
+/// Longest-common-subsequence line diff. O(n·m) — fine for catalogue-sized files.
+fn lcs_diff(a: &[&str], b: &[&str]) -> Vec<serde_json::Value> {
+    let (n, m) = (a.len(), b.len());
+    let mut dp = vec![vec![0u32; m + 1]; n + 1];
+    for i in (0..n).rev() {
+        for j in (0..m).rev() {
+            dp[i][j] = if a[i] == b[j] {
+                dp[i + 1][j + 1] + 1
+            } else {
+                dp[i + 1][j].max(dp[i][j + 1])
+            };
+        }
+    }
+    let mut rows = Vec::new();
+    let (mut i, mut j, mut oln, mut nln) = (0, 0, 1usize, 1usize);
+    while i < n && j < m {
+        if a[i] == b[j] {
+            rows.push(diff_row("context", a[i], Some(oln), Some(nln)));
+            i += 1;
+            j += 1;
+            oln += 1;
+            nln += 1;
+        } else if dp[i + 1][j] >= dp[i][j + 1] {
+            rows.push(diff_row("remove", a[i], Some(oln), None));
+            i += 1;
+            oln += 1;
+        } else {
+            rows.push(diff_row("add", b[j], None, Some(nln)));
+            j += 1;
+            nln += 1;
+        }
+    }
+    while i < n {
+        rows.push(diff_row("remove", a[i], Some(oln), None));
+        i += 1;
+        oln += 1;
+    }
+    while j < m {
+        rows.push(diff_row("add", b[j], None, Some(nln)));
+        j += 1;
+        nln += 1;
+    }
+    rows
 }
 
 /// Test decode a CAN frame using the catalog

@@ -7,6 +7,7 @@ import { WINDOW_EVENTS } from '../events/registry';
 import type { CatalogSavedPayload } from '../events/registry';
 import type { CanidFields, EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig, SerialChecksumConfig, ProtocolType } from '../apps/catalog/types';
 import type { CatalogViewMode } from '../apps/catalog/tree/frameGroups';
+import type { CatalogDiff } from '../api/catalog';
 
 /** CAN header field form entry - name + field settings */
 export interface CanHeaderFieldEntry {
@@ -39,6 +40,9 @@ export interface CatalogEditorState {
     lastSavedToml: string;
     /** Increments on reload to force re-parse even when content unchanged */
     reloadVersion: number;
+    /** Rust-computed diff of `toml` vs `lastSavedToml` (drives the unsaved-changes
+     *  indicator and the Text-mode diff view). `null` until first computed. */
+    diff: CatalogDiff | null;
   };
 
   // Edit mode
@@ -165,6 +169,8 @@ export interface CatalogEditorState {
   // Actions - Content
   setMode: (mode: EditMode) => void;
   setToml: (toml: string) => void;
+  /** Cache the Rust-computed diff/dirty result (see {@link CatalogDiff}). */
+  setDiff: (diff: CatalogDiff | null) => void;
 
   // Actions - Validation
   setValidation: (errors: ValidationError[], isValid?: boolean) => void;
@@ -283,7 +289,7 @@ const initialDialogPayload = {
 export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   // Initial state
   file: { path: null, name: null, decoderDir: '' },
-  content: { toml: '', lastSavedToml: '', reloadVersion: 0 },
+  content: { toml: '', lastSavedToml: '', reloadVersion: 0, diff: null },
   mode: 'ui',
 
   tree: {
@@ -379,7 +385,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     const newReloadVersion = get().content.reloadVersion + 1;
     set({
       file: { ...get().file, path, name },
-      content: { toml, lastSavedToml: toml, reloadVersion: newReloadVersion },
+      content: { toml, lastSavedToml: toml, reloadVersion: newReloadVersion, diff: null },
       tree: {
         nodes: [],
         selectedPath: null,
@@ -416,7 +422,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
 
   saveSuccess: (toml) => {
     set((state) => ({
-      content: { ...state.content, toml, lastSavedToml: toml },
+      content: { ...state.content, toml, lastSavedToml: toml, diff: null },
       status: { ...state.status, isSaving: false },
     }));
 
@@ -442,7 +448,12 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   setMode: (mode) => set({ mode }),
 
   setToml: (toml) =>
-    set((state) => ({ content: { ...state.content, toml } })),
+    // Invalidate the cached diff; the editor recomputes it from Rust (debounced),
+    // so the dirty indicator falls back to a string compare for the brief gap.
+    set((state) => ({ content: { ...state.content, toml, diff: null } })),
+
+  setDiff: (diff) =>
+    set((state) => ({ content: { ...state.content, diff } })),
 
   // Validation actions
   setValidation: (errors, isValid) => set({
@@ -712,6 +723,8 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   // Computed
   hasUnsavedChanges: () => {
     const { content } = get();
+    // Prefer the Rust-computed diff; fall back to a string compare until it lands.
+    if (content.diff) return content.diff.dirty;
     return content.toml !== content.lastSavedToml && content.lastSavedToml !== '';
   },
 }));

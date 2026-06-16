@@ -1,73 +1,80 @@
-import { describe, it, expect } from "vitest";
-import { tomlParse } from "../apps/catalog/toml";
-import { deleteSignalToml, upsertSignalToml, deleteMuxToml, deleteMuxCaseToml } from "../apps/catalog/editorOps";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const baseToml = `
-[frame.can."0x123"]
-length = 8
+// editorOps now delegates the actual edit to Rust (`catalog.edit`). These tests
+// assert each wrapper builds the correct `EditOp` payload; the comment-preserving
+// document semantics are covered by the Rust crate's unit tests.
+vi.mock("../api/catalog", () => ({
+  editCatalog: vi.fn(async () => "RESULT_TOML"),
+}));
 
-[[frame.can."0x123".signals]]
-name = "A"
-start_bit = 0
-bit_length = 8
+import { editCatalog } from "../api/catalog";
+import {
+  deleteSignalToml,
+  upsertSignalToml,
+  deleteMuxToml,
+  deleteMuxCaseToml,
+} from "../apps/catalog/editorOps";
 
-[frame.can."0x123".mux]
-name = "mux"
-start_bit = 0
-bit_length = 8
+const mockEdit = editCatalog as unknown as ReturnType<typeof vi.fn>;
+const BASE = "[meta]\nname = \"x\"\nversion = 1\n";
 
-[frame.can."0x123".mux.case1]
-foo = "bar"
-`;
+beforeEach(() => mockEdit.mockClear());
 
 describe("deleteSignalToml", () => {
-  it("is a no-op when the target path does not exist", () => {
-    const result = deleteSignalToml(baseToml, ["frame", "can", "0x999"], 0);
-    expect(tomlParse(result)).toEqual(tomlParse(baseToml));
+  it("emits RemoveArrayItem against the frame's signals array", async () => {
+    const out = await deleteSignalToml(BASE, ["frame", "can", "0x123"], 2);
+    expect(out).toBe("RESULT_TOML");
+    expect(mockEdit).toHaveBeenCalledWith(BASE, {
+      op: "RemoveArrayItem",
+      array_path: ["frame", "can", "0x123", "signals"],
+      index: 2,
+      remove_if_empty: false,
+    });
   });
 
-  it("removes the targeted signal index when present", () => {
-    const result = deleteSignalToml(baseToml, ["frame", "can", "0x123"], 0);
-    const parsed = tomlParse(result) as any;
-    expect(Array.isArray(parsed.frame.can["0x123"].signals)).toBe(true);
-    expect(parsed.frame.can["0x123"].signals).toHaveLength(0);
+  it("targets a mux-case signals array via its owner path", async () => {
+    await deleteSignalToml(BASE, ["frame", "can", "0x123", "mux", "case1"], 0);
+    expect(mockEdit).toHaveBeenCalledWith(
+      BASE,
+      expect.objectContaining({ array_path: ["frame", "can", "0x123", "mux", "case1", "signals"], index: 0 }),
+    );
   });
 });
 
-describe("signal upsert into mux cases", () => {
-  it("adds a signal under a mux case without disturbing other content", () => {
-    const result = upsertSignalToml(
-      baseToml,
+describe("upsertSignalToml", () => {
+  it("emits a sorted UpsertArrayItem with only non-default fields", async () => {
+    await upsertSignalToml(
+      BASE,
       ["frame", "can", "0x123", "mux", "case1"],
-      { name: "B", start_bit: 8, bit_length: 8 },
-      null
+      { name: "B", start_bit: 8, bit_length: 8, factor: 1, offset: 0 },
+      null,
     );
-    const parsed = tomlParse(result) as any;
-    expect(parsed.frame.can["0x123"].mux.case1.signals).toHaveLength(1);
-    expect(parsed.frame.can["0x123"].mux.case1.signals[0].name).toBe("B");
-    // Original mux properties stay intact
-    expect(parsed.frame.can["0x123"].mux.name).toBe("mux");
+    expect(mockEdit).toHaveBeenCalledWith(BASE, {
+      op: "UpsertArrayItem",
+      array_path: ["frame", "can", "0x123", "mux", "case1", "signals"],
+      value: { name: "B", start_bit: 8, bit_length: 8 }, // factor=1 / offset=0 dropped
+      index: undefined,
+      sort_keys: ["start_bit", "bit_length", "name"],
+    });
   });
 });
 
 describe("deleteMuxToml", () => {
-  it("is a no-op when the mux path does not exist", () => {
-    const result = deleteMuxToml(baseToml, ["frame", "can", "0x999", "mux"]);
-    expect(tomlParse(result)).toEqual(tomlParse(baseToml));
-  });
-
-  it("removes the mux object when present", () => {
-    const result = deleteMuxToml(baseToml, ["frame", "can", "0x123", "mux"]);
-    const parsed = tomlParse(result) as any;
-    expect(parsed.frame.can["0x123"].mux).toBeUndefined();
+  it("deletes the mux table at the given path", async () => {
+    await deleteMuxToml(BASE, ["frame", "can", "0x123", "mux"]);
+    expect(mockEdit).toHaveBeenCalledWith(BASE, {
+      op: "DeleteAtPath",
+      path: ["frame", "can", "0x123", "mux"],
+    });
   });
 });
 
 describe("deleteMuxCaseToml", () => {
-  it("removes only the targeted case", () => {
-    const result = deleteMuxCaseToml(baseToml, ["frame", "can", "0x123", "mux"], "case1");
-    const parsed = tomlParse(result) as any;
-    expect(parsed.frame.can["0x123"].mux.case1).toBeUndefined();
-    expect(parsed.frame.can["0x123"].mux.name).toBe("mux");
+  it("deletes the targeted case key", async () => {
+    await deleteMuxCaseToml(BASE, ["frame", "can", "0x123", "mux"], "case1");
+    expect(mockEdit).toHaveBeenCalledWith(BASE, {
+      op: "DeleteAtPath",
+      path: ["frame", "can", "0x123", "mux", "case1"],
+    });
   });
 });

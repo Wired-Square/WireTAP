@@ -7,7 +7,7 @@ import { useSettings, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
 import { useFocusStore } from "../../stores/focusStore";
-import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
+import { listCatalogs, diffCatalog, type CatalogMetadata } from "../../api/catalog";
 import { Eye } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
 import { borderDataView, bgDataView } from "../../styles/colourTokens";
@@ -23,6 +23,7 @@ import { createRenderTreeNode } from "./tree/renderTreeNode";
 import { buildFrameGroups, applyProtocolFilter } from "./tree/frameGroups";
 import EditorViewRouter from "./views/EditorViewRouter";
 import TextModeView from "./views/TextModeView";
+import DiffView from "./views/DiffView";
 import EmptySelectionView from "./views/EmptySelectionView";
 import CANFrameEditView from "./views/CANFrameEditView";
 import FrameEditView from "./views/FrameEditView";
@@ -42,6 +43,9 @@ function CatalogEditorInner() {
   const originalContent = useCatalogEditorStore((s) => s.content.lastSavedToml);
   const reloadVersion = useCatalogEditorStore((s) => s.content.reloadVersion);
   const setToml = useCatalogEditorStore((s) => s.setToml);
+  const storedDiff = useCatalogEditorStore((s) => s.content.diff);
+  const setDiff = useCatalogEditorStore((s) => s.setDiff);
+  const computeHasUnsavedChanges = useCatalogEditorStore((s) => s.hasUnsavedChanges);
   const editMode = useCatalogEditorStore((s) => s.mode);
   const setMode = useCatalogEditorStore((s) => s.setMode);
   const validationState = useCatalogEditorStore((s) => s.validation.isValid);
@@ -121,6 +125,8 @@ function CatalogEditorInner() {
   // Catalog picker state
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
   const [showCatalogPicker, setShowCatalogPicker] = useState(false);
+  // Text-mode sub-view: raw editor vs read-only diff against last save.
+  const [textView, setTextView] = useState<"edit" | "diff">("edit");
 
   // Load settings
   const { settings } = useSettings();
@@ -201,10 +207,27 @@ function CatalogEditorInner() {
   const currentSerialConfig = parsedCatalogInfo.serialConfig;
   const currentModbusConfig = parsedCatalogInfo.modbusConfig;
 
-  // Computed values
-  const hasUnsavedChanges = useMemo(() => {
-    return catalogContent !== originalContent && originalContent !== "";
-  }, [catalogContent, originalContent]);
+  // Computed values — the store owns the dirty logic (prefer the Rust diff, fall
+  // back to a string compare); recompute when its inputs change.
+  const hasUnsavedChanges = useMemo(
+    () => computeHasUnsavedChanges(),
+    [computeHasUnsavedChanges, storedDiff, catalogContent, originalContent],
+  );
+
+  // Recompute the diff/dirty state in Rust whenever the buffer or baseline change.
+  // Equal buffers short-circuit (no round-trip); edits debounce to coalesce typing.
+  useEffect(() => {
+    if (catalogContent === originalContent) {
+      setDiff({ dirty: false, lines: [] });
+      return;
+    }
+    const handle = setTimeout(() => {
+      diffCatalog(catalogContent, originalContent)
+        .then(setDiff)
+        .catch((e) => console.error("Failed to compute catalog diff:", e));
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [catalogContent, originalContent, setDiff]);
 
   const selectedNode = useMemo(() => {
     if (!selectedPath) return null;
@@ -468,14 +491,39 @@ function CatalogEditorInner() {
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {editMode === "text" ? (
             <>
-              {catalogPath && <TextFindBar textareaRef={textareaRef} />}
-              <TextModeView
-                ref={textareaRef}
-                toml={catalogContent}
-                onChangeToml={setToml}
-                placeholder={t("editor.openCatalogPlaceholder")}
-                isDisabled={!catalogPath}
-              />
+              {catalogPath && (
+                <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[color:var(--border-default)] bg-[var(--bg-surface)]">
+                  <button
+                    type="button"
+                    onClick={() => setTextView("edit")}
+                    className={`px-2.5 py-1 text-xs rounded ${textView === "edit" ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}
+                  >
+                    {t("editor.textViewEdit", "Edit")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTextView("diff")}
+                    className={`px-2.5 py-1 text-xs rounded ${textView === "diff" ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}
+                  >
+                    {t("editor.textViewDiff", "Diff")}
+                    {hasUnsavedChanges && <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--status-warning-text,#d97706)] align-middle" />}
+                  </button>
+                </div>
+              )}
+              {textView === "diff" && catalogPath ? (
+                <DiffView lines={storedDiff?.lines ?? []} />
+              ) : (
+                <>
+                  {catalogPath && <TextFindBar textareaRef={textareaRef} />}
+                  <TextModeView
+                    ref={textareaRef}
+                    toml={catalogContent}
+                    onChangeToml={setToml}
+                    placeholder={t("editor.openCatalogPlaceholder")}
+                    isDisabled={!catalogPath}
+                  />
+                </>
+              )}
             </>
           ) : (
             <div className="flex-1 p-6 overflow-y-auto overflow-x-hidden bg-[var(--bg-primary)]">

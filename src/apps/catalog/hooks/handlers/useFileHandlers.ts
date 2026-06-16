@@ -85,14 +85,14 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
 
       // Add protocol config based on selection
       if (selectedProtocol === "can") {
-        content = upsertCanConfigToml(content, {
+        content = await upsertCanConfigToml(content, {
           default_endianness: canDefaultEndianness,
           default_interval: canDefaultInterval,
           default_extended: canDefaultExtended,
           default_fd: canDefaultFd,
         });
       } else if (selectedProtocol === "modbus") {
-        content = upsertModbusConfigToml(content, {
+        content = await upsertModbusConfigToml(content, {
           device_address: modbusDeviceAddress,
           register_base: modbusRegisterBase,
           default_interval: modbusDefaultInterval,
@@ -100,7 +100,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
           default_word_order: modbusDefaultWordOrder,
         });
       } else if (selectedProtocol === "serial") {
-        content = upsertSerialConfigToml(content, { encoding: serialEncoding });
+        content = await upsertSerialConfigToml(content, { encoding: serialEncoding });
       }
 
       const nameBase = metaFields.name.trim() || "decoder";
