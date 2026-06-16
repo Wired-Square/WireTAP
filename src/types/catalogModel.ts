@@ -39,6 +39,8 @@ export interface Signal {
 export interface MuxCase {
   signals: Signal[];
   mux?: Mux;
+  /** Free-text notes on the case. */
+  notes?: string[];
 }
 
 export interface Mux {
@@ -47,6 +49,8 @@ export interface Mux {
   bitLength: number;
   /** Default case key applied when the selector matches no explicit case. */
   default?: string;
+  /** Free-text notes on the multiplexer. */
+  notes?: string[];
   /** Case key (`"0"`, `"0-3"`, `"1,2,5"`) → its signals/nested mux. */
   cases: Record<string, MuxCase>;
 }

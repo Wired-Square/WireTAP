@@ -82,6 +82,7 @@ function muxProps(m: Mux): Record<string, any> {
     start_bit: m.startBit,
     bit_length: m.bitLength,
     default: m.default,
+    notes: m.notes,
   });
 }
 
@@ -133,7 +134,10 @@ function muxNode(m: Mux, framePath: string[], muxPath: string[]): TomlNode {
       type: "mux-case",
       path: [...framePath, "mux", ...muxPath, k],
       children: caseChildren.length > 0 ? caseChildren : undefined,
-      metadata: { caseValue: k, properties: { signals: c.signals.map(signalProps) } },
+      metadata: {
+        caseValue: k,
+        properties: defined({ signals: c.signals.map(signalProps), notes: c.notes }),
+      },
     });
   }
   return {
