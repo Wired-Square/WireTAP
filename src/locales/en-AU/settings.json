@@ -360,7 +360,7 @@
       "name": "Name",
       "namePlaceholder": "Bookmark name"
     },
-    "editGraphLayout": {
+    "editDashboardLayout": {
       "title": "Edit Dashboard Layout",
       "name": "Name",
       "namePlaceholder": "Dashboard layout name"
@@ -594,7 +594,7 @@
     "update": "Update Profile",
     "addBtn": "Add Profile"
   },
-  "graphLayouts": {
+  "dashboardLayouts": {
     "title": "Dashboard Layouts",
     "empty": {
       "heading": "No graph layouts saved yet",
@@ -617,7 +617,7 @@
     "display": "Display",
     "devices": "Devices",
     "general": "General",
-    "graphLayouts": "Dashboard Layouts",
+    "dashboardLayouts": "Dashboard Layouts",
     "privacy": "Privacy",
     "selectionSets": "Selection Sets",
     "storage": "Storage"
@@ -627,7 +627,7 @@
     "deleteCatalogTitle": "Delete Catalog",
     "deleteBookmarkTitle": "Delete Bookmark",
     "deleteSelectionSetTitle": "Delete Selection Set",
-    "deleteGraphLayoutTitle": "Delete Dashboard Layout",
+    "deleteDashboardLayoutTitle": "Delete Dashboard Layout",
     "areYouSure": "Are you sure you want to delete"
   },
   "ioDeviceStatus": {

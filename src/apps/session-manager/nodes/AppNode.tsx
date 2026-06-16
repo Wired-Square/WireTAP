@@ -22,7 +22,7 @@ const appConfig: Record<string, { icon: typeof Search; colour: string }> = {
   "catalog-editor": { icon: FileText, colour: "text-blue-400" },
   "frame-calculator": { icon: Calculator, colour: "text-teal-400" },
   query: { icon: DatabaseZap, colour: "text-amber-400" },
-  graph: { icon: BarChart3, colour: "text-pink-400" },
+  dashboard: { icon: BarChart3, colour: "text-pink-400" },
   modbus: { icon: Server, colour: "text-amber-400" },
   settings: { icon: Settings, colour: "text-orange-400" },
 };

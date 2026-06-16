@@ -68,7 +68,7 @@ const visualConfig = {
     colour: "text-pink-400",
     bgColour: "hover:bg-pink-500/10",
     watermarkBg: "bg-pink-500/10 hover:bg-pink-500/20",
-    load: () => import("./graph/Graph"),
+    load: () => import("./dashboard/Dashboard"),
   },
   serial: {
     icon: Terminal,

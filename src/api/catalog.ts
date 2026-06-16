@@ -60,7 +60,7 @@ export async function validateCatalogWs(content: string): Promise<ValidationResu
 
 /**
  * Attach a catalogue to a session so the backend decodes its frames in Rust and
- * streams them as `DecodedSignals` (consumed by Decoder/Graph/Modbus). Returns
+ * streams them as `DecodedSignals` (consumed by Decoder/Dashboard/Modbus). Returns
  * the number of frames bound.
  */
 export async function attachCatalog(

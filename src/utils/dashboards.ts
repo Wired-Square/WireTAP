@@ -1,11 +1,11 @@
 // ui/src/utils/dashboards.ts
 //
-// Standalone dashboard artifact schema. Reuses the GraphPanel/LayoutItem shapes
+// Standalone dashboard artifact schema. Reuses the DashboardPanel/LayoutItem shapes
 // so loading a dashboard is the same as loading a saved layout, plus identity
 // and the catalog the bindings assume.
 
-import type { GraphPanel, LayoutItem, HypothesisParams } from "../stores/graphStore";
-import { getWidgetMeta } from "../apps/graph/widgets/widgetMeta";
+import type { DashboardPanel, LayoutItem, HypothesisParams } from "../stores/dashboardStore";
+import { getWidgetMeta } from "../apps/dashboard/widgets/widgetMeta";
 
 export const DASHBOARD_SCHEMA = "wiretap.dashboard/1";
 
@@ -14,7 +14,7 @@ export interface DashboardFileContent {
   name: string;
   /** The catalog filename the signal bindings assume (for decode + mismatch warnings). */
   catalogFilename?: string;
-  panels: GraphPanel[];
+  panels: DashboardPanel[];
   layout: LayoutItem[];
   candidateRegistry?: [string, HypothesisParams][];
   createdAt?: number;
@@ -25,7 +25,7 @@ export interface DashboardFileContent {
 export function buildDashboard(
   name: string,
   catalogFilename: string,
-  panels: GraphPanel[],
+  panels: DashboardPanel[],
   layout: LayoutItem[],
   candidateRegistry: Map<string, HypothesisParams>,
   now: number,
@@ -56,7 +56,7 @@ export function parseDashboard(json: string): DashboardFileContent {
   if (!Array.isArray(d.panels) || !Array.isArray(d.layout)) throw new Error("Dashboard must have panels[] and layout[]");
   for (const p of d.panels) {
     if (!p || typeof p.type !== "string" || !getWidgetMeta(p.type)) {
-      throw new Error(`Dashboard panel has unknown widget type: ${(p as GraphPanel)?.type}`);
+      throw new Error(`Dashboard panel has unknown widget type: ${(p as DashboardPanel)?.type}`);
     }
   }
   return d as DashboardFileContent;

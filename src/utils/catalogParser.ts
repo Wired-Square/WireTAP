@@ -1,7 +1,7 @@
 // ui/src/utils/catalogParser.ts
 // Catalogue adapter — maps the Rust-parsed `Catalog` (wiretap-catalog crate,
 // camelCase) onto the legacy `ParsedCatalog` shape (snake_case + `_inherited`)
-// that the Decoder/Graph/Query in-memory models consume. Parsing itself lives
+// that the Decoder/Dashboard/Query in-memory models consume. Parsing itself lives
 // in Rust (`catalog.parse`); this file only adapts the result and re-derives the
 // serial header byte-positions the crate doesn't expose.
 
@@ -326,7 +326,7 @@ function adaptSerialConfig(c?: SerialConfig): SerialProtocolConfig | null {
 
 /**
  * Adapt the Rust-parsed {@link Catalog} into the legacy {@link ParsedCatalog}
- * the Decoder/Graph/Query models consume. `rawToml` is carried through for callers
+ * the Decoder/Dashboard/Query models consume. `rawToml` is carried through for callers
  * that re-attach the catalogue content to a session.
  */
 export function catalogToResolved(catalog: Catalog, rawToml: string): ParsedCatalog {

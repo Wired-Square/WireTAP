@@ -36,7 +36,7 @@ pub struct AttachSourceParams {
     /// Session ID (as returned by `list_sessions`).
     pub session_id: String,
     /// Which source-aware tab to attach the session to, e.g. `discovery`,
-    /// `decoder`, `transmit`, `query`, or `graph` (the tabs declaring
+    /// `decoder`, `transmit`, `query`, or `dashboard` (the tabs declaring
     /// `sessionAware` in the app registry).
     pub panel: String,
 }

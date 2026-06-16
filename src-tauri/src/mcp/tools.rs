@@ -805,7 +805,7 @@ impl WireTapTools {
         ok_json(state)
     }
 
-    #[tool(description = "Surface an existing session in a source-aware tab so a human can see it. Opens or focuses the given tab (discovery, decoder, transmit, query, or graph) and points it at the session, replacing any source it is currently showing.")]
+    #[tool(description = "Surface an existing session in a source-aware tab so a human can see it. Opens or focuses the given tab (discovery, decoder, transmit, query, or dashboard) and points it at the session, replacing any source it is currently showing.")]
     async fn attach_source(
         &self,
         Parameters(p): Parameters<AttachSourceParams>,
@@ -946,7 +946,7 @@ impl ServerHandler for WireTapTools {
              (a repeat is mirrored into the Transmit queue as an Agent-badged, \
              human-controllable row), replay captures, and read/write Modbus. \
              attach_source surfaces a session in a source-aware tab (discovery, \
-             decoder, transmit, query, or graph) so the human sees what the agent is \
+             decoder, transmit, query, or dashboard) so the human sees what the agent is \
              working on. Tier 2 tools (discovery analysis, decoded signals, live \
              frame map) require the WireTAP window to be open."
                 .to_string(),

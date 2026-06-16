@@ -420,7 +420,7 @@ export interface SessionStore {
   setSessionCatalogPath: (sessionId: string, catalogPath: string | null) => void;
 
   // ---- Cross-App Session Join ----
-  /** Pending session joins keyed by app name (e.g., "transmit", "graph") */
+  /** Pending session joins keyed by app name (e.g., "transmit", "dashboard") */
   pendingJoins: Record<string, { sessionId: string }>;
   /** Request that an app auto-joins a session (called by source apps) */
   requestSessionJoin: (appName: string, sessionId: string) => void;

@@ -21,7 +21,7 @@ import type { DecodedFrame, DecodedSignal, DecoderViewMode, UnmatchedFrame, Filt
 import { useDecoderStore } from "../../../stores/decoderStore";
 import { useSettingsStore } from "../../../apps/settings/stores/settingsStore";
 import { useTransmitStore } from "../../../stores/transmitStore";
-import { useGraphStore } from "../../../stores/graphStore";
+import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { FrameDetail, SignalDef } from "../../../types/decoder";
@@ -1169,8 +1169,8 @@ export default function DecoderFramesView({
         icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
@@ -1193,8 +1193,8 @@ export default function DecoderFramesView({
           });
           if (numericSignals.length === 0) return;
 
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
@@ -1228,8 +1228,8 @@ export default function DecoderFramesView({
         icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
@@ -1245,8 +1245,8 @@ export default function DecoderFramesView({
         icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
@@ -1316,8 +1316,8 @@ export default function DecoderFramesView({
         icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);

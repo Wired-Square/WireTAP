@@ -21,12 +21,12 @@ import {
   type SelectionSet,
 } from '../../../utils/selectionSets';
 import {
-  getAllGraphLayouts,
-  type GraphLayout,
-} from '../../../utils/graphLayouts';
+  getAllDashboardLayouts,
+  type DashboardLayout,
+} from '../../../utils/dashboardLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display" | "mcp";
+export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "dashboard-layouts" | "display" | "mcp";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
 // Buffer setting defaults — single source of truth, referenced by settingsStore and useSettings
@@ -181,8 +181,8 @@ type DialogName =
   | 'createBookmark'
   | 'editSelectionSet'
   | 'deleteSelectionSet'
-  | 'editGraphLayout'
-  | 'deleteGraphLayout';
+  | 'editDashboardLayout'
+  | 'deleteDashboardLayout';
 
 interface DialogPayload {
   editingProfileId: string | null;
@@ -195,8 +195,8 @@ interface DialogPayload {
   bookmarkToDelete: TimeRangeFavorite | null;
   selectionSetToEdit: SelectionSet | null;
   selectionSetToDelete: SelectionSet | null;
-  graphLayoutToEdit: GraphLayout | null;
-  graphLayoutToDelete: GraphLayout | null;
+  dashboardLayoutToEdit: DashboardLayout | null;
+  dashboardLayoutToDelete: DashboardLayout | null;
 }
 
 const initialDialogs: Record<DialogName, boolean> = {
@@ -210,8 +210,8 @@ const initialDialogs: Record<DialogName, boolean> = {
   createBookmark: false,
   editSelectionSet: false,
   deleteSelectionSet: false,
-  editGraphLayout: false,
-  deleteGraphLayout: false,
+  editDashboardLayout: false,
+  deleteDashboardLayout: false,
 };
 
 const initialDialogPayload: DialogPayload = {
@@ -225,8 +225,8 @@ const initialDialogPayload: DialogPayload = {
   bookmarkToDelete: null,
   selectionSetToEdit: null,
   selectionSetToDelete: null,
-  graphLayoutToEdit: null,
-  graphLayoutToDelete: null,
+  dashboardLayoutToEdit: null,
+  dashboardLayoutToDelete: null,
 };
 
 const defaultSignalColours: SignalColours = {
@@ -304,8 +304,8 @@ interface SettingsState {
   // Selection sets
   selectionSets: SelectionSet[];
 
-  // Graph layouts
-  graphLayouts: GraphLayout[];
+  // Dashboard layouts
+  dashboardLayouts: DashboardLayout[];
 
   // Display settings
   display: {
@@ -378,7 +378,7 @@ interface SettingsState {
   loadCatalogs: () => Promise<void>;
   loadBookmarks: () => Promise<void>;
   loadSelectionSets: () => Promise<void>;
-  loadGraphLayouts: () => Promise<void>;
+  loadDashboardLayouts: () => Promise<void>;
 
   // Actions - Saving
   saveSettings: () => Promise<void>;
@@ -571,7 +571,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   selectionSets: [],
 
-  graphLayouts: [],
+  dashboardLayouts: [],
 
   display: {
     frameIdFormat: 'hex',
@@ -912,11 +912,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
-  loadGraphLayouts: async () => {
+  loadDashboardLayouts: async () => {
     try {
-      const allLayouts = await getAllGraphLayouts();
+      const allLayouts = await getAllDashboardLayouts();
       allLayouts.sort((a, b) => a.name.localeCompare(b.name));
-      set({ graphLayouts: allLayouts });
+      set({ dashboardLayouts: allLayouts });
     } catch (error) {
       console.error('Failed to load graph layouts:', error);
     }

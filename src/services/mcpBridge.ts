@@ -16,7 +16,7 @@ import type { FrameMessage } from "../types/frame";
 import { openPanel } from "../utils/windowCommunication";
 import { openDashboard } from "../api/dashboards";
 import { parseDashboard } from "../utils/dashboards";
-import { useGraphStore } from "../stores/graphStore";
+import { useDashboardStore } from "../stores/dashboardStore";
 
 // Bounds so a huge live buffer can't produce an enormous MCP response.
 const MAX_FRAME_IDS = 64;
@@ -129,7 +129,7 @@ async function uiOpenPanel(params: unknown) {
   const dashboardPath = (args as { dashboardPath?: string } | undefined)?.dashboardPath;
   if (dashboardPath) {
     const json = await openDashboard(dashboardPath);
-    useGraphStore.getState().loadDashboard(parseDashboard(json));
+    useDashboardStore.getState().loadDashboard(parseDashboard(json));
   }
   openPanel(panelId);
   return { opened: true, panelId, loadedDashboard: !!dashboardPath };

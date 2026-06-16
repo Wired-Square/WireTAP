@@ -29,7 +29,7 @@ import GeneralView from "./views/GeneralView";
 import CapturesView from "./views/CapturesView";
 import BookmarksView from "./views/BookmarksView";
 import SelectionSetsView from "./views/SelectionSetsView";
-import GraphLayoutsView from "./views/GraphLayoutsView";
+import DashboardLayoutsView from "./views/DashboardLayoutsView";
 import PrivacyView from "./views/PrivacyView";
 import McpServerView from "./views/McpServerView";
 import Devices from "../devices/Devices";
@@ -39,7 +39,7 @@ import ConfirmDeleteDialog from "../../dialogs/ConfirmDeleteDialog";
 import DuplicateCatalogDialog from "./dialogs/DuplicateCatalogDialog";
 import EditBookmarkDialog from "./dialogs/EditBookmarkDialog";
 import EditSelectionSetDialog from "./dialogs/EditSelectionSetDialog";
-import EditGraphLayoutDialog from "./dialogs/EditGraphLayoutDialog";
+import EditDashboardLayoutDialog from "./dialogs/EditDashboardLayoutDialog";
 import CreateBookmarkDialog from "./dialogs/CreateBookmarkDialog";
 import { useSettingsStore, type SettingsSection } from "./stores/settingsStore";
 import { useSettingsForms } from "./hooks/useSettingsForms";
@@ -59,7 +59,7 @@ export default function Settings() {
   const loadSettings = useSettingsStore((s) => s.loadSettings);
   const loadBookmarks = useSettingsStore((s) => s.loadBookmarks);
   const loadSelectionSets = useSettingsStore((s) => s.loadSelectionSets);
-  const loadGraphLayouts = useSettingsStore((s) => s.loadGraphLayouts);
+  const loadDashboardLayouts = useSettingsStore((s) => s.loadDashboardLayouts);
 
   // Locations
   const decoderDir = useSettingsStore((s) => s.locations.decoderDir);
@@ -188,8 +188,8 @@ export default function Settings() {
   // Selection sets
   const selectionSets = useSettingsStore((s) => s.selectionSets);
 
-  // Graph layouts
-  const graphLayouts = useSettingsStore((s) => s.graphLayouts);
+  // Dashboard layouts
+  const dashboardLayouts = useSettingsStore((s) => s.dashboardLayouts);
 
   // Dialog state
   const dialogs = useSettingsStore((s) => s.ui.dialogs);
@@ -217,9 +217,9 @@ export default function Settings() {
     selectionSetName: forms.selectionSetName,
     resetSelectionSetForm: forms.resetSelectionSetForm,
     initEditSelectionSetForm: forms.initEditSelectionSetForm,
-    graphLayoutName: forms.graphLayoutName,
-    resetGraphLayoutForm: forms.resetGraphLayoutForm,
-    initEditGraphLayoutForm: forms.initEditGraphLayoutForm,
+    dashboardLayoutName: forms.dashboardLayoutName,
+    resetDashboardLayoutForm: forms.resetDashboardLayoutForm,
+    initEditDashboardLayoutForm: forms.initEditDashboardLayoutForm,
   });
 
   // Sidebar collapsed state
@@ -233,21 +233,21 @@ export default function Settings() {
     loadSettings();
     loadBookmarks();
     loadSelectionSets();
-    loadGraphLayouts();
+    loadDashboardLayouts();
     isIOS().then(setIsIOSPlatform);
-  }, [loadSettings, loadBookmarks, loadSelectionSets, loadGraphLayouts]);
+  }, [loadSettings, loadBookmarks, loadSelectionSets, loadDashboardLayouts]);
 
   // Reload collections when they change from other panels
   useEffect(() => {
     const promise = onStoreChanged((event) => {
-      if (event.key === "graph.layouts") loadGraphLayouts();
+      if (event.key === "graph.layouts") loadDashboardLayouts();
       if (event.key === "favorites.timeRanges") loadBookmarks();
       if (event.key === "selectionSets.all") loadSelectionSets();
     });
     return () => {
       promise.then((unlisten) => unlisten());
     };
-  }, [loadGraphLayouts, loadBookmarks, loadSelectionSets]);
+  }, [loadDashboardLayouts, loadBookmarks, loadSelectionSets]);
 
   // Sidebar items (Storage hidden on iOS due to sandboxing restrictions)
   const sidebarItems: SideBarItem[] = [
@@ -258,7 +258,7 @@ export default function Settings() {
     { id: "display", label: t("sidebar.display"), icon: Monitor },
     { id: "devices", label: t("sidebar.devices"), icon: Cpu },
     { id: "general", label: t("sidebar.general"), icon: Cog },
-    { id: "graph-layouts", label: t("sidebar.graphLayouts"), icon: LayoutGrid },
+    { id: "dashboard-layouts", label: t("sidebar.dashboardLayouts"), icon: LayoutGrid },
     { id: "mcp", label: "MCP Server", icon: Bot },
     { id: "privacy", label: t("sidebar.privacy"), icon: Shield },
     { id: "selection-sets", label: t("sidebar.selectionSets"), icon: Star },
@@ -431,12 +431,12 @@ export default function Settings() {
             />
           )}
 
-          {/* Graph Layouts Section */}
-          {currentSection === "graph-layouts" && (
-            <GraphLayoutsView
-              graphLayouts={graphLayouts}
-              onEditGraphLayout={handlers.handleEditGraphLayout}
-              onDeleteGraphLayout={handlers.handleDeleteGraphLayout}
+          {/* Dashboard Layouts Section */}
+          {currentSection === "dashboard-layouts" && (
+            <DashboardLayoutsView
+              dashboardLayouts={dashboardLayouts}
+              onEditDashboardLayout={handlers.handleEditDashboardLayout}
+              onDeleteDashboardLayout={handlers.handleDeleteDashboardLayout}
             />
           )}
 
@@ -593,23 +593,23 @@ export default function Settings() {
         onConfirm={handlers.handleConfirmDeleteSelectionSet}
       />
 
-      {/* Edit Graph Layout Dialog */}
-      <EditGraphLayoutDialog
-        isOpen={dialogs.editGraphLayout}
-        name={forms.graphLayoutName}
-        onChangeName={forms.setGraphLayoutName}
-        onCancel={handlers.handleCancelEditGraphLayout}
-        onSave={handlers.handleConfirmEditGraphLayout}
+      {/* Edit Dashboard Layout Dialog */}
+      <EditDashboardLayoutDialog
+        isOpen={dialogs.editDashboardLayout}
+        name={forms.dashboardLayoutName}
+        onChangeName={forms.setDashboardLayoutName}
+        onCancel={handlers.handleCancelEditDashboardLayout}
+        onSave={handlers.handleConfirmEditDashboardLayout}
       />
 
-      {/* Delete Graph Layout Confirmation Dialog */}
+      {/* Delete Dashboard Layout Confirmation Dialog */}
       <ConfirmDeleteDialog
-        open={dialogs.deleteGraphLayout}
-        title={t("confirmDelete.deleteGraphLayoutTitle")}
+        open={dialogs.deleteDashboardLayout}
+        title={t("confirmDelete.deleteDashboardLayoutTitle")}
         message={t("confirmDelete.areYouSure")}
-        highlightText={dialogPayload.graphLayoutToDelete?.name}
-        onCancel={handlers.handleCancelDeleteGraphLayout}
-        onConfirm={handlers.handleConfirmDeleteGraphLayout}
+        highlightText={dialogPayload.dashboardLayoutToDelete?.name}
+        onCancel={handlers.handleCancelDeleteDashboardLayout}
+        onConfirm={handlers.handleConfirmDeleteDashboardLayout}
       />
     </AppLayout>
   );

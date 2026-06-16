@@ -328,7 +328,7 @@ export default function TestPattern() {
 }
 
 // ============================================================================
-// SVG Gauge (same arc maths as graph/GaugePanel)
+// SVG Gauge (same arc maths as dashboard/GaugePanel)
 // ============================================================================
 
 const GAUGE_START = 225;

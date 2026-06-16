@@ -30,7 +30,7 @@ import { bytesToHex } from "../../../utils/byteUtils";
 import { formatFrameId } from "../../../utils/frameIds";
 import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
 import { useTransmitStore } from "../../../stores/transmitStore";
-import { useGraphStore } from "../../../stores/graphStore";
+import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { trackAlloc } from "../../../services/memoryDiag";
 import type { FrameRow } from "../components/FrameDataTable";
@@ -645,7 +645,7 @@ function DiscoveryFramesView({
         icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
-          const store = useGraphStore.getState();
+          const store = useDashboardStore.getState();
           const panelId = store.addPanel('flow');
           store.updatePanel(panelId, { targetFrameId: frame.frame_id, title: formatFrameId(frame.frame_id, displayFrameIdFormat, frame.is_extended) });
           if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
