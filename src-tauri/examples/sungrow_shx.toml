@@ -19,11 +19,13 @@ version = 1
 default_frame = "modbus"
 
 [meta.modbus]
-device_address = 1
 register_base = 0
 default_interval = 5000
 default_byte_order = "big"
 default_word_order = "little"
+
+[node."Slave 1"]
+device_address = 1
 
 # ============================================================================
 # Version Strings (slow poll — 600s)
@@ -31,6 +33,7 @@ default_word_order = "little"
 # ============================================================================
 
 [frame.modbus.version_1]
+node = "Slave 1"
 register_number = 2581
 register_type = "input"
 length = 11
@@ -43,6 +46,7 @@ bit_length = 176
 format = "ascii"
 
 [frame.modbus.version_2]
+node = "Slave 1"
 register_number = 2596
 register_type = "input"
 length = 11
@@ -55,6 +59,7 @@ bit_length = 176
 format = "ascii"
 
 [frame.modbus.version_3]
+node = "Slave 1"
 register_number = 2612
 register_type = "input"
 length = 11
@@ -67,6 +72,7 @@ bit_length = 176
 format = "ascii"
 
 [frame.modbus.version_4_battery]
+node = "Slave 1"
 register_number = 2628
 register_type = "input"
 length = 11
@@ -84,6 +90,7 @@ format = "ascii"
 # ============================================================================
 
 [frame.modbus.protocol_version]
+node = "Slave 1"
 register_number = 4951
 register_type = "input"
 length = 2
@@ -99,6 +106,7 @@ bit_length = 32
 # ============================================================================
 
 [frame.modbus.firmware_arm]
+node = "Slave 1"
 register_number = 4953
 register_type = "input"
 length = 15
@@ -111,6 +119,7 @@ bit_length = 240
 format = "ascii"
 
 [frame.modbus.firmware_dsp]
+node = "Slave 1"
 register_number = 4968
 register_type = "input"
 length = 15
@@ -128,6 +137,7 @@ format = "ascii"
 # ============================================================================
 
 [frame.modbus.device_info]
+node = "Slave 1"
 register_number = 4989
 register_type = "input"
 length = 12
@@ -157,6 +167,7 @@ unit = "W"
 # ============================================================================
 
 [frame.modbus.pv_battery_generation]
+node = "Slave 1"
 register_number = 5002
 register_type = "input"
 length = 3
@@ -182,6 +193,7 @@ unit = "kWh"
 # ============================================================================
 
 [frame.modbus.inverter_temp]
+node = "Slave 1"
 register_number = 5007
 register_type = "input"
 length = 1
@@ -201,6 +213,7 @@ signed = true
 # ============================================================================
 
 [frame.modbus.solar_pv]
+node = "Slave 1"
 register_number = 5010
 register_type = "input"
 length = 8
@@ -259,6 +272,7 @@ unit = "W"
 # ============================================================================
 
 [frame.modbus.grid_voltage]
+node = "Slave 1"
 register_number = 5018
 register_type = "input"
 length = 3
@@ -290,6 +304,7 @@ unit = "V"
 # ============================================================================
 
 [frame.modbus.power_quality]
+node = "Slave 1"
 register_number = 5032
 register_type = "input"
 length = 3
@@ -314,6 +329,7 @@ signed = true
 # ============================================================================
 
 [frame.modbus.mppt4]
+node = "Slave 1"
 register_number = 5114
 register_type = "input"
 length = 2
@@ -338,6 +354,7 @@ unit = "A"
 # ============================================================================
 
 [frame.modbus.battery_power]
+node = "Slave 1"
 register_number = 5213
 register_type = "input"
 length = 2
@@ -355,6 +372,7 @@ signed = true
 # ============================================================================
 
 [frame.modbus.grid_frequency]
+node = "Slave 1"
 register_number = 5241
 register_type = "input"
 length = 1
@@ -373,6 +391,7 @@ unit = "Hz"
 # ============================================================================
 
 [frame.modbus.insulation_resistance]
+node = "Slave 1"
 register_number = 5245
 register_type = "input"
 length = 1
@@ -390,6 +409,7 @@ unit = "kΩ"
 # ============================================================================
 
 [frame.modbus.pv_strings]
+node = "Slave 1"
 register_number = 5252
 register_type = "input"
 length = 10
@@ -470,6 +490,7 @@ unit = "A"
 # ============================================================================
 
 [frame.modbus.meter_power]
+node = "Slave 1"
 register_number = 5600
 register_type = "input"
 length = 8
@@ -508,6 +529,7 @@ signed = true
 # ============================================================================
 
 [frame.modbus.battery_config]
+node = "Slave 1"
 register_number = 5627
 register_type = "input"
 length = 12
@@ -559,6 +581,7 @@ unit = "kWh"
 # ============================================================================
 
 [frame.modbus.backup_current]
+node = "Slave 1"
 register_number = 5719
 register_type = "input"
 length = 3
@@ -593,6 +616,7 @@ signed = true
 # ============================================================================
 
 [frame.modbus.backup_power]
+node = "Slave 1"
 register_number = 5722
 register_type = "input"
 length = 6
@@ -631,6 +655,7 @@ signed = true
 # ============================================================================
 
 [frame.modbus.backup_voltage_freq]
+node = "Slave 1"
 register_number = 5730
 register_type = "input"
 length = 4
@@ -669,6 +694,7 @@ unit = "Hz"
 # ============================================================================
 
 [frame.modbus.meter_frequency]
+node = "Slave 1"
 register_number = 5736
 register_type = "input"
 length = 1
@@ -686,6 +712,7 @@ unit = "Hz"
 # ============================================================================
 
 [frame.modbus.meter_voltage_current]
+node = "Slave 1"
 register_number = 5740
 register_type = "input"
 length = 6
@@ -741,6 +768,7 @@ unit = "A"
 # ============================================================================
 
 [frame.modbus.system_state]
+node = "Slave 1"
 register_number = 12999
 register_type = "input"
 length = 2
@@ -763,6 +791,7 @@ format = "hex"
 # ============================================================================
 
 [frame.modbus.pv_energy]
+node = "Slave 1"
 register_number = 13001
 register_type = "input"
 length = 6
@@ -802,6 +831,7 @@ unit = "kWh"
 # ============================================================================
 
 [frame.modbus.load_grid]
+node = "Slave 1"
 register_number = 13007
 register_type = "input"
 length = 4
@@ -826,6 +856,7 @@ signed = true
 # ============================================================================
 
 [frame.modbus.battery_charge_pv]
+node = "Slave 1"
 register_number = 13011
 register_type = "input"
 length = 3
@@ -851,6 +882,7 @@ unit = "kWh"
 # ============================================================================
 
 [frame.modbus.direct_consumption]
+node = "Slave 1"
 register_number = 13016
 register_type = "input"
 length = 3
@@ -876,6 +908,7 @@ unit = "kWh"
 # ============================================================================
 
 [frame.modbus.battery_status]
+node = "Slave 1"
 register_number = 13019
 register_type = "input"
 length = 9
@@ -932,6 +965,7 @@ unit = "kWh"
 # ============================================================================
 
 [frame.modbus.ac_power]
+node = "Slave 1"
 register_number = 13030
 register_type = "input"
 length = 5
@@ -973,6 +1007,7 @@ signed = true
 # ============================================================================
 
 [frame.modbus.energy_import_export]
+node = "Slave 1"
 register_number = 13035
 register_type = "input"
 length = 12
@@ -1030,6 +1065,7 @@ unit = "kWh"
 # ============================================================================
 
 [frame.modbus.inverter_firmware]
+node = "Slave 1"
 register_number = 13249
 register_type = "input"
 length = 15
@@ -1042,6 +1078,7 @@ bit_length = 240
 format = "ascii"
 
 [frame.modbus.comms_firmware]
+node = "Slave 1"
 register_number = 13264
 register_type = "input"
 length = 15
@@ -1054,6 +1091,7 @@ bit_length = 240
 format = "ascii"
 
 [frame.modbus.battery_firmware]
+node = "Slave 1"
 register_number = 13279
 register_type = "input"
 length = 15
@@ -1070,6 +1108,7 @@ format = "ascii"
 # ============================================================================
 
 [frame.modbus.load_adjustment_mode]
+node = "Slave 1"
 register_number = 13001
 register_type = "holding"
 length = 1
@@ -1085,6 +1124,7 @@ bit_length = 16
 # ============================================================================
 
 [frame.modbus.load_adjustment_enable]
+node = "Slave 1"
 register_number = 13010
 register_type = "holding"
 length = 1
@@ -1101,6 +1141,7 @@ bit_length = 16
 # ============================================================================
 
 [frame.modbus.ems_control]
+node = "Slave 1"
 register_number = 13049
 register_type = "holding"
 length = 3
@@ -1127,6 +1168,7 @@ unit = "W"
 # ============================================================================
 
 [frame.modbus.battery_soc_limits]
+node = "Slave 1"
 register_number = 13057
 register_type = "holding"
 length = 2
@@ -1151,6 +1193,7 @@ unit = "%"
 # ============================================================================
 
 [frame.modbus.export_limit]
+node = "Slave 1"
 register_number = 13073
 register_type = "holding"
 length = 2
@@ -1173,6 +1216,7 @@ bit_length = 16
 # ============================================================================
 
 [frame.modbus.power_limitation]
+node = "Slave 1"
 register_number = 13086
 register_type = "holding"
 length = 4
@@ -1203,6 +1247,7 @@ unit = "%"
 # ============================================================================
 
 [frame.modbus.power_gradients]
+node = "Slave 1"
 register_number = 31200
 register_type = "holding"
 length = 2
@@ -1226,6 +1271,7 @@ unit = "%"
 # ============================================================================
 
 [frame.modbus.apl_shutdown]
+node = "Slave 1"
 register_number = 31212
 register_type = "holding"
 length = 1
@@ -1242,6 +1288,7 @@ bit_length = 16
 # ============================================================================
 
 [frame.modbus.export_limit_per_phase]
+node = "Slave 1"
 register_number = 31225
 register_type = "holding"
 length = 1
@@ -1258,6 +1305,7 @@ bit_length = 16
 # ============================================================================
 
 [frame.modbus.site_import_limit]
+node = "Slave 1"
 register_number = 32997
 register_type = "holding"
 length = 1
@@ -1275,6 +1323,7 @@ unit = "kW"
 # ============================================================================
 
 [frame.modbus.battery_power_limits]
+node = "Slave 1"
 register_number = 33046
 register_type = "holding"
 length = 2
@@ -1295,6 +1344,7 @@ factor = 10
 unit = "W"
 
 [frame.modbus.battery_power_start]
+node = "Slave 1"
 register_number = 33148
 register_type = "holding"
 length = 2
@@ -1319,6 +1369,7 @@ unit = "W"
 # ============================================================================
 
 [frame.modbus.backup_soc]
+node = "Slave 1"
 register_number = 13099
 register_type = "holding"
 length = 1

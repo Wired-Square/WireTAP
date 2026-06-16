@@ -75,8 +75,10 @@ export function useFrameHandlers({
   const serialMaxFrameLength = useCatalogEditorStore((s) => s.forms.serialMaxFrameLength);
   const serialChecksum = useCatalogEditorStore((s) => s.forms.serialChecksum);
   const setIdFields = useCatalogEditorStore((s) => s.setCanFrameForm);
+  const nodeDeviceAddress = useCatalogEditorStore((s) => s.forms.nodeDeviceAddress);
   const setNodeName = useCatalogEditorStore((s) => s.setNodeName);
   const setNodeNotes = useCatalogEditorStore((s) => s.setNodeNotes);
+  const setNodeDeviceAddress = useCatalogEditorStore((s) => s.setNodeDeviceAddress);
 
   const dialogPayload = useCatalogEditorStore((s) => s.ui.dialogPayload);
   const availablePeers = useCatalogEditorStore((s) => s.ui.availablePeers);
@@ -282,7 +284,7 @@ export function useFrameHandlers({
         config = {
           protocol: "modbus" as const,
           register_number: node.metadata?.registerNumber,
-          device_address: node.metadata?.deviceAddress ?? 1,
+          node: node.metadata?.node,
           register_type: node.metadata?.registerType ?? "holding",
         };
         break;
@@ -314,7 +316,6 @@ export function useFrameHandlers({
       isLengthInherited: node.metadata?.lengthInherited,
       isTransmitterInherited: node.metadata?.transmitterInherited,
       isIntervalInherited: node.metadata?.intervalInherited,
-      isDeviceAddressInherited: node.metadata?.deviceAddressInherited,
     });
     setEditingFrameOriginalKey(originalKey);
     setEditingFrame(true);
@@ -348,7 +349,7 @@ export function useFrameHandlers({
       maxLength: frameFields.protocol === "can" ? 64 : 256,
       extended: cfg.extended,
       registerNumber: cfg.register_number,
-      deviceAddress: cfg.device_address,
+      node: cfg.node,
       registerType: cfg.register_type,
       registerBase: cfg.register_base,
       delimiter: cfg.delimiter,
@@ -388,7 +389,6 @@ export function useFrameHandlers({
           length: frameFields.isLengthInherited,
           transmitter: frameFields.isTransmitterInherited,
           interval: frameFields.isIntervalInherited,
-          deviceAddress: frameFields.isDeviceAddressInherited,
         },
         initialSignals,
       });
@@ -455,6 +455,7 @@ export function useFrameHandlers({
   const handleAddNode = () => {
     setNodeName("");
     setNodeNotes("");
+    setNodeDeviceAddress(undefined);
     openDialog("addNode");
   };
 
@@ -463,20 +464,22 @@ export function useFrameHandlers({
 
     try {
       const notesToSave = nodeNotes.trim() || undefined;
-      const newContent = await addNodeToml(catalogContent, nodeName, notesToSave);
+      const newContent = await addNodeToml(catalogContent, nodeName, notesToSave, nodeDeviceAddress);
       setToml(newContent);
       closeDialog("addNode");
       setNodeName("");
       setNodeNotes("");
+      setNodeDeviceAddress(undefined);
     } catch (error) {
       console.error("Failed to add node:", error);
     }
   };
 
-  const handleEditNode = (originalName: string, notes?: string) => {
+  const handleEditNode = (originalName: string, notes?: string, deviceAddress?: number) => {
     setDialogPayload({ editingNodeOriginalName: originalName });
     setNodeName(originalName);
     setNodeNotes(notes || "");
+    setNodeDeviceAddress(deviceAddress);
     openDialog("editNode");
   };
 
@@ -492,7 +495,8 @@ export function useFrameHandlers({
         catalogContent,
         originalName,
         nodeName,
-        notesToSave
+        notesToSave,
+        nodeDeviceAddress
       );
 
       if (!success) {
@@ -504,6 +508,7 @@ export function useFrameHandlers({
       closeDialog("editNode");
       setNodeName("");
       setNodeNotes("");
+      setNodeDeviceAddress(undefined);
       setDialogPayload({ editingNodeOriginalName: null });
       clearValidation();
 

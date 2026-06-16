@@ -124,6 +124,8 @@ export interface CatalogEditorState {
     mux: any;
     nodeName: string;
     nodeNotes: string;
+    /** Modbus-specific: the device (slave) address a node owns. */
+    nodeDeviceAddress?: number;
     muxCaseValue: string;
     muxCaseNotes: string;
     canDefaultEndianness: "little" | "big";  // For CAN config - stored in [meta.can]
@@ -230,6 +232,7 @@ export interface CatalogEditorState {
   setMuxForm: (mux: any) => void;
   setNodeName: (name: string) => void;
   setNodeNotes: (notes: string) => void;
+  setNodeDeviceAddress: (addr: number | undefined) => void;
   setMuxCaseValue: (value: string) => void;
   setMuxCaseNotes: (notes: string) => void;
   setCanDefaultEndianness: (endianness: "little" | "big") => void;
@@ -354,6 +357,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     },
     nodeName: '',
     nodeNotes: '',
+    nodeDeviceAddress: undefined,
     muxCaseValue: '',
     muxCaseNotes: '',
     canDefaultEndianness: 'little',   // Default for new catalogs - stored in [meta.can]
@@ -680,6 +684,9 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
 
   setNodeNotes: (nodeNotes) =>
     set((state) => ({ forms: { ...state.forms, nodeNotes } })),
+
+  setNodeDeviceAddress: (nodeDeviceAddress) =>
+    set((state) => ({ forms: { ...state.forms, nodeDeviceAddress } })),
 
   setMuxCaseValue: (muxCaseValue) =>
     set((state) => ({ forms: { ...state.forms, muxCaseValue } })),

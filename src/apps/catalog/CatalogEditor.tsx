@@ -376,7 +376,7 @@ function CatalogEditorInner() {
       }
       // Store modbus config from [meta.modbus] if present
       if (modbusConfig) {
-        setModbusDeviceAddress(modbusConfig.device_address);
+        setModbusDeviceAddress(modbusConfig.device_address ?? 1);
         setModbusRegisterBase(modbusConfig.register_base);
         setModbusDefaultInterval(modbusConfig.default_interval);
         setModbusDefaultByteOrder(modbusConfig.default_byte_order ?? "big");
@@ -699,9 +699,21 @@ function CatalogEditorInner() {
                         forms.setEditingId(true);
                         setSelectedPath(null);
                       },
+                      onAddRegisterForSlave: (slaveName) => {
+                        forms.setFrameFields({
+                          protocol: "modbus",
+                          config: { protocol: "modbus", register_type: "holding", node: slaveName },
+                          base: { length: 1 },
+                          modbusFrameKey: "",
+                        });
+                        forms.setEditingFrameOriginalKey(null);
+                        forms.setEditingFrame(true);
+                        setSelectedPath(null);
+                      },
                       onEditNode: handlers.handleEditNode,
                       onDeleteNode: handlers.handleRequestDeleteNode,
                       onRequestDeleteFrame: handlers.handleDeleteId,
+                      onRequestDeleteRegister: (key) => handlers.handleDeleteFrame("modbus", key),
                       onRequestDeleteSignal: (idKey, index, parentPath, signalName) =>
                         handlers.requestDeleteSignal(idKey, index, parentPath, signalName),
                     }}

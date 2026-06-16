@@ -31,9 +31,7 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
     defaults: ProtocolDefaults,
     _allFrames?: Record<string, any>
   ): ParsedFrame<ModbusConfig> => {
-    // Device address comes from [frame.modbus.config] - per-frame override not allowed
-    const deviceAddress = defaults.modbusDeviceAddress;
-    const deviceAddressInherited = deviceAddress !== undefined;
+    // The device address now lives on the register's node, not the frame.
 
     // Register base comes from [frame.modbus.config] - per-frame override not allowed
     const registerBase = defaults.modbusRegisterBase;
@@ -62,13 +60,12 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
       config: {
         protocol: "modbus",
         register_number: value.register_number,
-        device_address: deviceAddress ?? 1,
+        node: value.node,
         register_type: value.register_type ?? "holding",
         register_base: registerBase,
       },
       inherited: {
         interval: intervalInherited,
-        deviceAddress: deviceAddressInherited,
         registerBase: registerBaseInherited,
       },
     };
@@ -83,9 +80,9 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
       obj.register_number = config.register_number;
     }
 
-    // Only include device_address if not inherited
-    if (!omitInherited?.deviceAddress) {
-      obj.device_address = config.device_address;
+    // The register's slave node (the node owns the device address).
+    if (config.node) {
+      obj.node = config.node;
     }
 
     // Only include register_base if not inherited and explicitly set
@@ -130,7 +127,6 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
 
   getDefaultConfig: () => ({
     protocol: "modbus",
-    device_address: 1,
     register_type: "holding",
   }),
 
@@ -139,7 +135,7 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
   },
 
   getFrameDisplaySecondary: (config) => {
-    return `Device ${config.device_address}`;
+    return config.node ? `Slave ${config.node}` : "No slave";
   },
 
   getFrameKey: (config) => {

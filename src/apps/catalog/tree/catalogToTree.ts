@@ -219,7 +219,8 @@ function frameNode(f: Frame, cat: Catalog): TomlNode {
     metadata.bus = f.bus;
   } else if (f.protocol === "modbus") {
     metadata.registerNumber = f.frameId;
-    metadata.deviceAddress = cat.modbus?.deviceAddress ?? 1;
+    metadata.node = f.modbusNode;
+    metadata.deviceAddress = f.modbusDeviceAddress ?? cat.modbus?.deviceAddress ?? 1;
     metadata.deviceAddressInherited = inherited.has("deviceAddress");
     metadata.registerType = f.modbusRegisterType;
     metadata.registerBase = cat.modbus?.registerBase as 0 | 1 | undefined;
@@ -320,7 +321,11 @@ function nodeSection(nodes: NodeDef[]): TomlNode {
     key: n.name,
     type: "node",
     path: ["node", n.name],
-    metadata: { isNode: true, properties: defined({ notes: n.notes }) },
+    metadata: {
+      isNode: true,
+      deviceAddress: n.deviceAddress,
+      properties: defined({ device_address: n.deviceAddress, notes: n.notes }),
+    },
   }));
   return {
     key: "node",

@@ -142,8 +142,10 @@ export default function MetaView({
         >
           {modbusConfig && (
             <div className="text-xs text-[color:var(--text-muted)]">
-              <span>{t("metaView.address", { addr: modbusConfig.device_address })}</span>
-              <span> • {t("metaView.registerBase", { base: modbusConfig.register_base })}</span>
+              {modbusConfig.device_address !== undefined && (
+                <span>{t("metaView.address", { addr: modbusConfig.device_address })} • </span>
+              )}
+              <span>{t("metaView.registerBase", { base: modbusConfig.register_base })}</span>
               {modbusConfig.default_interval !== undefined && (
                 <span> • {t("metaView.intervalMs", { ms: modbusConfig.default_interval })}</span>
               )}

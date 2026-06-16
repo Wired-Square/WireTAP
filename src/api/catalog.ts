@@ -78,7 +78,8 @@ export interface FrameValidationInput {
   maxLength?: number;
   extended?: boolean;
   registerNumber?: number | null;
-  deviceAddress?: number;
+  /** The slave node a register is read from (its address lives on the node). */
+  node?: string;
   registerType?: string;
   registerBase?: number;
   delimiter?: number[];

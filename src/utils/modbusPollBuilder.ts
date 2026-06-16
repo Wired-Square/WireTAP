@@ -17,6 +17,8 @@ export interface ModbusPollGroup {
   interval_ms: number;
   /** frame_id to emit (= catalog register_number) */
   frame_id: number;
+  /** Device (slave) address to poll — resolved from the register's node. */
+  device_address: number;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 1000;
@@ -68,6 +70,7 @@ export function buildPollsFromCatalog(
       count: registerCount,
       interval_ms: intervalMs,
       frame_id: frame.frameId,
+      device_address: frame.modbusDeviceAddress ?? modbusConfig?.device_address ?? 1,
     });
   }
 

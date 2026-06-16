@@ -34,7 +34,6 @@ export interface FrameEditFields {
   isLengthInherited?: boolean;
   isTransmitterInherited?: boolean;
   isIntervalInherited?: boolean;
-  isDeviceAddressInherited?: boolean;
 }
 
 export type FrameEditViewProps = {
@@ -145,7 +144,7 @@ export default function FrameEditView({
 
   // Inheritance flag updates
   const handleInheritanceChange = useCallback(
-    (flag: keyof Pick<FrameEditFields, "isLengthInherited" | "isTransmitterInherited" | "isIntervalInherited" | "isDeviceAddressInherited">, value: boolean) => {
+    (flag: keyof Pick<FrameEditFields, "isLengthInherited" | "isTransmitterInherited" | "isIntervalInherited">, value: boolean) => {
       setFields({ ...fields, [flag]: value });
     },
     [fields, setFields]
@@ -168,9 +167,7 @@ export default function FrameEditView({
             onChange={handleModbusConfigChange}
             frameKey={fields.modbusFrameKey ?? ""}
             onFrameKeyChange={handleModbusKeyChange}
-            isDeviceAddressInherited={fields.isDeviceAddressInherited}
-            onDeviceAddressInheritedChange={(v) => handleInheritanceChange("isDeviceAddressInherited", v)}
-            defaultDeviceAddress={defaults?.modbusDeviceAddress}
+            availableSlaves={availablePeers}
             defaultRegisterBase={defaults?.modbusRegisterBase}
           />
         );
@@ -277,24 +274,26 @@ export default function FrameEditView({
               />
             </div>
 
-            {/* Transmitter (Peer) */}
-            <div>
-              <label className={`block ${textMedium} mb-2`}>
-                {t("frameEditView.transmitterLabel")}
-              </label>
-              <select
-                value={fields.base.transmitter || ""}
-                onChange={(e) => handleBaseChange({ transmitter: e.target.value || undefined })}
-                className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-              >
-                <option value="">{t("frameEditView.transmitterNone")}</option>
-                {availablePeers.map((peer) => (
-                  <option key={peer} value={peer}>
-                    {peer}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Transmitter (Peer) — Modbus uses the per-register Slave instead. */}
+            {fields.protocol !== "modbus" && (
+              <div>
+                <label className={`block ${textMedium} mb-2`}>
+                  {t("frameEditView.transmitterLabel")}
+                </label>
+                <select
+                  value={fields.base.transmitter || ""}
+                  onChange={(e) => handleBaseChange({ transmitter: e.target.value || undefined })}
+                  className={`w-full px-4 py-2 bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+                >
+                  <option value="">{t("frameEditView.transmitterNone")}</option>
+                  {availablePeers.map((peer) => (
+                    <option key={peer} value={peer}>
+                      {peer}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Interval (ms) */}
             <div>

@@ -18,7 +18,6 @@ export default function ModbusConfigView({
   onEditConfig,
 }: ModbusConfigViewProps) {
   const { t } = useTranslation("catalog");
-  const deviceAddress = modbusConfig?.device_address ?? selectedNode.metadata?.deviceAddress;
   const registerBase = modbusConfig?.register_base ?? selectedNode.metadata?.registerBase;
   const defaultInterval = modbusConfig?.default_interval;
   const defaultByteOrder = modbusConfig?.default_byte_order;
@@ -52,21 +51,9 @@ export default function ModbusConfigView({
         )}
       </div>
 
-      {/* Property cards */}
+      {/* Property cards. The device (slave) address now lives on each slave
+          node, not on [meta.modbus]. */}
       <div className="grid grid-cols-2 gap-4">
-        <div className={`p-4 ${bgSecondary} rounded-lg`}>
-          <div className={labelSmallMuted}>
-            {t("modbusConfig.deviceAddress")}
-          </div>
-          <div className={monoBody}>
-            {deviceAddress !== undefined ? (
-              deviceAddress
-            ) : (
-              <span className="text-orange-500">{t("modbusConfig.notSet")}</span>
-            )}
-          </div>
-        </div>
-
         <div className={`p-4 ${bgSecondary} rounded-lg`}>
           <div className={labelSmallMuted}>
             {t("modbusConfig.registerBase")}

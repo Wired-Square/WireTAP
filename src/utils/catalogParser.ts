@@ -123,6 +123,10 @@ export interface ResolvedFrame {
   modbusRegisterType?: 'holding' | 'input' | 'coil' | 'discrete';
   /** Modbus-specific: number of registers (not bytes) */
   modbusRegisterCount?: number;
+  /** Modbus-specific: the slave node this register is read from. */
+  modbusNode?: string;
+  /** Modbus-specific: resolved device (slave) address (from the node). */
+  modbusDeviceAddress?: number;
 }
 
 export interface ModbusProtocolConfig {
@@ -241,6 +245,8 @@ function adaptFrame(f: Frame): ResolvedFrame {
     copyFrom: f.copyFrom,
     modbusRegisterType: f.modbusRegisterType,
     modbusRegisterCount: f.modbusRegisterCount,
+    modbusNode: f.modbusNode,
+    modbusDeviceAddress: f.modbusDeviceAddress,
   };
 }
 

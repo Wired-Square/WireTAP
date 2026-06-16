@@ -100,7 +100,9 @@ export interface ModbusConfig {
   /** Starting register address. Optional: when omitted, it's derived from a
    *  numeric frame key (`[frame.modbus.2581]` / `[frame.modbus.0x32F9]`). */
   register_number?: number;
-  device_address: number;        // Modbus slave address (1-247)
+  /** The slave node this register is read from — the node owns the device
+   *  (slave) address. */
+  node?: string;
   register_type?: "holding" | "input" | "coil" | "discrete";
   register_base?: 0 | 1;         // 0-based or 1-based addressing (some manufacturers differ)
 }
@@ -141,7 +143,9 @@ export interface CanProtocolConfig {
 
 /** Modbus protocol config - stored in [meta.modbus] */
 export interface ModbusProtocolConfig {
-  device_address: number;      // Default slave address (1-247)
+  /** Legacy default slave address. The address now lives on each slave node;
+   *  this is kept only to migrate older catalogs. */
+  device_address?: number;
   register_base: 0 | 1;        // 0-based or 1-based register addressing
   default_interval?: number;   // Default poll interval in milliseconds
   default_byte_order?: "big" | "little";  // Default byte order for multi-register values
@@ -228,6 +232,8 @@ export interface TomlNode {
     bus?: number;
     // Modbus-specific
     registerNumber?: number;
+    /** The slave node a register is read from (the node owns the address). */
+    node?: string;
     deviceAddress?: number;
     deviceAddressInherited?: boolean;
     registerType?: "holding" | "input" | "coil" | "discrete";

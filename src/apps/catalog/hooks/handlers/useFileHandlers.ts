@@ -10,6 +10,7 @@ import {
   upsertSerialConfigToml,
   upsertModbusConfigToml,
   upsertCanConfigToml,
+  addNodeToml,
 } from "../../editorOps";
 import type { AppSettings } from "../../../../hooks/useSettings";
 import type { ProtocolType } from "../../types";
@@ -91,12 +92,14 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
         });
       } else if (selectedProtocol === "modbus") {
         content = await upsertModbusConfigToml(content, {
-          device_address: modbusDeviceAddress,
           register_base: modbusRegisterBase,
           default_interval: modbusDefaultInterval,
           default_byte_order: modbusDefaultByteOrder,
           default_word_order: modbusDefaultWordOrder,
         });
+        // Seed a first slave node so registers have somewhere to live (the
+        // device address now lives on the node, not [meta.modbus]).
+        content = await addNodeToml(content, `Slave ${modbusDeviceAddress}`, undefined, modbusDeviceAddress);
       } else if (selectedProtocol === "serial") {
         content = await upsertSerialConfigToml(content, { encoding: serialEncoding });
       }

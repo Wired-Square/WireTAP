@@ -15,9 +15,11 @@ export type NodeViewProps = {
   onSelectPath: (path: string[]) => void;
   catalogContent: string;
   onAddCanFrameForNode?: (nodeName: string) => void;
-  onEditNode?: (nodeName: string, notes?: string) => void;
+  onAddRegisterForSlave?: (slaveName: string) => void;
+  onEditNode?: (nodeName: string, notes?: string, deviceAddress?: number) => void;
   onDeleteNode?: (nodeName: string) => void;
   onRequestDeleteFrame?: (idKey: string) => void;
+  onRequestDeleteRegister?: (key: string) => void;
   onRequestDeleteSignal?: (idKey: string, index: number, parentPath: string[], signalName?: string) => void;
   displayFrameIdFormat?: "hex" | "decimal";
 };
@@ -44,20 +46,27 @@ export default function NodeView({
   onSelectPath,
   catalogContent,
   onAddCanFrameForNode,
+  onAddRegisterForSlave,
   onEditNode,
   onDeleteNode,
   onRequestDeleteFrame,
+  onRequestDeleteRegister,
   onRequestDeleteSignal,
   displayFrameIdFormat = "hex",
 }: NodeViewProps) {
   const { t } = useTranslation("catalog");
   const nodeName = selectedNode.key;
+  // A Modbus node is a slave: it owns a device address and registers reference
+  // it by `node`. CAN/serial nodes are transmitters referenced by `transmitter`.
+  const deviceAddress = selectedNode.metadata?.deviceAddress;
+  const isModbus = deviceAddress != null;
+  const frameProtocol = isModbus ? "modbus" : "can";
   const framesForNode = React.useMemo<FrameWithSignals[]>(() => {
     try {
       if (!catalogContent.trim()) return [];
 
       const parsed = tomlParse(catalogContent) as any;
-      const canFrames = parsed?.frame?.can || {};
+      const protoFrames = parsed?.frame?.[frameProtocol] || {};
       const results: FrameWithSignals[] = [];
 
       const collectMuxSignals = (
@@ -95,11 +104,13 @@ export default function NodeView({
         }
       };
 
-      for (const [id, frameVal] of Object.entries<any>(canFrames)) {
-        if (frameVal?.transmitter !== nodeName) continue;
+      for (const [id, frameVal] of Object.entries<any>(protoFrames)) {
+        if (id === "config") continue;
+        const ref = isModbus ? frameVal?.node : frameVal?.transmitter;
+        if (ref !== nodeName) continue;
 
         const signals: FrameSignal[] = [];
-        const pathPrefix = ["frame", "can", id];
+        const pathPrefix = ["frame", frameProtocol, id];
         const baseSignals = frameVal?.signals || frameVal?.signal || [];
         baseSignals.forEach((s: any, idx: number) => {
           signals.push({
@@ -136,24 +147,31 @@ export default function NodeView({
       console.warn("Failed to parse catalog for node view:", err);
       return [];
     }
-  }, [catalogContent, nodeName]);
+  }, [catalogContent, nodeName, frameProtocol, isModbus]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("nodeView.transmittingNode")}</h3>
+        <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">
+          {isModbus ? t("nodeView.slave") : t("nodeView.transmittingNode")}
+        </h3>
 
         <div className={flexRowGap2}>
-          {onAddCanFrameForNode && (
-            <button
-              onClick={() => onAddCanFrameForNode(nodeName)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
-              title={t("nodeView.addCanFrame")}
-            >
-              <Plus className={iconMd} />
-              {t("nodeView.addCanFrame")}
-            </button>
-          )}
+          {(() => {
+            const add = isModbus
+              ? { fn: onAddRegisterForSlave, label: t("nodeView.addRegister") }
+              : { fn: onAddCanFrameForNode, label: t("nodeView.addCanFrame") };
+            return add.fn ? (
+              <button
+                onClick={() => add.fn!(nodeName)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
+                title={add.label}
+              >
+                <Plus className={iconMd} />
+                {add.label}
+              </button>
+            ) : null;
+          })()}
 
           {onEditNode && (
             <button
@@ -162,7 +180,7 @@ export default function NodeView({
                 const notesStr = notes
                   ? (Array.isArray(notes) ? notes.join("\n") : notes)
                   : undefined;
-                onEditNode(nodeName, notesStr);
+                onEditNode(nodeName, notesStr, deviceAddress);
               }}
               className={iconButtonHover}
               title={t("nodeView.edit")}
@@ -187,6 +205,13 @@ export default function NodeView({
         <div className={labelSmallMuted}>{t("metaView.name")}</div>
         <div className={monoBody}>{nodeName}</div>
       </div>
+
+      {isModbus && (
+        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={labelSmallMuted}>{t("nodeView.deviceAddress")}</div>
+          <div className={monoBody}>{deviceAddress}</div>
+        </div>
+      )}
 
       {selectedNode.metadata?.properties?.notes && (
         <div className={`p-3 ${bgSecondary} rounded-lg`}>
@@ -243,11 +268,15 @@ export default function NodeView({
 
       <div className="space-y-2">
         <div className={sectionHeaderText}>
-          {t("nodeView.transmittedFrames", { count: framesForNode.length })}
+          {isModbus
+            ? t("nodeView.registersOnSlave", { count: framesForNode.length })
+            : t("nodeView.transmittedFrames", { count: framesForNode.length })}
         </div>
 
         {framesForNode.length === 0 ? (
-          <div className="text-sm text-[color:var(--text-muted)]">{t("nodeView.noTransmittedFrames")}</div>
+          <div className="text-sm text-[color:var(--text-muted)]">
+            {isModbus ? t("nodeView.noRegisters") : t("nodeView.noTransmittedFrames")}
+          </div>
         ) : (
           framesForNode.map((frame) => (
             <div
@@ -276,15 +305,19 @@ export default function NodeView({
                     </div>
                   )}
                   <button
-                    onClick={() => onSelectPath(["frame", "can", frame.id])}
+                    onClick={() => onSelectPath(["frame", frameProtocol, frame.id])}
                     className={iconButtonHover}
                     title={t("nodeView.editFrame")}
                   >
                     <Pencil className={`${iconMd} text-[color:var(--text-secondary)]`} />
                   </button>
-                  {onRequestDeleteFrame && (
+                  {(isModbus ? onRequestDeleteRegister : onRequestDeleteFrame) && (
                     <button
-                      onClick={() => onRequestDeleteFrame(frame.id)}
+                      onClick={() =>
+                        isModbus
+                          ? onRequestDeleteRegister?.(frame.id)
+                          : onRequestDeleteFrame?.(frame.id)
+                      }
                       className={iconButtonHoverDanger}
                       title={t("nodeView.deleteFrame")}
                     >

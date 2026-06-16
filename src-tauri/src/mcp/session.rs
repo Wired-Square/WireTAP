@@ -57,6 +57,7 @@ fn build_modbus_polls(catalog_toml: &str) -> Result<Vec<PollGroup>, String> {
             count: f.length,
             interval_ms: f.interval_ms,
             frame_id: f.register_number as u32,
+            device_address: f.device_address,
         })
         .collect())
 }

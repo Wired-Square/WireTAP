@@ -89,6 +89,11 @@ export interface Frame {
   modbusRegisterType?: RegisterType;
   /** Modbus register count (not bytes). */
   modbusRegisterCount?: number;
+  /** Modbus-specific: the slave node this register is read from. */
+  modbusNode?: string;
+  /** Modbus-specific: resolved device (slave) address — from the assigned node,
+   *  the legacy `[meta.modbus].device_address`, else `1`. */
+  modbusDeviceAddress?: number;
   /** Serial-specific: explicit frame delimiter bytes (raw encoding). */
   delimiter?: number[];
   /** Free-text notes (normalised from a string or array of strings). */
@@ -173,6 +178,8 @@ export interface Meta {
 /** A network node/peer declared under `[node.<name>]`. */
 export interface NodeDef {
   name: string;
+  /** Modbus-specific: the device (slave) address this node owns. */
+  deviceAddress?: number;
   notes?: string[];
 }
 

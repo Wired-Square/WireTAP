@@ -3,6 +3,7 @@
 import Dialog from "../../../components/Dialog";
 import { Input, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h2, caption } from "../../../styles";
+import NodeDeviceAddressField from "./NodeDeviceAddressField";
 
 export type AddNodeDialogProps = {
   open: boolean;
@@ -12,6 +13,11 @@ export type AddNodeDialogProps = {
 
   nodeNotes: string;
   setNodeNotes: (v: string) => void;
+
+  /** Modbus catalogues: a node owns a device (slave) address. */
+  showDeviceAddress?: boolean;
+  deviceAddress?: number;
+  setDeviceAddress?: (v: number | undefined) => void;
 
   onCancel: () => void;
   onAdd: () => void;
@@ -23,6 +29,9 @@ export default function AddNodeDialog({
   setNodeName,
   nodeNotes,
   setNodeNotes,
+  showDeviceAddress,
+  deviceAddress,
+  setDeviceAddress,
   onCancel,
   onAdd,
 }: AddNodeDialogProps) {
@@ -48,6 +57,12 @@ export default function AddNodeDialog({
               Enter a descriptive name for this node (e.g., "inverter", "battery", "motor")
             </p>
           </FormField>
+
+          <NodeDeviceAddressField
+            show={showDeviceAddress}
+            value={deviceAddress}
+            onChange={setDeviceAddress}
+          />
 
           <FormField label="Notes" variant="default">
             <Textarea
