@@ -71,20 +71,32 @@ export default function TextFindBar({ textareaRef }: TextFindBarProps) {
       if (index < 0 || index >= positions.length) return;
       if (!textareaRef.current) return;
 
+      const ta = textareaRef.current;
       const pos = positions[index];
       const queryLen = textFind.query.length;
 
       // Set selection in textarea
-      textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(pos, pos + queryLen);
+      ta.focus();
+      ta.setSelectionRange(pos, pos + queryLen);
 
-      // Scroll to make selection visible
-      // Calculate approximate line number and scroll
-      const textBefore = toml.substring(0, pos);
-      const lineNumber = textBefore.split('\n').length;
-      const lineHeight = 20; // approximate line height in pixels
-      const scrollTop = Math.max(0, (lineNumber - 5) * lineHeight);
-      textareaRef.current.scrollTop = scrollTop;
+      // Scroll the match into view only if it's outside the current viewport.
+      // Derive the real line height and top padding from the live element so
+      // the maths matches the rendered textarea (leading-[1.5rem] = 24px, p-4 = 16px).
+      const style = getComputedStyle(ta);
+      const lineHeight = parseFloat(style.lineHeight) || 24;
+      const padTop = parseFloat(style.paddingTop) || 0;
+
+      const lineIndex = toml.substring(0, pos).split("\n").length - 1; // 0-based
+      const margin = lineHeight * 2; // keep a couple of lines of context
+      const top = padTop + lineIndex * lineHeight;
+      const bottom = top + lineHeight;
+
+      if (top - margin < ta.scrollTop) {
+        ta.scrollTop = Math.max(0, top - margin);
+      } else if (bottom + margin > ta.scrollTop + ta.clientHeight) {
+        ta.scrollTop = bottom + margin - ta.clientHeight;
+      }
+      // else: already visible — leave scroll untouched
     },
     [textFind.query, toml, textareaRef]
   );

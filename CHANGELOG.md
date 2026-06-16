@@ -30,6 +30,8 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Fixed
 
+- **Catalog Editor text-mode find now scrolls the match into view**: navigating between find results set the textarea selection but computed the scroll target with a hardcoded 20px line height (the textarea renders at 24px) and ignored the editor's top padding, so matches lower in the file landed below the viewport. The scroll now derives the real line height and padding from the live element and only scrolls when the match is off-screen. [src/apps/catalog/components/TextFindBar.tsx](src/apps/catalog/components/TextFindBar.tsx).
+
 - **A mixed-generation `buffers.db` no longer kills the capture store on every launch**: the buffer→capture migration assumed an all-legacy schema, aborted on a database where a pre-rename build had re-created `buffer_metadata` beside already-renamed tables, and the rollback made every subsequent launch fail identically — captures and Discovery were silently dead. The baseline now migrates each object on its own evidence. [src-tauri/src/capture_db.rs](src-tauri/src/capture_db.rs).
 
 ## [0.7.1] - 2026-06-12
