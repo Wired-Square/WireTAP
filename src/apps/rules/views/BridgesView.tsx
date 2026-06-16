@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 import { useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";

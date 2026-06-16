@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // BRGB colour encoding: [brightness(8)][red(8)][green(8)][blue(8)]
 // Used by FrameLink indicator signals for LED colour representation.

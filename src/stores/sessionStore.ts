@@ -48,7 +48,9 @@ import {
   type BusMapping,
   type PlaybackPosition,
   type RawBytesPayload,
+  type ActiveSessionInfo,
 } from "../api/io";
+import { reconcileKnownSessions } from "./sessionRoster";
 import type { FrameMessage } from "../types/frame";
 import { tlog } from "../api/settings";
 import { trackAlloc } from "../services/memoryDiag";
@@ -210,6 +212,8 @@ export interface Session {
   catalogPath: string | null;
   /** Capture ID for raw bytes streams (set when capture-changed signal fires) */
   bytesCaptureId: string | null;
+  /** True when adopted from the backend roster (known-only, not UI-owned). */
+  external?: boolean;
 }
 
 /** Options for creating a session */
@@ -420,6 +424,8 @@ export interface SessionStore {
   pendingJoins: Record<string, { sessionId: string }>;
   /** Request that an app auto-joins a session (called by source apps) */
   requestSessionJoin: (appName: string, sessionId: string) => void;
+  /** Adopt backend roster sessions as known-only entries (reconcile). */
+  registerKnownSessions: (infos: ActiveSessionInfo[]) => void;
   /** Clear a pending join for an app (consumed by useIOSessionManager) */
   clearPendingJoin: (appName: string) => void;
 
@@ -1821,6 +1827,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set((state) => ({
       pendingJoins: { ...state.pendingJoins, [appName]: { sessionId } },
     }));
+  },
+
+  registerKnownSessions: (infos) => {
+    set((s) => ({ sessions: reconcileKnownSessions(s.sessions, infos) }));
   },
 
   clearPendingJoin: (appName) => {

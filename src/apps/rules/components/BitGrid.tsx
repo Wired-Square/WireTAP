@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // Visual bit grid for frame definition editing. Renders bytes as rows of 8
 // bit cells (MSB-first: 7,6,5,4,3,2,1,0 left-to-right). Users click bits

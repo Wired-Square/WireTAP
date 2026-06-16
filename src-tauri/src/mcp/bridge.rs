@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 //! Reverse RPC: lets the Rust backend (driven by the MCP server) ask the
 //! frontend for state only it holds — payload analysis, decoded signals, the

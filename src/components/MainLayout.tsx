@@ -16,6 +16,8 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { storeGet, storeSet } from "../api/store";
+import { getStartupErrors } from "../api/appStatus";
+import FlashNotification from "./FlashNotification";
 import { icon2xl } from "../styles/spacing";
 import { bgPrimary, textPrimary, textSecondary, textTertiary } from "../styles/colourTokens";
 import { launcherButton, launcherButtonLabel, launcherGrid } from "../styles/buttonStyles";
@@ -28,6 +30,9 @@ import {
   openPanel,
 } from "../utils/windowCommunication";
 import { useWindowPersistence } from "../hooks/useWindowPersistence";
+import { useRepeatQueueEvents } from "../hooks/useRepeatQueueEvents";
+import { useSessionRosterSync } from "../hooks/useSessionRosterSync";
+import { useAttachSourceEvents } from "../hooks/useAttachSourceEvents";
 import {
   getOpenMainWindows,
   addOpenMainWindow,
@@ -37,7 +42,7 @@ import {
 import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuState } from "../api";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
-import { apps, menuApps, menuGroupOrder, type AppEntry, type PanelId } from "../apps/registry";
+import { apps, menuApps, menuGroupOrder, sessionAwarePanelIds, type AppEntry, type PanelId } from "../apps/registry";
 import type { LucideIcon } from "lucide-react";
 const logo = "/logo.svg";
 
@@ -253,6 +258,42 @@ export default function MainLayout() {
 
   // Persist and restore window geometry (size + position) across restarts
   useWindowPersistence(windowLabel);
+
+  // Mirror repeat-transmit lifecycle (e.g. agent-started repeats) from the WS
+  // push channel into the transmit queue, opening the Transmit panel on start.
+  useRepeatQueueEvents();
+
+  // Adopt backend (incl. agent-created) sessions into the store as known-only.
+  useSessionRosterSync();
+
+  // Let an agent surface a session in a source-aware tab on request.
+  useAttachSourceEvents();
+
+  // Backend setup-time failures (dead capture store, …) must be shown, not
+  // buried in the log. Retried because the WS transport may still be
+  // connecting when the layout first mounts (command() rejects rather than
+  // queues when disconnected). Primary window only — every window mounts a
+  // MainLayout, and N copies of the same toast help nobody.
+  const [startupErrors, setStartupErrors] = useState<string[]>([]);
+  useEffect(() => {
+    if (isDynamicWindow) return;
+    let cancelled = false;
+    const fetchErrors = (attempt: number) => {
+      getStartupErrors()
+        .then((errors) => {
+          if (!cancelled && errors.length > 0) setStartupErrors(errors);
+        })
+        .catch(() => {
+          if (!cancelled && attempt < 5) {
+            setTimeout(() => fetchErrors(attempt + 1), 2000);
+          }
+        });
+    };
+    fetchErrors(0);
+    return () => {
+      cancelled = true;
+    };
+  }, [isDynamicWindow]);
 
   // Load saved layout on mount
   useEffect(() => {
@@ -487,12 +528,11 @@ export default function MainLayout() {
   }, [handlePanelClick]);
 
   // Disable all session + bookmark menu items when a non-session panel is focused.
-  // Session-aware panels manage their own state via useMenuSessionControl.
-  const SESSION_AWARE_PANELS = useRef(new Set(["discovery", "decoder", "transmit", "query", "dashboard", "graph"]));
+  // Session-aware panels (declared in apps.json) manage their own state via useMenuSessionControl.
   const focusedPanelId = useFocusStore((s) => s.focusedPanelId);
 
   useEffect(() => {
-    const hasSession = focusedPanelId !== null && SESSION_AWARE_PANELS.current.has(focusedPanelId);
+    const hasSession = focusedPanelId !== null && sessionAwarePanelIds.has(focusedPanelId);
     if (!hasSession) {
       updateMenuState({
         hasSession: false,
@@ -580,6 +620,14 @@ export default function MainLayout() {
           prefixHeaderActionsComponent={PrefixHeaderActions}
         />
       </div>
+      {startupErrors.length > 0 && (
+        <FlashNotification
+          message={startupErrors.join(" — ")}
+          type="error"
+          duration={0}
+          onDismiss={() => setStartupErrors([])}
+        />
+      )}
     </div>
   );
 }

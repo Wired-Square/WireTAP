@@ -157,6 +157,8 @@ type SharedAppEntry = {
   group: AppGroup;
   accelerator?: string;
   singleton?: boolean;
+  /** Tab can have a session/source attached (consumes `requestSessionJoin`). */
+  sessionAware?: boolean;
 };
 
 /** Group order from apps.json — used by LogoMenu and Watermark for layout. */
@@ -173,6 +175,11 @@ for (const a of sharedApps) {
     );
   }
 }
+
+/** Panel ids that declare `sessionAware` in apps.json — tabs a session can be attached to. */
+export const sessionAwarePanelIds: ReadonlySet<string> = new Set(
+  sharedApps.filter((a) => a.sessionAware).map((a) => a.id),
+);
 
 export type MenuApp = SharedAppEntry & {
   i18nKey: string;

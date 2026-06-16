@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 //! Rust-native session open for the MCP server. Mirrors the frontend's open
 //! flow (build Modbus poll groups from the profile's catalog, then create the

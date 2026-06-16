@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
 use crate::io::periodic::Cadence;
 use crate::io::{self, CanTransmitFrame, IOCapabilities, SignalThrottle};
@@ -53,6 +53,25 @@ pub struct TransmitResult {
 pub struct RepeatStoppedEvent {
     pub queue_id: String,
     pub reason: String,
+}
+
+/// Announces a repeat transmit that started outside the Transmit UI (e.g. an
+/// MCP agent), carrying everything the frontend needs to render it as a queue
+/// row so the human and the agent share one visible queue.
+#[derive(Clone, Debug, Serialize)]
+pub struct RepeatStartedEvent {
+    pub queue_id: String,
+    pub session_id: String,
+    pub profile_id: String,
+    pub profile_name: String,
+    pub frame_id: u32,
+    pub data: Vec<u8>,
+    pub bus: u8,
+    pub is_extended: bool,
+    pub is_fd: bool,
+    pub interval_ms: u64,
+    /// Where the repeat came from, e.g. `"agent"`.
+    pub origin: String,
 }
 
 /// Kinds that support CAN transmit (platform-dependent)
@@ -376,7 +395,6 @@ static IO_REPEAT_TASKS: Lazy<tokio::sync::Mutex<HashMap<String, IoRepeatTask>>> 
 /// Start repeat transmission for a CAN frame through an IO session
 #[tauri::command]
 pub async fn io_start_repeat_transmit(
-    app: AppHandle,
     session_id: String,
     queue_id: String,
     frame: CanTransmitFrame,
@@ -434,8 +452,7 @@ pub async fn io_start_repeat_transmit(
                     "[io_transmit] Stopping repeat for '{}' due to permanent error: {}",
                     queue_id_for_task, reason
                 );
-                // Notify frontend that repeat has stopped
-                let _ = app.emit("repeat-stopped", RepeatStoppedEvent {
+                crate::ws::dispatch::send_repeat_stopped(&RepeatStoppedEvent {
                     queue_id: queue_id_for_task.clone(),
                     reason,
                 });
@@ -496,7 +513,6 @@ pub async fn io_stop_all_repeats(_session_id: String) -> Result<(), String> {
 /// Start repeat transmission for serial bytes through an IO session
 #[tauri::command]
 pub async fn io_start_serial_repeat_transmit(
-    app: AppHandle,
     session_id: String,
     queue_id: String,
     bytes: Vec<u8>,
@@ -553,8 +569,7 @@ pub async fn io_start_serial_repeat_transmit(
                     "[io_transmit] Stopping serial repeat for '{}' due to permanent error: {}",
                     queue_id_for_task, reason
                 );
-                // Notify frontend that repeat has stopped
-                let _ = app.emit("repeat-stopped", RepeatStoppedEvent {
+                crate::ws::dispatch::send_repeat_stopped(&RepeatStoppedEvent {
                     queue_id: queue_id_for_task.clone(),
                     reason,
                 });
@@ -594,7 +609,6 @@ static IO_REPEAT_GROUPS: Lazy<tokio::sync::Mutex<HashMap<String, IoRepeatTask>>>
 /// system waits for the interval before repeating the sequence.
 #[tauri::command]
 pub async fn io_start_repeat_group(
-    app: AppHandle,
     session_id: String,
     group_id: String,
     frames: Vec<CanTransmitFrame>,
@@ -666,8 +680,7 @@ pub async fn io_start_repeat_group(
                         "[io_transmit] Stopping group repeat for '{}' due to permanent error: {}",
                         group_id_for_task, reason
                     );
-                    // Notify frontend that repeat has stopped
-                    let _ = app.emit("repeat-stopped", RepeatStoppedEvent {
+                    crate::ws::dispatch::send_repeat_stopped(&RepeatStoppedEvent {
                         queue_id: group_id_for_task.clone(),
                         reason,
                     });

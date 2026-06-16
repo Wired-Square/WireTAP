@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 export const BYTE_ORDER_LE = 0;
 export const BYTE_ORDER_BE = 1;

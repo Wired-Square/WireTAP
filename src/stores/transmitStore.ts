@@ -10,6 +10,7 @@ import {
   type TransmitProfile,
   type TransmitResult,
   type ReplayFrame,
+  type RepeatStartedEvent,
   getTransmitCapableProfiles,
   // IO session-based transmit
   ioTransmitCanFrame,
@@ -28,6 +29,7 @@ import {
 import type { ReplayState } from "../api/io";
 
 import { useSessionStore } from "./sessionStore";
+import { resolveQueueItemSession } from "./transmitRowSession";
 
 import { CAN_FD_DLC_VALUES } from "../constants";
 
@@ -75,6 +77,10 @@ export interface TransmitQueueItem {
   enabled: boolean;
   /** Group name for grouped repeat (items with same group are sent together in sequence) */
   groupName?: string;
+  /** Who added this item. `"agent"` rows come from an MCP client, not the UI. */
+  origin?: "user" | "agent";
+  /** The backend session this row transmits through (authoritative resolver key). */
+  sessionId?: string;
 }
 
 /** Progress info for an active replay */
@@ -227,6 +233,8 @@ export interface TransmitState {
   stopRepeat: (queueId: string) => Promise<void>;
   /** Mark repeat as stopped (called by backend event, no API call needed) */
   markRepeatStopped: (queueId: string) => void;
+  /** Upsert a queue item for a repeat started outside the UI (e.g. an MCP agent) */
+  addExternalRepeat: (ev: RepeatStartedEvent) => void;
   /** Stop all repeats */
   stopAllRepeats: () => Promise<void>;
   /** Update queue item repeat interval */
@@ -493,6 +501,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       repeatIntervalMs: state.queueRepeatIntervalMs,
       isRepeating: false,
       enabled: true,
+      sessionId: session.id,
     };
 
     set({ queue: [...state.queue, item] });
@@ -573,6 +582,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       repeatIntervalMs: queueRepeatIntervalMs,
       isRepeating: false,
       enabled: true,
+      sessionId: session.id,
     };
 
     set({ queue: [...state.queue, item] });
@@ -628,9 +638,9 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     const item = state.queue.find((q) => q.id === queueId);
     if (!item || item.isRepeating) return;
 
-    // Use the session that was stored with the queue item, not the currently active one
+    // Resolve the row's session by its sessionId (agent/new rows) or profile (legacy).
     const { sessions } = useSessionStore.getState();
-    const session = sessions[item.profileId];
+    const session = resolveQueueItemSession(item, sessions);
 
     if (!session || session.lifecycleState !== "connected") {
       set({ error: `Session '${item.profileName}' is not connected. Connect to it first.` });
@@ -726,6 +736,42 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
           q.id === queueId ? { ...q, isRepeating: false } : q
         ),
       });
+    }
+  },
+
+  // Called for a repeat started outside the UI (e.g. an MCP agent) through the
+  // same cadence engine the UI uses. Mirror it into the shared queue (upsert by
+  // queue_id) so it is visible and stoppable here.
+  addExternalRepeat: (ev) => {
+    const item: TransmitQueueItem = {
+      id: ev.queue_id,
+      profileId: ev.profile_id,
+      profileName: ev.profile_name,
+      type: "can",
+      canFrame: {
+        frame_id: ev.frame_id,
+        data: ev.data,
+        bus: ev.bus,
+        is_extended: ev.is_extended,
+        is_fd: ev.is_fd,
+        is_brs: false,
+        is_rtr: false,
+      },
+      repeatIntervalMs: ev.interval_ms,
+      isRepeating: true,
+      enabled: true,
+      origin: ev.origin === "agent" ? "agent" : "user",
+      sessionId: ev.session_id,
+    };
+    const state = get();
+    const exists = state.queue.some((q) => q.id === item.id);
+    set({
+      queue: exists
+        ? state.queue.map((q) => (q.id === item.id ? item : q))
+        : [...state.queue, item],
+    });
+    if (ev.profile_id) {
+      useSessionStore.getState().setHasQueuedMessages(ev.profile_id, true);
     }
   },
 
@@ -866,7 +912,7 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
     // Validate all sessions are connected and can transmit
     const { sessions } = useSessionStore.getState();
     for (const [profileId, items] of itemsBySession) {
-      const session = sessions[profileId];
+      const session = resolveQueueItemSession({ profileId }, sessions);
       if (!session || session.lifecycleState !== "connected") {
         set({ error: `Session '${items[0].profileName}' is not connected. Connect to it first.` });
         return;
@@ -884,10 +930,10 @@ export const useTransmitStore = create<TransmitState>((set, get) => ({
       // Start a repeat for each session's frames
       // Use unique sub-group names to track them: "groupName:profileId"
       for (const [profileId, items] of itemsBySession) {
-        const session = sessions[profileId];
+        const session = resolveQueueItemSession({ profileId }, sessions);
         const frames = items.map((q) => q.canFrame!);
         const subGroupName = itemsBySession.size > 1 ? `${groupName}:${profileId}` : groupName;
-        await ioStartRepeatGroup(session.id, subGroupName, frames, intervalMs);
+        await ioStartRepeatGroup(session!.id, subGroupName, frames, intervalMs);
       }
 
       // Mark group as active and items as repeating

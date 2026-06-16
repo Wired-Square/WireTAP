@@ -7,15 +7,13 @@ import type { SourceNodeData } from "../nodes/SourceNode";
 import type { SessionNodeData } from "../nodes/SessionNode";
 import type { AppNodeData } from "../nodes/AppNode";
 import type { InterfaceEdgeData } from "../edges/InterfaceEdge";
+import { sessionAwarePanelIds } from "../../registry";
 
 // Layout constants
 const COLUMN_SPACING = 300;
 const ROW_SPACING = 120;
 const START_X = 50;
 const START_Y = 50;
-
-/** Session-aware panel IDs that should appear as app nodes */
-const SESSION_AWARE_PANELS = new Set(["discovery", "decoder", "transmit", "query", "dashboard"]);
 
 // Custom node type that allows our typed data
 interface FlowNode<T = unknown> {
@@ -283,7 +281,7 @@ export function buildSessionGraph(
   // Column 3b: Unconnected app nodes for open session-aware panels
   if (openPanelIds) {
     const unconnectedPanels = openPanelIds.filter(
-      (id) => SESSION_AWARE_PANELS.has(id) && !connectedAppNames.has(id)
+      (id) => sessionAwarePanelIds.has(id) && !connectedAppNames.has(id)
     );
 
     // Position below all connected apps

@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -8,6 +7,7 @@ use once_cell::sync::Lazy;
 
 use crate::io::post_session::StreamEndedInfo;
 use crate::io::{FrameMessage, IOState, PlaybackPosition};
+use crate::transmit::{RepeatStartedEvent, RepeatStoppedEvent};
 use crate::ws::protocol::{self, MsgType};
 use crate::ws::server::ws_server;
 
@@ -402,12 +402,16 @@ pub async fn dispatch_command(
         name if name.starts_with("framelink.") => {
             crate::io::framelink::rules::dispatch_framelink_command(name, params).await
         }
+        name if name.starts_with("registry.") => {
+            crate::io::framelink::registry::dispatch_registry_command(name, params).await
+        }
         name if name.starts_with("smp.") => {
             crate::ws::smp::dispatch(name, params).await
         }
         name if name.starts_with("catalog.") => {
             crate::catalog::dispatch_catalog_command(name, params).await
         }
+        "app.startup_errors" => Ok(serde_json::json!(crate::startup_errors())),
         _ => Err(format!("Unknown command: {op_name}")),
     }
 }
@@ -441,6 +445,57 @@ pub fn send_replay_state(state: &crate::replay::ReplayState) {
         Err(_) => return,
     };
     let msg = protocol::encode_message(MsgType::ReplayState, 0, &payload);
+    server.send_global(msg);
+}
+
+/// Repeat-transmit lifecycle payload, pushed on the global channel as
+/// kind-discriminated JSON: `started` carries the full queue row, `stopped`
+/// carries the queue id and reason. The frontend decodes the union by `kind`,
+/// mirroring how `OtaEvent` discriminates its union.
+#[derive(serde::Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum RepeatEventPayload<'a> {
+    Started(&'a RepeatStartedEvent),
+    Stopped(&'a RepeatStoppedEvent),
+}
+
+fn send_repeat_event(payload: &RepeatEventPayload<'_>) {
+    let server = match ws_server() {
+        Some(s) => s,
+        None => return,
+    };
+    let bytes = match serde_json::to_vec(payload) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let msg = protocol::encode_message(MsgType::RepeatEvent, 0, &bytes);
+    server.send_global(msg);
+}
+
+/// Announce a repeat transmit that started outside the Transmit UI (e.g. an MCP
+/// agent) so it appears as a queue row.
+pub fn send_repeat_started(event: &RepeatStartedEvent) {
+    send_repeat_event(&RepeatEventPayload::Started(event));
+}
+
+/// Announce a repeat transmit that stopped (agent stop or permanent error).
+pub fn send_repeat_stopped(event: &RepeatStoppedEvent) {
+    send_repeat_event(&RepeatEventPayload::Stopped(event));
+}
+
+/// Ask the frontend to surface a session in a source-aware tab (open/focus the
+/// panel and point it at the session). Payload is JSON `{ "panel": …, "session_id": … }`.
+pub fn send_attach_to_panel(panel: &str, session_id: &str) {
+    let server = match ws_server() {
+        Some(s) => s,
+        None => return,
+    };
+    let payload =
+        match serde_json::to_vec(&serde_json::json!({ "panel": panel, "session_id": session_id })) {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+    let msg = protocol::encode_message(MsgType::AttachToPanel, 0, &payload);
     server.send_global(msg);
 }
 

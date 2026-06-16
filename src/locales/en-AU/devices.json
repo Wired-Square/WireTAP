@@ -23,8 +23,22 @@
       "addressRequired": "Please enter an IP address",
       "invalidPort": "Please enter a valid port number (1–65535)",
       "bleNoActionable": "This device has no BLE-side capability we can use",
-      "ipNoActionable": "This device has no IP-side capability we can use"
+      "ipNoActionable": "This device has no IP-side capability we can use",
+      "manualProbeFailed": "Couldn't reach a FrameLink device at {{address}} to register it: {{error}}",
+      "manualNoDeviceId": "The device at {{address}} didn't report an identity, so it can't be registered"
     }
+  },
+  "registered": {
+    "heading": "Registered devices",
+    "scanHeading": "Scanning",
+    "manualBadge": "manual",
+    "connect": "Connect",
+    "remove": "Remove from registry"
+  },
+  "resolution": {
+    "label": "Resolution",
+    "auto": "Auto (mDNS)",
+    "manual": "Manual (fixed IP)"
   },
   "device": {
     "back": "Back",

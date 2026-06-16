@@ -6,6 +6,7 @@ import { Play, Pause, Square, Trash2, UserMinus, Plus, X, Save, Unplug, Plug } f
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { useSessionStore } from "../../../stores/sessionStore";
+import { sessionAwarePanelIds } from "../../registry";
 import { getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence, addVirtualBus, removeVirtualBus, type ActiveSessionInfo, type VirtualBusState, type IOStateType } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { iconSm } from "../../../styles/spacing";
@@ -393,9 +394,8 @@ function SessionDetails({
       {/* Connect unconnected apps */}
       {onConnectApp && openPanelIds && (() => {
         const connectedApps = new Set(session.subscribers.map((l) => (l.app_name || l.subscriber_id).toLowerCase()));
-        const SESSION_AWARE = ["discovery", "decoder", "transmit", "query", "dashboard"];
         const unconnected = openPanelIds.filter(
-          (id) => SESSION_AWARE.includes(id) && !connectedApps.has(id)
+          (id) => sessionAwarePanelIds.has(id) && !connectedApps.has(id)
         );
         if (unconnected.length === 0) return null;
         return (

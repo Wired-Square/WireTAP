@@ -6,6 +6,9 @@
 //
 // The public API of capture_store.rs is unchanged — this module provides
 // the underlying storage layer only.
+//
+// Schema changes MUST be recorded migrations — see
+// docs/capture-db-migrations.md. Never issue ad-hoc DDL from feature code.
 
 use once_cell::sync::Lazy;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -67,12 +70,118 @@ CREATE INDEX IF NOT EXISTS idx_frames_capture_fid ON frames (capture_id, frame_i
 CREATE INDEX IF NOT EXISTS idx_bytes_capture_ts ON bytes (capture_id, timestamp_us);
 ";
 
-/// Migration: rename legacy `buffer_*` tables/columns to `capture_*`.
-/// Detects pre-rename schema and migrates in a single transaction.
-/// Idempotent — safely no-ops on fresh installs and already-migrated DBs.
-fn migrate_buffer_to_capture(conn: &mut Connection) -> Result<(), String> {
-    // Detect whether legacy `buffer_metadata` table exists
-    let has_legacy: bool = conn
+/// True when `table` has a column named `col`. A missing table yields an
+/// empty `pragma_table_info` set, i.e. `false`.
+fn has_column(conn: &Connection, table: &str, col: &str) -> Result<bool, String> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM pragma_table_info(?1) WHERE name = ?2)",
+        params![table, col],
+        |row| row.get(0),
+    )
+    .map_err(|e| format!("Failed to inspect {table} schema: {}", e))
+}
+
+// ============================================================================
+// Schema migrations
+//
+// Recorded, run-once migrations. `PRAGMA user_version` is the authoritative
+// gate; the `schema_migrations` table is the human-queryable audit trail
+// (version, name, applied_at). Each migration is applied in its own
+// transaction together with its audit row and version stamp, so a crash can
+// never leave a step half-applied or applied-but-unrecorded.
+//
+// ALL schema changes go through this mechanism — see
+// docs/capture-db-migrations.md for how to add a migration and the rules
+// (never edit or renumber a shipped migration; never infer state from
+// schema shape).
+// ============================================================================
+
+enum MigrationStep {
+    /// Conditional logic SQL can't express. Avoid for new migrations —
+    /// plain SQL steps use `Sql(include_str!(...))`, added with the first
+    /// SQL-file migration.
+    Rust(fn(&rusqlite::Transaction) -> Result<(), String>),
+}
+
+struct Migration {
+    version: i64,
+    name: &'static str,
+    step: MigrationStep,
+}
+
+/// All migrations, ascending and contiguous from version 1.
+/// `user_version` 0 = unstamped (any pre-versioning shape).
+const MIGRATIONS: &[Migration] = &[Migration {
+    version: 1,
+    name: "baseline_capture_schema",
+    step: MigrationStep::Rust(baseline_capture_schema),
+}];
+
+fn schema_version(conn: &Connection) -> Result<i64, String> {
+    conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|e| format!("Failed to read schema version: {}", e))
+}
+
+/// Apply every migration newer than the database's stamped version.
+fn run_migrations(conn: &mut Connection) -> Result<(), String> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (
+             version INTEGER PRIMARY KEY,
+             name TEXT NOT NULL,
+             applied_at INTEGER NOT NULL
+         );",
+    )
+    .map_err(|e| format!("Failed to create schema_migrations table: {}", e))?;
+
+    let current = schema_version(conn)?;
+    for m in MIGRATIONS {
+        if m.version <= current {
+            continue;
+        }
+        let tx = conn
+            .transaction()
+            .map_err(|e| format!("Failed to begin migration {} transaction: {}", m.version, e))?;
+
+        match m.step {
+            MigrationStep::Rust(f) => f(&tx)
+                .map_err(|e| format!("Migration {} ({}) failed: {}", m.version, m.name, e))?,
+        }
+
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, applied_at)
+             VALUES (?1, ?2, strftime('%s','now'))",
+            params![m.version, m.name],
+        )
+        .map_err(|e| format!("Failed to record migration {}: {}", m.version, e))?;
+        tx.pragma_update(None, "user_version", m.version)
+            .map_err(|e| format!("Failed to stamp schema version {}: {}", m.version, e))?;
+        tx.commit()
+            .map_err(|e| format!("Failed to commit migration {}: {}", m.version, e))?;
+
+        tlog!("[capture_db] Applied migration {} ({})", m.version, m.name);
+    }
+    Ok(())
+}
+
+/// Migration 1 — baseline. Normalises any unstamped database (fresh, legacy
+/// `buffer_*`, fully migrated, or mixed-generation) to the v1 shape.
+///
+/// This is the one migration that must infer state from the schema itself:
+/// pre-versioning databases carry no stamp, and a pre-rename build running
+/// against an already-migrated file re-creates an empty legacy
+/// `buffer_metadata` beside renamed tables (its CREATE TABLE IF NOT EXISTS).
+/// Each object is therefore migrated on its own evidence; a blanket
+/// "legacy detected → rename everything" aborts on the first
+/// already-renamed column and rolls back, failing initialisation on every
+/// launch of such a database.
+fn baseline_capture_schema(tx: &rusqlite::Transaction) -> Result<(), String> {
+    // Tables first (idempotent). Indexes are deferred until after the
+    // buffer→capture normalisation because they reference the renamed
+    // `capture_id` columns.
+    tx.execute_batch(SCHEMA_TABLES_SQL)
+        .map_err(|e| format!("Failed to create tables: {}", e))?;
+
+    let has_legacy: bool = tx
         .query_row(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='buffer_metadata'",
             [],
@@ -81,39 +190,58 @@ fn migrate_buffer_to_capture(conn: &mut Connection) -> Result<(), String> {
         .map(|n| n > 0)
         .unwrap_or(false);
 
-    if !has_legacy {
-        return Ok(());
+    if has_legacy {
+        tlog!("[capture_db] Legacy buffer_* schema detected — normalising to capture_*");
+
+        // Legacy indexes reference the old column names; they are recreated
+        // below under the new `idx_*_capture_*` names.
+        if has_column(tx, "frames", "buffer_id")? {
+            tx.execute_batch(
+                "ALTER TABLE frames RENAME COLUMN buffer_id TO capture_id;
+                 DROP INDEX IF EXISTS idx_frames_buffer_ts;
+                 DROP INDEX IF EXISTS idx_frames_buffer_fid;",
+            )
+            .map_err(|e| format!("Failed to migrate frames table: {}", e))?;
+        }
+        if has_column(tx, "bytes", "buffer_id")? {
+            tx.execute_batch(
+                "ALTER TABLE bytes RENAME COLUMN buffer_id TO capture_id;
+                 DROP INDEX IF EXISTS idx_bytes_buffer_ts;",
+            )
+            .map_err(|e| format!("Failed to migrate bytes table: {}", e))?;
+        }
+
+        // Fold legacy metadata rows into `capture_metadata` (created by
+        // SCHEMA_TABLES_SQL above if it didn't already exist), then drop the
+        // legacy table. Row copy rather than table rename: in the mixed case
+        // `capture_metadata` already holds migrated — possibly pinned —
+        // captures that a drop-and-rename would destroy.
+        tx.execute_batch(
+            "INSERT OR IGNORE INTO capture_metadata
+                 (capture_id, capture_kind, name, count, start_time_us, end_time_us,
+                  created_at, owning_session_id)
+             SELECT buffer_id, buffer_type, name, count, start_time_us, end_time_us,
+                    created_at, owning_session_id
+             FROM buffer_metadata;
+             DROP TABLE buffer_metadata;",
+        )
+        .map_err(|e| format!("Failed to migrate capture metadata: {}", e))?;
     }
 
-    tlog!("[capture_db] Legacy buffer_* schema detected — migrating to capture_* names");
+    tx.execute_batch(SCHEMA_INDEXES_SQL)
+        .map_err(|e| format!("Failed to create indexes: {}", e))?;
 
-    let tx = conn
-        .transaction()
-        .map_err(|e| format!("Failed to begin migration transaction: {}", e))?;
+    // Columns added after the original schema shipped; absent only on old
+    // pre-rename databases (duplicate-column errors ignored).
+    let _ = tx.execute(
+        "ALTER TABLE capture_metadata ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
+    let _ = tx.execute(
+        "ALTER TABLE capture_metadata ADD COLUMN buses TEXT NOT NULL DEFAULT '[]'",
+        [],
+    );
 
-    // The CREATE TABLE IF NOT EXISTS above will have already created an EMPTY
-    // `capture_metadata` table on this run. Drop it so we can rename the
-    // legacy table into place (with all its data).
-    //
-    // Legacy indexes are dropped here; the post-migration step in initialise()
-    // recreates them under the new `idx_*_capture_*` names.
-    tx.execute_batch(
-        "DROP TABLE IF EXISTS capture_metadata;
-         ALTER TABLE buffer_metadata RENAME TO capture_metadata;
-         ALTER TABLE capture_metadata RENAME COLUMN buffer_id TO capture_id;
-         ALTER TABLE capture_metadata RENAME COLUMN buffer_type TO capture_kind;
-         ALTER TABLE frames RENAME COLUMN buffer_id TO capture_id;
-         ALTER TABLE bytes RENAME COLUMN buffer_id TO capture_id;
-         DROP INDEX IF EXISTS idx_frames_buffer_ts;
-         DROP INDEX IF EXISTS idx_frames_buffer_fid;
-         DROP INDEX IF EXISTS idx_bytes_buffer_ts;",
-    )
-    .map_err(|e| format!("Failed to execute buffer→capture migration: {}", e))?;
-
-    tx.commit()
-        .map_err(|e| format!("Failed to commit migration: {}", e))?;
-
-    tlog!("[capture_db] Buffer → Capture schema migration complete");
     Ok(())
 }
 
@@ -131,33 +259,7 @@ pub fn initialise(app_data_dir: &Path, clear_on_start: bool) -> Result<(), Strin
     let mut conn = Connection::open(&db_path)
         .map_err(|e| format!("Failed to open capture database: {}", e))?;
 
-    // Create tables first (idempotent — IF NOT EXISTS).
-    // Indexes are deferred until AFTER the buffer→capture migration because
-    // they reference the renamed column names (`capture_id`) that don't exist
-    // on pre-migration legacy databases.
-    conn.execute_batch(SCHEMA_TABLES_SQL)
-        .map_err(|e| format!("Failed to create tables: {}", e))?;
-
-    // Migrate legacy buffer_* schema to capture_* if present.
-    // Must run BEFORE index creation and the ADD COLUMN migrations below,
-    // so both target the correct (renamed) column names.
-    migrate_buffer_to_capture(&mut conn)?;
-
-    // Create indexes now that columns have their final names.
-    conn.execute_batch(SCHEMA_INDEXES_SQL)
-        .map_err(|e| format!("Failed to create indexes: {}", e))?;
-
-    // Schema migration: add persistent column (idempotent — ignores duplicate column error)
-    let _ = conn.execute(
-        "ALTER TABLE capture_metadata ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0",
-        [],
-    );
-
-    // Schema migration: add buses column (idempotent — ignores duplicate column error)
-    let _ = conn.execute(
-        "ALTER TABLE capture_metadata ADD COLUMN buses TEXT NOT NULL DEFAULT '[]'",
-        [],
-    );
+    run_migrations(&mut conn)?;
 
     // Conditionally clear leftover data and reclaim disk space
     // Persistent (pinned) captures survive the clear.
@@ -1409,4 +1511,168 @@ pub fn delete_capture_metadata(capture_id: &str) -> Result<(), String> {
     .map_err(|e| format!("Failed to delete capture metadata: {}", e))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The pre-rename schema as shipped before April 2026 — used to build
+    /// legacy databases the baseline must normalise.
+    const LEGACY_SCHEMA_SQL: &str = "
+        CREATE TABLE buffer_metadata (
+            buffer_id TEXT PRIMARY KEY,
+            buffer_type TEXT NOT NULL,
+            name TEXT NOT NULL,
+            count INTEGER NOT NULL DEFAULT 0,
+            start_time_us INTEGER,
+            end_time_us INTEGER,
+            created_at INTEGER NOT NULL,
+            owning_session_id TEXT
+        );
+        CREATE TABLE frames (
+            rowid INTEGER PRIMARY KEY,
+            buffer_id TEXT NOT NULL,
+            protocol TEXT NOT NULL,
+            timestamp_us INTEGER NOT NULL,
+            frame_id INTEGER NOT NULL,
+            bus INTEGER NOT NULL,
+            dlc INTEGER NOT NULL,
+            payload BLOB NOT NULL,
+            is_extended INTEGER NOT NULL DEFAULT 0,
+            is_fd INTEGER NOT NULL DEFAULT 0,
+            source_address INTEGER,
+            incomplete INTEGER,
+            direction TEXT
+        );
+        CREATE TABLE bytes (
+            rowid INTEGER PRIMARY KEY,
+            buffer_id TEXT NOT NULL,
+            byte_val INTEGER NOT NULL,
+            timestamp_us INTEGER NOT NULL,
+            bus INTEGER NOT NULL DEFAULT 0
+        );
+    ";
+
+    fn version_of(conn: &Connection) -> i64 {
+        schema_version(conn).unwrap()
+    }
+
+    fn audit_rows(conn: &Connection) -> Vec<(i64, String)> {
+        let mut stmt = conn
+            .prepare("SELECT version, name FROM schema_migrations ORDER BY version")
+            .unwrap();
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    }
+
+    #[test]
+    fn fresh_database_migrates_to_current_version() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        run_migrations(&mut conn).unwrap();
+
+        assert_eq!(version_of(&conn), 1);
+        assert_eq!(audit_rows(&conn), vec![(1, "baseline_capture_schema".to_string())]);
+        assert!(has_column(&conn, "frames", "capture_id").unwrap());
+        assert!(has_column(&conn, "capture_metadata", "persistent").unwrap());
+        assert!(has_column(&conn, "capture_metadata", "buses").unwrap());
+    }
+
+    #[test]
+    fn legacy_database_is_renamed_and_data_preserved() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(LEGACY_SCHEMA_SQL).unwrap();
+        conn.execute_batch(
+            "INSERT INTO buffer_metadata (buffer_id, buffer_type, name, count, created_at)
+             VALUES ('b1', 'frames', 'old capture', 2, 1700000000);
+             INSERT INTO frames (buffer_id, protocol, timestamp_us, frame_id, bus, dlc, payload)
+             VALUES ('b1', 'can', 1, 256, 0, 4, x'DEADBEEF'),
+                    ('b1', 'can', 2, 257, 0, 4, x'01020304');",
+        )
+        .unwrap();
+
+        run_migrations(&mut conn).unwrap();
+
+        assert_eq!(version_of(&conn), 1);
+        assert!(!has_column(&conn, "frames", "buffer_id").unwrap());
+        let (name, count): (String, i64) = conn
+            .query_row(
+                "SELECT name, count FROM capture_metadata WHERE capture_id = 'b1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(name, "old capture");
+        assert_eq!(count, 2);
+        let frames: i64 = conn
+            .query_row("SELECT COUNT(*) FROM frames WHERE capture_id = 'b1'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(frames, 2);
+    }
+
+    /// Mixed-generation state: new-schema tables beside a stale legacy
+    /// `buffer_metadata` re-created by a pre-rename build. The baseline must
+    /// fold it without touching the already-renamed tables.
+    #[test]
+    fn mixed_generation_database_is_normalised() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA_TABLES_SQL).unwrap();
+        conn.execute_batch(
+            "ALTER TABLE capture_metadata ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0;
+             ALTER TABLE capture_metadata ADD COLUMN buses TEXT NOT NULL DEFAULT '[]';
+             INSERT INTO capture_metadata (capture_id, capture_kind, name, count, created_at, persistent)
+             VALUES ('pinned', 'frames', 'keep me', 1, 1700000000, 1);
+             CREATE TABLE buffer_metadata (
+                 buffer_id TEXT PRIMARY KEY,
+                 buffer_type TEXT NOT NULL,
+                 name TEXT NOT NULL,
+                 count INTEGER NOT NULL DEFAULT 0,
+                 start_time_us INTEGER,
+                 end_time_us INTEGER,
+                 created_at INTEGER NOT NULL,
+                 owning_session_id TEXT
+             );",
+        )
+        .unwrap();
+
+        run_migrations(&mut conn).unwrap();
+
+        assert_eq!(version_of(&conn), 1);
+        // Legacy husk gone, migrated (pinned) data untouched.
+        let legacy_tables: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='buffer_metadata'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(legacy_tables, 0);
+        let persistent: i64 = conn
+            .query_row(
+                "SELECT persistent FROM capture_metadata WHERE capture_id = 'pinned'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(persistent, 1);
+    }
+
+    #[test]
+    fn rerunning_migrations_is_a_recorded_noop() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        run_migrations(&mut conn).unwrap();
+        run_migrations(&mut conn).unwrap();
+
+        assert_eq!(version_of(&conn), 1);
+        assert_eq!(audit_rows(&conn).len(), 1);
+    }
+
+    #[test]
+    fn migration_versions_are_ascending_and_contiguous() {
+        for (i, m) in MIGRATIONS.iter().enumerate() {
+            assert_eq!(m.version, i as i64 + 1, "MIGRATIONS must be contiguous from 1");
+        }
+    }
 }

@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 /**
  * Format a numeric ID as a hex string with 0x prefix, uppercase, zero-padded.
