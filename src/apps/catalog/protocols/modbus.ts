@@ -1,7 +1,7 @@
 // ui/src/apps/catalog/protocols/modbus.ts
 // Modbus protocol handler
 
-import type { ModbusConfig, ValidationError } from "../types";
+import type { ModbusConfig } from "../types";
 import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
 import { parseCanIdToNumber } from "../utils";
 
@@ -126,55 +126,6 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
     }
 
     return obj;
-  },
-
-  validateConfig: (config, _existingKeys = [], _originalKey) => {
-    const errors: ValidationError[] = [];
-
-    // Register number is optional (a numeric frame key supplies it). Validate
-    // the range only when one is given; the "non-numeric key AND no register
-    // number" case is checked at save time, where the frame key is known.
-    if (
-      config.register_number != null &&
-      (!Number.isInteger(config.register_number) ||
-        config.register_number < 0 ||
-        config.register_number > 65535)
-    ) {
-      errors.push({ field: "register_number", message: "Register number must be 0-65535" });
-    }
-
-    // Validate device address
-    if (config.device_address === undefined || config.device_address === null) {
-      errors.push({ field: "device_address", message: "Device address is required" });
-    } else if (!Number.isInteger(config.device_address) || config.device_address < 1 || config.device_address > 247) {
-      errors.push({
-        field: "device_address",
-        message: "Device address must be 1-247",
-      });
-    }
-
-    // Validate register type
-    const validTypes = ["holding", "input", "coil", "discrete"];
-    if (config.register_type && !validTypes.includes(config.register_type)) {
-      errors.push({
-        field: "register_type",
-        message: "Register type must be: holding, input, coil, or discrete",
-      });
-    }
-
-    // Validate register base (if provided)
-    if (config.register_base !== undefined && config.register_base !== 0 && config.register_base !== 1) {
-      errors.push({
-        field: "register_base",
-        message: "Register base must be 0 or 1",
-      });
-    }
-
-    // Note: We don't check for duplicate keys here since Modbus frames use
-    // friendly names as keys, not register numbers. Duplicate names would be
-    // caught by TOML parsing.
-
-    return errors;
   },
 
   getDefaultConfig: () => ({

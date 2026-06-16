@@ -58,6 +58,48 @@ export async function validateCatalogWs(content: string): Promise<ValidationResu
   return await wsTransport.command<ValidationResult>("catalog.validate", { content });
 }
 
+// ── Granular, save-time form validation (single source of truth in the crate) ──
+// Each returns the findings array (empty = valid); the edit handlers block save
+// when non-empty, exactly as the former TS validators did.
+
+/** Validate `[meta]` fields. `meta` = `{ name, version }`. */
+export async function validateMetaWs(meta: { name: string; version: number }): Promise<ValidationError[]> {
+  return (await wsTransport.command<ValidationResult>("catalog.validateMeta", meta)).errors;
+}
+
+/** Validate a frame's identity + common + protocol-config fields. */
+export interface FrameValidationInput {
+  protocol: "can" | "modbus" | "serial";
+  /** CAN id, serial frame_id, or the Modbus table key. */
+  key: string;
+  length?: number;
+  transmitter?: string;
+  interval?: number;
+  maxLength?: number;
+  extended?: boolean;
+  registerNumber?: number | null;
+  deviceAddress?: number;
+  registerType?: string;
+  registerBase?: number;
+  delimiter?: number[];
+  existingKeys?: string[];
+  originalKey?: string;
+  availablePeers?: string[];
+}
+export async function validateFrameWs(input: FrameValidationInput): Promise<ValidationError[]> {
+  return (await wsTransport.command<ValidationResult>("catalog.validateFrame", input)).errors;
+}
+
+/** Validate signal form fields (snake_case keys, matching the editor form). */
+export async function validateSignalWs(signal: object): Promise<ValidationError[]> {
+  return (await wsTransport.command<ValidationResult>("catalog.validateSignal", signal)).errors;
+}
+
+/** Validate checksum form fields (snake_case keys; optional `frame_length`, default 256). */
+export async function validateChecksumWs(checksum: object): Promise<ValidationError[]> {
+  return (await wsTransport.command<ValidationResult>("catalog.validateChecksum", checksum)).errors;
+}
+
 /**
  * Apply one comment-/formatting-preserving edit in Rust (the `wiretap-catalog`
  * crate, via `toml_edit`) and return the new TOML. `op` is an `EditOp` payload

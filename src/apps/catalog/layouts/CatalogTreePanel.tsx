@@ -142,6 +142,34 @@ export default function CatalogTreePanel({
     </>
   ) : null;
 
+  // Protocol filter badges — rendered in the sidebar header row, beside the
+  // collapse toggle. Clicking one filters the tree to that protocol.
+  const badgeHeader = catalogPath && hasAnyBadge ? (
+    <div className="flex flex-wrap items-center gap-2">
+      {protocolBadges.map(({ protocol, Icon, label, configured, tone }) => {
+        const active = selectedProtocol === protocol;
+        return (
+          <button
+            key={protocol}
+            onClick={() => setSelectedProtocol(active ? null : protocol)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${tone} ${
+              active
+                ? "ring-2 ring-inset ring-[color:currentColor]"
+                : selectedProtocol
+                  ? "opacity-50 hover:opacity-100"
+                  : ""
+            }`}
+            title={active ? t("tree.showAllProtocols") : t("tree.filterToProtocol", { protocol: label })}
+          >
+            <Icon className={iconXs} />
+            {label}
+            {!configured && <span title={t("tree.noProtocolConfig", { protocol: label })}>!</span>}
+          </button>
+        );
+      })}
+    </div>
+  ) : undefined;
+
   return (
     <ResizableSidebar
       defaultWidth={320}
@@ -150,37 +178,11 @@ export default function CatalogTreePanel({
       className="overflow-hidden"
       collapsible
       collapsedContent={collapsedContent}
+      header={badgeHeader}
     >
       {/* Fixed header section */}
       {catalogPath && (
       <div className="flex-shrink-0 p-4 pb-0">
-        {/* Protocol filter badges — pinned to the top, divider beneath */}
-        {hasAnyBadge && (
-          <div className="flex flex-wrap gap-2 pb-3 mb-3 border-b border-[color:var(--border-default)]">
-            {protocolBadges.map(({ protocol, Icon, label, configured, tone }) => {
-              const active = selectedProtocol === protocol;
-              return (
-                <button
-                  key={protocol}
-                  onClick={() => setSelectedProtocol(active ? null : protocol)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${tone} ${
-                    active
-                      ? "ring-2 ring-inset ring-[color:currentColor]"
-                      : selectedProtocol
-                        ? "opacity-50 hover:opacity-100"
-                        : ""
-                  }`}
-                  title={active ? t("tree.showAllProtocols") : t("tree.filterToProtocol", { protocol: label })}
-                >
-                  <Icon className={iconXs} />
-                  {label}
-                  {!configured && <span title={t("tree.noProtocolConfig", { protocol: label })}>!</span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {/* Action buttons - add on the left, expand/collapse on the right */}
         <div className="flex items-center gap-2 mb-3">
             <button

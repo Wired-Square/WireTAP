@@ -5,7 +5,6 @@ import type {
   ProtocolType,
   ProtocolConfig,
   BaseFrameFields,
-  ValidationError,
 } from "../types";
 
 /**
@@ -92,18 +91,6 @@ export interface ProtocolHandler<T extends ProtocolConfig = ProtocolConfig> {
       registerBase?: boolean;
     }
   ) => Record<string, any>;
-
-  /**
-   * Validate protocol-specific config
-   * @param config - Config to validate
-   * @param existingKeys - Existing frame keys (for duplicate detection)
-   * @param originalKey - Original key if editing (to allow same key)
-   */
-  validateConfig: (
-    config: T,
-    existingKeys?: string[],
-    originalKey?: string
-  ) => ValidationError[];
 
   /**
    * Get default config for new frames

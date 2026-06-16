@@ -9,7 +9,7 @@ import {
   deleteChecksumToml,
   type ChecksumData,
 } from "../../editorOps";
-import { validateSignalFields, validateChecksumFields } from "../../validate";
+import { validateSignalWs, validateChecksumWs } from "../../../../api/catalog";
 import type { SignalFields } from "../useCatalogForms";
 
 export interface UseSignalHandlersParams {
@@ -127,7 +127,7 @@ export function useSignalHandlers({
   const handleSaveSignal = async () => {
     if (!currentIdForSignal) return;
 
-    const errors = validateSignalFields(signalFields);
+    const errors = await validateSignalWs(signalFields);
     if (errors.length > 0) {
       setValidation(errors);
       return;
@@ -169,7 +169,7 @@ export function useSignalHandlers({
   };
 
   const handleSaveChecksum = async (checksumData: ChecksumData, checksumsParentPath: string[], editingIndex: number | null) => {
-    const errors = validateChecksumFields(checksumData);
+    const errors = await validateChecksumWs(checksumData);
     if (errors.length > 0) {
       setValidation(errors);
       return;

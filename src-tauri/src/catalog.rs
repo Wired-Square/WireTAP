@@ -60,6 +60,28 @@ pub async fn dispatch_catalog_command(
             let errors = wiretap_catalog::validate::validate(&content()?);
             Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
         }
+        // Granular, save-time form validation (single source of truth in the
+        // crate). Each deserialises `params` into the matching input struct.
+        "catalog.validateMeta" => {
+            let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            let errors = wiretap_catalog::validate::validate_meta_fields(&input);
+            Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
+        }
+        "catalog.validateFrame" => {
+            let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            let errors = wiretap_catalog::validate::validate_frame_fields(&input);
+            Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
+        }
+        "catalog.validateSignal" => {
+            let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            let errors = wiretap_catalog::validate::validate_signal_fields(&input);
+            Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
+        }
+        "catalog.validateChecksum" => {
+            let input = serde_json::from_value(params).map_err(|e| e.to_string())?;
+            let errors = wiretap_catalog::validate::validate_checksum_fields(&input);
+            Ok(serde_json::json!({ "valid": errors.is_empty(), "errors": errors }))
+        }
         // DBC text → catalogue TOML.
         "catalog.import_dbc" => {
             let toml = wiretap_catalog::dbc::convert_dbc_to_toml(&content()?)?;

@@ -21,15 +21,10 @@ import {
   deleteModbusConfigToml,
   updateMetaToml,
 } from "../../editorOps";
-import {
-  validateCanFrameFields,
-  validateFrameConfig,
-  validateCommonFrameFields,
-} from "../../validate";
+import { validateFrameWs } from "../../../../api/catalog";
 import { protocolRegistry } from "../../protocols";
-import { modbusNeedsRegisterNumber, MODBUS_REGISTER_REQUIRED_MESSAGE } from "../../protocols/modbus";
 import type { FrameEditFields } from "../../views/FrameEditView";
-import type { ProtocolType, CANConfig, SerialConfig, ModbusConfig } from "../../types";
+import type { ProtocolType, CANConfig, SerialConfig } from "../../types";
 
 export interface UseFrameHandlersParams {
   // CAN frame editing (legacy)
@@ -130,19 +125,17 @@ export function useFrameHandlers({
         ? Object.keys(parsedForValidation.frame.can)
         : [];
 
-      const errors = validateCanFrameFields(
-        {
-          id: idFields.id,
-          length: idFields.length,
-          transmitter: idFields.transmitter,
-          interval: idFields.interval,
-        },
-        {
-          existingIds,
-          oldId,
-          availablePeers,
-        }
-      );
+      const errors = await validateFrameWs({
+        protocol: "can",
+        key: idFields.id,
+        length: idFields.length,
+        transmitter: idFields.transmitter,
+        interval: idFields.interval,
+        maxLength: 64,
+        existingKeys: existingIds,
+        originalKey: oldId ?? undefined,
+        availablePeers,
+      });
 
       if (errors.length > 0) {
         setValidation(errors);
@@ -341,36 +334,28 @@ export function useFrameHandlers({
       return;
     }
 
-    // Validate protocol-specific config
+    // Validate identity + common + protocol-config fields in the crate (the
+    // single source of truth). `cfg` carries the protocol-specific keys; the
+    // crate reads only the ones relevant to `protocol`.
     const existingKeys = getFrameKeys(catalogContent, frameFields.protocol);
-    const configErrors = validateFrameConfig(frameFields.protocol, frameFields.config, {
+    const cfg = frameFields.config as Record<string, any>;
+    const allErrors = await validateFrameWs({
+      protocol: frameFields.protocol,
+      key: frameKey,
+      length: frameFields.base.length,
+      transmitter: frameFields.base.transmitter,
+      interval: frameFields.base.interval,
+      maxLength: frameFields.protocol === "can" ? 64 : 256,
+      extended: cfg.extended,
+      registerNumber: cfg.register_number,
+      deviceAddress: cfg.device_address,
+      registerType: cfg.register_type,
+      registerBase: cfg.register_base,
+      delimiter: cfg.delimiter,
       existingKeys,
       originalKey: editingFrameOriginalKey ?? undefined,
+      availablePeers,
     });
-
-    // Validate common fields
-    const commonErrors = validateCommonFrameFields(
-      {
-        length: frameFields.base.length,
-        transmitter: frameFields.base.transmitter,
-        interval: frameFields.base.interval,
-      },
-      {
-        availablePeers,
-        maxLength: frameFields.protocol === "can" ? 64 : 256,
-      }
-    );
-
-    const allErrors = [...configErrors, ...commonErrors];
-
-    // Modbus: the register comes from either an explicit register_number or a
-    // numeric frame key. A non-numeric name with no register number is invalid.
-    if (
-      frameFields.protocol === "modbus" &&
-      modbusNeedsRegisterNumber(frameKey, frameFields.config as ModbusConfig)
-    ) {
-      allErrors.push({ field: "register_number", message: MODBUS_REGISTER_REQUIRED_MESSAGE });
-    }
 
     if (allErrors.length > 0) {
       setValidation(allErrors);

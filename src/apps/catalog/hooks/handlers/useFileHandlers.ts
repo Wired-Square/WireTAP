@@ -4,15 +4,13 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
 import { openCatalogAtPath, saveCatalogAtPath, pickCatalogToOpen, pickCatalogSavePath } from "../../io";
-import { parseTomlToTree } from "../../toml";
+import { validateCatalogWs, validateMetaWs } from "../../../../api/catalog";
 import {
   createMinimalCatalogToml,
   upsertSerialConfigToml,
   upsertModbusConfigToml,
   upsertCanConfigToml,
 } from "../../editorOps";
-import { validateMetaFields, validateSerialConfig } from "../../validate";
-import { validateCatalogWs } from "../../../../api/catalog";
 import type { AppSettings } from "../../../../hooks/useSettings";
 import type { ProtocolType } from "../../types";
 
@@ -74,7 +72,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
    * @param selectedProtocol - The protocol type selected in NewCatalogDialog
    */
   const handleCreateNewCatalog = async (selectedProtocol: ProtocolType) => {
-    const errors = validateMetaFields(metaFields);
+    const errors = await validateMetaWs(metaFields);
     if (errors.length > 0) {
       setValidation(errors);
       return;
@@ -177,30 +175,10 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     if (!catalogContent) return;
 
     try {
-      // Run backend validation (shared wiretap-catalog crate over the WebSocket)
+      // Whole-catalogue validation is fully owned by the wiretap-catalog crate
+      // (including the serial-encoding-required rule).
       const result = await validateCatalogWs(catalogContent);
-      const allErrors = [...result.errors];
-
-      // Also run frontend serial config validation
-      try {
-        const parsed = parseTomlToTree(catalogContent);
-        // Check if there are any serial frames (any child of frame.serial that isn't 'config')
-        const hasSerialFrames = parsed.tree.some(
-          (node) =>
-            node.path.length >= 3 &&
-            node.path[0] === "frame" &&
-            node.path[1] === "serial" &&
-            node.path[2] !== "config"
-        );
-        const serialErrors = validateSerialConfig(hasSerialFrames, parsed.serialConfig);
-        allErrors.push(...serialErrors);
-      } catch (parseError) {
-        // If parsing fails, the backend validation should have caught it
-        console.warn("Failed to parse catalog for serial config validation:", parseError);
-      }
-
-      const isValid = allErrors.length === 0;
-      setValidation(allErrors, isValid);
+      setValidation(result.errors, result.valid);
       openDialog("validationErrors");
     } catch (error) {
       console.error("Validation failed:", error);

@@ -44,6 +44,18 @@ const NODE_ICON: Record<string, { Icon: LucideIcon; cls: string }> = {
 };
 
 /**
+ * Modbus register-number badge tint per register type — the colour conveys the
+ * type (holding/input/coil/discrete), so the row drops the `[holding]` text.
+ */
+const REGISTER_TONE: Record<string, string> = {
+  holding:  "bg-[var(--status-info-bg)] text-[color:var(--accent-blue)]",
+  input:    "bg-[var(--status-success-bg)] text-[color:var(--text-green)]",
+  coil:     "bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]",
+  discrete: "bg-[var(--status-purple-bg)] text-[color:var(--text-purple)]",
+};
+const REGISTER_TONE_DEFAULT = `bg-[var(--bg-surface)] ${textMuted}`;
+
+/**
  * Creates a stable `renderTreeNode` function that can be passed into CatalogTreePanel.
  *
  * Note: selection/expansion state lives in CatalogEditor; this is purely presentational.
@@ -134,19 +146,18 @@ export function createRenderTreeNode({
               const address = typeof regNum === "number"
                 ? formatId(regNum, displayFrameIdFormat)
                 : undefined;
+              const tone = (regType && REGISTER_TONE[regType]) || REGISTER_TONE_DEFAULT;
               return (
                 <span className="flex items-center gap-1.5">
-                  <span>{node.key}</span>
                   {address && (
-                    <span className="tree-secondary-text text-xs">
+                    <span
+                      title={regType}
+                      className={`px-1 rounded text-[10px] font-semibold tabular-nums flex-shrink-0 ${tone}`}
+                    >
                       {address}
                     </span>
                   )}
-                  {regType && (
-                    <span className="text-[color:var(--accent-purple)] text-xs font-medium">
-                      [{regType}]
-                    </span>
-                  )}
+                  <span>{node.key}</span>
                 </span>
               );
             })() : node.type === "mux" ? (() => {
@@ -198,9 +209,21 @@ export function createRenderTreeNode({
                 : firstNote;
               const hasStartBit = node.metadata?.signalStartBit !== undefined;
               const hasBitLength = node.metadata?.signalBitLength !== undefined;
+              // Modbus signals carry a synthesised per-signal register address
+              // (frame base + bit offset) — surface it as a badge so the
+              // multi-register layout is visible in the tree.
+              const sigReg = node.metadata?.properties?.modbus_register;
               return (
                 <span className="flex flex-col">
                   <span className="flex items-center gap-1">
+                    {typeof sigReg === "number" && (
+                      <span
+                        title="Register"
+                        className={`px-1 rounded text-[10px] font-semibold tabular-nums flex-shrink-0 ${REGISTER_TONE_DEFAULT}`}
+                      >
+                        {formatId(sigReg, displayFrameIdFormat)}
+                      </span>
+                    )}
                     <span>{node.key}</span>
                     {hasStartBit && hasBitLength && (
                       <span className="tree-secondary-text text-xs">

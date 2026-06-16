@@ -45,11 +45,27 @@ export interface Mux {
   name?: string;
   startBit: number;
   bitLength: number;
+  /** Default case key applied when the selector matches no explicit case. */
+  default?: string;
   /** Case key (`"0"`, `"0-3"`, `"1,2,5"`) → its signals/nested mux. */
   cases: Record<string, MuxCase>;
 }
 
+/** A per-frame checksum definition (`[[frame.<proto>.<key>.checksum]]`). */
+export interface FrameChecksum {
+  name?: string;
+  algorithm: string;
+  startByte: number;
+  byteLength: number;
+  endianness?: Endianness;
+  calcStartByte: number;
+  calcEndByte?: number;
+}
+
 export interface Frame {
+  /** Authored catalogue table key (CAN: `"0x103"`; serial/modbus: the name) —
+   *  the stable identifier for the editor tree path and edits. */
+  key: string;
   /** Numeric id: CAN arbitration id, serial frame id, or Modbus register. */
   frameId: number;
   protocol: Protocol;
@@ -69,6 +85,16 @@ export interface Frame {
   modbusRegisterType?: RegisterType;
   /** Modbus register count (not bytes). */
   modbusRegisterCount?: number;
+  /** Serial-specific: explicit frame delimiter bytes (raw encoding). */
+  delimiter?: number[];
+  /** Free-text notes (normalised from a string or array of strings). */
+  notes?: string[];
+  /** Per-frame checksums (CAN/serial; absent on Modbus). */
+  checksums?: FrameChecksum[];
+  /** Fields whose value was inherited rather than set explicitly — drives the
+   *  editor's "(inherited)" labels. Entries: `length`, `transmitter`,
+   *  `interval`, `extended`, `fd`, `deviceAddress`, `registerBase`. */
+  inheritedFields?: string[];
 }
 
 export interface HeaderField {
@@ -140,6 +166,12 @@ export interface Meta {
   defaultFrame?: Protocol;
 }
 
+/** A network node/peer declared under `[node.<name>]`. */
+export interface NodeDef {
+  name: string;
+  notes?: string[];
+}
+
 export interface Catalog {
   meta: Meta;
   protocol: Protocol;
@@ -147,4 +179,6 @@ export interface Catalog {
   serial?: SerialConfig;
   modbus?: ModbusConfig;
   frames: Frame[];
+  /** Network nodes/peers from the `[node]` table, in key order. */
+  nodes?: NodeDef[];
 }

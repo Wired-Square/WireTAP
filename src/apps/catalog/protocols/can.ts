@@ -1,7 +1,7 @@
 // ui/src/apps/catalog/protocols/can.ts
 // CAN protocol handler
 
-import type { CANConfig, ValidationError } from "../types";
+import type { CANConfig } from "../types";
 import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
 import { findFrameByNumericId } from "../../../utils/catalogParser";
 
@@ -216,52 +216,6 @@ const canHandler: ProtocolHandler<CANConfig> = {
     }
 
     return obj;
-  },
-
-  validateConfig: (config, existingKeys = [], originalKey) => {
-    const errors: ValidationError[] = [];
-    const id = config.id?.trim() ?? "";
-
-    if (!id) {
-      errors.push({ field: "id", message: "ID is required" });
-      return errors;
-    }
-
-    // Validate ID format (hex or decimal)
-    const isHex = /^0x[0-9a-fA-F]+$/i.test(id);
-    const isDec = /^\d+$/.test(id);
-
-    if (!isHex && !isDec) {
-      errors.push({
-        field: "id",
-        message: 'ID must be hex (e.g., "0x123") or decimal (e.g., "291")',
-      });
-    }
-
-    // Check for valid range
-    if (isHex || isDec) {
-      const numericId = isHex ? parseInt(id, 16) : parseInt(id, 10);
-      const maxId = config.extended ? 0x1FFFFFFF : 0x7FF;
-
-      if (numericId < 0 || numericId > maxId) {
-        errors.push({
-          field: "id",
-          message: config.extended
-            ? "Extended ID must be 0-536870911 (0x1FFFFFFF)"
-            : "Standard ID must be 0-2047 (0x7FF)",
-        });
-      }
-    }
-
-    // Check for duplicates (allow same key if editing)
-    if (originalKey !== id && existingKeys.includes(id)) {
-      errors.push({
-        field: "id",
-        message: `CAN frame with ID ${id} already exists`,
-      });
-    }
-
-    return errors;
   },
 
   getDefaultConfig: () => ({

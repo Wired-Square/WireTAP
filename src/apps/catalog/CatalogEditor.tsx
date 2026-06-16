@@ -7,7 +7,7 @@ import { useSettings, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
 import { useFocusStore } from "../../stores/focusStore";
-import { listCatalogs, diffCatalog, type CatalogMetadata } from "../../api/catalog";
+import { listCatalogs, diffCatalog, parseCatalog, type CatalogMetadata } from "../../api/catalog";
 import { Eye } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
 import { borderDataView, bgDataView } from "../../styles/colourTokens";
@@ -15,8 +15,8 @@ import { emptyStateContainer, emptyStateText, emptyStateHeading } from "../../st
 import CatalogTreePanel from "./layouts/CatalogTreePanel";
 import CatalogToolbar from "./layouts/CatalogToolbar";
 import SelectionHeader from "./layouts/SelectionHeader";
-import { parseTomlToTree } from "./toml";
-import type { TomlNode } from "./types";
+import { catalogToTree } from "./tree/catalogToTree";
+import type { TomlNode, ParsedCatalogTree } from "./types";
 import { findNodeByPath } from "./tree/treeUtils";
 import { formatFrameId } from "./utils";
 import { createRenderTreeNode } from "./tree/renderTreeNode";
@@ -193,16 +193,17 @@ function CatalogEditorInner() {
     serialEncoding,       // From [frame.serial.config], stored in forms.serialEncoding
   }), [canDefaultInterval, canDefaultEndianness, modbusDeviceAddress, modbusRegisterBase, serialEncoding]);
 
-  // Get current protocol configs and frame detection from TOML
-  const parsedCatalogInfo = useMemo(() => {
-    if (!catalogContent) return { canConfig: undefined, serialConfig: undefined, modbusConfig: undefined, hasCanFrames: false, hasModbusFrames: false, hasSerialFrames: false };
-    try {
-      const { canConfig, serialConfig, modbusConfig, hasCanFrames, hasModbusFrames, hasSerialFrames } = parseTomlToTree(catalogContent);
-      return { canConfig, serialConfig, modbusConfig, hasCanFrames: !!hasCanFrames, hasModbusFrames: !!hasModbusFrames, hasSerialFrames: !!hasSerialFrames };
-    } catch {
-      return { canConfig: undefined, serialConfig: undefined, modbusConfig: undefined, hasCanFrames: false, hasModbusFrames: false, hasSerialFrames: false };
-    }
-  }, [catalogContent]);
+  // Protocol configs + frame detection, derived from the Rust-parsed catalogue
+  // (set by the async parse effect below).
+  const EMPTY_INFO = { canConfig: undefined, serialConfig: undefined, modbusConfig: undefined, hasCanFrames: false, hasModbusFrames: false, hasSerialFrames: false } as const;
+  const [parsedCatalogInfo, setParsedCatalogInfo] = useState<{
+    canConfig?: ParsedCatalogTree["canConfig"];
+    serialConfig?: ParsedCatalogTree["serialConfig"];
+    modbusConfig?: ParsedCatalogTree["modbusConfig"];
+    hasCanFrames: boolean;
+    hasModbusFrames: boolean;
+    hasSerialFrames: boolean;
+  }>(EMPTY_INFO);
 
   const currentCanConfig = parsedCatalogInfo.canConfig;
   const currentSerialConfig = parsedCatalogInfo.serialConfig;
@@ -294,20 +295,28 @@ function CatalogEditorInner() {
     }
   }, [openSuccess]);
 
-  // Parse TOML content whenever it changes
+  // Parse the catalogue (in Rust, the canonical parser) and build the editor
+  // tree from the resolved model. Async + debounced + cancellable so rapid
+  // edits don't race; mirrors the diff effect's pattern.
   useEffect(() => {
     if (editMode !== "ui") return;
 
-    if (!catalogContent) {
+    const clear = () => {
       setTreeData({ nodes: [], hasCanFrames: false, hasSerialFrames: false, hasModbusFrames: false });
       setSelectedPath(null);
       setAvailablePeers([]);
+      setParsedCatalogInfo(EMPTY_INFO);
+    };
+
+    if (!catalogContent) {
+      clear();
       return;
     }
 
-    try {
-      const { tree, meta, peers, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames } = parseTomlToTree(catalogContent);
+    let cancelled = false;
+    const applyParsed = ({ tree, meta, peers, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames }: ParsedCatalogTree) => {
       setTreeData({ nodes: tree, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames });
+      setParsedCatalogInfo({ canConfig, serialConfig, modbusConfig, hasCanFrames: !!hasCanFrames, hasModbusFrames: !!hasModbusFrames, hasSerialFrames: !!hasSerialFrames });
       if (meta) setMetaFields(meta);
       setAvailablePeers(peers);
       // Store CAN config from [meta.can] if present
@@ -381,12 +390,24 @@ function CatalogEditorInner() {
           setSelectedPath(null);
         }
       }
-    } catch (e) {
-      console.warn("Failed to parse TOML to tree:", e);
-      setTreeData({ nodes: [], hasCanFrames: false, hasSerialFrames: false, hasModbusFrames: false });
-      setSelectedPath(null);
-      setAvailablePeers([]);
-    }
+    };
+
+    const handle = setTimeout(() => {
+      parseCatalog(catalogContent)
+        .then((cat) => {
+          if (!cancelled) applyParsed(catalogToTree(cat));
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          console.warn("Failed to parse catalogue:", e);
+          clear();
+        });
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
     // Include reloadVersion to trigger re-parse on reload (even if content unchanged)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogContent, reloadVersion, editMode]);
