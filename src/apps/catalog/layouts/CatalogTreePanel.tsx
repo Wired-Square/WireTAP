@@ -1,12 +1,13 @@
 // ui/src/apps/catalog/layout/CatalogTreePanel.tsx
 
-import React from "react";
-import { Cable, Network, Plus, Server, UserPlus } from "lucide-react";
+import React, { useState } from "react";
+import { Cable, ChevronDown, ChevronRight, FoldVertical, Network, Plus, Server, UnfoldVertical, UserPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconMd, iconXs } from "../../../styles/spacing";
+import { iconMd, iconSm, iconXs } from "../../../styles/spacing";
 import { emptyStateText, emptyStateHeading } from "../../../styles/typography";
-import { iconActionButton } from "../../../styles/buttonStyles";
+import { iconActionButton, iconButtonHoverSmall } from "../../../styles/buttonStyles";
 import ResizableSidebar from "../../../components/ResizableSidebar";
+import FindBar from "../components/FindBar";
 import type { TomlNode, ProtocolType, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig } from "../types";
 import type { CatalogViewMode, FrameGroup } from "../tree/frameGroups";
 
@@ -46,6 +47,11 @@ export type CatalogTreePanelProps = {
   onAddCanFrame?: () => void;
   /** Generic callback for adding any protocol frame */
   onAddFrame?: (protocol?: ProtocolType) => void;
+
+  /** Expand every node with children. */
+  onExpandAll: () => void;
+  /** Collapse all nodes. */
+  onCollapseAll: () => void;
 };
 
 export default function CatalogTreePanel({
@@ -69,10 +75,21 @@ export default function CatalogTreePanel({
   onAddNode,
   onAddCanFrame,
   onAddFrame,
+  onExpandAll,
+  onCollapseAll,
 }: CatalogTreePanelProps) {
   const { t } = useTranslation("catalog");
   // Use generic handler if available, otherwise fall back to CAN-only
   const handleAddFrame = onAddFrame ?? onAddCanFrame;
+  // Per-node collapse in the Nodes view (ephemeral; keyed by group label).
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (label: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
   if (!visible) return null;
 
   // Protocol filter badges — shown when a protocol has config or frames.
@@ -135,10 +152,11 @@ export default function CatalogTreePanel({
       collapsedContent={collapsedContent}
     >
       {/* Fixed header section */}
+      {catalogPath && (
       <div className="flex-shrink-0 p-4 pb-0">
-        {/* Protocol filter badges */}
-        {catalogPath && hasAnyBadge && (
-          <div className="flex flex-wrap gap-2 mb-4">
+        {/* Protocol filter badges — pinned to the top, divider beneath */}
+        {hasAnyBadge && (
+          <div className="flex flex-wrap gap-2 pb-3 mb-3 border-b border-[color:var(--border-default)]">
             {protocolBadges.map(({ protocol, Icon, label, configured, tone }) => {
               const active = selectedProtocol === protocol;
               return (
@@ -163,9 +181,8 @@ export default function CatalogTreePanel({
           </div>
         )}
 
-        {/* Action buttons - left aligned */}
-        {catalogPath && (
-          <div className="flex gap-2 mb-4">
+        {/* Action buttons - add on the left, expand/collapse on the right */}
+        <div className="flex items-center gap-2 mb-3">
             <button
               onClick={onAddNode}
               className={iconActionButton('purple')}
@@ -180,12 +197,31 @@ export default function CatalogTreePanel({
             >
               <Plus className={iconMd} />
             </button>
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                onClick={onExpandAll}
+                className={iconButtonHoverSmall}
+                title={t("tree.expandAll")}
+              >
+                <UnfoldVertical className={iconSm} />
+              </button>
+              <button
+                onClick={onCollapseAll}
+                className={iconButtonHoverSmall}
+                title={t("tree.collapseAll")}
+              >
+                <FoldVertical className={iconSm} />
+              </button>
+            </div>
           </div>
-        )}
+
+        {/* Search */}
+        <div className="mb-3">
+          <FindBar />
+        </div>
 
         {/* View-mode selector */}
-        {catalogPath && (
-          <div className="flex mb-3 rounded-lg border border-[color:var(--border-default)] overflow-hidden text-xs">
+        <div className="flex mb-3 rounded-lg border border-[color:var(--border-default)] overflow-hidden text-xs">
             {VIEW_MODES.map((mode) => (
               <button
                 key={mode}
@@ -200,8 +236,8 @@ export default function CatalogTreePanel({
               </button>
             ))}
           </div>
-        )}
       </div>
+      )}
 
       {/* Scrollable tree section */}
       <div
@@ -219,16 +255,28 @@ export default function CatalogTreePanel({
           <p className={`${emptyStateText} ${emptyStateHeading}`}>{t("tree.noFrames")}</p>
         ) : (
           <div className="space-y-3">
-            {frameGroups.map((group) => (
-              <div key={group.label || "all"} className="space-y-1">
-                {group.label && (
-                  <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">
-                    {group.label}
-                  </div>
-                )}
-                {group.frames.map((frame) => renderTreeNode(frame, 0))}
-              </div>
-            ))}
+            {frameGroups.map((group) => {
+              const collapsed = collapsedGroups.has(group.label);
+              return (
+                <div key={group.label || "all"} className="space-y-1">
+                  {group.label && (
+                    <button
+                      onClick={() => toggleGroup(group.label)}
+                      className="flex items-center gap-1 w-full px-1 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)] hover:bg-[var(--hover-bg)]"
+                    >
+                      {collapsed ? (
+                        <ChevronRight className={`${iconXs} flex-shrink-0`} />
+                      ) : (
+                        <ChevronDown className={`${iconXs} flex-shrink-0`} />
+                      )}
+                      <span className="truncate">{group.label}</span>
+                      <span className="text-[color:var(--text-muted)] opacity-70">· {group.frames.length}</span>
+                    </button>
+                  )}
+                  {!collapsed && group.frames.map((frame) => renderTreeNode(frame, 0))}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

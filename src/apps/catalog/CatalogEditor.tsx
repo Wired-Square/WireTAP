@@ -28,7 +28,7 @@ import EmptySelectionView from "./views/EmptySelectionView";
 import CANFrameEditView from "./views/CANFrameEditView";
 import FrameEditView from "./views/FrameEditView";
 import { isFrameFieldsValid } from "./views/frameEditUtils";
-import FindBar from "./components/FindBar";
+import { CATALOG_SEARCH_INPUT_ID } from "./components/FindBar";
 import TextFindBar from "./components/TextFindBar";
 import CatalogDialogs from "./components/CatalogDialogs";
 import CatalogPickerDialog from "./dialogs/CatalogPickerDialog";
@@ -56,6 +56,8 @@ function CatalogEditorInner() {
   const setTreeData = useCatalogEditorStore((s) => s.setTreeData);
   const setSelectedPath = useCatalogEditorStore((s) => s.setSelectedPath);
   const toggleExpanded = useCatalogEditorStore((s) => s.toggleExpanded);
+  const expandAll = useCatalogEditorStore((s) => s.expandAll);
+  const collapseAll = useCatalogEditorStore((s) => s.resetExpanded);
   const idFields = useCatalogEditorStore((s) => s.forms.canFrame);
   const setIdFields = useCatalogEditorStore((s) => s.setCanFrameForm);
   const setMetaFields = useCatalogEditorStore((s) => s.setMetaForm);
@@ -81,7 +83,6 @@ function CatalogEditorInner() {
   const setViewMode = useCatalogEditorStore((s) => s.setViewMode);
   const selectedProtocol = useCatalogEditorStore((s) => s.ui.selectedProtocol);
   const setSelectedProtocol = useCatalogEditorStore((s) => s.setSelectedProtocol);
-  const openFind = useCatalogEditorStore((s) => s.openFind);
   const openTextFind = useCatalogEditorStore((s) => s.openTextFind);
   const openSuccess = useCatalogEditorStore((s) => s.openSuccess);
   const openDialog = useCatalogEditorStore((s) => s.openDialog);
@@ -396,14 +397,17 @@ function CatalogEditorInner() {
       if (editMode === "text") {
         openTextFind();
       } else {
-        openFind();
+        // The sidebar search is always visible in UI mode — just focus it.
+        const input = document.getElementById(CATALOG_SEARCH_INPUT_ID) as HTMLInputElement | null;
+        input?.focus();
+        input?.select();
       }
     });
 
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [editMode, openFind, openTextFind]);
+  }, [editMode, openTextFind]);
 
   // Tree navigation handlers
   const handleNodeClick = (node: TomlNode) => {
@@ -421,11 +425,10 @@ function CatalogEditorInner() {
       selectedNode,
       onNodeClick: handleNodeClick,
       onToggleExpand: handleToggleExpand,
-      formatFrameId: formatFrameIdForDisplay,
       displayFrameIdFormat,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedNodes, selectedNode, formatFrameIdForDisplay, displayFrameIdFormat]);
+  }, [expandedNodes, selectedNode, displayFrameIdFormat]);
 
   // The protocol badges narrow the displayed tree to one protocol's frames.
   const displayTree = useMemo(
@@ -459,8 +462,6 @@ function CatalogEditorInner() {
     >
       {/* Bubble container */}
       <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
-        {editMode === "ui" && catalogPath && <FindBar />}
-
         <div className={`flex-1 flex min-h-0 overflow-hidden ${bgDataView}`}>
         {/* Tree View Panel - Only show in UI mode */}
         {editMode === "ui" && (
@@ -485,6 +486,8 @@ function CatalogEditorInner() {
             onAddNode={handlers.handleAddNode}
             onAddCanFrame={handlers.handleAddCanFrame}
             onAddFrame={handleAddFrameWithDefaults}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
           />
         )}
 

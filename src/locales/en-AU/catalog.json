@@ -16,6 +16,8 @@
   "tree": {
     "addNode": "Add new node",
     "addFrame": "Add new frame",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
     "filterToProtocol": "Show only {{protocol}} frames",
     "showAllProtocols": "Show all protocols",
     "noProtocolConfig": "No {{protocol}} configuration defined",

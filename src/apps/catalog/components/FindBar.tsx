@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { X, ChevronUp, ChevronDown } from "lucide-react";
-import { iconMd } from "../../../styles/spacing";
-import { disabledState, borderDivider, focusRing, iconButtonHoverSmall } from "../../../styles";
+import { Search, ChevronUp, ChevronDown } from "lucide-react";
+import { iconSm } from "../../../styles/spacing";
+import { disabledState, focusRing, iconButtonHoverSmall } from "../../../styles";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { TomlNode } from "../types";
+
+/** DOM id for the sidebar search input, so the Find menu (⌘F) can focus it. */
+export const CATALOG_SEARCH_INPUT_ID = "catalog-tree-search";
 
 /**
  * Recursively collect all nodes from the tree that match the query.
@@ -78,14 +81,6 @@ export default function FindBar() {
   const setSelectedPath = useCatalogEditorStore((s) => s.setSelectedPath);
   const toggleExpanded = useCatalogEditorStore((s) => s.toggleExpanded);
 
-  // Focus input when opened
-  useEffect(() => {
-    if (find.isOpen && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [find.isOpen]);
-
   // Update matches when query changes
   useEffect(() => {
     if (!find.query.trim()) {
@@ -136,30 +131,33 @@ export default function FindBar() {
     }
   };
 
-  if (!find.isOpen) return null;
-
   const matchCount = find.matches.length;
   const currentMatch = find.currentIndex + 1;
+  const hasQuery = !!find.query.trim();
 
   return (
-    <div className={`flex items-center gap-2 px-4 py-2 bg-[var(--bg-surface)] ${borderDivider}`}>
-      <input
-        ref={inputRef}
-        type="text"
-        value={find.query}
-        onChange={(e) => setFindQuery(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={t("findBar.placeholderCatalog")}
-        className={`flex-1 px-3 py-1.5 text-sm rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
-      />
+    <div className="flex items-center gap-1.5">
+      <div className="relative flex-1">
+        <Search className={`${iconSm} absolute left-2 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)] pointer-events-none`} />
+        <input
+          ref={inputRef}
+          id={CATALOG_SEARCH_INPUT_ID}
+          type="text"
+          value={find.query}
+          onChange={(e) => setFindQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={t("findBar.placeholderCatalog")}
+          className={`w-full pl-7 pr-2 py-1.5 text-xs rounded-md border border-[color:var(--border-default)] bg-[var(--bg-primary)] text-[color:var(--text-primary)] ${focusRing}`}
+        />
+      </div>
 
-      <span className="text-sm text-[color:var(--text-muted)] min-w-[60px] text-center">
-        {find.query.trim()
-          ? matchCount > 0
+      {hasQuery && (
+        <span className="text-xs text-[color:var(--text-muted)] tabular-nums whitespace-nowrap">
+          {matchCount > 0
             ? t("findBar.currentOfTotal", { current: currentMatch, total: matchCount })
-            : t("findBar.noResults")
-          : ""}
-      </span>
+            : t("findBar.noResults")}
+        </span>
+      )}
 
       <button
         onClick={findPrevious}
@@ -167,7 +165,7 @@ export default function FindBar() {
         className={`${iconButtonHoverSmall} ${disabledState}`}
         title={t("findBar.previous")}
       >
-        <ChevronUp className={iconMd} />
+        <ChevronUp className={iconSm} />
       </button>
 
       <button
@@ -176,15 +174,7 @@ export default function FindBar() {
         className={`${iconButtonHoverSmall} ${disabledState}`}
         title={t("findBar.next")}
       >
-        <ChevronDown className={iconMd} />
-      </button>
-
-      <button
-        onClick={closeFind}
-        className={iconButtonHoverSmall}
-        title={t("findBar.close")}
-      >
-        <X className={iconMd} />
+        <ChevronDown className={iconSm} />
       </button>
     </div>
   );

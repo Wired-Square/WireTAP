@@ -190,6 +190,8 @@ export interface CatalogEditorState {
   setSelectedPath: (path: string[] | null) => void;
   toggleExpanded: (id: string) => void;
   resetExpanded: () => void;
+  /** Expand every node that has children (skips `meta`, mirroring the renderer). */
+  expandAll: () => void;
 
   // Actions - UI
   setViewMode: (mode: CatalogViewMode) => void;
@@ -498,6 +500,22 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     set((state) => ({
       tree: { ...state.tree, expandedIds: new Set<string>() },
     })),
+
+  expandAll: () => {
+    const { tree } = get();
+    const ids = new Set<string>();
+    const walk = (nodes: TomlNode[]) => {
+      for (const node of nodes) {
+        const hasChildren = !!node.children && node.children.length > 0 && node.type !== "meta";
+        if (hasChildren) {
+          ids.add(node.path.join("."));
+          walk(node.children!);
+        }
+      }
+    };
+    walk(tree.nodes);
+    set({ tree: { ...tree, expandedIds: ids } });
+  },
 
   // UI actions
   setViewMode: (mode) =>
