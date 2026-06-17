@@ -3,6 +3,7 @@
 
 import type { CANConfig } from "../types";
 import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
+import { readFrameInterval } from "./index";
 import { findFrameByNumericId } from "../../../utils/catalogParser";
 
 const canHandler: ProtocolHandler<CANConfig> = {
@@ -20,7 +21,7 @@ const canHandler: ProtocolHandler<CANConfig> = {
     let lengthInherited = false;
     let transmitter = value.transmitter;
     let transmitterInherited = false;
-    let interval = value.tx?.interval ?? value.tx?.interval_ms;
+    let interval = readFrameInterval(value);
     let intervalInherited = false;
 
     // Resolve extended: frame explicit > catalog default > auto-detect from ID
@@ -66,7 +67,7 @@ const canHandler: ProtocolHandler<CANConfig> = {
         transmitter = sourceFrame.transmitter;
         transmitterInherited = true;
       }
-      const srcInterval = sourceFrame.tx?.interval ?? sourceFrame.tx?.interval_ms;
+      const srcInterval = readFrameInterval(sourceFrame);
       if (interval === undefined && srcInterval !== undefined) {
         interval = srcInterval;
         intervalInherited = true;
@@ -127,7 +128,7 @@ const canHandler: ProtocolHandler<CANConfig> = {
           transmitter = primaryFrame.transmitter;
           transmitterInherited = true;
         }
-        const srcInterval = primaryFrame.tx?.interval ?? primaryFrame.tx?.interval_ms;
+        const srcInterval = readFrameInterval(primaryFrame);
         if (interval === undefined && srcInterval !== undefined) {
           interval = srcInterval;
           intervalInherited = true;
@@ -178,7 +179,7 @@ const canHandler: ProtocolHandler<CANConfig> = {
 
     // Only include interval if not inherited
     if (base.interval !== undefined && !omitInherited?.interval) {
-      obj.tx = { interval_ms: base.interval };
+      obj.interval_ms = base.interval;
     }
 
     if (base.notes) {

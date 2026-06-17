@@ -34,6 +34,7 @@
     "textViewEdit": "Edit",
     "textViewDiff": "Diff",
     "diffNoChanges": "No changes since last save",
+    "migrationBanner": "Upgraded this catalogue to the latest format on load. Save to apply, or review the",
     "openCatalogPlaceholder": "Open a catalog file to edit…",
     "openCatalogUiPrompt": "Open a catalog file to view in UI mode",
     "editFrameTitle": "Edit Frame",

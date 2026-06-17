@@ -100,9 +100,9 @@ export interface ModbusConfig {
   /** Starting register address. Optional: when omitted, it's derived from a
    *  numeric frame key (`[frame.modbus.2581]` / `[frame.modbus.0x32F9]`). */
   register_number?: number;
-  /** The slave node this register is read from — the node owns the device
-   *  (slave) address. */
-  node?: string;
+  /** The device (slave) address this register is read from, matched to a slave
+   *  node by its `device_address`. */
+  node_address?: number;
   register_type?: "holding" | "input" | "coil" | "discrete";
   register_base?: 0 | 1;         // 0-based or 1-based addressing (some manufacturers differ)
 }
@@ -232,8 +232,12 @@ export interface TomlNode {
     bus?: number;
     // Modbus-specific
     registerNumber?: number;
-    /** The slave node a register is read from (the node owns the address). */
+    /** Resolved display name of the slave a register belongs to (matched by
+     *  address); used to group registers under their slave. */
     node?: string;
+    /** The slave address a register references (`node_address`); seeds the edit
+     *  form's Slave picker. Undefined when the register names no slave. */
+    nodeAddress?: number;
     deviceAddress?: number;
     deviceAddressInherited?: boolean;
     registerType?: "holding" | "input" | "coil" | "discrete";
@@ -302,10 +306,19 @@ export interface CanidFields {
   notes?: string | string[];
 }
 
+/** A selectable slave for the Modbus register editor: a node's display name and
+ *  the `device_address` a register references it by. */
+export interface SlaveOption {
+  name: string;
+  address: number;
+}
+
 export interface ParsedCatalogTree {
   tree: TomlNode[];
   meta: MetaFields | null;
   peers: string[];
+  /** Declared slave nodes (name + device address) for the Modbus Slave picker. */
+  slaves: SlaveOption[];
   canConfig?: CanProtocolConfig;        // From [frame.can.config] section
   modbusConfig?: ModbusProtocolConfig;  // From [frame.modbus.config] section
   serialConfig?: SerialProtocolConfig;  // From [frame.serial.config] section

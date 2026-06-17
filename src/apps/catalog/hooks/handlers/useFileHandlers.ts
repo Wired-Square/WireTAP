@@ -3,7 +3,7 @@
 
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
-import { openCatalogAtPath, saveCatalogAtPath, pickCatalogToOpen, pickCatalogSavePath } from "../../io";
+import { openCatalogWithMigration, saveCatalogAtPath, pickCatalogToOpen, pickCatalogSavePath } from "../../io";
 import { validateCatalogWs, validateMetaWs } from "../../../../api/catalog";
 import {
   createMinimalCatalogToml,
@@ -28,6 +28,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
   const hasUnsavedChanges = useCatalogEditorStore((s) => s.hasUnsavedChanges);
   const setDecoderDir = useCatalogEditorStore((s) => s.setDecoderDir);
   const openSuccess = useCatalogEditorStore((s) => s.openSuccess);
+  const openSuccessMigrated = useCatalogEditorStore((s) => s.openSuccessMigrated);
 
   const catalogContent = useCatalogEditorStore((s) => s.content.toml);
   const saveSuccess = useCatalogEditorStore((s) => s.saveSuccess);
@@ -127,14 +128,22 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     }
   };
 
+  // Load a catalogue from disk, applying any schema migration: the migrated text
+  // becomes the working buffer with the on-disk original as the diff baseline, so
+  // the upgrade shows as a saveable diff (and raises the migration banner).
+  const openInto = async (path: string) => {
+    const { original, migration } = await openCatalogWithMigration(path);
+    if (migration.changed) {
+      openSuccessMigrated(path, original, migration.toml, migration.summary);
+    } else {
+      openSuccess(path, original);
+    }
+  };
+
   const handleOpenFile = async () => {
     try {
       const selected = await pickCatalogToOpen(decoderDir || undefined);
-
-      if (selected) {
-        const content = await openCatalogAtPath(selected);
-        openSuccess(selected, content);
-      }
+      if (selected) await openInto(selected);
     } catch (error) {
       console.error("Failed to open catalog:", error);
     }
@@ -153,8 +162,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     }
 
     try {
-      const content = await openCatalogAtPath(catalogPath);
-      openSuccess(catalogPath, content);
+      await openInto(catalogPath);
     } catch (error) {
       console.error("Failed to reload catalog:", error);
     }

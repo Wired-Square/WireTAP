@@ -3,6 +3,7 @@
 
 import type { SerialConfig } from "../types";
 import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
+import { readFrameInterval } from "./index";
 
 const serialHandler: ProtocolHandler<SerialConfig> = {
   type: "serial",
@@ -16,7 +17,7 @@ const serialHandler: ProtocolHandler<SerialConfig> = {
     _allFrames?: Record<string, any>
   ): ParsedFrame<SerialConfig> => {
     // Interval can be inherited from catalog defaults
-    let interval = value.tx?.interval ?? value.tx?.interval_ms;
+    let interval = readFrameInterval(value);
     let intervalInherited = false;
 
     if (interval === undefined && defaults.default_interval !== undefined) {
@@ -71,7 +72,7 @@ const serialHandler: ProtocolHandler<SerialConfig> = {
 
     // Only include interval if not inherited
     if (base.interval !== undefined && !omitInherited?.interval) {
-      obj.tx = { interval_ms: base.interval };
+      obj.interval_ms = base.interval;
     }
 
     if (base.notes) {

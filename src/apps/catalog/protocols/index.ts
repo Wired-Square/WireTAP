@@ -160,6 +160,12 @@ class ProtocolRegistry {
 /** Global protocol registry instance */
 export const protocolRegistry = new ProtocolRegistry();
 
+/** A frame's poll/tx interval: the canonical top-level `interval_ms`/`interval`,
+ *  falling back to the legacy `tx.interval_ms`/`tx.interval`. */
+export function readFrameInterval(value: any): number | undefined {
+  return value?.interval_ms ?? value?.interval ?? value?.tx?.interval_ms ?? value?.tx?.interval;
+}
+
 // Import handlers - they export their handler objects but don't self-register
 import canHandler from "./can";
 import modbusHandler from "./modbus";

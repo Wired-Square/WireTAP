@@ -128,6 +128,19 @@ pub async fn dispatch_catalog_command(
             let next = wiretap_catalog::edit::apply_edit(&text, op)?;
             Ok(serde_json::Value::String(next))
         }
+        // Upgrade a catalogue's text to the current schema (comment-preserving).
+        // Returns { changed, toml, summary }. The editor loads the result as the
+        // working buffer while keeping the on-disk text as the diff baseline, so a
+        // silent in-memory migration surfaces as a real, saveable diff. Params:
+        // { content }.
+        "catalog.migrate" => {
+            let m = wiretap_catalog::migrate::migrate(&content()?).map_err(|e| e.to_string())?;
+            Ok(serde_json::json!({
+                "changed": m.changed,
+                "toml": m.toml,
+                "summary": m.summary,
+            }))
+        }
         // Line diff of the working buffer against the last-saved baseline. Drives
         // both the unsaved-changes indicator and the Text-mode diff view from one
         // Rust-computed source. Params: { current, baseline }.

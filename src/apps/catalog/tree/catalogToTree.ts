@@ -220,6 +220,9 @@ function frameNode(f: Frame, cat: Catalog): TomlNode {
   } else if (f.protocol === "modbus") {
     metadata.registerNumber = f.frameId;
     metadata.node = f.modbusNode;
+    // Seed the Slave picker only when the register actually names a slave (a
+    // node matched its address); otherwise leave it unset.
+    metadata.nodeAddress = f.modbusNode ? f.modbusDeviceAddress : undefined;
     metadata.deviceAddress = f.modbusDeviceAddress ?? cat.modbus?.deviceAddress ?? 1;
     metadata.deviceAddressInherited = inherited.has("deviceAddress");
     metadata.registerType = f.modbusRegisterType;
@@ -388,6 +391,9 @@ export function catalogToTree(cat: Catalog): ParsedCatalogTree {
     tree,
     meta,
     peers: nodes.map((n) => n.name),
+    slaves: nodes
+      .filter((n) => n.deviceAddress != null)
+      .map((n) => ({ name: n.name, address: n.deviceAddress as number })),
     canConfig: toCanConfig(cat),
     modbusConfig: toModbusConfig(cat),
     serialConfig: toSerialConfig(cat),

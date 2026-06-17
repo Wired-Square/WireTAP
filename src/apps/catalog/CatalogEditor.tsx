@@ -8,9 +8,10 @@ import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdForma
 import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
 import { useFocusStore } from "../../stores/focusStore";
 import { listCatalogs, diffCatalog, parseCatalog, type CatalogMetadata } from "../../api/catalog";
-import { Eye } from "lucide-react";
+import { Eye, X } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
-import { borderDataView, bgDataView } from "../../styles/colourTokens";
+import { borderDataView, bgDataView, bgWarning, textWarning, borderWarning } from "../../styles/colourTokens";
+import { iconSm } from "../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading } from "../../styles/typography";
 import CatalogTreePanel from "./layouts/CatalogTreePanel";
 import CatalogToolbar from "./layouts/CatalogToolbar";
@@ -33,7 +34,7 @@ import TextFindBar from "./components/TextFindBar";
 import CatalogDialogs from "./components/CatalogDialogs";
 import CatalogPickerDialog from "./dialogs/CatalogPickerDialog";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
-import { openCatalogAtPath } from "./io";
+import { openCatalogWithMigration } from "./io";
 
 function CatalogEditorInner() {
   const { t } = useTranslation("catalog");
@@ -79,12 +80,17 @@ function CatalogEditorInner() {
   const setSerialChecksum = useCatalogEditorStore((s) => s.setSerialChecksum);
   const availablePeers = useCatalogEditorStore((s) => s.ui.availablePeers);
   const setAvailablePeers = useCatalogEditorStore((s) => s.setAvailablePeers);
+  const availableSlaves = useCatalogEditorStore((s) => s.ui.availableSlaves);
+  const setAvailableSlaves = useCatalogEditorStore((s) => s.setAvailableSlaves);
   const viewMode = useCatalogEditorStore((s) => s.ui.viewMode);
   const setViewMode = useCatalogEditorStore((s) => s.setViewMode);
   const selectedProtocol = useCatalogEditorStore((s) => s.ui.selectedProtocol);
   const setSelectedProtocol = useCatalogEditorStore((s) => s.setSelectedProtocol);
   const openTextFind = useCatalogEditorStore((s) => s.openTextFind);
   const openSuccess = useCatalogEditorStore((s) => s.openSuccess);
+  const openSuccessMigrated = useCatalogEditorStore((s) => s.openSuccessMigrated);
+  const migration = useCatalogEditorStore((s) => s.status.migration);
+  const dismissMigration = useCatalogEditorStore((s) => s.dismissMigration);
   const openDialog = useCatalogEditorStore((s) => s.openDialog);
   const decoderDir = useCatalogEditorStore((s) => s.file.decoderDir);
   const treeScrollTop = useCatalogEditorStore((s) => s.ui.treeScrollTop);
@@ -285,15 +291,21 @@ function CatalogEditorInner() {
     setShowCatalogPicker(true);
   }, [decoderDir]);
 
-  // Handler for selecting a catalog from the picker
+  // Handler for selecting a catalog from the picker. Applies any schema
+  // migration: the migrated text loads as the working buffer with the on-disk
+  // original as the diff baseline, so the upgrade shows as a saveable diff.
   const handleSelectCatalog = useCallback(async (path: string) => {
     try {
-      const content = await openCatalogAtPath(path);
-      openSuccess(path, content);
+      const { original, migration } = await openCatalogWithMigration(path);
+      if (migration.changed) {
+        openSuccessMigrated(path, original, migration.toml, migration.summary);
+      } else {
+        openSuccess(path, original);
+      }
     } catch (error) {
       console.error("Failed to open catalog:", error);
     }
-  }, [openSuccess]);
+  }, [openSuccess, openSuccessMigrated]);
 
   // Parse the catalogue (in Rust, the canonical parser) and build the editor
   // tree from the resolved model. Async + debounced + cancellable so rapid
@@ -305,6 +317,7 @@ function CatalogEditorInner() {
       setTreeData({ nodes: [], hasCanFrames: false, hasSerialFrames: false, hasModbusFrames: false });
       setSelectedPath(null);
       setAvailablePeers([]);
+      setAvailableSlaves([]);
       setParsedCatalogInfo(EMPTY_INFO);
     };
 
@@ -314,11 +327,12 @@ function CatalogEditorInner() {
     }
 
     let cancelled = false;
-    const applyParsed = ({ tree, meta, peers, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames }: ParsedCatalogTree) => {
+    const applyParsed = ({ tree, meta, peers, slaves, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames }: ParsedCatalogTree) => {
       setTreeData({ nodes: tree, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames });
       setParsedCatalogInfo({ canConfig, serialConfig, modbusConfig, hasCanFrames: !!hasCanFrames, hasModbusFrames: !!hasModbusFrames, hasSerialFrames: !!hasSerialFrames });
       if (meta) setMetaFields(meta);
       setAvailablePeers(peers);
+      setAvailableSlaves(slaves);
       // Store CAN config from [meta.can] if present
       if (canConfig) {
         setCanDefaultEndianness(canConfig.default_endianness);
@@ -513,6 +527,44 @@ function CatalogEditorInner() {
         )}
 
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {migration && (
+            <div className={`flex items-start gap-3 px-4 py-2.5 border-b ${borderWarning} ${bgWarning}`}>
+              <div className="flex-1 text-xs">
+                <p className={`font-medium ${textWarning}`}>
+                  {t(
+                    "editor.migrationBanner",
+                    "Upgraded this catalogue to the latest format on load. Save to apply, or review the",
+                  )}{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("text");
+                      setTextView("diff");
+                    }}
+                    className="underline font-semibold hover:no-underline"
+                  >
+                    {t("editor.textViewDiff", "Diff")}
+                  </button>
+                  .
+                </p>
+                {migration.summary.length > 0 && (
+                  <ul className="mt-1 list-disc list-inside text-[color:var(--text-muted)]">
+                    {migration.summary.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={dismissMigration}
+                aria-label={t("common.dismiss", "Dismiss")}
+                className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+              >
+                <X className={iconSm} />
+              </button>
+            </div>
+          )}
           {editMode === "text" ? (
             <>
               {catalogPath && (
@@ -569,6 +621,7 @@ function CatalogEditorInner() {
                   fields={forms.frameFields}
                   setFields={forms.setFrameFields}
                   availablePeers={availablePeers}
+                  availableSlaves={availableSlaves}
                   allowProtocolChange={!forms.editingFrameOriginalKey}
                   defaults={catalogDefaults}
                   onCancel={handlers.handleCancelFrameEdit}
@@ -699,10 +752,10 @@ function CatalogEditorInner() {
                         forms.setEditingId(true);
                         setSelectedPath(null);
                       },
-                      onAddRegisterForSlave: (slaveName) => {
+                      onAddRegisterForSlave: (slaveAddress) => {
                         forms.setFrameFields({
                           protocol: "modbus",
-                          config: { protocol: "modbus", register_type: "holding", node: slaveName },
+                          config: { protocol: "modbus", register_type: "holding", node_address: slaveAddress },
                           base: { length: 1 },
                           modbusFrameKey: "",
                         });

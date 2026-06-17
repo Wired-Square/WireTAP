@@ -13,6 +13,7 @@ import type {
   ModbusConfig,
   SerialConfig,
   BaseFrameFields,
+  SlaveOption,
 } from "../types";
 import { protocolRegistry } from "../protocols";
 import { CANConfigSection, ModbusConfigSection, SerialConfigSection } from "./protocol-editors";
@@ -44,6 +45,8 @@ export type FrameEditViewProps = {
   setFields: (fields: FrameEditFields) => void;
 
   availablePeers: string[];
+  /** Declared slave nodes (name + address) for the Modbus Slave picker. */
+  availableSlaves: SlaveOption[];
 
   /** Whether to allow changing the protocol (only for new frames) */
   allowProtocolChange?: boolean;
@@ -69,6 +72,7 @@ export default function FrameEditView({
   fields,
   setFields,
   availablePeers,
+  availableSlaves,
   allowProtocolChange = true,
   defaults,
   primaryActionLabel,
@@ -167,7 +171,7 @@ export default function FrameEditView({
             onChange={handleModbusConfigChange}
             frameKey={fields.modbusFrameKey ?? ""}
             onFrameKeyChange={handleModbusKeyChange}
-            availableSlaves={availablePeers}
+            availableSlaves={availableSlaves}
             defaultRegisterBase={defaults?.modbusRegisterBase}
           />
         );

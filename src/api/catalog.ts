@@ -78,8 +78,8 @@ export interface FrameValidationInput {
   maxLength?: number;
   extended?: boolean;
   registerNumber?: number | null;
-  /** The slave node a register is read from (its address lives on the node). */
-  node?: string;
+  /** The device (slave) address a register is read from (matched to a node). */
+  nodeAddress?: number;
   registerType?: string;
   registerBase?: number;
   delimiter?: number[];
@@ -130,6 +130,24 @@ export interface CatalogDiff {
  */
 export async function diffCatalog(current: string, baseline: string): Promise<CatalogDiff> {
   return await wsTransport.command<CatalogDiff>("catalog.diff", { current, baseline });
+}
+
+/** Result of {@link migrateCatalog}: whether the text was upgraded, the upgraded
+ * TOML (equal to the input when unchanged), and a human-readable summary. */
+export interface CatalogMigration {
+  changed: boolean;
+  toml: string;
+  summary: string[];
+}
+
+/**
+ * Upgrade a catalogue's text to the current schema in Rust (comment-preserving).
+ * The editor loads the result as the working buffer while keeping the on-disk
+ * text as the diff baseline, so a previously silent in-memory migration surfaces
+ * as a real, saveable diff.
+ */
+export async function migrateCatalog(content: string): Promise<CatalogMigration> {
+  return await wsTransport.command<CatalogMigration>("catalog.migrate", { content });
 }
 
 /**

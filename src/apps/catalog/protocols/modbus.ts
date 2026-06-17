@@ -3,6 +3,7 @@
 
 import type { ModbusConfig } from "../types";
 import type { ProtocolHandler, ProtocolDefaults, ParsedFrame } from "./index";
+import { readFrameInterval } from "./index";
 import { parseCanIdToNumber } from "../utils";
 
 /** True when a frame key is itself a register address (decimal or 0x-hex). */
@@ -38,7 +39,7 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
     const registerBaseInherited = registerBase !== undefined;
 
     // Interval can be inherited from catalog defaults
-    let interval = value.tx?.interval ?? value.tx?.interval_ms;
+    let interval = readFrameInterval(value);
     let intervalInherited = false;
 
     if (interval === undefined && defaults.modbusDefaultInterval !== undefined) {
@@ -60,7 +61,7 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
       config: {
         protocol: "modbus",
         register_number: value.register_number,
-        node: value.node,
+        node_address: value.node_address,
         register_type: value.register_type ?? "holding",
         register_base: registerBase,
       },
@@ -80,9 +81,9 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
       obj.register_number = config.register_number;
     }
 
-    // The register's slave node (the node owns the device address).
-    if (config.node) {
-      obj.node = config.node;
+    // The register's slave, referenced by address (matched to a node).
+    if (config.node_address != null) {
+      obj.node_address = config.node_address;
     }
 
     // Only include register_base if not inherited and explicitly set
@@ -106,7 +107,7 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
 
     // Only include interval if not inherited
     if (base.interval !== undefined && !omitInherited?.interval) {
-      obj.tx = { interval_ms: base.interval };
+      obj.interval_ms = base.interval;
     }
 
     if (base.notes) {
@@ -135,7 +136,7 @@ const modbusHandler: ProtocolHandler<ModbusConfig> = {
   },
 
   getFrameDisplaySecondary: (config) => {
-    return config.node ? `Slave ${config.node}` : "No slave";
+    return config.node_address != null ? `Slave ${config.node_address}` : "No slave";
   },
 
   getFrameKey: (config) => {

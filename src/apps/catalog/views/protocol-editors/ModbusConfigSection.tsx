@@ -1,7 +1,7 @@
 // ui/src/apps/catalog/views/protocol-editors/ModbusConfigSection.tsx
 
 import { useTranslation } from "react-i18next";
-import type { ModbusConfig } from "../../types";
+import type { ModbusConfig, SlaveOption } from "../../types";
 import { isRegisterKey, modbusNeedsRegisterNumber, MODBUS_REGISTER_REQUIRED_MESSAGE } from "../../protocols/modbus";
 import { caption, textMedium, focusRing } from "../../../../styles";
 
@@ -11,8 +11,8 @@ export type ModbusConfigSectionProps = {
   /** The TOML key (friendly name) for this Modbus frame */
   frameKey: string;
   onFrameKeyChange: (key: string) => void;
-  /** Declared slave nodes the register can be attributed to. */
-  availableSlaves: string[];
+  /** Declared slave nodes (name + address) the register can be attributed to. */
+  availableSlaves: SlaveOption[];
   defaultRegisterBase?: 0 | 1;
 };
 
@@ -85,14 +85,16 @@ export default function ModbusConfigSection({
           {t("protocolEditors.modbusSlaveLabel")}
         </label>
         <select
-          value={config.node ?? ""}
-          onChange={(e) => onChange({ ...config, node: e.target.value || undefined })}
+          value={config.node_address ?? ""}
+          onChange={(e) =>
+            onChange({ ...config, node_address: e.target.value === "" ? undefined : Number(e.target.value) })
+          }
           className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
         >
           <option value="">{t("protocolEditors.modbusSlaveNone")}</option>
           {availableSlaves.map((slave) => (
-            <option key={slave} value={slave}>
-              {slave}
+            <option key={slave.address} value={slave.address}>
+              {slave.name} (#{slave.address})
             </option>
           ))}
         </select>

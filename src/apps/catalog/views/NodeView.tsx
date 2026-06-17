@@ -15,7 +15,7 @@ export type NodeViewProps = {
   onSelectPath: (path: string[]) => void;
   catalogContent: string;
   onAddCanFrameForNode?: (nodeName: string) => void;
-  onAddRegisterForSlave?: (slaveName: string) => void;
+  onAddRegisterForSlave?: (slaveAddress: number) => void;
   onEditNode?: (nodeName: string, notes?: string, deviceAddress?: number) => void;
   onDeleteNode?: (nodeName: string) => void;
   onRequestDeleteFrame?: (idKey: string) => void;
@@ -57,7 +57,7 @@ export default function NodeView({
   const { t } = useTranslation("catalog");
   const nodeName = selectedNode.key;
   // A Modbus node is a slave: it owns a device address and registers reference
-  // it by `node`. CAN/serial nodes are transmitters referenced by `transmitter`.
+  // it by `node_address`. CAN/serial nodes are transmitters referenced by `transmitter`.
   const deviceAddress = selectedNode.metadata?.deviceAddress;
   const isModbus = deviceAddress != null;
   const frameProtocol = isModbus ? "modbus" : "can";
@@ -106,8 +106,12 @@ export default function NodeView({
 
       for (const [id, frameVal] of Object.entries<any>(protoFrames)) {
         if (id === "config") continue;
-        const ref = isModbus ? frameVal?.node : frameVal?.transmitter;
-        if (ref !== nodeName) continue;
+        // Modbus registers reference their slave by address; CAN frames by name.
+        if (isModbus) {
+          if (frameVal?.node_address !== deviceAddress) continue;
+        } else if (frameVal?.transmitter !== nodeName) {
+          continue;
+        }
 
         const signals: FrameSignal[] = [];
         const pathPrefix = ["frame", frameProtocol, id];
@@ -158,12 +162,14 @@ export default function NodeView({
 
         <div className={flexRowGap2}>
           {(() => {
-            const add = isModbus
-              ? { fn: onAddRegisterForSlave, label: t("nodeView.addRegister") }
-              : { fn: onAddCanFrameForNode, label: t("nodeView.addCanFrame") };
-            return add.fn ? (
+            // A Modbus slave seeds a new register by its address; a CAN node by name.
+            const add =
+              isModbus && deviceAddress != null
+                ? { onClick: () => onAddRegisterForSlave?.(deviceAddress), label: t("nodeView.addRegister"), show: !!onAddRegisterForSlave }
+                : { onClick: () => onAddCanFrameForNode?.(nodeName), label: t("nodeView.addCanFrame"), show: !!onAddCanFrameForNode };
+            return add.show ? (
               <button
-                onClick={() => add.fn!(nodeName)}
+                onClick={add.onClick}
                 className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium"
                 title={add.label}
               >

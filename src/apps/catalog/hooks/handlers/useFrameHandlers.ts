@@ -284,7 +284,7 @@ export function useFrameHandlers({
         config = {
           protocol: "modbus" as const,
           register_number: node.metadata?.registerNumber,
-          node: node.metadata?.node,
+          node_address: node.metadata?.nodeAddress,
           register_type: node.metadata?.registerType ?? "holding",
         };
         break;
@@ -349,7 +349,7 @@ export function useFrameHandlers({
       maxLength: frameFields.protocol === "can" ? 64 : 256,
       extended: cfg.extended,
       registerNumber: cfg.register_number,
-      node: cfg.node,
+      nodeAddress: cfg.node_address,
       registerType: cfg.register_type,
       registerBase: cfg.register_base,
       delimiter: cfg.delimiter,
