@@ -8506,8 +8506,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-catalog"
-version = "0.8.1"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.8.1#7e28594699ee44ec7edc22810849194a239ee45a"
+version = "0.8.2"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.8.2#cfa92ee288f38df8fe274220e84b2196cd3c417d"
 dependencies = [
  "can-dbc",
  "rust_decimal",
@@ -8521,8 +8521,8 @@ dependencies = [
 
 [[package]]
 name = "wiretap-decode"
-version = "0.8.1"
-source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.8.1#7e28594699ee44ec7edc22810849194a239ee45a"
+version = "0.8.2"
+source = "git+ssh://git@github.com/Wired-Square/wiretap-lib-rs.git?tag=v0.8.2#cfa92ee288f38df8fe274220e84b2196cd3c417d"
 dependencies = [
  "rust_decimal",
  "serde",
