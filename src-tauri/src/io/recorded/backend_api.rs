@@ -198,13 +198,13 @@ impl CursorFetcher {
             self.base_url, self.database, self.page_size
         );
         if let Some(s) = &self.start {
-            url.push_str(&format!("&start={}", encode(s)));
+            url.push_str(&format!("&start={}", crate::apiclient::urlencoding(s)));
         }
         if let Some(e) = &self.end {
-            url.push_str(&format!("&end={}", encode(e)));
+            url.push_str(&format!("&end={}", crate::apiclient::urlencoding(e)));
         }
         if let Some(c) = &self.cursor {
-            url.push_str(&format!("&after={}", encode(c)));
+            url.push_str(&format!("&after={}", crate::apiclient::urlencoding(c)));
         }
         url
     }
@@ -261,16 +261,25 @@ impl CursorFetcher {
     }
 }
 
-/// Minimal percent-encoding for query-string values.
-fn encode(s: &str) -> String {
-    s.bytes()
-        .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                (b as char).to_string()
-            }
-            _ => format!("%{b:02X}"),
-        })
-        .collect()
+/// Store the latest playback position and signal it (throttled). Shared by the
+/// three emit points in the stream loop below.
+fn emit_playback_position(
+    session_id: &str,
+    playback_time_us: i64,
+    total_emitted: i64,
+    throttle: &mut SignalThrottle,
+) {
+    crate::io::store_playback_position(
+        session_id,
+        PlaybackPosition {
+            timestamp_us: playback_time_us,
+            frame_index: (total_emitted - 1) as usize,
+            frame_count: Some(total_emitted as usize),
+        },
+    );
+    if throttle.should_signal("playback-position") {
+        signal_playback_position(session_id);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +315,6 @@ async fn run_api_stream(
 
     let mut frame_queue: VecDeque<FrameMessage> = VecDeque::new();
     let mut total_emitted = 0i64;
-    let mut stream_reason = "complete";
 
     // Refill helper: pull pages until the buffer reaches target or exhausted
     async fn refill(
@@ -331,7 +339,7 @@ async fn run_api_stream(
 
     if frame_queue.is_empty() {
         tlog!("[BackendAPI:{}] No frames returned from query", session_id);
-        emit_stream_ended(&session_id, stream_reason, "BackendAPI");
+        emit_stream_ended(&session_id, "complete", "BackendAPI");
         return Ok(());
     }
 
@@ -407,17 +415,7 @@ async fn run_api_stream(
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
                 }
-                crate::io::store_playback_position(
-                    &session_id,
-                    PlaybackPosition {
-                        timestamp_us: playback_time_us,
-                        frame_index: (total_emitted - 1) as usize,
-                        frame_count: Some(total_emitted as usize),
-                    },
-                );
-                if throttle.should_signal("playback-position") {
-                    signal_playback_position(&session_id);
-                }
+                emit_playback_position(&session_id, playback_time_us, total_emitted, &mut throttle);
                 tokio::time::sleep(Duration::from_millis(NO_LIMIT_YIELD_MS)).await;
             }
             continue;
@@ -454,17 +452,7 @@ async fn run_api_stream(
                 if throttle.should_signal("frames-ready") {
                     signal_frames_ready(&session_id);
                 }
-                crate::io::store_playback_position(
-                    &session_id,
-                    PlaybackPosition {
-                        timestamp_us: playback_time_us,
-                        frame_index: (total_emitted - 1) as usize,
-                        frame_count: Some(total_emitted as usize),
-                    },
-                );
-                if throttle.should_signal("playback-position") {
-                    signal_playback_position(&session_id);
-                }
+                emit_playback_position(&session_id, playback_time_us, total_emitted, &mut throttle);
                 tokio::task::yield_now().await;
                 if control.is_paused() {
                     continue;
@@ -490,17 +478,7 @@ async fn run_api_stream(
             if throttle.should_signal("frames-ready") {
                 signal_frames_ready(&session_id);
             }
-            crate::io::store_playback_position(
-                &session_id,
-                PlaybackPosition {
-                    timestamp_us: playback_time_us,
-                    frame_index: (total_emitted - 1) as usize,
-                    frame_count: Some(total_emitted as usize),
-                },
-            );
-            if throttle.should_signal("playback-position") {
-                signal_playback_position(&session_id);
-            }
+            emit_playback_position(&session_id, playback_time_us, total_emitted, &mut throttle);
         }
     }
 
@@ -513,9 +491,8 @@ async fn run_api_stream(
     if control.is_cancelled() {
         tlog!("[BackendAPI:{}] Stream cancelled by user (emitted: {})", session_id, total_emitted);
     } else {
-        let _ = &mut stream_reason;
         tlog!("[BackendAPI:{}] Stream ended (emitted: {})", session_id, total_emitted);
-        emit_stream_ended(&session_id, stream_reason, "BackendAPI");
+        emit_stream_ended(&session_id, "complete", "BackendAPI");
     }
     Ok(())
 }

@@ -16,6 +16,7 @@ import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../settings/stores/settingsStore";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { getIOKindLabel } from "../../utils/ioKindLabel";
+import { getTimeRangeCapableProfiles } from "../../utils/profileFilters";
 
 import { useDialogManager } from "../../hooks/useDialogManager";
 import { useQueryHandlers } from "./hooks/useQueryHandlers";
@@ -132,10 +133,7 @@ function QueryInner() {
   // Filter profiles to database-backed kinds (direct PostgreSQL or the
   // WireTAP backend API — both answer the same analytical queries).
   const postgresProfiles = useMemo(
-    () =>
-      (settings?.io_profiles ?? []).filter(
-        (p) => p.kind === "postgres" || p.kind === "wiretap"
-      ),
+    () => getTimeRangeCapableProfiles(settings?.io_profiles ?? []),
     [settings?.io_profiles]
   );
 

@@ -665,7 +665,7 @@ pub async fn api_test_connection(app: tauri::AppHandle, profile_id: String) -> R
 }
 
 /// Minimal percent-encoding for query-string values (RFC3339 timestamps).
-fn urlencoding(s: &str) -> String {
+pub(crate) fn urlencoding(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
