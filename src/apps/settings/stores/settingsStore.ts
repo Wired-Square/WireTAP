@@ -21,12 +21,12 @@ import {
   type SelectionSet,
 } from '../../../utils/selectionSets';
 import {
-  getAllGraphLayouts,
-  type GraphLayout,
-} from '../../../utils/graphLayouts';
+  getAllDashboardLayouts,
+  type DashboardLayout,
+} from '../../../utils/dashboardLayouts';
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
-export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "graph-layouts" | "display" | "mcp";
+export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "dashboard-layouts" | "display" | "mcp";
 export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
 // Buffer setting defaults — single source of truth, referenced by settingsStore and useSettings
@@ -130,6 +130,8 @@ interface AppSettings {
   mcp_allow_session_control?: boolean;
   mcp_allow_catalog_write?: boolean;
   mcp_allow_catalog_modify?: boolean;
+  mcp_allow_dashboard_write?: boolean;
+  mcp_allow_ui_control?: boolean;
   mcp_server_port?: number;
   mcp_server_token?: string;
   // Theme settings
@@ -179,8 +181,8 @@ type DialogName =
   | 'createBookmark'
   | 'editSelectionSet'
   | 'deleteSelectionSet'
-  | 'editGraphLayout'
-  | 'deleteGraphLayout';
+  | 'editDashboardLayout'
+  | 'deleteDashboardLayout';
 
 interface DialogPayload {
   editingProfileId: string | null;
@@ -193,8 +195,8 @@ interface DialogPayload {
   bookmarkToDelete: TimeRangeFavorite | null;
   selectionSetToEdit: SelectionSet | null;
   selectionSetToDelete: SelectionSet | null;
-  graphLayoutToEdit: GraphLayout | null;
-  graphLayoutToDelete: GraphLayout | null;
+  dashboardLayoutToEdit: DashboardLayout | null;
+  dashboardLayoutToDelete: DashboardLayout | null;
 }
 
 const initialDialogs: Record<DialogName, boolean> = {
@@ -208,8 +210,8 @@ const initialDialogs: Record<DialogName, boolean> = {
   createBookmark: false,
   editSelectionSet: false,
   deleteSelectionSet: false,
-  editGraphLayout: false,
-  deleteGraphLayout: false,
+  editDashboardLayout: false,
+  deleteDashboardLayout: false,
 };
 
 const initialDialogPayload: DialogPayload = {
@@ -223,8 +225,8 @@ const initialDialogPayload: DialogPayload = {
   bookmarkToDelete: null,
   selectionSetToEdit: null,
   selectionSetToDelete: null,
-  graphLayoutToEdit: null,
-  graphLayoutToDelete: null,
+  dashboardLayoutToEdit: null,
+  dashboardLayoutToDelete: null,
 };
 
 const defaultSignalColours: SignalColours = {
@@ -302,8 +304,8 @@ interface SettingsState {
   // Selection sets
   selectionSets: SelectionSet[];
 
-  // Graph layouts
-  graphLayouts: GraphLayout[];
+  // Dashboard layouts
+  dashboardLayouts: DashboardLayout[];
 
   // Display settings
   display: {
@@ -355,6 +357,8 @@ interface SettingsState {
     allowSessionControl: boolean;
     allowCatalogWrite: boolean;
     allowCatalogModify: boolean;
+    allowDashboardWrite: boolean;
+    allowUiControl: boolean;
     serverPort: number;
     serverToken: string;
   };
@@ -374,7 +378,7 @@ interface SettingsState {
   loadCatalogs: () => Promise<void>;
   loadBookmarks: () => Promise<void>;
   loadSelectionSets: () => Promise<void>;
-  loadGraphLayouts: () => Promise<void>;
+  loadDashboardLayouts: () => Promise<void>;
 
   // Actions - Saving
   saveSettings: () => Promise<void>;
@@ -454,6 +458,8 @@ interface SettingsState {
   setMcpAllowSessionControl: (value: boolean) => void;
   setMcpAllowCatalogWrite: (value: boolean) => void;
   setMcpAllowCatalogModify: (value: boolean) => void;
+  setMcpAllowDashboardWrite: (value: boolean) => void;
+  setMcpAllowUiControl: (value: boolean) => void;
   setMcpServerPort: (port: number) => void;
   setMcpServerToken: (token: string) => void;
 }
@@ -565,7 +571,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   selectionSets: [],
 
-  graphLayouts: [],
+  dashboardLayouts: [],
 
   display: {
     frameIdFormat: 'hex',
@@ -613,6 +619,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     allowSessionControl: false,
     allowCatalogWrite: false,
     allowCatalogModify: false,
+    allowDashboardWrite: false,
+    allowUiControl: false,
     serverPort: 8787,
     serverToken: "",
   },
@@ -744,6 +752,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         mcp_allow_session_control: settings.mcp_allow_session_control ?? false,
         mcp_allow_catalog_write: settings.mcp_allow_catalog_write ?? false,
         mcp_allow_catalog_modify: settings.mcp_allow_catalog_modify ?? false,
+        mcp_allow_dashboard_write: settings.mcp_allow_dashboard_write ?? false,
+        mcp_allow_ui_control: settings.mcp_allow_ui_control ?? false,
         mcp_server_port: settings.mcp_server_port ?? 8787,
         mcp_server_token: settings.mcp_server_token ?? "",
       };
@@ -837,6 +847,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           allowSessionControl: normalized.mcp_allow_session_control ?? false,
           allowCatalogWrite: normalized.mcp_allow_catalog_write ?? false,
           allowCatalogModify: normalized.mcp_allow_catalog_modify ?? false,
+          allowDashboardWrite: normalized.mcp_allow_dashboard_write ?? false,
+          allowUiControl: normalized.mcp_allow_ui_control ?? false,
           serverPort: normalized.mcp_server_port ?? 8787,
           serverToken: normalized.mcp_server_token ?? "",
         },
@@ -900,11 +912,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
-  loadGraphLayouts: async () => {
+  loadDashboardLayouts: async () => {
     try {
-      const allLayouts = await getAllGraphLayouts();
+      const allLayouts = await getAllDashboardLayouts();
       allLayouts.sort((a, b) => a.name.localeCompare(b.name));
-      set({ graphLayouts: allLayouts });
+      set({ dashboardLayouts: allLayouts });
     } catch (error) {
       console.error('Failed to load graph layouts:', error);
     }
@@ -990,6 +1002,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         mcp_allow_session_control: mcp.allowSessionControl,
         mcp_allow_catalog_write: mcp.allowCatalogWrite,
         mcp_allow_catalog_modify: mcp.allowCatalogModify,
+        mcp_allow_dashboard_write: mcp.allowDashboardWrite,
+        mcp_allow_ui_control: mcp.allowUiControl,
         mcp_server_port: mcp.serverPort,
         mcp_server_token: mcp.serverToken,
       };
@@ -1542,6 +1556,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   setMcpAllowCatalogModify: (value) => {
     set((state) => ({ mcp: { ...state.mcp, allowCatalogModify: value } }));
+    scheduleSave(get().saveSettings);
+  },
+  setMcpAllowDashboardWrite: (value) => {
+    set((state) => ({ mcp: { ...state.mcp, allowDashboardWrite: value } }));
+    scheduleSave(get().saveSettings);
+  },
+  setMcpAllowUiControl: (value) => {
+    set((state) => ({ mcp: { ...state.mcp, allowUiControl: value } }));
     scheduleSave(get().saveSettings);
   },
   setMcpServerPort: (port) => {

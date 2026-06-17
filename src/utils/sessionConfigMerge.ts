@@ -1,7 +1,7 @@
 // ui/src/utils/sessionConfigMerge.ts
 //
 // Shared utility for merging catalog config into IO session load options.
-// Used by Decoder, Graph, and any app that loads a catalog and starts a session.
+// Used by Decoder, Dashboard, and any app that loads a catalog and starts a session.
 
 import type { LoadOptions as ManagerLoadOptions } from "../hooks/useIOSessionManager";
 import type { LoadOptions as DialogLoadOptions } from "../dialogs/IoSourcePickerDialog";

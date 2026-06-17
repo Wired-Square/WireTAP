@@ -146,7 +146,10 @@ export default function CatalogToolbar({
         title={editMode === "ui" ? t("toolbar.switchToText") : t("toolbar.switchToGui")}
         className={toggleButtonClass(editMode === "text", "purple")}
       >
-        <Glasses className={iconMd} fill={editMode === "text" ? "currentColor" : "none"} />
+        <Glasses
+          className={`${iconMd} ${hasUnsavedChanges && editMode !== "text" ? "animate-pulse" : ""}`}
+          fill={editMode === "text" ? "currentColor" : "none"}
+        />
       </button>
     </AppTopBar>
   );

@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // Device overview — horizontal flow diagram showing the relationship
 // between interfaces, frame defs, bridges, transformers, generators,

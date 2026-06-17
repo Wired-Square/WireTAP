@@ -13,13 +13,12 @@ renamed in a future cleanup.
 launch (setting: *Clear captures on start*). Pinned (persistent) captures
 always survive restart. See [capture-flow.md § Persistence](capture-flow.md#7-persistence).
 
-**Schema migration:** On first launch of a post-rename build, the database
-detects the legacy `buffer_metadata` table and atomically renames it to
-`capture_metadata`, plus renames the `buffer_id` / `buffer_type` columns
-on `frames`, `bytes`, and `capture_metadata` to `capture_id` / `capture_kind`.
-The migration is idempotent — safe to run multiple times. See
-`migrate_buffer_to_capture` in
-[src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs).
+**Schema migrations:** All schema changes are recorded, run-once migrations
+gated by `PRAGMA user_version` and audited in the `schema_migrations` table —
+see [capture-db-migrations.md](capture-db-migrations.md) for the rules and
+how to add one. The v1 baseline (`baseline_capture_schema` in
+[src-tauri/src/capture_db.rs](../src-tauri/src/capture_db.rs)) normalises
+unstamped pre-versioning databases, including the legacy `buffer_*` rename.
 
 **PRAGMAs:**
 

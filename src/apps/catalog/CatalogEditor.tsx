@@ -7,32 +7,34 @@ import { useSettings, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
 import { useFocusStore } from "../../stores/focusStore";
-import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
-import { Eye } from "lucide-react";
+import { listCatalogs, diffCatalog, parseCatalog, type CatalogMetadata } from "../../api/catalog";
+import { Eye, X } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
-import { borderDataView, bgDataView } from "../../styles/colourTokens";
+import { borderDataView, bgDataView, bgWarning, textWarning, borderWarning } from "../../styles/colourTokens";
+import { iconSm } from "../../styles/spacing";
 import { emptyStateContainer, emptyStateText, emptyStateHeading } from "../../styles/typography";
 import CatalogTreePanel from "./layouts/CatalogTreePanel";
 import CatalogToolbar from "./layouts/CatalogToolbar";
 import SelectionHeader from "./layouts/SelectionHeader";
-import { parseTomlToTree } from "./toml";
-import type { TomlNode } from "./types";
+import { catalogToTree } from "./tree/catalogToTree";
+import type { TomlNode, ParsedCatalogTree } from "./types";
 import { findNodeByPath } from "./tree/treeUtils";
 import { formatFrameId } from "./utils";
 import { createRenderTreeNode } from "./tree/renderTreeNode";
 import { buildFrameGroups, applyProtocolFilter } from "./tree/frameGroups";
 import EditorViewRouter from "./views/EditorViewRouter";
 import TextModeView from "./views/TextModeView";
+import DiffView from "./views/DiffView";
 import EmptySelectionView from "./views/EmptySelectionView";
 import CANFrameEditView from "./views/CANFrameEditView";
 import FrameEditView from "./views/FrameEditView";
 import { isFrameFieldsValid } from "./views/frameEditUtils";
-import FindBar from "./components/FindBar";
+import { CATALOG_SEARCH_INPUT_ID } from "./components/FindBar";
 import TextFindBar from "./components/TextFindBar";
 import CatalogDialogs from "./components/CatalogDialogs";
 import CatalogPickerDialog from "./dialogs/CatalogPickerDialog";
 import { useCatalogForms, useCatalogHandlers } from "./hooks";
-import { openCatalogAtPath } from "./io";
+import { openCatalogWithMigration } from "./io";
 
 function CatalogEditorInner() {
   const { t } = useTranslation("catalog");
@@ -42,6 +44,9 @@ function CatalogEditorInner() {
   const originalContent = useCatalogEditorStore((s) => s.content.lastSavedToml);
   const reloadVersion = useCatalogEditorStore((s) => s.content.reloadVersion);
   const setToml = useCatalogEditorStore((s) => s.setToml);
+  const storedDiff = useCatalogEditorStore((s) => s.content.diff);
+  const setDiff = useCatalogEditorStore((s) => s.setDiff);
+  const computeHasUnsavedChanges = useCatalogEditorStore((s) => s.hasUnsavedChanges);
   const editMode = useCatalogEditorStore((s) => s.mode);
   const setMode = useCatalogEditorStore((s) => s.setMode);
   const validationState = useCatalogEditorStore((s) => s.validation.isValid);
@@ -52,6 +57,8 @@ function CatalogEditorInner() {
   const setTreeData = useCatalogEditorStore((s) => s.setTreeData);
   const setSelectedPath = useCatalogEditorStore((s) => s.setSelectedPath);
   const toggleExpanded = useCatalogEditorStore((s) => s.toggleExpanded);
+  const expandAll = useCatalogEditorStore((s) => s.expandAll);
+  const collapseAll = useCatalogEditorStore((s) => s.resetExpanded);
   const idFields = useCatalogEditorStore((s) => s.forms.canFrame);
   const setIdFields = useCatalogEditorStore((s) => s.setCanFrameForm);
   const setMetaFields = useCatalogEditorStore((s) => s.setMetaForm);
@@ -73,13 +80,17 @@ function CatalogEditorInner() {
   const setSerialChecksum = useCatalogEditorStore((s) => s.setSerialChecksum);
   const availablePeers = useCatalogEditorStore((s) => s.ui.availablePeers);
   const setAvailablePeers = useCatalogEditorStore((s) => s.setAvailablePeers);
+  const availableSlaves = useCatalogEditorStore((s) => s.ui.availableSlaves);
+  const setAvailableSlaves = useCatalogEditorStore((s) => s.setAvailableSlaves);
   const viewMode = useCatalogEditorStore((s) => s.ui.viewMode);
   const setViewMode = useCatalogEditorStore((s) => s.setViewMode);
   const selectedProtocol = useCatalogEditorStore((s) => s.ui.selectedProtocol);
   const setSelectedProtocol = useCatalogEditorStore((s) => s.setSelectedProtocol);
-  const openFind = useCatalogEditorStore((s) => s.openFind);
   const openTextFind = useCatalogEditorStore((s) => s.openTextFind);
   const openSuccess = useCatalogEditorStore((s) => s.openSuccess);
+  const openSuccessMigrated = useCatalogEditorStore((s) => s.openSuccessMigrated);
+  const migration = useCatalogEditorStore((s) => s.status.migration);
+  const dismissMigration = useCatalogEditorStore((s) => s.dismissMigration);
   const openDialog = useCatalogEditorStore((s) => s.openDialog);
   const decoderDir = useCatalogEditorStore((s) => s.file.decoderDir);
   const treeScrollTop = useCatalogEditorStore((s) => s.ui.treeScrollTop);
@@ -121,6 +132,8 @@ function CatalogEditorInner() {
   // Catalog picker state
   const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
   const [showCatalogPicker, setShowCatalogPicker] = useState(false);
+  // Text-mode sub-view: raw editor vs read-only diff against last save.
+  const [textView, setTextView] = useState<"edit" | "diff">("edit");
 
   // Load settings
   const { settings } = useSettings();
@@ -186,25 +199,43 @@ function CatalogEditorInner() {
     serialEncoding,       // From [frame.serial.config], stored in forms.serialEncoding
   }), [canDefaultInterval, canDefaultEndianness, modbusDeviceAddress, modbusRegisterBase, serialEncoding]);
 
-  // Get current protocol configs and frame detection from TOML
-  const parsedCatalogInfo = useMemo(() => {
-    if (!catalogContent) return { canConfig: undefined, serialConfig: undefined, modbusConfig: undefined, hasCanFrames: false, hasModbusFrames: false, hasSerialFrames: false };
-    try {
-      const { canConfig, serialConfig, modbusConfig, hasCanFrames, hasModbusFrames, hasSerialFrames } = parseTomlToTree(catalogContent);
-      return { canConfig, serialConfig, modbusConfig, hasCanFrames: !!hasCanFrames, hasModbusFrames: !!hasModbusFrames, hasSerialFrames: !!hasSerialFrames };
-    } catch {
-      return { canConfig: undefined, serialConfig: undefined, modbusConfig: undefined, hasCanFrames: false, hasModbusFrames: false, hasSerialFrames: false };
-    }
-  }, [catalogContent]);
+  // Protocol configs + frame detection, derived from the Rust-parsed catalogue
+  // (set by the async parse effect below).
+  const EMPTY_INFO = { canConfig: undefined, serialConfig: undefined, modbusConfig: undefined, hasCanFrames: false, hasModbusFrames: false, hasSerialFrames: false } as const;
+  const [parsedCatalogInfo, setParsedCatalogInfo] = useState<{
+    canConfig?: ParsedCatalogTree["canConfig"];
+    serialConfig?: ParsedCatalogTree["serialConfig"];
+    modbusConfig?: ParsedCatalogTree["modbusConfig"];
+    hasCanFrames: boolean;
+    hasModbusFrames: boolean;
+    hasSerialFrames: boolean;
+  }>(EMPTY_INFO);
 
   const currentCanConfig = parsedCatalogInfo.canConfig;
   const currentSerialConfig = parsedCatalogInfo.serialConfig;
   const currentModbusConfig = parsedCatalogInfo.modbusConfig;
 
-  // Computed values
-  const hasUnsavedChanges = useMemo(() => {
-    return catalogContent !== originalContent && originalContent !== "";
-  }, [catalogContent, originalContent]);
+  // Computed values — the store owns the dirty logic (prefer the Rust diff, fall
+  // back to a string compare); recompute when its inputs change.
+  const hasUnsavedChanges = useMemo(
+    () => computeHasUnsavedChanges(),
+    [computeHasUnsavedChanges, storedDiff, catalogContent, originalContent],
+  );
+
+  // Recompute the diff/dirty state in Rust whenever the buffer or baseline change.
+  // Equal buffers short-circuit (no round-trip); edits debounce to coalesce typing.
+  useEffect(() => {
+    if (catalogContent === originalContent) {
+      setDiff({ dirty: false, lines: [] });
+      return;
+    }
+    const handle = setTimeout(() => {
+      diffCatalog(catalogContent, originalContent)
+        .then(setDiff)
+        .catch((e) => console.error("Failed to compute catalog diff:", e));
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [catalogContent, originalContent, setDiff]);
 
   const selectedNode = useMemo(() => {
     if (!selectedPath) return null;
@@ -260,32 +291,48 @@ function CatalogEditorInner() {
     setShowCatalogPicker(true);
   }, [decoderDir]);
 
-  // Handler for selecting a catalog from the picker
+  // Handler for selecting a catalog from the picker. Applies any schema
+  // migration: the migrated text loads as the working buffer with the on-disk
+  // original as the diff baseline, so the upgrade shows as a saveable diff.
   const handleSelectCatalog = useCallback(async (path: string) => {
     try {
-      const content = await openCatalogAtPath(path);
-      openSuccess(path, content);
+      const { original, migration } = await openCatalogWithMigration(path);
+      if (migration.changed) {
+        openSuccessMigrated(path, original, migration.toml, migration.summary);
+      } else {
+        openSuccess(path, original);
+      }
     } catch (error) {
       console.error("Failed to open catalog:", error);
     }
-  }, [openSuccess]);
+  }, [openSuccess, openSuccessMigrated]);
 
-  // Parse TOML content whenever it changes
+  // Parse the catalogue (in Rust, the canonical parser) and build the editor
+  // tree from the resolved model. Async + debounced + cancellable so rapid
+  // edits don't race; mirrors the diff effect's pattern.
   useEffect(() => {
     if (editMode !== "ui") return;
 
-    if (!catalogContent) {
+    const clear = () => {
       setTreeData({ nodes: [], hasCanFrames: false, hasSerialFrames: false, hasModbusFrames: false });
       setSelectedPath(null);
       setAvailablePeers([]);
+      setAvailableSlaves([]);
+      setParsedCatalogInfo(EMPTY_INFO);
+    };
+
+    if (!catalogContent) {
+      clear();
       return;
     }
 
-    try {
-      const { tree, meta, peers, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames } = parseTomlToTree(catalogContent);
+    let cancelled = false;
+    const applyParsed = ({ tree, meta, peers, slaves, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames }: ParsedCatalogTree) => {
       setTreeData({ nodes: tree, canConfig, serialConfig, modbusConfig, hasCanFrames, hasSerialFrames, hasModbusFrames });
+      setParsedCatalogInfo({ canConfig, serialConfig, modbusConfig, hasCanFrames: !!hasCanFrames, hasModbusFrames: !!hasModbusFrames, hasSerialFrames: !!hasSerialFrames });
       if (meta) setMetaFields(meta);
       setAvailablePeers(peers);
+      setAvailableSlaves(slaves);
       // Store CAN config from [meta.can] if present
       if (canConfig) {
         setCanDefaultEndianness(canConfig.default_endianness);
@@ -343,7 +390,7 @@ function CatalogEditorInner() {
       }
       // Store modbus config from [meta.modbus] if present
       if (modbusConfig) {
-        setModbusDeviceAddress(modbusConfig.device_address);
+        setModbusDeviceAddress(modbusConfig.device_address ?? 1);
         setModbusRegisterBase(modbusConfig.register_base);
         setModbusDefaultInterval(modbusConfig.default_interval);
         setModbusDefaultByteOrder(modbusConfig.default_byte_order ?? "big");
@@ -357,12 +404,24 @@ function CatalogEditorInner() {
           setSelectedPath(null);
         }
       }
-    } catch (e) {
-      console.warn("Failed to parse TOML to tree:", e);
-      setTreeData({ nodes: [], hasCanFrames: false, hasSerialFrames: false, hasModbusFrames: false });
-      setSelectedPath(null);
-      setAvailablePeers([]);
-    }
+    };
+
+    const handle = setTimeout(() => {
+      parseCatalog(catalogContent)
+        .then((cat) => {
+          if (!cancelled) applyParsed(catalogToTree(cat));
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          console.warn("Failed to parse catalogue:", e);
+          clear();
+        });
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
     // Include reloadVersion to trigger re-parse on reload (even if content unchanged)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogContent, reloadVersion, editMode]);
@@ -373,14 +432,17 @@ function CatalogEditorInner() {
       if (editMode === "text") {
         openTextFind();
       } else {
-        openFind();
+        // The sidebar search is always visible in UI mode — just focus it.
+        const input = document.getElementById(CATALOG_SEARCH_INPUT_ID) as HTMLInputElement | null;
+        input?.focus();
+        input?.select();
       }
     });
 
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [editMode, openFind, openTextFind]);
+  }, [editMode, openTextFind]);
 
   // Tree navigation handlers
   const handleNodeClick = (node: TomlNode) => {
@@ -398,11 +460,10 @@ function CatalogEditorInner() {
       selectedNode,
       onNodeClick: handleNodeClick,
       onToggleExpand: handleToggleExpand,
-      formatFrameId: formatFrameIdForDisplay,
       displayFrameIdFormat,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedNodes, selectedNode, formatFrameIdForDisplay, displayFrameIdFormat]);
+  }, [expandedNodes, selectedNode, displayFrameIdFormat]);
 
   // The protocol badges narrow the displayed tree to one protocol's frames.
   const displayTree = useMemo(
@@ -436,8 +497,6 @@ function CatalogEditorInner() {
     >
       {/* Bubble container */}
       <div className={`flex-1 flex flex-col min-h-0 rounded-lg border ${borderDataView} overflow-hidden`}>
-        {editMode === "ui" && catalogPath && <FindBar />}
-
         <div className={`flex-1 flex min-h-0 overflow-hidden ${bgDataView}`}>
         {/* Tree View Panel - Only show in UI mode */}
         {editMode === "ui" && (
@@ -462,20 +521,85 @@ function CatalogEditorInner() {
             onAddNode={handlers.handleAddNode}
             onAddCanFrame={handlers.handleAddCanFrame}
             onAddFrame={handleAddFrameWithDefaults}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
           />
         )}
 
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {migration && (
+            <div className={`flex items-start gap-3 px-4 py-2.5 border-b ${borderWarning} ${bgWarning}`}>
+              <div className="flex-1 text-xs">
+                <p className={`font-medium ${textWarning}`}>
+                  {t(
+                    "editor.migrationBanner",
+                    "Upgraded this catalogue to the latest format on load. Save to apply, or review the",
+                  )}{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("text");
+                      setTextView("diff");
+                    }}
+                    className="underline font-semibold hover:no-underline"
+                  >
+                    {t("editor.textViewDiff", "Diff")}
+                  </button>
+                  .
+                </p>
+                {migration.summary.length > 0 && (
+                  <ul className="mt-1 list-disc list-inside text-[color:var(--text-muted)]">
+                    {migration.summary.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={dismissMigration}
+                aria-label={t("common.dismiss", "Dismiss")}
+                className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+              >
+                <X className={iconSm} />
+              </button>
+            </div>
+          )}
           {editMode === "text" ? (
             <>
-              {catalogPath && <TextFindBar textareaRef={textareaRef} />}
-              <TextModeView
-                ref={textareaRef}
-                toml={catalogContent}
-                onChangeToml={setToml}
-                placeholder={t("editor.openCatalogPlaceholder")}
-                isDisabled={!catalogPath}
-              />
+              {catalogPath && (
+                <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[color:var(--border-default)] bg-[var(--bg-surface)]">
+                  <button
+                    type="button"
+                    onClick={() => setTextView("edit")}
+                    className={`px-2.5 py-1 text-xs rounded ${textView === "edit" ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}
+                  >
+                    {t("editor.textViewEdit", "Edit")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTextView("diff")}
+                    className={`px-2.5 py-1 text-xs rounded ${textView === "diff" ? "bg-[var(--bg-primary)] text-[color:var(--text-primary)]" : "text-[color:var(--text-muted)]"}`}
+                  >
+                    {t("editor.textViewDiff", "Diff")}
+                    {hasUnsavedChanges && <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-[var(--status-warning-text,#d97706)] align-middle" />}
+                  </button>
+                </div>
+              )}
+              {textView === "diff" && catalogPath ? (
+                <DiffView lines={storedDiff?.lines ?? []} />
+              ) : (
+                <>
+                  {catalogPath && <TextFindBar textareaRef={textareaRef} />}
+                  <TextModeView
+                    ref={textareaRef}
+                    toml={catalogContent}
+                    onChangeToml={setToml}
+                    placeholder={t("editor.openCatalogPlaceholder")}
+                    isDisabled={!catalogPath}
+                  />
+                </>
+              )}
             </>
           ) : (
             <div className="flex-1 p-6 overflow-y-auto overflow-x-hidden bg-[var(--bg-primary)]">
@@ -497,6 +621,7 @@ function CatalogEditorInner() {
                   fields={forms.frameFields}
                   setFields={forms.setFrameFields}
                   availablePeers={availablePeers}
+                  availableSlaves={availableSlaves}
                   allowProtocolChange={!forms.editingFrameOriginalKey}
                   defaults={catalogDefaults}
                   onCancel={handlers.handleCancelFrameEdit}
@@ -627,9 +752,21 @@ function CatalogEditorInner() {
                         forms.setEditingId(true);
                         setSelectedPath(null);
                       },
+                      onAddRegisterForSlave: (slaveAddress) => {
+                        forms.setFrameFields({
+                          protocol: "modbus",
+                          config: { protocol: "modbus", register_type: "holding", node_address: slaveAddress },
+                          base: { length: 1 },
+                          modbusFrameKey: "",
+                        });
+                        forms.setEditingFrameOriginalKey(null);
+                        forms.setEditingFrame(true);
+                        setSelectedPath(null);
+                      },
                       onEditNode: handlers.handleEditNode,
                       onDeleteNode: handlers.handleRequestDeleteNode,
                       onRequestDeleteFrame: handlers.handleDeleteId,
+                      onRequestDeleteRegister: (key) => handlers.handleDeleteFrame("modbus", key),
                       onRequestDeleteSignal: (idKey, index, parentPath, signalName) =>
                         handlers.requestDeleteSignal(idKey, index, parentPath, signalName),
                     }}

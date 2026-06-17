@@ -23,7 +23,7 @@ export default function ModbusFrameView({
   const deviceAddressInherited = selectedNode.metadata?.deviceAddressInherited;
   const registerType = selectedNode.metadata?.registerType ?? "holding";
   const length = selectedNode.metadata?.length;
-  const transmitter = selectedNode.metadata?.transmitter;
+  const slave = selectedNode.metadata?.node;
   const interval = selectedNode.metadata?.interval;
   const intervalInherited = selectedNode.metadata?.intervalInherited;
   const notes = selectedNode.metadata?.notes;
@@ -105,16 +105,14 @@ export default function ModbusFrameView({
           </div>
         </div>
 
-        {transmitter && (
-          <div className={`p-4 ${bgSecondary} rounded-lg`}>
-            <div className={labelSmallMuted}>
-              {t("modbusFrame.transmitter")}
-            </div>
-            <div className={monoBody}>
-              {transmitter}
-            </div>
+        <div className={`p-4 ${bgSecondary} rounded-lg`}>
+          <div className={labelSmallMuted}>
+            {t("modbusFrame.slave")}
           </div>
-        )}
+          <div className={monoBody}>
+            {slave ?? <span className="text-orange-500">{t("modbusFrame.notSet")}</span>}
+          </div>
+        </div>
 
         {interval !== undefined && (
           <div className={`p-4 ${bgSecondary} rounded-lg`}>

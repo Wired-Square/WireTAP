@@ -63,7 +63,6 @@ export default function UnifiedConfigDialog({
   // Modbus config
   const modbusConfig = useCatalogEditorStore((s) => s.tree.modbusConfig);
   const hasModbusFrames = useCatalogEditorStore((s) => s.tree.hasModbusFrames);
-  const modbusDeviceAddress = useCatalogEditorStore((s) => s.forms.modbusDeviceAddress);
   const setModbusDeviceAddress = useCatalogEditorStore((s) => s.setModbusDeviceAddress);
   const modbusRegisterBase = useCatalogEditorStore((s) => s.forms.modbusRegisterBase);
   const setModbusRegisterBase = useCatalogEditorStore((s) => s.setModbusRegisterBase);
@@ -169,8 +168,7 @@ export default function UnifiedConfigDialog({
 
   // Validation
   const isMetaValid = metaFields.name.trim() !== "" && metaFields.version >= 1;
-  const isModbusValid = !modbusEnabled || (modbusDeviceAddress >= 1 && modbusDeviceAddress <= 247);
-  const isValid = isMetaValid && isModbusValid;
+  const isValid = isMetaValid;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -254,8 +252,6 @@ export default function UnifiedConfigDialog({
               onToggleExpanded={() => setModbusExpanded(!modbusExpanded)}
               onAdd={handleAddModbusConfig}
               onRemove={handleRemoveModbusConfig}
-              deviceAddress={modbusDeviceAddress}
-              setDeviceAddress={setModbusDeviceAddress}
               registerBase={modbusRegisterBase}
               setRegisterBase={setModbusRegisterBase}
               defaultInterval={modbusDefaultInterval}

@@ -3,7 +3,7 @@
 // Candidate generation and interest scoring for the Hypothesis Explorer.
 // Uses Discovery payload analysis results to rank signal hypotheses.
 
-import type { HypothesisParams } from '../stores/graphStore';
+import type { HypothesisParams } from '../stores/dashboardStore';
 import type { PayloadAnalysisResult, ByteRole } from './analysis/payloadAnalysis';
 
 /** Configuration for generating hypothesis candidates */

@@ -13,9 +13,8 @@ export type ModbusConfigSectionProps = {
   onToggleExpanded: () => void;
   onAdd: () => void;
   onRemove: () => void;
-  // Config values (only used when configured)
-  deviceAddress: number;
-  setDeviceAddress: (address: number) => void;
+  // Config values (only used when configured). The device (slave) address lives
+  // on each slave node, not here.
   registerBase: 0 | 1;
   setRegisterBase: (base: 0 | 1) => void;
   defaultInterval: number | undefined;
@@ -33,8 +32,6 @@ export default function ModbusConfigSection({
   onToggleExpanded,
   onAdd,
   onRemove,
-  deviceAddress,
-  setDeviceAddress,
   registerBase,
   setRegisterBase,
   defaultInterval,
@@ -46,7 +43,6 @@ export default function ModbusConfigSection({
 }: ModbusConfigSectionProps) {
   // Status indicator
   const showWarning = hasFrames && !isConfigured;
-  const isValid = deviceAddress >= 1 && deviceAddress <= 247;
 
   return (
     <div className="border border-[color:var(--border-default)] rounded-lg overflow-hidden">
@@ -105,31 +101,6 @@ export default function ModbusConfigSection({
       {/* Content */}
       {isExpanded && isConfigured && (
         <div className="p-4 space-y-4 border-t border-[color:var(--border-default)]">
-          {/* Device Address */}
-          <div>
-            <label className={`block ${textMedium} mb-2`}>
-              Device Address <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={247}
-              value={deviceAddress}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
-                if (!isNaN(val)) setDeviceAddress(val);
-              }}
-              className={`w-full px-4 py-2 border rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
-                !isValid
-                  ? "bg-[var(--status-danger-bg)] border-[color:var(--status-danger-border)]"
-                  : "bg-[var(--bg-surface)] border-[color:var(--border-default)]"
-              }`}
-            />
-            <p className={`mt-1 ${caption}`}>
-              Modbus slave address (1-247)
-            </p>
-          </div>
-
           {/* Register Base */}
           <div>
             <label className={`block ${textMedium} mb-2`}>
@@ -215,7 +186,7 @@ export default function ModbusConfigSection({
       {/* Collapsed preview when configured but not expanded */}
       {!isExpanded && isConfigured && (
         <div className={`px-4 py-2 ${caption} border-t border-[color:var(--border-default)]`}>
-          Address: {deviceAddress} • Base: {registerBase}-based
+          Base: {registerBase}-based
           {defaultInterval !== undefined && ` • ${defaultInterval}ms`}
           {` • Byte: ${defaultByteOrder === "big" ? "BE" : "LE"}`}
           {` • Word: ${defaultWordOrder === "big" ? "BE" : "LE"}`}

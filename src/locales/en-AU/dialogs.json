@@ -36,7 +36,7 @@
       "multiSource": "Multi-source I/O with real-time streaming",
       "catalogue": "Signal catalogue editor",
       "transmission": "Frame transmission and playback",
-      "graphing": "Graphing and data visualisation"
+      "graphing": "Dashboards and data visualisation"
     },
     "licenseLabel": "License:",
     "licenseValue": "MIT License",

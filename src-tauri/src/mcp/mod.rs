@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 //! MCP server — exposes live WireTAP runtime state to an external MCP client
 //! over a localhost streamable-HTTP transport. Opt-in via settings; read-only
@@ -58,6 +57,8 @@ pub fn start(
     allow_session_control: bool,
     allow_catalog_write: bool,
     allow_catalog_modify: bool,
+    allow_dashboard_write: bool,
+    allow_ui_control: bool,
     token: String,
 ) -> Result<(), String> {
     if is_running() {
@@ -83,6 +84,8 @@ pub fn start(
                 allow_session_control,
                 allow_catalog_write,
                 allow_catalog_modify,
+                allow_dashboard_write,
+                allow_ui_control,
             ))
         },
         LocalSessionManager::default().into(),

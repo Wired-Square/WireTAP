@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 /** Frame def ID sentinel for device-owned signals (hardware config) */
 export const FRAME_DEF_ID_DEVICE = 0xFFFF;

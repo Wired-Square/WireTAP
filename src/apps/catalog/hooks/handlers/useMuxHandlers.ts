@@ -117,7 +117,7 @@ export function useMuxHandlers({
     setEditingMux(true);
   };
 
-  const handleSaveMux = () => {
+  const handleSaveMux = async () => {
     if (!muxFields.name || muxFields.start_bit === undefined || muxFields.bit_length === undefined) {
       return;
     }
@@ -131,7 +131,7 @@ export function useMuxHandlers({
       ) {
         ownerPath = currentMuxPath.slice(0, -1);
       }
-      const newContent = upsertMuxToml(catalogContent, ownerPath, muxFields);
+      const newContent = await upsertMuxToml(catalogContent, ownerPath, muxFields);
       setToml(newContent);
       setEditingMux(false);
     } catch (error) {
@@ -139,9 +139,9 @@ export function useMuxHandlers({
     }
   };
 
-  const handleDeleteMux = (muxPath: string[]) => {
+  const handleDeleteMux = async (muxPath: string[]) => {
     try {
-      const newContent = deleteMuxToml(catalogContent, muxPath);
+      const newContent = await deleteMuxToml(catalogContent, muxPath);
       setToml(newContent);
       setSelectedPath(null);
     } catch (error) {
@@ -157,12 +157,12 @@ export function useMuxHandlers({
     openDialog("addMuxCase");
   };
 
-  const handleSaveCase = () => {
+  const handleSaveCase = async () => {
     if (!caseValue.trim()) return;
 
     try {
       const notesToSave = caseNotes.trim() || undefined;
-      const { toml: newContent, didAdd } = addMuxCaseToml(
+      const { toml: newContent, didAdd } = await addMuxCaseToml(
         catalogContent,
         dialogPayload.currentMuxPath,
         caseValue,
@@ -194,7 +194,7 @@ export function useMuxHandlers({
     openDialog("editMuxCase");
   };
 
-  const handleSaveEditCase = () => {
+  const handleSaveEditCase = async () => {
     if (!caseValue.trim()) return;
 
     const muxPath = dialogPayload.editingCaseMuxPath;
@@ -203,7 +203,7 @@ export function useMuxHandlers({
 
     try {
       const notesToSave = caseNotes.trim() || undefined;
-      const { toml: newContent, success, error } = editMuxCaseToml(
+      const { toml: newContent, success, error } = await editMuxCaseToml(
         catalogContent,
         muxPath,
         originalValue,
@@ -233,9 +233,9 @@ export function useMuxHandlers({
     }
   };
 
-  const handleDeleteCase = (muxPath: string[], caseKey: string) => {
+  const handleDeleteCase = async (muxPath: string[], caseKey: string) => {
     try {
-      const newContent = deleteMuxCaseToml(catalogContent, muxPath, caseKey);
+      const newContent = await deleteMuxCaseToml(catalogContent, muxPath, caseKey);
       setToml(newContent);
       setSelectedPath(null);
     } catch (error) {

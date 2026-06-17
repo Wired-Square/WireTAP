@@ -1,0 +1,192 @@
+{
+  "topBar": {
+    "addPanel": "Add panel",
+    "addInstruments": "Add catalog signals as instruments",
+    "manageLayouts": "Manage layouts",
+    "candidates": "Generate candidate signal panels",
+    "switchToGrid": "Switch to Grid View",
+    "switchToRaw": "Switch to Raw JSON View",
+    "removeAll": "Remove all panels",
+    "deleteLayout": "Delete layout",
+    "differentCatalog": "Different catalog",
+    "framesCount_one": "{{count}} frame",
+    "framesCount_other": "{{count}} frames",
+    "panelsCount": "{{count}}p",
+    "panelTypes": {
+      "lineChart": "Line Chart",
+      "gauge": "Gauge",
+      "list": "List",
+      "flow": "Flow View",
+      "heatmap": "Bit Heatmap",
+      "histogram": "Histogram",
+      "iconState": "Indicator",
+      "rotary": "Rotary / Wheel",
+      "levelBar": "Level Bar",
+      "bitfield": "Bitfield",
+      "rawCanvas": "Custom Canvas",
+      "customSvg": "Custom SVG"
+    },
+    "layouts": {
+      "saveCurrent": "Save Current Layout",
+      "save": "Save",
+      "saveFile": "File",
+      "saveFileHint": "Save as a shareable .dashboard.json file",
+      "dashboardFiles": "Dashboard files",
+      "namePlaceholder": "Layout name",
+      "noLayouts": "No saved layouts"
+    },
+    "candidatesMenu": {
+      "quick": "Quick Candidates",
+      "hypothesis": "Hypothesis Explorer"
+    }
+  },
+  "grid": {
+    "emptyState": "Add a panel using the \"Add Panel\" button above."
+  },
+  "panel": {
+    "actions": "Panel actions",
+    "signalsCount_one": "{{count}} signal",
+    "signalsCount_other": "{{count}} signals",
+    "following": "Following",
+    "followMode": "Follow mode",
+    "hideStats": "Hide stats",
+    "showStats": "Show stats",
+    "resetZoom": "Reset zoom",
+    "exportPng": "Export PNG",
+    "exportSvg": "Export SVG",
+    "exportCsv": "Export CSV",
+    "configure": "Configure",
+    "clone": "Clone",
+    "remove": "Remove"
+  },
+  "import": {
+    "placeholder": "Paste a graph layout JSON here…"
+  },
+  "catalogPicker": {
+    "title": "Select Dashboard Catalog"
+  },
+  "hypothesis": {
+    "title": "Hypothesis Explorer",
+    "fields": {
+      "frameId": "Frame ID",
+      "single": "Single",
+      "allDiscovered": "All discovered ({{count}})",
+      "selectFrameId": "Select a frame ID…",
+      "noFrames": "Start a session to discover frame IDs",
+      "bitLengths": "Bit Lengths",
+      "bitLabel": "{{bits}}-bit",
+      "endianness": "Endianness",
+      "littleEndian": "Little-endian",
+      "bigEndian": "Big-endian",
+      "bitRange": "Bit Range",
+      "byteAligned": "Byte-aligned only",
+      "startBit": "Start bit",
+      "endBit": "End bit",
+      "rangeTo": "to",
+      "signed": "Signed interpretation",
+      "useHints": "Rank using analysis hints",
+      "advancedShown": "▾ Scale & offset",
+      "advancedHidden": "▸ Scale & offset",
+      "factor": "Factor",
+      "offset": "Offset"
+    },
+    "preview": {
+      "summary_one": "{{count}} candidate will be generated",
+      "summary_other": "{{count}} candidates will be generated",
+      "cap": " (capped at 500)",
+      "noMatches": "No candidates match the current configuration"
+    },
+    "actions": {
+      "next": "Preview",
+      "back": "Back",
+      "selectAll": "All",
+      "selectNone": "None",
+      "topN": "Top {{count}}",
+      "selectionSummary_one": "{{count}} selected → {{panels}} panel",
+      "selectionSummary_other": "{{count}} selected → {{panels}} panels",
+      "generate_one": "Generate {{count}} Signal",
+      "generate_other": "Generate {{count}} Signals"
+    }
+  },
+  "candidates": {
+    "title": "Candidate Signals",
+    "fields": {
+      "frameId": "Frame ID",
+      "selectFrameId": "Select a frame ID…",
+      "noFrames": "Start a session to discover frame IDs",
+      "bitLengths": "Bit Lengths",
+      "bitLabel": "{{bits}}-bit",
+      "endianness": "Endianness",
+      "littleEndian": "Little-endian",
+      "bigEndian": "Big-endian",
+      "startByte": "Start Byte",
+      "endByte": "End Byte",
+      "useHints": "Use analysis hints (skip static/counter bytes)"
+    },
+    "preview": {
+      "summary_one": "{{count}} candidate signal will be created as line-chart panels (up to 4 per panel):",
+      "summary_other": "{{count}} candidate signals will be created as line-chart panels (up to 4 per panel):",
+      "noMatches": "No candidates match the current configuration"
+    },
+    "actions": {
+      "next": "Preview",
+      "back": "Back",
+      "generate_one": "Generate {{count}} Signal",
+      "generate_other": "Generate {{count}} Signals"
+    },
+    "byteLabel": "byte {{offset}}, {{bits}}-bit",
+    "byteLabelEndian": "byte {{offset}}, {{bits}}-bit {{endian}}",
+    "panelTitle": "Candidates: {{label}}",
+    "panelTitleRange": "Candidates: {{from}} … {{to}}"
+  },
+  "panelConfig": {
+    "title": "Configure Panel",
+    "fields": {
+      "title": "Title",
+      "titlePlaceholder": "Panel title",
+      "minValue": "Min Value",
+      "maxValue": "Max Value",
+      "primaryDisplay": "Primary Display Value",
+      "frameId": "Frame ID",
+      "selectFrameId": "Select a frame ID…",
+      "noFrames": "Start a session to discover frame IDs",
+      "byteCount": "Byte Count (1–8)",
+      "binCount": "Bin Count (5–200)",
+      "signals": "Signals",
+      "svgMode": "SVG Mode",
+      "svgModeScene": "Declarative scene",
+      "svgModeScript": "Script (returns SVG markup)",
+      "canvasCode": "Draw function (ctx, { signals, width, height, time, dt })",
+      "svgCode": "SVG function (signals, { width, height, time, dt }) → markup",
+      "customCodeHint": "Runs sandboxed in a Web Worker (no DOM, Tauri, or network). Bound signals are passed as the signals array, in order."
+    },
+    "actions": {
+      "dragReorder": "Drag to reorder",
+      "leftAxis": "Left Y-axis",
+      "rightAxis": "Right Y-axis",
+      "confidence": "Confidence: {{level}}",
+      "changeSource": "Change signal source",
+      "removeSignal": "Remove signal",
+      "addSignals": "Add signals",
+      "addSignalsLabel": "Add Signals",
+      "save": "Save"
+    }
+  },
+  "signalPicker": {
+    "panelNotFound": "Panel not found.",
+    "titleSelect": "Select Signals",
+    "titleReplace": "Replace Signal",
+    "replacing": "Replacing: {{name}}",
+    "search": "Search signals…",
+    "noMatching": "No matching signals found.",
+    "noCatalog": "No catalog loaded. Load a catalog first.",
+    "selectedCount": "{{count}} selected",
+    "signalsCount_one": "{{count}} signal",
+    "signalsCount_other": "{{count}} signals",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "titleInstruments": "Add Instruments",
+    "addInstruments": "Add as Instruments",
+    "addInstrumentsHint": "Create a pre-configured widget panel for each selected signal (using its catalog display hint, or inferred from its range/enum)"
+  }
+}

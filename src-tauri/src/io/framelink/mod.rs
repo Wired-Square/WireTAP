@@ -4,6 +4,7 @@
 // Connects via TCP, streams CAN and RS-485 frames.
 
 pub mod reader;
+pub mod registry;
 pub mod rules;
 mod shared;
 

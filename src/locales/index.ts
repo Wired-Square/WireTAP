@@ -18,7 +18,7 @@ import enAUDevices from './en-AU/devices.json';
 import enAUQuery from './en-AU/query.json';
 import enAURules from './en-AU/rules.json';
 import enAUCatalog from './en-AU/catalog.json';
-import enAUGraph from './en-AU/graph.json';
+import enAUDashboard from './en-AU/dashboard.json';
 import enAUSessionManager from './en-AU/sessionManager.json';
 import enAUSerial from './en-AU/serial.json';
 
@@ -28,7 +28,7 @@ export const SUPPORTED_LANGUAGES = ['en-AU'] as const;
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
-export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit', 'discovery', 'decoder', 'testPattern', 'analysis', 'devices', 'query', 'rules', 'catalog', 'graph', 'sessionManager', 'serial'] as const;
+export const NAMESPACES = ['common', 'settings', 'menus', 'dialogs', 'calculator', 'transmit', 'discovery', 'decoder', 'testPattern', 'analysis', 'devices', 'query', 'rules', 'catalog', 'dashboard', 'sessionManager', 'serial'] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 
 export const resources = {
@@ -47,7 +47,7 @@ export const resources = {
     query: enAUQuery,
     rules: enAURules,
     catalog: enAUCatalog,
-    graph: enAUGraph,
+    dashboard: enAUDashboard,
     sessionManager: enAUSessionManager,
     serial: enAUSerial,
   },

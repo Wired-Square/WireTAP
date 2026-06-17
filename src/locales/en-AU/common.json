@@ -211,7 +211,7 @@
     "delimiterHint": "LF=0A, CR=0D, CRLF=0D0A"
   },
   "findBar": {
-    "placeholderCatalog": "Find in catalog...",
+    "placeholderCatalog": "Search id or signal name…",
     "placeholderText": "Find in text...",
     "placeholderFrames": "Find in frames…",
     "noResults": "No results",

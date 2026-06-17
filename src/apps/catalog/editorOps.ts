@@ -1,56 +1,32 @@
 // ui/src/apps/catalog/editorOps.ts
+//
+// Catalogue edit operations. Each function is a thin async wrapper that builds an
+// `EditOp` payload and applies it in Rust (`catalog.edit` → wiretap-catalog crate,
+// via toml_edit) so comments and formatting survive — only the targeted entry
+// changes. The semantic "which fields to write" decisions live here; the
+// comment-preserving document manipulation (sorted insertion, hex masks, key
+// preservation, rename-with-refs) lives in the crate.
 
-import type { MetaFields, ProtocolType, BaseFrameFields, ProtocolConfig, ModbusConfig, SerialConfig, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig, SerialEncoding, ChecksumAlgorithm, ChecksumDefinition } from "./types";
-import { tomlParse, tomlStringify } from "./toml";
+import type { MetaFields, ProtocolType, BaseFrameFields, ProtocolConfig, SerialConfig, CanProtocolConfig, ModbusProtocolConfig, SerialProtocolConfig, ChecksumAlgorithm } from "./types";
+import { tomlParse } from "./toml";
+import { editCatalog } from "../../api/catalog";
 import { protocolRegistry } from "./protocols";
 
-
-function normalizeKeySegment(seg: string): string {
-  // Tree paths may include quoted TOML keys (e.g. "0x700", "2").
-  // Parsed objects use the raw key without quotes.
-  if (seg.startsWith('"') && seg.endsWith('"') && seg.length >= 2) {
-    return seg.slice(1, -1);
-  }
-  return seg;
-}
+// ── small pure helpers (path/data shaping stays in TS) ───────────────────────
 
 function isNumericSegment(seg: string): boolean {
   return /^-?\d+$/.test(seg);
 }
 
-/**
- * Traverse a mixed object/array structure, creating intermediate containers as needed.
- * Special-cases the "signals" key to always be an array.
- */
-function getOrCreateContainerAtPath(root: any, path: string[]): any {
-  let cur: any = root;
-
-  for (const rawSeg of path) {
-    const seg = normalizeKeySegment(rawSeg);
-
-    // If we're currently inside an array, numeric segments index into it.
-    if (Array.isArray(cur)) {
-      if (!isNumericSegment(seg)) {
-        throw new Error(`Expected numeric path segment for array, got: ${seg}`);
-      }
-      const idx = Number(seg);
-      if (!cur[idx] || typeof cur[idx] !== "object" || Array.isArray(cur[idx])) {
-        cur[idx] = {};
-      }
-      cur = cur[idx];
-      continue;
-    }
-
-    // Otherwise we're in an object.
-    if (seg === "signals") {
-      cur = ensureArray(cur, "signals");
-      continue;
-    }
-
-    cur = ensureObject(cur, seg);
+/** Drop only-undefined keys; keep `false`/`0`/`""`. Mirrors the old "only write
+ *  non-default fields" object building (undefined is dropped by JSON anyway, but
+ *  being explicit keeps payloads clean). */
+function compact<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) out[k] = v;
   }
-
-  return cur;
+  return out;
 }
 
 function normalizeSignalTarget(targetPath: string[], index: number | null): { ownerPath: string[]; index: number | null } {
@@ -62,398 +38,158 @@ function normalizeSignalTarget(targetPath: string[], index: number | null): { ow
     isNumericSegment(targetPath[targetPath.length - 1])
   ) {
     const idx = Number(targetPath[targetPath.length - 1]);
-    const ownerPath = targetPath.slice(0, -2);
-    return { ownerPath, index: idx };
+    return { ownerPath: targetPath.slice(0, -2), index: idx };
   }
-
   return { ownerPath: targetPath, index };
 }
 
-function ensureObject(obj: any, key: string): any {
-  const k = normalizeKeySegment(key);
-  if (!obj[k] || typeof obj[k] !== "object" || Array.isArray(obj[k])) {
-    obj[k] = {};
-  }
-  return obj[k];
-}
-
-function getContainerAtPath(root: any, path: string[]): any | undefined {
-  let cur: any = root;
-
-  for (const rawSeg of path) {
-    if (cur === undefined || cur === null) return undefined;
-    const seg = normalizeKeySegment(rawSeg);
-
-    if (Array.isArray(cur)) {
-      if (!isNumericSegment(seg)) return undefined;
-      cur = cur[Number(seg)];
-      continue;
-    }
-
-    if (typeof cur !== "object") return undefined;
-    cur = (cur as any)[seg];
-  }
-
-  return cur;
-}
-
-function getOrCreatePath(root: any, path: string[]): any {
-  return getOrCreateContainerAtPath(root, path);
-}
-
-function ensureArray(obj: any, key: string): any[] {
-  const k = normalizeKeySegment(key);
-  if (!obj[k] || !Array.isArray(obj[k])) obj[k] = [];
-  return obj[k];
-}
-
-function numericKeyCompare(a: string, b: string): number {
-  const normalize = (v: string) => {
-    if (/^0x[0-9a-fA-F]+$/.test(v)) return parseInt(v, 16);
-    if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
-    return null;
-  };
-
-  const aNum = normalize(a);
-  const bNum = normalize(b);
-  if (aNum !== null && bNum !== null) return aNum - bNum;
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
-}
-
-function sortObjectKeysNumeric(obj: Record<string, any>): Record<string, any> {
-  const sorted: Record<string, any> = {};
-  Object.keys(obj)
-    .sort(numericKeyCompare)
-    .forEach((k) => {
-      sorted[k] = obj[k];
-    });
-  return sorted;
-}
+// ── catalogue scaffolding ─────────────────────────────────────────────────────
 
 export function createMinimalCatalogToml(meta: MetaFields): string {
-  const cat: any = {
-    meta: {
-      name: meta.name,
-      version: meta.version,
-    },
-  };
-
-  // Protocol configs are added via upsertCanConfigToml, upsertSerialConfigToml, upsertModbusConfigToml
-  // They are stored at [meta.can], [meta.serial], [meta.modbus]
-
-  return tomlStringify(cat);
+  // Brand-new file: a plain template, no comments to preserve.
+  return `[meta]\nname = ${JSON.stringify(meta.name ?? "")}\nversion = ${meta.version ?? 1}\n`;
 }
 
-export function updateMetaToml(toml: string, meta: MetaFields): string {
-  const parsed = tomlParse(toml) as any;
-
-  // Preserve existing protocol configs when updating meta fields
-  const existingCan = parsed.meta?.can;
-  const existingSerial = parsed.meta?.serial;
-  const existingModbus = parsed.meta?.modbus;
-
-  parsed.meta = {
-    name: meta.name,
-    version: meta.version,
-    // Restore protocol configs
-    ...(existingCan && { can: existingCan }),
-    ...(existingSerial && { serial: existingSerial }),
-    ...(existingModbus && { modbus: existingModbus }),
-  };
-  return tomlStringify(parsed);
+export function updateMetaToml(toml: string, meta: MetaFields): Promise<string> {
+  // managed_keys = name/version only → existing [meta.can]/[meta.serial]/[meta.modbus] are preserved.
+  return editCatalog(toml, {
+    op: "SetTable",
+    path: ["meta"],
+    value: { name: meta.name, version: meta.version },
+    managed_keys: ["name", "version"],
+  });
 }
 
 // ============================================================================
-// CAN Protocol Config Operations
+// CAN Protocol Config
 // ============================================================================
 
-/**
- * Get the CAN protocol config from [meta.can].
- */
+/** Read [meta.can] (UI form hydration; read-only, comments irrelevant). */
 export function getCanConfig(toml: string): CanProtocolConfig | null {
   const parsed = tomlParse(toml) as any;
-  const configSection = parsed?.meta?.can;
-  if (!configSection || typeof configSection !== "object") return null;
-
-  // Support both new key (default_byte_order) and old key (default_endianness) for backwards compatibility
-  const byteOrderValue = configSection.default_byte_order ?? configSection.default_endianness;
-  const defaultEndianness = byteOrderValue === "big" ? "big" as const
-    : byteOrderValue === "little" ? "little" as const
-    : null;
-
-  // default_byte_order is required
+  const c = parsed?.meta?.can;
+  if (!c || typeof c !== "object") return null;
+  const byteOrder = c.default_byte_order ?? c.default_endianness;
+  const defaultEndianness = byteOrder === "big" ? "big" : byteOrder === "little" ? "little" : null;
   if (!defaultEndianness) return null;
-
   const config: CanProtocolConfig = { default_endianness: defaultEndianness };
-
-  // default_interval is optional
-  if (typeof configSection.default_interval === "number") {
-    config.default_interval = configSection.default_interval;
-  }
-
-  // frame_id_mask is optional (e.g., 0x1FFFFF00 for J1939)
-  if (typeof configSection.frame_id_mask === "number") {
-    config.frame_id_mask = configSection.frame_id_mask;
-  }
-
-  // default_extended is optional (default: undefined = auto-detect from ID)
-  if (typeof configSection.default_extended === "boolean") {
-    config.default_extended = configSection.default_extended;
-  }
-
-  // default_fd is optional (default: undefined = classic CAN)
-  if (typeof configSection.default_fd === "boolean") {
-    config.default_fd = configSection.default_fd;
-  }
-
-  // Header fields are parsed elsewhere (in toml.ts), not here
-
+  if (typeof c.default_interval === "number") config.default_interval = c.default_interval;
+  if (typeof c.frame_id_mask === "number") config.frame_id_mask = c.frame_id_mask;
+  if (typeof c.default_extended === "boolean") config.default_extended = c.default_extended;
+  if (typeof c.default_fd === "boolean") config.default_fd = c.default_fd;
   return config;
 }
 
-/**
- * Upsert the CAN protocol config in [meta.can].
- * This stores default_byte_order and optional default_interval.
- * Mask values are stored as hex literals in the TOML output.
- */
-export function upsertCanConfigToml(toml: string, config: CanProtocolConfig): string {
-  const parsed = tomlParse(toml) as any;
-  const meta = ensureObject(parsed, "meta");
-
-  // Build config object - use default_byte_order as the TOML key
-  const configObj: any = {
+export function upsertCanConfigToml(toml: string, config: CanProtocolConfig): Promise<string> {
+  const value: Record<string, unknown> = compact({
     default_byte_order: config.default_endianness,
-  };
-
-  if (config.default_interval !== undefined) {
-    configObj.default_interval = config.default_interval;
-  }
-
-  // Store default_extended if explicitly set
-  if (config.default_extended !== undefined) {
-    configObj.default_extended = config.default_extended;
-  }
-
-  // Store default_fd if explicitly set
-  if (config.default_fd !== undefined) {
-    configObj.default_fd = config.default_fd;
-  }
-
-  // Store frame_id_mask as hex marker string
-  if (config.frame_id_mask !== undefined) {
-    configObj.frame_id_mask = `__HEX__0x${config.frame_id_mask.toString(16).toUpperCase()}`;
-  }
-
-  // Serialize header fields if present (with masks as hex)
+    default_interval: config.default_interval,
+    default_extended: config.default_extended,
+    default_fd: config.default_fd,
+    frame_id_mask: config.frame_id_mask, // Rust renders mask/frame_id_mask as hex
+  });
   if (config.fields && Object.keys(config.fields).length > 0) {
-    const fieldsObj: any = {};
+    const fields: Record<string, unknown> = {};
     for (const [name, field] of Object.entries(config.fields)) {
-      const hexMask = `__HEX__0x${field.mask.toString(16).toUpperCase()}`;
-      const fieldObj: any = { mask: hexMask };
-      if (field.shift !== undefined && field.shift !== 0) {
-        fieldObj.shift = field.shift;
-      }
-      if (field.format && field.format !== "hex") {
-        fieldObj.format = field.format;
-      }
-      fieldsObj[name] = fieldObj;
+      fields[name] = compact({
+        mask: field.mask,
+        shift: field.shift !== undefined && field.shift !== 0 ? field.shift : undefined,
+        format: field.format && field.format !== "hex" ? field.format : undefined,
+      });
     }
-    configObj.fields = fieldsObj;
+    value.fields = fields;
   }
-
-  meta.can = configObj;
-
-  return tomlStringify(parsed);
+  return editCatalog(toml, { op: "SetTable", path: ["meta", "can"], value, replace_contents: true });
 }
 
-/**
- * Delete the CAN protocol config section from [meta.can].
- */
-export function deleteCanConfigToml(toml: string): string {
-  const parsed = tomlParse(toml) as any;
-  if (parsed?.meta?.can) {
-    delete parsed.meta.can;
-  }
-  return tomlStringify(parsed);
+export function deleteCanConfigToml(toml: string): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path: ["meta", "can"] });
 }
 
 // ============================================================================
-// Serial Protocol Config Operations
+// Serial Protocol Config
 // ============================================================================
 
-/**
- * Get the serial protocol config from [meta.serial].
- */
 export function getSerialConfig(toml: string): SerialProtocolConfig | null {
   const parsed = tomlParse(toml) as any;
-  const configSection = parsed?.meta?.serial;
-  if (!configSection || typeof configSection !== "object") return null;
-
-  const validEncodings: SerialEncoding[] = ["slip", "cobs", "raw", "length_prefixed"];
-  if (!validEncodings.includes(configSection.encoding)) return null;
-
-  const config: SerialProtocolConfig = { encoding: configSection.encoding };
-
-  // frame_id_mask is optional (e.g., 0xFF00 to match on TYPE only, ignore COMMAND)
-  if (typeof configSection.frame_id_mask === "number") {
-    config.frame_id_mask = configSection.frame_id_mask;
-  }
-
+  const c = parsed?.meta?.serial;
+  if (!c || typeof c !== "object") return null;
+  const validEncodings = ["slip", "cobs", "raw", "length_prefixed"];
+  if (!validEncodings.includes(c.encoding)) return null;
+  const config: SerialProtocolConfig = { encoding: c.encoding };
+  if (typeof c.frame_id_mask === "number") config.frame_id_mask = c.frame_id_mask;
   return config;
 }
 
-/**
- * Upsert the serial protocol config in [meta.serial].
- * This is separate from per-frame settings - all serial frames share this config.
- */
-export function upsertSerialConfigToml(toml: string, config: SerialProtocolConfig): string {
-  const parsed = tomlParse(toml) as any;
-  const meta = ensureObject(parsed, "meta");
-
-  // Build config object
-  const configObj: any = {
+export function upsertSerialConfigToml(toml: string, config: SerialProtocolConfig): Promise<string> {
+  const value: Record<string, unknown> = compact({
     encoding: config.encoding,
-  };
-
-  // byte_order is optional (defaults to big endian)
-  if (config.byte_order) {
-    configObj.byte_order = config.byte_order;
-  }
-
-  // header_length is required when fields are defined
-  if (config.header_length !== undefined && config.header_length > 0) {
-    configObj.header_length = config.header_length;
-  }
-
-  // max_frame_length is optional (default: 64 in backend)
-  if (config.max_frame_length !== undefined && config.max_frame_length > 0) {
-    configObj.max_frame_length = config.max_frame_length;
-  }
-
-  // Serialize header fields if present (new mask-based format)
-  // Note: mask values are stored as hex strings with a marker prefix
-  // that gets converted to hex literals in tomlStringify
+    byte_order: config.byte_order,
+    header_length: config.header_length !== undefined && config.header_length > 0 ? config.header_length : undefined,
+    max_frame_length: config.max_frame_length !== undefined && config.max_frame_length > 0 ? config.max_frame_length : undefined,
+  });
   if (config.fields && Object.keys(config.fields).length > 0) {
-    const fieldsObj: any = {};
+    const fields: Record<string, unknown> = {};
     for (const [name, field] of Object.entries(config.fields)) {
-      // Store mask as hex marker string (e.g., "__HEX__0xFF00")
-      // This will be converted to actual hex literal in tomlStringify
-      const hexMask = `__HEX__0x${field.mask.toString(16).toUpperCase()}`;
-      const fieldObj: any = { mask: hexMask };
-      // Only include non-default values
-      if (field.endianness && field.endianness !== "big") {
-        fieldObj.endianness = field.endianness;
-      }
-      if (field.format && field.format !== "hex") {
-        fieldObj.format = field.format;
-      }
-      fieldsObj[name] = fieldObj;
+      fields[name] = compact({
+        mask: field.mask,
+        endianness: field.endianness && field.endianness !== "big" ? field.endianness : undefined,
+        format: field.format && field.format !== "hex" ? field.format : undefined,
+      });
     }
-    configObj.fields = fieldsObj;
+    value.fields = fields;
   }
-
-  // Serialize checksum config if present
   if (config.checksum) {
-    const checksumObj: any = {
+    value.checksum = compact({
       algorithm: config.checksum.algorithm,
       start_byte: config.checksum.start_byte,
       byte_length: config.checksum.byte_length,
       calc_start_byte: config.checksum.calc_start_byte,
       calc_end_byte: config.checksum.calc_end_byte,
-    };
-    if (config.checksum.big_endian) {
-      checksumObj.big_endian = true;
-    }
-    configObj.checksum = checksumObj;
+      big_endian: config.checksum.big_endian ? true : undefined,
+    });
   }
-
-  // Note: frame_id_mask is deprecated - use 'id' header field instead
-  // We don't write frame_id_mask anymore, but legacy files may still have it
-
-  meta.serial = configObj;
-
-  return tomlStringify(parsed);
+  return editCatalog(toml, { op: "SetTable", path: ["meta", "serial"], value, replace_contents: true });
 }
 
-/**
- * Delete the serial protocol config section from [meta.serial].
- */
-export function deleteSerialConfigToml(toml: string): string {
-  const parsed = tomlParse(toml) as any;
-  if (parsed?.meta?.serial) {
-    delete parsed.meta.serial;
-  }
-  return tomlStringify(parsed);
+export function deleteSerialConfigToml(toml: string): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path: ["meta", "serial"] });
 }
 
 // ============================================================================
-// Modbus Protocol Config Operations
+// Modbus Protocol Config
 // ============================================================================
 
-/**
- * Get the modbus protocol config from [meta.modbus].
- */
 export function getModbusConfig(toml: string): ModbusProtocolConfig | null {
   const parsed = tomlParse(toml) as any;
-  const configSection = parsed?.meta?.modbus;
-  if (!configSection || typeof configSection !== "object") return null;
-
-  const deviceAddress = typeof configSection.device_address === "number"
-    ? configSection.device_address
-    : undefined;
-  const registerBase = configSection.register_base === 0 || configSection.register_base === 1
-    ? (configSection.register_base as 0 | 1)
-    : undefined;
-
-  if (deviceAddress === undefined || registerBase === undefined) return null;
-
+  const c = parsed?.meta?.modbus;
+  if (!c || typeof c !== "object") return null;
+  const deviceAddress = typeof c.device_address === "number" ? c.device_address : undefined;
+  const registerBase = c.register_base === 0 || c.register_base === 1 ? (c.register_base as 0 | 1) : undefined;
+  if (registerBase === undefined) return null;
   return { device_address: deviceAddress, register_base: registerBase };
 }
 
-/**
- * Upsert the modbus protocol config in [meta.modbus].
- * This is separate from per-frame settings - all modbus frames share this config.
- */
-export function upsertModbusConfigToml(toml: string, config: ModbusProtocolConfig): string {
-  const parsed = tomlParse(toml) as any;
-  const meta = ensureObject(parsed, "meta");
-
-  // Ensure config section exists and set values
-  const modbusObj: Record<string, any> = {
-    device_address: config.device_address,
+export function upsertModbusConfigToml(toml: string, config: ModbusProtocolConfig): Promise<string> {
+  // The device address lives on each slave node, not here.
+  const value = compact({
     register_base: config.register_base,
-  };
-
-  if (config.default_interval !== undefined) {
-    modbusObj.default_interval = config.default_interval;
-  }
-
-  if (config.default_byte_order !== undefined) {
-    modbusObj.default_byte_order = config.default_byte_order;
-  }
-
-  if (config.default_word_order !== undefined) {
-    modbusObj.default_word_order = config.default_word_order;
-  }
-
-  meta.modbus = modbusObj;
-
-  return tomlStringify(parsed);
+    default_interval: config.default_interval,
+    default_byte_order: config.default_byte_order,
+    default_word_order: config.default_word_order,
+  });
+  return editCatalog(toml, { op: "SetTable", path: ["meta", "modbus"], value, replace_contents: true });
 }
 
-/**
- * Delete the modbus protocol config section from [meta.modbus].
- */
-export function deleteModbusConfigToml(toml: string): string {
-  const parsed = tomlParse(toml) as any;
-  if (parsed?.meta?.modbus) {
-    delete parsed.meta.modbus;
-  }
-  return tomlStringify(parsed);
+export function deleteModbusConfigToml(toml: string): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path: ["meta", "modbus"] });
 }
+
+// ============================================================================
+// CAN Frames (legacy direct editor)
+// ============================================================================
 
 export interface UpsertCanFrameParams {
-  /** If editing and the id changed, provide the old id */
   oldId?: string | null;
   id: string;
   length: number;
@@ -465,101 +201,52 @@ export interface UpsertCanFrameParams {
   notes?: string | string[];
 }
 
-export function upsertCanFrameToml(toml: string, p: UpsertCanFrameParams): string {
-  const parsed = tomlParse(toml) as any;
-  const frame = ensureObject(parsed, "frame");
-  const can = ensureObject(frame, "can");
-
-  const newId = normalizeKeySegment(p.id);
-  const oldId = p.oldId ? normalizeKeySegment(p.oldId) : null;
-
-  if (oldId && oldId !== newId && can[oldId]) {
-    can[newId] = can[oldId];
-    delete can[oldId];
+/** Collapse a single-element notes array to a plain string (tidier TOML). */
+function normalizeNotes(notes: string | string[] | undefined): string | string[] | undefined {
+  if (Array.isArray(notes)) {
+    if (notes.length === 0) return undefined;
+    if (notes.length === 1) return notes[0];
   }
-
-  if (!can[newId] || typeof can[newId] !== "object") can[newId] = {};
-
-  // length
-  if (!p.isLengthInherited) {
-    can[newId].length = p.length;
-  } else {
-    delete can[newId].length;
-  }
-
-  // notes (can be string or array of strings)
-  if (p.notes) {
-    // Normalize: if array with single element, store as string
-    if (Array.isArray(p.notes)) {
-      if (p.notes.length === 0) {
-        delete can[newId].notes;
-      } else if (p.notes.length === 1) {
-        can[newId].notes = p.notes[0];
-      } else {
-        can[newId].notes = p.notes;
-      }
-    } else {
-      can[newId].notes = p.notes;
-    }
-  } else {
-    delete can[newId].notes;
-  }
-
-  // transmitter
-  if (p.transmitter && !p.isTransmitterInherited) {
-    can[newId].transmitter = p.transmitter;
-  } else {
-    delete can[newId].transmitter;
-  }
-
-  // interval (stored as tx.interval_ms)
-  if (p.interval !== undefined && !p.isIntervalInherited) {
-    const tx = ensureObject(can[newId], "tx");
-    tx.interval_ms = p.interval;
-  } else {
-    if (can[newId].tx) {
-      delete can[newId].tx.interval_ms;
-      if (Object.keys(can[newId].tx).length === 0) delete can[newId].tx;
-    }
-  }
-
-  frame.can = sortObjectKeysNumeric(frame.can);
-
-  return tomlStringify(parsed);
+  return notes || undefined;
 }
 
-export function deleteCanFrameToml(toml: string, id: string): string {
-  const parsed = tomlParse(toml) as any;
-  const k = normalizeKeySegment(id);
-  if (parsed?.frame?.can && parsed.frame.can[k]) {
-    delete parsed.frame.can[k];
-    parsed.frame.can = sortObjectKeysNumeric(parsed.frame.can);
-  }
-  return tomlStringify(parsed);
+export function upsertCanFrameToml(toml: string, p: UpsertCanFrameParams): Promise<string> {
+  const value: Record<string, unknown> = compact({
+    length: p.isLengthInherited ? undefined : p.length,
+    notes: normalizeNotes(p.notes),
+    transmitter: p.transmitter && !p.isTransmitterInherited ? p.transmitter : undefined,
+    tx: p.interval !== undefined && !p.isIntervalInherited ? { interval_ms: p.interval } : undefined,
+  });
+  return editCatalog(toml, {
+    op: "UpsertFrame",
+    protocol: "can",
+    key: p.id,
+    value,
+    managed_keys: ["length", "notes", "transmitter", "tx"],
+    rename_from: p.oldId ?? undefined,
+  });
+}
+
+export function deleteCanFrameToml(toml: string, id: string): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path: ["frame", "can", id] });
 }
 
 // ============================================================================
-// Generic Frame Operations (Protocol-Agnostic)
+// Generic Frames (CAN/Modbus/Serial via the protocol registry)
 // ============================================================================
 
 export interface UpsertFrameParams {
   protocol: ProtocolType;
   base: BaseFrameFields;
   config: ProtocolConfig;
-  /** The TOML key for this frame (the user's chosen name/register). Falls back
-   *  to the handler's `getFrameKey(config)` when not supplied. */
   key?: string;
-  /** Original key if editing (to handle renames) */
   originalKey?: string;
-  /** Which fields are inherited (omit from TOML) */
   omitInherited?: {
     length?: boolean;
     transmitter?: boolean;
     interval?: boolean;
-    deviceAddress?: boolean;
     registerBase?: boolean;
   };
-  /** Initial signals to add for new frames (only applied if frame doesn't exist) */
   initialSignals?: Array<{
     name: string;
     start_bit: number;
@@ -569,169 +256,49 @@ export interface UpsertFrameParams {
   }>;
 }
 
-/**
- * Generic function to upsert any frame type using the protocol registry.
- * Protocol handlers serialize their config to TOML-compatible objects.
- */
-export function upsertFrameToml(toml: string, params: UpsertFrameParams): string {
+export function upsertFrameToml(toml: string, params: UpsertFrameParams): Promise<string> {
   const { protocol, base, config, key, originalKey, omitInherited, initialSignals } = params;
-
   const handler = protocolRegistry.get(protocol);
-  if (!handler) {
-    throw new Error(`Unknown protocol: ${protocol}`);
+  if (!handler) throw new Error(`Unknown protocol: ${protocol}`);
+
+  const frameKey = (key?.trim() || handler.getFrameKey(config));
+  // The handler decides which scalar fields to write; strip sub-tables so the
+  // Rust merge preserves any existing signals/mux/checksum on the frame.
+  const serialized = handler.serializeFrame(frameKey, base, config, omitInherited);
+  const value: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(serialized)) {
+    if (k === "signals" || k === "mux" || k === "checksum") continue;
+    if (v !== undefined) value[k] = v;
   }
 
-  const parsed = tomlParse(toml) as any;
-  const frame = ensureObject(parsed, "frame");
-  const protocolSection = ensureObject(frame, protocol);
-
-  // Prefer the caller-supplied key (the user's chosen name/register); fall back
-  // to the handler deriving one from config for legacy callers.
-  const newKey = normalizeKeySegment(key?.trim() || handler.getFrameKey(config));
-  const oldKey = originalKey ? normalizeKeySegment(originalKey) : null;
-
-  // Check if this is a new frame (no existing data)
-  const isNewFrame = !protocolSection[newKey] && !oldKey;
-
-  // Handle rename: copy data from old key to new key, then delete old
-  if (oldKey && oldKey !== newKey && protocolSection[oldKey]) {
-    protocolSection[newKey] = protocolSection[oldKey];
-    delete protocolSection[oldKey];
-  }
-
-  // Use the handler to serialize the frame
-  const serialized = handler.serializeFrame(newKey, base, config, omitInherited);
-
-  // Merge with existing data (preserves signals, mux, etc.)
-  if (!protocolSection[newKey] || typeof protocolSection[newKey] !== "object") {
-    protocolSection[newKey] = {};
-  }
-
-  // Update frame properties (but keep signals and mux intact)
-  const existing = protocolSection[newKey];
-  const existingSignals = existing.signals;
-  const existingMux = existing.mux;
-
-  // Apply serialized data
-  Object.assign(protocolSection[newKey], serialized);
-
-  // Restore signals and mux if they weren't in the serialized output
-  if (existingSignals && !serialized.signals) {
-    protocolSection[newKey].signals = existingSignals;
-  }
-  if (existingMux && !serialized.mux) {
-    protocolSection[newKey].mux = existingMux;
-  }
-
-  // Add initial signals for new frames (if provided and no existing signals)
-  if (isNewFrame && initialSignals && initialSignals.length > 0 && !protocolSection[newKey].signals) {
-    protocolSection[newKey].signals = initialSignals;
-  }
-
-  // Sort keys numerically for CAN frames
-  if (protocol === "can") {
-    frame.can = sortObjectKeysNumeric(frame.can);
-  }
-
-  return tomlStringify(parsed);
-}
-
-/**
- * Delete a frame by protocol and key.
- */
-export function deleteFrameToml(toml: string, protocol: ProtocolType, key: string): string {
-  const parsed = tomlParse(toml) as any;
-  const k = normalizeKeySegment(key);
-
-  if (parsed?.frame?.[protocol] && parsed.frame[protocol][k]) {
-    delete parsed.frame[protocol][k];
-
-    // Sort keys for CAN frames
-    if (protocol === "can") {
-      parsed.frame.can = sortObjectKeysNumeric(parsed.frame.can);
-    }
-  }
-
-  return tomlStringify(parsed);
-}
-
-/**
- * Get all existing frame keys for a protocol (for duplicate detection).
- */
-export function getFrameKeys(toml: string, protocol: ProtocolType): string[] {
-  const parsed = tomlParse(toml) as any;
-  const protocolSection = parsed?.frame?.[protocol];
-  if (!protocolSection || typeof protocolSection !== "object") {
-    return [];
-  }
-  return Object.keys(protocolSection);
-}
-
-// ============================================================================
-// Protocol-Specific Wrappers (Backward Compatibility)
-// ============================================================================
-
-/**
- * Upsert a Modbus frame.
- */
-export interface UpsertModbusFrameParams {
-  /** If editing and the key changed, provide the old key */
-  oldKey?: string | null;
-  /** Friendly name / TOML key */
-  key: string;
-  registerNumber: number;
-  deviceAddress: number;
-  registerType?: "holding" | "input" | "coil" | "discrete";
-  length?: number;
-  transmitter?: string;
-  interval?: number;
-  notes?: string | string[];
-  isDeviceAddressInherited?: boolean;
-  isIntervalInherited?: boolean;
-}
-
-export function upsertModbusFrameToml(toml: string, p: UpsertModbusFrameParams): string {
-  const base: BaseFrameFields = {
-    length: p.length ?? 1,
-    transmitter: p.transmitter,
-    interval: p.interval,
-    notes: p.notes,
-  };
-
-  const config: ModbusConfig = {
-    protocol: "modbus",
-    register_number: p.registerNumber,
-    device_address: p.deviceAddress,
-    register_type: p.registerType ?? "holding",
-  };
-
-  return upsertFrameToml(toml, {
-    protocol: "modbus",
-    base,
-    config,
-    originalKey: p.oldKey ?? undefined,
-    omitInherited: {
-      deviceAddress: p.isDeviceAddressInherited,
-      interval: p.isIntervalInherited,
-    },
+  return editCatalog(toml, {
+    op: "UpsertFrame",
+    protocol,
+    key: frameKey,
+    value,
+    managed_keys: [], // merge-only (matches the previous Object.assign semantics)
+    rename_from: originalKey ?? undefined,
+    initial_signals: initialSignals ?? [],
   });
 }
 
-/**
- * Delete a Modbus frame.
- */
-export function deleteModbusFrameToml(toml: string, key: string): string {
+export function deleteFrameToml(toml: string, protocol: ProtocolType, key: string): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path: ["frame", protocol, key] });
+}
+
+/** Existing frame keys for a protocol (duplicate detection; read-only). */
+export function getFrameKeys(toml: string, protocol: ProtocolType): string[] {
+  const parsed = tomlParse(toml) as any;
+  const section = parsed?.frame?.[protocol];
+  return section && typeof section === "object" ? Object.keys(section) : [];
+}
+
+export function deleteModbusFrameToml(toml: string, key: string): Promise<string> {
   return deleteFrameToml(toml, "modbus", key);
 }
 
-/**
- * Upsert a Serial frame.
- * NOTE: Encoding is NOT set per-frame - it's in [meta.serial]
- */
 export interface UpsertSerialFrameParams {
-  /** If editing and the key changed, provide the old key */
   oldKey?: string | null;
-  /** Frame identifier / TOML key */
   frameId: string;
   length?: number;
   delimiter?: number[];
@@ -741,38 +308,25 @@ export interface UpsertSerialFrameParams {
   isIntervalInherited?: boolean;
 }
 
-export function upsertSerialFrameToml(toml: string, p: UpsertSerialFrameParams): string {
-  const base: BaseFrameFields = {
-    length: p.length ?? 0,
-    transmitter: p.transmitter,
-    interval: p.interval,
-    notes: p.notes,
-  };
-
-  const config: SerialConfig = {
-    protocol: "serial",
-    frame_id: p.frameId,
-    delimiter: p.delimiter,
-    // NOTE: encoding is NOT here - it's in [meta.serial]
-  };
-
+export function upsertSerialFrameToml(toml: string, p: UpsertSerialFrameParams): Promise<string> {
+  const base: BaseFrameFields = { length: p.length ?? 0, transmitter: p.transmitter, interval: p.interval, notes: p.notes };
+  const config: SerialConfig = { protocol: "serial", frame_id: p.frameId, delimiter: p.delimiter };
   return upsertFrameToml(toml, {
     protocol: "serial",
     base,
     config,
     originalKey: p.oldKey ?? undefined,
-    omitInherited: {
-      interval: p.isIntervalInherited,
-    },
+    omitInherited: { interval: p.isIntervalInherited },
   });
 }
 
-/**
- * Delete a Serial frame.
- */
-export function deleteSerialFrameToml(toml: string, key: string): string {
+export function deleteSerialFrameToml(toml: string, key: string): Promise<string> {
   return deleteFrameToml(toml, "serial", key);
 }
+
+// ============================================================================
+// Signals
+// ============================================================================
 
 export interface SignalData {
   name: string;
@@ -791,64 +345,48 @@ export interface SignalData {
   notes?: string;
 }
 
-export function upsertSignalToml(toml: string, targetPath: string[], signal: SignalData, index: number | null): string {
-  const parsed = tomlParse(toml) as any;
-  const normalized = normalizeSignalTarget(targetPath, index);
-  const target = getOrCreatePath(parsed, normalized.ownerPath);
-  const signals = ensureArray(target, "signals");
-  const signalIndex = normalized.index;
+const SIGNAL_SORT_KEYS = ["start_bit", "bit_length", "name"];
 
-  // only include non-default fields (keeps TOML tidy)
-  const data: any = {
+export function upsertSignalToml(toml: string, targetPath: string[], signal: SignalData, index: number | null): Promise<string> {
+  const { ownerPath, index: idx } = normalizeSignalTarget(targetPath, index);
+  const value = compact({
     name: signal.name,
     start_bit: signal.start_bit,
     bit_length: signal.bit_length,
-  };
-
-  if (signal.factor !== undefined && signal.factor !== 1) data.factor = signal.factor;
-  if (signal.offset !== undefined && signal.offset !== 0) data.offset = signal.offset;
-  if (signal.unit) data.unit = signal.unit;
-  if (signal.signed !== undefined) data.signed = signal.signed;
-  if (signal.endianness) data.byte_order = signal.endianness;
-  if (signal.min !== undefined) data.min = signal.min;
-  if (signal.max !== undefined) data.max = signal.max;
-  if (signal.format) data.format = signal.format;
-  if (signal.confidence) data.confidence = signal.confidence;
-  if (signal.enum) data.enum = signal.enum;
-  if (signal.notes) data.notes = signal.notes;
-
-  if (signalIndex !== null && signalIndex >= 0 && signalIndex < signals.length) {
-    signals[signalIndex] = data;
-  } else {
-    signals.push(data);
-  }
-
-  signals.sort((a: any, b: any) => {
-    const aStart = a.start_bit ?? 0;
-    const bStart = b.start_bit ?? 0;
-    if (aStart !== bStart) return aStart - bStart;
-    const aLen = a.bit_length ?? 0;
-    const bLen = b.bit_length ?? 0;
-    if (aLen !== bLen) return aLen - bLen;
-    return String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
+    factor: signal.factor !== undefined && signal.factor !== 1 ? signal.factor : undefined,
+    offset: signal.offset !== undefined && signal.offset !== 0 ? signal.offset : undefined,
+    unit: signal.unit || undefined,
+    signed: signal.signed,
+    byte_order: signal.endianness, // TOML key is byte_order
+    min: signal.min,
+    max: signal.max,
+    format: signal.format || undefined,
+    confidence: signal.confidence || undefined,
+    enum: signal.enum,
+    notes: signal.notes || undefined,
   });
-
-  return tomlStringify(parsed);
+  return editCatalog(toml, {
+    op: "UpsertArrayItem",
+    array_path: [...ownerPath, "signals"],
+    value,
+    index: idx ?? undefined,
+    sort_keys: SIGNAL_SORT_KEYS,
+  });
 }
 
-export function deleteSignalToml(toml: string, signalsParentPath: string[], index: number): string {
-  const parsed = tomlParse(toml) as any;
-
-  const normalized = normalizeSignalTarget(signalsParentPath, index);
-  const target = getContainerAtPath(parsed, normalized.ownerPath);
-  const idx = normalized.index;
-
-  if (target && Array.isArray((target as any).signals) && idx !== null && idx >= 0 && idx < (target as any).signals.length) {
-    (target as any).signals.splice(idx, 1);
-  }
-
-  return tomlStringify(parsed);
+export function deleteSignalToml(toml: string, signalsParentPath: string[], index: number): Promise<string> {
+  const { ownerPath, index: idx } = normalizeSignalTarget(signalsParentPath, index);
+  return editCatalog(toml, {
+    op: "RemoveArrayItem",
+    array_path: [...ownerPath, "signals"],
+    index: idx ?? index,
+    remove_if_empty: false,
+  });
 }
+
+// ============================================================================
+// Mux
+// ============================================================================
 
 export interface MuxData {
   name: string;
@@ -857,248 +395,117 @@ export interface MuxData {
   notes?: string;
 }
 
-/**
- * Upsert a mux object on the target node.
- * `muxOwnerPath` points to the frame or case object that owns the mux (NOT including "mux").
- */
-export function upsertMuxToml(toml: string, muxOwnerPath: string[], mux: MuxData): string {
-  const parsed = tomlParse(toml) as any;
-  const owner = getOrCreatePath(parsed, muxOwnerPath);
-  const muxObj = ensureObject(owner, "mux");
-  muxObj.name = mux.name;
-  muxObj.start_bit = mux.start_bit;
-  muxObj.bit_length = mux.bit_length;
-  if (mux.notes) {
-    muxObj.notes = mux.notes;
-  } else {
-    delete muxObj.notes;
-  }
-  return tomlStringify(parsed);
+export function upsertMuxToml(toml: string, muxOwnerPath: string[], mux: MuxData): Promise<string> {
+  return editCatalog(toml, {
+    op: "SetTable",
+    path: [...muxOwnerPath, "mux"],
+    value: compact({ name: mux.name, start_bit: mux.start_bit, bit_length: mux.bit_length, notes: mux.notes || undefined }),
+    managed_keys: ["name", "start_bit", "bit_length", "notes"],
+  });
 }
 
-/**
- * Delete mux at a path that includes the key "mux" as its last segment.
- */
-export function deleteMuxToml(toml: string, muxPath: string[]): string {
-  const parsed = tomlParse(toml) as any;
-  if (muxPath.length === 0) return toml;
-  const parentPath = muxPath.slice(0, -1);
-  const key = normalizeKeySegment(muxPath[muxPath.length - 1]);
-  const parent = getContainerAtPath(parsed, parentPath);
-  if (parent && typeof parent === "object") {
-    delete parent[key];
-  }
-  return tomlStringify(parsed);
+export function deleteMuxToml(toml: string, muxPath: string[]): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path: muxPath });
 }
 
-/**
- * Add a case to a mux object.
- * `muxPath` points directly to the mux object (including "mux").
- */
-export function addMuxCaseToml(toml: string, muxPath: string[], caseValue: string, notes?: string): { toml: string; didAdd: boolean } {
-  const parsed = tomlParse(toml) as any;
-  const muxObj = getOrCreatePath(parsed, muxPath);
-  const k = normalizeKeySegment(caseValue);
-  if (muxObj[k]) {
+export async function addMuxCaseToml(toml: string, muxPath: string[], caseValue: string, notes?: string): Promise<{ toml: string; didAdd: boolean }> {
+  try {
+    const next = await editCatalog(toml, {
+      op: "SetTable",
+      path: [...muxPath, caseValue],
+      value: compact({ notes: notes || undefined }),
+      managed_keys: ["notes"],
+      error_if_exists: true,
+    });
+    return { toml: next, didAdd: true };
+  } catch {
     return { toml, didAdd: false };
   }
-  const caseObj: Record<string, any> = {};
-  if (notes) {
-    caseObj.notes = notes;
-  }
-  muxObj[k] = caseObj;
-  return { toml: tomlStringify(parsed), didAdd: true };
 }
 
-/**
- * Delete a mux case from a mux object.
- * `muxPath` points directly to the mux object (including "mux").
- */
-export function deleteMuxCaseToml(toml: string, muxPath: string[], caseValue: string): string {
-  const parsed = tomlParse(toml) as any;
-  const muxObj = getContainerAtPath(parsed, muxPath);
-  const k = normalizeKeySegment(caseValue);
-  if (muxObj && typeof muxObj === "object" && Object.prototype.hasOwnProperty.call(muxObj, k)) {
-    delete muxObj[k];
-  }
-  return tomlStringify(parsed);
+export function deleteMuxCaseToml(toml: string, muxPath: string[], caseValue: string): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path: [...muxPath, caseValue] });
 }
 
-/**
- * Edit a mux case - rename and/or update notes.
- * `muxPath` points directly to the mux object (including "mux").
- * `oldCaseValue` is the current case key.
- * `newCaseValue` is the new case key (can be the same if only updating notes).
- * `notes` is the new notes value (undefined to remove notes).
- */
-export function editMuxCaseToml(
+export async function editMuxCaseToml(
   toml: string,
   muxPath: string[],
   oldCaseValue: string,
   newCaseValue: string,
   notes?: string
-): { toml: string; success: boolean; error?: string } {
-  const parsed = tomlParse(toml) as any;
-  const muxObj = getContainerAtPath(parsed, muxPath);
-
-  if (!muxObj || typeof muxObj !== "object") {
-    return { toml, success: false, error: "Mux not found" };
+): Promise<{ toml: string; success: boolean; error?: string }> {
+  try {
+    const next = await editCatalog(toml, {
+      op: "RenameKey",
+      parent_path: muxPath,
+      old: oldCaseValue,
+      new: newCaseValue,
+      set_value: compact({ notes: notes || undefined }),
+      managed_keys: ["notes"],
+      error_if_exists: true,
+    });
+    return { toml: next, success: true };
+  } catch (e) {
+    return { toml, success: false, error: e instanceof Error ? e.message : String(e) };
   }
-
-  const oldKey = normalizeKeySegment(oldCaseValue);
-  const newKey = normalizeKeySegment(newCaseValue);
-
-  if (!Object.prototype.hasOwnProperty.call(muxObj, oldKey)) {
-    return { toml, success: false, error: `Case ${oldCaseValue} not found` };
-  }
-
-  // Check if renaming to an existing key (that isn't the same case)
-  if (oldKey !== newKey && Object.prototype.hasOwnProperty.call(muxObj, newKey)) {
-    return { toml, success: false, error: `Case ${newCaseValue} already exists` };
-  }
-
-  // Get the existing case data
-  const caseData = muxObj[oldKey];
-
-  // Update notes
-  if (notes) {
-    caseData.notes = notes;
-  } else {
-    delete caseData.notes;
-  }
-
-  // Handle rename if needed
-  if (oldKey !== newKey) {
-    // Create new key with the data, delete old key
-    muxObj[newKey] = caseData;
-    delete muxObj[oldKey];
-  }
-
-  return { toml: tomlStringify(parsed), success: true };
-}
-
-export function addNodeToml(toml: string, nodeName: string, notes?: string): string {
-  const parsed = tomlParse(toml) as any;
-  const node = ensureObject(parsed, "node");
-  if (!node[nodeName]) {
-    const nodeObj: Record<string, any> = {};
-    if (notes) {
-      nodeObj.notes = notes;
-    }
-    node[nodeName] = nodeObj;
-  }
-
-  const sortedNode: Record<string, any> = {};
-  for (const key of Object.keys(node).sort(numericKeyCompare)) {
-    sortedNode[key] = node[key];
-  }
-  parsed.node = sortedNode;
-
-  return tomlStringify(parsed);
-}
-
-export function deleteNodeToml(toml: string, nodeName: string): string {
-  const parsed = tomlParse(toml) as any;
-  const nodes = parsed?.node;
-  if (nodes && typeof nodes === "object") {
-    delete nodes[normalizeKeySegment(nodeName)];
-    parsed.node = sortObjectKeysNumeric(nodes);
-  }
-  return tomlStringify(parsed);
-}
-
-/**
- * Edit a node - rename and/or update notes.
- * If renamed, updates all frame transmitter references to the new name.
- */
-export function editNodeToml(
-  toml: string,
-  oldName: string,
-  newName: string,
-  notes?: string
-): { toml: string; success: boolean; error?: string } {
-  const parsed = tomlParse(toml) as any;
-  const nodes = parsed?.node;
-
-  if (!nodes || typeof nodes !== "object") {
-    return { toml, success: false, error: "No nodes section found" };
-  }
-
-  const oldKey = normalizeKeySegment(oldName);
-  const newKey = normalizeKeySegment(newName);
-
-  if (!Object.prototype.hasOwnProperty.call(nodes, oldKey)) {
-    return { toml, success: false, error: `Node ${oldName} not found` };
-  }
-
-  // Check if renaming to an existing key (that isn't the same node)
-  if (oldKey !== newKey && Object.prototype.hasOwnProperty.call(nodes, newKey)) {
-    return { toml, success: false, error: `Node ${newName} already exists` };
-  }
-
-  // Get the existing node data
-  const nodeData = nodes[oldKey] || {};
-
-  // Update notes
-  if (notes) {
-    nodeData.notes = notes;
-  } else {
-    delete nodeData.notes;
-  }
-
-  // Handle rename if needed
-  if (oldKey !== newKey) {
-    // Create new key with the data, delete old key
-    nodes[newKey] = nodeData;
-    delete nodes[oldKey];
-
-    // Update all frame transmitter references
-    const canFrames = parsed?.frame?.can;
-    if (canFrames && typeof canFrames === "object") {
-      for (const frameVal of Object.values<any>(canFrames)) {
-        if (frameVal?.transmitter === oldName) {
-          frameVal.transmitter = newName;
-        }
-      }
-    }
-
-    // Sort nodes
-    parsed.node = sortObjectKeysNumeric(nodes);
-  }
-
-  return { toml: tomlStringify(parsed), success: true };
-}
-
-/**
- * Generic delete by path. Removes the final segment from its parent (object or array).
- */
-export function deleteTomlAtPath(toml: string, path: string[]): string {
-  if (path.length === 0) return toml;
-
-  const parsed = tomlParse(toml) as any;
-  const parentPath = path.slice(0, -1);
-  const lastSeg = normalizeKeySegment(path[path.length - 1]);
-  const parent = getContainerAtPath(parsed, parentPath);
-
-  if (parent === undefined || parent === null) return tomlStringify(parsed);
-
-  if (Array.isArray(parent)) {
-    const idx = Number(lastSeg);
-    if (!Number.isNaN(idx) && idx >= 0 && idx < parent.length) {
-      parent.splice(idx, 1);
-    }
-    return tomlStringify(parsed);
-  }
-
-  if (typeof parent === "object" && Object.prototype.hasOwnProperty.call(parent, lastSeg)) {
-    delete (parent as any)[lastSeg];
-  }
-
-  return tomlStringify(parsed);
 }
 
 // ============================================================================
-// Checksum Operations
+// Nodes
+// ============================================================================
+
+export function addNodeToml(
+  toml: string,
+  nodeName: string,
+  notes?: string,
+  deviceAddress?: number,
+): Promise<string> {
+  return editCatalog(toml, {
+    op: "SetTable",
+    path: ["node", nodeName],
+    value: compact({ device_address: deviceAddress, notes: notes || undefined }),
+    managed_keys: ["device_address", "notes"],
+    sort_parent_numeric: true,
+    skip_if_exists: true,
+  });
+}
+
+export function deleteNodeToml(toml: string, nodeName: string): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path: ["node", nodeName] });
+}
+
+export async function editNodeToml(
+  toml: string,
+  oldName: string,
+  newName: string,
+  notes?: string,
+  deviceAddress?: number,
+): Promise<{ toml: string; success: boolean; error?: string }> {
+  try {
+    const next = await editCatalog(toml, {
+      op: "RenameKey",
+      parent_path: ["node"],
+      old: oldName,
+      new: newName,
+      set_value: compact({ device_address: deviceAddress, notes: notes || undefined }),
+      managed_keys: ["device_address", "notes"],
+      sort_numeric: true,
+      update_transmitter_refs: true,
+      error_if_exists: true,
+    });
+    return { toml: next, success: true };
+  } catch (e) {
+    return { toml, success: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Generic delete: removes the final path segment from its parent. */
+export function deleteTomlAtPath(toml: string, path: string[]): Promise<string> {
+  return editCatalog(toml, { op: "DeleteAtPath", path });
+}
+
+// ============================================================================
+// Checksums
 // ============================================================================
 
 export interface ChecksumData {
@@ -1112,72 +519,38 @@ export interface ChecksumData {
   notes?: string;
 }
 
-/**
- * Upsert a checksum in the target frame's checksum array.
- * `checksumParentPath` points to the frame that owns the checksum array (e.g., ["frame", "serial", "0x01"]).
- * If `index` is provided, updates existing checksum at that index; otherwise adds a new one.
- */
+const CHECKSUM_SORT_KEYS = ["start_byte", "name"];
+
 export function upsertChecksumToml(
   toml: string,
   checksumParentPath: string[],
   checksum: ChecksumData,
   index: number | null
-): string {
-  const parsed = tomlParse(toml) as any;
-  const target = getOrCreatePath(parsed, checksumParentPath);
-  const checksums = ensureArray(target, "checksum");
-
-  // Build checksum object with only non-default fields
-  const data: ChecksumDefinition = {
+): Promise<string> {
+  const value = compact({
     name: checksum.name,
     algorithm: checksum.algorithm,
     start_byte: checksum.start_byte,
     byte_length: checksum.byte_length,
     calc_start_byte: checksum.calc_start_byte,
     calc_end_byte: checksum.calc_end_byte,
-  };
-
-  // Only include optional fields if set
-  if (checksum.endianness && checksum.byte_length > 1) {
-    data.endianness = checksum.endianness;
-  }
-  if (checksum.notes) {
-    data.notes = checksum.notes;
-  }
-
-  if (index !== null && index >= 0 && index < checksums.length) {
-    checksums[index] = data;
-  } else {
-    checksums.push(data);
-  }
-
-  // Sort checksums by start_byte for consistent ordering
-  checksums.sort((a: any, b: any) => {
-    const aStart = a.start_byte ?? 0;
-    const bStart = b.start_byte ?? 0;
-    if (aStart !== bStart) return aStart - bStart;
-    return String(a.name || "").localeCompare(String(b.name || ""), undefined, { numeric: true, sensitivity: "base" });
+    endianness: checksum.endianness && checksum.byte_length > 1 ? checksum.endianness : undefined,
+    notes: checksum.notes || undefined,
   });
-
-  return tomlStringify(parsed);
+  return editCatalog(toml, {
+    op: "UpsertArrayItem",
+    array_path: [...checksumParentPath, "checksum"],
+    value,
+    index: index ?? undefined,
+    sort_keys: CHECKSUM_SORT_KEYS,
+  });
 }
 
-/**
- * Delete a checksum from the target frame's checksum array.
- * `checksumParentPath` points to the frame that owns the checksum array.
- */
-export function deleteChecksumToml(toml: string, checksumParentPath: string[], index: number): string {
-  const parsed = tomlParse(toml) as any;
-  const target = getContainerAtPath(parsed, checksumParentPath);
-
-  if (target && Array.isArray(target.checksum) && index >= 0 && index < target.checksum.length) {
-    target.checksum.splice(index, 1);
-
-    // Remove empty checksum array
-    if (target.checksum.length === 0) {
-      delete target.checksum;
-    }
-  }
-
-  return tomlStringify(parsed);
+export function deleteChecksumToml(toml: string, checksumParentPath: string[], index: number): Promise<string> {
+  return editCatalog(toml, {
+    op: "RemoveArrayItem",
+    array_path: [...checksumParentPath, "checksum"],
+    index,
+    remove_if_empty: true,
+  });
 }

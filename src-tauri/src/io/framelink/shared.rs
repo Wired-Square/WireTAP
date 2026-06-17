@@ -1,5 +1,4 @@
 // Copyright (c) 2026, Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // FrameLink connection manager. FrameLink devices accept exactly one TCP
 // client, so all operations — session streaming AND signal read/write — must
@@ -21,6 +20,30 @@ use once_cell::sync::Lazy;
 use tokio::sync::Mutex;
 
 use super::{FrameLinkProbeResult, ProbeInterface};
+
+// ============================================================================
+// WS command param helpers — shared by every framelink command module
+// ============================================================================
+
+/// Convert any `Display` error into a `String`, for WS command results.
+pub(super) trait IntoStringErr<T> {
+    fn str_err(self) -> Result<T, String>;
+}
+
+impl<T, E: std::fmt::Display> IntoStringErr<T> for Result<T, E> {
+    fn str_err(self) -> Result<T, String> {
+        self.map_err(|e| e.to_string())
+    }
+}
+
+/// Extract a non-empty `device_id` string from WS command params.
+pub(super) fn get_device_id(params: &serde_json::Value) -> Result<String, String> {
+    params["device_id"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Missing 'device_id' parameter".to_string())
+}
 
 // ============================================================================
 // Types
@@ -278,7 +301,9 @@ async fn fetch_capabilities(
 
 /// Get or reconnect a managed connection by device_id.
 /// If the connection is dead, reconnects using the last known address.
-/// If the device is not in the pool, discovers it via mDNS and connects.
+/// If the device is not in the pool: a Manual registry device connects
+/// directly to its stored host (no discovery); otherwise it is resolved
+/// via mDNS and connected.
 pub(crate) async fn get_connection(
     device_id: &str,
     timeout_sec: f64,
@@ -301,6 +326,22 @@ pub(crate) async fn get_connection(
             .ok_or_else(|| format!("Reconnection to '{}' failed", device_id))
     } else {
         drop(pool);
+        // A Manual registry device resolves to its stored host with no
+        // discovery — the data/management path must honour the registry
+        // exactly as the SMP path does, so a pinned device is never scanned
+        // for on reuse. Auto/unregistered devices fall through to mDNS.
+        if let framelink::ConnectTarget::Direct(addr) =
+            framelink::target_for(&framelink::DeviceId::from(device_id), framelink::Transport::Tcp)
+        {
+            let host = addr.ip().to_string();
+            connect_by_address(&host, addr.port(), timeout_sec).await?;
+            let pool = POOL.lock().await;
+            return pool
+                .get(device_id)
+                .cloned()
+                .ok_or_else(|| format!("Manual connection to '{}' ({}) failed", device_id, addr));
+        }
+
         // Not in pool — poll the shared Discovery for an mDNS-resolved match
         let discovery = crate::device_scan::discovery_handle().await?;
         let deadline = tokio::time::Instant::now() + Duration::from_secs_f64(timeout_sec);

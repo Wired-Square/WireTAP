@@ -15,9 +15,9 @@ import {
   type SelectionSetSettingsHandlers,
 } from './handlers/useSelectionSetSettingsHandlers';
 import {
-  useGraphLayoutHandlers,
-  type GraphLayoutHandlers,
-} from './handlers/useGraphLayoutHandlers';
+  useDashboardLayoutHandlers,
+  type DashboardLayoutHandlers,
+} from './handlers/useDashboardLayoutHandlers';
 import type { IOProfile } from '../stores/settingsStore';
 import type { TimeBounds } from '../../../components/TimeBoundsInput';
 
@@ -55,13 +55,13 @@ export interface UseSettingsHandlersParams {
   resetSelectionSetForm: () => void;
   initEditSelectionSetForm: (name: string) => void;
 
-  // Graph layout form (editing)
-  graphLayoutName: string;
-  resetGraphLayoutForm: () => void;
-  initEditGraphLayoutForm: (name: string) => void;
+  // Dashboard layout form (editing)
+  dashboardLayoutName: string;
+  resetDashboardLayoutForm: () => void;
+  initEditDashboardLayoutForm: (name: string) => void;
 }
 
-export type SettingsHandlers = IOProfileHandlers & SettingsCatalogHandlers & BookmarkHandlers & SelectionSetSettingsHandlers & GraphLayoutHandlers;
+export type SettingsHandlers = IOProfileHandlers & SettingsCatalogHandlers & BookmarkHandlers & SelectionSetSettingsHandlers & DashboardLayoutHandlers;
 
 export function useSettingsHandlers(params: UseSettingsHandlersParams): SettingsHandlers {
   // IO Profile handlers (no params needed - uses store directly)
@@ -99,11 +99,11 @@ export function useSettingsHandlers(params: UseSettingsHandlersParams): Settings
     initEditSelectionSetForm: params.initEditSelectionSetForm,
   });
 
-  // Graph layout handlers
-  const graphLayoutHandlers = useGraphLayoutHandlers({
-    graphLayoutName: params.graphLayoutName,
-    resetGraphLayoutForm: params.resetGraphLayoutForm,
-    initEditGraphLayoutForm: params.initEditGraphLayoutForm,
+  // Dashboard layout handlers
+  const dashboardLayoutHandlers = useDashboardLayoutHandlers({
+    dashboardLayoutName: params.dashboardLayoutName,
+    resetDashboardLayoutForm: params.resetDashboardLayoutForm,
+    initEditDashboardLayoutForm: params.initEditDashboardLayoutForm,
   });
 
   // Spread all handlers into a flat object
@@ -112,6 +112,6 @@ export function useSettingsHandlers(params: UseSettingsHandlersParams): Settings
     ...catalogHandlers,
     ...bookmarkHandlers,
     ...selectionSetHandlers,
-    ...graphLayoutHandlers,
+    ...dashboardLayoutHandlers,
   };
 }

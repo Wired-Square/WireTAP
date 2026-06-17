@@ -21,6 +21,8 @@ type Props = {
   collapsible?: boolean;
   /** Content to show when sidebar is collapsed (e.g., icon-only buttons) */
   collapsedContent?: ReactNode;
+  /** Left-aligned content for the header row, beside the collapse toggle. */
+  header?: ReactNode;
 };
 
 export default function ResizableSidebar({
@@ -32,6 +34,7 @@ export default function ResizableSidebar({
   className = "",
   collapsible = false,
   collapsedContent,
+  header,
 }: Props) {
   const [width, setWidth] = useState(defaultWidth);
   const [isResizing, setIsResizing] = useState(false);
@@ -105,10 +108,11 @@ export default function ResizableSidebar({
     >
       {/* Header with collapse toggle - matches AppSideBar pattern */}
       {collapsible && (
-        <div className={`flex ${isCollapsed ? "justify-center" : "justify-end"} p-2 border-b ${borderDefault}`}>
+        <div className={`flex items-center gap-2 p-2 border-b ${borderDefault} ${isCollapsed ? "justify-center" : header ? "justify-between" : "justify-end"}`}>
+          {!isCollapsed && header}
           <button
             onClick={handleToggleCollapse}
-            className={`p-1.5 ${roundedDefault} ${hoverLight} ${textSecondary}`}
+            className={`p-1.5 ${roundedDefault} ${hoverLight} ${textSecondary} flex-shrink-0`}
             title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? (

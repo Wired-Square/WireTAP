@@ -88,6 +88,12 @@ export default function CatalogDialogs({
   const setNodeName = useCatalogEditorStore((s) => s.setNodeName);
   const nodeNotes = useCatalogEditorStore((s) => s.forms.nodeNotes);
   const setNodeNotes = useCatalogEditorStore((s) => s.setNodeNotes);
+  const nodeDeviceAddress = useCatalogEditorStore((s) => s.forms.nodeDeviceAddress);
+  const setNodeDeviceAddress = useCatalogEditorStore((s) => s.setNodeDeviceAddress);
+  const hasModbusFrames = useCatalogEditorStore((s) => s.tree.hasModbusFrames);
+  const hasModbusConfig = useCatalogEditorStore((s) => !!s.tree.modbusConfig);
+  // A node owns a device (slave) address only in a Modbus catalogue.
+  const showNodeDeviceAddress = hasModbusFrames || hasModbusConfig;
   const serialEncoding = useCatalogEditorStore((s) => s.forms.serialEncoding);
   const setSerialEncoding = useCatalogEditorStore((s) => s.setSerialEncoding);
   const modbusDeviceAddress = useCatalogEditorStore((s) => s.forms.modbusDeviceAddress);
@@ -201,9 +207,13 @@ export default function CatalogDialogs({
         setNodeName={setNodeName}
         nodeNotes={nodeNotes}
         setNodeNotes={setNodeNotes}
+        showDeviceAddress={showNodeDeviceAddress}
+        deviceAddress={nodeDeviceAddress}
+        setDeviceAddress={setNodeDeviceAddress}
         onCancel={() => {
           closeDialog("addNode");
           setNodeNotes("");
+          setNodeDeviceAddress(undefined);
         }}
         onAdd={handlers.handleSaveNode}
       />
@@ -214,12 +224,16 @@ export default function CatalogDialogs({
         setNodeName={setNodeName}
         nodeNotes={nodeNotes}
         setNodeNotes={setNodeNotes}
+        showDeviceAddress={showNodeDeviceAddress}
+        deviceAddress={nodeDeviceAddress}
+        setDeviceAddress={setNodeDeviceAddress}
         validationErrors={validationErrors}
         clearValidation={clearValidation}
         onCancel={() => {
           closeDialog("editNode");
           setNodeName("");
           setNodeNotes("");
+          setNodeDeviceAddress(undefined);
           setDialogPayload({ editingNodeOriginalName: null });
           clearValidation();
         }}

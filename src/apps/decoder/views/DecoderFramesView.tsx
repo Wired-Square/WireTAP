@@ -1,7 +1,7 @@
 // ui/src/apps/decoder/views/DecoderFramesView.tsx
 
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
-import { Calculator, Star, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter, Target, Send, BarChart3, Pencil } from "lucide-react";
+import { Calculator, Star, Clock, Check, X, Layers, Copy, ClipboardCopy, Filter, Target, Send, Gauge, Pencil } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { PlaybackControls } from "../../../components/PlaybackControls";
@@ -21,7 +21,7 @@ import type { DecodedFrame, DecodedSignal, DecoderViewMode, UnmatchedFrame, Filt
 import { useDecoderStore } from "../../../stores/decoderStore";
 import { useSettingsStore } from "../../../apps/settings/stores/settingsStore";
 import { useTransmitStore } from "../../../stores/transmitStore";
-import { useGraphStore } from "../../../stores/graphStore";
+import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { FrameDetail, SignalDef } from "../../../types/decoder";
@@ -1165,25 +1165,25 @@ export default function DecoderFramesView({
         },
       },
       {
-        label: 'Graph Frame',
-        icon: <BarChart3 className={iconXs} />,
+        label: 'Dashboard Frame',
+        icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
           }
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
-          openPanel("graph");
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
+          openPanel("dashboard");
         },
       },
       {
-        label: 'Graph All Signals',
-        icon: <BarChart3 className={iconXs} />,
+        label: 'Dashboard All Signals',
+        icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
           const allSignals = getAllFrameSignals(frame);
@@ -1193,8 +1193,8 @@ export default function DecoderFramesView({
           });
           if (numericSignals.length === 0) return;
 
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
@@ -1206,8 +1206,8 @@ export default function DecoderFramesView({
               gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
             }
           }
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
-          openPanel("graph");
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
+          openPanel("dashboard");
         },
       },
       {
@@ -1224,37 +1224,37 @@ export default function DecoderFramesView({
 
     return [
       {
-        label: 'Graph Frame',
-        icon: <BarChart3 className={iconXs} />,
+        label: 'Dashboard Frame',
+        icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
           }
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.id, title: formatFrameId(frame.id, displayFrameIdFormat, frame.isExtended) });
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
-          openPanel("graph");
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
+          openPanel("dashboard");
         },
       },
       {
-        label: 'Graph Signal',
-        icon: <BarChart3 className={iconXs} />,
+        label: 'Dashboard Signal',
+        icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
           }
           const panelId = gStore.addPanel('line-chart');
           gStore.addSignalToPanel(panelId, frame.id, signal.name, signal.unit);
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
-          openPanel("graph");
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
+          openPanel("dashboard");
         },
       },
       {
@@ -1312,20 +1312,20 @@ export default function DecoderFramesView({
         },
       },
       {
-        label: 'Graph Frame',
-        icon: <BarChart3 className={iconXs} />,
+        label: 'Dashboard Frame',
+        icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDecoderStore.getState().ioProfile;
-          const gStore = useGraphStore.getState();
-          // Pre-load decoder catalog so Graph can decode frames immediately after joining
+          const gStore = useDashboardStore.getState();
+          // Pre-load decoder catalog so Dashboard can decode frames immediately after joining
           const decoderCatalogPath = useDecoderStore.getState().catalogPath;
           if (decoderCatalogPath && decoderCatalogPath !== gStore.catalogPath) {
             gStore.loadCatalog(decoderCatalogPath);
           }
           const panelId = gStore.addPanel('flow');
           gStore.updatePanel(panelId, { targetFrameId: frame.frameId, title: formattedId });
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
-          openPanel("graph");
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
+          openPanel("dashboard");
         },
       },
     ];

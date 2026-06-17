@@ -272,8 +272,9 @@ async fn run_poll_loop(
         // Schedule next poll
         next_poll_time[poll_idx] = Instant::now() + Duration::from_millis(poll.interval_ms);
 
-        // Build and send request
-        let request = build_rtu_request(config.unit_id, poll);
+        // Build and send request — the slave address comes from the register's
+        // node (config.unit_id is only the connection-level fallback).
+        let request = build_rtu_request(poll.device_address, poll);
         let result = execute_rtu_request(
             &port,
             &request,
@@ -289,7 +290,7 @@ async fn run_poll_loop(
                     protocol: "modbus".to_string(),
                     timestamp_us: now_us(),
                     frame_id: poll.frame_id,
-                    bus: config.unit_id,
+                    bus: poll.device_address,
                     dlc: bytes.len() as u8,
                     bytes,
                     is_extended: false,

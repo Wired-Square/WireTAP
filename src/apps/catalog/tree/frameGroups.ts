@@ -47,8 +47,7 @@ function frameNumericId(frame: TomlNode): number {
 /** The node a frame belongs to: CAN transmitter or Modbus slave (else Unassigned). */
 function nodeKey(frame: TomlNode): string {
   if (frame.metadata?.frameType === "modbus") {
-    const addr = frame.metadata?.deviceAddress;
-    return addr != null ? `Slave ${addr}` : UNASSIGNED;
+    return frame.metadata?.node ?? UNASSIGNED;
   }
   return frame.metadata?.transmitter ?? UNASSIGNED;
 }

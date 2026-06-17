@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // BRGB colour picker — native colour wheel for RGB, brightness slider,
 // and hex input. Writes to the device only on committed changes.

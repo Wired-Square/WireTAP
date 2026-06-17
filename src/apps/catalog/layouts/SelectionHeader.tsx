@@ -12,8 +12,13 @@ export type SelectionHeaderProps = {
   onDelete?: () => void;
 };
 
-function labelForNodeType(type: TomlNode["type"]): string {
-  switch (type) {
+/** Count the signals decoded from a Modbus register (frame-level + mux cases). */
+function modbusSignalCount(node: TomlNode): number {
+  return (node.metadata?.signals?.length ?? 0) + (node.metadata?.muxSignalCount ?? 0);
+}
+
+function labelForNode(node: TomlNode): string {
+  switch (node.type) {
     case "section":
       return "Table";
     case "table-array":
@@ -27,9 +32,11 @@ function labelForNodeType(type: TomlNode["type"]): string {
     case "can-frame":
       return "CAN Frame";
     case "modbus-frame":
-      return "Modbus Frame";
+      // A register decodes one signal; more than one makes it a register group.
+      return modbusSignalCount(node) > 1 ? "Register Group" : "Register";
     case "node":
-      return "Peer";
+      // A Modbus node owns a device address; CAN/serial nodes are peers.
+      return node.metadata?.deviceAddress != null ? "Slave" : "Peer";
     case "value":
       return "Value";
     case "mux":
@@ -39,7 +46,7 @@ function labelForNodeType(type: TomlNode["type"]): string {
     case "inline-table":
       return "Inline Table";
     default:
-      return type;
+      return node.type;
   }
 }
 
@@ -89,7 +96,7 @@ export default function SelectionHeader({ selectedNode, formatFrameId, onEdit, o
       </div>
 
       <div className={`${flexRowGap2} text-sm text-[color:var(--text-muted)]`}>
-        <span className="px-2 py-1 bg-[var(--bg-surface)] rounded">{labelForNodeType(selectedNode.type)}</span>
+        <span className="px-2 py-1 bg-[var(--bg-surface)] rounded">{labelForNode(selectedNode)}</span>
         <span className="font-mono text-xs">{selectedNode.path.join(".")}</span>
         {selectedNode.metadata?.isCopy && (
           <span className="text-xs bg-[var(--accent-bg)] text-[color:var(--accent-primary)] px-2 py-1 rounded">

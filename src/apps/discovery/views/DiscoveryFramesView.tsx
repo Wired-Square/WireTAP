@@ -1,6 +1,6 @@
 // ui/src/apps/discovery/views/DiscoveryFramesView.tsx
 import React, { useEffect, useRef, useMemo, memo, useState, useCallback } from "react";
-import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw, Copy, ClipboardCopy, Target, Send, BarChart3, Bookmark, Search, Play } from "lucide-react";
+import { FileText, Hash, Network, Filter, Calculator, Snowflake, RefreshCw, Copy, ClipboardCopy, Target, Send, Gauge, Bookmark, Search, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { iconSm, iconXs, flexRowGap2 } from "../../../styles/spacing";
 import { formatIsoUs, formatHumanUs, renderDeltaNode } from "../../../utils/timeFormat";
@@ -30,7 +30,7 @@ import { bytesToHex } from "../../../utils/byteUtils";
 import { formatFrameId } from "../../../utils/frameIds";
 import { sendHexDataToCalculator, openPanel } from "../../../utils/windowCommunication";
 import { useTransmitStore } from "../../../stores/transmitStore";
-import { useGraphStore } from "../../../stores/graphStore";
+import { useDashboardStore } from "../../../stores/dashboardStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import { trackAlloc } from "../../../services/memoryDiag";
 import type { FrameRow } from "../components/FrameDataTable";
@@ -641,15 +641,15 @@ function DiscoveryFramesView({
         onClick: () => setShowReplayDialog(true),
       },
       {
-        label: 'Graph',
-        icon: <BarChart3 className={iconXs} />,
+        label: 'Dashboard',
+        icon: <Gauge className={iconXs} />,
         onClick: () => {
           const sourceSessionId = useDiscoveryUIStore.getState().ioProfile;
-          const store = useGraphStore.getState();
+          const store = useDashboardStore.getState();
           const panelId = store.addPanel('flow');
           store.updatePanel(panelId, { targetFrameId: frame.frame_id, title: formatFrameId(frame.frame_id, displayFrameIdFormat, frame.is_extended) });
-          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("graph", sourceSessionId);
-          openPanel("graph");
+          if (sourceSessionId) useSessionStore.getState().requestSessionJoin("dashboard", sourceSessionId);
+          openPanel("dashboard");
         },
       },
     ];

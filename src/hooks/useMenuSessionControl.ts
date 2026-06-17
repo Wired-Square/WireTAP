@@ -1,6 +1,6 @@
 // ui/src/hooks/useMenuSessionControl.ts
 // Centralised hook for session-control event handling and menu state reporting.
-// Replaces duplicated patterns across Decoder, Discovery, Transmit, Query, and Graph.
+// Replaces duplicated patterns across Decoder, Discovery, Transmit, Query, and Dashboard.
 //
 // Listens directly for native menu events (menu-session-*) — no MainLayout relay needed.
 // Only the focused panel responds to each event.
@@ -48,7 +48,7 @@ export interface BookmarkConfig {
 }
 
 export interface UseMenuSessionControlOptions {
-  /** Panel ID this hook is associated with (e.g. "decoder", "graph"). */
+  /** Panel ID this hook is associated with (e.g. "decoder", "dashboard"). */
   panelId: string;
   /** Current session state — reported to the native menu when this panel is focused. */
   sessionState: MenuReportState;

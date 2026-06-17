@@ -111,6 +111,30 @@ export interface RepeatStoppedEvent {
   reason: string;
 }
 
+/** A repeat transmit started outside the Transmit UI (e.g. an MCP agent). */
+export interface RepeatStartedEvent {
+  queue_id: string;
+  session_id: string;
+  profile_id: string;
+  profile_name: string;
+  frame_id: number;
+  data: number[];
+  bus: number;
+  is_extended: boolean;
+  is_fd: boolean;
+  interval_ms: number;
+  /** Where the repeat came from, e.g. `"agent"`. */
+  origin: string;
+}
+
+/**
+ * Repeat-transmit lifecycle event pushed over the WebSocket
+ * (`MsgType.RepeatEvent`), discriminated by `kind`.
+ */
+export type RepeatEvent =
+  | ({ kind: "started" } & RepeatStartedEvent)
+  | ({ kind: "stopped" } & RepeatStoppedEvent);
+
 // ============================================================================
 // Profile Query API
 // ============================================================================
@@ -295,7 +319,7 @@ export interface ReplayFrame {
 /**
  * Start a time-accurate replay of captured frames.
  * Frames are transmitted in order with delays derived from original timestamps / speed.
- * History events are emitted as `transmit-history`. A `repeat-stopped` event fires when done.
+ * Progress and completion are surfaced via the `ReplayState` WS message.
  * @param sessionId - Target session to transmit on
  * @param replayId - Unique ID for this replay (used to stop it)
  * @param frames - Frames to replay, sorted by timestamp_us ascending

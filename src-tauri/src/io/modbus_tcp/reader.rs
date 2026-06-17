@@ -58,6 +58,14 @@ pub struct PollGroup {
     pub interval_ms: u64,
     /// frame_id to emit (= catalog register_number)
     pub frame_id: u32,
+    /// Device (slave) address to poll — resolved from the register's node.
+    /// Defaults to 1 so older poll payloads without this field still load.
+    #[serde(default = "default_device_address")]
+    pub device_address: u8,
+}
+
+fn default_device_address() -> u8 {
+    1
 }
 
 /// Modbus TCP source configuration
@@ -171,7 +179,6 @@ impl IOSource for ModbusTcpSource {
             let handle = spawn_poll_task(
                 self.app.clone(),
                 self.session_id.clone(),
-                self.config.unit_id,
                 poll.clone(),
                 ctx.clone(),
                 self.cancel_flag.clone(),
@@ -253,7 +260,6 @@ impl IOSource for ModbusTcpSource {
 fn spawn_poll_task(
     _app: AppHandle,
     session_id: String,
-    unit_id: u8,
     poll: PollGroup,
     ctx: Arc<Mutex<client::Context>>,
     cancel_flag: Arc<AtomicBool>,
@@ -279,6 +285,11 @@ fn spawn_poll_task(
 
         while cadence.next().await.is_some() {
             let mut ctx = ctx.lock().await;
+
+            // One TCP connection multiplexes all slaves: point the shared
+            // context at this poll's device address before reading. Done inside
+            // the held lock so concurrent poll tasks can't race the slave id.
+            ctx.set_slave(Slave(poll.device_address));
 
             // tokio-modbus read methods return Result<Result<Vec<T>, Exception>>
             // Outer Result = IO error, Inner Result = Modbus exception
@@ -344,7 +355,7 @@ fn spawn_poll_task(
                         protocol: "modbus".to_string(),
                         timestamp_us: now_us(),
                         frame_id: poll.frame_id,
-                        bus: unit_id,
+                        bus: poll.device_address,
                         dlc: bytes.len() as u8,
                         bytes,
                         is_extended: false,

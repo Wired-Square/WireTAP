@@ -5,8 +5,9 @@ import { tlog } from '../api/settings';
 import { emit } from '@tauri-apps/api/event';
 import { WINDOW_EVENTS } from '../events/registry';
 import type { CatalogSavedPayload } from '../events/registry';
-import type { CanidFields, EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig, SerialChecksumConfig, ProtocolType } from '../apps/catalog/types';
+import type { CanidFields, EditMode, MetaFields, TomlNode, ValidationError, SerialEncoding, HeaderFieldFormat, CanProtocolConfig, SerialProtocolConfig, ModbusProtocolConfig, SerialChecksumConfig, ProtocolType, SlaveOption } from '../apps/catalog/types';
 import type { CatalogViewMode } from '../apps/catalog/tree/frameGroups';
+import type { CatalogDiff } from '../api/catalog';
 
 /** CAN header field form entry - name + field settings */
 export interface CanHeaderFieldEntry {
@@ -39,6 +40,9 @@ export interface CatalogEditorState {
     lastSavedToml: string;
     /** Increments on reload to force re-parse even when content unchanged */
     reloadVersion: number;
+    /** Rust-computed diff of `toml` vs `lastSavedToml` (drives the unsaved-changes
+     *  indicator and the Text-mode diff view). `null` until first computed. */
+    diff: CatalogDiff | null;
   };
 
   // Edit mode
@@ -65,6 +69,8 @@ export interface CatalogEditorState {
     /** Active protocol filter from the badges (null = all protocols). */
     selectedProtocol: ProtocolType | null;
     availablePeers: string[];
+    /** Declared slave nodes (name + address) for the Modbus Slave picker. */
+    availableSlaves: SlaveOption[];
     find: {
       isOpen: boolean;
       query: string;
@@ -120,6 +126,8 @@ export interface CatalogEditorState {
     mux: any;
     nodeName: string;
     nodeNotes: string;
+    /** Modbus-specific: the device (slave) address a node owns. */
+    nodeDeviceAddress?: number;
     muxCaseValue: string;
     muxCaseNotes: string;
     canDefaultEndianness: "little" | "big";  // For CAN config - stored in [meta.can]
@@ -152,19 +160,31 @@ export interface CatalogEditorState {
     isLoading: boolean;
     isSaving: boolean;
     lastError?: string;
+    /** Set when a catalogue was upgraded to the current schema on load (the
+     * working buffer holds the migrated text, the baseline the on-disk original).
+     * `null` once dismissed, saved, or when no migration occurred. */
+    migration: { summary: string[] } | null;
   };
 
   // Actions - File operations
   setDecoderDir: (dir: string) => void;
   openSuccess: (path: string, toml: string) => void;
+  /** Like {@link openSuccess} but the loaded file was upgraded on open: the
+   * working buffer is the migrated text while the diff baseline stays the
+   * on-disk original, so the upgrade shows as an unsaved, diffable change. */
+  openSuccessMigrated: (path: string, originalToml: string, migratedToml: string, summary: string[]) => void;
   openError: (error: string) => void;
   saveStart: () => void;
   saveSuccess: (toml: string) => void;
   saveError: (error: string) => void;
+  /** Dismiss the load-time migration banner. */
+  dismissMigration: () => void;
 
   // Actions - Content
   setMode: (mode: EditMode) => void;
   setToml: (toml: string) => void;
+  /** Cache the Rust-computed diff/dirty result (see {@link CatalogDiff}). */
+  setDiff: (diff: CatalogDiff | null) => void;
 
   // Actions - Validation
   setValidation: (errors: ValidationError[], isValid?: boolean) => void;
@@ -184,11 +204,14 @@ export interface CatalogEditorState {
   setSelectedPath: (path: string[] | null) => void;
   toggleExpanded: (id: string) => void;
   resetExpanded: () => void;
+  /** Expand every node that has children (skips `meta`, mirroring the renderer). */
+  expandAll: () => void;
 
   // Actions - UI
   setViewMode: (mode: CatalogViewMode) => void;
   setSelectedProtocol: (protocol: ProtocolType | null) => void;
   setAvailablePeers: (peers: string[]) => void;
+  setAvailableSlaves: (slaves: SlaveOption[]) => void;
 
   // Actions - Scroll
   setTreeScrollTop: (scrollTop: number) => void;
@@ -222,6 +245,7 @@ export interface CatalogEditorState {
   setMuxForm: (mux: any) => void;
   setNodeName: (name: string) => void;
   setNodeNotes: (notes: string) => void;
+  setNodeDeviceAddress: (addr: number | undefined) => void;
   setMuxCaseValue: (value: string) => void;
   setMuxCaseNotes: (notes: string) => void;
   setCanDefaultEndianness: (endianness: "little" | "big") => void;
@@ -283,7 +307,7 @@ const initialDialogPayload = {
 export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   // Initial state
   file: { path: null, name: null, decoderDir: '' },
-  content: { toml: '', lastSavedToml: '', reloadVersion: 0 },
+  content: { toml: '', lastSavedToml: '', reloadVersion: 0, diff: null },
   mode: 'ui',
 
   tree: {
@@ -302,6 +326,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     viewMode: 'tree',
     selectedProtocol: null,
     availablePeers: [],
+    availableSlaves: [],
     find: {
       isOpen: false,
       query: '',
@@ -346,6 +371,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     },
     nodeName: '',
     nodeNotes: '',
+    nodeDeviceAddress: undefined,
     muxCaseValue: '',
     muxCaseNotes: '',
     canDefaultEndianness: 'little',   // Default for new catalogs - stored in [meta.can]
@@ -368,7 +394,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   },
 
   validation: { errors: [], isValid: null },
-  status: { isLoading: false, isSaving: false },
+  status: { isLoading: false, isSaving: false, migration: null },
 
   // File operations
   setDecoderDir: (dir) =>
@@ -379,7 +405,7 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
     const newReloadVersion = get().content.reloadVersion + 1;
     set({
       file: { ...get().file, path, name },
-      content: { toml, lastSavedToml: toml, reloadVersion: newReloadVersion },
+      content: { toml, lastSavedToml: toml, reloadVersion: newReloadVersion, diff: null },
       tree: {
         nodes: [],
         selectedPath: null,
@@ -396,18 +422,33 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
         viewMode: 'tree',
         selectedProtocol: null,
         availablePeers: [],
+    availableSlaves: [],
         dialogs: { ...initialDialogs },
         dialogPayload: { ...initialDialogPayload },
       },
       validation: { errors: [], isValid: null },
-      status: { ...get().status, isLoading: false, lastError: undefined },
+      status: { ...get().status, isLoading: false, lastError: undefined, migration: null },
     });
+  },
+
+  openSuccessMigrated: (path, originalToml, migratedToml, summary) => {
+    // Reuse the full open reset (working buffer = migrated text), then peg the
+    // diff baseline to the on-disk original and raise the migration banner. The
+    // buffer now differs from the baseline, so the diff/dirty indicators light up.
+    get().openSuccess(path, migratedToml);
+    set((state) => ({
+      content: { ...state.content, lastSavedToml: originalToml },
+      status: { ...state.status, migration: { summary } },
+    }));
   },
 
   openError: (error) =>
     set((state) => ({
-      status: { ...state.status, isLoading: false, lastError: error },
+      status: { ...state.status, isLoading: false, lastError: error, migration: null },
     })),
+
+  dismissMigration: () =>
+    set((state) => ({ status: { ...state.status, migration: null } })),
 
   saveStart: () =>
     set((state) => ({
@@ -416,8 +457,8 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
 
   saveSuccess: (toml) => {
     set((state) => ({
-      content: { ...state.content, toml, lastSavedToml: toml },
-      status: { ...state.status, isSaving: false },
+      content: { ...state.content, toml, lastSavedToml: toml, diff: null },
+      status: { ...state.status, isSaving: false, migration: null },
     }));
 
     // Emit catalog-saved event for inter-window communication
@@ -442,7 +483,12 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   setMode: (mode) => set({ mode }),
 
   setToml: (toml) =>
-    set((state) => ({ content: { ...state.content, toml } })),
+    // Invalidate the cached diff; the editor recomputes it from Rust (debounced),
+    // so the dirty indicator falls back to a string compare for the brief gap.
+    set((state) => ({ content: { ...state.content, toml, diff: null } })),
+
+  setDiff: (diff) =>
+    set((state) => ({ content: { ...state.content, diff } })),
 
   // Validation actions
   setValidation: (errors, isValid) => set({
@@ -488,6 +534,22 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
       tree: { ...state.tree, expandedIds: new Set<string>() },
     })),
 
+  expandAll: () => {
+    const { tree } = get();
+    const ids = new Set<string>();
+    const walk = (nodes: TomlNode[]) => {
+      for (const node of nodes) {
+        const hasChildren = !!node.children && node.children.length > 0 && node.type !== "meta";
+        if (hasChildren) {
+          ids.add(node.path.join("."));
+          walk(node.children!);
+        }
+      }
+    };
+    walk(tree.nodes);
+    set({ tree: { ...tree, expandedIds: ids } });
+  },
+
   // UI actions
   setViewMode: (mode) =>
     set((state) => ({ ui: { ...state.ui, viewMode: mode } })),
@@ -497,6 +559,9 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
 
   setAvailablePeers: (peers) =>
     set((state) => ({ ui: { ...state.ui, availablePeers: peers } })),
+
+  setAvailableSlaves: (slaves) =>
+    set((state) => ({ ui: { ...state.ui, availableSlaves: slaves } })),
 
   // Scroll actions
   setTreeScrollTop: (scrollTop) =>
@@ -652,6 +717,9 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   setNodeNotes: (nodeNotes) =>
     set((state) => ({ forms: { ...state.forms, nodeNotes } })),
 
+  setNodeDeviceAddress: (nodeDeviceAddress) =>
+    set((state) => ({ forms: { ...state.forms, nodeDeviceAddress } })),
+
   setMuxCaseValue: (muxCaseValue) =>
     set((state) => ({ forms: { ...state.forms, muxCaseValue } })),
 
@@ -712,6 +780,8 @@ export const useCatalogEditorStore = create<CatalogEditorState>((set, get) => ({
   // Computed
   hasUnsavedChanges: () => {
     const { content } = get();
+    // Prefer the Rust-computed diff; fall back to a string compare until it lands.
+    if (content.diff) return content.diff.dirty;
     return content.toml !== content.lastSavedToml && content.lastSavedToml !== '';
   },
 }));

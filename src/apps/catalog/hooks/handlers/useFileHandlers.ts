@@ -3,16 +3,15 @@
 
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCatalogEditorStore } from "../../../../stores/catalogEditorStore";
-import { openCatalogAtPath, saveCatalogAtPath, pickCatalogToOpen, pickCatalogSavePath } from "../../io";
-import { parseTomlToTree } from "../../toml";
+import { openCatalogWithMigration, saveCatalogAtPath, pickCatalogToOpen, pickCatalogSavePath } from "../../io";
+import { validateCatalogWs, validateMetaWs } from "../../../../api/catalog";
 import {
   createMinimalCatalogToml,
   upsertSerialConfigToml,
   upsertModbusConfigToml,
   upsertCanConfigToml,
+  addNodeToml,
 } from "../../editorOps";
-import { validateMetaFields, validateSerialConfig } from "../../validate";
-import { validateCatalogWs } from "../../../../api/catalog";
 import type { AppSettings } from "../../../../hooks/useSettings";
 import type { ProtocolType } from "../../types";
 
@@ -29,6 +28,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
   const hasUnsavedChanges = useCatalogEditorStore((s) => s.hasUnsavedChanges);
   const setDecoderDir = useCatalogEditorStore((s) => s.setDecoderDir);
   const openSuccess = useCatalogEditorStore((s) => s.openSuccess);
+  const openSuccessMigrated = useCatalogEditorStore((s) => s.openSuccessMigrated);
 
   const catalogContent = useCatalogEditorStore((s) => s.content.toml);
   const saveSuccess = useCatalogEditorStore((s) => s.saveSuccess);
@@ -74,7 +74,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
    * @param selectedProtocol - The protocol type selected in NewCatalogDialog
    */
   const handleCreateNewCatalog = async (selectedProtocol: ProtocolType) => {
-    const errors = validateMetaFields(metaFields);
+    const errors = await validateMetaWs(metaFields);
     if (errors.length > 0) {
       setValidation(errors);
       return;
@@ -85,22 +85,24 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
 
       // Add protocol config based on selection
       if (selectedProtocol === "can") {
-        content = upsertCanConfigToml(content, {
+        content = await upsertCanConfigToml(content, {
           default_endianness: canDefaultEndianness,
           default_interval: canDefaultInterval,
           default_extended: canDefaultExtended,
           default_fd: canDefaultFd,
         });
       } else if (selectedProtocol === "modbus") {
-        content = upsertModbusConfigToml(content, {
-          device_address: modbusDeviceAddress,
+        content = await upsertModbusConfigToml(content, {
           register_base: modbusRegisterBase,
           default_interval: modbusDefaultInterval,
           default_byte_order: modbusDefaultByteOrder,
           default_word_order: modbusDefaultWordOrder,
         });
+        // Seed a first slave node so registers have somewhere to live (the
+        // device address now lives on the node, not [meta.modbus]).
+        content = await addNodeToml(content, `Slave ${modbusDeviceAddress}`, undefined, modbusDeviceAddress);
       } else if (selectedProtocol === "serial") {
-        content = upsertSerialConfigToml(content, { encoding: serialEncoding });
+        content = await upsertSerialConfigToml(content, { encoding: serialEncoding });
       }
 
       const nameBase = metaFields.name.trim() || "decoder";
@@ -126,14 +128,22 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     }
   };
 
+  // Load a catalogue from disk, applying any schema migration: the migrated text
+  // becomes the working buffer with the on-disk original as the diff baseline, so
+  // the upgrade shows as a saveable diff (and raises the migration banner).
+  const openInto = async (path: string) => {
+    const { original, migration } = await openCatalogWithMigration(path);
+    if (migration.changed) {
+      openSuccessMigrated(path, original, migration.toml, migration.summary);
+    } else {
+      openSuccess(path, original);
+    }
+  };
+
   const handleOpenFile = async () => {
     try {
       const selected = await pickCatalogToOpen(decoderDir || undefined);
-
-      if (selected) {
-        const content = await openCatalogAtPath(selected);
-        openSuccess(selected, content);
-      }
+      if (selected) await openInto(selected);
     } catch (error) {
       console.error("Failed to open catalog:", error);
     }
@@ -152,8 +162,7 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     }
 
     try {
-      const content = await openCatalogAtPath(catalogPath);
-      openSuccess(catalogPath, content);
+      await openInto(catalogPath);
     } catch (error) {
       console.error("Failed to reload catalog:", error);
     }
@@ -177,30 +186,10 @@ export function useFileHandlers({ settings, saveFrameIdFormat }: UseFileHandlers
     if (!catalogContent) return;
 
     try {
-      // Run backend validation (shared wiretap-catalog crate over the WebSocket)
+      // Whole-catalogue validation is fully owned by the wiretap-catalog crate
+      // (including the serial-encoding-required rule).
       const result = await validateCatalogWs(catalogContent);
-      const allErrors = [...result.errors];
-
-      // Also run frontend serial config validation
-      try {
-        const parsed = parseTomlToTree(catalogContent);
-        // Check if there are any serial frames (any child of frame.serial that isn't 'config')
-        const hasSerialFrames = parsed.tree.some(
-          (node) =>
-            node.path.length >= 3 &&
-            node.path[0] === "frame" &&
-            node.path[1] === "serial" &&
-            node.path[2] !== "config"
-        );
-        const serialErrors = validateSerialConfig(hasSerialFrames, parsed.serialConfig);
-        allErrors.push(...serialErrors);
-      } catch (parseError) {
-        // If parsing fails, the backend validation should have caught it
-        console.warn("Failed to parse catalog for serial config validation:", parseError);
-      }
-
-      const isValid = allErrors.length === 0;
-      setValidation(allErrors, isValid);
+      setValidation(result.errors, result.valid);
       openDialog("validationErrors");
     } catch (error) {
       console.error("Validation failed:", error);

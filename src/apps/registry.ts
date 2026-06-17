@@ -16,7 +16,7 @@ import {
   Activity,
   Send,
   DatabaseZap,
-  BarChart3,
+  Gauge,
   Workflow,
   FileText,
   Calculator,
@@ -63,12 +63,12 @@ const visualConfig = {
     watermarkBg: "bg-red-500/10 hover:bg-red-500/20",
     load: () => import("./transmit/Transmit"),
   },
-  graph: {
-    icon: BarChart3,
+  dashboard: {
+    icon: Gauge,
     colour: "text-pink-400",
     bgColour: "hover:bg-pink-500/10",
     watermarkBg: "bg-pink-500/10 hover:bg-pink-500/20",
-    load: () => import("./graph/Graph"),
+    load: () => import("./dashboard/Dashboard"),
   },
   serial: {
     icon: Terminal,
@@ -157,6 +157,8 @@ type SharedAppEntry = {
   group: AppGroup;
   accelerator?: string;
   singleton?: boolean;
+  /** Tab can have a session/source attached (consumes `requestSessionJoin`). */
+  sessionAware?: boolean;
 };
 
 /** Group order from apps.json — used by LogoMenu and Watermark for layout. */
@@ -173,6 +175,11 @@ for (const a of sharedApps) {
     );
   }
 }
+
+/** Panel ids that declare `sessionAware` in apps.json — tabs a session can be attached to. */
+export const sessionAwarePanelIds: ReadonlySet<string> = new Set(
+  sharedApps.filter((a) => a.sessionAware).map((a) => a.id),
+);
 
 export type MenuApp = SharedAppEntry & {
   i18nKey: string;

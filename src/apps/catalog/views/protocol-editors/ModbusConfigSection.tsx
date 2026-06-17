@@ -1,7 +1,7 @@
 // ui/src/apps/catalog/views/protocol-editors/ModbusConfigSection.tsx
 
 import { useTranslation } from "react-i18next";
-import type { ModbusConfig } from "../../types";
+import type { ModbusConfig, SlaveOption } from "../../types";
 import { isRegisterKey, modbusNeedsRegisterNumber, MODBUS_REGISTER_REQUIRED_MESSAGE } from "../../protocols/modbus";
 import { caption, textMedium, focusRing } from "../../../../styles";
 
@@ -11,9 +11,8 @@ export type ModbusConfigSectionProps = {
   /** The TOML key (friendly name) for this Modbus frame */
   frameKey: string;
   onFrameKeyChange: (key: string) => void;
-  isDeviceAddressInherited?: boolean;
-  onDeviceAddressInheritedChange?: (inherited: boolean) => void;
-  defaultDeviceAddress?: number;
+  /** Declared slave nodes (name + address) the register can be attributed to. */
+  availableSlaves: SlaveOption[];
   defaultRegisterBase?: 0 | 1;
 };
 
@@ -22,9 +21,7 @@ export default function ModbusConfigSection({
   onChange,
   frameKey,
   onFrameKeyChange,
-  isDeviceAddressInherited,
-  onDeviceAddressInheritedChange,
-  defaultDeviceAddress,
+  availableSlaves,
   defaultRegisterBase,
 }: ModbusConfigSectionProps) {
   const { t } = useTranslation("catalog");
@@ -82,40 +79,27 @@ export default function ModbusConfigSection({
         )}
       </div>
 
-      {/* Device Address - Required (but can be inherited) */}
+      {/* Slave - the node that owns the device address */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className={`block ${textMedium}`}>
-            {t("protocolEditors.modbusDeviceAddressLabel")} <span className="text-red-500">{t("protocolEditors.modbusDeviceAddressRequired")}</span>
-          </label>
-          {defaultDeviceAddress !== undefined && onDeviceAddressInheritedChange && (
-            <label className={`flex items-center gap-2 ${caption}`}>
-              <input
-                type="checkbox"
-                checked={isDeviceAddressInherited ?? false}
-                onChange={(e) => onDeviceAddressInheritedChange(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-[color:var(--border-default)] text-[color:var(--accent-primary)] focus:ring-[color:var(--accent-primary)]"
-              />
-              {t("protocolEditors.modbusUseDefault", { value: defaultDeviceAddress })}
-            </label>
-          )}
-        </div>
-        <input
-          type="number"
-          min="1"
-          max="247"
-          value={config.device_address}
+        <label className={`block ${textMedium} mb-2`}>
+          {t("protocolEditors.modbusSlaveLabel")}
+        </label>
+        <select
+          value={config.node_address ?? ""}
           onChange={(e) =>
-            onChange({ ...config, device_address: parseInt(e.target.value) || 1 })
+            onChange({ ...config, node_address: e.target.value === "" ? undefined : Number(e.target.value) })
           }
-          disabled={isDeviceAddressInherited}
-          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing} ${
-            isDeviceAddressInherited ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-          placeholder={t("protocolEditors.modbusDeviceAddressPlaceholder")}
-        />
+          className={`w-full px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
+        >
+          <option value="">{t("protocolEditors.modbusSlaveNone")}</option>
+          {availableSlaves.map((slave) => (
+            <option key={slave.address} value={slave.address}>
+              {slave.name} (#{slave.address})
+            </option>
+          ))}
+        </select>
         <p className={`${caption} mt-1`}>
-          {t("protocolEditors.modbusDeviceAddressHint")}
+          {t("protocolEditors.modbusSlaveHint")}
         </p>
       </div>
 

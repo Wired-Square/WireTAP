@@ -19,7 +19,7 @@ export const CAN_FD_DLC_VALUES = [8, 12, 16, 20, 24, 32, 48, 64] as const;
 // UI Timing Constants
 // =============================================================================
 
-/** Interval (ms) for batching UI updates in frame-consuming apps (Decoder, Graph) */
+/** Interval (ms) for batching UI updates in frame-consuming apps (Decoder, Dashboard) */
 export const UI_UPDATE_INTERVAL_MS = 100;
 
 /** Feedback duration (ms) after a copy-to-clipboard action */

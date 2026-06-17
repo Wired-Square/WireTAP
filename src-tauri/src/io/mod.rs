@@ -62,7 +62,7 @@ pub use codec::{SocketCanCodec, SocketCanEncodedFrame};
 pub use gs_usb::GsUsbConfig;
 pub use gvret::{BusMapping, GvretDeviceInfo, probe_gvret_tcp};
 pub use modbus_tcp::{
-    ModbusTcpConfig, ModbusTcpSource, PollGroup,
+    build_polls_from_catalog, ModbusTcpConfig, ModbusTcpSource, PollGroup,
     ModbusScanConfig, ScanCompletePayload, UnitIdScanConfig,
 };
 #[cfg(not(target_os = "ios"))]
@@ -2507,7 +2507,6 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
 }
 
 /// Check if a session exists
-#[allow(dead_code)]
 pub async fn session_exists(session_id: &str) -> bool {
     let sessions = IO_SESSIONS.lock().await;
     sessions.contains_key(session_id)

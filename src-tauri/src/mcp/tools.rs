@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 //! MCP tool definitions. Read tools are always available; control (mutation)
 //! tools are only merged into the router when `mcp_allow_control` is on.
@@ -23,6 +22,7 @@ use crate::analysis::QuerySource;
 
 /// Counter for generating unique replay IDs without a clock/RNG.
 static REPLAY_SEQ: AtomicU64 = AtomicU64::new(1);
+static REPEAT_SEQ: AtomicU64 = AtomicU64::new(1);
 
 const BRIDGE_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -39,6 +39,8 @@ impl WireTapTools {
         allow_session_control: bool,
         allow_catalog_write: bool,
         allow_catalog_modify: bool,
+        allow_dashboard_write: bool,
+        allow_ui_control: bool,
     ) -> Self {
         let mut tool_router = Self::read_router();
         if allow_control {
@@ -52,6 +54,12 @@ impl WireTapTools {
         }
         if allow_catalog_modify {
             tool_router = tool_router + Self::catalog_modify_router();
+        }
+        if allow_dashboard_write {
+            tool_router = tool_router + Self::dashboard_write_router();
+        }
+        if allow_ui_control {
+            tool_router = tool_router + Self::ui_control_router();
         }
         Self { app, tool_router }
     }
@@ -609,6 +617,79 @@ impl WireTapTools {
         ok_json(result)
     }
 
+    #[tool(description = "Start a repeating frame transmit through a session at a fixed interval — the same cadence engine that backs the Transmit app's repeat. Returns a queue_id; pass it to repeat_transmit_stop. A frame sent to a serial bus is framed onto that interface, like transmit_frame. interval_ms 250 ≈ 4 Hz.")]
+    async fn repeat_transmit_start(
+        &self,
+        Parameters(p): Parameters<RepeatTransmitStartParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let frame = crate::io::CanTransmitFrame {
+            frame_id: p.frame_id,
+            data: p.data.clone(),
+            bus: p.bus,
+            is_extended: p.is_extended,
+            is_fd: p.is_fd,
+            is_brs: false,
+            is_rtr: false,
+        };
+        let seq = REPEAT_SEQ.fetch_add(1, Ordering::Relaxed);
+        let queue_id = format!("mcp-repeat-{seq}");
+        crate::transmit::io_start_repeat_transmit(
+            p.session_id.clone(),
+            queue_id.clone(),
+            frame,
+            p.interval_ms,
+        )
+        .await
+        .map_err(err)?;
+
+        // Surface it in the Transmit UI as an agent-originated queue row so the
+        // human and the agent share one visible, controllable queue.
+        let profile_id = crate::sessions::get_session_profile_ids(&p.session_id)
+            .into_iter()
+            .next()
+            .unwrap_or_default();
+        let profile_name = crate::settings::load_settings_sync(&self.app)
+            .ok()
+            .and_then(|s| {
+                s.io_profiles
+                    .iter()
+                    .find(|pr| pr.id == profile_id)
+                    .map(|pr| pr.name.clone())
+            })
+            .unwrap_or_else(|| profile_id.clone());
+        crate::ws::dispatch::send_repeat_started(&crate::transmit::RepeatStartedEvent {
+            queue_id: queue_id.clone(),
+            session_id: p.session_id,
+            profile_id,
+            profile_name,
+            frame_id: p.frame_id,
+            data: p.data,
+            bus: p.bus,
+            is_extended: p.is_extended,
+            is_fd: p.is_fd,
+            interval_ms: p.interval_ms,
+            origin: "agent".to_string(),
+        });
+        ok_json(json!({ "queue_id": queue_id, "interval_ms": p.interval_ms }))
+    }
+
+    #[tool(description = "Stop a repeating transmit started by repeat_transmit_start, by its queue_id.")]
+    async fn repeat_transmit_stop(
+        &self,
+        Parameters(p): Parameters<RepeatTransmitStopParams>,
+    ) -> Result<CallToolResult, McpError> {
+        crate::transmit::io_stop_repeat_transmit(p.queue_id.clone())
+            .await
+            .map_err(err)?;
+        // Mark the agent's queue row stopped in the Transmit UI (the UI's own
+        // stop path updates state locally, but a backend stop needs this).
+        crate::ws::dispatch::send_repeat_stopped(&crate::transmit::RepeatStoppedEvent {
+            queue_id: p.queue_id.clone(),
+            reason: "Stopped by agent".to_string(),
+        });
+        ok_json(json!({ "stopped": p.queue_id }))
+    }
+
     #[tool(description = "Replay all CAN frames from a capture through a session with original timing. Returns a replay_id.")]
     async fn replay_capture(
         &self,
@@ -723,6 +804,25 @@ impl WireTapTools {
         let state = crate::io::stop_session(&p.session_id).await.map_err(err)?;
         ok_json(state)
     }
+
+    #[tool(description = "Surface an existing session in a source-aware tab so a human can see it. Opens or focuses the given tab (discovery, decoder, transmit, query, or dashboard) and points it at the session, replacing any source it is currently showing.")]
+    async fn attach_source(
+        &self,
+        Parameters(p): Parameters<AttachSourceParams>,
+    ) -> Result<CallToolResult, McpError> {
+        if !crate::io::session_exists(&p.session_id).await {
+            return Err(err(format!("Session '{}' not found", p.session_id)));
+        }
+        if !crate::app_registry::is_session_aware_panel(&p.panel) {
+            return Err(err(format!(
+                "'{}' is not a source-aware tab; valid tabs: {}",
+                p.panel,
+                crate::app_registry::session_aware_panel_ids().join(", ")
+            )));
+        }
+        crate::ws::dispatch::send_attach_to_panel(&p.panel, &p.session_id);
+        ok_json(json!({ "attached": p.session_id, "panel": p.panel }))
+    }
 }
 
 // ── Catalog write tools (registered when mcp_allow_catalog_write is on) ───────
@@ -773,6 +873,65 @@ impl WireTapTools {
     }
 }
 
+// ── Dashboard write tools (registered when mcp_allow_dashboard_write is on) ────
+
+/// Validate a dashboard JSON string (schema + panel widget types). The embedded
+/// custom-widget `code` is NEVER executed here — it is stored opaque and only
+/// ever runs later inside the frontend's sandboxed worker.
+fn validate_dashboard_or_reject(content: &str) -> Result<(), McpError> {
+    let value: serde_json::Value =
+        serde_json::from_str(content).map_err(|e| err(format!("Dashboard is not valid JSON: {e}")))?;
+    if value.get("schema").and_then(|s| s.as_str()) != Some("wiretap.dashboard/1") {
+        return Err(err("Dashboard 'schema' must be \"wiretap.dashboard/1\""));
+    }
+    let panels = value
+        .get("panels")
+        .and_then(|p| p.as_array())
+        .ok_or_else(|| err("Dashboard must have a 'panels' array"))?;
+    if value.get("layout").and_then(|l| l.as_array()).is_none() {
+        return Err(err("Dashboard must have a 'layout' array"));
+    }
+    const KNOWN: &[&str] = &[
+        "line-chart", "gauge", "list", "flow", "heatmap", "histogram",
+        "icon-state", "rotary", "level-bar", "bitfield", "raw-canvas", "custom-svg",
+    ];
+    for p in panels {
+        let ty = p.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        if !KNOWN.contains(&ty) {
+            return Err(err(format!("Dashboard panel has unknown widget type: {ty:?}")));
+        }
+    }
+    Ok(())
+}
+
+#[tool_router(router = dashboard_write_router)]
+impl WireTapTools {
+    #[tool(description = "Create or overwrite a dashboard artifact (*.dashboard.json, schema \"wiretap.dashboard/1\") in the dashboards directory. Validates the JSON shape and that every panel type is a known widget. Any embedded custom-widget code is stored opaque and only ever runs later inside the frontend's sandboxed worker — it is NOT executed here. Requires the dashboard-write MCP permission.")]
+    async fn create_dashboard(
+        &self,
+        Parameters(p): Parameters<DashboardParams>,
+    ) -> Result<CallToolResult, McpError> {
+        validate_dashboard_or_reject(&p.content)?;
+        let settings = crate::settings::load_settings_sync(&self.app).map_err(err)?;
+        let path = crate::dashboard::write_dashboard(&settings.decoder_dir, &p.filename, &p.content)
+            .map_err(err)?;
+        ok_json(json!({ "saved": true, "path": path }))
+    }
+}
+
+// ── UI control tools (registered when mcp_allow_ui_control is on) ─────────────
+
+#[tool_router(router = ui_control_router)]
+impl WireTapTools {
+    #[tool(description = "Open (or focus) an app/panel in the running WireTAP window, e.g. \"dashboard\", \"discovery\", \"decoder\", \"query\". Pass args like { \"dashboardPath\": \"…\" } to load a dashboard before opening it. Requires an open WireTAP window and the ui-control MCP permission.")]
+    async fn open_app(
+        &self,
+        Parameters(p): Parameters<OpenAppParams>,
+    ) -> Result<CallToolResult, McpError> {
+        bridge_call("ui.openPanel", json!({ "panelId": p.panel_id, "args": p.args })).await
+    }
+}
+
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for WireTapTools {
     fn get_info(&self) -> ServerInfo {
@@ -780,10 +939,16 @@ impl ServerHandler for WireTapTools {
         let mut info = ServerInfo::default();
         info.capabilities = ServerCapabilities::builder().enable_tools().build();
         info.instructions = Some(
-            "WireTAP runtime introspection for CAN-bus reverse engineering and \
-             development. Read tools expose live sessions, captures, frame data, \
-             payload analysis and decoded signals. Tier 2 tools (discovery analysis, \
-             decoded signals, live frame map) require the WireTAP window to be open."
+            "WireTAP runtime introspection and control for CAN-bus reverse \
+             engineering and development. Read tools expose live sessions, captures, \
+             frame data, payload analysis and decoded signals. Permission-gated \
+             control tools open/stop sessions, transmit one-shot or repeating frames \
+             (a repeat is mirrored into the Transmit queue as an Agent-badged, \
+             human-controllable row), replay captures, and read/write Modbus. \
+             attach_source surfaces a session in a source-aware tab (discovery, \
+             decoder, transmit, query, or dashboard) so the human sees what the agent is \
+             working on. Tier 2 tools (discovery analysis, decoded signals, live \
+             frame map) require the WireTAP window to be open."
                 .to_string(),
         );
         info

@@ -3,6 +3,9 @@
 // Query commands for running analytical queries against capture SQLite data.
 // Mirrors the PostgreSQL query commands in dbquery.rs but operates on the
 // local capture_db instead.
+//
+// Schema changes to buffers.db MUST be recorded migrations — see
+// docs/capture-db-migrations.md. Never issue ad-hoc DDL from this file.
 
 use std::collections::{BTreeMap, HashMap};
 

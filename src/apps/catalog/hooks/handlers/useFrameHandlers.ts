@@ -21,15 +21,10 @@ import {
   deleteModbusConfigToml,
   updateMetaToml,
 } from "../../editorOps";
-import {
-  validateCanFrameFields,
-  validateFrameConfig,
-  validateCommonFrameFields,
-} from "../../validate";
+import { validateFrameWs } from "../../../../api/catalog";
 import { protocolRegistry } from "../../protocols";
-import { modbusNeedsRegisterNumber, MODBUS_REGISTER_REQUIRED_MESSAGE } from "../../protocols/modbus";
 import type { FrameEditFields } from "../../views/FrameEditView";
-import type { ProtocolType, CANConfig, SerialConfig, ModbusConfig } from "../../types";
+import type { ProtocolType, CANConfig, SerialConfig } from "../../types";
 
 export interface UseFrameHandlersParams {
   // CAN frame editing (legacy)
@@ -80,8 +75,10 @@ export function useFrameHandlers({
   const serialMaxFrameLength = useCatalogEditorStore((s) => s.forms.serialMaxFrameLength);
   const serialChecksum = useCatalogEditorStore((s) => s.forms.serialChecksum);
   const setIdFields = useCatalogEditorStore((s) => s.setCanFrameForm);
+  const nodeDeviceAddress = useCatalogEditorStore((s) => s.forms.nodeDeviceAddress);
   const setNodeName = useCatalogEditorStore((s) => s.setNodeName);
   const setNodeNotes = useCatalogEditorStore((s) => s.setNodeNotes);
+  const setNodeDeviceAddress = useCatalogEditorStore((s) => s.setNodeDeviceAddress);
 
   const dialogPayload = useCatalogEditorStore((s) => s.ui.dialogPayload);
   const availablePeers = useCatalogEditorStore((s) => s.ui.availablePeers);
@@ -119,7 +116,7 @@ export function useFrameHandlers({
     }
   };
 
-  const handleSaveId = () => {
+  const handleSaveId = async () => {
     if (!idFields.id) return;
 
     const oldId = editingFrameId;
@@ -130,19 +127,17 @@ export function useFrameHandlers({
         ? Object.keys(parsedForValidation.frame.can)
         : [];
 
-      const errors = validateCanFrameFields(
-        {
-          id: idFields.id,
-          length: idFields.length,
-          transmitter: idFields.transmitter,
-          interval: idFields.interval,
-        },
-        {
-          existingIds,
-          oldId,
-          availablePeers,
-        }
-      );
+      const errors = await validateFrameWs({
+        protocol: "can",
+        key: idFields.id,
+        length: idFields.length,
+        transmitter: idFields.transmitter,
+        interval: idFields.interval,
+        maxLength: 64,
+        existingKeys: existingIds,
+        originalKey: oldId ?? undefined,
+        availablePeers,
+      });
 
       if (errors.length > 0) {
         setValidation(errors);
@@ -154,7 +149,7 @@ export function useFrameHandlers({
     }
 
     try {
-      const newContent = upsertCanFrameToml(catalogContent, {
+      const newContent = await upsertCanFrameToml(catalogContent, {
         oldId,
         id: idFields.id,
         length: idFields.length,
@@ -181,11 +176,11 @@ export function useFrameHandlers({
     openDialog("deleteCanFrame");
   };
 
-  const handleConfirmDeleteId = () => {
+  const handleConfirmDeleteId = async () => {
     if (!dialogPayload.idToDelete) return;
 
     try {
-      const newContent = deleteCanFrameToml(catalogContent, dialogPayload.idToDelete);
+      const newContent = await deleteCanFrameToml(catalogContent, dialogPayload.idToDelete);
       setToml(newContent);
       closeDialog("deleteCanFrame");
       setDialogPayload({ idToDelete: null });
@@ -289,7 +284,7 @@ export function useFrameHandlers({
         config = {
           protocol: "modbus" as const,
           register_number: node.metadata?.registerNumber,
-          device_address: node.metadata?.deviceAddress ?? 1,
+          node_address: node.metadata?.nodeAddress,
           register_type: node.metadata?.registerType ?? "holding",
         };
         break;
@@ -321,7 +316,6 @@ export function useFrameHandlers({
       isLengthInherited: node.metadata?.lengthInherited,
       isTransmitterInherited: node.metadata?.transmitterInherited,
       isIntervalInherited: node.metadata?.intervalInherited,
-      isDeviceAddressInherited: node.metadata?.deviceAddressInherited,
     });
     setEditingFrameOriginalKey(originalKey);
     setEditingFrame(true);
@@ -332,7 +326,7 @@ export function useFrameHandlers({
   /**
    * Handle saving a generic frame (CAN, Modbus, or Serial)
    */
-  const handleSaveFrame = () => {
+  const handleSaveFrame = async () => {
     if (!frameFields || !setEditingFrame) return;
 
     const frameKey = getFrameKeyFromFields(frameFields);
@@ -341,36 +335,28 @@ export function useFrameHandlers({
       return;
     }
 
-    // Validate protocol-specific config
+    // Validate identity + common + protocol-config fields in the crate (the
+    // single source of truth). `cfg` carries the protocol-specific keys; the
+    // crate reads only the ones relevant to `protocol`.
     const existingKeys = getFrameKeys(catalogContent, frameFields.protocol);
-    const configErrors = validateFrameConfig(frameFields.protocol, frameFields.config, {
+    const cfg = frameFields.config as Record<string, any>;
+    const allErrors = await validateFrameWs({
+      protocol: frameFields.protocol,
+      key: frameKey,
+      length: frameFields.base.length,
+      transmitter: frameFields.base.transmitter,
+      interval: frameFields.base.interval,
+      maxLength: frameFields.protocol === "can" ? 64 : 256,
+      extended: cfg.extended,
+      registerNumber: cfg.register_number,
+      nodeAddress: cfg.node_address,
+      registerType: cfg.register_type,
+      registerBase: cfg.register_base,
+      delimiter: cfg.delimiter,
       existingKeys,
       originalKey: editingFrameOriginalKey ?? undefined,
+      availablePeers,
     });
-
-    // Validate common fields
-    const commonErrors = validateCommonFrameFields(
-      {
-        length: frameFields.base.length,
-        transmitter: frameFields.base.transmitter,
-        interval: frameFields.base.interval,
-      },
-      {
-        availablePeers,
-        maxLength: frameFields.protocol === "can" ? 64 : 256,
-      }
-    );
-
-    const allErrors = [...configErrors, ...commonErrors];
-
-    // Modbus: the register comes from either an explicit register_number or a
-    // numeric frame key. A non-numeric name with no register number is invalid.
-    if (
-      frameFields.protocol === "modbus" &&
-      modbusNeedsRegisterNumber(frameKey, frameFields.config as ModbusConfig)
-    ) {
-      allErrors.push({ field: "register_number", message: MODBUS_REGISTER_REQUIRED_MESSAGE });
-    }
 
     if (allErrors.length > 0) {
       setValidation(allErrors);
@@ -393,7 +379,7 @@ export function useFrameHandlers({
         }];
       }
 
-      const newContent = upsertFrameToml(catalogContent, {
+      const newContent = await upsertFrameToml(catalogContent, {
         protocol: frameFields.protocol,
         base: frameFields.base,
         config: frameFields.config,
@@ -403,7 +389,6 @@ export function useFrameHandlers({
           length: frameFields.isLengthInherited,
           transmitter: frameFields.isTransmitterInherited,
           interval: frameFields.isIntervalInherited,
-          deviceAddress: frameFields.isDeviceAddressInherited,
         },
         initialSignals,
       });
@@ -421,9 +406,9 @@ export function useFrameHandlers({
   /**
    * Handle deleting a frame by protocol and key
    */
-  const handleDeleteFrame = (protocol: ProtocolType, key: string) => {
+  const handleDeleteFrame = async (protocol: ProtocolType, key: string) => {
     try {
-      const newContent = deleteFrameToml(catalogContent, protocol, key);
+      const newContent = await deleteFrameToml(catalogContent, protocol, key);
       setToml(newContent);
       setSelectedPath(null);
     } catch (error) {
@@ -450,12 +435,12 @@ export function useFrameHandlers({
     openDialog("deleteNode");
   };
 
-  const handleConfirmDeleteNode = () => {
+  const handleConfirmDeleteNode = async () => {
     const nodeNameToDelete = dialogPayload.nodeToDelete;
     if (!nodeNameToDelete) return;
 
     try {
-      const newContent = deleteNodeToml(catalogContent, nodeNameToDelete);
+      const newContent = await deleteNodeToml(catalogContent, nodeNameToDelete);
       setToml(newContent);
       setSelectedPath(null);
     } catch (error) {
@@ -470,32 +455,35 @@ export function useFrameHandlers({
   const handleAddNode = () => {
     setNodeName("");
     setNodeNotes("");
+    setNodeDeviceAddress(undefined);
     openDialog("addNode");
   };
 
-  const handleSaveNode = () => {
+  const handleSaveNode = async () => {
     if (!nodeName.trim()) return;
 
     try {
       const notesToSave = nodeNotes.trim() || undefined;
-      const newContent = addNodeToml(catalogContent, nodeName, notesToSave);
+      const newContent = await addNodeToml(catalogContent, nodeName, notesToSave, nodeDeviceAddress);
       setToml(newContent);
       closeDialog("addNode");
       setNodeName("");
       setNodeNotes("");
+      setNodeDeviceAddress(undefined);
     } catch (error) {
       console.error("Failed to add node:", error);
     }
   };
 
-  const handleEditNode = (originalName: string, notes?: string) => {
+  const handleEditNode = (originalName: string, notes?: string, deviceAddress?: number) => {
     setDialogPayload({ editingNodeOriginalName: originalName });
     setNodeName(originalName);
     setNodeNotes(notes || "");
+    setNodeDeviceAddress(deviceAddress);
     openDialog("editNode");
   };
 
-  const handleSaveEditNode = () => {
+  const handleSaveEditNode = async () => {
     if (!nodeName.trim()) return;
 
     const originalName = dialogPayload.editingNodeOriginalName;
@@ -503,11 +491,12 @@ export function useFrameHandlers({
 
     try {
       const notesToSave = nodeNotes.trim() || undefined;
-      const { toml: newContent, success, error } = editNodeToml(
+      const { toml: newContent, success, error } = await editNodeToml(
         catalogContent,
         originalName,
         nodeName,
-        notesToSave
+        notesToSave,
+        nodeDeviceAddress
       );
 
       if (!success) {
@@ -519,6 +508,7 @@ export function useFrameHandlers({
       closeDialog("editNode");
       setNodeName("");
       setNodeNotes("");
+      setNodeDeviceAddress(undefined);
       setDialogPayload({ editingNodeOriginalName: null });
       clearValidation();
 
@@ -541,11 +531,11 @@ export function useFrameHandlers({
     openDialog("deleteGeneric");
   };
 
-  const handleConfirmDeleteGeneric = () => {
+  const handleConfirmDeleteGeneric = async () => {
     const path = dialogPayload.genericPathToDelete;
     if (!path) return;
     try {
-      const newContent = deleteTomlAtPath(catalogContent, path);
+      const newContent = await deleteTomlAtPath(catalogContent, path);
       setToml(newContent);
       setSelectedPath(null);
     } catch (error) {
@@ -565,13 +555,10 @@ export function useFrameHandlers({
    * Save unified config - saves meta + only the enabled protocol configs
    * Called from UnifiedConfigDialog with explicit enabled states
    */
-  const handleSaveConfig = (enabledConfigs: { can: boolean; serial: boolean; modbus: boolean }) => {
-    console.log("[handleSaveConfig] Called with:", enabledConfigs);
-    console.log("[handleSaveConfig] catalogContent length:", catalogContent?.length);
+  const handleSaveConfig = async (enabledConfigs: { can: boolean; serial: boolean; modbus: boolean }) => {
     try {
       // Start with updating meta
-      let newContent = updateMetaToml(catalogContent, metaFields);
-      console.log("[handleSaveConfig] After updateMetaToml, length:", newContent?.length);
+      let newContent = await updateMetaToml(catalogContent, metaFields);
 
       // Save or delete CAN config based on enabled state
       if (enabledConfigs.can) {
@@ -598,7 +585,7 @@ export function useFrameHandlers({
               )
             : undefined;
 
-        newContent = upsertCanConfigToml(newContent, {
+        newContent = await upsertCanConfigToml(newContent, {
           default_endianness: canDefaultEndianness,
           default_interval: canDefaultInterval,
           default_extended: canDefaultExtended,
@@ -608,7 +595,7 @@ export function useFrameHandlers({
         });
       } else {
         // Delete CAN config if disabled
-        newContent = deleteCanConfigToml(newContent);
+        newContent = await deleteCanConfigToml(newContent);
       }
 
       // Save or delete Serial config based on enabled state
@@ -630,7 +617,7 @@ export function useFrameHandlers({
               )
             : undefined;
 
-        newContent = upsertSerialConfigToml(newContent, {
+        newContent = await upsertSerialConfigToml(newContent, {
           encoding: serialEncoding,
           byte_order: serialByteOrder,
           header_length: serialHeaderLength,
@@ -640,12 +627,12 @@ export function useFrameHandlers({
         });
       } else {
         // Delete Serial config if disabled
-        newContent = deleteSerialConfigToml(newContent);
+        newContent = await deleteSerialConfigToml(newContent);
       }
 
       // Save or delete Modbus config based on enabled state
       if (enabledConfigs.modbus) {
-        newContent = upsertModbusConfigToml(newContent, {
+        newContent = await upsertModbusConfigToml(newContent, {
           device_address: modbusDeviceAddress,
           register_base: modbusRegisterBase,
           default_interval: modbusDefaultInterval,
@@ -654,16 +641,12 @@ export function useFrameHandlers({
         });
       } else {
         // Delete Modbus config if disabled
-        newContent = deleteModbusConfigToml(newContent);
+        newContent = await deleteModbusConfigToml(newContent);
       }
 
-      console.log("[handleSaveConfig] Final newContent length:", newContent?.length);
-      console.log("[handleSaveConfig] Calling setToml...");
       setToml(newContent);
-      console.log("[handleSaveConfig] Calling closeDialog...");
       closeDialog("config");
       clearValidation();
-      console.log("[handleSaveConfig] Done!");
     } catch (error) {
       console.error("[handleSaveConfig] Error:", error);
       setValidation([{ field: "config", message: "Failed to save configuration" }]);
@@ -673,9 +656,9 @@ export function useFrameHandlers({
   /**
    * Remove CAN config from catalog
    */
-  const handleRemoveCanConfig = () => {
+  const handleRemoveCanConfig = async () => {
     try {
-      const newContent = deleteCanConfigToml(catalogContent);
+      const newContent = await deleteCanConfigToml(catalogContent);
       setToml(newContent);
     } catch (error) {
       console.error("Failed to remove CAN config:", error);
@@ -685,9 +668,9 @@ export function useFrameHandlers({
   /**
    * Remove Serial config from catalog
    */
-  const handleRemoveSerialConfig = () => {
+  const handleRemoveSerialConfig = async () => {
     try {
-      const newContent = deleteSerialConfigToml(catalogContent);
+      const newContent = await deleteSerialConfigToml(catalogContent);
       setToml(newContent);
     } catch (error) {
       console.error("Failed to remove Serial config:", error);
@@ -697,9 +680,9 @@ export function useFrameHandlers({
   /**
    * Remove Modbus config from catalog
    */
-  const handleRemoveModbusConfig = () => {
+  const handleRemoveModbusConfig = async () => {
     try {
-      const newContent = deleteModbusConfigToml(catalogContent);
+      const newContent = await deleteModbusConfigToml(catalogContent);
       setToml(newContent);
     } catch (error) {
       console.error("Failed to remove Modbus config:", error);
@@ -707,7 +690,7 @@ export function useFrameHandlers({
   };
 
   // Legacy individual config handlers (kept for backwards compatibility)
-  const handleSaveSerialConfig = () => {
+  const handleSaveSerialConfig = async () => {
     try {
       // Convert header fields to TOML format (mask-based)
       const fields: Record<string, { mask: number; endianness?: "big" | "little"; format?: "hex" | "decimal" }> | undefined =
@@ -726,7 +709,7 @@ export function useFrameHandlers({
             )
           : undefined;
 
-      const newContent = upsertSerialConfigToml(catalogContent, {
+      const newContent = await upsertSerialConfigToml(catalogContent, {
         encoding: serialEncoding,
         byte_order: serialByteOrder,
         header_length: serialHeaderLength,
@@ -743,9 +726,9 @@ export function useFrameHandlers({
     }
   };
 
-  const handleSaveModbusConfig = () => {
+  const handleSaveModbusConfig = async () => {
     try {
-      const newContent = upsertModbusConfigToml(catalogContent, {
+      const newContent = await upsertModbusConfigToml(catalogContent, {
         device_address: modbusDeviceAddress,
         register_base: modbusRegisterBase,
         default_interval: modbusDefaultInterval,
@@ -761,7 +744,7 @@ export function useFrameHandlers({
     }
   };
 
-  const handleSaveCanConfig = () => {
+  const handleSaveCanConfig = async () => {
     try {
       const frameIdMaskStr = canFrameIdMask.trim().replace(/^0x/i, '');
       const frameIdMaskNum = frameIdMaskStr ? parseInt(frameIdMaskStr, 16) : undefined;
@@ -786,8 +769,8 @@ export function useFrameHandlers({
             )
           : undefined;
 
-      let newContent = updateMetaToml(catalogContent, metaFields);
-      newContent = upsertCanConfigToml(newContent, {
+      let newContent = await updateMetaToml(catalogContent, metaFields);
+      newContent = await upsertCanConfigToml(newContent, {
         default_endianness: canDefaultEndianness,
         default_interval: canDefaultInterval,
         default_extended: canDefaultExtended,

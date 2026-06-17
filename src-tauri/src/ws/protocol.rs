@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 
 pub const PROTOCOL_VERSION: u8 = 1;
 pub const HEADER_SIZE: usize = 4;
@@ -21,6 +20,7 @@ pub enum MsgType {
     ReplayState      = 0x0C,
     TestPatternState = 0x0D,
     OtaEvent         = 0x0E,
+    RepeatEvent      = 0x0F,
     Subscribe        = 0x10,
     Unsubscribe      = 0x11,
     SubscribeAck     = 0x12,
@@ -29,6 +29,7 @@ pub enum MsgType {
     // the session (decode happens once, in Rust). Raw FrameData still flows for
     // Discovery/Analysis/raw-hex/Calculator.
     DecodedSignals   = 0x14,
+    AttachToPanel    = 0x15,
     Command          = 0x20,
     CommandResponse  = 0x21,
     // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
@@ -57,11 +58,13 @@ impl TryFrom<u8> for MsgType {
             0x0C => Ok(MsgType::ReplayState),
             0x0D => Ok(MsgType::TestPatternState),
             0x0E => Ok(MsgType::OtaEvent),
+            0x0F => Ok(MsgType::RepeatEvent),
             0x10 => Ok(MsgType::Subscribe),
             0x11 => Ok(MsgType::Unsubscribe),
             0x12 => Ok(MsgType::SubscribeAck),
             0x13 => Ok(MsgType::SubscribeNack),
             0x14 => Ok(MsgType::DecodedSignals),
+            0x15 => Ok(MsgType::AttachToPanel),
             0x20 => Ok(MsgType::Command),
             0x21 => Ok(MsgType::CommandResponse),
             0x30 => Ok(MsgType::BridgeRequest),
@@ -1384,6 +1387,12 @@ mod tests {
     #[test]
     fn subscribe_nack_empty_error() {
         assert!(encode_subscribe_nack("").is_empty());
+    }
+
+    #[test]
+    fn attach_to_panel_msg_type_round_trips() {
+        assert_eq!(MsgType::try_from(0x15u8), Ok(MsgType::AttachToPanel));
+        assert_eq!(MsgType::AttachToPanel as u8, 0x15);
     }
 
     // -----------------------------------------------------------------------

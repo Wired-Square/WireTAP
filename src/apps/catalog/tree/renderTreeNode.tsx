@@ -1,10 +1,16 @@
 // ui/src/apps/catalog/tree/renderTreeNode.tsx
 
 import React from "react";
-import { ChevronDown, ChevronRight, Link2, Layers } from "lucide-react";
+import {
+  ChevronDown, ChevronRight, Link2, Layers,
+  Network, Server, Cable, Zap, Lock, ClipboardList, Settings, User, Shuffle, MapPin,
+  type LucideIcon,
+} from "lucide-react";
 import { iconMd, iconSm } from "../../../styles/spacing";
 import { hoverLight } from "../../../styles";
-import { formatFrameId as formatModbusRegister } from "../../../utils/frameIds";
+import { textMuted } from "../../../styles/colourTokens";
+import { formatFrameId as formatId } from "../../../utils/frameIds";
+import { parseCanIdToNumber } from "../utils";
 import type { TomlNode } from "../types";
 
 export type RenderTreeNode = (node: TomlNode, depth?: number) => React.ReactNode;
@@ -14,9 +20,40 @@ export type CreateRenderTreeNodeArgs = {
   selectedNode: TomlNode | null;
   onNodeClick: (node: TomlNode) => void;
   onToggleExpand: (node: TomlNode) => void;
-  formatFrameId?: (id: string) => { primary: string; secondary?: string };
   displayFrameIdFormat?: "hex" | "decimal";
 };
+
+/**
+ * Lucide icon per node type. Protocol frames reuse the badge icons
+ * (Network/Server/Cable) with matching tones so rows read consistently across
+ * CAN/Modbus/Serial. Copy (Link2) and mirror (Layers) indicators are separate.
+ */
+const NODE_ICON: Record<string, { Icon: LucideIcon; cls: string }> = {
+  "can-frame":     { Icon: Network,  cls: "text-[color:var(--text-green)]" },
+  "modbus-frame":  { Icon: Server,   cls: "text-[color:var(--text-amber)]" },
+  "serial-frame":  { Icon: Cable,    cls: "text-[color:var(--text-purple)]" },
+  "can-config":    { Icon: Settings, cls: textMuted },
+  "modbus-config": { Icon: Settings, cls: textMuted },
+  "serial-config": { Icon: Settings, cls: textMuted },
+  signal:          { Icon: Zap,           cls: "text-[color:var(--text-amber)]" },
+  checksum:        { Icon: Lock,          cls: textMuted },
+  meta:            { Icon: ClipboardList, cls: textMuted },
+  node:            { Icon: User,          cls: textMuted },
+  mux:             { Icon: Shuffle,       cls: "text-[color:var(--accent-blue)]" },
+  "mux-case":      { Icon: MapPin,        cls: textMuted },
+};
+
+/**
+ * Modbus register-number badge tint per register type — the colour conveys the
+ * type (holding/input/coil/discrete), so the row drops the `[holding]` text.
+ */
+const REGISTER_TONE: Record<string, string> = {
+  holding:  "bg-[var(--status-info-bg)] text-[color:var(--accent-blue)]",
+  input:    "bg-[var(--status-success-bg)] text-[color:var(--text-green)]",
+  coil:     "bg-[var(--status-warning-bg)] text-[color:var(--text-amber)]",
+  discrete: "bg-[var(--status-purple-bg)] text-[color:var(--text-purple)]",
+};
+const REGISTER_TONE_DEFAULT = `bg-[var(--bg-surface)] ${textMuted}`;
 
 /**
  * Creates a stable `renderTreeNode` function that can be passed into CatalogTreePanel.
@@ -28,7 +65,6 @@ export function createRenderTreeNode({
   selectedNode,
   onNodeClick,
   onToggleExpand,
-  formatFrameId,
   displayFrameIdFormat = "hex",
 }: CreateRenderTreeNodeArgs): RenderTreeNode {
   const render: RenderTreeNode = (node, depth = 0) => {
@@ -78,20 +114,17 @@ export function createRenderTreeNode({
                 <Layers className={`${iconSm} text-[color:var(--accent-purple)] flex-shrink-0`} />
               </span>
             )}
-            {node.type === "signal" && "⚡ "}
-            {node.type === "checksum" && "🔐 "}
-            {node.type === "meta" && "📋 "}
-            {node.type === "can-frame" && "🔖 "}
-            {node.type === "can-config" && "⚙️ "}
-            {node.type === "modbus-frame" && "📟 "}
-            {node.type === "modbus-config" && "⚙️ "}
-            {node.type === "serial-frame" && "📡 "}
-            {node.type === "serial-config" && "⚙️ "}
-            {node.type === "node" && "👤 "}
-            {node.type === "mux" && "🔀 "}
-            {node.type === "mux-case" && "📍 "}
-            {node.type === "can-frame" && formatFrameId ? (() => {
-              const formatted = formatFrameId(node.key);
+            {(() => {
+              const icon = NODE_ICON[node.type];
+              if (!icon) return null;
+              const { Icon, cls } = icon;
+              return <Icon className={`${iconSm} ${cls} flex-shrink-0`} />;
+            })()}
+            {node.type === "can-frame" ? (() => {
+              const num = parseCanIdToNumber(node.key);
+              const id = num !== null
+                ? formatId(num, displayFrameIdFormat, node.metadata?.extended)
+                : node.key;
               const notes = node.metadata?.notes;
               const firstNote = Array.isArray(notes) ? notes[0] : notes;
               const truncatedNote = firstNote && firstNote.length > 40
@@ -99,14 +132,7 @@ export function createRenderTreeNode({
                 : firstNote;
               return (
                 <span className="flex flex-col">
-                  <span className="flex items-center gap-1.5">
-                    <span>{formatted.primary}</span>
-                    {formatted.secondary && (
-                    <span className="tree-secondary-text text-xs">
-                        ({formatted.secondary})
-                    </span>
-                    )}
-                  </span>
+                  <span>{id}</span>
                   {truncatedNote && (
                     <span className="tree-secondary-text text-xs italic">
                       {truncatedNote}
@@ -118,21 +144,20 @@ export function createRenderTreeNode({
               const regNum = node.metadata?.registerNumber;
               const regType = node.metadata?.registerType;
               const address = typeof regNum === "number"
-                ? formatModbusRegister(regNum, displayFrameIdFormat)
+                ? formatId(regNum, displayFrameIdFormat)
                 : undefined;
+              const tone = (regType && REGISTER_TONE[regType]) || REGISTER_TONE_DEFAULT;
               return (
                 <span className="flex items-center gap-1.5">
-                  <span>{node.key}</span>
                   {address && (
-                    <span className="tree-secondary-text text-xs">
-                      ({address})
+                    <span
+                      title={regType}
+                      className={`px-1 rounded text-[10px] font-semibold tabular-nums flex-shrink-0 ${tone}`}
+                    >
+                      {address}
                     </span>
                   )}
-                  {regType && (
-                    <span className="text-[color:var(--accent-purple)] text-xs font-medium">
-                      [{regType}]
-                    </span>
-                  )}
+                  <span>{node.key}</span>
                 </span>
               );
             })() : node.type === "mux" ? (() => {
@@ -184,9 +209,21 @@ export function createRenderTreeNode({
                 : firstNote;
               const hasStartBit = node.metadata?.signalStartBit !== undefined;
               const hasBitLength = node.metadata?.signalBitLength !== undefined;
+              // Modbus signals carry a synthesised per-signal register address
+              // (frame base + bit offset) — surface it as a badge so the
+              // multi-register layout is visible in the tree.
+              const sigReg = node.metadata?.properties?.modbus_register;
               return (
                 <span className="flex flex-col">
                   <span className="flex items-center gap-1">
+                    {typeof sigReg === "number" && (
+                      <span
+                        title="Register"
+                        className={`px-1 rounded text-[10px] font-semibold tabular-nums flex-shrink-0 ${REGISTER_TONE_DEFAULT}`}
+                      >
+                        {formatId(sigReg, displayFrameIdFormat)}
+                      </span>
+                    )}
                     <span>{node.key}</span>
                     {hasStartBit && hasBitLength && (
                       <span className="tree-secondary-text text-xs">

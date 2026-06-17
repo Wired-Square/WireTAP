@@ -386,8 +386,10 @@ Graph) mirrors the session's `catalogPath` into local state, then `attachAndReso
 the same parse binds Rust decode *and* builds the UI model (it falls back to a
 model-only `loadCatalog` if attach fails). Modbus is handled by the Decoder
 itself (there is no separate Modbus app): when a Modbus catalogue is involved the
-Decoder builds its poll groups *before* the watch — an awaited `onBeforeStart` in
-the IO picker pre-loads the catalogue so the session is created **with** polls in
+Decoder fetches its poll groups — built in Rust (`catalog.polls`, surfaced on the
+resolved catalogue by `catalogParser.ts`; the single source of truth shared with
+the MCP/headless open flow) — *before* the watch, via an awaited `onBeforeStart` in
+the IO picker that pre-loads the catalogue so the session is created **with** polls in
 a single connection (rather than starting pollless and reconnecting, which broke
 single-connection devices). A catalogue change mid-stream reinitialises the same
 session id with the new polls.

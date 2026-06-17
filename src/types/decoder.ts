@@ -12,6 +12,8 @@ export type SignalDef = {
   factor?: number;
   offset?: number;
   unit?: string;
+  min?: number;
+  max?: number;
   format?: SignalFormat;
   enum?: Record<number, string>;
   confidence?: Confidence;

@@ -1,6 +1,6 @@
 // ui/src/hooks/useSessionCatalog.ts
 //
-// Shared catalogue load/attach wiring for session-bound apps (Decoder, Graph).
+// Shared catalogue load/attach wiring for session-bound apps (Decoder, Dashboard).
 // Splits catalogue handling into two effects:
 //   1. Mirror — track the session's catalogPath into local state (parse-free).
 //   2. Load/attach — from a single parse, load the UI model and (when a session
@@ -12,7 +12,7 @@ import { useEffect } from "react";
 import { tlog } from "../api/settings";
 
 interface UseSessionCatalogOpts {
-  /** Log label, e.g. "Decoder" / "Graph". */
+  /** Log label, e.g. "Decoder" / "Dashboard". */
   label: string;
   sessionId: string | undefined;
   /** The app store's active catalogue path. */

@@ -1,5 +1,4 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // Palette editor — select a board palette, preview its gradient, edit colour
 // stops, and upload entries to the device as user signals.

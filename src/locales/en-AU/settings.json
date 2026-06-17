@@ -200,7 +200,7 @@
         "help": "Maximum number of results returned by database queries in the Query app"
       },
       "graphBuffer": {
-        "label": "Graph Buffer Size",
+        "label": "Dashboard Buffer Size",
         "help": "Samples per signal in graph ring buffers. Higher values show more history but use more memory."
       }
     },
@@ -361,10 +361,10 @@
       "name": "Name",
       "namePlaceholder": "Bookmark name"
     },
-    "editGraphLayout": {
-      "title": "Edit Graph Layout",
+    "editDashboardLayout": {
+      "title": "Edit Dashboard Layout",
       "name": "Name",
-      "namePlaceholder": "Graph layout name"
+      "namePlaceholder": "Dashboard layout name"
     },
     "editSelectionSet": {
       "title": "Edit Selection Set",
@@ -605,11 +605,11 @@
       "databasePlaceholder": "wiretap"
     }
   },
-  "graphLayouts": {
-    "title": "Graph Layouts",
+  "dashboardLayouts": {
+    "title": "Dashboard Layouts",
     "empty": {
       "heading": "No graph layouts saved yet",
-      "description": "Save layouts from the Graph app"
+      "description": "Save layouts from the Dashboard app"
     },
     "panelCount_one": "{{count}} panel",
     "panelCount_other": "{{count}} panels",
@@ -628,7 +628,7 @@
     "display": "Display",
     "devices": "Devices",
     "general": "General",
-    "graphLayouts": "Graph Layouts",
+    "dashboardLayouts": "Dashboard Layouts",
     "privacy": "Privacy",
     "selectionSets": "Selection Sets",
     "storage": "Storage"
@@ -638,7 +638,7 @@
     "deleteCatalogTitle": "Delete Catalog",
     "deleteBookmarkTitle": "Delete Bookmark",
     "deleteSelectionSetTitle": "Delete Selection Set",
-    "deleteGraphLayoutTitle": "Delete Graph Layout",
+    "deleteDashboardLayoutTitle": "Delete Dashboard Layout",
     "areYouSure": "Are you sure you want to delete"
   },
   "ioDeviceStatus": {

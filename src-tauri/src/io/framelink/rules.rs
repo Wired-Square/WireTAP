@@ -1,25 +1,14 @@
 // Copyright 2026 Wired Square Pty Ltd
-// SPDX-License-Identifier: Apache-2.0
 //
 // FrameLink rule operations dispatched via WS commands.
 // All operations route through the shared connection pool (one TCP connection per device).
 
 use std::collections::BTreeMap;
-use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Extension trait to convert any Display error to String for WS command results.
-trait IntoStringErr<T> {
-    fn str_err(self) -> Result<T, String>;
-}
-
-impl<T, E: fmt::Display> IntoStringErr<T> for Result<T, E> {
-    fn str_err(self) -> Result<T, String> {
-        self.map_err(|e| e.to_string())
-    }
-}
+use super::shared::{get_device_id, IntoStringErr};
 
 use framelink::protocol::bridge::{self, BridgeInfo};
 use framelink::protocol::dsig;
@@ -331,13 +320,6 @@ fn gen_to_descriptor(
 // ============================================================================
 
 /// Extract device_id from command params.
-fn get_device_id(params: &Value) -> Result<String, String> {
-    params["device_id"]
-        .as_str()
-        .map(|s| s.to_string())
-        .ok_or_else(|| "Missing 'device_id' parameter".to_string())
-}
-
 fn get_timeout(params: &Value) -> f64 {
     params["timeout"].as_f64().unwrap_or(5.0)
 }

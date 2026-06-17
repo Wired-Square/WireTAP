@@ -5,6 +5,7 @@ import Dialog from "../../../components/Dialog";
 import { Input, Textarea, FormField, SecondaryButton, PrimaryButton } from "../../../components/forms";
 import { h2, caption } from "../../../styles";
 import type { ValidationError } from "../types";
+import NodeDeviceAddressField from "./NodeDeviceAddressField";
 
 export type EditNodeDialogProps = {
   open: boolean;
@@ -14,6 +15,11 @@ export type EditNodeDialogProps = {
 
   nodeNotes: string;
   setNodeNotes: (v: string) => void;
+
+  /** Modbus catalogues: a node owns a device (slave) address. */
+  showDeviceAddress?: boolean;
+  deviceAddress?: number;
+  setDeviceAddress?: (v: number | undefined) => void;
 
   validationErrors: ValidationError[];
   clearValidation: () => void;
@@ -28,6 +34,9 @@ export default function EditNodeDialog({
   setNodeName,
   nodeNotes,
   setNodeNotes,
+  showDeviceAddress,
+  deviceAddress,
+  setDeviceAddress,
   validationErrors,
   clearValidation,
   onCancel,
@@ -60,9 +69,15 @@ export default function EditNodeDialog({
               <p className="mt-2 text-sm text-[color:var(--danger)]">{nodeError.message}</p>
             )}
             <p className={`mt-2 ${caption}`}>
-              Changing the name will update all frames that reference this node as transmitter.
+              Changing the name will update all frames that reference this node.
             </p>
           </FormField>
+
+          <NodeDeviceAddressField
+            show={showDeviceAddress}
+            value={deviceAddress}
+            onChange={setDeviceAddress}
+          />
 
           <FormField label="Notes" variant="default">
             <Textarea

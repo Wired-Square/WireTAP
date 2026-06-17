@@ -5,7 +5,6 @@ import type {
   ProtocolType,
   ProtocolConfig,
   BaseFrameFields,
-  ValidationError,
 } from "../types";
 
 /**
@@ -94,18 +93,6 @@ export interface ProtocolHandler<T extends ProtocolConfig = ProtocolConfig> {
   ) => Record<string, any>;
 
   /**
-   * Validate protocol-specific config
-   * @param config - Config to validate
-   * @param existingKeys - Existing frame keys (for duplicate detection)
-   * @param originalKey - Original key if editing (to allow same key)
-   */
-  validateConfig: (
-    config: T,
-    existingKeys?: string[],
-    originalKey?: string
-  ) => ValidationError[];
-
-  /**
    * Get default config for new frames
    */
   getDefaultConfig: () => T;
@@ -172,6 +159,12 @@ class ProtocolRegistry {
 
 /** Global protocol registry instance */
 export const protocolRegistry = new ProtocolRegistry();
+
+/** A frame's poll/tx interval: the canonical top-level `interval_ms`/`interval`,
+ *  falling back to the legacy `tx.interval_ms`/`tx.interval`. */
+export function readFrameInterval(value: any): number | undefined {
+  return value?.interval_ms ?? value?.interval ?? value?.tx?.interval_ms ?? value?.tx?.interval;
+}
 
 // Import handlers - they export their handler objects but don't self-register
 import canHandler from "./can";

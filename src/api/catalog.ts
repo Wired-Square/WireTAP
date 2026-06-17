@@ -58,9 +58,126 @@ export async function validateCatalogWs(content: string): Promise<ValidationResu
   return await wsTransport.command<ValidationResult>("catalog.validate", { content });
 }
 
+// ── Granular, save-time form validation (single source of truth in the crate) ──
+// Each returns the findings array (empty = valid); the edit handlers block save
+// when non-empty, exactly as the former TS validators did.
+
+/** Validate `[meta]` fields. `meta` = `{ name, version }`. */
+export async function validateMetaWs(meta: { name: string; version: number }): Promise<ValidationError[]> {
+  return (await wsTransport.command<ValidationResult>("catalog.validateMeta", meta)).errors;
+}
+
+/** Validate a frame's identity + common + protocol-config fields. */
+export interface FrameValidationInput {
+  protocol: "can" | "modbus" | "serial";
+  /** CAN id, serial frame_id, or the Modbus table key. */
+  key: string;
+  length?: number;
+  transmitter?: string;
+  interval?: number;
+  maxLength?: number;
+  extended?: boolean;
+  registerNumber?: number | null;
+  /** The device (slave) address a register is read from (matched to a node). */
+  nodeAddress?: number;
+  registerType?: string;
+  registerBase?: number;
+  delimiter?: number[];
+  existingKeys?: string[];
+  originalKey?: string;
+  availablePeers?: string[];
+}
+export async function validateFrameWs(input: FrameValidationInput): Promise<ValidationError[]> {
+  return (await wsTransport.command<ValidationResult>("catalog.validateFrame", input)).errors;
+}
+
+/** Validate signal form fields (snake_case keys, matching the editor form). */
+export async function validateSignalWs(signal: object): Promise<ValidationError[]> {
+  return (await wsTransport.command<ValidationResult>("catalog.validateSignal", signal)).errors;
+}
+
+/** Validate checksum form fields (snake_case keys; optional `frame_length`, default 256). */
+export async function validateChecksumWs(checksum: object): Promise<ValidationError[]> {
+  return (await wsTransport.command<ValidationResult>("catalog.validateChecksum", checksum)).errors;
+}
+
+/**
+ * Apply one comment-/formatting-preserving edit in Rust (the `wiretap-catalog`
+ * crate, via `toml_edit`) and return the new TOML. `op` is an `EditOp` payload
+ * (see editorOps.ts); only the targeted entry changes, comments survive.
+ */
+export async function editCatalog(content: string, op: Record<string, unknown>): Promise<string> {
+  return await wsTransport.command<string>("catalog.edit", { content, ...op });
+}
+
+/** One line of a {@link CatalogDiff}. */
+export interface DiffLine {
+  kind: "context" | "add" | "remove";
+  text: string;
+  oldLine: number | null;
+  newLine: number | null;
+}
+
+/** Result of {@link diffCatalog}: a dirty flag plus the unified line diff. */
+export interface CatalogDiff {
+  dirty: boolean;
+  lines: DiffLine[];
+}
+
+/**
+ * Diff the working buffer against the last-saved baseline in Rust. Drives both
+ * the unsaved-changes indicator and the Text-mode diff view from one source.
+ */
+export async function diffCatalog(current: string, baseline: string): Promise<CatalogDiff> {
+  return await wsTransport.command<CatalogDiff>("catalog.diff", { current, baseline });
+}
+
+/** Result of {@link migrateCatalog}: whether the text was upgraded, the upgraded
+ * TOML (equal to the input when unchanged), and a human-readable summary. */
+export interface CatalogMigration {
+  changed: boolean;
+  toml: string;
+  summary: string[];
+}
+
+/**
+ * Upgrade a catalogue's text to the current schema in Rust (comment-preserving).
+ * The editor loads the result as the working buffer while keeping the on-disk
+ * text as the diff baseline, so a previously silent in-memory migration surfaces
+ * as a real, saveable diff.
+ */
+export async function migrateCatalog(content: string): Promise<CatalogMigration> {
+  return await wsTransport.command<CatalogMigration>("catalog.migrate", { content });
+}
+
+/** A Modbus poll group sent to the Rust reader as JSON (mirrors the backend
+ *  `PollGroup`). Built in Rust from the catalogue's `[frame.modbus.*]` entries. */
+export interface ModbusPollGroup {
+  register_type: "holding" | "input" | "coil" | "discrete";
+  /** Protocol-level start address (0-based, 0-65535). */
+  start_register: number;
+  /** Number of registers (or coils) to read. */
+  count: number;
+  /** Poll interval in milliseconds. */
+  interval_ms: number;
+  /** frame_id to emit (= catalog register_number). */
+  frame_id: number;
+  /** Device (slave) address to poll — resolved from the register's slave node. */
+  device_address: number;
+}
+
+/**
+ * Build Modbus poll groups from catalogue TOML in Rust (the single source of
+ * truth for the catalogue → polls mapping, shared with the MCP/headless open
+ * flow). Empty for a non-Modbus catalogue.
+ */
+export async function catalogPolls(content: string): Promise<ModbusPollGroup[]> {
+  return await wsTransport.command<ModbusPollGroup[]>("catalog.polls", { content });
+}
+
 /**
  * Attach a catalogue to a session so the backend decodes its frames in Rust and
- * streams them as `DecodedSignals` (consumed by Decoder/Graph/Modbus). Returns
+ * streams them as `DecodedSignals` (consumed by Decoder/Dashboard/Modbus). Returns
  * the number of frames bound.
  */
 export async function attachCatalog(
