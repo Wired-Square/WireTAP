@@ -96,9 +96,11 @@ curl -fsS -H "$A" "$BASE/v1/admin/ingest-sessions" | grep -q sessions; check "in
 
 # --- revocation ---
 kid=$(curl -fsS -H "$A" "$BASE/v1/admin/keys" | python3 -c 'import sys,json;ks=json.load(sys.stdin)["keys"];print([k["id"] for k in ks if k["name"]=="smoke-read" and not k["revoked"]][-1])')
-curl -fsS -X DELETE -H "$A" "$BASE/v1/admin/keys/$kid" | grep -q revoked; check "revoke read key" $?
+curl -fsS -X POST -H "$A" "$BASE/v1/admin/keys/$kid/revoke" | grep -q revoked; check "revoke read key" $?
 code=$(curl -s -o /dev/null -w '%{http_code}' -H "$R" "$BASE/v1/databases")
 [ "$code" = "401" ]; check "revoked key -> 401 immediately" $?
+curl -fsS -X POST -H "$A" "$BASE/v1/admin/keys/$kid/restore" | grep -q restored; check "restore read key" $?
+curl -fsS -X DELETE -H "$A" "$BASE/v1/admin/keys/$kid" | grep -q deleted; check "delete read key" $?
 
 echo
 echo "$PASS passed, $FAIL failed"
