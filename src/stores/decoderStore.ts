@@ -50,7 +50,7 @@ import type { SelectionSet } from '../utils/selectionSets';
 import type { CanHeaderField, HeaderFieldFormat } from '../apps/catalog/types';
 import type { PlaybackSpeed } from '../components/TimeController';
 import { loadCatalog as loadCatalogFromPath, attachAndResolve, parseCanId, type ParsedCatalog, type ModbusProtocolConfig } from '../utils/catalogParser';
-import { buildPollsFromCatalog, type ModbusPollGroup } from '../utils/modbusPollBuilder';
+import { type ModbusPollGroup } from '../api/catalog';
 import { frameKey } from '../utils/frameKey';
 
 
@@ -498,13 +498,10 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         }
       }
 
-      // Build Modbus poll groups (empty for non-modbus catalogues). Done here so
-      // the poll config is computed in the same parse transaction that sets
-      // frames/protocol — it can never drift, and switching to a non-modbus
-      // catalogue clears stale modbus state.
-      const pollGroups = catalog.protocol === 'modbus'
-        ? buildPollsFromCatalog(catalog.frames, catalog.modbusConfig)
-        : [];
+      // Modbus poll groups are built in Rust (`catalog.polls`, surfaced on the
+      // ParsedCatalog) — the single source of truth, shared with the headless
+      // open flow. Empty for non-Modbus catalogues.
+      const pollGroups = catalog.pollGroups;
       const modbusPollsJson = pollGroups.length > 0 ? JSON.stringify(pollGroups) : null;
 
       set({

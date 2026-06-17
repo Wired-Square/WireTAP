@@ -6,7 +6,7 @@
 // serial header byte-positions the crate doesn't expose.
 
 import { openCatalogAtPath } from '../apps/catalog/io';
-import { parseCatalog, attachCatalog } from '../api/catalog';
+import { parseCatalog, attachCatalog, catalogPolls, type ModbusPollGroup } from '../api/catalog';
 import type { Confidence, SignalFormat, Endianness } from '../types/catalog';
 import type { MuxDef, MuxCaseDef, SignalDef } from '../types/decoder';
 import type {
@@ -150,6 +150,8 @@ export interface ParsedCatalog {
   frames: Map<number, ResolvedFrame>;
   rawToml: string;
   protocol: 'can' | 'serial' | 'modbus';
+  /** Modbus poll groups built in Rust (`catalog.polls`); empty for non-Modbus. */
+  pollGroups: ModbusPollGroup[];
 }
 
 // =============================================================================
@@ -353,7 +355,13 @@ export function catalogToResolved(catalog: Catalog, rawToml: string): ParsedCata
     frames,
     rawToml,
     protocol: catalog.protocol,
+    pollGroups: [],
   };
+}
+
+/** Adapt a parsed catalogue and attach its Rust-built Modbus poll groups. */
+async function resolveWithPolls(catalog: Catalog, content: string): Promise<ParsedCatalog> {
+  return { ...catalogToResolved(catalog, content), pollGroups: await catalogPolls(content) };
 }
 
 /**
@@ -362,8 +370,7 @@ export function catalogToResolved(catalog: Catalog, rawToml: string): ParsedCata
  */
 export async function loadCatalog(path: string): Promise<ParsedCatalog> {
   const content = await openCatalogAtPath(path);
-  const catalog = await parseCatalog(content);
-  return catalogToResolved(catalog, content);
+  return resolveWithPolls(await parseCatalog(content), content);
 }
 
 /**
@@ -374,5 +381,5 @@ export async function loadCatalog(path: string): Promise<ParsedCatalog> {
 export async function attachAndResolve(sessionId: string, path: string): Promise<ParsedCatalog> {
   const content = await openCatalogAtPath(path);
   const { catalog } = await attachCatalog(sessionId, content);
-  return catalogToResolved(catalog, content);
+  return resolveWithPolls(catalog, content);
 }

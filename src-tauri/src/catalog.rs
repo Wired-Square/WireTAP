@@ -141,6 +141,14 @@ pub async fn dispatch_catalog_command(
                 "summary": m.summary,
             }))
         }
+        // Catalogue TOML → Modbus poll groups (the single source of truth for the
+        // catalogue → polls mapping, shared with the MCP/headless open flow). The
+        // editor passes these to the Modbus reader as `modbus_polls`. Empty for a
+        // non-Modbus catalogue. Params: { content }.
+        "catalog.polls" => {
+            let polls = crate::io::build_polls_from_catalog(&content()?)?;
+            serde_json::to_value(polls).map_err(|e| e.to_string())
+        }
         // Line diff of the working buffer against the last-saved baseline. Drives
         // both the unsaved-changes indicator and the Text-mode diff view from one
         // Rust-computed source. Params: { current, baseline }.

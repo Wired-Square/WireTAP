@@ -150,6 +150,31 @@ export async function migrateCatalog(content: string): Promise<CatalogMigration>
   return await wsTransport.command<CatalogMigration>("catalog.migrate", { content });
 }
 
+/** A Modbus poll group sent to the Rust reader as JSON (mirrors the backend
+ *  `PollGroup`). Built in Rust from the catalogue's `[frame.modbus.*]` entries. */
+export interface ModbusPollGroup {
+  register_type: "holding" | "input" | "coil" | "discrete";
+  /** Protocol-level start address (0-based, 0-65535). */
+  start_register: number;
+  /** Number of registers (or coils) to read. */
+  count: number;
+  /** Poll interval in milliseconds. */
+  interval_ms: number;
+  /** frame_id to emit (= catalog register_number). */
+  frame_id: number;
+  /** Device (slave) address to poll — resolved from the register's slave node. */
+  device_address: number;
+}
+
+/**
+ * Build Modbus poll groups from catalogue TOML in Rust (the single source of
+ * truth for the catalogue → polls mapping, shared with the MCP/headless open
+ * flow). Empty for a non-Modbus catalogue.
+ */
+export async function catalogPolls(content: string): Promise<ModbusPollGroup[]> {
+  return await wsTransport.command<ModbusPollGroup[]>("catalog.polls", { content });
+}
+
 /**
  * Attach a catalogue to a session so the backend decodes its frames in Rust and
  * streams them as `DecodedSignals` (consumed by Decoder/Dashboard/Modbus). Returns

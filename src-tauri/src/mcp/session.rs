@@ -10,9 +10,6 @@ use std::time::Duration;
 
 use serde_json::{json, Value};
 
-use crate::io::modbus_tcp::RegisterType;
-use crate::io::PollGroup;
-
 static SID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 fn generate_session_id(kind: &str) -> String {
@@ -24,42 +21,6 @@ fn generate_session_id(kind: &str) -> String {
         "f"
     };
     format!("{prefix}_mcp{}", SID_COUNTER.fetch_add(1, Ordering::Relaxed))
-}
-
-/// Map the catalogue crate's register type onto the IO layer's enum.
-fn map_register_type(rt: wiretap_catalog::modbus::RegisterType) -> RegisterType {
-    use wiretap_catalog::modbus::RegisterType as Cat;
-    match rt {
-        Cat::Input => RegisterType::Input,
-        Cat::Holding => RegisterType::Holding,
-        Cat::Coil => RegisterType::Coil,
-        Cat::Discrete => RegisterType::Discrete,
-    }
-}
-
-/// Build Modbus poll groups from a catalog's `[frame.modbus.*]` entries via the
-/// shared `wiretap-catalog` crate (which also resolves the register-from-key and
-/// signal-less-register shorthands, and the `register_base` protocol address).
-fn build_modbus_polls(catalog_toml: &str) -> Result<Vec<PollGroup>, String> {
-    use wiretap_catalog::modbus::{ManifestError, ModbusManifest};
-    let manifest = match ModbusManifest::parse(catalog_toml) {
-        Ok(m) => m,
-        // A catalogue with no Modbus frames yields no polls (not an error).
-        Err(ManifestError::NoFrames) => return Ok(vec![]),
-        Err(e) => return Err(format!("Failed to parse catalog: {e}")),
-    };
-    Ok(manifest
-        .frames
-        .iter()
-        .map(|f| PollGroup {
-            register_type: map_register_type(f.register_type),
-            start_register: manifest.protocol_address(f),
-            count: f.length,
-            interval_ms: f.interval_ms,
-            frame_id: f.register_number as u32,
-            device_address: f.device_address,
-        })
-        .collect())
 }
 
 /// Touch the MCP subscriber every 10s so the heartbeat watchdog doesn't reap a
@@ -97,7 +58,7 @@ pub async fn open(
         let path = std::path::PathBuf::from(&settings.decoder_dir).join(&catalog);
         let toml = std::fs::read_to_string(&path)
             .map_err(|e| format!("Failed to read catalog '{catalog}': {e}"))?;
-        let polls = build_modbus_polls(&toml)?;
+        let polls = crate::io::build_polls_from_catalog(&toml)?;
         if polls.is_empty() {
             return Err(format!("Catalog '{catalog}' has no [frame.modbus.*] poll definitions"));
         }
