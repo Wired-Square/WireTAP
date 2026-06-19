@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Decoders/catalogs sometimes showed as empty on startup (0.8.0 regression)**: the Decoder, Catalog Editor, Query and Dashboard read the catalog list only once the decoder directory had resolved from settings, gating the read on that value (`if (!decoderDir) return`). 0.8.0's heavier startup (capture-DB hydration, WebSocket/MCP/backend init) shifted the timing so the gated read ran before settings resolved and never re-fired, leaving "No catalogs found" until a later event (opening a dialog, saving settings) forced a re-read. The backend `list_catalogs` command resolves the decoder directory itself and ignored the value the frontend passed, so the gate was always spurious — the catalog list now reads on mount regardless of settings timing, and the unused argument was dropped. Also hardened first-run example-decoder seeding to complete during app setup before the window loads. [src/api/catalog.ts](src/api/catalog.ts), [src/apps/decoder/Decoder.tsx](src/apps/decoder/Decoder.tsx), [src/apps/catalog/CatalogEditor.tsx](src/apps/catalog/CatalogEditor.tsx), [src/apps/query/Query.tsx](src/apps/query/Query.tsx), [src/apps/dashboard/Dashboard.tsx](src/apps/dashboard/Dashboard.tsx), [src-tauri/src/lib.rs](src-tauri/src/lib.rs).
+
 ## [0.8.0] - 2026-06-17
 
 ### Added

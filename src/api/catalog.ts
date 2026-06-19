@@ -218,10 +218,14 @@ export async function testDecodeFrame(
 }
 
 /**
- * List all catalogs in the decoder directory
+ * List all catalogs in the decoder directory.
+ *
+ * The directory is resolved in Rust (from settings), so callers must NOT gate
+ * this on having a decoder dir — it works before settings resolve. Gating on it
+ * left the catalog list empty when settings loaded late at startup.
  */
-export async function listCatalogs(decoderDir: string): Promise<CatalogMetadata[]> {
-  return await invoke<CatalogMetadata[]>("list_catalogs", { decoderDir });
+export async function listCatalogs(): Promise<CatalogMetadata[]> {
+  return await invoke<CatalogMetadata[]>("list_catalogs");
 }
 
 /**

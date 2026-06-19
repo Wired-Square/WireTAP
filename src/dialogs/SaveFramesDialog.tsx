@@ -47,15 +47,14 @@ export default function SaveFramesDialog({ open, meta, decoderDir, knowledgeInte
 
   // Load existing catalog filenames when dialog opens
   useEffect(() => {
-    if (open && decoderDir) {
-      listCatalogs(decoderDir)
-        .then((catalogs) => {
-          setExistingFiles(new Set(catalogs.map((c) => c.filename.toLowerCase())));
-        })
-        .catch(() => {
-          setExistingFiles(new Set());
-        });
-    }
+    if (!open) return;
+    listCatalogs()
+      .then((catalogs) => {
+        setExistingFiles(new Set(catalogs.map((c) => c.filename.toLowerCase())));
+      })
+      .catch(() => {
+        setExistingFiles(new Set());
+      });
   }, [open, decoderDir]);
 
   // Check if filename already exists

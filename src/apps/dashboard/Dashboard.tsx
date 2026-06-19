@@ -438,11 +438,10 @@ function DashboardInner() {
     }
   }, [settings, initFromSettings, setBufferCapacity]);
 
-  // Load catalog list and saved layouts on mount
+  // Load catalog list and saved layouts on mount. The catalog dir is resolved
+  // in Rust, so the list must NOT gate on decoderDir being populated.
   useEffect(() => {
-    if (decoderDir) {
-      listCatalogs(decoderDir).then(setCatalogs).catch(console.error);
-    }
+    listCatalogs().then(setCatalogs).catch(console.error);
     loadSavedLayouts();
   }, [decoderDir, loadSavedLayouts]);
 

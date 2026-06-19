@@ -275,21 +275,18 @@ function CatalogEditorInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
-  // Load catalog list when decoder dir is available
+  // Load catalog list on mount (refresh if the decoder dir changes). The dir is
+  // resolved in Rust, so this must NOT gate on decoderDir being populated.
   useEffect(() => {
-    if (decoderDir) {
-      listCatalogs(decoderDir).then(setCatalogs).catch(console.error);
-    }
+    listCatalogs().then(setCatalogs).catch(console.error);
   }, [decoderDir]);
 
   // Handler for opening catalog picker
   const handleOpenCatalogPicker = useCallback(() => {
     // Refresh catalog list before showing picker
-    if (decoderDir) {
-      listCatalogs(decoderDir).then(setCatalogs).catch(console.error);
-    }
+    listCatalogs().then(setCatalogs).catch(console.error);
     setShowCatalogPicker(true);
-  }, [decoderDir]);
+  }, []);
 
   // Handler for selecting a catalog from the picker. Applies any schema
   // migration: the migrated text loads as the working buffer with the on-disk

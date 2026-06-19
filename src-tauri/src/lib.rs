@@ -1095,23 +1095,23 @@ pub fn run() {
                 Err(e) => tlog!("[mcp] Could not load settings to start server: {}", e),
             }
 
-            // Install example decoders on app startup (only copies missing files)
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                // Load settings to get decoder directory
-                match settings::load_settings(app_handle.clone()).await {
-                    Ok(app_settings) => {
-                        // Install example decoders (won't overwrite existing files)
-                        if let Err(e) = settings::install_example_decoders(&app_handle, &app_settings.decoder_dir) {
-                            tlog!("[setup] Failed to install example decoders: {}", e);
-                        }
-
-                    }
-                    Err(e) => {
-                        tlog!("[setup] Failed to load settings for example decoder installation: {}", e);
+            // Seed bundled example decoders synchronously, before the webview loads.
+            // The frontend's first list_catalogs() must read a populated decoder
+            // directory, otherwise it silently shows an empty catalog list (the copy
+            // used to race the read as a fire-and-forget task).
+            //
+            // load_settings (not load_settings_sync) is required: on first run it
+            // resolves decoder_dir via with_defaults(), creates the directory, and
+            // persists settings.json. Its only .await is save_settings, whose body is
+            // plain synchronous file IO, so block_on does no real async work.
+            match tauri::async_runtime::block_on(settings::load_settings(app.handle().clone())) {
+                Ok(app_settings) => {
+                    if let Err(e) = settings::install_example_decoders(app.handle(), &app_settings.decoder_dir) {
+                        tlog!("[setup] Failed to install example decoders: {}", e);
                     }
                 }
-            });
+                Err(e) => tlog!("[setup] Failed to load settings for example decoder installation: {}", e),
+            }
 
             Ok(())
         })

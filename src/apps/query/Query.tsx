@@ -94,14 +94,12 @@ function QueryInner() {
     "addBookmark",
   ] as const);
 
-  // Load catalogs when decoder directory changes
+  // Load catalogs on mount (refresh if the decoder dir changes). The directory
+  // is resolved in Rust, so this must NOT gate on settings being resolved.
   useEffect(() => {
-    const decoderDir = settings?.decoder_dir;
-    if (!decoderDir) return;
-
     const loadCatalogList = async () => {
       try {
-        const list = await listCatalogs(decoderDir);
+        const list = await listCatalogs();
         setCatalogs(list);
       } catch (e) {
         console.error("Failed to load catalog list:", e);

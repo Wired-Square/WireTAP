@@ -919,13 +919,13 @@ function DecoderInner() {
     };
   }, []);
 
-  // Load catalog list when decoder dir changes
+  // Load catalog list on mount (and refresh if the decoder dir changes). The
+  // directory is resolved in Rust, so this must NOT gate on decoderDir — gating
+  // left the list empty when settings resolved late at startup.
   useEffect(() => {
-    if (!decoderDir) return;
-
     const loadCatalogList = async () => {
       try {
-        const list = await listCatalogs(decoderDir);
+        const list = await listCatalogs();
         setCatalogs(list);
       } catch (e) {
         console.error("Failed to load catalog list:", e);
@@ -943,13 +943,11 @@ function DecoderInner() {
           const { catalogPath: savedPath } = event.payload;
 
           // Refresh catalog list
-          if (decoderDir) {
-            try {
-              const list = await listCatalogs(decoderDir);
-              setCatalogs(list);
-            } catch (e) {
-              console.error("Failed to refresh catalog list:", e);
-            }
+          try {
+            const list = await listCatalogs();
+            setCatalogs(list);
+          } catch (e) {
+            console.error("Failed to refresh catalog list:", e);
           }
 
           // Only reload if this decoder is using that catalog. The path is

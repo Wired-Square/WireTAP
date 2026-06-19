@@ -565,9 +565,7 @@ export default function IoSourcePickerDialog({
   // Fetch available catalogues for the decoder picker when the dialog opens.
   useEffect(() => {
     if (!isOpen) return;
-    const decoderDir = settings?.decoder_dir;
-    if (!decoderDir) return;
-    listCatalogs(decoderDir).then(setCatalogs).catch(console.error);
+    listCatalogs().then(setCatalogs).catch(console.error);
   }, [isOpen, settings?.decoder_dir]);
 
   // Record a manual tab pick so the Sessions auto-default stops fighting the user.

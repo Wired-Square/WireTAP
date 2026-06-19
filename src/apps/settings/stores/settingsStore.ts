@@ -881,9 +881,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   loadCatalogs: async () => {
     try {
-      const { decoderDir } = get().locations;
-      if (!decoderDir) return;
-      const catalogList = await listCatalogs(decoderDir);
+      const catalogList = await listCatalogs();
       set((state) => ({
         catalogs: { ...state.catalogs, list: catalogList },
       }));
