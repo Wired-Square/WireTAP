@@ -30,6 +30,9 @@ pub enum MsgType {
     // Discovery/Analysis/raw-hex/Calculator.
     DecodedSignals   = 0x14,
     AttachToPanel    = 0x15,
+    // Live frame counters for a streaming session, pushed on the frame cadence so
+    // the frontend renders counts straight from the backend (no TS-side counting).
+    FrameCounts      = 0x16,
     Command          = 0x20,
     CommandResponse  = 0x21,
     // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
@@ -65,6 +68,7 @@ impl TryFrom<u8> for MsgType {
             0x13 => Ok(MsgType::SubscribeNack),
             0x14 => Ok(MsgType::DecodedSignals),
             0x15 => Ok(MsgType::AttachToPanel),
+            0x16 => Ok(MsgType::FrameCounts),
             0x20 => Ok(MsgType::Command),
             0x21 => Ok(MsgType::CommandResponse),
             0x30 => Ok(MsgType::BridgeRequest),
@@ -535,6 +539,18 @@ pub fn encode_session_info(speed: f64, subscriber_count: u16) -> Vec<u8> {
 pub struct SessionInfoMsg {
     pub speed: f64,
     pub subscriber_count: u16,
+}
+
+// ----------------------------------------------------------------------------
+// 0x16 — Frame Counts
+// ----------------------------------------------------------------------------
+
+/// Encode a FrameCounts payload — fixed 12 bytes: total u64 LE + unique u32 LE.
+pub fn encode_frame_counts(total: u64, unique: u32) -> Vec<u8> {
+    let mut out = Vec::with_capacity(12);
+    out.extend_from_slice(&total.to_le_bytes());
+    out.extend_from_slice(&unique.to_le_bytes());
+    out
 }
 
 pub fn decode_session_info(payload: &[u8]) -> Result<SessionInfoMsg, ProtocolError> {

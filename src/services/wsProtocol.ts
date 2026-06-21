@@ -36,6 +36,7 @@ export const MsgType = {
   SubscribeNack: 0x13,
   DecodedSignals: 0x14,
   AttachToPanel: 0x15,
+  FrameCounts: 0x16,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,
@@ -431,6 +432,16 @@ export function decodeSessionInfo(payload: DataView): {
   const speed = payload.getFloat64(0, true);
   const subscriber_count = payload.getUint16(8, true);
   return { speed, subscriber_count };
+}
+
+/** Decode a FrameCounts payload — total u64 LE + unique u32 LE (12 bytes). */
+export function decodeFrameCounts(payload: DataView): {
+  total: number;
+  unique: number;
+} {
+  const total = Number(payload.getBigUint64(0, true));
+  const unique = payload.getUint32(8, true);
+  return { total, unique };
 }
 
 export function decodeSubscribeAck(payload: DataView): {

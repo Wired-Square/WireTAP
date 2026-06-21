@@ -28,7 +28,7 @@ export { isCaptureProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, stopAndSwitchToCapture, resumeSessionToLive, type StreamEndedInfo, type IOCapabilities } from "../api/io";
+import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, stopAndSwitchToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -297,68 +297,22 @@ export interface UseIOSessionManagerResult {
   ) => Promise<void>;
 }
 
-/**
- * Generate a unique multi-source session ID.
- * Pattern: {dataType}_{shortId}
- * - f_ = frames (CAN or framed serial)
- * - b_ = bytes (raw serial)
- * - s_ = session (fallback)
- *
- * Profile names are passed to the backend separately for logging purposes.
- */
-function generateMultiSessionId(
-  busMappings: Map<string, BusMapping[]>,
-  profileNames: Map<string, string>,
-  emitRawBytes?: boolean
-): string {
-  // Determine protocol from first enabled bus
-  let protocol: string | null = null;
+// Multi-source session-id generation (prefix inference from output type) now
+// lives in Rust — see `generateSessionId("realtime", …)` / the `generate_session_id`
+// command. The frontend no longer infers the prefix.
 
-  for (const [profileId, mappings] of busMappings.entries()) {
-    for (const mapping of mappings) {
-      if (mapping.enabled && !protocol) {
-        // First choice: explicit protocol from traits
-        if (mapping.traits?.protocols?.length) {
-          protocol = mapping.traits.protocols[0].toLowerCase();
-        }
-        // Second choice: infer from interfaceId (e.g., "can0" → "can")
-        else if (mapping.interfaceId) {
-          const match = mapping.interfaceId.match(/^([a-z]+)/i);
-          if (match) {
-            protocol = match[1].toLowerCase();
-          }
-        }
-        // Third choice: infer from profile name
-        else {
-          const profileName = profileNames.get(profileId)?.toLowerCase() || "";
-          if (profileName.includes("gs_usb") || profileName.includes("candlelight") ||
-              profileName.includes("gvret") || profileName.includes("slcan") ||
-              profileName.includes("socketcan")) {
-            protocol = "can";
-          } else if (profileName.includes("serial")) {
-            protocol = "serial";
-          }
-        }
-      }
-    }
-  }
+// Session IDs the user deliberately destroyed (via the session menu's "Destroy
+// session" recovery action). When the resulting `destroyed` event arrives, the
+// manager resets to "No source" instead of switching to the orphaned capture —
+// a deliberate destroy means a clean slate, not "review the capture".
+const userDestroyedSessions = new Set<string>();
 
-  // Generate short random suffix (6 hex chars)
-  const shortId = Math.random().toString(16).slice(2, 8);
-
-  // Determine prefix based on output data type, not transport protocol
-  let prefix: string;
-  if (protocol === "serial" && emitRawBytes) {
-    prefix = "b";  // bytes (raw serial)
-  } else if (protocol === "modbus") {
-    prefix = "m";  // modbus
-  } else if (protocol === "can" || protocol === "serial") {
-    prefix = "f";  // frames (CAN or framed serial)
-  } else {
-    prefix = "s";  // session (fallback)
-  }
-
-  return `${prefix}_${shortId}`;
+/** Mark a session as user-destroyed so its `destroyed` event resets to No source. */
+export function markSessionUserDestroyed(sessionId: string): void {
+  userDestroyedSessions.add(sessionId);
+  // Clear once the destroyed event has fanned out to every manager in this
+  // window (each shared panel handles it), so they all reset — not just the first.
+  setTimeout(() => userDestroyedSessions.delete(sessionId), 2000);
 }
 
 /**
@@ -409,9 +363,6 @@ export function useIOSessionManager(
 
   // ---- Detach/Watch State ----
   const [isDetached, setIsDetached] = useState(false);
-  const [watchFrameCount, setWatchFrameCount] = useState(0);
-  const watchUniqueIdsRef = useRef(new Set<number>());
-  const [watchUniqueFrameCount, setWatchUniqueFrameCount] = useState(0);
   const [isWatching, setIsWatching] = useState(false);
 
   // ---- Ingest State (unified with session) ----
@@ -444,6 +395,14 @@ export function useIOSessionManager(
   // ioProfile is fallback (recorded sources, capture profiles)
   const effectiveSessionId = multiSessionId ?? ioProfile ?? undefined;
 
+  // Frame counts are Rust-authoritative — pushed live (FrameCounts 0x16) onto the
+  // session in the store. Read them here so the UI renders them directly; no TS
+  // counting (which previously drifted/froze via the isWatching latch).
+  const watchFrameCount = useSessionStore((s) =>
+    effectiveSessionId ? s.sessions[effectiveSessionId]?.frameCount ?? 0 : 0);
+  const watchUniqueFrameCount = useSessionStore((s) =>
+    effectiveSessionId ? s.sessions[effectiveSessionId]?.uniqueFrameCount ?? 0 : 0);
+
   // Profile name for display
   const ioProfileName = useMemo(() => {
     if (multiBusProfiles.length > 1) {
@@ -468,13 +427,9 @@ export function useIOSessionManager(
     return new Map(ioProfiles.map((p) => [p.id, p.name]));
   }, [ioProfiles]);
 
-  // ---- Watch/Ingest Frame Counting ----
-  const isWatchingRef = useRef(isWatching);
+  // ---- Ingest frame suppression ----
   const isLoadingRef = useRef(isLoading);
   const loadSessionIdRef = useRef(loadSessionId);
-  useEffect(() => {
-    isWatchingRef.current = isWatching;
-  }, [isWatching]);
   useEffect(() => {
     isLoadingRef.current = isLoading;
   }, [isLoading]);
@@ -495,18 +450,7 @@ export function useIOSessionManager(
       // arrives, so new-stream frames flow normally after the matching event.
       return;
     }
-    if (isWatchingRef.current) {
-      setWatchFrameCount((prev) => prev + frames.length);
-      const ids = watchUniqueIdsRef.current;
-      let changed = false;
-      for (const f of frames) {
-        if (!ids.has(f.frame_id)) {
-          ids.add(f.frame_id);
-          changed = true;
-        }
-      }
-      if (changed) setWatchUniqueFrameCount(ids.size);
-    }
+    // Frame counts come from the backend (FrameCounts push) — no TS counting here.
     onFramesProp?.(frames);
   }, [onFramesProp]);
 
@@ -533,12 +477,8 @@ export function useIOSessionManager(
       return;
     }
     tlog.debug(`[IOSessionManager:${appName}] Session reconfigured externally - clearing state`);
-    // Call the same cleanup as before watch
+    // Call the same cleanup as before watch (frame counts are backend-driven)
     onBeforeWatch?.();
-    // Reset frame count
-    setWatchFrameCount(0);
-    watchUniqueIdsRef.current = new Set();
-    setWatchUniqueFrameCount(0);
     // Reset stream completed flag
     if (streamCompletedRef) {
       streamCompletedRef.current = false;
@@ -549,12 +489,8 @@ export function useIOSessionManager(
   // This clears frames so the app doesn't show old capture frames mixed with new live frames
   const handleResuming = useCallback(() => {
     tlog.debug(`[IOSessionManager:${appName}] Session resuming to live - clearing state`);
-    // Call the same cleanup as before watch
+    // Call the same cleanup as before watch (frame counts are backend-driven)
     onBeforeWatch?.();
-    // Reset frame count
-    setWatchFrameCount(0);
-    watchUniqueIdsRef.current = new Set();
-    setWatchUniqueFrameCount(0);
     // Reset stream completed flag
     if (streamCompletedRef) {
       streamCompletedRef.current = false;
@@ -604,7 +540,10 @@ export function useIOSessionManager(
   // Handle external session destruction (e.g., destroyed from Sessions app)
   // Switches to capture mode if orphaned captures are available, otherwise clears state
   const handleSessionDestroyed = useCallback((orphanedCaptureIds: string[]) => {
-    tlog.info(`[IOSessionManager:${appName}] Session destroyed externally, orphaned captures: ${JSON.stringify(orphanedCaptureIds)}`);
+    // A user-initiated "Destroy session" wants a clean slate, not the orphaned
+    // capture the external-destroy path falls back to.
+    const userInitiated = effectiveSessionId ? userDestroyedSessions.has(effectiveSessionId) : false;
+    tlog.info(`[IOSessionManager:${appName}] Session destroyed${userInitiated ? " (user)" : " externally"}, orphaned captures: ${JSON.stringify(orphanedCaptureIds)}`);
 
     // Clear app state (frame lists, etc.)
     onBeforeWatch?.();
@@ -616,23 +555,24 @@ export function useIOSessionManager(
     setIsWatching(false);
     setIsLoading(false);
     setIsDetached(false);
-    setWatchFrameCount(0);
-    watchUniqueIdsRef.current = new Set();
-    setWatchUniqueFrameCount(0);
     streamCompletedRef.current = false;
 
-    // Switch to orphaned capture if available, otherwise clear profile
-    if (orphanedCaptureIds.length > 0) {
-      const captureId = orphanedCaptureIds[0];
-      setIoProfile(captureId);
-      setSourceProfileId(captureId);
-    } else {
+    if (userInitiated) {
+      // Deliberate destroy → clean slate, skip the capture fallback.
       setIoProfile(null);
+    } else {
+      // External destroy → switch to the orphaned capture if there is one.
+      if (orphanedCaptureIds.length > 0) {
+        const captureId = orphanedCaptureIds[0];
+        setIoProfile(captureId);
+        setSourceProfileId(captureId);
+      } else {
+        setIoProfile(null);
+      }
+      // Notify app with orphaned capture IDs so it can set up capture mode.
+      onSessionDestroyed?.(orphanedCaptureIds);
     }
-
-    // Notify app with orphaned capture IDs so it can set up capture mode
-    onSessionDestroyed?.(orphanedCaptureIds);
-  }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
+  }, [appName, effectiveSessionId, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
 
   const sessionOptions: UseIOSessionOptions = {
     appName,
@@ -778,11 +718,10 @@ export function useIOSessionManager(
     }
   }, [session, ioProfile, setMultiBusProfiles, setIoProfile]);
 
-  const resetWatchFrameCount = useCallback(() => {
-    setWatchFrameCount(0);
-    watchUniqueIdsRef.current = new Set();
-    setWatchUniqueFrameCount(0);
-  }, []);
+  // Frame counts are Rust-authoritative (reset by the backend when the capture
+  // resets), so this is now a no-op — kept for the manager's public interface
+  // (Discovery's playback handlers still call it).
+  const resetWatchFrameCount = useCallback(() => {}, []);
 
   // Start multi-bus session
   const startMultiBusSession = useCallback(async (
@@ -816,10 +755,9 @@ export function useIOSessionManager(
       }
     }
 
-    // Use provided session ID or generate one to avoid collisions between windows
-    const sessionId = sessionIdOverride ?? (effectiveBusMappings.size > 0
-      ? generateMultiSessionId(effectiveBusMappings, profileNamesMap, emitRawBytes)
-      : `s_${Math.random().toString(16).slice(2, 8)}`);
+    // Use provided session ID, otherwise let Rust generate one (it infers the
+    // cosmetic prefix from the profiles' output type).
+    const sessionId = sessionIdOverride ?? await generateSessionId(profileIds, emitRawBytes ?? false);
 
     const createOptions: CreateMultiSourceOptions = {
       sessionId,
@@ -1376,13 +1314,14 @@ export function useIOSessionManager(
   useEffect(() => {
     if (isStreaming) {
       wasStreamingRef.current = true;
-    } else if (wasStreamingRef.current && isWatching) {
-      // Streaming just stopped
+    } else if (wasStreamingRef.current) {
+      // Streaming just stopped → clear the watching flag. Always reset the latch
+      // first so a stop that sets isWatching=false directly (leave/stopWatch)
+      // doesn't leave it stuck true and tear down the next watch.
       wasStreamingRef.current = false;
-      setIsWatching(false);
-      resetWatchFrameCount();
+      if (isWatching) setIsWatching(false);
     }
-  }, [isStreaming, isWatching, resetWatchFrameCount]);
+  }, [isStreaming, isWatching]);
 
   return {
     // Profile State

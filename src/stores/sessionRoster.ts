@@ -10,8 +10,15 @@ import type { ActiveSessionInfo } from "../api/io";
 /**
  * Returns a new sessions map that:
  *  - adds a known-only `Session` for each roster session the store doesn't own,
- *  - leaves UI-owned entries (`external` falsy) untouched,
+ *  - refreshes the authoritative fields (ioState, capabilities, subscriberCount,
+ *    capture id/count) of entries already in the store from the roster — so a
+ *    frontend that drifted (e.g. while the WS was down) re-syncs to Rust,
  *  - drops adopted (`external: true`) entries no longer in the roster.
+ *
+ * The roster is the backend's source of truth. UI-only fields (speed, playback
+ * position, catalogue, capture name/persistence, queued-message flag) are
+ * preserved, and entries are only rebuilt when an authoritative field actually
+ * changed, keeping object identity stable to avoid needless re-renders.
  */
 export function reconcileKnownSessions(
   current: Record<string, Session>,
@@ -25,7 +32,36 @@ export function reconcileKnownSessions(
   }
 
   for (const info of infos) {
-    if (next[info.sessionId]) continue; // UI-owned or already adopted — leave it
+    const existing = next[info.sessionId];
+    if (existing) {
+      // Already in the store (UI-owned or adopted) — refresh authoritative state.
+      const captureCount = info.captureFrameCount ?? existing.capture.count;
+      const frameCount = info.captureFrameCount ?? existing.frameCount;
+      const uniqueFrameCount = info.captureUniqueFrameCount ?? existing.uniqueFrameCount;
+      const changed =
+        existing.ioState !== info.state ||
+        existing.subscriberCount !== info.subscriberCount ||
+        existing.capture.id !== info.captureId ||
+        existing.capture.count !== captureCount ||
+        existing.frameCount !== frameCount ||
+        existing.uniqueFrameCount !== uniqueFrameCount;
+      if (changed) {
+        next[info.sessionId] = {
+          ...existing,
+          ioState: info.state,
+          subscriberCount: info.subscriberCount,
+          capabilities: info.capabilities ?? existing.capabilities,
+          frameCount,
+          uniqueFrameCount,
+          capture: {
+            ...existing.capture,
+            id: info.captureId ?? existing.capture.id,
+            count: captureCount,
+          },
+        };
+      }
+      continue;
+    }
     next[info.sessionId] = {
       id: info.sessionId,
       profileId: info.sourceProfileIds[0] ?? "",
@@ -35,6 +71,8 @@ export function reconcileKnownSessions(
       capabilities: info.capabilities,
       errorMessage: null,
       subscriberCount: info.subscriberCount,
+      frameCount: info.captureFrameCount ?? 0,
+      uniqueFrameCount: info.captureUniqueFrameCount ?? 0,
       capture: {
         available: false,
         id: info.captureId,

@@ -73,6 +73,8 @@ class WsTransport {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay: number = 1000;
   private shouldReconnect: boolean = true;
+  // Listeners fired after a successful reconnect (re-auth + re-subscribe).
+  private reconnectListeners: Set<() => void> = new Set();
 
   // Heartbeat
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -241,6 +243,18 @@ class WsTransport {
         const idx = arr.indexOf(handler);
         if (idx >= 0) arr.splice(idx, 1);
       }
+    };
+  }
+
+  /**
+   * Register a listener fired after a successful reconnect (re-auth + re-subscribe).
+   * Returns an unregister function. Use to reconcile state that may have drifted
+   * while the socket was down (e.g. refresh the session roster from the backend).
+   */
+  onReconnect(listener: () => void): () => void {
+    this.reconnectListeners.add(listener);
+    return () => {
+      this.reconnectListeners.delete(listener);
     };
   }
 
@@ -418,17 +432,43 @@ class WsTransport {
       this.reconnectTimer = null;
       try {
         await this.doConnect();
-        // Save session IDs, then clear all stale channel mappings.
-        // The old channel numbers are invalid after reconnect; the server
-        // will assign new ones via SubscribeAck.
-        const sessionIds = [...this.sessionToChannel.keys()];
+        // The old channel numbers are invalid after reconnect; the server assigns
+        // new ones via SubscribeAck. Re-stage the existing handlers as pending
+        // (keyed by sessionId) so they get re-wired to the new channels — otherwise
+        // the frontend goes deaf to sessions the backend still has alive (frozen
+        // sessions, stale store). The handler closures stay valid across reconnect.
+        const restaged = new Map<string, { msgType: number; handler: MessageHandler }[]>();
+        const stage = (sessionId: string, msgType: number, handler: MessageHandler) => {
+          const list = restaged.get(sessionId);
+          if (list) list.push({ msgType, handler });
+          else restaged.set(sessionId, [{ msgType, handler }]);
+        };
+        for (const [channel, byType] of this.handlers) {
+          const sessionId = this.channelToSession.get(channel);
+          if (!sessionId) continue;
+          for (const [msgType, hs] of byType) for (const h of hs) stage(sessionId, msgType, h);
+        }
+        for (const [sessionId, list] of this.pendingHandlers) {
+          for (const { msgType, handler } of list) stage(sessionId, msgType, handler);
+        }
+
+        const sessionIds = new Set<string>([
+          ...this.sessionToChannel.keys(),
+          ...this.pendingHandlers.keys(),
+        ]);
         this.channelToSession.clear();
         this.sessionToChannel.clear();
         this.handlers.clear();
-        this.pendingHandlers.clear();
-        // Re-subscribe all sessions
+        this.pendingHandlers = restaged;
+
+        // Re-subscribe all sessions; SubscribeAck re-wires the re-staged handlers.
         for (const sessionId of sessionIds) {
           this.ws?.send(encodeSubscribe(sessionId));
+        }
+
+        // Let listeners reconcile state that may have drifted while we were down.
+        for (const fn of this.reconnectListeners) {
+          try { fn(); } catch { /* listener errors must not abort reconnect */ }
         }
       } catch {
         // Exponential backoff: 1s, 2s, 4s, 8s, ..., max 30s

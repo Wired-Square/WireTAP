@@ -2538,6 +2538,9 @@ pub struct ActiveSessionInfo {
     /// Frame count in the owned capture
     #[serde(default)]
     pub capture_frame_count: Option<usize>,
+    /// Distinct (bus, frame_id) count in the owned capture (live streaming only)
+    #[serde(default)]
+    pub capture_unique_frame_count: Option<usize>,
     /// Whether the session is actively streaming data
     #[serde(default)]
     pub is_streaming: bool,
@@ -2557,6 +2560,9 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
             let capture_frame_count = capture_id
                 .as_ref()
                 .map(|id| capture_store::get_capture_count(id));
+            let capture_unique_frame_count = capture_id
+                .as_ref()
+                .map(|id| capture_store::get_capture_unique_count(id));
 
             // Check if session is actively streaming (running state)
             let is_streaming = matches!(session.source.state(), IOState::Running);
@@ -2585,6 +2591,7 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
                 source_profile_ids,
                 capture_id,
                 capture_frame_count,
+                capture_unique_frame_count,
                 is_streaming,
             }
         })

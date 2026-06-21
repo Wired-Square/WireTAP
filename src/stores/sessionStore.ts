@@ -70,6 +70,7 @@ import {
   decodeSessionError,
   decodePlaybackPosition,
   decodeSessionInfo,
+  decodeFrameCounts,
   decodeScopedSessionLifecycle,
 } from "../services/wsProtocol";
 
@@ -179,6 +180,10 @@ export interface Session {
   errorMessage: string | null;
   /** Number of listeners connected to this session (from Rust backend) */
   subscriberCount: number;
+  /** Total frames seen this session (Rust-authoritative, pushed live). */
+  frameCount: number;
+  /** Distinct (bus, frame_id) count this session (Rust-authoritative, pushed live). */
+  uniqueFrameCount: number;
   /** Capture info after stream ends */
   capture: {
     available: boolean;
@@ -609,6 +614,14 @@ async function setupSessionEventSubscribers(
       })
     );
 
+    // FrameCounts (0x16) — live total + unique counts, Rust-authoritative.
+    eventListeners.wsUnlistenFunctions.push(
+      wsTransport.onSessionMessage(sessionId, MsgType.FrameCounts, (payload) => {
+        const { total, unique } = decodeFrameCounts(payload);
+        updateSession(sessionId, { frameCount: total, uniqueFrameCount: unique });
+      })
+    );
+
     // Reconfigured (0x0A) — signal-only, no payload to decode
     eventListeners.wsUnlistenFunctions.push(
       wsTransport.onSessionMessage(sessionId, MsgType.Reconfigured, () => {
@@ -933,6 +946,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             id: sessionId,
             profileId,
             profileName,
+            frameCount: 0,
+            uniqueFrameCount: 0,
             lifecycleState: "error",
             ioState: "error",
             capabilities: null,
@@ -1078,6 +1093,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         capabilities,
         errorMessage: null,
         subscriberCount: finalListenerCount,
+        frameCount: 0,
+        uniqueFrameCount: 0,
         capture: {
           available: false,
           id: captureId,

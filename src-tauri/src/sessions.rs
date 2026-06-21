@@ -272,6 +272,67 @@ fn choose_profile_by_id(settings: &AppSettings, profile_id: Option<&str>) -> Opt
     }
 }
 
+/// Map a profile kind to its output protocol family ("can" | "serial" | "modbus"
+/// | "unknown"). Used to pick a session-id prefix.
+fn protocol_for_kind(kind: &str) -> &'static str {
+    match kind {
+        "gvret_tcp" | "gvret-tcp" | "gvret_usb" | "gvret-usb" | "slcan" | "gs_usb"
+        | "socketcan" | "mqtt" | "framelink" | "virtual" => "can",
+        "serial" => "serial",
+        "modbus_tcp" | "modbus_rtu" => "modbus",
+        _ => "unknown",
+    }
+}
+
+/// A random 6-hex-char id suffix (matches the previous frontend scheme).
+fn random_hex6() -> String {
+    use std::hash::{BuildHasher, Hasher};
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    hasher.write_u64(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0),
+    );
+    format!("{:06x}", hasher.finish() & 0xFF_FFFF)
+}
+
+/// Generate an opaque realtime session id. The prefix (modbus → m_, raw serial →
+/// b_, CAN/framed serial → f_, otherwise s_) is inferred from the profiles' output
+/// type. It is cosmetic — nothing parses the id — but owned here, not in the
+/// frontend. Modbus anywhere wins; otherwise the first resolvable profile decides
+/// (matches the old frontend behaviour of keying on the first enabled mapping).
+#[tauri::command(rename_all = "snake_case")]
+pub async fn generate_session_id(
+    app: tauri::AppHandle,
+    profile_ids: Vec<String>,
+    emit_raw_bytes: Option<bool>,
+) -> Result<String, String> {
+    let settings = settings::load_settings(app.clone())
+        .await
+        .map_err(|e| format!("Failed to load settings: {}", e))?;
+    let mut protocol: Option<&str> = None;
+    for id in &profile_ids {
+        if let Some(p) = settings.io_profiles.iter().find(|p| &p.id == id) {
+            let proto = protocol_for_kind(&p.kind);
+            if proto == "modbus" {
+                protocol = Some("modbus");
+                break;
+            }
+            if protocol.is_none() {
+                protocol = Some(proto);
+            }
+        }
+    }
+    let prefix = match protocol {
+        Some("modbus") => "m",
+        Some("serial") if emit_raw_bytes.unwrap_or(false) => "b",
+        Some("can") | Some("serial") => "f",
+        _ => "s",
+    };
+    Ok(format!("{}_{}", prefix, random_hex6()))
+}
+
 /// Check if a profile kind is a real-time device that can use IOBroker.
 /// These devices support the multi-source architecture for unified session handling.
 fn is_realtime_device(kind: &str) -> bool {

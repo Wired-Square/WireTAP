@@ -23,11 +23,15 @@ export function useSessionRosterSync(): void {
     };
 
     reconcile(); // initial sync — catches sessions created before mount
-    const unlisten = wsTransport.onGlobalMessage(MsgType.SessionLifecycle, reconcile);
+    const unlistenLifecycle = wsTransport.onGlobalMessage(MsgType.SessionLifecycle, reconcile);
+    // Re-sync after a WS reconnect: while the socket was down we may have missed
+    // state/lifecycle events, leaving owned sessions frozen with stale state.
+    const unlistenReconnect = wsTransport.onReconnect(reconcile);
 
     return () => {
       cancelled = true;
-      unlisten();
+      unlistenLifecycle();
+      unlistenReconnect();
     };
   }, []);
 }

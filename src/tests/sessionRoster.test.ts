@@ -38,10 +38,41 @@ describe("reconcileKnownSessions", () => {
     expect(next.f_mcp1.profileId).toBe("io_x");
   });
 
-  it("does not overwrite a UI-owned (non-external) entry", () => {
-    const owned = { id: "f_mcp1", external: false, profileName: "Mine" } as unknown as Session;
+  const ownedSession = (overrides: Partial<Session>) =>
+    ({
+      id: "f_mcp1",
+      external: false,
+      profileName: "Mine",
+      ioState: "stopped",
+      subscriberCount: 0,
+      capabilities: undefined,
+      capture: {
+        available: false, id: null, kind: null, count: 0, owningSessionId: null,
+        startTimeUs: null, endTimeUs: null, name: "My capture", persistent: true,
+      },
+      ...overrides,
+    }) as unknown as Session;
+
+  it("refreshes a UI-owned entry from the roster, preserving UI-only fields", () => {
+    const owned = ownedSession({});
     const next = reconcileKnownSessions({ f_mcp1: owned }, [info("f_mcp1")]);
-    expect(next.f_mcp1).toBe(owned);
+    // Authoritative fields re-synced from Rust...
+    expect(next.f_mcp1).not.toBe(owned);
+    expect(next.f_mcp1.ioState).toBe("running");
+    expect(next.f_mcp1.subscriberCount).toBe(1);
+    expect(next.f_mcp1.capabilities).toBe(caps);
+    // ...UI-only fields preserved.
+    expect(next.f_mcp1.external).toBe(false);
+    expect(next.f_mcp1.profileName).toBe("Mine");
+    expect(next.f_mcp1.capture.name).toBe("My capture");
+    expect(next.f_mcp1.capture.persistent).toBe(true);
+  });
+
+  it("leaves an entry untouched when no authoritative field changed", () => {
+    // info() reports state=running, subscriberCount=1, no capture.
+    const owned = ownedSession({ ioState: "running", subscriberCount: 1, capabilities: caps });
+    const next = reconcileKnownSessions({ f_mcp1: owned }, [info("f_mcp1")]);
+    expect(next.f_mcp1).toBe(owned); // stable identity — avoids needless re-renders
   });
 
   it("removes an external entry that vanished from the roster", () => {

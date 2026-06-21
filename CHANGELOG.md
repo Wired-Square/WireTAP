@@ -2,6 +2,24 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- **Realtime session-id generation moved into Rust**: the session id's human-readable prefix (`f_` frames / `b_` raw bytes / `m_` modbus / `s_` fallback) was inferred in the frontend from profile traits. A new `generate_session_id` command now owns that inference (from the profiles' output type), so the multi-source watch path asks the backend for the id instead of computing it. The prefix is cosmetic (nothing parses the id); the recorded/capture/load fixed prefixes are unchanged. Second slice of moving session logic into Rust — no user-visible change. [src-tauri/src/sessions.rs](src-tauri/src/sessions.rs), [src/api/io.ts](src/api/io.ts), [src/hooks/useIOSessionManager.ts](src/hooks/useIOSessionManager.ts).
+
+- **Session controls collapsed into a fixed-width chip + a click-to-open menu**: the per-app top bar previously showed a row of inline buttons after the session chip (rename, pin, clear, speed, play/pause, bookmark, disconnect) whose presence changed with session state, so the control's width jumped around. Clicking the session chip now opens a single menu holding the session details (previously a hover-only tooltip) and every action — change source, play/pause, speed, load bookmark, rename/pin/clear capture, disconnect — so the chip stays the same width regardless of state. The git/multi-bus icon was dropped from the chip (the coloured status dot already conveys live state); the capture and default-reader icons remain. The dropdown styling shared with the Dashboard panel menu was extracted to [src/styles/menuStyles.ts](src/styles/menuStyles.ts). [src/components/SessionControls.tsx](src/components/SessionControls.tsx), [src/apps/dashboard/views/panels/PanelWrapper.tsx](src/apps/dashboard/views/panels/PanelWrapper.tsx).
+
+### Added
+
+- **"Destroy session" recovery action**: the session menu has a destructive "Destroy session" item that tears down the current backend session via `destroy_reader_session` — a hard reset for a session wedged in a bad state. A deliberate destroy is marked so that when the `session-lifecycle "destroyed"` event runs the normal per-app cleanup, the app resets cleanly to "No source" instead of falling back to the orphaned capture (the external-destroy behaviour), which otherwise left a half-loaded capture-replay. [src/components/SessionControls.tsx](src/components/SessionControls.tsx), [src/hooks/useIOSessionManager.ts](src/hooks/useIOSessionManager.ts).
+
+### Fixed
+
+- **Sessions froze (and "Stop & review capture" did nothing) after a WebSocket reconnect**: on reconnect the transport cleared every per-session message handler and re-subscribed, but never re-registered the handlers `sessionStore` had installed — so the frontend went deaf to a session the backend still had alive. The UI froze with stale state, the session-manager and the consuming apps disagreed, and leave/stop early-returned on a now-empty session id. The transport now re-stages the existing handlers across a reconnect (re-wired to the new channels by `SubscribeAck`) and exposes an `onReconnect` hook; the session-roster sync reconciles from the Rust backend (`list_active_sessions`) on reconnect, and that reconcile now refreshes the authoritative state (ioState, capabilities, subscriber count, capture) of sessions the UI already owns instead of only adopting new ones — Rust is the source of truth. [src/services/wsTransport.ts](src/services/wsTransport.ts), [src/hooks/useSessionRosterSync.ts](src/hooks/useSessionRosterSync.ts), [src/stores/sessionRoster.ts](src/stores/sessionRoster.ts).
+
+- **Frame/Unique counts are now backend-authoritative (fixes counts stuck at 0 after a restart)**: the counts were computed in the frontend, gated by an `isWatching` latch that could get stuck — after a destroy→restart the next watch was torn down before its stream connected, so the counts never incremented (worked on a fresh launch, not after a restart). The frontend no longer counts: Rust maintains a running total and a distinct-(bus, frame_id) unique count per capture and pushes both live over a new `FrameCounts` WS message (0x16) on the 2 Hz frame cadence (also surfaced on `list_active_sessions`); the TS frame-counting and the latch are deleted. First slice of moving session state authority into Rust. [src-tauri/src/capture_store.rs](src-tauri/src/capture_store.rs), [src-tauri/src/ws/dispatch.rs](src-tauri/src/ws/dispatch.rs), [src-tauri/src/ws/protocol.rs](src-tauri/src/ws/protocol.rs), [src-tauri/src/io/mod.rs](src-tauri/src/io/mod.rs), [src/stores/sessionStore.ts](src/stores/sessionStore.ts), [src/hooks/useIOSessionManager.ts](src/hooks/useIOSessionManager.ts).
+
 ## [0.8.1] - 2026-06-21
 
 ### Fixed

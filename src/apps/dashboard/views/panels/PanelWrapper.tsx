@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Trash2, Settings2, Copy, Maximize2, ChevronsRight, BarChart2, Download, EllipsisVertical, Image, FileCode } from "lucide-react";
 import { iconSm } from "../../../../styles/spacing";
 import { iconButtonHover } from "../../../../styles/buttonStyles";
+import { menuClasses, menuItem, menuDivider } from "../../../../styles/menuStyles";
 import { useDashboardStore, type DashboardPanel } from "../../../../stores/dashboardStore";
 import { getWidget } from "../../widgets/registry";
 
@@ -19,10 +20,6 @@ function menuToggle(isActive: boolean, colour: "blue" | "purple"): string {
 
 /** Distance threshold (px) to distinguish a click from a drag. */
 const DRAG_THRESHOLD = 5;
-
-const menuClasses = "fixed py-1 min-w-[160px] bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-lg shadow-xl z-[9999]";
-const menuItem = "w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[color:var(--text-primary)] hover:bg-[var(--hover-bg)] transition-colors cursor-pointer";
-const menuDivider = "my-1 border-t border-[var(--border-default)]";
 
 interface Props {
   panel: DashboardPanel;

@@ -1,22 +1,23 @@
 // src/components/SessionControls.tsx
 //
 // Shared session control components for top bars.
-// Handles reader display, play/pause/leave controls, speed, and capture metadata.
+// Renders a fixed-width session chip plus a kebab (⋮) menu holding the session
+// details and all actions (play/pause, speed, bookmark, rename, pin, clear,
+// disconnect). The chip width never changes as session state changes.
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Star, FileText, Play, Pause, GitMerge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2 } from "lucide-react";
-import { iconSm, iconXs } from "../styles/spacing";
+import { Star, FileText, Play, Pause, Gauge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2, ArrowRightLeft, Power } from "lucide-react";
+import { iconSm } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
 import type { BusSourceInfo } from "../utils/busFormat";
-import { isCaptureProfileId } from "../hooks/useIOSessionManager";
-import {
-  buttonBase,
-  warningButtonBase,
-  successIconButton,
-} from "../styles/buttonStyles";
+import { isCaptureProfileId, markSessionUserDestroyed } from "../hooks/useIOSessionManager";
+import { buttonBase } from "../styles/buttonStyles";
+import { menuClasses, menuItem, menuDivider } from "../styles/menuStyles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
+import { destroyReaderSession } from "../api/io";
 
 // ============================================================================
 // Session Button - displays current source with appropriate icon
@@ -35,18 +36,14 @@ export interface SessionButtonProps {
   defaultReadProfileId?: string | null;
   /** Current session ID (e.g., "f_abc123") - displayed in nav bar */
   sessionId?: string | null;
-  /** Current IO state (running, stopped, paused, error) */
+  /** Current IO state (running, stopped, paused, error) - drives the status dot */
   ioState?: string | null;
-  /** Number of unique frame IDs (shown in tooltip) */
-  frameCount?: number;
-  /** Total number of frames seen (shown in tooltip when available) */
-  totalFrameCount?: number;
-  /** Bus-to-source mapping for multi-bus tooltip display */
-  outputBusToSource?: Map<number, BusSourceInfo>;
-  /** Click handler to open session picker */
+  /** Click handler (opens the session menu, or the picker when no source) */
   onClick: () => void;
-  /** Whether button should be disabled (e.g., while streaming) */
-  disabled?: boolean;
+  /** Ref forwarded to the underlying button (used as the menu anchor) */
+  buttonRef?: React.Ref<HTMLButtonElement>;
+  /** Native tooltip text */
+  title?: string;
   /** Whether the session is in capture replay mode */
   isCaptureMode?: boolean;
 }
@@ -59,11 +56,9 @@ export function SessionButton({
   defaultReadProfileId,
   sessionId,
   ioState,
-  frameCount,
-  totalFrameCount,
-  outputBusToSource,
   onClick,
-  disabled = false,
+  buttonRef,
+  title,
   isCaptureMode: isCaptureModeProp,
 }: SessionButtonProps) {
   const isCaptureProfile = isCaptureModeProp ?? isCaptureProfileId(ioProfile);
@@ -111,33 +106,75 @@ export function SessionButton({
   };
   const statusColour = getStatusColour();
 
-  // --- Tooltip data (only when a session is configured) ---
-  const showTooltip = ioProfile !== null;
+  return (
+    <button
+      ref={buttonRef}
+      onClick={onClick}
+      className={buttonBase}
+      title={title}
+    >
+      {/* Capture / default-reader type icon (no icon for multi-bus or plain sources) */}
+      {isCaptureProfile ? (
+        <FileText className={`${iconSm} text-blue-500 flex-shrink-0`} />
+      ) : isDefaultReader ? (
+        <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
+      ) : null}
+      {statusColour && (
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColour}`} />
+      )}
+      <span className="max-w-40 truncate">{displayName}</span>
+      {sessionId && !sessionIdInDisplayName && (
+        <span className="text-[color:var(--text-muted)] text-xs font-mono">{sessionId}</span>
+      )}
+    </button>
+  );
+}
 
-  const getStatusLabel = (): { label: string; colour: string } | null => {
-    if (!ioState || !ioProfile) return null;
-    if (ioState === "running")  return { label: "Running",  colour: "text-[color:var(--status-success-text)]" };
-    if (ioState === "paused")   return { label: "Paused",   colour: "text-[color:var(--status-warning-text)]" };
-    if (ioState === "stopped")  return { label: "Stopped",  colour: "text-[color:var(--text-muted)]" };
-    if (ioState === "starting") return { label: "Starting", colour: "text-[color:var(--status-info-text)]" };
-    if (ioState.startsWith("Error")) return { label: ioState, colour: "text-[color:var(--status-danger-text)]" };
-    return { label: ioState, colour: "text-[color:var(--text-secondary)]" };
-  };
-  const statusLabel = getStatusLabel();
+// ============================================================================
+// Session details - derives the rows shown at the top of the kebab menu
+// ============================================================================
 
-  let typeLabel: string;
-  if (isCaptureProfile) {
-    typeLabel = "Capture";
-  } else if (showAsMultiBus) {
-    typeLabel = "Realtime";
-  } else if (selectedProfile?.kind) {
-    typeLabel = getIOKindLabel(selectedProfile.kind);
-  } else {
-    typeLabel = "Unknown";
+interface SessionDetails {
+  statusLabel: { label: string; colour: string } | null;
+  typeLabel: string;
+  interfaceEntries: { label: string; kind: string }[];
+}
+
+function getSessionDetails({
+  ioProfile,
+  ioProfiles,
+  multiBusProfiles,
+  ioState,
+  outputBusToSource,
+  isCaptureMode,
+}: {
+  ioProfile: string | null;
+  ioProfiles: IOProfile[];
+  multiBusProfiles: string[];
+  ioState?: string | null;
+  outputBusToSource?: Map<number, BusSourceInfo>;
+  isCaptureMode: boolean;
+}): SessionDetails {
+  const selectedProfile = ioProfiles.find((p) => p.id === ioProfile);
+  const showAsMultiBus = !isCaptureMode && multiBusProfiles.length > 0;
+
+  let statusLabel: SessionDetails["statusLabel"] = null;
+  if (ioState && ioProfile) {
+    if (ioState === "running")       statusLabel = { label: "Running",  colour: "text-[color:var(--status-success-text)]" };
+    else if (ioState === "paused")   statusLabel = { label: "Paused",   colour: "text-[color:var(--status-warning-text)]" };
+    else if (ioState === "stopped")  statusLabel = { label: "Stopped",  colour: "text-[color:var(--text-muted)]" };
+    else if (ioState === "starting") statusLabel = { label: "Starting", colour: "text-[color:var(--status-info-text)]" };
+    else if (ioState.startsWith("Error")) statusLabel = { label: ioState, colour: "text-[color:var(--status-danger-text)]" };
+    else statusLabel = { label: ioState, colour: "text-[color:var(--text-secondary)]" };
   }
 
-  // Build interface entries for tooltip (shown last)
-  let interfaceEntries: { label: string; kind: string }[] = [];
+  let typeLabel: string;
+  if (isCaptureMode) typeLabel = "Capture";
+  else if (showAsMultiBus) typeLabel = "Realtime";
+  else if (selectedProfile?.kind) typeLabel = getIOKindLabel(selectedProfile.kind);
+  else typeLabel = "Unknown";
+
+  let interfaceEntries: SessionDetails["interfaceEntries"] = [];
   if (outputBusToSource && outputBusToSource.size > 0) {
     // Multi-bus: show bus-mapped interface info
     interfaceEntries = Array.from(outputBusToSource.entries())
@@ -152,242 +189,11 @@ export function SessionButton({
     interfaceEntries = [{ label: selectedProfile.name, kind }];
   }
 
-  // Tooltip boundary clamping — adjust left offset so the tooltip stays on-screen
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [tooltipOffset, setTooltipOffset] = useState(0);
-  const [arrowOffset, setArrowOffset] = useState("50%");
-
-  const clampTooltip = useCallback(() => {
-    const tip = tooltipRef.current;
-    const container = containerRef.current;
-    if (!tip || !container) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const tipWidth = tip.offsetWidth;
-    const margin = 8;
-
-    // Default: centered on the button
-    const centeredLeft = containerRect.left + containerRect.width / 2 - tipWidth / 2;
-    let offset = 0;
-
-    if (centeredLeft < margin) {
-      // Clipping left edge
-      offset = margin - centeredLeft;
-    } else if (centeredLeft + tipWidth > window.innerWidth - margin) {
-      // Clipping right edge
-      offset = (window.innerWidth - margin) - (centeredLeft + tipWidth);
-    }
-
-    setTooltipOffset(offset);
-    // Move arrow to stay centered over button
-    const arrowPos = tipWidth / 2 - offset;
-    setArrowOffset(`${arrowPos}px`);
-  }, []);
-
-  return (
-    <div className="relative group shrink-0" ref={containerRef} onMouseEnter={clampTooltip}>
-      <button
-        onClick={onClick}
-        disabled={disabled}
-        className={buttonBase}
-        title={showTooltip ? undefined : "Select source"}
-      >
-        {showAsMultiBus ? (
-          <GitMerge className={`${iconSm} text-purple-500 flex-shrink-0`} />
-        ) : isCaptureProfile ? (
-          <FileText className={`${iconSm} text-blue-500 flex-shrink-0`} />
-        ) : isDefaultReader ? (
-          <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
-        ) : null}
-        {statusColour && (
-          <span
-            className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColour}`}
-          />
-        )}
-        <span className="max-w-40 truncate">{displayName}</span>
-        {sessionId && !sessionIdInDisplayName && (
-          <span className="text-[color:var(--text-muted)] text-xs font-mono">{sessionId}</span>
-        )}
-      </button>
-
-      {/* Session preview tooltip */}
-      {showTooltip && (
-        <div
-          ref={tooltipRef}
-          style={{ transform: `translateX(calc(-50% + ${tooltipOffset}px))` }}
-          className={[
-            "absolute left-1/2 top-full mt-2",
-            "min-w-[180px] max-w-[280px]",
-            "px-3 py-2 rounded-lg border shadow-xl z-50",
-            "bg-[var(--bg-surface)] border-[color:var(--border-default)]",
-            "text-xs",
-            "opacity-0 invisible group-hover:opacity-100 group-hover:visible",
-            "transition-all duration-200 delay-300",
-            "pointer-events-none",
-          ].join(" ")}
-        >
-          {/* Arrow */}
-          <div
-            style={{ left: arrowOffset }}
-            className="absolute -top-1 -translate-x-1/2 w-2 h-2 rotate-45 bg-[var(--bg-surface)] border-l border-t border-[color:var(--border-default)]"
-          />
-
-          {/* State */}
-          {statusLabel && (
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <span className="text-[color:var(--text-muted)]">State</span>
-              <span className={`font-medium ${statusLabel.colour}`}>{statusLabel.label}</span>
-            </div>
-          )}
-
-          {/* Type */}
-          <div className="flex items-center justify-between gap-3 mb-1">
-            <span className="text-[color:var(--text-muted)]">Type</span>
-            <span className="font-medium text-[color:var(--text-primary)]">{typeLabel}</span>
-          </div>
-
-          {/* Capture label */}
-          {captureMetadata?.id && (
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <span className="text-[color:var(--text-muted)]">Capture</span>
-              <span className="font-medium text-[color:var(--text-primary)] truncate max-w-[160px]">
-                {captureMetadata.name || captureMetadata.id}
-              </span>
-            </div>
-          )}
-
-          {/* Frame counts */}
-          {totalFrameCount != null && (
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <span className="text-[color:var(--text-muted)]">Frames</span>
-              <span className="font-medium text-[color:var(--text-primary)]">{totalFrameCount.toLocaleString()}</span>
-            </div>
-          )}
-          {frameCount != null && (
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <span className="text-[color:var(--text-muted)]">{totalFrameCount != null ? "Unique" : "Frames"}</span>
-              <span className="font-medium text-[color:var(--text-primary)]">{frameCount.toLocaleString()}</span>
-            </div>
-          )}
-
-          {/* Interfaces (shown last, one per bus) */}
-          {interfaceEntries.length > 0 && (
-            <div className="flex items-start justify-between gap-3 mt-1 pt-1 border-t border-[color:var(--border-default)]">
-              <span className="text-[color:var(--text-muted)] shrink-0">
-                {interfaceEntries.length > 1 ? "Interfaces" : "Interface"}
-              </span>
-              <div className="flex flex-col items-end">
-                {interfaceEntries.map((entry, i) => (
-                  <span key={i} className="text-[color:var(--text-primary)] truncate max-w-[170px]">
-                    {entry.label}{entry.kind ? ` (${entry.kind})` : ""}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  return { statusLabel, typeLabel, interfaceEntries };
 }
 
 // ============================================================================
-// Session Action Buttons - play, pause, leave
-// ============================================================================
-
-export interface SessionActionButtonsProps {
-  /** Whether the session is actively streaming (running or paused) */
-  isStreaming: boolean;
-  /** Whether the session is paused */
-  isPaused?: boolean;
-  /** Whether the session is stopped but can be resumed */
-  isStopped?: boolean;
-  /** Whether the IO source supports time range filtering (shows bookmark button) */
-  supportsTimeRange?: boolean;
-  /** Whether we have an active source (enables Leave button) */
-  hasSource?: boolean;
-  /** Whether we're in capture mode (affects leave tooltip) */
-  isCaptureMode?: boolean;
-  /** Play/resume the session */
-  onPlay?: () => void;
-  /** Pause the session */
-  onPause?: () => void;
-  /** Leave the session */
-  onLeave?: () => void;
-  /** Open bookmark picker (for time range sources) */
-  onOpenBookmarkPicker?: () => void;
-}
-
-export function SessionActionButtons({
-  isStreaming,
-  isPaused = false,
-  isStopped = false,
-  supportsTimeRange = false,
-  hasSource = false,
-  isCaptureMode = false,
-  onPlay,
-  onPause,
-  onLeave,
-  onOpenBookmarkPicker,
-}: SessionActionButtonsProps) {
-  const { t } = useTranslation("common");
-  // Show Play when paused or stopped
-  const showPlay = (isPaused || isStopped) && onPlay;
-  // Show Pause when running (streaming but not paused)
-  const showPause = isStreaming && !isPaused && onPause;
-
-  return (
-    <>
-      {/* Bookmark button - shown when source supports time range */}
-      {supportsTimeRange && onOpenBookmarkPicker && (
-        <button
-          onClick={onOpenBookmarkPicker}
-          className={buttonBase}
-          title={t("session.loadBookmark")}
-        >
-          <Bookmark className={iconSm} />
-        </button>
-      )}
-
-      {/* Play button - shown when paused or stopped */}
-      {showPlay && (
-        <button
-          onClick={onPlay}
-          className={successIconButton}
-          title={isStopped ? t("session.resumeIo") : t("playback.play")}
-        >
-          <Play className={iconSm} />
-        </button>
-      )}
-
-      {/* Pause button - shown when running */}
-      {showPause && (
-        <button
-          onClick={onPause}
-          className={buttonBase}
-          title={t("playback.pause")}
-        >
-          <Pause className={iconSm} />
-        </button>
-      )}
-
-      {/* Leave button - always shown when a source is connected */}
-      {hasSource && onLeave && (
-        <button
-          onClick={onLeave}
-          className={warningButtonBase}
-          title={isCaptureMode ? "Disconnect" : "Stop & review capture"}
-        >
-          <LogOut className={iconSm} />
-        </button>
-      )}
-    </>
-  );
-}
-
-// ============================================================================
-// IO Session Controls - combined reader, speed, and session controls
+// IO Session Controls - session chip + kebab menu (details + all actions)
 // ============================================================================
 
 export interface IOSessionControlsProps {
@@ -406,11 +212,11 @@ export interface IOSessionControlsProps {
   sessionId?: string | null;
   /** Current IO state (running, stopped, paused, error) */
   ioState?: string | null;
-  /** Number of unique frame IDs (shown in tooltip) */
+  /** Number of unique frame IDs (shown in menu details) */
   frameCount?: number;
-  /** Total number of frames seen (shown in tooltip when available) */
+  /** Total number of frames seen (shown in menu details when available) */
   totalFrameCount?: number;
-  /** Bus-to-source mapping for multi-bus tooltip display */
+  /** Bus-to-source mapping for multi-bus details display */
   outputBusToSource?: Map<number, BusSourceInfo>;
   /** Click handler to open session picker */
   onOpenIoSessionPicker: () => void;
@@ -452,16 +258,16 @@ export interface IOSessionControlsProps {
   onRenameCapture?: (newName: string) => void;
 
   // Clear capture props
-  /** Called when user clicks the clear/trash button. If absent, button is hidden. */
+  /** Called when user clicks clear/delete. If absent, item is hidden. */
   onClearCapture?: () => void;
   /** Whether the app has data that can be cleared (controls disabled state) */
   hasData?: boolean;
 }
 
 /**
- * Combined IO session controls component.
- * Includes reader button, speed picker button, and session action buttons (play/pause/leave/bookmark).
- * Use this instead of separate SessionButton + SessionActionButtons for consistent layout.
+ * Combined IO session controls: a fixed-width session chip plus a kebab (⋮)
+ * menu. The chip opens the session picker; the kebab holds the session details
+ * and every action (play/pause, speed, bookmark, rename, pin, clear, disconnect).
  */
 export function IOSessionControls({
   // Reader props
@@ -502,7 +308,7 @@ export function IOSessionControls({
   const isCaptureMode = isCaptureModeProp ?? isCaptureProfileId(ioProfile);
   const hasSource = ioProfile !== null;
 
-  // Rename popover state
+  // --- Rename popover state ---
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -529,13 +335,99 @@ export function IOSessionControls({
     setIsRenaming(false);
   };
 
-  const cancelRename = () => {
-    setIsRenaming(false);
+  const cancelRename = () => setIsRenaming(false);
+
+  // --- Kebab menu state (click-to-open, portal-rendered, viewport-clamped) ---
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRectRef = useRef<DOMRect | null>(null);
+
+  const handleButtonClick = useCallback(() => {
+    if (menuOpen) {
+      setMenuOpen(false);
+      return;
+    }
+    if (buttonRef.current) {
+      buttonRectRef.current = buttonRef.current.getBoundingClientRect();
+      setMenuStyle({ visibility: "hidden" }); // reset until measured
+    }
+    setMenuOpen(true);
+  }, [menuOpen]);
+
+  // Close on any click outside the button or the menu.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [menuOpen]);
+
+  // After the portal menu mounts, measure it and position within the viewport.
+  useLayoutEffect(() => {
+    if (!menuOpen || !menuRef.current || !buttonRectRef.current) return;
+    const menu = menuRef.current;
+    const btnRect = buttonRectRef.current;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    const gap = 2;
+
+    // Vertical: prefer below button, flip above if it won't fit
+    let top = btnRect.bottom + gap;
+    if (top + mh > vh) top = btnRect.top - gap - mh;
+    top = Math.max(4, Math.min(top, vh - mh - 4));
+
+    // Horizontal: align left edge to button left edge, clamp to viewport
+    let left = btnRect.left;
+    if (left + mw > vw - 4) left = vw - 4 - mw;
+    if (left < 4) left = 4;
+
+    setMenuStyle({ top, left, visibility: "visible" });
+  }, [menuOpen]);
+
+  /** Run a menu action then dismiss the menu. */
+  const runAndClose = (fn?: () => void) => () => {
+    fn?.();
+    setMenuOpen(false);
   };
 
+  // --- Details + action visibility ---
+  const { statusLabel, typeLabel, interfaceEntries } = getSessionDetails({
+    ioProfile,
+    ioProfiles,
+    multiBusProfiles,
+    ioState,
+    outputBusToSource,
+    isCaptureMode,
+  });
+
+  const showPlay = (isPaused || isStopped) && !!onPlay;
+  const showPause = isStreaming && !isPaused && !!onPause;
+  const showSpeed = hasSource && !!onOpenSpeedPicker;
+  const showBookmark = supportsTimeRange && !!onOpenBookmarkPicker;
+  const showRename = !!captureMetadata?.id && !!onRenameCapture;
+  const showPin = !!captureMetadata?.id && !!onToggleCapturePin;
+  const showClear = !!onClearCapture && !!ioProfile && !(isCaptureMode && capturePersistent);
+  const showLeave = hasSource && !!onLeave;
+  const changeSourceDisabled = isStreaming && !isCaptureMode;
+  // Backend session id for the hard-reset action (effective id, falling back to profile).
+  const destroyId = sessionId ?? ioProfile;
+
+  const speedLabel = speed === 1 ? "1x" : `${speed}x`;
+  const detailRow = "flex items-center justify-between gap-3 mb-1";
+  const detailKey = "text-[color:var(--text-muted)]";
+  const detailVal = "font-medium text-[color:var(--text-primary)]";
+
   return (
-    <>
-      {/* IO Session Selection */}
+    <div className="relative shrink-0">
+      {/* Session chip — click opens the session menu (or the picker when no source) */}
       <SessionButton
         ioProfile={ioProfile}
         ioProfiles={ioProfiles}
@@ -544,97 +436,174 @@ export function IOSessionControls({
         defaultReadProfileId={defaultReadProfileId}
         sessionId={sessionId}
         ioState={ioState}
-        frameCount={frameCount}
-        totalFrameCount={totalFrameCount}
-        outputBusToSource={outputBusToSource}
-        onClick={onOpenIoSessionPicker}
-        disabled={isStreaming && !isCaptureMode}
+        onClick={hasSource ? handleButtonClick : onOpenIoSessionPicker}
+        buttonRef={buttonRef}
+        title={hasSource ? "Session menu" : "Select source"}
         isCaptureMode={isCaptureMode}
       />
 
-      {/* Capture actions - pin and rename (shown when capture metadata is available) */}
-      {captureMetadata?.id && (
-        <div className="relative flex items-center gap-0.5">
-          {onRenameCapture && (
-            <button
-              onClick={startRename}
-              className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-              title={t("session.renameCapture")}
-            >
-              <Pencil className={iconXs} />
-            </button>
-          )}
-          {onToggleCapturePin && (
-            <button
-              onClick={onToggleCapturePin}
-              className={`p-1 rounded transition-colors hover:bg-[var(--hover-bg)] ${
-                capturePersistent
-                  ? "text-[color:var(--status-warning-text)]"
-                  : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-              }`}
-              title={capturePersistent ? t("session.unpinCapture") : t("session.pinCapture")}
-            >
-              {capturePersistent ? <Pin className={iconXs} /> : <PinOff className={iconXs} />}
-            </button>
-          )}
-          {/* Rename popover */}
-          {isRenaming && (
-            <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg shadow-xl p-2">
-              <input
-                ref={renameInputRef}
-                type="text"
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={commitRename}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitRename();
-                  if (e.key === "Escape") cancelRename();
-                }}
-                className="w-48 px-2 py-1 text-sm bg-transparent border border-[color:var(--status-info-text)] rounded outline-none text-[color:var(--text-primary)]"
-                placeholder={t("session.captureName")}
-              />
-            </div>
-          )}
+      {/* Rename popover */}
+      {isRenaming && (
+        <div className="absolute left-0 top-full mt-1 z-50 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg shadow-xl p-2">
+          <input
+            ref={renameInputRef}
+            type="text"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitRename();
+              if (e.key === "Escape") cancelRename();
+            }}
+            className="w-48 px-2 py-1 text-sm bg-transparent border border-[color:var(--status-info-text)] rounded outline-none text-[color:var(--text-primary)]"
+            placeholder={t("session.captureName")}
+          />
         </div>
       )}
 
-      {/* Clear capture button — hidden for persistent captures */}
-      {onClearCapture && ioProfile && !(isCaptureMode && capturePersistent) && (
-        <button
-          onClick={onClearCapture}
-          disabled={!hasData}
-          className="p-1 rounded transition-colors hover:bg-[var(--hover-bg)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] enabled:hover:!bg-red-600 enabled:hover:!text-white disabled:opacity-30 disabled:cursor-not-allowed"
-          title={isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}
-        >
-          <Trash2 className={iconXs} />
-        </button>
-      )}
+      {/* Dropdown menu — rendered in a portal to escape overflow clipping */}
+      {menuOpen && createPortal(
+        <div ref={menuRef} className={`${menuClasses} max-w-[280px]`} style={menuStyle}>
+          {/* Details */}
+          <div className="px-3 py-2 text-xs cursor-default">
+            {statusLabel && (
+              <div className={detailRow}>
+                <span className={detailKey}>State</span>
+                <span className={`font-medium ${statusLabel.colour}`}>{statusLabel.label}</span>
+              </div>
+            )}
+            <div className={detailRow}>
+              <span className={detailKey}>Type</span>
+              <span className={detailVal}>{typeLabel}</span>
+            </div>
+            {captureMetadata?.id && (
+              <div className={detailRow}>
+                <span className={detailKey}>Capture</span>
+                <span className={`${detailVal} truncate max-w-[160px]`}>
+                  {captureMetadata.name || captureMetadata.id}
+                </span>
+              </div>
+            )}
+            {totalFrameCount != null && (
+              <div className={detailRow}>
+                <span className={detailKey}>Frames</span>
+                <span className={detailVal}>{totalFrameCount.toLocaleString()}</span>
+              </div>
+            )}
+            {frameCount != null && (
+              <div className={detailRow}>
+                <span className={detailKey}>{totalFrameCount != null ? "Unique" : "Frames"}</span>
+                <span className={detailVal}>{frameCount.toLocaleString()}</span>
+              </div>
+            )}
+            {interfaceEntries.length > 0 && (
+              <div className="flex items-start justify-between gap-3 mt-1 pt-1 border-t border-[color:var(--border-default)]">
+                <span className={`${detailKey} shrink-0`}>
+                  {interfaceEntries.length > 1 ? "Interfaces" : "Interface"}
+                </span>
+                <div className="flex flex-col items-end">
+                  {interfaceEntries.map((entry, i) => (
+                    <span key={i} className="text-[color:var(--text-primary)] truncate max-w-[170px]">
+                      {entry.label}{entry.kind ? ` (${entry.kind})` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
-      {/* Speed button - always visible when source connected, greyed out for realtime */}
-      {hasSource && onOpenSpeedPicker && (
-        <button
-          onClick={supportsSpeed ? onOpenSpeedPicker : undefined}
-          disabled={!supportsSpeed}
-          className={`${buttonBase} ${!supportsSpeed ? "opacity-40 cursor-default" : ""}`}
-          title={supportsSpeed ? "Set playback speed" : "Speed control (available for captures)"}
-        >
-          <span>{speed === 0 ? "0x" : speed === 1 ? "1x" : `${speed}x`}</span>
-        </button>
-      )}
+          <div className={menuDivider} />
 
-      {/* Session control buttons (play, pause, leave, bookmark) - always visible */}
-      <SessionActionButtons
-        isStreaming={isStreaming}
-        isPaused={isPaused}
-        isStopped={isStopped}
-        supportsTimeRange={supportsTimeRange}
-        hasSource={hasSource}
-        isCaptureMode={isCaptureMode}
-        onPlay={onPlay}
-        onPause={onPause}
-        onLeave={onLeave}
-        onOpenBookmarkPicker={onOpenBookmarkPicker}
-      />
-    </>
+          {/* Change source */}
+          <button
+            onClick={runAndClose(onOpenIoSessionPicker)}
+            disabled={changeSourceDisabled}
+            className={menuItem}
+            title={changeSourceDisabled ? "Pause or disconnect to change source" : undefined}
+          >
+            <ArrowRightLeft className={iconSm} />
+            Change source
+          </button>
+
+          {/* Playback / capture actions */}
+          {showPlay && (
+            <button onClick={runAndClose(onPlay)} className={menuItem}>
+              <Play className={iconSm} />
+              {isStopped ? t("session.resumeIo") : t("playback.play")}
+            </button>
+          )}
+          {showPause && (
+            <button onClick={runAndClose(onPause)} className={menuItem}>
+              <Pause className={iconSm} />
+              {t("playback.pause")}
+            </button>
+          )}
+          {showSpeed && (
+            <button
+              onClick={supportsSpeed ? runAndClose(onOpenSpeedPicker) : undefined}
+              disabled={!supportsSpeed}
+              className={menuItem}
+              title={supportsSpeed ? undefined : "Speed control (available for captures)"}
+            >
+              <Gauge className={iconSm} />
+              <span className="flex-1 text-left">Speed</span>
+              <span className="text-[color:var(--text-muted)]">{speedLabel}</span>
+            </button>
+          )}
+          {showBookmark && (
+            <button onClick={runAndClose(onOpenBookmarkPicker)} className={menuItem}>
+              <Bookmark className={iconSm} />
+              {t("session.loadBookmark")}
+            </button>
+          )}
+          {showRename && (
+            <button onClick={() => { startRename(); setMenuOpen(false); }} className={menuItem}>
+              <Pencil className={iconSm} />
+              {t("session.renameCapture")}
+            </button>
+          )}
+          {showPin && (
+            <button onClick={runAndClose(onToggleCapturePin)} className={menuItem}>
+              {capturePersistent ? <Pin className={iconSm} /> : <PinOff className={iconSm} />}
+              {capturePersistent ? t("session.unpinCapture") : t("session.pinCapture")}
+            </button>
+          )}
+          {showClear && (
+            <button
+              onClick={runAndClose(onClearCapture)}
+              disabled={!hasData}
+              className={`${menuItem} text-red-400 ${hasData ? "hover:!bg-red-500/10" : ""}`}
+              title={isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}
+            >
+              <Trash2 className={iconSm} />
+              {isCaptureMode ? "Delete capture" : "Clear capture and start fresh"}
+            </button>
+          )}
+
+          {/* Disconnect + hard reset */}
+          {(showLeave || destroyId) && <div className={menuDivider} />}
+          {showLeave && (
+            <button onClick={runAndClose(onLeave)} className={`${menuItem} text-amber-500 hover:!bg-amber-500/10`}>
+              <LogOut className={iconSm} />
+              {isCaptureMode ? "Disconnect" : "Stop & review capture"}
+            </button>
+          )}
+          {destroyId && (
+            <button
+              onClick={runAndClose(() => {
+                markSessionUserDestroyed(destroyId);
+                destroyReaderSession(destroyId).catch(() => {});
+              })}
+              className={`${menuItem} text-red-400 hover:!bg-red-500/10`}
+              title="Destroy this session in the backend and reset to No source"
+            >
+              <Power className={iconSm} />
+              Destroy session
+            </button>
+          )}
+        </div>,
+        document.body,
+      )}
+    </div>
   );
 }

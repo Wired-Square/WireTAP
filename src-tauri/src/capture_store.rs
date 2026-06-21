@@ -86,6 +86,16 @@ struct NamedCapture {
     metadata: CaptureMetadata,
     /// In-memory set for efficient bus tracking during streaming
     seen_buses: HashSet<u8>,
+    /// Distinct (bus, frame_id) keys seen during streaming, for a cheap O(1)
+    /// unique-frame count. Populated on append only — empty for DB-hydrated
+    /// captures (their live "unique" display uses a different path).
+    unique_frame_ids: HashSet<u64>,
+}
+
+/// Pack (bus, frame_id) into one key for the unique-frame set.
+#[inline]
+fn unique_frame_key(bus: u8, frame_id: u32) -> u64 {
+    ((bus as u64) << 32) | frame_id as u64
 }
 
 /// Capture registry holding multiple named captures
@@ -211,7 +221,7 @@ fn create_capture_internal(kind: CaptureKind, name: String, set_streaming: bool)
         buses: Vec::new(),
     };
 
-    let capture = NamedCapture { metadata: metadata.clone(), seen_buses: HashSet::new() };
+    let capture = NamedCapture { metadata: metadata.clone(), seen_buses: HashSet::new(), unique_frame_ids: HashSet::new() };
     registry.captures.insert(id.clone(), capture);
 
     if set_streaming {
@@ -323,6 +333,7 @@ pub fn clear_capture(id: &str) -> Result<(), String> {
             cap.metadata.end_time_us = None;
             cap.metadata.buses = Vec::new();
             cap.seen_buses.clear();
+            cap.unique_frame_ids.clear();
         } else {
             return Err(format!("Capture '{}' not found", id));
         }
@@ -464,6 +475,7 @@ pub fn hydrate_from_db() {
                 ..meta
             },
             seen_buses,
+            unique_frame_ids: HashSet::new(),
         };
 
         // Persist if we changed anything (backfilled buses or orphaned)
@@ -728,7 +740,7 @@ pub fn copy_capture(source_capture_id: &str, new_name: String) -> Result<String,
         };
 
         let seen_buses: HashSet<u8> = source_metadata.buses.iter().copied().collect();
-        let entry = NamedCapture { metadata: metadata.clone(), seen_buses };
+        let entry = NamedCapture { metadata: metadata.clone(), seen_buses, unique_frame_ids: HashSet::new() };
         registry.captures.insert(id.clone(), entry);
         (id, metadata)
     };
@@ -775,10 +787,11 @@ pub fn append_frames_to_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
             cap.metadata.end_time_us = new_frames.last().map(|f| f.timestamp_us);
             cap.metadata.count += new_frames.len();
 
-            // Track distinct buses
+            // Track distinct buses and distinct (bus, frame_id) keys
             let prev_len = cap.seen_buses.len();
             for f in &new_frames {
                 cap.seen_buses.insert(f.bus);
+                cap.unique_frame_ids.insert(unique_frame_key(f.bus, f.frame_id));
             }
             if cap.seen_buses.len() != prev_len {
                 let mut sorted: Vec<u8> = cap.seen_buses.iter().copied().collect();
@@ -813,10 +826,12 @@ pub fn clear_and_refill_capture(capture_id: &str, new_frames: Vec<FrameMessage>)
             cap.metadata.end_time_us = new_frames.last().map(|f| f.timestamp_us);
             cap.metadata.count = new_frames.len();
 
-            // Reset and rebuild bus tracking
+            // Reset and rebuild bus + unique-frame tracking
             cap.seen_buses.clear();
+            cap.unique_frame_ids.clear();
             for f in &new_frames {
                 cap.seen_buses.insert(f.bus);
+                cap.unique_frame_ids.insert(unique_frame_key(f.bus, f.frame_id));
             }
             let mut sorted: Vec<u8> = cap.seen_buses.iter().copied().collect();
             sorted.sort();
@@ -1125,6 +1140,13 @@ pub fn has_any_data() -> bool {
 pub fn get_capture_count(id: &str) -> usize {
     let registry = CAPTURE_REGISTRY.read().unwrap();
     registry.captures.get(id).map(|b| b.metadata.count).unwrap_or(0)
+}
+
+/// Distinct (bus, frame_id) count seen while streaming into this capture.
+/// O(1). Returns 0 for DB-hydrated captures that have had no live appends.
+pub fn get_capture_unique_count(id: &str) -> usize {
+    let registry = CAPTURE_REGISTRY.read().unwrap();
+    registry.captures.get(id).map(|b| b.unique_frame_ids.len()).unwrap_or(0)
 }
 
 /// Get the kind of a specific capture.

@@ -175,6 +175,13 @@ pub fn send_new_frames(session_id: &str) {
         }
     }
 
+    // Push live counts so the frontend renders Frames/Unique straight from the
+    // backend (no TS-side counting). total is the capture count; unique is the
+    // distinct (bus, frame_id) count maintained as frames are appended.
+    let unique = crate::capture_store::get_capture_unique_count(&capture_id);
+    let counts = protocol::encode_frame_counts(total as u64, unique as u32);
+    server.send_to_channel(channel, protocol::encode_message(MsgType::FrameCounts, channel, &counts));
+
     // Update offset — use total as a ceiling so we never fall behind a cleared capture.
     let next = new_offset.max(total);
     if let Ok(mut offsets) = FRAME_OFFSETS.write() {

@@ -1353,6 +1353,8 @@ export interface ActiveSessionInfo {
   captureId: string | null;
   /** Frame count in the owned capture */
   captureFrameCount: number | null;
+  /** Distinct (bus, frame_id) count in the owned capture (live streaming only) */
+  captureUniqueFrameCount: number | null;
   /** Whether the session is actively streaming data */
   isStreaming: boolean;
 }
@@ -1388,6 +1390,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     source_profile_ids: string[];
     capture_id: string | null;
     capture_frame_count: number | null;
+    capture_unique_frame_count: number | null;
     is_streaming: boolean;
   }> = await invoke("list_active_sessions");
 
@@ -1412,8 +1415,23 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     sourceProfileIds: s.source_profile_ids ?? [],
     captureId: s.capture_id ?? null,
     captureFrameCount: s.capture_frame_count ?? null,
+    captureUniqueFrameCount: s.capture_unique_frame_count ?? null,
     isStreaming: s.is_streaming ?? false,
   }));
+}
+
+/**
+ * Generate an opaque realtime session id. The cosmetic prefix is inferred by Rust
+ * from the given profiles' output type (nothing parses the id).
+ */
+export async function generateSessionId(
+  profileIds: string[],
+  emitRawBytes = false,
+): Promise<string> {
+  return invoke("generate_session_id", {
+    profile_ids: profileIds,
+    emit_raw_bytes: emitRawBytes,
+  });
 }
 
 // ============================================================================
