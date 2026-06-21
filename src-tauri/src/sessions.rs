@@ -1080,6 +1080,35 @@ pub async fn io_stop_and_switch_to_capture(
     stop_and_switch_to_capture(&app, &session_id, speed.unwrap_or(1.0)).await
 }
 
+/// Stop a session and switch it to capture replay, choosing the backend path from
+/// the source's temporal mode. Realtime → stop-and-switch all listeners (falling
+/// back to a plain suspend if no capture exists); recorded → suspend (preserves
+/// position) then switch to capture replay. Owns the decision that used to live in
+/// the frontend `stopWatch`.
+#[tauri::command(rename_all = "snake_case")]
+pub async fn session_stop_to_capture(
+    app: tauri::AppHandle,
+    session_id: String,
+) -> Result<(), String> {
+    let is_realtime = get_session_capabilities(&session_id)
+        .await
+        .map(|c| c.traits.temporal_mode == TemporalMode::Realtime)
+        .unwrap_or(false);
+
+    if is_realtime {
+        if let Err(e) = stop_and_switch_to_capture(&app, &session_id, 1.0).await {
+            tlog!("[session_stop_to_capture] stop-and-switch failed ({}); suspending", e);
+            suspend_session(&session_id).await?;
+        }
+    } else {
+        suspend_session(&session_id).await?;
+        if let Err(e) = switch_to_capture_replay(&app, &session_id, 1.0).await {
+            tlog!("[session_stop_to_capture] switch-to-capture-replay failed: {}", e);
+        }
+    }
+    Ok(())
+}
+
 /// Resume a suspended session with a fresh capture.
 /// The old capture is orphaned (becomes available for standalone viewing).
 /// A new capture is created for the session and streaming starts.

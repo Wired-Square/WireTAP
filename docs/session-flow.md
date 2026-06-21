@@ -253,6 +253,15 @@ When a user presses Leave while already viewing a capture, `handleLeave`
 calls `session.leave()` to unregister the subscriber, fully resets app state,
 and the session is destroyed.
 
+### Stop → capture replay (the Stop control)
+
+Stopping a session *without* leaving (the playback Stop control → `stopWatch`)
+switches it to capture replay in place. The realtime-vs-recorded decision and its
+fallbacks live in Rust's `session_stop_to_capture` command: a **realtime** source
+stops and switches all listeners to capture (falling back to a plain `suspend` if
+no capture exists); a **recorded** source `suspend`s (preserving position) then
+switches to capture replay. The frontend just calls the one command.
+
 ### Destroy session (recovery)
 
 The session menu also has a destructive **Destroy session** item for recovering

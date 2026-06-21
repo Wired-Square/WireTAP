@@ -780,6 +780,15 @@ export async function stopAndSwitchToCapture(
 }
 
 /**
+ * Stop a session and switch it to capture replay. Rust picks the path from the
+ * source's temporal mode (realtime → stop-and-switch w/ suspend fallback;
+ * recorded → suspend + switch), so callers don't branch.
+ */
+export async function sessionStopToCapture(sessionId: string): Promise<void> {
+  return invoke("session_stop_to_capture", { session_id: sessionId });
+}
+
+/**
  * Resume a session from capture playback back to live streaming.
  * This is the reverse of switchSessionToCaptureReplay.
  * It recreates the original reader from the stored profile configuration,

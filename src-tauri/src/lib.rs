@@ -1171,6 +1171,7 @@ pub fn run() {
             sessions::resume_reader_session,
             sessions::suspend_reader_session,
             sessions::io_stop_and_switch_to_capture,
+            sessions::session_stop_to_capture,
             sessions::resume_reader_session_fresh,
             sessions::copy_capture_for_detach,
             sessions::update_reader_speed,

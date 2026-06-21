@@ -28,7 +28,7 @@ export { isCaptureProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, stopAndSwitchToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
+import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, stopAndSwitchToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -911,38 +911,14 @@ export function useIOSessionManager(
   }, [session, ioProfiles, onBeforeWatch, onBeforeMultiWatch, startMultiBusSession, setMultiBusProfiles, setIoProfile, setPlaybackSpeedProp, resetWatchFrameCount]);
 
 
-  // Stop watching: for realtime sources, atomically stop and switch ALL listeners
-  // to capture replay. For recorded sources (postgres, csv), suspend and switch to
-  // capture replay so users can step through captured frames.
+  // Stop watching → switch to capture replay. Rust picks the path from the
+  // source's temporal mode (realtime: stop-and-switch all listeners; recorded:
+  // suspend + switch, preserving position).
   const stopWatch = useCallback(async () => {
     if (!session.sessionId) return;
-
-    // Use capabilities to determine source type (works for all windows, even joiners
-    // that don't have sourceProfileId set)
-    const isRealtimeSession = session.capabilities?.traits.temporal_mode === "realtime";
-
-    if (isRealtimeSession) {
-      try {
-        await stopAndSwitchToCapture(session.sessionId, 1.0);
-        tlog.debug(`[IOSessionManager:${appName}] Stopped realtime session and switched to capture`);
-      } catch (e) {
-        tlog.info(`[IOSessionManager:${appName}] stopAndSwitchToCapture failed, falling back to suspend: ${e}`);
-        await session.suspend();
-      }
-      setIsWatching(false);
-      return;
-    }
-
-    // Recorded sources: existing suspend + switchToCaptureReplay
-    await session.suspend();
-    try {
-      await session.switchToCaptureReplay(1.0);
-      tlog.debug(`[IOSessionManager:${appName}] Switched to capture replay mode after stop`);
-    } catch (e) {
-      tlog.info(`[IOSessionManager:${appName}] Failed to switch to capture replay after stop: ${e}`);
-    }
+    await sessionStopToCapture(session.sessionId);
     setIsWatching(false);
-  }, [session, appName]);
+  }, [session.sessionId]);
 
   // Suspend session: alias for stopWatch (kept for backward compatibility)
   const suspendSession = stopWatch;
