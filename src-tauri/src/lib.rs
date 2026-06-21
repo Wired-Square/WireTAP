@@ -1455,7 +1455,7 @@ pub fn run() {
                     let _ = io::stop_session(&label).await;
 
                     // Destroy the session state
-                    let _ = io::destroy_session(&label).await;
+                    let _ = io::destroy_session(&label, false).await;
 
                     // Wait for WebKit to process any pending IPC operations.
                     // The session is stopped, so no new events will be emitted.

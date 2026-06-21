@@ -13,7 +13,7 @@ import { iconSm } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
 import type { BusSourceInfo } from "../utils/busFormat";
-import { isCaptureProfileId, markSessionUserDestroyed } from "../hooks/useIOSessionManager";
+import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import { buttonBase } from "../styles/buttonStyles";
 import { menuClasses, menuItem, menuDivider } from "../styles/menuStyles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
@@ -591,8 +591,9 @@ export function IOSessionControls({
           {destroyId && (
             <button
               onClick={runAndClose(() => {
-                markSessionUserDestroyed(destroyId);
-                destroyReaderSession(destroyId).catch(() => {});
+                // reset=true → backend marks the destroyed event so the app
+                // resets to "No source" rather than the orphaned capture.
+                destroyReaderSession(destroyId, true).catch(() => {});
               })}
               className={`${menuItem} text-red-400 hover:!bg-red-500/10`}
               title="Destroy this session in the backend and reset to No source"

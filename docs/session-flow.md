@@ -256,14 +256,13 @@ and the session is destroyed.
 ### Destroy session (recovery)
 
 The session menu also has a destructive **Destroy session** item for recovering
-from a wedged session. It calls `destroy_reader_session` directly (tearing down
-the backend session for *all* subscribers, not just this one) after marking the
-destroy as user-initiated via `markSessionUserDestroyed`. When the resulting
-`session-lifecycle "destroyed"` event runs the normal per-app cleanup
-(`handleSessionDestroyed`), that mark makes the manager reset to **No source**
-instead of switching to the orphaned capture (the external-destroy fallback) — a
-deliberate destroy means a clean slate. See
-[useIOSessionManager.ts](../src/hooks/useIOSessionManager.ts).
+from a wedged session. It calls `destroy_reader_session(reset: true)`, tearing
+down the backend session for *all* subscribers. The deliberate-destroy intent is
+carried by Rust in the emitted `session-lifecycle "destroyed"` event (a `reset`
+flag on `SessionLifecyclePayload`); the per-app cleanup (`handleSessionDestroyed`)
+reads it and resets to **No source** instead of switching to the orphaned capture
+(the external-destroy fallback, `reset: false`). Rust owns the intent — there is
+no frontend shim.
 
 ### Play / Pause
 

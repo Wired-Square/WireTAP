@@ -202,7 +202,7 @@ export interface UseIOSessionOptions {
   /** Callback when the session's device is replaced in-place (caps/state change, listeners preserved) */
   onSourceReplaced?: (payload: SourceReplacedPayload) => void;
   /** Callback when session is destroyed externally (e.g., from Session Manager or last-subscriber auto-destroy) */
-  onDestroyed?: (orphanedCaptureIds: string[]) => void;
+  onDestroyed?: (orphanedCaptureIds: string[], reset: boolean) => void;
 }
 
 export interface UseIOSessionResult {
@@ -568,7 +568,7 @@ export function useIOSession(
       // Session destroyed externally (from Session Manager, last-subscriber auto-destroy, etc.)
       // This is a global event - we filter by our session ID.
       // Orphaned capture IDs are fetched from the post-session cache.
-      const unlistenLifecycle = await listen<{ session_id: string; event_type: string }>(
+      const unlistenLifecycle = await listen<{ session_id: string; event_type: string; reset?: boolean }>(
         "session-lifecycle",
         async (event) => {
           if (cancelled) return;
@@ -605,7 +605,7 @@ export function useIOSession(
             for (const id of bufferIds) {
               useSessionStore.getState().addKnownCaptureId(id);
             }
-            callbacksRef.current.onDestroyed?.(bufferIds);
+            callbacksRef.current.onDestroyed?.(bufferIds, event.payload.reset ?? false);
           }
         }
       );
@@ -636,8 +636,9 @@ export function useIOSession(
             for (const id of event.payload.capture_ids) {
               useSessionStore.getState().addKnownCaptureId(id);
             }
-            // Notify higher-level hooks with copied capture IDs (same path as destroy)
-            callbacksRef.current.onDestroyed?.(event.payload.capture_ids);
+            // Notify higher-level hooks with copied capture IDs (same path as destroy).
+            // Eviction is never a deliberate user reset.
+            callbacksRef.current.onDestroyed?.(event.payload.capture_ids, false);
           }
         }
       );

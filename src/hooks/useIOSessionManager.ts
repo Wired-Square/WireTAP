@@ -301,20 +301,6 @@ export interface UseIOSessionManagerResult {
 // lives in Rust — see `generateSessionId("realtime", …)` / the `generate_session_id`
 // command. The frontend no longer infers the prefix.
 
-// Session IDs the user deliberately destroyed (via the session menu's "Destroy
-// session" recovery action). When the resulting `destroyed` event arrives, the
-// manager resets to "No source" instead of switching to the orphaned capture —
-// a deliberate destroy means a clean slate, not "review the capture".
-const userDestroyedSessions = new Set<string>();
-
-/** Mark a session as user-destroyed so its `destroyed` event resets to No source. */
-export function markSessionUserDestroyed(sessionId: string): void {
-  userDestroyedSessions.add(sessionId);
-  // Clear once the destroyed event has fanned out to every manager in this
-  // window (each shared panel handles it), so they all reset — not just the first.
-  setTimeout(() => userDestroyedSessions.delete(sessionId), 2000);
-}
-
 /**
  * High-level IO session management hook.
  * Wraps common patterns used by Discovery, Decoder, and Transmit apps.
@@ -539,10 +525,10 @@ export function useIOSessionManager(
 
   // Handle external session destruction (e.g., destroyed from Sessions app)
   // Switches to capture mode if orphaned captures are available, otherwise clears state
-  const handleSessionDestroyed = useCallback((orphanedCaptureIds: string[]) => {
+  const handleSessionDestroyed = useCallback((orphanedCaptureIds: string[], userInitiated: boolean) => {
     // A user-initiated "Destroy session" wants a clean slate, not the orphaned
-    // capture the external-destroy path falls back to.
-    const userInitiated = effectiveSessionId ? userDestroyedSessions.has(effectiveSessionId) : false;
+    // capture the external-destroy path falls back to. The intent is carried by
+    // the backend `destroyed` event (`reset`), so it's correct for every panel.
     tlog.info(`[IOSessionManager:${appName}] Session destroyed${userInitiated ? " (user)" : " externally"}, orphaned captures: ${JSON.stringify(orphanedCaptureIds)}`);
 
     // Clear app state (frame lists, etc.)
@@ -572,7 +558,7 @@ export function useIOSessionManager(
       // Notify app with orphaned capture IDs so it can set up capture mode.
       onSessionDestroyed?.(orphanedCaptureIds);
     }
-  }, [appName, effectiveSessionId, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
+  }, [appName, onBeforeWatch, setMultiBusProfiles, setIoProfile, streamCompletedRef, onSessionDestroyed]);
 
   const sessionOptions: UseIOSessionOptions = {
     appName,

@@ -12,7 +12,7 @@ All notable changes to WireTAP will be documented in this file.
 
 ### Added
 
-- **"Destroy session" recovery action**: the session menu has a destructive "Destroy session" item that tears down the current backend session via `destroy_reader_session` — a hard reset for a session wedged in a bad state. A deliberate destroy is marked so that when the `session-lifecycle "destroyed"` event runs the normal per-app cleanup, the app resets cleanly to "No source" instead of falling back to the orphaned capture (the external-destroy behaviour), which otherwise left a half-loaded capture-replay. [src/components/SessionControls.tsx](src/components/SessionControls.tsx), [src/hooks/useIOSessionManager.ts](src/hooks/useIOSessionManager.ts).
+- **"Destroy session" recovery action**: the session menu has a destructive "Destroy session" item that tears down the current backend session via `destroy_reader_session(reset: true)` — a hard reset for a session wedged in a bad state. The deliberate-destroy intent travels in the backend's `session-lifecycle "destroyed"` event (a `reset` flag), so the per-app cleanup resets cleanly to "No source" instead of falling back to the orphaned capture (the external-destroy behaviour, which otherwise left a half-loaded capture-replay). Rust is the source of truth for the intent — no frontend shim. [src-tauri/src/sessions.rs](src-tauri/src/sessions.rs), [src-tauri/src/io/mod.rs](src-tauri/src/io/mod.rs), [src/components/SessionControls.tsx](src/components/SessionControls.tsx), [src/hooks/useIOSessionManager.ts](src/hooks/useIOSessionManager.ts).
 
 ### Fixed
 

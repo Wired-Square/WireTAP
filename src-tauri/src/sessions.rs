@@ -1206,9 +1206,11 @@ pub async fn update_reader_direction(session_id: String, reverse: bool) -> Resul
     update_session_direction(&session_id, reverse).await
 }
 
-/// Destroy a reader session
+/// Destroy a reader session. `reset` marks a deliberate user destroy (the app
+/// resets to "No source" rather than the orphaned capture); it travels in the
+/// emitted `destroyed` lifecycle event.
 #[tauri::command(rename_all = "snake_case")]
-pub async fn destroy_reader_session(session_id: String) -> Result<(), String> {
+pub async fn destroy_reader_session(session_id: String, reset: bool) -> Result<(), String> {
     // Unregister profile usage for all profiles this session was using
     let profile_ids = take_session_profiles(&session_id);
     for profile_id in profile_ids {
@@ -1218,7 +1220,7 @@ pub async fn destroy_reader_session(session_id: String) -> Result<(), String> {
     // Capture orphaning is handled by destroy_session() which also emits
     // the capture-changed signal. Don't orphan here to avoid a double-call
     // that would cause destroy_session's emit to have an empty capture list.
-    destroy_session(&session_id).await
+    destroy_session(&session_id, reset).await
 }
 
 /// Create a reader session for a capture.
@@ -1260,7 +1262,7 @@ pub async fn transition_to_capture_source(
 ) -> Result<IOCapabilities, String> {
     // Stop and destroy current session
     let _ = stop_session(&session_id).await;
-    let _ = destroy_session(&session_id).await;
+    let _ = destroy_session(&session_id, false).await;
 
     if !capture_store::has_any_data() {
         return Err("No data in capture for replay".to_string());
@@ -2402,7 +2404,7 @@ pub async fn create_multi_source_session(
     // This ensures we use the fresh bus mappings provided by the frontend.
     // Without this, a stopped session would be reused with stale mappings.
     if get_session_state(&session_id).await.is_some() {
-        let _ = destroy_session(&session_id).await;
+        let _ = destroy_session(&session_id, false).await;
     }
 
     // Create the multi-source reader (validates interface trait compatibility)

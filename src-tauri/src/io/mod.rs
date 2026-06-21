@@ -1126,6 +1126,10 @@ pub struct SessionLifecyclePayload {
     pub source_profile_ids: Vec<String>,
     /// The subscriber ID that created the session (only for "created")
     pub creator_subscriber_id: Option<String>,
+    /// True when a "destroyed" event was a deliberate user destroy (the app should
+    /// reset to "No source" rather than fall back to the orphaned capture).
+    #[serde(default)]
+    pub reset: bool,
 }
 
 /// Emit a global session lifecycle event to all windows.
@@ -1415,6 +1419,7 @@ pub async fn create_session(
         subscriber_count,
         source_profile_ids,
         creator_subscriber_id: subscriber_id,
+        reset: false,
     });
 
     CreateSessionResult {
@@ -1671,7 +1676,7 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
     // Phase 2b: Destroy sessions that exceeded the grace period
     for session_id in sessions_to_destroy {
         tlog!("[reader watchdog] Destroying session '{}' (grace period expired)", session_id);
-        if let Err(e) = destroy_session(&session_id).await {
+        if let Err(e) = destroy_session(&session_id, false).await {
             tlog!("[reader watchdog] Failed to destroy session '{}': {}", session_id, e);
         }
     }
@@ -2470,8 +2475,9 @@ pub async fn resume_to_live_session(
     Ok(result.capabilities)
 }
 
-/// Destroy a reader session
-pub async fn destroy_session(session_id: &str) -> Result<(), String> {
+/// Destroy a reader session. `reset` marks a deliberate user destroy so the
+/// frontend resets to "No source" rather than the orphaned capture.
+pub async fn destroy_session(session_id: &str, reset: bool) -> Result<(), String> {
     let removed = {
         let mut sessions = IO_SESSIONS.lock().await;
         sessions.remove(session_id)
@@ -2494,6 +2500,7 @@ pub async fn destroy_session(session_id: &str) -> Result<(), String> {
             subscriber_count: 0,
             source_profile_ids,
             creator_subscriber_id: None,
+            reset,
         });
     }
     // Clear the closing flag now that the session is fully destroyed
@@ -2842,6 +2849,7 @@ pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Res
             subscriber_count: 0,
             source_profile_ids,
             creator_subscriber_id: None,
+            reset: false,
         });
         // Clear any closing flag
         clear_session_closing(session_id);
@@ -3184,6 +3192,7 @@ pub async fn reinitialize_session_if_safe(
             subscriber_count: 0,
             source_profile_ids,
             creator_subscriber_id: None,
+            reset: false,
         });
         let _ = session.source.stop().await;
     }

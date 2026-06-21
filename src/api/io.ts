@@ -535,8 +535,8 @@ export async function reconfigureReaderSession(
  * Destroy a reader session.
  * Stops the reader if running and cleans up resources.
  */
-export async function destroyReaderSession(sessionId: string): Promise<void> {
-  return invoke("destroy_reader_session", { session_id: sessionId });
+export async function destroyReaderSession(sessionId: string, reset = false): Promise<void> {
+  return invoke("destroy_reader_session", { session_id: sessionId, reset });
 }
 
 /**
