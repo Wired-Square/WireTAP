@@ -2699,98 +2699,199 @@ pub struct RegisterSubscriberResult {
 /// If the subscriber is already registered, this updates their heartbeat.
 /// Returns session info for the registered subscriber.
 pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name: Option<&str>) -> Result<RegisterSubscriberResult, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+    // Sessions that were emptied by enforcing the one-subscriber-one-session invariant
+    // below. They are removed from IO_SESSIONS under the lock and torn down after it
+    // drops (we can't call unregister_subscriber here — it re-locks IO_SESSIONS).
+    let mut evicted_to_destroy: Vec<(String, IOSession)> = Vec::new();
 
-    let now = std::time::Instant::now();
+    let result = {
+        let mut sessions = IO_SESSIONS.lock().await;
 
-    // Check if the session is in the suspension grace period. If a heartbeat
-    // arrives while suspended, the WebView has recovered (e.g., display woke
-    // up, App Nap ended). Clear the suspension and resume the reader.
-    let needs_resume = if let Some(suspended_at) = session.suspended_at.take() {
-        let suspended_for = now.duration_since(suspended_at);
-        tlog!(
-            "[reader] Session '{}' resuming from suspension (was suspended for {:?}, subscriber '{}' heartbeat)",
-            session_id, suspended_for, subscriber_id
-        );
-        // Only resume if the device is paused (we paused it during suspension)
-        matches!(session.source.state(), IOState::Paused)
-    } else {
-        false
-    };
+        let now = std::time::Instant::now();
 
-    if let Some(sub) = session.subscribers.get_mut(subscriber_id) {
-        // Already registered - update heartbeat
-        sub.last_heartbeat = now;
-    } else {
-        // New subscriber - register them
-        let resolved_app_name = app_name.unwrap_or(subscriber_id).to_string();
-        session.subscribers.insert(
-            subscriber_id.to_string(),
-            SessionSubscriber {
-                subscriber_id: subscriber_id.to_string(),
-                app_name: resolved_app_name.clone(),
-                registered_at: now,
-                last_heartbeat: now,
-                is_active: true, // New subscribers are active by default
-            },
-        );
+        // Check the suspension grace period and whether this is a fresh registration. Read
+        // both out in one short-lived borrow so nothing is held across the eviction loop
+        // (which needs `&mut sessions`). If a heartbeat arrives while suspended, the WebView
+        // has recovered (e.g. display woke up, App Nap ended) — resume the paused reader.
+        let (needs_resume, already_subscribed) = {
+            let session = sessions
+                .get_mut(session_id)
+                .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+            let needs_resume = if let Some(suspended_at) = session.suspended_at.take() {
+                let suspended_for = now.duration_since(suspended_at);
+                tlog!(
+                    "[reader] Session '{}' resuming from suspension (was suspended for {:?}, subscriber '{}' heartbeat)",
+                    session_id, suspended_for, subscriber_id
+                );
+                // Only resume if the device is paused (we paused it during suspension)
+                matches!(session.source.state(), IOState::Paused)
+            } else {
+                false
+            };
+            (needs_resume, session.subscribers.contains_key(subscriber_id))
+        };
 
-        // Update legacy joiner_count
-        session.joiner_count = session.subscribers.len();
-
-        tlog!(
-            "[reader] Session '{}' registered subscriber '{}', total: {}",
-            session_id,
-            subscriber_id,
-            session.subscribers.len()
-        );
-
-        // Emit joiner count change
-        emit_joiner_count_change(session_id, session.subscribers.len(), Some(subscriber_id), Some(&resolved_app_name), Some("joined"));
-    }
-
-    // Get session's frame capture
-    let capture_ids = crate::capture_store::get_session_capture_ids(session_id);
-    let (capture_id, capture_kind) = capture_ids.iter()
-        .filter_map(|id| crate::capture_store::get_capture_metadata(id))
-        .find(|m| m.kind == crate::capture_store::CaptureKind::Frames)
-        .map(|m| (Some(m.id), Some("frames".to_string())))
-        .unwrap_or((None, None));
-
-    // Resume from suspension if needed (the reader was paused when listeners went stale)
-    if needs_resume {
-        let previous = session.source.state();
-        match session.source.resume().await {
-            Ok(()) => {
-                let current = session.source.state();
-                if previous != current {
-                    emit_state_change(session_id, &previous, &current);
+        if already_subscribed {
+            // Already on this session — heartbeat update only. No eviction: the
+            // one-subscriber-one-session invariant already holds for this subscriber.
+            if let Some(session) = sessions.get_mut(session_id) {
+                if let Some(sub) = session.subscribers.get_mut(subscriber_id) {
+                    sub.last_heartbeat = now;
                 }
-                tlog!("[reader] Session '{}' reader resumed successfully", session_id);
             }
-            Err(e) => {
-                tlog!("[reader] Session '{}' failed to resume reader: {}", session_id, e);
+        } else {
+            // New registration. Enforce the one-subscriber-one-session invariant: remove
+            // this subscriber_id from every OTHER session before adding it here. If a
+            // vacated session is left with no subscribers, extract it for teardown after
+            // the lock drops.
+            let other_ids: Vec<String> = sessions
+                .keys()
+                .filter(|id| id.as_str() != session_id)
+                .cloned()
+                .collect();
+            for other_id in other_ids {
+                let now_empty = {
+                    let Some(other) = sessions.get_mut(&other_id) else { continue };
+                    let Some(remaining) = remove_subscriber(other, &other_id, subscriber_id) else { continue };
+                    tlog!(
+                        "[reader] Subscriber '{}' moved off session '{}' (joining '{}'), remaining: {}",
+                        subscriber_id, other_id, session_id, remaining
+                    );
+                    remaining == 0
+                };
+                if now_empty {
+                    tlog!("[reader] Session '{}' emptied by subscriber move, destroying", other_id);
+                    if let Some(extracted) = sessions.remove(&other_id) {
+                        evicted_to_destroy.push((other_id, extracted));
+                    }
+                }
+            }
+
+            // Register on the joined session.
+            let resolved_app_name = app_name.unwrap_or(subscriber_id).to_string();
+            let session = sessions
+                .get_mut(session_id)
+                .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+            session.subscribers.insert(
+                subscriber_id.to_string(),
+                SessionSubscriber {
+                    subscriber_id: subscriber_id.to_string(),
+                    app_name: resolved_app_name.clone(),
+                    registered_at: now,
+                    last_heartbeat: now,
+                    is_active: true, // New subscribers are active by default
+                },
+            );
+
+            // Update legacy joiner_count
+            session.joiner_count = session.subscribers.len();
+
+            tlog!(
+                "[reader] Session '{}' registered subscriber '{}', total: {}",
+                session_id,
+                subscriber_id,
+                session.subscribers.len()
+            );
+
+            // Emit joiner count change
+            emit_joiner_count_change(session_id, session.subscribers.len(), Some(subscriber_id), Some(&resolved_app_name), Some("joined"));
+        }
+
+        // Get session's frame capture
+        let capture_ids = crate::capture_store::get_session_capture_ids(session_id);
+        let (capture_id, capture_kind) = capture_ids.iter()
+            .filter_map(|id| crate::capture_store::get_capture_metadata(id))
+            .find(|m| m.kind == crate::capture_store::CaptureKind::Frames)
+            .map(|m| (Some(m.id), Some("frames".to_string())))
+            .unwrap_or((None, None));
+
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| format!("Session '{}' not found", session_id))?;
+
+        // Resume from suspension if needed (the reader was paused when listeners went stale)
+        if needs_resume {
+            let previous = session.source.state();
+            match session.source.resume().await {
+                Ok(()) => {
+                    let current = session.source.state();
+                    if previous != current {
+                        emit_state_change(session_id, &previous, &current);
+                    }
+                    tlog!("[reader] Session '{}' reader resumed successfully", session_id);
+                }
+                Err(e) => {
+                    tlog!("[reader] Session '{}' failed to resume reader: {}", session_id, e);
+                }
             }
         }
+
+        // Retrieve any startup error (one-shot: cleared after retrieval)
+        let startup_error = take_startup_error(session_id);
+        if let Some(ref err) = startup_error {
+            tlog!("[reader] Returning startup error for session '{}': {}", session_id, err);
+        }
+
+        RegisterSubscriberResult {
+            capabilities: session.source.capabilities(),
+            state: session.source.state(),
+            capture_id,
+            capture_kind,
+            subscriber_count: session.subscribers.len(),
+            startup_error,
+        }
+    };
+    // Lock released here
+
+    // Tear down any session the subscriber was evicted from (its last subscriber left).
+    for (sid, session) in evicted_to_destroy {
+        destroy_extracted_session(&sid, session).await;
     }
 
-    // Retrieve any startup error (one-shot: cleared after retrieval)
-    let startup_error = take_startup_error(session_id);
-    if let Some(ref err) = startup_error {
-        tlog!("[reader] Returning startup error for session '{}': {}", session_id, err);
-    }
+    Ok(result)
+}
 
-    Ok(RegisterSubscriberResult {
-        capabilities: session.source.capabilities(),
-        state: session.source.state(),
-        capture_id,
-        capture_kind,
-        subscriber_count: session.subscribers.len(),
-        startup_error,
-    })
+/// Remove `subscriber_id` from `session`, update the legacy joiner_count, and emit a
+/// "left" joiner-count change. Returns the remaining subscriber count, or None if the
+/// subscriber wasn't on this session. Shared by `unregister_subscriber` and the
+/// one-subscriber-one-session eviction in `register_subscriber`, so the "left" bookkeeping
+/// lives in one place.
+fn remove_subscriber(session: &mut IOSession, session_id: &str, subscriber_id: &str) -> Option<usize> {
+    let removed = session.subscribers.remove(subscriber_id)?;
+    session.joiner_count = session.subscribers.len();
+    let remaining = session.subscribers.len();
+    emit_joiner_count_change(session_id, remaining, Some(subscriber_id), Some(&removed.app_name), Some("left"));
+    Some(remaining)
+}
+
+/// Run the slow Phase-2 teardown for a session that has already been removed from
+/// IO_SESSIONS. The caller MUST have dropped the IO_SESSIONS lock first, since stopping
+/// the source and emitting lifecycle events can be slow. Shared by the two "last
+/// subscriber left" paths: an explicit unregister, and the one-subscriber-one-session
+/// eviction that fires when a subscriber registers on a different session.
+async fn destroy_extracted_session(session_id: &str, mut session: IOSession) {
+    let _ = session.source.stop().await;
+    // Orphan captures and store IDs in post-session cache before lifecycle event.
+    let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
+    emit_capture_orphaned_as_changed(session_id, orphaned);
+    // Now emit lifecycle event
+    let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
+    emit_session_lifecycle(&session.app, SessionLifecyclePayload {
+        session_id: session_id.to_string(),
+        event_type: "destroyed".to_string(),
+        source_type: None,
+        state: None,
+        subscriber_count: 0,
+        source_profile_ids,
+        creator_subscriber_id: None,
+        reset: false,
+    });
+    // Clear any closing flag
+    clear_session_closing(session_id);
+    clear_playback_position(session_id);
+    // Clean up profile tracking (release single-handle device locks)
+    crate::sessions::cleanup_session_profiles(session_id);
+    tlog!("[reader] Session '{}' destroyed", session_id);
 }
 
 /// Unregister a subscriber from a session.
@@ -2806,22 +2907,15 @@ pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Res
             return Ok(0);
         };
 
-        let Some(removed) = session.subscribers.remove(subscriber_id) else {
+        let Some(remaining) = remove_subscriber(session, session_id, subscriber_id) else {
             // Subscriber wasn't registered - that's fine
             return Ok(session.subscribers.len());
         };
-
-        let removed_app_name = removed.app_name;
-        session.joiner_count = session.subscribers.len();
-        let remaining = session.subscribers.len();
 
         tlog!(
             "[reader] Session '{}' unregistered subscriber '{}', remaining: {}",
             session_id, subscriber_id, remaining
         );
-
-        // Emit joiner count change
-        emit_joiner_count_change(session_id, remaining, Some(subscriber_id), Some(&removed_app_name), Some("left"));
 
         if remaining == 0 {
             tlog!("[reader] Session '{}' has no listeners left, destroying", session_id);
@@ -2834,29 +2928,8 @@ pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Res
     // Lock released here
 
     // Phase 2: Perform slow cleanup outside the critical section
-    if let Some(mut session) = session_to_destroy {
-        let _ = session.source.stop().await;
-        // Orphan captures and store IDs in post-session cache before lifecycle event.
-        let orphaned = crate::capture_store::orphan_captures_for_session(session_id);
-        emit_capture_orphaned_as_changed(session_id, orphaned);
-        // Now emit lifecycle event
-        let source_profile_ids = crate::sessions::get_session_profile_ids(session_id);
-        emit_session_lifecycle(&session.app, SessionLifecyclePayload {
-            session_id: session_id.to_string(),
-            event_type: "destroyed".to_string(),
-            source_type: None,
-            state: None,
-            subscriber_count: 0,
-            source_profile_ids,
-            creator_subscriber_id: None,
-            reset: false,
-        });
-        // Clear any closing flag
-        clear_session_closing(session_id);
-        clear_playback_position(session_id);
-        // Clean up profile tracking (release single-handle device locks)
-        crate::sessions::cleanup_session_profiles(session_id);
-        tlog!("[reader] Session '{}' destroyed", session_id);
+    if let Some(session) = session_to_destroy {
+        destroy_extracted_session(session_id, session).await;
     }
 
     Ok(remaining)

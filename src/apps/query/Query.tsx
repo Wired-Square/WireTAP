@@ -217,6 +217,9 @@ function QueryInner() {
       const preferred = profiles.find(p => p.id === sourceProfileId)?.preferred_catalog;
       if (preferred) {
         const decoderDir = settings?.decoder_dir;
+        // Wait for settings — an empty decoderDir makes buildCatalogPath() emit a bare
+        // filename and the attach fails. Re-runs once settings resolve (see deps below).
+        if (!decoderDir) return;
         const path = buildCatalogPath(preferred, decoderDir);
         setCatalogPath(path);
         useSessionStore.getState().setSessionCatalogPath(sid, path);
@@ -229,7 +232,7 @@ function QueryInner() {
       useSessionStore.getState().setSessionCatalogPath(sid, catalogPath);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionCatalogPath, session.sessionId, sourceProfileId]);
+  }, [sessionCatalogPath, session.sessionId, sourceProfileId, settings?.decoder_dir]);
 
   // Determine active source — a capture replay or a postgres profile
   const hasSource = !!sourceProfileId;

@@ -273,6 +273,30 @@ reads it and resets to **No source** instead of switching to the orphaned captur
 (the external-destroy fallback, `reset: false`). Rust owns the intent — there is
 no frontend shim.
 
+### Subscriber registration & the one-session invariant
+
+Each session tracks its subscribers in a map on the `IOSession`; the session is
+destroyed when its **last** subscriber leaves (`unregister_subscriber`). A
+subscriber id is per-`useIOSession`-hook (`appName_<rand>`), and a hook only ever
+views one session at a time, so a subscriber must belong to **exactly one**
+session.
+
+`register_subscriber` ([io/mod.rs](../src-tauri/src/io/mod.rs)) enforces that
+invariant authoritatively: registering a subscriber on a session first removes
+that same subscriber id from every *other* session, and any session left with no
+subscribers by the move is torn down — the same teardown as a normal
+last-subscriber-leaves (stop source, orphan capture, `session-lifecycle
+"destroyed"`), factored into a shared `destroy_extracted_session` helper. The
+"left" bookkeeping (remove + joiner-count + event) is shared with
+`unregister_subscriber` via `remove_subscriber`.
+
+This is the backstop for a frontend leave that loses a race when an app switches
+sources (e.g. the Decoder moving from a live Modbus source to a capture replay).
+Without it the old session keeps its subscriber and never tears down — left
+running and, for a realtime source, polling the device forever — while showing as
+a second session bound to the one app. Because the rule lives in Rust (the session
+authority) under the `IO_SESSIONS` lock, no frontend timing can orphan a session.
+
 ### Play / Pause
 
 Play and Pause are items in the session menu (opened by clicking the session chip).
@@ -432,6 +456,17 @@ session via `setSessionCatalogPath` (the cross-app channel), so a decode-aware a
 selected source's `preferred_catalog`, and when the chosen catalogue declares serial
 framing the picker parses it (`loadCatalog`) and reflects that encoding in the
 source's framing dropdown, so the framing is explicit before connecting.
+
+**Auto-select from `preferred_catalog`.** When a session is created *without* a
+catalogue, the decode-aware apps (Decoder, Dashboard, Query) auto-select one from
+the source profile's `preferred_catalog` — building an absolute path with
+`buildCatalogPath(preferred, decoderDir)` and setting it via `setSessionCatalogPath`.
+The effect waits for `decoderDir` to resolve from settings before running: an empty
+dir yields a bare filename, `open_catalog` reads the path verbatim (no dir
+resolution) so the attach fails, and the effect's own "already set" guard would then
+stop it ever re-running — leaving the session undecoded until a manual pick. Distinct
+from the catalog *list* read (which `list_catalogs` resolves dir-side and so does not
+gate on `decoderDir`).
 
 **Live serial reframing.** Serial framing (SLIP/Modbus-RTU/delimiter) is applied
 by the backend read loop ([io/serial/reader.rs](../src-tauri/src/io/serial/reader.rs)),

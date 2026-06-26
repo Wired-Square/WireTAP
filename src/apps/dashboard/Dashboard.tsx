@@ -357,6 +357,10 @@ function DashboardInner() {
   useEffect(() => {
     if (sessionCatalogPath !== null) return;
     if (!sessionId) return;
+    // Gate until settings resolve — decoderDir is "" before then, which makes
+    // buildCatalogPath() emit a bare filename and the attach fails. decoderDir is in the
+    // deps below, so this re-runs once settings arrive.
+    if (!decoderDir) return;
 
     const profiles = useSettingsStore.getState().ioProfiles.profiles;
     const profileIds = multiBusProfiles.length > 0
@@ -385,7 +389,7 @@ function DashboardInner() {
       useSessionStore.getState().setSessionCatalogPath(sessionId, catalogPath);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionCatalogPath, sessionId, multiBusProfiles, sourceProfileId]);
+  }, [sessionCatalogPath, sessionId, multiBusProfiles, sourceProfileId, decoderDir]);
 
   // Centralised IO picker handlers
   const ioPickerProps = useIOSourcePickerHandlers({

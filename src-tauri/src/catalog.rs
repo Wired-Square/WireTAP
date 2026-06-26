@@ -340,6 +340,22 @@ pub async fn list_catalogs(app: AppHandle) -> Result<Vec<CatalogFile>, String> {
     // Sort by filename
     catalogs.sort_by(|a, b| a.filename.cmp(&b.filename));
 
+    // Warn (non-fatal) when two or more catalogs share a display name. Selection is keyed
+    // by filename/path, so this is harmless — but it makes the picker show identical labels
+    // and is worth surfacing so a future "wrong catalog" report explains itself.
+    let mut filenames_by_name: std::collections::HashMap<&str, Vec<&str>> = std::collections::HashMap::new();
+    for c in &catalogs {
+        filenames_by_name.entry(c.name.as_str()).or_default().push(c.filename.as_str());
+    }
+    for (name, filenames) in &filenames_by_name {
+        if filenames.len() > 1 {
+            tlog!(
+                "[catalog] {} decoders share the display name '{}': {:?} — they're disambiguated by filename",
+                filenames.len(), name, filenames
+            );
+        }
+    }
+
     Ok(catalogs)
 }
 

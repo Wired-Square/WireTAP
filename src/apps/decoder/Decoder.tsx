@@ -641,6 +641,11 @@ function DecoderInner() {
   useEffect(() => {
     if (sessionCatalogPath !== null) return; // undefined (no session) or string (already set)
     if (!sessionId) return;
+    // Gate until settings resolve. decoderDir is "" before settings load, which makes
+    // buildCatalogPath() emit a bare filename → the attach fails and this effect's
+    // sessionCatalogPath guard then prevents it ever re-running. decoderDir is in the deps
+    // below, so this re-runs (still with sessionCatalogPath === null) once settings arrive.
+    if (!decoderDir) return;
 
     const profiles = useSettingsStore.getState().ioProfiles.profiles;
     const profileIds = ioProfiles.length > 0
@@ -672,8 +677,9 @@ function DecoderInner() {
     }
     // sessionCatalogPath drives the primary trigger: undefined→null when session is created.
     // ioProfiles/sourceProfileId included in case they arrive in a later render.
+    // decoderDir re-runs this once settings resolve (see the !decoderDir gate above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionCatalogPath, sessionId, ioProfiles, sourceProfileId, watchSource]);
+  }, [sessionCatalogPath, sessionId, ioProfiles, sourceProfileId, watchSource, decoderDir]);
 
   // Use the orchestrator hook for all handlers
   const handlers = useDecoderHandlers({
