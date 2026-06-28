@@ -18,7 +18,15 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::time::{interval, Duration, Interval};
+use tokio::time::{interval, sleep, Duration, Interval};
+
+/// How often `next()` re-checks the cancel flag while waiting for the next tick.
+/// Long intervals (e.g. a 30s Modbus poll) would otherwise keep the task — and the
+/// connection it holds — alive long after `stop()` was requested, stalling teardown
+/// and leaving the device busy for a restart. Bounding the wait to this makes
+/// cancellation prompt without affecting tick timing (the timer still wins the
+/// select when its deadline is sooner).
+const CANCEL_POLL_MS: u64 = 100;
 
 /// Drives an interval loop with cancel and optional pause support.
 ///
@@ -51,7 +59,18 @@ impl Cadence {
     /// can simply write `while cadence.next().await.is_some() { ... }`.
     pub async fn next(&mut self) -> Option<()> {
         loop {
-            self.timer.tick().await;
+            // Wait for the next due tick, but wake at least every CANCEL_POLL_MS so a set
+            // cancel flag is noticed promptly instead of after a full interval. The timer
+            // still wins the select when its deadline is sooner, so tick timing is unchanged.
+            loop {
+                if self.cancel.load(Ordering::Relaxed) {
+                    return None;
+                }
+                tokio::select! {
+                    _ = self.timer.tick() => break,
+                    _ = sleep(Duration::from_millis(CANCEL_POLL_MS)) => {}
+                }
+            }
 
             if self.cancel.load(Ordering::Relaxed) {
                 return None;
