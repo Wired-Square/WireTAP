@@ -287,39 +287,6 @@ export async function setFraming(
   });
 }
 
-/**
- * Result of joining an existing session.
- */
-export interface JoinSessionResult {
-  capabilities: IOCapabilities;
-  state: IOState;
-  capture_id: string | null;
-  /** Kind of the active capture ("frames" or "bytes"), if any */
-  capture_kind: "frames" | "bytes" | null;
-  /** Number of apps connected to this session (including this one) */
-  joiner_count: number;
-}
-
-/**
- * Join an existing reader session (for session sharing between apps).
- * Returns session info if session exists, throws error if not.
- * The caller can then set up event listeners to receive frames and state changes.
- * Any app that joins can control the session (start/stop/pause/resume).
- */
-export async function joinReaderSession(sessionId: string): Promise<JoinSessionResult> {
-  return invoke("join_reader_session", { session_id: sessionId });
-}
-
-/**
- * Leave a reader session without stopping it.
- * Call this when you want to stop listening but not stop the session.
- * The frontend should stop listening to events after calling this.
- * @returns The remaining joiner count after leaving
- */
-export async function leaveReaderSession(sessionId: string): Promise<number> {
-  return invoke("leave_reader_session", { session_id: sessionId });
-}
-
 // Legacy heartbeat functions removed - use registerSessionSubscriber/unregisterSessionSubscriber instead
 
 /**
@@ -1449,6 +1416,75 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     captureUniqueFrameCount: s.capture_unique_frame_count ?? null,
     isStreaming: s.is_streaming ?? false,
     catalogPath: s.catalog_path ?? null,
+  }));
+}
+
+// ============================================================================
+// Open-app registry (cross-window roster of session-aware app instances)
+// ============================================================================
+
+/**
+ * A single open session-aware app instance, tracked globally by Rust across all
+ * windows. `sessionId` is its current session attachment (null = open but not
+ * watching a session).
+ */
+export interface AppInstanceInfo {
+  /** Unique instance id == the session subscriber id (e.g. "main-1_decoder"). */
+  instanceId: string;
+  /** Cosmetic per-instance display id (e.g. "decoder_a3f9"). */
+  displayId: string;
+  /** Human-readable app name (e.g. "decoder"). */
+  appName: string;
+  /** Label of the window that owns this instance. */
+  windowLabel: string;
+  /** Current session attachment, or null when open but not watching. */
+  sessionId: string | null;
+  /** Seconds since this instance first registered. */
+  registeredSecondsAgo: number;
+  /** Whether actively receiving frames. */
+  isActive: boolean;
+}
+
+/** Register an open app instance (call on panel mount). */
+export async function registerOpenApp(
+  instanceId: string,
+  displayId: string,
+  appName: string,
+  windowLabel: string,
+): Promise<void> {
+  await invoke("register_open_app", {
+    instance_id: instanceId,
+    display_id: displayId,
+    app_name: appName,
+    window_label: windowLabel,
+  });
+}
+
+/** Unregister an open app instance (call on panel unmount). */
+export async function unregisterOpenApp(instanceId: string): Promise<void> {
+  await invoke("unregister_open_app", { instance_id: instanceId });
+}
+
+/** List every open app instance across all windows. */
+export async function listOpenApps(): Promise<AppInstanceInfo[]> {
+  const raw: Array<{
+    instance_id: string;
+    display_id: string;
+    app_name: string;
+    window_label: string;
+    session_id: string | null;
+    registered_seconds_ago: number;
+    is_active: boolean;
+  }> = await invoke("list_open_apps");
+
+  return raw.map((a) => ({
+    instanceId: a.instance_id,
+    displayId: a.display_id,
+    appName: a.app_name,
+    windowLabel: a.window_label,
+    sessionId: a.session_id ?? null,
+    registeredSecondsAgo: a.registered_seconds_ago,
+    isActive: a.is_active,
   }));
 }
 

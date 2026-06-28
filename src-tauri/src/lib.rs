@@ -1163,8 +1163,6 @@ pub fn run() {
             sessions::get_reader_session_state,
             sessions::get_reader_session_capabilities,
             sessions::get_reader_session_joiner_count,
-            sessions::join_reader_session,
-            sessions::leave_reader_session,
             sessions::start_reader_session,
             sessions::stop_reader_session,
             sessions::pause_reader_session,
@@ -1204,6 +1202,10 @@ pub fn run() {
             sessions::resume_source_polling,
             sessions::update_source_bus_mappings_cmd,
             sessions::get_session_subscriber_list,
+            sessions::register_open_app,
+            sessions::unregister_open_app,
+            sessions::list_open_apps,
+            sessions::prune_window_apps,
             sessions::reinitialize_session_if_safe_cmd,
             sessions::set_session_subscriber_active,
             sessions::probe_gvret_device,
@@ -1432,6 +1434,19 @@ pub fn run() {
         //
         // NOTE: This bypasses the JavaScript StopStreamDialog. For UX, if you want
         // to confirm with the user, you'd need to use a different approach.
+        // When any window is destroyed, prune its open-app instances from the global
+        // registry so the Session Manager graph (in other windows) drops its app nodes
+        // and tears down any session it was the last subscriber on. (A hard crash that
+        // fires no Destroyed event leaves the window's unattached nodes until restart —
+        // the in-memory registry clears on relaunch.)
+        if let WindowEvent::Destroyed = event {
+            let label = window.label().to_string();
+            tauri::async_runtime::spawn(async move {
+                io::prune_window_sessions(&label).await;
+            });
+            return;
+        }
+
         if let WindowEvent::CloseRequested { api, .. } = event {
             let label = window.label().to_string();
             // For decoder/discovery windows, do safe close with cleanup
@@ -1458,6 +1473,10 @@ pub fn run() {
 
                     // Destroy the session state
                     let _ = io::destroy_session(&label, false).await;
+
+                    // Drop this window's open-app instances from the global registry
+                    // (it gets hidden, not destroyed, so no Destroyed event fires).
+                    io::prune_window_sessions(&label).await;
 
                     // Wait for WebKit to process any pending IPC operations.
                     // The session is stopped, so no new events will be emitted.

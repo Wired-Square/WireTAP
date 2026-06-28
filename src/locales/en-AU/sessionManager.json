@@ -45,6 +45,7 @@
       "signalGenerator": "Signal Generator",
       "app": "App",
       "appId": "App ID",
+      "window": "Window",
       "status": "Status",
       "type": "Type",
       "session": "Session",

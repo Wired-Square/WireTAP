@@ -15,15 +15,18 @@
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useSessionStore } from "../stores/sessionStore";
-import { useFocusStore } from "../stores/focusStore";
 import { tlog } from "../api/settings";
 
-// Generate unique subscriber instance IDs using random suffix.
-// Random is needed because each Tauri window has its own JS context,
-// so a module-level counter would reset to 0 in each window.
+// Deterministic per-(window, app) subscriber/instance id. There is exactly one
+// instance of each session-aware app per window, so `${windowLabel}_${appName}` is
+// globally unique. It MUST match the id MainLayout registers from Dockview's panel
+// lifecycle (see registerOpenApp there) so an open panel and its session
+// attachment are the same open-app-registry entry — that lets the Session Manager
+// graph show open-but-unattached apps (even tabs Dockview hasn't mounted yet).
 function generateSubscriberId(appName: string): string {
-  return `${appName}_${Math.random().toString(36).slice(2, 6)}`;
+  return `${getCurrentWebviewWindow().label}_${appName}`;
 }
 
 // Module-level map to track sessions being reinitialized.
@@ -438,13 +441,6 @@ export function useIOSession(
       onDestroyed,
     };
   }, [onFrames, onDecoded, onBytes, onError, onTimeUpdate, onStreamEnded, onStreamComplete, onSpeedChange, onReconfigure, onSuspended, onSwitchedToCapture, onResuming, onSourceReplaced, onDestroyed]);
-
-  // ---- Register subscriber ID with focusStore so Visual tab can display it ----
-  useEffect(() => {
-    const lid = subscriberIdRef.current;
-    useFocusStore.getState().setListenerId(appName, lid);
-    return () => useFocusStore.getState().removeListenerId(appName);
-  }, [appName]);
 
   // ---- Sync session store → localState ----
   // The session store receives WS push messages (SessionState, SessionLifecycle,

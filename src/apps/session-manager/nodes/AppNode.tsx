@@ -49,10 +49,8 @@ function AppNode({ data, selected }: AppNodeProps) {
 
   const bgColour = "bg-[var(--bg-surface)]";
 
-  // Format display name from app ID
-  const displayName = appId.includes("-")
-    ? appId.split("-").slice(0, 2).join("-")
-    : appId;
+  // Show the cosmetic per-instance id (e.g. "decoder_a3f9").
+  const displayName = appId;
 
   return (
     <div

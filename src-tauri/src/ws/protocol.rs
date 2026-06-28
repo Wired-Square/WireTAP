@@ -33,6 +33,9 @@ pub enum MsgType {
     // Live frame counters for a streaming session, pushed on the frame cadence so
     // the frontend renders counts straight from the backend (no TS-side counting).
     FrameCounts      = 0x16,
+    // Cross-window open-app roster snapshot (every open session-aware app instance,
+    // across all windows). Opaque JSON; the frontend replaces its roster state.
+    OpenAppsChanged  = 0x17,
     Command          = 0x20,
     CommandResponse  = 0x21,
     // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
@@ -69,6 +72,7 @@ impl TryFrom<u8> for MsgType {
             0x14 => Ok(MsgType::DecodedSignals),
             0x15 => Ok(MsgType::AttachToPanel),
             0x16 => Ok(MsgType::FrameCounts),
+            0x17 => Ok(MsgType::OpenAppsChanged),
             0x20 => Ok(MsgType::Command),
             0x21 => Ok(MsgType::CommandResponse),
             0x30 => Ok(MsgType::BridgeRequest),

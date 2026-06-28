@@ -9,13 +9,13 @@ use crate::{
     io::{
         self,
         create_session, destroy_session, get_session_capabilities, get_session_joiner_count, get_session_state,
-        get_session_subscribers, get_session_source_configs, join_session, leave_session, list_sessions, pause_session,
+        get_session_subscribers, get_session_source_configs, list_sessions, pause_session,
         reconfigure_session, register_subscriber, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_subscriber_active, start_session, stop_session,
         stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_subscriber,
         evict_session_subscriber, leave_session_to_capture, add_source_to_session, remove_source_from_session, update_source_bus_mappings, pause_source_in_session, resume_source_in_session, get_session_source_count,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
-        JoinSessionResult, SubscriberInfo, RegisterSubscriberResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
+        SubscriberInfo, RegisterSubscriberResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
         GvretDeviceInfo, probe_gvret_tcp,
         ModbusTcpConfig, ModbusTcpSource,
@@ -1011,22 +1011,6 @@ pub async fn get_reader_session_capabilities(
     Ok(get_session_capabilities(&session_id).await)
 }
 
-/// Join an existing reader session (for session sharing between apps).
-/// Returns session info if session exists, error if not.
-/// The caller can then set up event listeners to receive frames and state changes.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn join_reader_session(session_id: String) -> Result<JoinSessionResult, String> {
-    join_session(&session_id).await
-}
-
-/// Leave a reader session without stopping it.
-/// Call this when you want to stop listening but not stop the session.
-/// Returns the new joiner count.
-#[tauri::command(rename_all = "snake_case")]
-pub async fn leave_reader_session(session_id: String) -> Result<usize, String> {
-    leave_session(&session_id).await
-}
-
 /// Get the joiner count for a reader session
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_reader_session_joiner_count(session_id: String) -> Result<usize, String> {
@@ -1466,6 +1450,35 @@ pub async fn unregister_session_subscriber(
 #[tauri::command(rename_all = "snake_case")]
 pub async fn get_session_subscriber_list(session_id: String) -> Result<Vec<SubscriberInfo>, String> {
     get_session_subscribers(&session_id).await
+}
+
+// ============================================================================
+// Open-app registry (cross-window roster of session-aware app instances)
+// ============================================================================
+
+/// Register an open session-aware app instance (called on panel mount). Tracks the
+/// instance globally so the Session Manager graph can show apps from every window.
+#[tauri::command(rename_all = "snake_case")]
+pub fn register_open_app(instance_id: String, display_id: String, app_name: String, window_label: String) {
+    crate::io::register_app(&instance_id, &display_id, &app_name, &window_label);
+}
+
+/// Unregister an open app instance (called on panel unmount).
+#[tauri::command(rename_all = "snake_case")]
+pub async fn unregister_open_app(instance_id: String) {
+    crate::io::unregister_app(&instance_id).await;
+}
+
+/// List every open app instance across all windows (drives the roster reconcile).
+#[tauri::command(rename_all = "snake_case")]
+pub fn list_open_apps() -> Vec<crate::io::AppInstanceInfo> {
+    crate::io::list_open_apps()
+}
+
+/// Remove all app instances owned by a window (called when a window is closing).
+#[tauri::command(rename_all = "snake_case")]
+pub async fn prune_window_apps(window_label: String) {
+    crate::io::prune_window_sessions(&window_label).await;
 }
 
 /// Evict a listener from a session, giving it a copy of the current capture.

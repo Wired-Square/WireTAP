@@ -21,7 +21,7 @@ import {
 } from "../../api/io";
 import Dialog from "../../components/Dialog";
 import { useSettingsStore } from "../settings/stores/settingsStore";
-import { useFocusStore } from "../../stores/focusStore";
+import { useOpenAppsStore } from "../../stores/openAppsStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSessionManagerStore } from "./stores/sessionManagerStore";
 import { useSessionLogStore } from "./stores/sessionLogStore";
@@ -49,9 +49,9 @@ export default function SessionManager() {
   // updates immediately, before the debounced save to backend completes.
   const profiles = useSettingsStore((s) => s.ioProfiles.profiles);
 
-  // Track which panels are currently open (for unconnected app nodes)
-  const openPanelIds = useFocusStore((s) => s.openPanelIds);
-  const subscriberIds = useFocusStore((s) => s.subscriberIds);
+  // Open session-aware app instances across ALL windows (Rust-owned roster). Drives
+  // the unconnected app nodes and the "connect app" actions.
+  const openApps = useOpenAppsStore((s) => s.instances);
 
   // Tab definitions
   const tabs: TabDefinition[] = useMemo(
@@ -285,8 +285,7 @@ export default function SessionManager() {
                 <SessionCanvas
                   sessions={sessions}
                   profiles={profiles}
-                  openPanelIds={openPanelIds}
-                  subscriberIds={subscriberIds}
+                  openApps={openApps}
                   onEnableBusMapping={handleEnableBusMapping}
                   onCreateBusMapping={handleCreateBusMapping}
                   onConnectAppToSession={handleConnectAppToSession}
@@ -298,7 +297,7 @@ export default function SessionManager() {
             <SessionDetailPanel
               sessions={sessions}
               profiles={profiles}
-              openPanelIds={openPanelIds}
+              openApps={openApps}
               onStartSession={handleStartSession}
               onStopSession={handleStopSession}
               onPauseSession={handlePauseSession}

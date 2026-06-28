@@ -483,6 +483,22 @@ pub fn send_ota_event(event: &serde_json::Value) {
     server.send_global(msg);
 }
 
+/// Push the open-app roster snapshot to all connected WS clients on the global
+/// channel. Payload is opaque JSON (`Vec<AppInstanceInfo>`); the frontend replaces
+/// its roster state. Mirrors `send_ota_event` / `send_replay_state`.
+pub fn send_open_apps_changed(roster: &[crate::io::AppInstanceInfo]) {
+    let server = match ws_server() {
+        Some(s) => s,
+        None => return,
+    };
+    let payload = match serde_json::to_vec(roster) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let msg = protocol::encode_message(MsgType::OpenAppsChanged, 0, &payload);
+    server.send_global(msg);
+}
+
 /// Send replay state update (global, channel 0).
 pub fn send_replay_state(state: &crate::replay::ReplayState) {
     let server = match ws_server() {

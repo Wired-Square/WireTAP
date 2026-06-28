@@ -6,9 +6,9 @@ import { Play, Pause, Square, Trash2, UserMinus, Plus, X, Save, Unplug, Plug } f
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
 import { useSettingsStore } from "../../settings/stores/settingsStore";
 import { useSessionStore } from "../../../stores/sessionStore";
-import { sessionAwarePanelIds } from "../../registry";
-import { getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence, addVirtualBus, removeVirtualBus, type ActiveSessionInfo, type VirtualBusState, type IOStateType } from "../../../api/io";
+import { getVirtualBusStates, setVirtualBusTrafficEnabled, setVirtualBusCadence, addVirtualBus, removeVirtualBus, type ActiveSessionInfo, type AppInstanceInfo, type VirtualBusState, type IOStateType } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
+import { formatWindowName } from "../../../utils/windowName";
 import { iconSm } from "../../../styles/spacing";
 import { iconButtonHover, iconButtonHoverDanger } from "../../../styles/buttonStyles";
 import { emptyStateText } from "../../../styles/typography";
@@ -17,7 +17,7 @@ import { tlog } from "../../../api/settings";
 interface SessionDetailPanelProps {
   sessions: ActiveSessionInfo[];
   profiles: IOProfile[];
-  openPanelIds?: string[];
+  openApps?: AppInstanceInfo[];
   onStartSession: (sessionId: string) => void;
   onStopSession: (sessionId: string) => void;
   onPauseSession: (sessionId: string) => void;
@@ -33,7 +33,7 @@ interface SessionDetailPanelProps {
 export default function SessionDetailPanel({
   sessions,
   profiles,
-  openPanelIds,
+  openApps,
   onStartSession,
   onStopSession,
   onPauseSession,
@@ -66,7 +66,7 @@ export default function SessionDetailPanel({
       const session = sessions.find((s) => s.sessionId === sessionId);
       if (!session) return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.sessionNotFound")}</p>;
 
-      return <SessionDetails session={session} profiles={profiles} openPanelIds={openPanelIds} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} onDisableBusMapping={onDisableBusMapping} onConnectApp={onConnectAppToSession} />;
+      return <SessionDetails session={session} profiles={profiles} openApps={openApps} onStart={onStartSession} onStop={onStopSession} onPause={onPauseSession} onResume={onResumeSession} onDestroy={onDestroySession} onAddSource={onAddSource} onDisableBusMapping={onDisableBusMapping} onConnectApp={onConnectAppToSession} />;
     }
 
     if (selectedNode.type === "source") {
@@ -78,13 +78,13 @@ export default function SessionDetailPanel({
     }
 
     if (selectedNode.type === "app") {
-      // Check if this is an unconnected app node (app::panelId — no session ID in the middle)
+      // Unconnected app node is `app::${instanceId}` (no session id in the middle).
       const parts = selectedNode.id.split("::");
       if (parts.length === 2) {
-        const appName = parts[1];
-        return <UnconnectedAppDetails appName={appName} sessions={sessions} onConnectApp={onConnectAppToSession} />;
+        const instance = openApps?.find((a) => a.instanceId === parts[1]);
+        return <UnconnectedAppDetails instance={instance} fallbackId={parts[1]} sessions={sessions} onConnectApp={onConnectAppToSession} />;
       }
-      return <AppDetails nodeId={selectedNode.id} sessions={sessions} onEvict={onEvictSubscriber} />;
+      return <AppDetails nodeId={selectedNode.id} sessions={sessions} openApps={openApps} onEvict={onEvictSubscriber} />;
     }
 
     if (selectedNode.type === "edge") {
@@ -147,7 +147,7 @@ function protocolBadgeStyle(protocol: string): string {
 function SessionDetails({
   session,
   profiles,
-  openPanelIds,
+  openApps,
   onStart,
   onStop,
   onPause,
@@ -159,7 +159,7 @@ function SessionDetails({
 }: {
   session: ActiveSessionInfo;
   profiles: IOProfile[];
-  openPanelIds?: string[];
+  openApps?: AppInstanceInfo[];
   onStart: (id: string) => void;
   onStop: (id: string) => void;
   onPause: (id: string) => void;
@@ -391,12 +391,17 @@ function SessionDetails({
         </div>
       </div>
 
-      {/* Connect unconnected apps */}
-      {onConnectApp && openPanelIds && (() => {
+      {/* Connect unconnected apps — open app instances (any window) not on a session.
+          Dedup by app type so we offer each app once, even with multiple windows. */}
+      {onConnectApp && openApps && (() => {
         const connectedApps = new Set(session.subscribers.map((l) => (l.app_name || l.subscriber_id).toLowerCase()));
-        const unconnected = openPanelIds.filter(
-          (id) => sessionAwarePanelIds.has(id) && !connectedApps.has(id)
-        );
+        const unconnected = [
+          ...new Set(
+            openApps
+              .filter((a) => a.sessionId == null && !connectedApps.has(a.appName.toLowerCase()))
+              .map((a) => a.appName)
+          ),
+        ];
         if (unconnected.length === 0) return null;
         return (
           <div className="pt-2 border-t border-[color:var(--border-default)]">
@@ -778,27 +783,49 @@ function SessionDecoderPicker({ session }: { session: ActiveSessionInfo }) {
   );
 }
 
+// Shared "Window" detail row (renders nothing when the window is unknown).
+function WindowField({ windowLabel }: { windowLabel?: string }) {
+  const { t } = useTranslation("sessionManager");
+  if (!windowLabel) return null;
+  return (
+    <div>
+      <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
+        {t("detail.labels.window")}
+      </label>
+      <p className="text-sm text-[color:var(--text-primary)]">
+        {formatWindowName(windowLabel)}
+      </p>
+    </div>
+  );
+}
+
 // Unconnected app details sub-component
 function UnconnectedAppDetails({
-  appName,
+  instance,
+  fallbackId,
   sessions,
   onConnectApp,
 }: {
-  appName: string;
+  instance?: AppInstanceInfo;
+  fallbackId: string;
   sessions: ActiveSessionInfo[];
   onConnectApp?: (sessionId: string, appName: string) => void;
 }) {
   const { t } = useTranslation("sessionManager");
+  const displayId = instance?.displayId ?? fallbackId;
+  const appType = instance?.appName ?? fallbackId;
   return (
     <div className="space-y-4">
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
           {t("detail.labels.app")}
         </label>
-        <p className="text-sm text-[color:var(--text-primary)] capitalize">
-          {appName}
+        <p className="text-sm text-[color:var(--text-primary)] font-mono">
+          {displayId}
         </p>
       </div>
+
+      <WindowField windowLabel={instance?.windowLabel} />
 
       <div>
         <label className="text-xs text-[color:var(--text-muted)] uppercase tracking-wide">
@@ -819,7 +846,7 @@ function UnconnectedAppDetails({
             {sessions.map((s) => (
               <button
                 key={s.sessionId}
-                onClick={() => onConnectApp(s.sessionId, appName)}
+                onClick={() => onConnectApp(s.sessionId, appType)}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${iconButtonHover} text-cyan-400`}
               >
                 <Plug className={iconSm} />
@@ -1004,7 +1031,7 @@ function EdgeDetails({
 }
 
 // Connected app details sub-component
-function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: ActiveSessionInfo[]; onEvict: (sessionId: string, subscriberId: string) => void }) {
+function AppDetails({ nodeId, sessions, openApps, onEvict }: { nodeId: string; sessions: ActiveSessionInfo[]; openApps?: AppInstanceInfo[]; onEvict: (sessionId: string, subscriberId: string) => void }) {
   const { t } = useTranslation("sessionManager");
   // Parse "app::${sessionId}::${subscriberId}"
   const parts = nodeId.split("::");
@@ -1013,6 +1040,7 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
 
   const session = sessions.find((s) => s.sessionId === sessionId);
   const listener = session?.subscribers.find((l) => l.subscriber_id === subscriberId);
+  const instance = openApps?.find((a) => a.instanceId === subscriberId);
 
   if (!listener) {
     return <p className="text-sm text-[color:var(--text-muted)]">{t("detail.appNotFound")}</p>;
@@ -1035,9 +1063,12 @@ function AppDetails({ nodeId, sessions, onEvict }: { nodeId: string; sessions: A
           {t("detail.labels.appId")}
         </label>
         <p className="text-sm text-[color:var(--text-primary)] font-mono">
-          {listener.subscriber_id}
+          {instance?.displayId ?? listener.subscriber_id}
         </p>
       </div>
+
+      {/* Window */}
+      <WindowField windowLabel={instance?.windowLabel} />
 
       {/* Session */}
       <div>

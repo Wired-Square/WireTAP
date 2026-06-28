@@ -32,6 +32,7 @@ import {
 import { useWindowPersistence } from "../hooks/useWindowPersistence";
 import { useRepeatQueueEvents } from "../hooks/useRepeatQueueEvents";
 import { useSessionRosterSync } from "../hooks/useSessionRosterSync";
+import { useOpenAppsSync } from "../hooks/useOpenAppsSync";
 import { useAttachSourceEvents } from "../hooks/useAttachSourceEvents";
 import {
   getOpenMainWindows,
@@ -40,6 +41,8 @@ import {
   getNextMainWindowNumber,
 } from "../utils/persistence";
 import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuState } from "../api";
+import { registerOpenApp, unregisterOpenApp } from "../api/io";
+import { formatWindowName } from "../utils/windowName";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
 import { apps, menuApps, menuGroupOrder, sessionAwarePanelIds, type AppEntry, type PanelId } from "../apps/registry";
@@ -259,12 +262,20 @@ export default function MainLayout() {
   // Persist and restore window geometry (size + position) across restarts
   useWindowPersistence(windowLabel);
 
+  // Surface which window this is in the OS title bar (multi-window setups).
+  useEffect(() => {
+    void getCurrentWebviewWindow().setTitle(`WireTAP — ${formatWindowName(windowLabel)}`);
+  }, [windowLabel]);
+
   // Mirror repeat-transmit lifecycle (e.g. agent-started repeats) from the WS
   // push channel into the transmit queue, opening the Transmit panel on start.
   useRepeatQueueEvents();
 
   // Adopt backend (incl. agent-created) sessions into the store as known-only.
   useSessionRosterSync();
+
+  // Mirror the Rust-owned open-app roster (every window's open apps) into the store.
+  useOpenAppsSync();
 
   // Let an agent surface a session in a source-aware tab on request.
   useAttachSourceEvents();
@@ -399,13 +410,28 @@ export default function MainLayout() {
     (event: DockviewReadyEvent) => {
       apiRef.current = event.api;
 
-      // Listen for panel and layout changes to trigger save + track open panels
+      // Register a session-aware panel in the Rust open-app registry so the Session
+      // Manager graph shows it (across all windows) even before Dockview mounts its
+      // content. The id matches useIOSession's subscriber id (`${windowLabel}_${appName}`)
+      // so the open panel and its session attachment are the same registry entry.
+      const registerPanel = (panelId: string) => {
+        if (sessionAwarePanelIds.has(panelId)) {
+          // Cosmetic per-instance display id; Rust keeps the first one (re-registers
+          // preserve it), so the label is stable for the panel's lifetime.
+          const displayId = `${panelId}_${Math.random().toString(36).slice(2, 6)}`;
+          void registerOpenApp(`${windowLabel}_${panelId}`, displayId, panelId, windowLabel);
+        }
+      };
+
+      // Listen for panel and layout changes to trigger save
       event.api.onDidAddPanel((panel) => {
-        useFocusStore.getState().addOpenPanel(panel.id);
+        registerPanel(panel.id);
         saveLayout();
       });
       event.api.onDidRemovePanel((panel) => {
-        useFocusStore.getState().removeOpenPanel(panel.id);
+        if (sessionAwarePanelIds.has(panel.id)) {
+          void unregisterOpenApp(`${windowLabel}_${panel.id}`);
+        }
         // Notify backend when Settings panel is closed (singleton tracking)
         if (panel.id === "settings") {
           settingsPanelClosed();
@@ -444,13 +470,16 @@ export default function MainLayout() {
         });
       }
 
-      // Seed the open panels store from all currently loaded panels
-      useFocusStore.getState().setOpenPanels(event.api.panels.map((p) => p.id));
+      // Seed the open-app registry from all currently-loaded panels (onDidAddPanel
+      // may not fire for panels restored via fromJSON).
+      for (const p of event.api.panels) {
+        registerPanel(p.id);
+      }
 
       // Set initial active panel in store
       useFocusStore.getState().setFocusedPanelId(event.api.activePanel?.id ?? null);
     },
-    [saveLayout, savedLayout, isDynamicWindow]
+    [saveLayout, savedLayout, isDynamicWindow, windowLabel]
   );
 
   // Handle panel open/focus - used by logo menu and cross-panel communication

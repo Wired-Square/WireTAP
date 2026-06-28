@@ -633,29 +633,15 @@ const HEARTBEAT_CHECK_INTERVAL_SECS: u64 = 5;
 /// stays alive so it can resume if heartbeats return (e.g., after display wake).
 const SUSPENSION_GRACE_PERIOD_SECS: u64 = 300; // 5 minutes
 
-/// A registered subscriber for an IO session
-#[derive(Clone, Debug)]
-pub struct SessionSubscriber {
-    /// Unique ID for this subscriber instance (e.g., "discovery_1", "decoder_2")
-    pub subscriber_id: String,
-    /// Human-readable app name (e.g., "discovery", "decoder")
-    pub app_name: String,
-    /// When this subscriber was registered
-    pub registered_at: std::time::Instant,
-    /// Last heartbeat from this subscriber
-    pub last_heartbeat: std::time::Instant,
-    /// Whether this subscriber is active (receiving frames). Set to false when detaching.
-    pub is_active: bool,
-}
-
-/// Active IO session
+/// Active IO session.
+///
+/// Subscribers are NOT stored here — they live in the global `APP_REGISTRY`
+/// (keyed by instance_id, with `session_id` pointing back here). The per-session
+/// subscriber list/count is derived via `subscribers_for_session` /
+/// `subscriber_count_for_session`. Only session-level state lives on the struct.
 pub struct IOSession {
     pub source: Box<dyn IOSource>,
     pub app: AppHandle,
-    /// Number of apps connected to this session (legacy counter, for backwards compatibility)
-    pub joiner_count: usize,
-    /// Map of subscriber IDs to their subscriber info
-    pub subscribers: HashMap<String, SessionSubscriber>,
     /// Display names of the sources in this session (for logging)
     pub source_names: Vec<String>,
     /// Original source configs for rebuilding the live reader on resume.
@@ -703,6 +689,269 @@ fn emit_speed_change(session_id: &str, speed: f64) {
 /// Global session manager
 static IO_SESSIONS: Lazy<Mutex<HashMap<String, IOSession>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+
+// ============================================================================
+// Open-app registry (cross-window roster of session-aware app instances)
+// ============================================================================
+//
+// Single source of truth for every open session-aware app instance across all
+// windows. `session_id` is the instance's current session attachment (None =
+// panel open but not watching). Because it is a single Option, the
+// one-subscriber-one-session invariant holds by construction. The per-session
+// subscriber view used by the UI is derived from this registry — see
+// `subscribers_for_session` / `subscriber_count_for_session`.
+//
+// Lock discipline: APP_REGISTRY is a std Mutex held only for tiny critical
+// sections. NEVER hold it across `IO_SESSIONS.lock().await`. Mutating functions
+// take the registry lock, mutate, drop the guard, THEN emit the roster broadcast
+// (which re-locks the registry) and run any async session teardown.
+
+/// A single open session-aware app instance, tracked globally across windows.
+#[derive(Clone, Debug)]
+pub struct AppInstance {
+    /// Unique instance id == the session subscriber_id (e.g. "main-1_decoder").
+    pub instance_id: String,
+    /// Cosmetic per-instance display id (e.g. "decoder_a3f9"). Generated once by the
+    /// frontend on first registration; preserved across re-registers.
+    pub display_id: String,
+    /// Human-readable app name (e.g. "decoder").
+    pub app_name: String,
+    /// Label of the window that owns this instance (for window-close pruning).
+    pub window_label: String,
+    /// Current session attachment. None = panel open but not watching a session.
+    pub session_id: Option<String>,
+    /// When this instance first registered.
+    pub registered_at: std::time::Instant,
+    /// Last heartbeat. Window-close pruning is the primary cleanup; this is a backstop.
+    pub last_heartbeat: std::time::Instant,
+    /// Whether actively receiving frames (false when detached / paused).
+    pub is_active: bool,
+}
+
+/// Serializable snapshot of an app instance for the frontend roster.
+#[derive(Clone, Debug, Serialize)]
+pub struct AppInstanceInfo {
+    pub instance_id: String,
+    pub display_id: String,
+    pub app_name: String,
+    pub window_label: String,
+    pub session_id: Option<String>,
+    pub registered_seconds_ago: u64,
+    pub is_active: bool,
+}
+
+/// Global registry of open app instances, keyed by instance_id.
+static APP_REGISTRY: Lazy<std::sync::Mutex<HashMap<String, AppInstance>>> =
+    Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
+
+/// Snapshot the full open-app roster (drives the frontend reconcile query).
+pub fn list_open_apps() -> Vec<AppInstanceInfo> {
+    let now = std::time::Instant::now();
+    let Ok(reg) = APP_REGISTRY.lock() else { return Vec::new() };
+    reg.values()
+        .map(|a| AppInstanceInfo {
+            instance_id: a.instance_id.clone(),
+            display_id: a.display_id.clone(),
+            app_name: a.app_name.clone(),
+            window_label: a.window_label.clone(),
+            session_id: a.session_id.clone(),
+            registered_seconds_ago: now.duration_since(a.registered_at).as_secs(),
+            is_active: a.is_active,
+        })
+        .collect()
+}
+
+/// Subscribers (derived) attached to `session_id`, shaped for the UI.
+pub fn subscribers_for_session(session_id: &str) -> Vec<SubscriberInfo> {
+    let now = std::time::Instant::now();
+    let Ok(reg) = APP_REGISTRY.lock() else { return Vec::new() };
+    reg.values()
+        .filter(|a| a.session_id.as_deref() == Some(session_id))
+        .map(|a| SubscriberInfo {
+            subscriber_id: a.instance_id.clone(),
+            app_name: a.app_name.clone(),
+            registered_seconds_ago: now.duration_since(a.registered_at).as_secs(),
+            is_active: a.is_active,
+        })
+        .collect()
+}
+
+/// Count of app instances attached to `session_id`.
+pub fn subscriber_count_for_session(session_id: &str) -> usize {
+    let Ok(reg) = APP_REGISTRY.lock() else { return 0 };
+    reg.values()
+        .filter(|a| a.session_id.as_deref() == Some(session_id))
+        .count()
+}
+
+/// instance_ids attached to `session_id`, excluding `except`.
+pub fn other_instances_on_session(session_id: &str, except: &str) -> Vec<String> {
+    let Ok(reg) = APP_REGISTRY.lock() else { return Vec::new() };
+    reg.values()
+        .filter(|a| a.session_id.as_deref() == Some(session_id) && a.instance_id != except)
+        .map(|a| a.instance_id.clone())
+        .collect()
+}
+
+/// The session an app instance is currently attached to (None if unattached/unknown).
+pub fn current_session_of_app(instance_id: &str) -> Option<String> {
+    let reg = APP_REGISTRY.lock().ok()?;
+    reg.get(instance_id).and_then(|a| a.session_id.clone())
+}
+
+/// Register an open app instance (panel mount). Idempotent: if it already exists,
+/// refresh app_name/window_label/heartbeat but preserve its session attachment and
+/// its display_id (the first one wins, so re-registers don't churn the label).
+pub fn register_app(instance_id: &str, display_id: &str, app_name: &str, window_label: &str) {
+    {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return };
+        let now = std::time::Instant::now();
+        reg.entry(instance_id.to_string())
+            .and_modify(|a| {
+                a.app_name = app_name.to_string();
+                a.window_label = window_label.to_string();
+                a.last_heartbeat = now;
+            })
+            .or_insert_with(|| AppInstance {
+                instance_id: instance_id.to_string(),
+                display_id: display_id.to_string(),
+                app_name: app_name.to_string(),
+                window_label: window_label.to_string(),
+                session_id: None,
+                registered_at: now,
+                last_heartbeat: now,
+                is_active: false,
+            });
+    }
+    emit_open_apps_changed();
+}
+
+/// Mark an app instance as attached to `session_id` (a subscriber registered on a
+/// session). Inserts a placeholder if the instance is unknown — e.g. the
+/// mount-register hasn't run yet, or an MCP/agent registers a subscriber directly.
+pub fn attach_app(instance_id: &str, app_name: &str, session_id: &str) {
+    {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return };
+        let now = std::time::Instant::now();
+        reg.entry(instance_id.to_string())
+            .and_modify(|a| {
+                a.session_id = Some(session_id.to_string());
+                a.is_active = true;
+                a.last_heartbeat = now;
+                if a.app_name.is_empty() {
+                    a.app_name = app_name.to_string();
+                }
+            })
+            .or_insert_with(|| AppInstance {
+                instance_id: instance_id.to_string(),
+                // Fallback when a subscriber attaches without a prior register_app
+                // (e.g. an MCP/agent path or a non-session-aware app).
+                display_id: instance_id.to_string(),
+                app_name: app_name.to_string(),
+                window_label: "unknown".to_string(),
+                session_id: Some(session_id.to_string()),
+                registered_at: now,
+                last_heartbeat: now,
+                is_active: true,
+            });
+    }
+    emit_open_apps_changed();
+}
+
+/// Apply `f` to the instance if present, then broadcast the roster. No-op if unknown.
+fn update_app(instance_id: &str, f: impl FnOnce(&mut AppInstance)) {
+    {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return };
+        match reg.get_mut(instance_id) {
+            Some(a) => f(a),
+            None => return,
+        }
+    }
+    emit_open_apps_changed();
+}
+
+/// Clear an app instance's session attachment (a subscriber left a session). Keeps
+/// the instance — the panel may still be open. No-op (no broadcast) if unknown.
+pub fn detach_app(instance_id: &str) {
+    update_app(instance_id, |a| {
+        a.session_id = None;
+        a.is_active = false;
+    });
+}
+
+/// Set an app instance's active flag (frames flowing or not). No-op if unknown.
+pub fn set_app_active(instance_id: &str, is_active: bool) {
+    update_app(instance_id, |a| a.is_active = is_active);
+}
+
+/// Remove an app instance entirely (panel unmount). If it was attached and its
+/// session is now empty, tear that session down (same cascade as the last
+/// subscriber leaving). This is robust to the unmount firing `unregister_app`
+/// before `unregister_subscriber` (the two run unordered).
+pub async fn unregister_app(instance_id: &str) {
+    let removed = {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return };
+        reg.remove(instance_id)
+    };
+    let Some(inst) = removed else { return };
+    emit_open_apps_changed();
+    if let Some(sid) = inst.session_id {
+        teardown_session_if_empty(&sid).await;
+    }
+}
+
+/// Remove all app instances owned by `window_label` (window closed) and tear down
+/// any session left with no subscribers. Reuses the last-subscriber-leaves cascade.
+pub async fn prune_window_sessions(window_label: &str) {
+    let removed: Vec<AppInstance> = {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return };
+        let ids: Vec<String> = reg
+            .values()
+            .filter(|a| a.window_label == window_label)
+            .map(|a| a.instance_id.clone())
+            .collect();
+        ids.iter().filter_map(|id| reg.remove(id)).collect()
+    };
+    if removed.is_empty() {
+        return;
+    }
+    emit_open_apps_changed();
+
+    // Tear down each distinct session whose subscribers were removed, if now empty.
+    let mut seen: Vec<String> = Vec::new();
+    for sid in removed.into_iter().filter_map(|a| a.session_id) {
+        if !seen.contains(&sid) {
+            seen.push(sid.clone());
+            teardown_session_if_empty(&sid).await;
+        }
+    }
+}
+
+/// If `session_id` has no attached subscribers left, extract and destroy it (same
+/// cascade as the last subscriber leaving). Otherwise emit the updated joiner count.
+async fn teardown_session_if_empty(session_id: &str) {
+    let count = subscriber_count_for_session(session_id);
+    if count == 0 {
+        let extracted = { IO_SESSIONS.lock().await.remove(session_id) };
+        if let Some(session) = extracted {
+            tlog!("[reader] Session '{}' emptied (app/window gone), destroying", session_id);
+            emit_joiner_count_change(session_id, 0, None, None, Some("left"));
+            destroy_extracted_session(session_id, session).await;
+        }
+    } else {
+        emit_joiner_count_change(session_id, count, None, None, Some("left"));
+    }
+}
+
+/// Broadcast the full open-app roster to every window (Tauri emit + WS channel-0),
+/// mirroring `emit_session_lifecycle`. MUST be called WITHOUT holding APP_REGISTRY.
+pub fn emit_open_apps_changed() {
+    let roster = list_open_apps();
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit("open-apps-changed", &roster);
+    }
+    crate::ws::dispatch::send_open_apps_changed(&roster);
+}
 
 /// Playback position cache — updated during capture/recorded streaming, polled by frontend
 static PLAYBACK_POSITIONS: Lazy<RwLock<HashMap<String, PlaybackPosition>>> =
@@ -791,8 +1040,8 @@ async fn update_wake_lock() {
 
     // Check if any session is actively running with listeners
     let sessions = IO_SESSIONS.lock().await;
-    let any_watched = sessions.values().any(|session| {
-        matches!(session.source.state(), IOState::Running) && !session.subscribers.is_empty()
+    let any_watched = sessions.iter().any(|(session_id, session)| {
+        matches!(session.source.state(), IOState::Running) && subscriber_count_for_session(session_id) > 0
     });
     drop(sessions);
 
@@ -1310,12 +1559,10 @@ pub async fn create_session(
     clear_session_closing(&session_id);
 
     let mut sessions = IO_SESSIONS.lock().await;
-    let now = std::time::Instant::now();
 
     // Check if session already exists - join it instead of overwriting
     if let Some(existing) = sessions.get_mut(&session_id) {
         let capabilities = existing.source.capabilities();
-        let subscriber_count: usize;
 
         // Clear suspension if the session was in the grace period
         if existing.suspended_at.take().is_some() {
@@ -1326,63 +1573,32 @@ pub async fn create_session(
             // Resume will happen via register_subscriber or auto-start
         }
 
-        if let Some(lid) = subscriber_id {
-            // Check if already registered
-            if let Some(sub) = existing.subscribers.get_mut(&lid) {
-                // Already registered - update heartbeat
-                sub.last_heartbeat = now;
-            } else {
-                // New subscriber joining existing session
-                let resolved_name = app_name.clone().unwrap_or_else(|| lid.clone());
-                existing.subscribers.insert(
-                    lid.clone(),
-                    SessionSubscriber {
-                        subscriber_id: lid.clone(),
-                        app_name: resolved_name.clone(),
-                        registered_at: now,
-                        last_heartbeat: now,
-                        is_active: true, // New subscribers are active by default
-                    },
-                );
-                existing.joiner_count = existing.subscribers.len();
-
-                tlog!(
-                    "[reader] Session '{}' - subscriber '{}' joined existing session, total: {}",
-                    session_id, lid, existing.subscribers.len()
-                );
-
-                // Emit joiner count change
-                emit_joiner_count_change(&session_id, existing.subscribers.len(), Some(&lid), Some(&resolved_name), Some("joined"));
-            }
-            subscriber_count = existing.subscribers.len();
-        } else {
-            subscriber_count = existing.subscribers.len();
+        // Attach the joining subscriber to the registry (idempotent — refreshes
+        // heartbeat if already attached). The per-session count is derived.
+        if let Some(lid) = &subscriber_id {
+            let resolved_name = app_name.clone().unwrap_or_else(|| lid.clone());
+            attach_app(lid, &resolved_name, &session_id);
+            emit_joiner_count_change(&session_id, subscriber_count_for_session(&session_id), Some(lid), Some(&resolved_name), Some("joined"));
+            tlog!(
+                "[reader] Session '{}' - subscriber '{}' joined existing session, total: {}",
+                session_id, lid, subscriber_count_for_session(&session_id)
+            );
         }
 
         return CreateSessionResult {
             capabilities,
             is_new: false,
-            subscriber_count,
+            subscriber_count: subscriber_count_for_session(&session_id),
         };
     }
 
     // No existing session - create new one
     let capabilities = device.capabilities();
 
-    // Create initial listeners map
-    let mut subscribers = HashMap::new();
+    // Attach the creating subscriber to the registry (the per-session view is derived).
     if let Some(lid) = subscriber_id.clone() {
         let resolved_name = app_name.unwrap_or_else(|| lid.clone());
-        subscribers.insert(
-            lid.clone(),
-            SessionSubscriber {
-                subscriber_id: lid.clone(),
-                app_name: resolved_name,
-                registered_at: now,
-                last_heartbeat: now,
-                is_active: true, // New subscribers are active by default
-            },
-        );
+        attach_app(&lid, &resolved_name, &session_id);
         tlog!(
             "[reader] Session '{}' created with subscriber '{}', total: 1",
             session_id, lid
@@ -1391,15 +1607,13 @@ pub async fn create_session(
         tlog!("[reader] Session '{}' created with no initial subscriber", session_id);
     }
 
-    let subscriber_count = subscribers.len().max(1);
+    let subscriber_count = subscriber_count_for_session(&session_id).max(1);
     let source_type = device.source_type().to_string();
     let state = device.state();
     let app_for_event = app.clone();
     let session = IOSession {
         source: device,
         app,
-        joiner_count: subscriber_count,
-        subscribers,
         source_names: source_names.unwrap_or_default(),
         source_configs,
         suspended_at: None,
@@ -1441,10 +1655,15 @@ pub async fn get_session_capabilities(session_id: &str) -> Option<IOCapabilities
     sessions.get(session_id).map(|s| s.source.capabilities())
 }
 
-/// Get the joiner count for a session (0 if session doesn't exist)
+/// Get the joiner count for a session (0 if session doesn't exist). Derived from
+/// the open-app registry (the count of attached app instances).
 pub async fn get_session_joiner_count(session_id: &str) -> usize {
     let sessions = IO_SESSIONS.lock().await;
-    sessions.get(session_id).map(|s| s.joiner_count).unwrap_or(0)
+    if sessions.contains_key(session_id) {
+        subscriber_count_for_session(session_id)
+    } else {
+        0
+    }
 }
 
 /// Get the number of source configs in a multi-source session.
@@ -1468,93 +1687,21 @@ pub async fn get_session_source_configs(session_id: &str) -> Vec<SourceConfig> {
         .unwrap_or_default()
 }
 
-/// Result of joining an existing session
-#[derive(Clone, Debug, Serialize)]
-pub struct JoinSessionResult {
-    pub capabilities: IOCapabilities,
-    pub state: IOState,
-    pub capture_id: Option<String>,
-    /// Kind of the active capture ("frames" or "bytes"), if any
-    pub capture_kind: Option<String>,
-    /// Number of apps connected to this session (including this one)
-    pub joiner_count: usize,
-}
-
-/// Join an existing reader session (for session sharing between apps).
-/// Returns session info if session exists, error if not.
-/// The caller can then set up event listeners to receive frames and state changes.
-/// Increments the joiner count.
-pub async fn join_session(session_id: &str) -> Result<JoinSessionResult, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    session.joiner_count += 1;
-    let joiner_count = session.joiner_count;
-
-    // Emit joiner count change event to all subscribers (legacy join - no subscriber ID)
-    emit_joiner_count_change(session_id, joiner_count, None, None, Some("joined"));
-
-    // Get session's frame capture
-    let capture_ids = crate::capture_store::get_session_capture_ids(session_id);
-    let (capture_id, capture_kind) = capture_ids.iter()
-        .filter_map(|id| crate::capture_store::get_capture_metadata(id))
-        .find(|m| m.kind == crate::capture_store::CaptureKind::Frames)
-        .map(|m| (Some(m.id), Some("frames".to_string())))
-        .unwrap_or((None, None));
-
-    Ok(JoinSessionResult {
-        capabilities: session.source.capabilities(),
-        state: session.source.state(),
-        capture_id,
-        capture_kind,
-        joiner_count,
-    })
-}
-
-/// Leave a reader session without stopping it.
-/// Decrements the joiner count. The frontend should stop listening to events after calling this.
-/// Returns the new joiner count.
-pub async fn leave_session(session_id: &str) -> Result<usize, String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    if let Some(session) = sessions.get_mut(session_id) {
-        session.joiner_count = session.joiner_count.saturating_sub(1);
-        let joiner_count = session.joiner_count;
-
-        // Emit joiner count change event to remaining subscribers (legacy leave - no subscriber ID)
-        emit_joiner_count_change(session_id, joiner_count, None, None, Some("left"));
-
-        // If no joiners left, stop the session to prevent emitting to destroyed WebViews
-        if joiner_count == 0 {
-            let previous = session.source.state();
-            if !matches!(previous, IOState::Stopped) {
-                let _ = session.source.stop().await;
-                let current = session.source.state();
-                if previous != current {
-                    emit_state_change(session_id, &previous, &current);
-                }
-            }
-        }
-
-        Ok(joiner_count)
-    } else {
-        // Session doesn't exist (may have been destroyed), that's fine
-        Ok(0)
-    }
-}
-
-/// Touch `last_heartbeat` for all subscribers on the given sessions.
+/// Touch `last_heartbeat` for all app instances attached to the given sessions.
 /// Called by the WS server when a client heartbeat arrives, bridging the WS
 /// keepalive to the IO session watchdog so the frontend can skip per-subscriber
 /// `register_subscriber` invoke polling.
 pub async fn touch_subscriber_heartbeats(session_ids: &[String]) {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let now = std::time::Instant::now();
-    for sid in session_ids {
-        if let Some(session) = sessions.get_mut(sid.as_str()) {
-            for sub in session.subscribers.values_mut() {
-                sub.last_heartbeat = now;
+    if session_ids.is_empty() {
+        return;
+    }
+    if let Ok(mut reg) = APP_REGISTRY.lock() {
+        let now = std::time::Instant::now();
+        for inst in reg.values_mut() {
+            if let Some(sid) = inst.session_id.as_deref() {
+                if session_ids.iter().any(|s| s == sid) {
+                    inst.last_heartbeat = now;
+                }
             }
         }
     }
@@ -1578,15 +1725,45 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
     let mut sessions_to_destroy: Vec<String> = Vec::new();
     let mut sessions_to_pause: Vec<String> = Vec::new();
 
-    // Phase 1: Remove stale subscribers while holding the lock
+    let now = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(HEARTBEAT_TIMEOUT_SECS);
+    let grace = std::time::Duration::from_secs(SUSPENSION_GRACE_PERIOD_SECS);
+
+    // Phase 1: Evict stale ATTACHED app instances from the registry. Unattached
+    // instances have no WS heartbeat path (no channel subscription), so they are
+    // NOT evicted on staleness — window-close pruning reaps those. An attached
+    // instance implies its session is not suspended (attach clears suspended_at),
+    // so this only affects live sessions. Returns affected session → removed count.
+    let mut affected: HashMap<String, usize> = HashMap::new();
+    {
+        let Ok(mut reg) = APP_REGISTRY.lock() else { return results };
+        let stale: Vec<String> = reg
+            .values()
+            .filter(|a| a.session_id.is_some() && now.duration_since(a.last_heartbeat) > timeout)
+            .map(|a| a.instance_id.clone())
+            .collect();
+        for id in stale {
+            if let Some(inst) = reg.remove(&id) {
+                let sid = inst.session_id.unwrap_or_default();
+                tlog!(
+                    "[reader] Removing stale subscriber '{}' from session '{}' (no heartbeat)",
+                    id, sid
+                );
+                *affected.entry(sid).or_insert(0) += 1;
+            }
+        }
+    } // APP_REGISTRY lock released
+    if !affected.is_empty() {
+        emit_open_apps_changed();
+    }
+
+    // Phase 2: Under the IO_SESSIONS lock, grace-destroy already-suspended sessions
+    // and suspend any session that just lost its last subscriber.
     {
         let mut sessions = IO_SESSIONS.lock().await;
-        let now = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(HEARTBEAT_TIMEOUT_SECS);
-        let grace = std::time::Duration::from_secs(SUSPENSION_GRACE_PERIOD_SECS);
 
-        for (session_id, session) in sessions.iter_mut() {
-            // Check if an already-suspended session has exceeded the grace period
+        // Grace-period expiry for already-suspended sessions.
+        for (session_id, session) in sessions.iter() {
             if let Some(suspended_at) = session.suspended_at {
                 if now.duration_since(suspended_at) > grace {
                     // Don't destroy if a WebView health probe or recovery is in progress
@@ -1608,58 +1785,30 @@ pub async fn cleanup_stale_subscribers() -> Vec<(String, usize, usize)> {
                         sessions_to_destroy.push(session_id.clone());
                     }
                 }
-                // Skip subscriber cleanup for already-suspended sessions
-                continue;
             }
+        }
 
-            let before_count = session.subscribers.len();
+        // Suspend sessions whose last subscriber just went stale.
+        for (sid, removed_count) in &affected {
+            let Some(session) = sessions.get_mut(sid) else { continue };
+            let after_count = subscriber_count_for_session(sid);
+            results.push((sid.clone(), *removed_count, after_count));
 
-            // Remove stale subscribers
-            session.subscribers.retain(|subscriber_id, sub| {
-                let is_stale = now.duration_since(sub.last_heartbeat) > timeout;
-                if is_stale {
-                    tlog!(
-                        "[reader] Session '{}' removing stale subscriber '{}' (no heartbeat for {:?})",
-                        session_id,
-                        subscriber_id,
-                        now.duration_since(sub.last_heartbeat)
-                    );
-                }
-                !is_stale
-            });
+            // Emit joiner count change (sync - no specific subscriber)
+            emit_joiner_count_change(sid, after_count, None, None, None);
 
-            let after_count = session.subscribers.len();
-            let removed_count = before_count - after_count;
+            // If no subscribers left, enter suspension grace period instead of destroying
+            if after_count == 0 && session.suspended_at.is_none() {
+                tlog!(
+                    "[reader] Session '{}' has no listeners left — entering suspension grace period ({}s)",
+                    sid, SUSPENSION_GRACE_PERIOD_SECS
+                );
+                session.suspended_at = Some(now);
 
-            if removed_count > 0 {
-                results.push((session_id.clone(), removed_count, after_count));
-
-                // Sync the legacy joiner_count with subscriber count
-                if session.joiner_count > after_count {
-                    let old_count = session.joiner_count;
-                    session.joiner_count = after_count;
-                    tlog!(
-                        "[reader] Session '{}' synced joiner_count {} -> {} after cleanup",
-                        session_id, old_count, after_count
-                    );
-
-                    // Emit joiner count change (sync - no specific subscriber)
-                    emit_joiner_count_change(session_id, after_count, None, None, None);
-
-                    // If no subscribers left, enter suspension grace period instead of destroying
-                    if after_count == 0 {
-                        tlog!(
-                            "[reader] Session '{}' has no listeners left — entering suspension grace period ({}s)",
-                            session_id, SUSPENSION_GRACE_PERIOD_SECS
-                        );
-                        session.suspended_at = Some(now);
-
-                        // Pause the reader to stop frame emission (reduces IPC pressure
-                        // while the WebView is throttled). Only pause if running.
-                        if matches!(session.source.state(), IOState::Running) {
-                            sessions_to_pause.push(session_id.clone());
-                        }
-                    }
+                // Pause the reader to stop frame emission (reduces IPC pressure
+                // while the WebView is throttled). Only pause if running.
+                if matches!(session.source.state(), IOState::Running) {
+                    sessions_to_pause.push(sid.clone());
                 }
             }
         }
@@ -1760,7 +1909,8 @@ async fn log_session_status() {
             IOState::Paused => "paused",
             IOState::Error(_) => "error",
         };
-        let subscriber_ids: Vec<&str> = session.subscribers.keys().map(|s| s.as_str()).collect();
+        let subscribers = subscribers_for_session(session_id);
+        let subscriber_ids: Vec<&str> = subscribers.iter().map(|s| s.subscriber_id.as_str()).collect();
         let sources = if session.source_names.is_empty() {
             String::new()
         } else {
@@ -1775,7 +1925,7 @@ async fn log_session_status() {
             "[session status]   '{}': state={}, listeners={} {:?}{}{}",
             session_id,
             state,
-            session.subscribers.len(),
+            subscriber_ids.len(),
             subscriber_ids,
             sources,
             suspended
@@ -2578,25 +2728,15 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
             // Check if session is actively streaming (running state)
             let is_streaming = matches!(session.source.state(), IOState::Running);
 
-            // Build individual subscriber details
-            let now = std::time::Instant::now();
-            let subscribers: Vec<SubscriberInfo> = session
-                .subscribers
-                .values()
-                .map(|l| SubscriberInfo {
-                    subscriber_id: l.subscriber_id.clone(),
-                    app_name: l.app_name.clone(),
-                    registered_seconds_ago: now.duration_since(l.registered_at).as_secs(),
-                    is_active: l.is_active,
-                })
-                .collect();
+            // Build individual subscriber details (derived from the open-app registry)
+            let subscribers = subscribers_for_session(session_id);
 
             ActiveSessionInfo {
                 session_id: session_id.clone(),
                 source_type: session.source.source_type().to_string(),
                 state: session.source.state(),
                 capabilities: session.source.capabilities(),
-                subscriber_count: session.subscribers.len(),
+                subscriber_count: subscribers.len(),
                 subscribers,
                 broker_configs: session.source.broker_configs(),
                 source_profile_ids,
@@ -2704,25 +2844,25 @@ pub struct RegisterSubscriberResult {
 /// If the subscriber is already registered, this updates their heartbeat.
 /// Returns session info for the registered subscriber.
 pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name: Option<&str>) -> Result<RegisterSubscriberResult, String> {
-    // Sessions that were emptied by enforcing the one-subscriber-one-session invariant
-    // below. They are removed from IO_SESSIONS under the lock and torn down after it
-    // drops (we can't call unregister_subscriber here — it re-locks IO_SESSIONS).
-    let mut evicted_to_destroy: Vec<(String, IOSession)> = Vec::new();
+    let resolved_app_name = app_name.unwrap_or(subscriber_id).to_string();
+
+    // The subscriber's prior session attachment, captured before we re-attach it here.
+    // Enforcing the one-subscriber-one-session invariant is automatic: `session_id` is a
+    // single Option, so attaching to this session detaches from any other. If that other
+    // session is left empty we tear it down after releasing the lock.
+    let prev_session_id = current_session_of_app(subscriber_id);
 
     let result = {
         let mut sessions = IO_SESSIONS.lock().await;
-
         let now = std::time::Instant::now();
 
-        // Check the suspension grace period and whether this is a fresh registration. Read
-        // both out in one short-lived borrow so nothing is held across the eviction loop
-        // (which needs `&mut sessions`). If a heartbeat arrives while suspended, the WebView
-        // has recovered (e.g. display woke up, App Nap ended) — resume the paused reader.
-        let (needs_resume, already_subscribed) = {
+        // Verify the session exists before attaching, and resume it if a heartbeat
+        // arrived while it was suspended (e.g. display woke up, App Nap ended).
+        let needs_resume = {
             let session = sessions
                 .get_mut(session_id)
                 .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-            let needs_resume = if let Some(suspended_at) = session.suspended_at.take() {
+            if let Some(suspended_at) = session.suspended_at.take() {
                 let suspended_for = now.duration_since(suspended_at);
                 tlog!(
                     "[reader] Session '{}' resuming from suspension (was suspended for {:?}, subscriber '{}' heartbeat)",
@@ -2732,75 +2872,18 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
                 matches!(session.source.state(), IOState::Paused)
             } else {
                 false
-            };
-            (needs_resume, session.subscribers.contains_key(subscriber_id))
+            }
         };
 
-        if already_subscribed {
-            // Already on this session — heartbeat update only. No eviction: the
-            // one-subscriber-one-session invariant already holds for this subscriber.
-            if let Some(session) = sessions.get_mut(session_id) {
-                if let Some(sub) = session.subscribers.get_mut(subscriber_id) {
-                    sub.last_heartbeat = now;
-                }
-            }
-        } else {
-            // New registration. Enforce the one-subscriber-one-session invariant: remove
-            // this subscriber_id from every OTHER session before adding it here. If a
-            // vacated session is left with no subscribers, extract it for teardown after
-            // the lock drops.
-            let other_ids: Vec<String> = sessions
-                .keys()
-                .filter(|id| id.as_str() != session_id)
-                .cloned()
-                .collect();
-            for other_id in other_ids {
-                let now_empty = {
-                    let Some(other) = sessions.get_mut(&other_id) else { continue };
-                    let Some(remaining) = remove_subscriber(other, &other_id, subscriber_id) else { continue };
-                    tlog!(
-                        "[reader] Subscriber '{}' moved off session '{}' (joining '{}'), remaining: {}",
-                        subscriber_id, other_id, session_id, remaining
-                    );
-                    remaining == 0
-                };
-                if now_empty {
-                    tlog!("[reader] Session '{}' emptied by subscriber move, destroying", other_id);
-                    if let Some(extracted) = sessions.remove(&other_id) {
-                        evicted_to_destroy.push((other_id, extracted));
-                    }
-                }
-            }
-
-            // Register on the joined session.
-            let resolved_app_name = app_name.unwrap_or(subscriber_id).to_string();
-            let session = sessions
-                .get_mut(session_id)
-                .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-            session.subscribers.insert(
-                subscriber_id.to_string(),
-                SessionSubscriber {
-                    subscriber_id: subscriber_id.to_string(),
-                    app_name: resolved_app_name.clone(),
-                    registered_at: now,
-                    last_heartbeat: now,
-                    is_active: true, // New subscribers are active by default
-                },
-            );
-
-            // Update legacy joiner_count
-            session.joiner_count = session.subscribers.len();
-
-            tlog!(
-                "[reader] Session '{}' registered subscriber '{}', total: {}",
-                session_id,
-                subscriber_id,
-                session.subscribers.len()
-            );
-
-            // Emit joiner count change
-            emit_joiner_count_change(session_id, session.subscribers.len(), Some(subscriber_id), Some(&resolved_app_name), Some("joined"));
-        }
+        // Attach (idempotent — refreshes heartbeat / app_name / is_active). The
+        // per-session subscriber view is derived from the registry.
+        attach_app(subscriber_id, &resolved_app_name, session_id);
+        let count = subscriber_count_for_session(session_id);
+        tlog!(
+            "[reader] Session '{}' registered subscriber '{}', total: {}",
+            session_id, subscriber_id, count
+        );
+        emit_joiner_count_change(session_id, count, Some(subscriber_id), Some(&resolved_app_name), Some("joined"));
 
         // Get session's frame capture
         let capture_ids = crate::capture_store::get_session_capture_ids(session_id);
@@ -2842,31 +2925,21 @@ pub async fn register_subscriber(session_id: &str, subscriber_id: &str, app_name
             state: session.source.state(),
             capture_id,
             capture_kind,
-            subscriber_count: session.subscribers.len(),
+            subscriber_count: subscriber_count_for_session(session_id),
             startup_error,
         }
     };
     // Lock released here
 
-    // Tear down any session the subscriber was evicted from (its last subscriber left).
-    for (sid, session) in evicted_to_destroy {
-        destroy_extracted_session(&sid, session).await;
+    // If the subscriber moved off a different session, tear that session down if it's
+    // now empty (same cascade as the last subscriber leaving).
+    if let Some(prev) = prev_session_id {
+        if prev != session_id {
+            teardown_session_if_empty(&prev).await;
+        }
     }
 
     Ok(result)
-}
-
-/// Remove `subscriber_id` from `session`, update the legacy joiner_count, and emit a
-/// "left" joiner-count change. Returns the remaining subscriber count, or None if the
-/// subscriber wasn't on this session. Shared by `unregister_subscriber` and the
-/// one-subscriber-one-session eviction in `register_subscriber`, so the "left" bookkeeping
-/// lives in one place.
-fn remove_subscriber(session: &mut IOSession, session_id: &str, subscriber_id: &str) -> Option<usize> {
-    let removed = session.subscribers.remove(subscriber_id)?;
-    session.joiner_count = session.subscribers.len();
-    let remaining = session.subscribers.len();
-    emit_joiner_count_change(session_id, remaining, Some(subscriber_id), Some(&removed.app_name), Some("left"));
-    Some(remaining)
 }
 
 /// Run the slow Phase-2 teardown for a session that has already been removed from
@@ -2903,39 +2976,22 @@ async fn destroy_extracted_session(session_id: &str, mut session: IOSession) {
 /// If this was the last subscriber, the session will be stopped and destroyed.
 /// Returns the remaining subscriber count.
 pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Result<usize, String> {
-    // Phase 1: Remove the subscriber under the lock, extract session if last subscriber left
-    let (remaining, session_to_destroy) = {
-        let mut sessions = IO_SESSIONS.lock().await;
-
-        let Some(session) = sessions.get_mut(session_id) else {
-            // Session doesn't exist - that's fine during cleanup
-            return Ok(0);
-        };
-
-        let Some(remaining) = remove_subscriber(session, session_id, subscriber_id) else {
-            // Subscriber wasn't registered - that's fine
-            return Ok(session.subscribers.len());
-        };
-
-        tlog!(
-            "[reader] Session '{}' unregistered subscriber '{}', remaining: {}",
-            session_id, subscriber_id, remaining
-        );
-
-        if remaining == 0 {
-            tlog!("[reader] Session '{}' has no listeners left, destroying", session_id);
-            // Remove from map so we can release the lock before slow operations
-            (remaining, sessions.remove(session_id))
-        } else {
-            (remaining, None)
-        }
-    };
-    // Lock released here
-
-    // Phase 2: Perform slow cleanup outside the critical section
-    if let Some(session) = session_to_destroy {
-        destroy_extracted_session(session_id, session).await;
+    // Only act if the subscriber is actually attached to THIS session.
+    if current_session_of_app(subscriber_id).as_deref() != Some(session_id) {
+        return Ok(subscriber_count_for_session(session_id));
     }
+
+    // Detach in the registry (keeps the instance — the panel may still be open; it
+    // becomes an unconnected app node). The per-session count is derived.
+    detach_app(subscriber_id);
+    let remaining = subscriber_count_for_session(session_id);
+    tlog!(
+        "[reader] Session '{}' unregistered subscriber '{}', remaining: {}",
+        session_id, subscriber_id, remaining
+    );
+
+    // Emit the updated count and destroy the session if that was the last subscriber.
+    teardown_session_if_empty(session_id).await;
 
     Ok(remaining)
 }
@@ -3208,23 +3264,10 @@ pub async fn update_source_bus_mappings(
 /// Useful for debugging and for the frontend to understand session state.
 pub async fn get_session_subscribers(session_id: &str) -> Result<Vec<SubscriberInfo>, String> {
     let sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    let now = std::time::Instant::now();
-    let subscribers: Vec<SubscriberInfo> = session
-        .subscribers
-        .values()
-        .map(|l| SubscriberInfo {
-            subscriber_id: l.subscriber_id.clone(),
-            app_name: l.app_name.clone(),
-            registered_seconds_ago: now.duration_since(l.registered_at).as_secs(),
-            is_active: l.is_active,
-        })
-        .collect();
-
-    Ok(subscribers)
+    if !sessions.contains_key(session_id) {
+        return Err(format!("Session '{}' not found", session_id));
+    }
+    Ok(subscribers_for_session(session_id))
 }
 
 /// Result of attempting a safe reinitialize
@@ -3251,21 +3294,16 @@ pub async fn reinitialize_session_if_safe(
     let mut sessions = IO_SESSIONS.lock().await;
 
     // Session doesn't exist - that's fine, caller can create a new one
-    let Some(session) = sessions.get_mut(session_id) else {
+    if !sessions.contains_key(session_id) {
         return Ok(ReinitializeResult {
             success: true,
             reason: None,
             other_subscribers: vec![],
         });
-    };
+    }
 
-    // Check if this subscriber is the only one
-    let other_subscribers: Vec<String> = session
-        .subscribers
-        .keys()
-        .filter(|id| *id != subscriber_id)
-        .cloned()
-        .collect();
+    // Check if this subscriber is the only one (derived from the open-app registry)
+    let other_subscribers = other_instances_on_session(session_id, subscriber_id);
 
     if !other_subscribers.is_empty() {
         return Ok(ReinitializeResult {
@@ -3312,20 +3350,20 @@ pub async fn reinitialize_session_if_safe(
 /// When a subscriber detaches (stops receiving frames), set is_active to false.
 /// When they rejoin, set is_active to true.
 pub async fn set_subscriber_active(session_id: &str, subscriber_id: &str, is_active: bool) -> Result<(), String> {
-    let mut sessions = IO_SESSIONS.lock().await;
-    let session = sessions
-        .get_mut(session_id)
-        .ok_or_else(|| format!("Session '{}' not found", session_id))?;
-
-    if let Some(sub) = session.subscribers.get_mut(subscriber_id) {
-        let was_active = sub.is_active;
-        sub.is_active = is_active;
-        tlog!(
-            "[reader] Session '{}' subscriber '{}' active: {} -> {}",
-            session_id, subscriber_id, was_active, is_active
-        );
-        Ok(())
-    } else {
-        Err(format!("Subscriber '{}' not found in session '{}'", subscriber_id, session_id))
+    {
+        let sessions = IO_SESSIONS.lock().await;
+        if !sessions.contains_key(session_id) {
+            return Err(format!("Session '{}' not found", session_id));
+        }
     }
+    // The subscriber lives in the open-app registry; verify it's attached to this session.
+    if current_session_of_app(subscriber_id).as_deref() != Some(session_id) {
+        return Err(format!("Subscriber '{}' not found in session '{}'", subscriber_id, session_id));
+    }
+    tlog!(
+        "[reader] Session '{}' subscriber '{}' active -> {}",
+        session_id, subscriber_id, is_active
+    );
+    set_app_active(subscriber_id, is_active);
+    Ok(())
 }

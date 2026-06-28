@@ -186,8 +186,9 @@ Defined in [src/stores/sessionStore.ts:711](../src/stores/sessionStore.ts#L711).
 
 A session is an `IOSession` stored in the global `IO_SESSIONS` HashMap in
 [src-tauri/src/io/mod.rs](../src-tauri/src/io/mod.rs). Each session owns a
-`Box<dyn IOSource>` plus subscriber metadata, source config, profile bookkeeping,
-and capabilities.
+`Box<dyn IOSource>` plus source config, profile bookkeeping, and capabilities. Its
+subscribers are **not** stored on it — they live in the global `APP_REGISTRY` (see
+[The open-app registry](#the-open-app-registry--subscribers--the-cross-window-roster)).
 
 Every session eventually becomes a capture (or is torn down). Pause/Play control the
 live view; the three **exit controls** in the session menu each end it differently:
@@ -255,29 +256,63 @@ reads it and resets to **No source** instead of switching to the orphaned captur
 (the external-destroy fallback, `reset: false`). Rust owns the intent — there is
 no frontend shim.
 
-### Subscriber registration & the one-session invariant
+### The open-app registry — subscribers & the cross-window roster
 
-Each session tracks its subscribers in a map on the `IOSession`; the session is
-destroyed when its **last** subscriber leaves (`unregister_subscriber`). A
-subscriber id is per-`useIOSession`-hook (`appName_<rand>`), and a hook only ever
-views one session at a time, so a subscriber must belong to **exactly one**
+Subscribers are **not** stored on the `IOSession`. A single global `APP_REGISTRY`
+([io/mod.rs](../src-tauri/src/io/mod.rs)) is the source of truth for every open
+session-aware app instance across **all** windows. Each `AppInstance` carries its
+`instance_id`, a cosmetic `display_id` (`appName_<rand>`, for the UI), its owning
+`window_label`, and a single `session_id: Option<String>` — `None` = the panel is
+open but not watching, `Some(sid)` = attached to that session. Because the
+attachment is one `Option`, the **one-subscriber-one-session** invariant holds by
+construction: attaching to a session simply overwrites the field.
+
+The per-session subscriber list/count the rest of the system reads (e.g.
+`ActiveSessionInfo.subscribers`, the wake-lock, the joiner count) is **derived**
+from the registry via `subscribers_for_session` / `subscriber_count_for_session`.
+The `IOSession` keeps no `subscribers`/`joiner_count` field.
+
+Instance ids are deterministic — `${windowLabel}_${appName}` (one session-aware
+app per window). The same id is the registry key, the session subscriber id, and
+the value `useIOSession` registers, so an open panel and its session attachment
+are the same entry.
+
+**Registration is Dockview-driven, attachment is `useIOSession`-driven:**
+
+- `MainLayout` registers/unregisters an open-app from Dockview's
+  `onDidAddPanel`/`onDidRemovePanel` (`register_app` / `unregister_app`). This
+  fires for **every** session-aware tab — including ones Dockview hasn't mounted
+  yet — so a never-activated panel still shows in the graph.
+- When the panel watches a source, `register_subscriber` → `attach_app` sets the
+  entry's `session_id`; leaving (`unregister_subscriber` → `detach_app`) clears it
+  back to `None` (the panel is still open). These run inside the existing join/leave
+  commands — no new frontend calls.
+
+**Teardown** still fires when a session's **last** subscriber leaves: every path
+that can empty a session (`unregister_subscriber`, the attach-elsewhere move in
+`register_subscriber`, panel unmount via `unregister_app`, and window close via
+`prune_window_sessions`) calls the shared `teardown_session_if_empty`, which checks
+`subscriber_count_for_session == 0` and runs `destroy_extracted_session` (stop
+source, orphan capture, `session-lifecycle "destroyed"`). The attach-elsewhere move
+is the backstop for a frontend leave that loses a race when an app switches sources
+— because the rule lives in Rust under the locks, no frontend timing can orphan a
 session.
 
-`register_subscriber` ([io/mod.rs](../src-tauri/src/io/mod.rs)) enforces that
-invariant authoritatively: registering a subscriber on a session first removes
-that same subscriber id from every *other* session, and any session left with no
-subscribers by the move is torn down — the same teardown as a normal
-last-subscriber-leaves (stop source, orphan capture, `session-lifecycle
-"destroyed"`), factored into a shared `destroy_extracted_session` helper. The
-"left" bookkeeping (remove + joiner-count + event) is shared with
-`unregister_subscriber` via `remove_subscriber`.
+**Cross-window roster.** Any registry mutation calls `emit_open_apps_changed`,
+which broadcasts exactly like `session-lifecycle`: a Tauri `app.emit("open-apps-changed", …)`
+**and** a WS channel-0 `OpenAppsChanged` (0x17). Each window reconciles its
+`openAppsStore` from `list_open_apps()` on that broadcast (and on WS reconnect) via
+`useOpenAppsSync` — mirroring how `useSessionRosterSync` reconciles sessions. The
+Session Manager "Visual" graph sources its app nodes from this store, so it shows
+apps from every window (connected nodes where `session_id` is set, unconnected where
+it is `null`). When a window closes, `on_window_event`'s `Destroyed` handler calls
+`prune_window_sessions(label)` to drop that window's instances and cascade any
+last-subscriber teardown.
 
-This is the backstop for a frontend leave that loses a race when an app switches
-sources (e.g. the Decoder moving from a live Modbus source to a capture replay).
-Without it the old session keeps its subscriber and never tears down — left
-running and, for a realtime source, polling the device forever — while showing as
-a second session bound to the one app. Because the rule lives in Rust (the session
-authority) under the `IO_SESSIONS` lock, no frontend timing can orphan a session.
+Windows are surfaced to the user by `formatWindowName`
+([src/utils/windowName.ts](../src/utils/windowName.ts)): the primary window
+(internally labelled `dashboard`) shows as `main`, and dynamic `main-N` windows
+show as `N` (in App Details and the OS title bar).
 
 ### Play / Pause
 
@@ -371,6 +406,7 @@ Global (channel 0):
 | `TransmitUpdated`   | 0x0B | Transmit queue changes |
 | `ReplayState`       | 0x0C | Replay controller state |
 | `TestPatternState`  | 0x0D | Test pattern generator state |
+| `OpenAppsChanged`   | 0x17 | Open-app roster changed; clients re-fetch `list_open_apps` (see [§ The open-app registry](#the-open-app-registry--subscribers--the-cross-window-roster)) |
 
 Control frames: `Subscribe` / `Unsubscribe` / `SubscribeAck` / `SubscribeNack`,
 plus `Heartbeat` and `Auth`. Request/response RPC uses `Command` (0x20) /

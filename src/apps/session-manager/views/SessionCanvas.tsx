@@ -24,7 +24,7 @@ import AppNode from "../nodes/AppNode";
 import InterfaceEdge from "../edges/InterfaceEdge";
 import { buildSessionGraph, calculateFitViewPadding, type CaptureInfo } from "../utils/layoutUtils";
 import { useSessionManagerStore } from "../stores/sessionManagerStore";
-import type { ActiveSessionInfo } from "../../../api/io";
+import type { ActiveSessionInfo, AppInstanceInfo } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import { listCaptures } from "../../../api/capture";
 
@@ -44,8 +44,7 @@ const edgeTypes: EdgeTypes = {
 interface SessionCanvasProps {
   sessions: ActiveSessionInfo[];
   profiles: IOProfile[];
-  openPanelIds?: string[];
-  subscriberIds?: Record<string, string>;
+  openApps?: AppInstanceInfo[];
   onEnableBusMapping?: (sessionId: string, profileId: string, deviceBus: number, outputBus: number) => void;
   onCreateBusMapping?: (sessionId: string, profileId: string, deviceBus: number, newOutputBus: number) => void;
   onConnectAppToSession?: (sessionId: string, appName: string) => void;
@@ -54,8 +53,7 @@ interface SessionCanvasProps {
 export default function SessionCanvas({
   sessions,
   profiles,
-  openPanelIds,
-  subscriberIds,
+  openApps,
   onEnableBusMapping,
   onCreateBusMapping,
   onConnectAppToSession,
@@ -83,8 +81,8 @@ export default function SessionCanvas({
   }, [sessions]);
 
   const graphData = useMemo(
-    () => buildSessionGraph(sessions, profiles, captureInfoMap, openPanelIds, subscriberIds),
-    [sessions, profiles, captureInfoMap, openPanelIds, subscriberIds]
+    () => buildSessionGraph(sessions, profiles, captureInfoMap, openApps),
+    [sessions, profiles, captureInfoMap, openApps]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(graphData.nodes as Node[]);
@@ -184,15 +182,17 @@ export default function SessionCanvas({
         return;
       }
 
-      // Case 2: Session → App (connect unconnected app to session)
+      // Case 2: Session → App (connect unconnected app to session). The node id is
+      // `app::<instanceId>`; resolve back to the app type name for the join request.
       if (source.startsWith("session-") && target.startsWith("app::")) {
         if (!onConnectAppToSession) return;
         const sessionId = source.replace(/^session-/, "");
-        const appName = target.replace(/^app::/, "");
+        const instanceId = target.replace(/^app::/, "");
+        const appName = openApps?.find((a) => a.instanceId === instanceId)?.appName ?? instanceId;
         onConnectAppToSession(sessionId, appName);
       }
     },
-    [sessions, onEnableBusMapping, onCreateBusMapping, onConnectAppToSession]
+    [sessions, openApps, onEnableBusMapping, onCreateBusMapping, onConnectAppToSession]
   );
 
   // Validate connections: source→session bus mappings or session→unconnected app

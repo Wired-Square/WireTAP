@@ -1,13 +1,12 @@
 // src/apps/session-manager/utils/layoutUtils.ts
 
 import type { Edge } from "@xyflow/react";
-import type { ActiveSessionInfo } from "../../../api/io";
+import type { ActiveSessionInfo, AppInstanceInfo } from "../../../api/io";
 import type { IOProfile } from "../../../hooks/useSettings";
 import type { SourceNodeData } from "../nodes/SourceNode";
 import type { SessionNodeData } from "../nodes/SessionNode";
 import type { AppNodeData } from "../nodes/AppNode";
 import type { InterfaceEdgeData } from "../edges/InterfaceEdge";
-import { sessionAwarePanelIds } from "../../registry";
 
 // Layout constants
 const COLUMN_SPACING = 300;
@@ -39,14 +38,14 @@ export interface CaptureInfo {
 /**
  * Transform session data into React Flow nodes and edges.
  * @param captureInfoMap Optional map of capture_id → metadata for capture source nodes.
- * @param openPanelIds IDs of currently open Dockview panels (used for unconnected app nodes).
+ * @param openApps Open session-aware app instances across all windows (Rust-owned
+ *   roster). Instances with `sessionId == null` become the unconnected app nodes.
  */
 export function buildSessionGraph(
   sessions: ActiveSessionInfo[],
   profiles: IOProfile[],
   captureInfoMap?: Map<string, CaptureInfo>,
-  openPanelIds?: string[],
-  subscriberIds?: Record<string, string>,
+  openApps?: AppInstanceInfo[],
 ): SessionGraphData {
   const nodes: FlowNode[] = [];
   const edges: Edge[] = [];
@@ -150,9 +149,6 @@ export function buildSessionGraph(
     });
   });
 
-  // Track which app names already appear as connected apps (for unconnected app nodes)
-  const connectedAppNames = new Set<string>();
-
   // Column 2: Session nodes + Column 3: Connected app nodes
   sessions.forEach((session, index) => {
     // Collect input buses for this session
@@ -240,10 +236,12 @@ export function buildSessionGraph(
 
     session.subscribers.forEach((listener, appIndex) => {
       const appName = listener.app_name || listener.subscriber_id;
-      connectedAppNames.add(appName.toLowerCase());
+      // The cosmetic display id + window live in the open-app roster; match by id
+      // (instance_id == subscriber_id).
+      const openApp = openApps?.find((a) => a.instanceId === listener.subscriber_id);
 
       const nodeData: AppNodeData = {
-        appId: listener.subscriber_id,
+        appId: openApp?.displayId ?? listener.subscriber_id,
         appName,
         sessionId: session.sessionId,
         isActive: listener.is_active,
@@ -278,11 +276,11 @@ export function buildSessionGraph(
     });
   });
 
-  // Column 3b: Unconnected app nodes for open session-aware panels
-  if (openPanelIds) {
-    const unconnectedPanels = openPanelIds.filter(
-      (id) => sessionAwarePanelIds.has(id) && !connectedAppNames.has(id)
-    );
+  // Column 3b: Unconnected app nodes — open session-aware app instances (across ALL
+  // windows) that aren't attached to any session. Sourced from the Rust-owned roster,
+  // so a session_id of null is the authoritative "unconnected" signal.
+  if (openApps) {
+    const unconnected = openApps.filter((a) => a.sessionId == null);
 
     // Position below all connected apps
     const maxConnectedY = nodes
@@ -290,16 +288,16 @@ export function buildSessionGraph(
       .reduce((max, n) => Math.max(max, n.position.y), START_Y - ROW_SPACING * 0.6);
     const unconnectedBaseY = maxConnectedY + ROW_SPACING;
 
-    unconnectedPanels.forEach((panelId, i) => {
+    unconnected.forEach((inst, i) => {
       const nodeData: AppNodeData = {
-        appId: subscriberIds?.[panelId] ?? panelId,
-        appName: panelId,
+        appId: inst.displayId,
+        appName: inst.appName,
         isActive: false,
         isConnected: false,
       };
 
       nodes.push({
-        id: `app::${panelId}`,
+        id: `app::${inst.instanceId}`,
         type: "app",
         position: {
           x: START_X + COLUMN_SPACING * 2,
