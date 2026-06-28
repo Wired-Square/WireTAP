@@ -407,9 +407,10 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
     shorthands + mirror/copy resolved)
   - `catalog.validate` — TOML → `{ valid, errors[] }` (field-path + message)
   - `catalog.import_dbc` / `catalog.export_dbc` — DBC ↔ catalogue TOML
-  - `catalog.attach` `{ session_id, content }` — parse + bind a catalogue to a
-    session, **returning the resolved `Catalog`** so the caller builds its UI
-    model from that one parse; `catalog.detach` `{ session_id }` — unbind
+  - `catalog.attach` `{ session_id, content, path? }` — parse + bind a catalogue to
+    a session, **returning the resolved `Catalog`** so the caller builds its UI
+    model from that one parse; the optional `path` is recorded as the session's
+    authoritative decoder path (see below). `catalog.detach` `{ session_id }` — unbind
 - **`DecodedSignals` push** (0x14): while a catalogue is attached,
   `send_new_frames` decodes the same batch via `decode_by_id` (applying
   `frame_id_mask`) and pushes a parallel JSON message
@@ -437,7 +438,15 @@ For a session-bound app, loading a catalogue parses it **once**: the
 Graph) mirrors the session's `catalogPath` into local state, then `attachAndResolve`
 (`catalogParser.ts`) calls `catalog.attach` and adapts the returned `Catalog` — so
 the same parse binds Rust decode *and* builds the UI model (it falls back to a
-model-only `loadCatalog` if attach fails). Modbus is handled by the Decoder
+model-only `loadCatalog` if attach fails).
+
+The session's `catalogPath` is **Rust-authoritative**: `attachAndResolve` passes the
+file path to `catalog.attach`, which records it; `list_active_sessions` reports it as
+`catalog_path` and `reconcileKnownSessions` adopts it one-way. Apps mirror it into
+local state but must **never write it back** — the dashboard loader doing so (in
+`applyParsedCatalog`) raced the mirror into a ~50 ms attach/reload loop.
+`setSessionCatalogPath` remains an optimistic local echo that the next reconcile
+confirms. Modbus is handled by the Decoder
 itself (there is no separate Modbus app): when a Modbus catalogue is involved the
 Decoder fetches its poll groups — built in Rust (`catalog.polls`, surfaced on the
 resolved catalogue by `catalogParser.ts`; the single source of truth shared with
@@ -529,7 +538,10 @@ so total and unique counts are both O(1). `send_new_frames` pushes them on the
 `list_active_sessions` (`capture_frame_count` / `capture_unique_frame_count`).
 `sessionStore` writes them onto the `Session` (`frameCount` / `uniqueFrameCount`),
 and `useIOSessionManager` exposes them for rendering — replacing the old
-frontend counting + `isWatching` latch that could stick at 0 after a restart.
+frontend counting + `isWatching` latch that could stick at 0 after a restart. The
+shared session-picker dot (`SessionButton`'s `ActivityDot`) derives a frames/sec rate
+from `frameCount` to pulse a sonar ripple in step with bus activity — the dashboard's
+old numeric "N frames" readout was dropped in favour of it.
 
 ### Subscription lifecycle
 
@@ -556,8 +568,9 @@ has alive and the UI would appear frozen. After re-subscribing, the transport
 fires `onReconnect` listeners; [`useSessionRosterSync`](../src/hooks/useSessionRosterSync.ts)
 uses this (and the global `SessionLifecycle` broadcast) to reconcile against the
 backend roster (`list_active_sessions`). Reconciliation refreshes the
-authoritative state (`ioState`, capabilities, subscriber count, capture) of
-sessions the UI already owns — Rust is the source of truth — as well as adopting
+authoritative state (`ioState`, capabilities, subscriber count, capture, attached
+catalogue path) of sessions the UI already owns — Rust is the source of truth — as
+well as adopting
 new backend sessions and dropping vanished adopted ones
 ([sessionRoster.ts](../src/stores/sessionRoster.ts)).
 
