@@ -189,78 +189,60 @@ A session is an `IOSession` stored in the global `IO_SESSIONS` HashMap in
 `Box<dyn IOSource>` plus subscriber metadata, source config, profile bookkeeping,
 and capabilities.
 
-Every session eventually becomes a capture. The unified lifecycle is:
+Every session eventually becomes a capture (or is torn down). Pause/Play control the
+live view; the three **exit controls** in the session menu each end it differently:
 
 ```
-  REALTIME:   connect → streaming → leave → CAPTURE → leave → No Source
-  CAPTURE:    connect → paused → play → running → leave → No Source
-  RECORDED:   connect → streaming → leave → CAPTURE → leave → No Source
-  IMPORT:     → CAPTURE (same as above)
+  Leave session    one app detaches and reviews a frozen capture snapshot;
+                   any other apps on the session keep streaming live
+  Stop session     the shared source stops → every connected app reviews the
+                   same capture
+  Destroy session  the session is torn down → every connected app → No Source
 ```
 
-```
-                  ┌────────────┐
-                  │  RUNNING   │ ◀──── play (resume/start)
-                  └─────┬──────┘
-                        │
-        ┌───────────────┼───────────────┐
-        ▼               ▼               ▼
-  ┌──────────┐  ┌──────────────────┐  ┌──────────────────┐
-  │  PAUSED  │  │ LEAVE (realtime/ │  │ LEAVE (capture)  │
-  │          │  │  recorded)       │  │                  │
-  │ play →   │  │ → switch to      │  │ → full disconnect│
-  │  RUNNING │  │   capture replay │  │   (No Source)    │
-  └──────────┘  └───────┬──────────┘  └──────┬───────────┘
-                        │                     │
-                        ▼                     ▼
-                 ┌────────────────┐   ┌──────────────────┐
-                 │ CAPTURE REPLAY │   │ destroy_session  │
-                 │ (CaptureSource │   │  (remove from    │
-                 │   swapped in)  │   │   IO_SESSIONS)   │
-                 └────────────────┘   └──────────────────┘
-```
+### Leave session — per-app detach to a snapshot
 
-### LEAVE (realtime or recorded source) — "first leave"
-
-When a user presses Leave on a realtime or recorded (PostgreSQL) session,
-`handleLeave` calls `stopAndSwitchToCapture`, which transitions the session
-to capture replay in-place:
+`handleLeave` ([useIOSessionManager.ts](../src/hooks/useIOSessionManager.ts)) calls the
+Rust `session_leave_to_capture` command; the heavy lifting is in
+`detach_subscriber_to_capture_copy` ([io/mod.rs](../src-tauri/src/io/mod.rs)):
 
 ```
-App clicks Leave (realtime/recorded)
+App clicks Leave (realtime/recorded; other apps may share the session)
      │
      ▼
-stop_and_switch_to_capture(session_id, speed)       src-tauri/src/io/mod.rs
-     ├─ device.stop()                               → emit_stream_ended
-     │                                              → finalize_session_captures
-     ├─ pick frame capture via get_session_capture_ids
-     ├─ mark_capture_active
-     ├─ orphan capture from session, release profiles
-     ├─ replace_session_source(sessions, id, CaptureSource, …)
-     └─ emit session-lifecycle scoped (state+caps) → all subscribers
+session_leave_to_capture(session_id, subscriber_id)      src-tauri/src/io/mod.rs
+     ├─ copy_capture(frame capture) → orphaned snapshot "{capture}_{n}"
+     ├─ unregister_subscriber(this subscriber only)
+     │     └─ session stays alive if other subscribers remain;
+     │        destroyed via the last-subscriber teardown if not
+     └─ emit `subscriber-evicted { session_id, subscriber_id, capture_ids }`
                    │
                    ▼
-        Every subscribed app receives the WS SessionLifecycle message
-        and transitions to capture replay mode together.
+        Only the leaving app's useIOSession receives the event →
+        onDestroyed(capture_ids, /*userInitiated*/ false) →
+        handleSessionDestroyed switches THIS app to the snapshot replay.
+        Any other apps are untouched and keep streaming the live source.
 ```
 
-If no capture is available (e.g., 0 frames received), the backend returns
-an error and `handleLeave` falls back to a full disconnect.
+The snapshot is a frozen copy — the live session keeps its own capture. Opening the
+live capture directly as a replay is deliberately *not* used: `CaptureSource::new`
+re-owns (steals) the capture, which would stop the remaining apps persisting frames.
+The same `detach_subscriber_to_capture_copy` core backs the Session-Manager's forced
+**evict** (it labels the copy `(evicted)` instead of `_{n}`). In capture-replay mode
+there's nothing live to leave, so Leave is a plain `session.leave()` disconnect to No
+Source. If there are no captured frames, the copy is empty and the app simply returns
+to No Source.
 
-### LEAVE (capture) — "second leave"
+### Stop session — stop the shared source for all apps
 
-When a user presses Leave while already viewing a capture, `handleLeave`
-calls `session.leave()` to unregister the subscriber, fully resets app state,
-and the session is destroyed.
-
-### Stop → capture replay (the Stop control)
-
-Stopping a session *without* leaving (the playback Stop control → `stopWatch`)
-switches it to capture replay in place. The realtime-vs-recorded decision and its
-fallbacks live in Rust's `session_stop_to_capture` command: a **realtime** source
-stops and switches all listeners to capture (falling back to a plain `suspend` if
-no capture exists); a **recorded** source `suspend`s (preserving position) then
-switches to capture replay. The frontend just calls the one command.
+The **Stop session** control (`stopWatch` → `session_stop_to_capture`) switches the
+*whole* session to capture replay in place, so every connected app reviews the same
+capture. The realtime-vs-recorded decision and its fallbacks live in Rust: a
+**realtime** source stops and switches all listeners to capture (falling back to a
+plain `suspend` if no capture exists); a **recorded** source `suspend`s (preserving
+position) then switches to capture replay. It emits a scoped `session-lifecycle` so
+every subscribed app transitions together (`onSwitchedToCapture`); the frontend just
+calls the one command.
 
 ### Destroy session (recovery)
 
@@ -417,7 +399,12 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
   (`[{ frameId, bus, t, signals[], selectors[], headerFields[], sourceAddress }]`).
   `sessionStore` routes it to an `onDecoded` callback (threaded through
   `useIOSession`/`useIOSessionManager`); an app calls `catalog.attach` when it
-  loads a catalogue. Raw `FrameData` keeps flowing for
+  loads a catalogue. Because `send_new_frames` only decodes frames *past* a
+  forward-only per-session send offset, `catalog.attach` also re-decodes the frames
+  already delivered to the client (`redecode_delivered`) and pushes their signals —
+  otherwise a catalogue bound *after* a capture replay had already streamed its
+  frames (e.g. the per-app Leave switching the decoder to a fresh replay session)
+  would leave them showing "No signals decoded". Raw `FrameData` keeps flowing for
   Discovery/Analysis/raw-hex/Calculator. **Decoder and Graph** both
   consume the decoded stream — there is no longer a TypeScript decode engine.
   The Decoder keeps its mirror-validation byte-compare on the raw `FrameData`
