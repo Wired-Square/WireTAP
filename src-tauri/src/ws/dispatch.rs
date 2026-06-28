@@ -222,6 +222,37 @@ pub fn clear_frame_offset(session_id: &str) {
     }
 }
 
+/// Decode the frames already delivered to this session's client (everything up to the
+/// current send offset) against the attached catalogue and push DecodedSignals — without
+/// re-sending the FrameData. `send_new_frames` only decodes frames *past* the offset, so a
+/// catalogue attached after frames were delivered (e.g. a capture replay that started
+/// streaming before the decoder bound its catalogue) would otherwise leave those frames
+/// undecoded. Called right after `attach_catalog`.
+pub fn redecode_delivered(session_id: &str) {
+    let Some(catalog) = attached_catalog(session_id) else { return };
+    let Some(server) = ws_server() else { return };
+    let Some(channel) = server.channel_for_session(session_id) else { return };
+    let Some(capture_id) = crate::capture_store::get_session_frame_capture_id(session_id) else {
+        return;
+    };
+    let offset = FRAME_OFFSETS
+        .read()
+        .ok()
+        .and_then(|m| m.get(session_id).copied())
+        .unwrap_or(0);
+    if offset == 0 {
+        return; // nothing delivered yet — send_new_frames will decode going forward
+    }
+
+    let (frames, _indices, _total) =
+        crate::capture_store::get_capture_frames_paginated(&capture_id, 0, offset);
+    let decoded = encode_decoded_batch(&frames, &catalog);
+    if !decoded.is_empty() {
+        let dmsg = protocol::encode_message(MsgType::DecodedSignals, channel, &decoded);
+        server.send_to_channel(channel, dmsg);
+    }
+}
+
 /// Send a batch of frames to all WebSocket subscribers for this session.
 pub fn send_frames(session_id: &str, frames: &[FrameMessage]) {
     let server = match ws_server() {

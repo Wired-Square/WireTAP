@@ -100,6 +100,9 @@ pub async fn dispatch_catalog_command(
             // this one parse instead of a separate catalog.parse round-trip.
             let catalog = serde_json::to_value(&cat).map_err(|e| e.to_string())?;
             crate::ws::dispatch::attach_catalog(&session_id, path, cat);
+            // Decode frames already delivered before this attach (e.g. a capture replay
+            // that started before the catalogue bound) so they don't show "No signals".
+            crate::ws::dispatch::redecode_delivered(&session_id);
             Ok(serde_json::json!({ "attached": true, "frames": frame_count, "catalog": catalog }))
         }
         // Detach a session's catalogue (decoded stream stops). Params: { session_id }.
