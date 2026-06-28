@@ -18,6 +18,79 @@ import { buttonBase } from "../styles/buttonStyles";
 import { menuClasses, menuItem, menuDivider } from "../styles/menuStyles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
 import { destroyReaderSession } from "../api/io";
+import { useSessionStore } from "../stores/sessionStore";
+
+// ============================================================================
+// Activity dot - status dot that emits a sonar ripple whose cadence scales with
+// the live frame-arrival rate (faster frames -> faster ripples; static when the
+// session isn't running or the bus goes quiet).
+// ============================================================================
+
+/** Map a smoothed frames/sec rate to a ripple period (ms). Log-scaled because CAN
+ *  rates span ~10-10000 fps; returns 0 when too slow to bother animating. */
+function ripplePeriodMs(rate: number): number {
+  const MIN = 3, MAX = 3000, SLOW = 1300, FAST = 320;
+  if (rate < MIN) return 0;
+  const t = Math.min(1, (Math.log(rate) - Math.log(MIN)) / (Math.log(MAX) - Math.log(MIN)));
+  return SLOW + (FAST - SLOW) * t;
+}
+
+interface ActivityDotProps {
+  sessionId?: string | null;
+  /** Tailwind colour class(es) for the dot (carries animate-pulse for "starting"). */
+  colourClass: string;
+  /** Only ripple while the session is actively streaming. */
+  active: boolean;
+}
+
+/** Status dot with a frame-rate-scaled sonar ripple. Isolated so only it re-renders
+ *  as the live frame count ticks — not the whole SessionButton. */
+function ActivityDot({ sessionId, colourClass, active }: ActivityDotProps) {
+  const frameCount = useSessionStore((s) =>
+    sessionId ? (s.sessions[sessionId]?.frameCount ?? 0) : 0,
+  );
+
+  const [periodMs, setPeriodMs] = useState(0);
+  const prevCountRef = useRef(frameCount);
+  const prevTimeRef = useRef(0);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      setPeriodMs(0);
+      prevTimeRef.current = 0;
+      return;
+    }
+
+    const now = performance.now();
+    const delta = frameCount - prevCountRef.current;
+    prevCountRef.current = frameCount;
+    // Skip the first sample after going active (no prior timestamp to rate against).
+    if (prevTimeRef.current && delta > 0) {
+      setPeriodMs(ripplePeriodMs(delta / ((now - prevTimeRef.current) / 1000)));
+    }
+    prevTimeRef.current = now;
+
+    // Re-arm idle decay: if no further frames arrive, stop rippling.
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => setPeriodMs(0), 1500);
+    return () => clearTimeout(idleTimerRef.current ?? undefined);
+  }, [frameCount, active]);
+
+  if (!active || periodMs <= 0) {
+    return <span className={`w-2 h-2 rounded-full flex-shrink-0 ${colourClass}`} />;
+  }
+
+  return (
+    <span className="relative inline-flex flex-shrink-0 w-2 h-2">
+      <span
+        className={`activity-ripple absolute inset-0 rounded-full ${colourClass}`}
+        style={{ animationDuration: `${periodMs}ms` }}
+      />
+      <span className={`relative w-2 h-2 rounded-full ${colourClass}`} />
+    </span>
+  );
+}
 
 // ============================================================================
 // Session Button - displays current source with appropriate icon
@@ -120,7 +193,7 @@ export function SessionButton({
         <Star className={`${iconSm} text-amber-500 flex-shrink-0`} fill="currentColor" />
       ) : null}
       {statusColour && (
-        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColour}`} />
+        <ActivityDot sessionId={sessionId} colourClass={statusColour} active={ioState === "running"} />
       )}
       <span className="max-w-40 truncate">{displayName}</span>
       {sessionId && !sessionIdInDisplayName && (

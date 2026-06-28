@@ -323,7 +323,6 @@ function DashboardInner() {
     handleLeave,
     resumeWithNewCapture,
     // Watch state
-    isWatching,
     watchFrameCount,
     watchUniqueFrameCount,
     stopWatch,
@@ -511,7 +510,6 @@ function DashboardInner() {
           catalogs={catalogs}
           catalogPath={catalogPath}
           onOpenCatalogPicker={() => dialogs.catalogPicker.open()}
-          isWatching={isWatching}
           watchFrameCount={watchFrameCount}
           watchUniqueFrameCount={watchUniqueFrameCount}
           savedLayouts={savedLayouts}

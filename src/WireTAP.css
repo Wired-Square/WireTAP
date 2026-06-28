@@ -250,6 +250,25 @@ form button {
   animation: fade-in 0.2s ease-out;
 }
 
+/* Sonar-ripple emitted by the session-picker activity dot. The animation-duration
+   is set inline and scales with the live frame-arrival rate. */
+@keyframes activity-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.75);
+    opacity: 0;
+  }
+}
+
+.activity-ripple {
+  animation-name: activity-ripple;
+  animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  animation-iteration-count: infinite;
+}
+
 /* CSS variable defaults - light mode (applied to :root) */
 /* These are overridden by useTheme hook, but provide fallback */
 :root {

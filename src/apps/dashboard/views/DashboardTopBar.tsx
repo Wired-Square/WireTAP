@@ -46,8 +46,7 @@ interface Props {
   catalogPath: string | null;
   onOpenCatalogPicker: () => void;
 
-  // Watch state (for frame count display)
-  isWatching: boolean;
+  // Frame counts (kebab-menu session details)
   watchFrameCount: number;
   watchUniqueFrameCount?: number;
 
@@ -88,7 +87,6 @@ export default function DashboardTopBar({
   catalogs,
   catalogPath,
   onOpenCatalogPicker,
-  isWatching,
   watchFrameCount,
   watchUniqueFrameCount,
   savedLayouts,
@@ -209,13 +207,6 @@ export default function DashboardTopBar({
         catalogPath,
         onOpen: onOpenCatalogPicker,
       }}
-      actions={
-        isWatching && watchFrameCount > 0 ? (
-          <span className={`text-xs ${textSecondary}`}>
-            {t("topBar.framesCount", { count: watchFrameCount })}
-          </span>
-        ) : undefined
-      }
     >
       {/* Add panel button with dropdown */}
       <div ref={addMenuRef} className="relative">
