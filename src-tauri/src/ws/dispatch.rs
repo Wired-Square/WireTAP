@@ -22,14 +22,18 @@ static FRAME_OFFSETS: Lazy<RwLock<HashMap<String, usize>>> =
 /// Catalogues attached to sessions for live decode. When a session has one,
 /// [`send_new_frames`] also decodes the batch (once, in Rust) and pushes a
 /// `DecodedSignals` message — raw `FrameData` still flows for the apps that
-/// need bytes. `Arc` so we decode outside the lock. Keyed by session id.
-static ATTACHED_CATALOGS: Lazy<RwLock<HashMap<String, Arc<wiretap_catalog::Catalog>>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
+/// need bytes. `Arc` so we decode outside the lock. Keyed by session id. The
+/// stored path (when known) is the session's authoritative decoder path, which
+/// the frontend mirrors one-way via `ActiveSessionInfo.catalog_path`.
+static ATTACHED_CATALOGS: Lazy<
+    RwLock<HashMap<String, (Option<String>, Arc<wiretap_catalog::Catalog>)>>,
+> = Lazy::new(|| RwLock::new(HashMap::new()));
 
-/// Attach a parsed catalogue to a session, enabling the decoded stream.
-pub fn attach_catalog(session_id: &str, catalog: wiretap_catalog::Catalog) {
+/// Attach a parsed catalogue to a session, enabling the decoded stream. `path` is
+/// the source file path when known — the authoritative decoder path for the session.
+pub fn attach_catalog(session_id: &str, path: Option<String>, catalog: wiretap_catalog::Catalog) {
     if let Ok(mut m) = ATTACHED_CATALOGS.write() {
-        m.insert(session_id.to_string(), Arc::new(catalog));
+        m.insert(session_id.to_string(), (path, Arc::new(catalog)));
     }
 }
 
@@ -45,7 +49,16 @@ fn attached_catalog(session_id: &str) -> Option<Arc<wiretap_catalog::Catalog>> {
     ATTACHED_CATALOGS
         .read()
         .ok()
-        .and_then(|m| m.get(session_id).cloned())
+        .and_then(|m| m.get(session_id).map(|(_, cat)| cat.clone()))
+}
+
+/// The source file path of the catalogue attached to `session_id`, if known.
+/// Authoritative for the frontend (surfaced via `ActiveSessionInfo.catalog_path`).
+pub fn attached_catalog_path(session_id: &str) -> Option<String> {
+    ATTACHED_CATALOGS
+        .read()
+        .ok()
+        .and_then(|m| m.get(session_id).and_then(|(path, _)| path.clone()))
 }
 
 /// Decode a frame batch against `catalog` into the `DecodedSignals` JSON

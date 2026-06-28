@@ -99,7 +99,11 @@ export function tooltipPlugin(
   return {
     hooks: {
       init(_u: uPlot) {
+        // Defensive: at most one tooltip node in <body>, even if a previous chart
+        // instance was stranded without its destroy hook running.
+        document.querySelectorAll("[data-wiretap-tooltip]").forEach((n) => n.remove());
         tooltip = document.createElement("div");
+        tooltip.dataset.wiretapTooltip = "1";
         tooltip.style.cssText = TOOLTIP_CSS;
         document.body.appendChild(tooltip);
       },
@@ -417,8 +421,10 @@ export function measurementPlugin(
         line2.style.borderColor = "var(--accent-warning, #f59e0b)";
         over.appendChild(line2);
 
-        // Create measurement overlay portalled to body
+        // Create measurement overlay portalled to body (deduped like the tooltip).
+        document.querySelectorAll("[data-wiretap-measure]").forEach((n) => n.remove());
         overlay = document.createElement("div");
+        overlay.dataset.wiretapMeasure = "1";
         overlay.style.cssText = MEASUREMENT_OVERLAY_CSS;
         document.body.appendChild(overlay);
 

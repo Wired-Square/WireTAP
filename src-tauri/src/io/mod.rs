@@ -2551,6 +2551,10 @@ pub struct ActiveSessionInfo {
     /// Whether the session is actively streaming data
     #[serde(default)]
     pub is_streaming: bool,
+    /// Source file path of the catalogue attached for live decode (None when no
+    /// decoder is bound). Authoritative — the frontend mirrors this one-way.
+    #[serde(default)]
+    pub catalog_path: Option<String>,
 }
 
 /// List all active sessions
@@ -2600,6 +2604,7 @@ pub async fn list_sessions() -> Vec<ActiveSessionInfo> {
                 capture_frame_count,
                 capture_unique_frame_count,
                 is_streaming,
+                catalog_path: crate::ws::dispatch::attached_catalog_path(session_id),
             }
         })
         .collect()

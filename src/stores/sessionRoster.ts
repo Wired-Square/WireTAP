@@ -15,10 +15,12 @@ import type { ActiveSessionInfo } from "../api/io";
  *    frontend that drifted (e.g. while the WS was down) re-syncs to Rust,
  *  - drops adopted (`external: true`) entries no longer in the roster.
  *
- * The roster is the backend's source of truth. UI-only fields (speed, playback
- * position, catalogue, capture name/persistence, queued-message flag) are
- * preserved, and entries are only rebuilt when an authoritative field actually
- * changed, keeping object identity stable to avoid needless re-renders.
+ * The roster is the backend's source of truth. The attached catalogue path is now
+ * authoritative too (Rust reports it as `catalogPath`), so it's adopted here rather
+ * than preserved. Remaining UI-only fields (speed, playback position, capture
+ * name/persistence, queued-message flag) are preserved, and entries are only rebuilt
+ * when an authoritative field actually changed, keeping object identity stable to
+ * avoid needless re-renders.
  */
 export function reconcileKnownSessions(
   current: Record<string, Session>,
@@ -38,13 +40,15 @@ export function reconcileKnownSessions(
       const captureCount = info.captureFrameCount ?? existing.capture.count;
       const frameCount = info.captureFrameCount ?? existing.frameCount;
       const uniqueFrameCount = info.captureUniqueFrameCount ?? existing.uniqueFrameCount;
+      const catalogPath = info.catalogPath ?? null;
       const changed =
         existing.ioState !== info.state ||
         existing.subscriberCount !== info.subscriberCount ||
         existing.capture.id !== info.captureId ||
         existing.capture.count !== captureCount ||
         existing.frameCount !== frameCount ||
-        existing.uniqueFrameCount !== uniqueFrameCount;
+        existing.uniqueFrameCount !== uniqueFrameCount ||
+        existing.catalogPath !== catalogPath;
       if (changed) {
         next[info.sessionId] = {
           ...existing,
@@ -53,6 +57,7 @@ export function reconcileKnownSessions(
           capabilities: info.capabilities ?? existing.capabilities,
           frameCount,
           uniqueFrameCount,
+          catalogPath,
           capture: {
             ...existing.capture,
             id: info.captureId ?? existing.capture.id,
@@ -90,7 +95,7 @@ export function reconcileKnownSessions(
       streamEndedReason: null,
       speed: null,
       playbackPosition: null,
-      catalogPath: null,
+      catalogPath: info.catalogPath ?? null,
       bytesCaptureId: null,
       external: true,
     };

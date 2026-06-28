@@ -33,11 +33,12 @@ export function useSessionCatalog({
   loadCatalogForSession,
   setCatalogPath,
 }: UseSessionCatalogOpts): void {
-  // Mirror the session's catalogPath into local state (the load/attach effect
-  // does the parse — keeping this parse-free avoids a double parse).
+  // Mirror the session's (Rust-authoritative) catalogPath into local state, one-way.
+  // The load/attach effect does the parse — keeping this parse-free avoids a double
+  // parse. Nothing writes `catalogPath` back, so this converges to the session path.
   useEffect(() => {
     if (!sessionCatalogPath || sessionCatalogPath === catalogPath) return;
-    tlog.debug(`[${label}] session decoder changed externally → ${sessionCatalogPath}`);
+    tlog.verbose(`[${label}] session decoder changed externally → ${sessionCatalogPath}`);
     setCatalogPath(sessionCatalogPath);
   }, [label, sessionCatalogPath, catalogPath, setCatalogPath]);
 

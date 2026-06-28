@@ -380,6 +380,6 @@ export async function loadCatalog(path: string): Promise<ParsedCatalog> {
  */
 export async function attachAndResolve(sessionId: string, path: string): Promise<ParsedCatalog> {
   const content = await openCatalogAtPath(path);
-  const { catalog } = await attachCatalog(sessionId, content);
+  const { catalog } = await attachCatalog(sessionId, content, path);
   return resolveWithPolls(catalog, content);
 }

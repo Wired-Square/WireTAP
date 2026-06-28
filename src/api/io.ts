@@ -1366,6 +1366,8 @@ export interface ActiveSessionInfo {
   captureUniqueFrameCount: number | null;
   /** Whether the session is actively streaming data */
   isStreaming: boolean;
+  /** Source path of the catalogue attached for live decode (Rust-authoritative). */
+  catalogPath: string | null;
 }
 
 /**
@@ -1401,6 +1403,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     capture_frame_count: number | null;
     capture_unique_frame_count: number | null;
     is_streaming: boolean;
+    catalog_path: string | null;
   }> = await invoke("list_active_sessions");
 
   return raw.map((s) => ({
@@ -1426,6 +1429,7 @@ export async function listActiveSessions(): Promise<ActiveSessionInfo[]> {
     captureFrameCount: s.capture_frame_count ?? null,
     captureUniqueFrameCount: s.capture_unique_frame_count ?? null,
     isStreaming: s.is_streaming ?? false,
+    catalogPath: s.catalog_path ?? null,
   }));
 }
 

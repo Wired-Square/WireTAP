@@ -1,6 +1,6 @@
 // ui/src/apps/dashboard/views/panels/line-chart/LineChartPanel.tsx
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import { useDashboardStore, buildAlignedData, getSignalLabel, type DashboardPanel } from "../../../../../stores/dashboardStore";
@@ -138,6 +138,9 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<uPlot | null>(null);
   const respKeyRef = useRef<string>("");
+  // Bumped by the ResizeObserver when a responsive breakpoint is crossed, to drive
+  // chart recreation through the single owning effect (not a second create site).
+  const [respKey, setRespKey] = useState("");
   const isUpdatingDataRef = useRef(false);
   const dataVersion = useDashboardStore((s) => s.dataVersion);
   const seriesBuffers = useDashboardStore((s) => s.seriesBuffers);
@@ -172,25 +175,13 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
     }
   }, [panel.id, setFollowMode]);
 
-  // Destroy chart on unmount
-  useEffect(() => {
-    return () => {
-      chartRef.current?.destroy();
-      chartRef.current = null;
-    };
-  }, []);
-
-  // Re-create chart when panel signals change (series config changes)
+  // Single owner of the uPlot instance: the cleanup destroys exactly the instance it
+  // created (the local `chart`, not chartRef), so no orphaned chart/body-tooltip can
+  // survive a re-run, StrictMode, HMR, or a responsive recreate (sigKey/respKey).
   const sigKey = signalConfigKey(panel);
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
-
-    // Destroy existing chart
-    chartRef.current?.destroy();
-    chartRef.current = null;
-
-    if (panel.signals.length === 0) return;
+    if (!el || panel.signals.length === 0) return;
 
     const rect = el.getBoundingClientRect();
     const opts = buildOptions(panel, rect.width, rect.height, confidenceColours, handleUserInteraction);
@@ -200,8 +191,12 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
     chartRef.current = chart;
     respKeyRef.current = responsiveKey(rect.width, rect.height);
 
+    return () => {
+      chart.destroy();
+      if (chartRef.current === chart) chartRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panel.signals.length, sigKey]);
+  }, [panel.signals.length, sigKey, respKey]);
 
   // Update data when dataVersion changes (new signal values pushed)
   const updateData = useCallback(() => {
@@ -247,7 +242,9 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoomResetVersion]);
 
-  // Handle resize — setSize for normal resizes, recreate chart when crossing responsive thresholds
+  // Handle resize — setSize for normal resizes; on a responsive breakpoint crossing,
+  // bump respKey so the owning effect recreates the chart (single create/destroy path).
+  // Reads refs only, so the observer is set up once and never strands a chart.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -258,18 +255,10 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
         if (width <= 0 || height <= 0) continue;
 
         const newKey = responsiveKey(width, height);
-        if (newKey !== respKeyRef.current && chartRef.current) {
-          // Responsive threshold crossed — recreate chart with new options
-          chartRef.current.destroy();
-          chartRef.current = null;
-
-          if (panel.signals.length === 0) return;
-
-          const opts = buildOptions(panel, width, height, confidenceColours, handleUserInteraction);
-          const data = buildAlignedData(panel.signals, useDashboardStore.getState().seriesBuffers) as uPlot.AlignedData;
-          const chart = new uPlot(opts, data, el);
-          chartRef.current = chart;
+        if (newKey !== respKeyRef.current) {
+          // Crossed a responsive threshold — recreate via the owning effect.
           respKeyRef.current = newKey;
+          setRespKey(newKey);
         } else {
           chartRef.current?.setSize({ width, height });
         }
@@ -278,7 +267,7 @@ export default function LineChartPanel({ panel, canvasRef }: Props) {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [panel.signals, handleUserInteraction]);
+  }, []);
 
   if (panel.signals.length === 0) {
     return (

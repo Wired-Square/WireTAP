@@ -88,15 +88,18 @@ pub async fn dispatch_catalog_command(
             Ok(serde_json::Value::String(toml))
         }
         // Attach a catalogue to a session so its frames are decoded in Rust and
-        // streamed as DecodedSignals. Params: { session_id, content }.
+        // streamed as DecodedSignals. Params: { session_id, content, path? }. The
+        // optional `path` is recorded as the session's authoritative decoder path and
+        // surfaced back to the frontend via `ActiveSessionInfo.catalog_path`.
         "catalog.attach" => {
             let session_id = req("session_id")?;
+            let path = params.get("path").and_then(|v| v.as_str()).map(str::to_string);
             let cat = wiretap_catalog::Catalog::parse(&content()?).map_err(|e| e.to_string())?;
             let frame_count = cat.frames.len();
             // Return the resolved Catalog so the caller can feed its UI model from
             // this one parse instead of a separate catalog.parse round-trip.
             let catalog = serde_json::to_value(&cat).map_err(|e| e.to_string())?;
-            crate::ws::dispatch::attach_catalog(&session_id, cat);
+            crate::ws::dispatch::attach_catalog(&session_id, path, cat);
             Ok(serde_json::json!({ "attached": true, "frames": frame_count, "catalog": catalog }))
         }
         // Detach a session's catalogue (decoded stream stops). Params: { session_id }.

@@ -284,7 +284,7 @@ interface DashboardState {
   /** Attach to a session for Rust decode AND load the model from that one parse. */
   loadCatalogForSession: (sessionId: string, path: string) => Promise<void>;
   /** Build the in-memory model from an already-resolved catalogue. */
-  applyParsedCatalog: (catalog: ParsedCatalog, path: string) => void;
+  applyParsedCatalog: (catalog: ParsedCatalog) => void;
   /** Track the active catalogue path without parsing. */
   setCatalogPath: (path: string | null) => void;
   initFromSettings: (decoderDir?: string, defaultReadProfile?: string | null) => Promise<void>;
@@ -363,12 +363,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   // ── Actions ──
 
   loadCatalog: async (path: string) => {
-    get().applyParsedCatalog(await loadCatalogFromPath(path), path);
+    get().applyParsedCatalog(await loadCatalogFromPath(path));
   },
 
   loadCatalogForSession: async (sessionId: string, path: string) => {
     try {
-      get().applyParsedCatalog(await attachAndResolve(sessionId, path), path);
+      get().applyParsedCatalog(await attachAndResolve(sessionId, path));
     } catch (e) {
       tlog.info(`[dashboardStore] catalog attach failed, loading model only: ${e}`);
       await get().loadCatalog(path);
@@ -377,7 +377,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   setCatalogPath: (path: string | null) => set({ catalogPath: path }),
 
-  applyParsedCatalog: (catalog: ParsedCatalog, path: string) => {
+  // Apply a parsed catalogue to the dashboard's decode model. The catalogue PATH is
+  // owned by the session (Rust-authoritative, mirrored one-way via useSessionCatalog) —
+  // this must NOT write `catalogPath`, or it races the mirror into a reload loop.
+  applyParsedCatalog: (catalog: ParsedCatalog) => {
     try {
       // Convert ParsedCatalog frames to FrameDetail format
       const frameMap = new Map<number, FrameDetail>();
@@ -426,7 +429,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
       set({
         frames: frameMap,
-        catalogPath: path,
         protocol: catalog.protocol,
         canConfig: catalog.canConfig,
         serialConfig,
