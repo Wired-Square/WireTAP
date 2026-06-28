@@ -37,6 +37,8 @@ type Props = {
   onPause?: () => void;
   /** Called when user wants to leave session */
   onLeave?: () => void;
+  onStop?: () => void;
+  onDestroy?: () => void;
   /** Whether the IO source supports time range filtering */
   supportsTimeRange?: boolean;
   /** Called to open bookmark picker */
@@ -111,6 +113,8 @@ export default function DiscoveryTopBar({
   onPlay,
   onPause,
   onLeave,
+  onStop,
+  onDestroy,
   frameCount,
   uniqueFrameCount,
   totalFrameCount,
@@ -170,6 +174,8 @@ export default function DiscoveryTopBar({
         onPlay,
         onPause,
         onLeave,
+        onStop,
+        onDestroy,
         onOpenBookmarkPicker,
         isCaptureMode,
         capturePersistent,

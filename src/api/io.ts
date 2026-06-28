@@ -948,6 +948,25 @@ export async function evictSessionSubscriber(
 }
 
 /**
+ * Leave a session (user-initiated): the calling app detaches and reviews a frozen
+ * snapshot of the capture, while the session keeps streaming for any remaining apps.
+ * The backend copies the capture, unregisters this subscriber, and emits
+ * `subscriber-evicted` so this app switches to the snapshot.
+ * @param sessionId The session ID
+ * @param subscriberId This app's subscriber ID
+ * @returns Copied snapshot capture IDs (empty when nothing was captured)
+ */
+export async function leaveSessionToCapture(
+  sessionId: string,
+  subscriberId: string
+): Promise<string[]> {
+  return invoke("session_leave_to_capture", {
+    session_id: sessionId,
+    subscriber_id: subscriberId,
+  });
+}
+
+/**
  * Add a new IO source to an existing multi-source session.
  * Stops the current device, creates a new IOBroker with all sources (old + new),
  * and restarts. Keeps the same session ID and listeners.

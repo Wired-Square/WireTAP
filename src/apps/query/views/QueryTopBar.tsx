@@ -36,6 +36,8 @@ interface Props {
   onPlay?: () => void;
   onPause?: () => void;
   onLeave?: () => void;
+  onStop?: () => void;
+  onDestroy?: () => void;
   onOpenBookmarkPicker?: () => void;
 }
 
@@ -56,6 +58,8 @@ export default function QueryTopBar({
   onPlay,
   onPause,
   onLeave,
+  onStop,
+  onDestroy,
   onOpenBookmarkPicker,
 }: Props) {
   return (
@@ -77,6 +81,8 @@ export default function QueryTopBar({
         onPlay,
         onPause,
         onLeave,
+        onStop,
+        onDestroy,
         onOpenBookmarkPicker,
       }}
       catalog={{

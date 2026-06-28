@@ -586,6 +586,25 @@ pub fn get_session_capture_ids(session_id: &str) -> Vec<String> {
         .collect()
 }
 
+/// Next unique "{base}_{n}" capture name — n is the highest existing such suffix + 1.
+/// Gives each per-app "Leave session" snapshot a distinct, sortable name.
+pub fn next_indexed_name(base: &str) -> String {
+    let prefix = format!("{}_", base);
+    let max_n = CAPTURE_REGISTRY
+        .read()
+        .map(|registry| {
+            registry
+                .captures
+                .values()
+                .filter_map(|b| b.metadata.name.strip_prefix(prefix.as_str()))
+                .filter_map(|suffix| suffix.parse::<u32>().ok())
+                .max()
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
+    format!("{}_{}", base, max_n + 1)
+}
+
 /// Get the frame capture ID for a session, if one exists.
 pub fn get_session_frame_capture_id(session_id: &str) -> Option<String> {
     let registry = CAPTURE_REGISTRY.read().unwrap();

@@ -513,6 +513,7 @@ function DiscoveryInner() {
     resetWatchFrameCount,
     // Session switching methods
     stopWatch,
+    handleDestroy,
     resumeWithNewCapture,
     selectProfile,
     watchSource,
@@ -1057,6 +1058,8 @@ function DiscoveryInner() {
           onPlay={isStopped || canReturnToLive ? resumeWithNewCapture : handlers.handlePlay}
           onPause={handlers.handlePause}
           onLeave={handleLeave}
+          onStop={isStreaming ? stopWatch : undefined}
+          onDestroy={handleDestroy}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
           onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
           speed={playbackSpeed}

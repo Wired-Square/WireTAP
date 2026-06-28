@@ -53,6 +53,8 @@ interface Props {
   onPlay?: () => void;
   onPause?: () => void;
   onLeave?: () => void;
+  onStop?: () => void;
+  onDestroy?: () => void;
 
   // Loading/error state
   isLoading?: boolean;
@@ -81,6 +83,8 @@ export default function TransmitTopBar({
   onPlay,
   onPause,
   onLeave,
+  onStop,
+  onDestroy,
   isLoading = false,
   error = null,
 }: Props) {
@@ -114,6 +118,8 @@ export default function TransmitTopBar({
         onPlay,
         onPause,
         onLeave,
+        onStop,
+        onDestroy,
       }}
       actions={
         <>

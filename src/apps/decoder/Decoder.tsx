@@ -552,6 +552,7 @@ function DecoderInner() {
     isLoading,
     // Session switching methods
     stopWatch,
+    handleDestroy,
     resumeWithNewCapture,
     selectProfile,
     watchSource,
@@ -1179,6 +1180,8 @@ function DecoderInner() {
             onPlay={isStopped || canReturnToLive ? resumeWithNewCapture : handlers.handlePlay}
             onPause={isDecoding ? handlers.handlePause : undefined}
             onLeave={!isDetached ? handleLeave : undefined}
+            onStop={isStreaming ? stopWatch : undefined}
+            onDestroy={handleDestroy}
             supportsTimeRange={capabilities?.supports_time_range ?? false}
             onOpenBookmarkPicker={() => dialogs.bookmarkPicker.open()}
             frameCount={frameList.length}

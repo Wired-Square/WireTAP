@@ -1197,6 +1197,7 @@ pub fn run() {
             sessions::register_session_subscriber,
             sessions::unregister_session_subscriber,
             sessions::evict_session_subscriber_cmd,
+            sessions::session_leave_to_capture,
             sessions::add_source_to_session_cmd,
             sessions::remove_source_from_session_cmd,
             sessions::pause_source_polling,

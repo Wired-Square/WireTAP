@@ -28,7 +28,7 @@ export { isCaptureProfileId };
 import type { BusMapping, PlaybackPosition, RawBytesPayload } from "../api/io";
 import type { IOProfile } from "./useSettings";
 import type { FrameMessage } from "../types/frame";
-import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, stopAndSwitchToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
+import { setSessionSubscriberActive, reconfigureReaderSession, switchSessionToCaptureReplay, leaveSessionToCapture, sessionStopToCapture, resumeSessionToLive, generateSessionId, type StreamEndedInfo, type IOCapabilities } from "../api/io";
 import { markFavoriteUsed, type TimeRangeFavorite } from "../utils/favorites";
 import { localToUtc } from "../utils/timeFormat";
 import { isRealtimeProfile, generateLoadSessionId } from "../dialogs/io-source-picker/utils";
@@ -615,14 +615,10 @@ export function useIOSessionManager(
   // - Capture mode → full disconnect (No Source)
   // - Realtime/Recorded → stop source and switch to capture replay in-place
   const handleLeave = useCallback(async () => {
-    const currentIsCaptureMode = isCaptureProfileId(ioProfile) || isCaptureProfileId(sourceProfileId)
-      || session.capabilities?.traits.temporal_mode === "capture";
-
-    if (currentIsCaptureMode) {
-      // Already viewing a capture → "second leave" → No Source.
-      // Reset state BEFORE the async leave so React batches both updates
-      // in the same render — prevents useIOSession from re-creating the
-      // session when it sees effectiveSessionId still set.
+    // Full disconnect to No Source. Reset state BEFORE the async leave so React batches
+    // both in one render — stops useIOSession re-creating the session while its
+    // effectiveSessionId is still set.
+    const disconnect = async () => {
       onBeforeWatch?.();
       setMultiBusProfiles([]);
       setMultiSessionId(null);
@@ -631,26 +627,28 @@ export function useIOSessionManager(
       setIsWatching(false);
       setIsDetached(false);
       await session.leave();
-    } else {
-      // Realtime or Recorded → stop source, switch to capture in-place.
-      // session-lifecycle event fires → capabilities update → isCaptureMode flips true.
-      const sessionId = session.sessionId;
-      if (!sessionId) return;
-      try {
-        await stopAndSwitchToCapture(sessionId, 1.0);
-        tlog.debug(`[IOSessionManager:${appName}] Leave: switched to capture`);
-      } catch (e) {
-        // No capture available (e.g., 0 frames received) — full disconnect
-        tlog.info(`[IOSessionManager:${appName}] Leave: no capture, disconnecting: ${e}`);
-        onBeforeWatch?.();
-        setMultiBusProfiles([]);
-        setMultiSessionId(null);
-        setIoProfile(null);
-        setSourceProfileId(null);
-        setIsWatching(false);
-        setIsDetached(false);
-        await session.leave();
-      }
+    };
+
+    const isCapture = isCaptureProfileId(ioProfile) || isCaptureProfileId(sourceProfileId)
+      || session.capabilities?.traits.temporal_mode === "capture";
+    if (isCapture) {
+      // Already viewing a capture → "second leave" → No Source.
+      await disconnect();
+      return;
+    }
+
+    // Realtime or Recorded → per-app leave: Rust copies a capture snapshot, unregisters
+    // THIS subscriber (the session keeps streaming for any other apps), and emits
+    // `subscriber-evicted` → useIOSession routes it to handleSessionDestroyed, which
+    // switches this app to the snapshot. Rust handles 0-frame / sole-subscriber.
+    const sessionId = session.sessionId;
+    if (!sessionId) return;
+    try {
+      await leaveSessionToCapture(sessionId, session.subscriberId);
+      tlog.debug(`[IOSessionManager:${appName}] Leave: detached to capture snapshot`);
+    } catch (e) {
+      tlog.info(`[IOSessionManager:${appName}] Leave failed, disconnecting: ${e}`);
+      await disconnect();
     }
   }, [session, onBeforeWatch, setMultiBusProfiles, setIoProfile, ioProfile, sourceProfileId, appName]);
 
@@ -660,12 +658,13 @@ export function useIOSessionManager(
     setIsWatching(true);
   }, [session]);
 
-  // Destroy the session entirely
+  // Destroy the session entirely — reset=true so the global `destroyed` broadcast tells
+  // EVERY connected app to return to "No source" (not fall back to the orphaned capture).
   const handleDestroy = useCallback(async () => {
     const { destroyReaderSession } = await import("../api/io");
     const sessionId = session.sessionId;
     if (sessionId) {
-      await destroyReaderSession(sessionId);
+      await destroyReaderSession(sessionId, true);
     }
     // Clear local state
     setMultiBusProfiles([]);

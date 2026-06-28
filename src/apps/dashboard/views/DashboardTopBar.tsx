@@ -39,6 +39,8 @@ interface Props {
   onPlay?: () => void;
   onPause?: () => void;
   onLeave?: () => void;
+  onStop?: () => void;
+  onDestroy?: () => void;
   onOpenIoSessionPicker: () => void;
 
   // Catalog
@@ -83,6 +85,8 @@ export default function DashboardTopBar({
   onPlay,
   onPause,
   onLeave,
+  onStop,
+  onDestroy,
   onOpenIoSessionPicker,
   catalogs,
   catalogPath,
@@ -201,6 +205,8 @@ export default function DashboardTopBar({
         onPlay,
         onPause,
         onLeave,
+        onStop,
+        onDestroy,
       }}
       catalog={{
         catalogs,

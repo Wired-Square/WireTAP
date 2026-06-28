@@ -44,6 +44,8 @@ interface Props {
   onPlay?: () => void;
   onPause?: () => void;
   onLeave?: () => void;
+  onStop?: () => void;
+  onDestroy?: () => void;
 
   // Test config
   role: TestRole;
@@ -85,6 +87,8 @@ export default function TestPatternTopBar({
   onPlay,
   onPause,
   onLeave,
+  onStop,
+  onDestroy,
   role,
   mode,
   rateHz,
@@ -127,6 +131,8 @@ export default function TestPatternTopBar({
         onPlay,
         onPause,
         onLeave,
+        onStop,
+        onDestroy,
       }}
       actions={
         <>

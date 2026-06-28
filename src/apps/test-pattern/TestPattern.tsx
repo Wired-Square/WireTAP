@@ -137,6 +137,8 @@ export default function TestPattern() {
     canReturnToLive,
     sessionReady,
     handleLeave: managerLeave,
+    handleDestroy: managerDestroy,
+    stopWatch,
     watchFrameCount,
     watchUniqueFrameCount,
   } = manager;
@@ -232,9 +234,10 @@ export default function TestPattern() {
           frameCount={watchUniqueFrameCount}
           totalFrameCount={watchFrameCount}
           onOpenIoPicker={() => dialogs.ioSessionPicker.open()}
-          onPause={() => session.stop()}
           onPlay={() => session.start()}
           onLeave={managerLeave}
+          onStop={isStreaming ? stopWatch : undefined}
+          onDestroy={managerDestroy}
           role={role}
           mode={mode}
           rateHz={rateHz}

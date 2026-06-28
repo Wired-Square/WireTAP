@@ -177,6 +177,8 @@ export default function AppTopBar({
             onPlay={ioSession.onPlay}
             onPause={ioSession.onPause}
             onLeave={ioSession.onLeave}
+            onStop={ioSession.onStop}
+            onDestroy={ioSession.onDestroy}
             onOpenBookmarkPicker={ioSession.onOpenBookmarkPicker}
             isCaptureMode={ioSession.isCaptureMode}
             capturePersistent={ioSession.capturePersistent}

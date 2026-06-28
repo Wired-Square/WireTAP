@@ -2940,56 +2940,76 @@ pub async fn unregister_subscriber(session_id: &str, subscriber_id: &str) -> Res
     Ok(remaining)
 }
 
-/// Evict a subscriber from a session, giving it a copy of the current capture.
-/// This is used by the Session Manager to remove a subscriber without destroying the session.
-/// The evicted subscriber receives a capture copy so it can continue viewing data standalone.
-/// Returns the list of copied capture IDs.
-pub async fn evict_session_subscriber(app: &AppHandle, session_id: &str, subscriber_id: &str) -> Result<Vec<String>, String> {
-    // Copy the capture before unregistering (so the evicted subscriber gets a snapshot)
+/// Detach a single subscriber from a session, handing it a frozen snapshot copy of the
+/// session's frame capture so it can keep reviewing the data standalone. The session
+/// stays alive for the remaining subscribers (or is destroyed if this was the last one).
+/// `label` names the snapshot in the capture list (e.g. "evicted", "review"). Returns the
+/// copied capture IDs and emits `subscriber-evicted` so the detached app switches to it.
+async fn detach_subscriber_to_capture_copy(
+    app: &AppHandle,
+    session_id: &str,
+    subscriber_id: &str,
+    name_for_copy: impl Fn(&str) -> String,
+) -> Result<Vec<String>, String> {
+    // Copy the capture before unregistering (so the detached subscriber gets a snapshot).
     let mut copied_capture_ids = Vec::new();
     if let Some(capture_id) = crate::capture_store::get_session_capture_ids(session_id).into_iter().next() {
-        let copy_name = format!("{} (evicted)", subscriber_id);
+        // Derive the snapshot name from the original capture's name.
+        let base = crate::capture_store::get_capture_metadata(&capture_id)
+            .map(|m| m.name)
+            .unwrap_or_else(|| capture_id.clone());
+        let copy_name = name_for_copy(&base);
         match crate::capture_store::copy_capture(&capture_id, copy_name) {
             Ok(copied_id) => {
                 tlog!(
-                    "[reader] Copied capture '{}' -> '{}' for evicted subscriber '{}'",
+                    "[reader] Copied capture '{}' -> '{}' for detached subscriber '{}'",
                     capture_id, copied_id, subscriber_id
                 );
                 copied_capture_ids.push(copied_id);
             }
             Err(e) => {
                 tlog!(
-                    "[reader] Failed to copy capture for evicted subscriber '{}': {}",
+                    "[reader] Failed to copy capture for detached subscriber '{}': {}",
                     subscriber_id, e
                 );
             }
         }
     }
 
-    // Unregister the subscriber (this may destroy the session if it was the last one)
+    // Unregister the subscriber (this may destroy the session if it was the last one).
     let remaining = unregister_subscriber(session_id, subscriber_id).await?;
 
-    // Emit subscriber-evicted event so the frontend can clean up the evicted app
+    // Emit subscriber-evicted so the frontend switches the detached app to the snapshot.
     #[derive(Clone, Debug, Serialize)]
     struct SubscriberEvictedPayload {
         session_id: String,
         subscriber_id: String,
         capture_ids: Vec<String>,
     }
-
-    let payload = SubscriberEvictedPayload {
+    let _ = app.emit("subscriber-evicted", SubscriberEvictedPayload {
         session_id: session_id.to_string(),
         subscriber_id: subscriber_id.to_string(),
         capture_ids: copied_capture_ids.clone(),
-    };
-    let _ = app.emit("subscriber-evicted", payload);
+    });
 
     tlog!(
-        "[reader] Evicted subscriber '{}' from session '{}' (remaining: {}, capture copies: {:?})",
+        "[reader] Detached subscriber '{}' from session '{}' (remaining: {}, capture copies: {:?})",
         subscriber_id, session_id, remaining, copied_capture_ids
     );
-
     Ok(copied_capture_ids)
+}
+
+/// Evict a subscriber from a session (Session Manager: forced removal), handing it a
+/// snapshot copy of the capture. See [`detach_subscriber_to_capture_copy`].
+pub async fn evict_session_subscriber(app: &AppHandle, session_id: &str, subscriber_id: &str) -> Result<Vec<String>, String> {
+    detach_subscriber_to_capture_copy(app, session_id, subscriber_id, |base| format!("{} (evicted)", base)).await
+}
+
+/// Leave a session (user-initiated): the calling subscriber detaches and reviews a frozen
+/// snapshot of the capture, while the session keeps streaming for any remaining apps. The
+/// snapshot gets a unique "{name}_{n}" name so repeated leaves stay distinct.
+pub async fn leave_session_to_capture(app: &AppHandle, session_id: &str, subscriber_id: &str) -> Result<Vec<String>, String> {
+    detach_subscriber_to_capture_copy(app, session_id, subscriber_id, crate::capture_store::next_indexed_name).await
 }
 
 /// Add a new source to an existing multi-source session.

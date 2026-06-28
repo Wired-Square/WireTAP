@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Star, FileText, Play, Pause, Gauge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2, ArrowRightLeft, Power } from "lucide-react";
+import { Star, FileText, Play, Pause, Gauge, Bookmark, LogOut, Pencil, Pin, PinOff, Trash2, ArrowRightLeft, Power, Square } from "lucide-react";
 import { iconSm } from "../styles/spacing";
 import type { IOProfile } from "../types/common";
 import type { CaptureMetadata } from "../api/capture";
@@ -17,7 +17,6 @@ import { isCaptureProfileId } from "../hooks/useIOSessionManager";
 import { buttonBase } from "../styles/buttonStyles";
 import { menuClasses, menuItem, menuDivider } from "../styles/menuStyles";
 import { getIOKindLabel } from "../utils/ioKindLabel";
-import { destroyReaderSession } from "../api/io";
 import { useSessionStore } from "../stores/sessionStore";
 
 // ============================================================================
@@ -315,8 +314,12 @@ export interface IOSessionControlsProps {
   onPlay?: () => void;
   /** Pause the session */
   onPause?: () => void;
-  /** Leave the session */
+  /** Leave the session — this app detaches and reviews a capture snapshot; others keep streaming. */
   onLeave?: () => void;
+  /** Stop the shared session — ALL connected apps switch to reviewing the capture. */
+  onStop?: () => void;
+  /** Destroy the session — ALL connected apps return to "No source". */
+  onDestroy?: () => void;
   /** Open bookmark picker (for time range sources) */
   onOpenBookmarkPicker?: () => void;
 
@@ -367,6 +370,8 @@ export function IOSessionControls({
   onPlay,
   onPause,
   onLeave,
+  onStop,
+  onDestroy,
   onOpenBookmarkPicker,
   // Capture action props
   isCaptureMode: isCaptureModeProp,
@@ -489,9 +494,9 @@ export function IOSessionControls({
   const showPin = !!captureMetadata?.id && !!onToggleCapturePin;
   const showClear = !!onClearCapture && !!ioProfile && !(isCaptureMode && capturePersistent);
   const showLeave = hasSource && !!onLeave;
+  const showStop = hasSource && !isCaptureMode && !!onStop;
+  const showDestroy = hasSource && !!onDestroy;
   const changeSourceDisabled = isStreaming && !isCaptureMode;
-  // Backend session id for the hard-reset action (effective id, falling back to profile).
-  const destroyId = sessionId ?? ioProfile;
 
   const speedLabel = speed === 1 ? "1x" : `${speed}x`;
   const detailRow = "flex items-center justify-between gap-3 mb-1";
@@ -653,23 +658,29 @@ export function IOSessionControls({
             </button>
           )}
 
-          {/* Disconnect + hard reset */}
-          {(showLeave || destroyId) && <div className={menuDivider} />}
+          {/* Exit controls: Leave (this app) / Stop (all apps) / Destroy (all apps) */}
+          {(showLeave || showStop || showDestroy) && <div className={menuDivider} />}
           {showLeave && (
             <button onClick={runAndClose(onLeave)} className={`${menuItem} text-amber-500 hover:!bg-amber-500/10`}>
               <LogOut className={iconSm} />
-              {isCaptureMode ? "Disconnect" : "Stop & review capture"}
+              {isCaptureMode ? "Disconnect" : "Leave session"}
             </button>
           )}
-          {destroyId && (
+          {showStop && (
             <button
-              onClick={runAndClose(() => {
-                // reset=true → backend marks the destroyed event so the app
-                // resets to "No source" rather than the orphaned capture.
-                destroyReaderSession(destroyId, true).catch(() => {});
-              })}
+              onClick={runAndClose(onStop)}
+              className={`${menuItem} text-amber-500 hover:!bg-amber-500/10`}
+              title="Stop the session for all connected apps and review the capture"
+            >
+              <Square className={iconSm} />
+              Stop session
+            </button>
+          )}
+          {showDestroy && (
+            <button
+              onClick={runAndClose(onDestroy)}
               className={`${menuItem} text-red-400 hover:!bg-red-500/10`}
-              title="Destroy this session in the backend and reset to No source"
+              title="Destroy this session and reset all connected apps to No source"
             >
               <Power className={iconSm} />
               Destroy session

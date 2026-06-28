@@ -49,6 +49,8 @@ type Props = {
   onPause?: () => void;
   /** Called when user wants to leave session */
   onLeave?: () => void;
+  onStop?: () => void;
+  onDestroy?: () => void;
   /** Whether the IO source supports time range filtering */
   supportsTimeRange?: boolean;
   /** Called to open bookmark picker */
@@ -148,6 +150,8 @@ export default function DecoderTopBar({
   onPlay,
   onPause,
   onLeave,
+  onStop,
+  onDestroy,
   supportsTimeRange = false,
   onOpenBookmarkPicker,
   isCaptureMode = false,
@@ -221,6 +225,8 @@ export default function DecoderTopBar({
         onPlay,
         onPause,
         onLeave,
+        onStop,
+        onDestroy,
         onOpenBookmarkPicker,
         isCaptureMode,
         capturePersistent,

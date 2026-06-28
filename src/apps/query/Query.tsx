@@ -176,6 +176,7 @@ function QueryInner() {
     isStopped,
     joinerCount,
     handleLeave,
+    handleDestroy,
     capabilities,
     session,
     watchFrameCount,
@@ -396,9 +397,10 @@ function QueryInner() {
           isPaused={isPaused}
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
-          onPause={handlers.handleStopWatch}
           onPlay={session.start}
           onLeave={handleLeave}
+          onStop={isStreaming ? stopWatch : undefined}
+          onDestroy={handleDestroy}
         />
       }
     >

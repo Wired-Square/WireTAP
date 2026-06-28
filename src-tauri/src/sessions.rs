@@ -13,7 +13,7 @@ use crate::{
         reconfigure_session, register_subscriber, reinitialize_session_if_safe, resume_session,
         resume_session_fresh, seek_session, seek_session_by_frame, set_subscriber_active, start_session, stop_session,
         stop_and_switch_to_capture, suspend_session, switch_to_capture_replay, resume_to_live_session, transmit_frame, unregister_subscriber,
-        evict_session_subscriber, add_source_to_session, remove_source_from_session, update_source_bus_mappings, pause_source_in_session, resume_source_in_session, get_session_source_count,
+        evict_session_subscriber, leave_session_to_capture, add_source_to_session, remove_source_from_session, update_source_bus_mappings, pause_source_in_session, resume_source_in_session, get_session_source_count,
         update_session_direction, update_session_speed, update_session_time_range, ActiveSessionInfo, IOCapabilities, IOSource, IOState,
         JoinSessionResult, SubscriberInfo, RegisterSubscriberResult, ReinitializeResult, CaptureSource, step_frame, StepResult,
         BusMapping, InterfaceTraits, Protocol, TemporalMode,
@@ -1477,6 +1477,18 @@ pub async fn evict_session_subscriber_cmd(
     subscriber_id: String,
 ) -> Result<Vec<String>, String> {
     evict_session_subscriber(&app, &session_id, &subscriber_id).await
+}
+
+/// Leave a session (user-initiated): the calling app detaches and reviews a frozen
+/// snapshot of the capture; the session keeps streaming for any remaining apps.
+/// Returns the copied snapshot capture IDs (empty when there was nothing captured).
+#[tauri::command(rename_all = "snake_case")]
+pub async fn session_leave_to_capture(
+    app: tauri::AppHandle,
+    session_id: String,
+    subscriber_id: String,
+) -> Result<Vec<String>, String> {
+    leave_session_to_capture(&app, &session_id, &subscriber_id).await
 }
 
 /// Add a new IO source to an existing multi-source session.

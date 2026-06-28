@@ -165,6 +165,7 @@ function TransmitInner() {
     capabilities,
     joinerCount,
     handleLeave: managerLeave,
+    handleDestroy: managerDestroy,
     stopWatch,
     resumeWithNewCapture,
     watchFrameCount,
@@ -291,9 +292,10 @@ function TransmitInner() {
           ioState={session.state}
           capabilities={capabilities ? { protocols: capabilities.traits.protocols, available_buses: capabilities.available_buses } : null}
           onOpenIoPicker={handlers.handleOpenIoPicker}
-          onPause={handlers.handleStop}
           onPlay={handlers.handleResume}
           onLeave={managerLeave}
+          onStop={isStreaming ? stopWatch : undefined}
+          onDestroy={managerDestroy}
           uniqueFrameCount={watchUniqueFrameCount}
           totalFrameCount={watchFrameCount}
           isLoading={isLoading}

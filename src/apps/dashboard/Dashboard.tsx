@@ -326,6 +326,7 @@ function DashboardInner() {
     watchFrameCount,
     watchUniqueFrameCount,
     stopWatch,
+    handleDestroy,
   } = manager;
 
   const { sessionId, state: readerState } = session;
@@ -503,9 +504,10 @@ function DashboardInner() {
           isPaused={isPaused}
           isStopped={isStopped}
           supportsTimeRange={capabilities?.supports_time_range ?? false}
-          onPause={stopWatch}
           onPlay={resumeWithNewCapture}
           onLeave={!isDetached ? handleLeave : undefined}
+          onStop={isStreaming ? stopWatch : undefined}
+          onDestroy={handleDestroy}
           onOpenIoSessionPicker={() => dialogs.ioSessionPicker.open()}
           catalogs={catalogs}
           catalogPath={catalogPath}
