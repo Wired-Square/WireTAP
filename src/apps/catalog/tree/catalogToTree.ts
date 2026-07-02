@@ -71,6 +71,7 @@ function signalProps(s: Signal): Record<string, any> {
     format: s.format,
     enum: s.enum,
     confidence: s.confidence,
+    notes: s.notes,
     modbus_register: s.modbusRegister,
     modbus_register_count: s.modbusRegisterCount,
   });

@@ -28,6 +28,8 @@ export interface Signal {
   /** Value→label map (the crate serialises `enum_map` as `enum`). */
   enum?: Record<string, string>;
   confidence?: Confidence;
+  /** Free-text notes (string or array in TOML; resolved to a list). */
+  notes?: string[];
   /** True when inherited from a mirror/copy source. Omitted when false. */
   inherited?: boolean;
   /** Modbus-specific: the signal's own register number (synthesised by the crate). */
