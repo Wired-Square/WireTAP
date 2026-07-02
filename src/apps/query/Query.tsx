@@ -22,8 +22,7 @@ import { useDialogManager } from "../../hooks/useDialogManager";
 import { useQueryHandlers } from "./hooks/useQueryHandlers";
 import type { FrameMessage } from "../../types/frame";
 import type { PlaybackPosition } from "../../api/io";
-import type { CatalogMetadata } from "../../api/catalog";
-import { listCatalogs } from "../../api/catalog";
+import { useCatalogList } from "../../hooks/useCatalogList";
 
 import { getFavoritesForProfile, type TimeRangeFavorite } from "../../utils/favorites";
 import { loadCatalog } from "../../utils/catalogParser";
@@ -59,8 +58,8 @@ function QueryInner() {
 
   const setParsedCatalog = useQueryStore((s) => s.setParsedCatalog);
 
-  // Catalog state
-  const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
+  // Catalog state — backend-owned list, pushed live.
+  const catalogs = useCatalogList();
 
   // Favourites state (bookmarks)
   const [favourites, setFavourites] = useState<TimeRangeFavorite[]>([]);
@@ -94,19 +93,6 @@ function QueryInner() {
     "addBookmark",
   ] as const);
 
-  // Load catalogs on mount (refresh if the decoder dir changes). The directory
-  // is resolved in Rust, so this must NOT gate on settings being resolved.
-  useEffect(() => {
-    const loadCatalogList = async () => {
-      try {
-        const list = await listCatalogs();
-        setCatalogs(list);
-      } catch (e) {
-        console.error("Failed to load catalog list:", e);
-      }
-    };
-    loadCatalogList();
-  }, [settings?.decoder_dir]);
 
   // Load and parse catalog when path changes
   useEffect(() => {

@@ -18,9 +18,11 @@ pub async fn open_catalog(path: String) -> Result<String, String> {
 
 /// Save catalog to TOML file
 #[tauri::command]
-pub async fn save_catalog(path: String, content: String) -> Result<(), String> {
+pub async fn save_catalog(app: AppHandle, path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content)
-        .map_err(|e| format!("Failed to write catalog file: {}", e))
+        .map_err(|e| format!("Failed to write catalog file: {}", e))?;
+    refresh_catalog_cache(&app);
+    Ok(())
 }
 
 /// Write raw bytes to a file path (used for PNG image export)
@@ -290,60 +292,79 @@ pub async fn test_decode_frame(
     }
 }
 
-use tauri::AppHandle;
-use std::path::PathBuf;
+use tauri::{AppHandle, Manager};
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogFile {
     pub name: String,
     pub filename: String,
     pub path: String,
 }
 
-/// List available catalog decoders from the decoder directory
-#[tauri::command]
-pub async fn list_catalogs(app: AppHandle) -> Result<Vec<CatalogFile>, String> {
-    // Load settings to get decoder directory
-    let settings = crate::settings::load_settings(app).await?;
-    let decoder_dir = PathBuf::from(&settings.decoder_dir);
+/// Backend-owned, always-warm cache of the decoder-directory catalogue list.
+///
+/// The list used to be re-scanned from disk on every `list_catalogs()` call,
+/// and ~8 frontend consumers each fetched on their own mount across two
+/// windows — so the picker showed an empty list until each async fetch
+/// resolved, and the directory was re-walked (and the duplicate-name warning
+/// re-logged) once per consumer. The cache is built once at startup, served
+/// from memory, and kept fresh by mutation commands + a filesystem watcher.
+#[derive(Default)]
+pub struct CatalogCache {
+    state: Mutex<CatalogCacheState>,
+    /// Holds the live filesystem watcher; dropping it stops watching. Desktop
+    /// only — iOS has no decoder directory to watch. Write-only (a keep-alive
+    /// guard, never read back), hence the allow.
+    #[cfg(not(target_os = "ios"))]
+    #[allow(dead_code)]
+    watcher: Mutex<Option<notify::RecommendedWatcher>>,
+}
 
-    if !decoder_dir.exists() {
-        return Ok(vec![]);
-    }
+#[derive(Default)]
+struct CatalogCacheState {
+    /// Directory the cache was last built from. `None` until first warm; used
+    /// to detect a decoder-dir change and to serve without re-resolving settings.
+    dir: Option<PathBuf>,
+    catalogs: Vec<CatalogFile>,
+}
 
+/// Walk the decoder directory and build the catalogue list. Pure (no shared
+/// state); the duplicate-name warning is logged here so it fires once per
+/// rebuild rather than once per consumer fetch.
+fn scan_catalogs(decoder_dir: &Path) -> Vec<CatalogFile> {
     let mut catalogs = Vec::new();
 
-    // Read all .toml files from the decoder directory
-    let entries = std::fs::read_dir(&decoder_dir)
-        .map_err(|e| format!("Failed to read decoder directory: {}", e))?;
-
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("toml") {
-                let filename = path
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("")
-                    .to_string();
-
-                // Try to parse the catalog to get the name
-                let name = if let Ok(content) = std::fs::read_to_string(&path) {
-                    extract_catalog_name(&content).unwrap_or_else(|| filename.clone())
-                } else {
-                    filename.clone()
-                };
-
-                catalogs.push(CatalogFile {
-                    name,
-                    filename,
-                    path: path.to_string_lossy().to_string(),
-                });
-            }
+    let entries = match std::fs::read_dir(decoder_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            tlog!("[catalog] Failed to read decoder directory {:?}: {}", decoder_dir, e);
+            return catalogs;
         }
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("toml") {
+            continue;
+        }
+        let filename = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        let name = match std::fs::read_to_string(&path) {
+            Ok(content) => extract_catalog_name(&content).unwrap_or_else(|| filename.clone()),
+            Err(_) => filename.clone(),
+        };
+        catalogs.push(CatalogFile {
+            name,
+            filename,
+            path: path.to_string_lossy().to_string(),
+        });
     }
 
-    // Sort by filename
     catalogs.sort_by(|a, b| a.filename.cmp(&b.filename));
 
     // Warn (non-fatal) when two or more catalogs share a display name. Selection is keyed
@@ -362,7 +383,145 @@ pub async fn list_catalogs(app: AppHandle) -> Result<Vec<CatalogFile>, String> {
         }
     }
 
-    Ok(catalogs)
+    catalogs
+}
+
+/// Resolve the decoder directory from settings (synchronously). Returns `None`
+/// when settings can't be read or the directory doesn't exist.
+fn resolve_decoder_dir(app: &AppHandle) -> Option<PathBuf> {
+    let settings = crate::settings::load_settings_sync(app)
+        .map_err(|e| tlog!("[catalog] Could not load settings for decoder dir: {}", e))
+        .ok()?;
+    let dir = PathBuf::from(&settings.decoder_dir);
+    dir.exists().then_some(dir)
+}
+
+/// Rebuild the catalogue cache from the current decoder directory, store it, and
+/// signal all WS clients (CatalogListChanged) to reconcile. Returns the fresh list.
+pub fn refresh_catalog_cache(app: &AppHandle) -> Vec<CatalogFile> {
+    let dir = match resolve_decoder_dir(app) {
+        Some(d) => d,
+        None => return Vec::new(),
+    };
+    let catalogs = scan_catalogs(&dir);
+    {
+        let cache = app.state::<CatalogCache>();
+        let mut st = cache.state.lock().unwrap();
+        st.dir = Some(dir);
+        st.catalogs = catalogs.clone();
+    }
+    // Signal every connected WS client; each reconciles via list_catalogs.
+    crate::ws::dispatch::send_catalog_list_changed(&catalogs);
+    catalogs
+}
+
+/// Rebuild the cache for the current decoder directory and (re)point the
+/// filesystem watcher at it. Returns the fresh list.
+fn rebuild_and_watch(app: &AppHandle) -> Vec<CatalogFile> {
+    let list = refresh_catalog_cache(app);
+    if let Err(e) = restart_watcher(app) {
+        tlog!("[catalog] decoder-dir watcher error: {}", e);
+    }
+    list
+}
+
+/// Warm the cache and start watching the decoder directory. Call once during
+/// app setup, after example decoders are installed.
+pub fn start_catalog_cache(app: &AppHandle) {
+    let list = rebuild_and_watch(app);
+    tlog!("[catalog] Cache warmed: {} decoder(s)", list.len());
+}
+
+/// React to a settings save: if the decoder directory changed, rebuild the cache
+/// for the new directory and re-point the filesystem watcher.
+pub fn handle_decoder_dir_change(app: &AppHandle, new_dir: &str) {
+    // `try_state`, not `state`: save_settings can run during early setup (via
+    // load_settings' first-run init) before the cache is managed.
+    let Some(cache) = app.try_state::<CatalogCache>() else {
+        return;
+    };
+    let changed = {
+        let st = cache.state.lock().unwrap();
+        st.dir.as_deref() != Some(Path::new(new_dir))
+    };
+    if changed {
+        rebuild_and_watch(app);
+    }
+}
+
+/// (Re)create the filesystem watcher on the current decoder directory. A burst
+/// of filesystem events is debounced before a single cache rebuild + emit. The
+/// previous watcher (and its debounce thread) is torn down when replaced.
+#[cfg(not(target_os = "ios"))]
+fn restart_watcher(app: &AppHandle) -> Result<(), String> {
+    use notify::{EventKind, RecursiveMode, Watcher};
+    use std::time::Duration;
+
+    let dir = match resolve_decoder_dir(app) {
+        Some(d) => d,
+        None => return Ok(()),
+    };
+
+    // The watcher handler runs on notify's own thread; it only nudges the
+    // debounce channel. A dedicated thread coalesces bursts and rebuilds, so a
+    // multi-file edit triggers one scan, not one per event.
+    let (tx, rx) = std::sync::mpsc::channel::<()>();
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        if let Ok(event) = res {
+            let relevant = matches!(
+                event.kind,
+                EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+            ) && event
+                .paths
+                .iter()
+                .any(|p| p.extension().and_then(|s| s.to_str()) == Some("toml"));
+            if relevant {
+                let _ = tx.send(());
+            }
+        }
+    })
+    .map_err(|e| format!("watcher init: {}", e))?;
+    watcher
+        .watch(&dir, RecursiveMode::NonRecursive)
+        .map_err(|e| format!("watch {:?}: {}", dir, e))?;
+
+    let app_for_thread = app.clone();
+    std::thread::spawn(move || {
+        // Exits when the watcher (the sole sender) is dropped on the next restart.
+        while rx.recv().is_ok() {
+            std::thread::sleep(Duration::from_millis(250));
+            while rx.try_recv().is_ok() {}
+            refresh_catalog_cache(&app_for_thread);
+        }
+    });
+
+    let cache = app.state::<CatalogCache>();
+    let mut slot = cache.watcher.lock().unwrap();
+    *slot = Some(watcher); // dropping the old watcher stops its debounce thread
+    Ok(())
+}
+
+// iOS has no filesystem watcher: the cache is warmed once at startup and
+// refreshed only via the explicit mutation/settings paths (which call
+// refresh_catalog_cache directly), never from out-of-band file changes.
+#[cfg(target_os = "ios")]
+fn restart_watcher(_app: &AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
+/// List available catalog decoders. Served from the warm, backend-owned cache so
+/// the first frontend call returns a populated list immediately. Falls back to a
+/// one-off scan only if the cache was never built (shouldn't happen post-setup).
+#[tauri::command]
+pub async fn list_catalogs(app: AppHandle) -> Result<Vec<CatalogFile>, String> {
+    {
+        let cache = app.state::<CatalogCache>();
+        let st = cache.state.lock().unwrap();
+        if st.dir.is_some() {
+            return Ok(st.catalogs.clone());
+        }
+    }
+    Ok(refresh_catalog_cache(&app))
 }
 
 /// Extract catalog name from TOML content
@@ -389,6 +548,7 @@ fn extract_catalog_name(content: &str) -> Option<String> {
 /// Duplicate a catalog file
 #[tauri::command]
 pub async fn duplicate_catalog(
+    app: AppHandle,
     source_path: String,
     new_filename: String,
     new_name: String,
@@ -415,12 +575,14 @@ pub async fn duplicate_catalog(
     std::fs::write(&dest, content)
         .map_err(|e| format!("Failed to write duplicated catalog: {}", e))?;
 
+    refresh_catalog_cache(&app);
     Ok(())
 }
 
 /// Rename/edit a catalog file
 #[tauri::command]
 pub async fn rename_catalog(
+    app: AppHandle,
     old_path: String,
     new_filename: String,
     new_name: String,
@@ -458,12 +620,15 @@ pub async fn rename_catalog(
             .map_err(|e| format!("Failed to update catalog: {}", e))?;
     }
 
+    refresh_catalog_cache(&app);
     Ok(())
 }
 
 /// Delete a catalog file
 #[tauri::command]
-pub async fn delete_catalog(path: String) -> Result<(), String> {
+pub async fn delete_catalog(app: AppHandle, path: String) -> Result<(), String> {
     std::fs::remove_file(&path)
-        .map_err(|e| format!("Failed to delete catalog: {}", e))
+        .map_err(|e| format!("Failed to delete catalog: {}", e))?;
+    refresh_catalog_cache(&app);
+    Ok(())
 }

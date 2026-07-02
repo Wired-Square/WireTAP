@@ -116,6 +116,15 @@ pub struct AppSettings {
     pub telemetry_enabled: bool,
     #[serde(default = "default_telemetry_consent_given")]
     pub telemetry_consent_given: bool,
+    /// Anonymous feature-usage analytics (separate opt-in from crash reports)
+    #[serde(default = "default_usage_analytics_enabled")]
+    pub usage_analytics_enabled: bool,
+    #[serde(default = "default_usage_analytics_consent_given")]
+    pub usage_analytics_consent_given: bool,
+    /// Random anonymous per-install identifier, generated once by the frontend
+    /// so Sentry can count distinct installs. Empty until first generated.
+    #[serde(default)]
+    pub install_id: String,
 
     // Capture persistence
     #[serde(default = "default_clear_captures_on_start", alias = "clear_buffers_on_start")]
@@ -322,6 +331,12 @@ fn default_telemetry_enabled() -> bool {
 fn default_telemetry_consent_given() -> bool {
     false
 }
+fn default_usage_analytics_enabled() -> bool {
+    false
+}
+fn default_usage_analytics_consent_given() -> bool {
+    false
+}
 
 // Capture persistence defaults
 fn default_clear_captures_on_start() -> bool {
@@ -433,6 +448,9 @@ impl Default for AppSettings {
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
             telemetry_consent_given: default_telemetry_consent_given(),
+            usage_analytics_enabled: default_usage_analytics_enabled(),
+            usage_analytics_consent_given: default_usage_analytics_consent_given(),
+            install_id: String::new(),
             // Capture persistence
             clear_captures_on_start: default_clear_captures_on_start(),
             capture_storage: default_capture_storage(),
@@ -525,6 +543,9 @@ impl AppSettings {
             // Privacy / telemetry
             telemetry_enabled: default_telemetry_enabled(),
             telemetry_consent_given: default_telemetry_consent_given(),
+            usage_analytics_enabled: default_usage_analytics_enabled(),
+            usage_analytics_consent_given: default_usage_analytics_consent_given(),
+            install_id: String::new(),
             // Capture persistence
             clear_captures_on_start: default_clear_captures_on_start(),
             capture_storage: default_capture_storage(),
@@ -963,7 +984,15 @@ pub async fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), 
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
 
     std::fs::write(&settings_path, content)
-        .map_err(|e| format!("Failed to write settings: {}", e))
+        .map_err(|e| format!("Failed to write settings: {}", e))?;
+
+    // Rebuild the catalogue cache + re-point the watcher if the decoder dir moved.
+    crate::catalog::handle_decoder_dir_change(&app, &settings.decoder_dir);
+
+    // Keep the cached telemetry consent + install id in sync (read on every emit).
+    crate::telemetry::refresh_consent(&settings);
+
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]

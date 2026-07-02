@@ -21,6 +21,7 @@ pub mod io;
 mod profile_tracker;
 mod sessions;
 mod settings;
+mod telemetry;
 #[cfg(not(target_os = "ios"))]
 mod serial_terminal;
 mod store_manager;
@@ -1113,6 +1114,12 @@ pub fn run() {
                 Err(e) => tlog!("[setup] Failed to load settings for example decoder installation: {}", e),
             }
 
+            // Warm the backend-owned catalogue cache (and start watching the
+            // decoder dir) now that the directory is populated, so the frontend's
+            // first list_catalogs() is served from memory instead of racing a scan.
+            app.manage(catalog::CatalogCache::default());
+            catalog::start_catalog_cache(app.handle());
+
             Ok(())
         })
         .manage(SettingsWindowState(Mutex::new(None)));
@@ -1132,6 +1139,8 @@ pub fn run() {
     let builder = builder.invoke_handler(tauri::generate_handler![
             show_current_window,
             log_from_frontend,
+            telemetry::telemetry_init,
+            telemetry::track_feature_usage,
             set_log_level,
             create_main_window,
             settings_panel_closed,

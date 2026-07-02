@@ -19,6 +19,13 @@
     "accept": "Yes, help improve WireTAP",
     "decline": "No thanks"
   },
+  "usageAnalyticsConsent": {
+    "title": "Which features matter?",
+    "intro": "One more thing, and it's separate from crash reports. I'd love to know which parts of WireTAP actually get used — it's hard to know what to keep, improve, or retire when I can't see what people reach for.",
+    "details": "If you're happy to share, WireTAP will send anonymous events for things like which IO source types you start, which panels you open, and which operating system you're on. <strong>No CAN bus data, no connection details, no personal data</strong> — just feature names. You can change your mind any time in <strong>Settings → Privacy</strong>.",
+    "accept": "Sure, share usage analytics",
+    "decline": "No thanks"
+  },
   "about": {
     "title": "About WireTAP",
     "loading": "Loading…",

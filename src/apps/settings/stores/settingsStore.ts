@@ -162,6 +162,9 @@ interface AppSettings {
   // Privacy / telemetry
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
+  usage_analytics_enabled?: boolean;
+  usage_analytics_consent_given?: boolean;
+  install_id?: string;
   // Buffer persistence
   clear_captures_on_start?: boolean;
   buffer_storage?: string;
@@ -345,6 +348,9 @@ interface SettingsState {
     logLevel: string;
     telemetryEnabled: boolean;
     telemetryConsentGiven: boolean;
+    usageAnalyticsEnabled: boolean;
+    usageAnalyticsConsentGiven: boolean;
+    installId: string;
     modbusMaxRegisterErrors: number;
     smpPort: number;
     language: string;
@@ -450,6 +456,9 @@ interface SettingsState {
   setLogLevel: (value: string) => void;
   setTelemetryEnabled: (value: boolean) => void;
   setTelemetryConsentGiven: (value: boolean) => void;
+  setUsageAnalyticsEnabled: (value: boolean) => void;
+  setUsageAnalyticsConsentGiven: (value: boolean) => void;
+  setInstallId: (value: string) => void;
   setModbusMaxRegisterErrors: (value: number) => void;
   setSmpPort: (port: number) => void;
   setLanguage: (lang: string) => void;
@@ -608,6 +617,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     logLevel: "off",
     telemetryEnabled: false,
     telemetryConsentGiven: false,
+    usageAnalyticsEnabled: false,
+    usageAnalyticsConsentGiven: false,
+    installId: "",
     modbusMaxRegisterErrors: DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
     smpPort: 1337,
     language: "en-AU",
@@ -737,6 +749,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Privacy / telemetry
         telemetry_enabled: settings.telemetry_enabled ?? false,
         telemetry_consent_given: settings.telemetry_consent_given ?? false,
+        usage_analytics_enabled: settings.usage_analytics_enabled ?? false,
+        usage_analytics_consent_given: settings.usage_analytics_consent_given ?? false,
+        install_id: settings.install_id ?? "",
         // Buffer persistence
         clear_captures_on_start: settings.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
         buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
@@ -837,6 +852,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           logLevel: normalized.log_level ?? "off",
           telemetryEnabled: normalized.telemetry_enabled ?? false,
           telemetryConsentGiven: normalized.telemetry_consent_given ?? false,
+          usageAnalyticsEnabled: normalized.usage_analytics_enabled ?? false,
+          usageAnalyticsConsentGiven: normalized.usage_analytics_consent_given ?? false,
+          installId: normalized.install_id ?? "",
           modbusMaxRegisterErrors: normalized.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
           smpPort: normalized.smp_port ?? 1337,
           language: normalized.language ?? "en-AU",
@@ -968,6 +986,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Privacy / telemetry
         telemetry_enabled: general.telemetryEnabled,
         telemetry_consent_given: general.telemetryConsentGiven,
+        usage_analytics_enabled: general.usageAnalyticsEnabled,
+        usage_analytics_consent_given: general.usageAnalyticsConsentGiven,
+        install_id: general.installId,
         // Modbus
         modbus_max_register_errors: general.modbusMaxRegisterErrors,
         // Theme settings
@@ -1063,6 +1084,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // Privacy / telemetry
       telemetry_enabled: general.telemetryEnabled,
       telemetry_consent_given: general.telemetryConsentGiven,
+      usage_analytics_enabled: general.usageAnalyticsEnabled,
+      usage_analytics_consent_given: general.usageAnalyticsConsentGiven,
+      install_id: general.installId,
       // Modbus
       modbus_max_register_errors: general.modbusMaxRegisterErrors,
       // Theme settings
@@ -1511,6 +1535,27 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setTelemetryConsentGiven: (value) => {
     set((state) => ({
       general: { ...state.general, telemetryConsentGiven: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setUsageAnalyticsEnabled: (value) => {
+    set((state) => ({
+      general: { ...state.general, usageAnalyticsEnabled: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setUsageAnalyticsConsentGiven: (value) => {
+    set((state) => ({
+      general: { ...state.general, usageAnalyticsConsentGiven: value },
+    }));
+    scheduleSave(get().saveSettings);
+  },
+
+  setInstallId: (value) => {
+    set((state) => ({
+      general: { ...state.general, installId: value },
     }));
     scheduleSave(get().saveSettings);
   },

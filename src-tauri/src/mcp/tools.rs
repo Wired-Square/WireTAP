@@ -842,7 +842,7 @@ impl WireTapTools {
             )));
         }
         validate_or_reject(&p.content)?;
-        crate::catalog::save_catalog(path.to_string_lossy().into_owned(), p.content)
+        crate::catalog::save_catalog(self.app.clone(), path.to_string_lossy().into_owned(), p.content)
             .await
             .map_err(err)?;
         ok_json(json!({ "created": true, "path": path.to_string_lossy() }))
@@ -868,7 +868,7 @@ impl WireTapTools {
                 err(format!("Catalog '{want}' not found — use create_catalog for a new file"))
             })?;
         validate_or_reject(&p.content)?;
-        crate::catalog::save_catalog(cat.path.clone(), p.content).await.map_err(err)?;
+        crate::catalog::save_catalog(self.app.clone(), cat.path.clone(), p.content).await.map_err(err)?;
         ok_json(json!({ "updated": true, "filename": cat.filename, "path": cat.path }))
     }
 }

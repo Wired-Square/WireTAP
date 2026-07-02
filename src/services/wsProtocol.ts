@@ -38,6 +38,7 @@ export const MsgType = {
   AttachToPanel: 0x15,
   FrameCounts: 0x16,
   OpenAppsChanged: 0x17,
+  CatalogListChanged: 0x18,
   Command: 0x20,
   CommandResponse: 0x21,
   BridgeRequest: 0x30,

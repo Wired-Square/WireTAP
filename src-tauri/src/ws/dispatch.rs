@@ -499,6 +499,22 @@ pub fn send_open_apps_changed(roster: &[crate::io::AppInstanceInfo]) {
     server.send_global(msg);
 }
 
+/// Signal all connected WS clients that the decoder-catalogue list changed.
+/// Payload is the fresh list as JSON; the frontend treats this as a "re-sync"
+/// trigger and reconciles via `list_catalogs`. Mirrors `send_open_apps_changed`.
+pub fn send_catalog_list_changed(catalogs: &[crate::catalog::CatalogFile]) {
+    let server = match ws_server() {
+        Some(s) => s,
+        None => return,
+    };
+    let payload = match serde_json::to_vec(catalogs) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    let msg = protocol::encode_message(MsgType::CatalogListChanged, 0, &payload);
+    server.send_global(msg);
+}
+
 /// Send replay state update (global, channel 0).
 pub fn send_replay_state(state: &crate::replay::ReplayState) {
     let server = match ws_server() {

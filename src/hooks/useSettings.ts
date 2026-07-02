@@ -329,6 +329,10 @@ export interface AppSettings {
   // Privacy / telemetry
   telemetry_enabled?: boolean;
   telemetry_consent_given?: boolean;
+  usage_analytics_enabled?: boolean;
+  usage_analytics_consent_given?: boolean;
+  /** Random anonymous per-install id (generated once by the frontend) */
+  install_id?: string;
   // Buffer persistence
   clear_captures_on_start?: boolean;
   /** Buffer storage backend ("sqlite" is the only option for now) */

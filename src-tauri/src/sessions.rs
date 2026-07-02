@@ -572,6 +572,10 @@ pub async fn create_reader_session(
     // Check if this profile is already in use (for single-handle devices)
     profile_tracker::can_use_profile(&profile.id, &profile.kind)?;
 
+    // Anonymous usage telemetry: which source kind gets started (postgres,
+    // wiretap, and any MCP-driven kind all land here).
+    crate::telemetry::emit_feature_usage("io_source_start", &profile.kind);
+
     // Track profile_id for later registration
     let profile_id_for_tracking = profile.id.clone();
 
@@ -1258,6 +1262,9 @@ pub async fn create_capture_source_session(
         capture_id,
         speed.unwrap_or(0.0), // 0 = no limit by default
     );
+
+    // Anonymous usage telemetry: user explicitly opened a capture for replay.
+    crate::telemetry::emit_feature_usage("io_source_start", "capture");
 
     let result = create_session(app, session_id, Box::new(reader), None, None, None, vec![]).await;
     Ok(result.capabilities)
@@ -2475,6 +2482,15 @@ pub async fn create_multi_source_session(
     }
     // Store all profiles for this session (needed for cleanup on destroy)
     register_session_profiles(&session_id, &profile_ids);
+
+    // Anonymous usage telemetry: which source kinds get started (deduped so a
+    // multi-bus start doesn't over-count a single user action).
+    let mut seen = std::collections::HashSet::new();
+    for config in &stored_configs {
+        if seen.insert(config.profile_kind.as_str()) {
+            crate::telemetry::emit_feature_usage("io_source_start", &config.profile_kind);
+        }
+    }
 
     let result = create_session(app, session_id.clone(), Box::new(reader), subscriber_id, app_name, Some(source_display_names), stored_configs).await;
 

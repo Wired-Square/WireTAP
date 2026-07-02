@@ -11,7 +11,7 @@ import { useSessionCatalog } from "../../hooks/useSessionCatalog";
 import { useIOSourcePickerHandlers } from "../../hooks/useIOSourcePickerHandlers";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useSettingsStore } from "../settings/stores/settingsStore";
-import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
+import { useCatalogList } from "../../hooks/useCatalogList";
 import { mergeSerialConfig } from "../../utils/sessionConfigMerge";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { tlog } from "../../api/settings";
@@ -37,7 +37,7 @@ import type { DecodedFrameMsg } from "../../services/wsProtocol";
 function DashboardInner() {
   const { t } = useTranslation("dashboard");
   const { settings } = useSettings();
-  const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
+  const catalogs = useCatalogList();
 
   // Dialog to configure which panel
   const [configuringPanelId, setConfiguringPanelId] = useState<string | null>(null);
@@ -442,12 +442,11 @@ function DashboardInner() {
     }
   }, [settings, initFromSettings, setBufferCapacity]);
 
-  // Load catalog list and saved layouts on mount. The catalog dir is resolved
-  // in Rust, so the list must NOT gate on decoderDir being populated.
+  // Catalogue list comes from useCatalogList (backend-owned, pushed live).
+  // Load saved layouts on mount.
   useEffect(() => {
-    listCatalogs().then(setCatalogs).catch(console.error);
     loadSavedLayouts();
-  }, [decoderDir, loadSavedLayouts]);
+  }, [loadSavedLayouts]);
 
   // Reload saved layouts when they change from other panels
   useEffect(() => {

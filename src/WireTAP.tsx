@@ -20,12 +20,14 @@ import { useAppErrorDialog, useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./apps/settings/stores/settingsStore";
 import { checkRecoveryOccurred } from "./api/io";
 import { checkCandorMigration, tlog } from "./api/settings";
+import { initTelemetry } from "./api/telemetry";
 import { initWsTransport } from "./services/wsTransport";
 import { initMcpBridge } from "./services/mcpBridge";
 import "./services/memoryDiag"; // Memory diagnostic counters
 import type { CandorMigrationInfo } from "./api/settings";
 import ErrorDialog from "./dialogs/ErrorDialog";
-import TelemetryConsentDialog from "./dialogs/TelemetryConsentDialog";
+import { Shield, BarChart3 } from "lucide-react";
+import ConsentDialog from "./dialogs/ConsentDialog";
 import CandorMigrationDialog from "./dialogs/CandorMigrationDialog";
 
 // Lazy load AboutDialog since it's rarely used
@@ -70,6 +72,12 @@ export default function WireTAP() {
     loadCaptureIds();
   }, [loadSettingsStore, loadCaptureIds]);
 
+  // Hand the Sentry DSN to the Rust backend so it can initialise its
+  // usage-analytics logs client (emission + consent gating live in Rust).
+  useEffect(() => {
+    initTelemetry();
+  }, []);
+
   // Telemetry consent state
   const settingsLoaded = useSettingsStore((s) => s.originalSettings !== null);
   const language = useSettingsStore((s) => s.general.language);
@@ -77,6 +85,14 @@ export default function WireTAP() {
   const telemetryConsentGiven = useSettingsStore((s) => s.general.telemetryConsentGiven);
   const setTelemetryEnabled = useSettingsStore((s) => s.setTelemetryEnabled);
   const setTelemetryConsentGiven = useSettingsStore((s) => s.setTelemetryConsentGiven);
+
+  // Usage-analytics consent state (separate opt-in from crash reports)
+  const usageAnalyticsEnabled = useSettingsStore((s) => s.general.usageAnalyticsEnabled);
+  const usageAnalyticsConsentGiven = useSettingsStore((s) => s.general.usageAnalyticsConsentGiven);
+  const setUsageAnalyticsEnabled = useSettingsStore((s) => s.setUsageAnalyticsEnabled);
+  const setUsageAnalyticsConsentGiven = useSettingsStore((s) => s.setUsageAnalyticsConsentGiven);
+  const installId = useSettingsStore((s) => s.general.installId);
+  const setInstallId = useSettingsStore((s) => s.setInstallId);
 
   // Apply global theme (dark/light mode + CSS variables)
   useTheme();
@@ -121,19 +137,30 @@ export default function WireTAP() {
     }
   }, [settingsLoaded]);
 
-  // Show consent dialog on first boot (or upgrade without the setting)
+  // Generate a random anonymous per-install id once, so Sentry can count
+  // distinct installs. Persists through the normal settings-save path.
+  useEffect(() => {
+    if (settingsLoaded && !installId) {
+      setInstallId(crypto.randomUUID());
+    }
+  }, [settingsLoaded, installId, setInstallId]);
+
+  // Show crash-report consent dialog on first boot (or upgrade without the setting)
   useEffect(() => {
     if (settingsLoaded && !telemetryConsentGiven) {
       setShowConsentDialog(true);
     }
   }, [settingsLoaded, telemetryConsentGiven]);
 
-  // Enable/disable Sentry based on consent + preference
+  // Enable the Sentry client whenever either opt-in is on (per-event consent is
+  // enforced in beforeSend), and attach the anonymous install id so "users
+  // affected" counts work.
   useEffect(() => {
-    if (settingsLoaded && telemetryConsentGiven) {
-      setSentryEnabled(telemetryEnabled);
-    }
-  }, [settingsLoaded, telemetryConsentGiven, telemetryEnabled]);
+    if (!settingsLoaded) return;
+    const enabled = telemetryEnabled || usageAnalyticsEnabled;
+    setSentryEnabled(enabled);
+    Sentry.setUser(enabled && installId ? { id: installId } : null);
+  }, [settingsLoaded, telemetryEnabled, usageAnalyticsEnabled, installId]);
 
   // Check if the page was reloaded by the watchdog after a WebView content
   // process jettison (macOS reclaims WKWebView memory under pressure).
@@ -162,6 +189,24 @@ export default function WireTAP() {
     setShowConsentDialog(false);
   };
 
+  // Both paths record consent; the dialog's visibility is derived from
+  // usageAnalyticsConsentGiven, and the effect above owns enabling Sentry.
+  const handleUsageConsentAccept = () => {
+    setUsageAnalyticsEnabled(true);
+    setUsageAnalyticsConsentGiven(true);
+  };
+
+  const handleUsageConsentDecline = () => {
+    setUsageAnalyticsEnabled(false);
+    setUsageAnalyticsConsentGiven(true);
+  };
+
+  // Usage-analytics consent is shown once, sequenced after the crash-report
+  // dialog: new users answer crash first, existing crash-consenters see only
+  // this. Fully derived — recording consent closes it, no separate state.
+  const showUsageConsent =
+    settingsLoaded && telemetryConsentGiven && !usageAnalyticsConsentGiven && !showConsentDialog;
+
   return (
     <>
       <Suspense fallback={null}>
@@ -180,16 +225,26 @@ export default function WireTAP() {
         details={appErrorDetails ?? undefined}
         onClose={closeAppError}
       />
-      {/* Telemetry consent dialog - shown on first boot */}
-      <TelemetryConsentDialog
+      {/* Crash-report consent dialog - shown on first boot */}
+      <ConsentDialog
         isOpen={showConsentDialog}
         onAccept={handleConsentAccept}
         onDecline={handleConsentDecline}
+        icon={Shield}
+        i18nKey="telemetryConsent"
+      />
+      {/* Usage-analytics consent dialog - shown after the crash-report dialog */}
+      <ConsentDialog
+        isOpen={showUsageConsent}
+        onAccept={handleUsageConsentAccept}
+        onDecline={handleUsageConsentDecline}
+        icon={BarChart3}
+        i18nKey="usageAnalyticsConsent"
       />
       {/* CANdor migration dialog - shown when old data is detected */}
       {migrationInfo && (
         <CandorMigrationDialog
-          open={!showConsentDialog}
+          open={!showConsentDialog && !showUsageConsent}
           info={migrationInfo}
           onComplete={() => setMigrationInfo(null)}
         />

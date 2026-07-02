@@ -7,7 +7,8 @@ import { useSettings, getSaveFrameIdFormat } from "../../hooks/useSettings";
 import { useFrameIdFormat, withFrameIdFormat } from "../../hooks/useFrameIdFormat";
 import { useCatalogEditorStore } from "../../stores/catalogEditorStore";
 import { useFocusStore } from "../../stores/focusStore";
-import { listCatalogs, diffCatalog, parseCatalog, type CatalogMetadata } from "../../api/catalog";
+import { diffCatalog, parseCatalog } from "../../api/catalog";
+import { useCatalogList } from "../../hooks/useCatalogList";
 import { Eye, X } from "lucide-react";
 import AppLayout from "../../components/AppLayout";
 import { borderDataView, bgDataView, bgWarning, textWarning, borderWarning } from "../../styles/colourTokens";
@@ -129,8 +130,8 @@ function CatalogEditorInner() {
     }
   }, [isFocused]);
 
-  // Catalog picker state
-  const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
+  // Catalog picker state — backend-owned list, pushed live.
+  const catalogs = useCatalogList();
   const [showCatalogPicker, setShowCatalogPicker] = useState(false);
   // Text-mode sub-view: raw editor vs read-only diff against last save.
   const [textView, setTextView] = useState<"edit" | "diff">("edit");
@@ -275,16 +276,8 @@ function CatalogEditorInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
 
-  // Load catalog list on mount (refresh if the decoder dir changes). The dir is
-  // resolved in Rust, so this must NOT gate on decoderDir being populated.
-  useEffect(() => {
-    listCatalogs().then(setCatalogs).catch(console.error);
-  }, [decoderDir]);
-
-  // Handler for opening catalog picker
+  // Handler for opening catalog picker. The list is kept live by useCatalogList.
   const handleOpenCatalogPicker = useCallback(() => {
-    // Refresh catalog list before showing picker
-    listCatalogs().then(setCatalogs).catch(console.error);
     setShowCatalogPicker(true);
   }, []);
 

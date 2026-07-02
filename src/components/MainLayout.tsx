@@ -42,6 +42,7 @@ import {
 } from "../utils/persistence";
 import { getAppVersion, settingsPanelClosed, openSettingsPanel, updateMenuState } from "../api";
 import { registerOpenApp, unregisterOpenApp } from "../api/io";
+import { trackFeatureUsage } from "../api/telemetry";
 import { formatWindowName } from "../utils/windowName";
 import { useSettingsStore } from "../apps/settings/stores/settingsStore";
 import { useFocusStore } from "../stores/focusStore";
@@ -410,6 +411,10 @@ export default function MainLayout() {
     (event: DockviewReadyEvent) => {
       apiRef.current = event.api;
 
+      // True only while boot-time layout restore / default-panel opening runs, so
+      // those auto-opens aren't counted as user-initiated feature usage.
+      let restoringLayout = false;
+
       // Register a session-aware panel in the Rust open-app registry so the Session
       // Manager graph shows it (across all windows) even before Dockview mounts its
       // content. The id matches useIOSession's subscriber id (`${windowLabel}_${appName}`)
@@ -426,6 +431,11 @@ export default function MainLayout() {
       // Listen for panel and layout changes to trigger save
       event.api.onDidAddPanel((panel) => {
         registerPanel(panel.id);
+        // Anonymous usage telemetry: which app panels users open. Skip boot-time
+        // restores/defaults so we count only user-initiated opens.
+        if (!restoringLayout) {
+          trackFeatureUsage("app_open", panel.id);
+        }
         saveLayout();
       });
       event.api.onDidRemovePanel((panel) => {
@@ -447,13 +457,15 @@ export default function MainLayout() {
         useFocusStore.getState().setFocusedPanelId(panel?.id ?? null);
       });
 
-      // Try to restore saved layout
+      // Try to restore saved layout (boot-time restore isn't user-initiated usage)
       if (savedLayout) {
+        restoringLayout = true;
         try {
           event.api.fromJSON(savedLayout);
         } catch (error) {
           console.error("Failed to restore layout, using default:", error);
         }
+        restoringLayout = false;
       }
 
       // Dynamic windows show the watermark instead of default panel
@@ -463,11 +475,13 @@ export default function MainLayout() {
 
       // No saved layout or restore failed - open Discovery panel by default
       if (!savedLayout) {
+        restoringLayout = true;
         event.api.addPanel({
           id: "discovery",
           component: "discovery",
           title: getPanelTitle(t, "discovery"),
         });
+        restoringLayout = false;
       }
 
       // Seed the open-app registry from all currently-loaded panels (onDidAddPanel

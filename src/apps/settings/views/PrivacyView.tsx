@@ -6,11 +6,15 @@ import { labelDefault, helpText } from "../../../styles";
 type PrivacyViewProps = {
   telemetryEnabled: boolean;
   onChangeTelemetryEnabled: (value: boolean) => void;
+  usageAnalyticsEnabled: boolean;
+  onChangeUsageAnalyticsEnabled: (value: boolean) => void;
 };
 
 export default function PrivacyView({
   telemetryEnabled,
   onChangeTelemetryEnabled,
+  usageAnalyticsEnabled,
+  onChangeUsageAnalyticsEnabled,
 }: PrivacyViewProps) {
   const { t } = useTranslation("settings");
 
@@ -20,7 +24,7 @@ export default function PrivacyView({
         {t("privacy.title")}
       </h2>
 
-      {/* Telemetry */}
+      {/* Crash reports */}
       <div className="space-y-2">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
@@ -32,6 +36,22 @@ export default function PrivacyView({
           <div>
             <span className={labelDefault}>{t("privacy.telemetry.label")}</span>
             <p className={helpText}>{t("privacy.telemetry.help")}</p>
+          </div>
+        </label>
+      </div>
+
+      {/* Usage analytics */}
+      <div className="space-y-2">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={usageAnalyticsEnabled}
+            onChange={(e) => onChangeUsageAnalyticsEnabled(e.target.checked)}
+            className="mt-1"
+          />
+          <div>
+            <span className={labelDefault}>{t("privacy.usageAnalytics.label")}</span>
+            <p className={helpText}>{t("privacy.usageAnalytics.help")}</p>
           </div>
         </label>
       </div>

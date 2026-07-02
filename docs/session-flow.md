@@ -407,6 +407,7 @@ Global (channel 0):
 | `ReplayState`       | 0x0C | Replay controller state |
 | `TestPatternState`  | 0x0D | Test pattern generator state |
 | `OpenAppsChanged`   | 0x17 | Open-app roster changed; clients re-fetch `list_open_apps` (see [§ The open-app registry](#the-open-app-registry--subscribers--the-cross-window-roster)) |
+| `CatalogListChanged`| 0x18 | Decoder-catalogue list changed (mutation, decoder-dir change, or filesystem watcher); clients re-fetch `list_catalogs` from the warm backend cache (see [§ Catalogue list cache](#catalogue-list-cache)) |
 
 Control frames: `Subscribe` / `Unsubscribe` / `SubscribeAck` / `SubscribeNack`,
 plus `Heartbeat` and `Auth`. Request/response RPC uses `Command` (0x20) /
@@ -514,6 +515,34 @@ session has none) so the now-framed messages land, stream and decode. The Decode
 calls it from [`useSessionCatalog`](../src/hooks/useSessionCatalog.ts)'s sibling
 serial-config effect when the encoding first appears, falling back to a full
 re-watch if the live swap fails.
+
+### Catalogue list cache
+
+The decoder-picker list (what `list_catalogs` returns — the `.toml` files in
+`decoder_dir`, distinct from the *attached* catalogue above) is **owned by the
+backend**, not re-scanned per call. A `CatalogCache` in managed state
+([catalog.rs](../src-tauri/src/catalog.rs)) is **warmed once during `setup`**
+(`start_catalog_cache`, right after the example decoders are seeded), so the
+frontend's first `list_catalogs` is served from memory — no startup race where
+the picker shows empty until settings resolve, and no re-walking the directory
+(or re-logging the duplicate-display-name warning) once per consumer.
+
+The cache is kept fresh by `refresh_catalog_cache`, called when a catalogue
+mutation command runs (`save`/`duplicate`/`rename`/`delete_catalog`), when
+`decoder_dir` changes in `save_settings`, and — on desktop — by a `notify`
+filesystem watcher on the decoder dir (debounced ~250 ms) that catches `.toml`
+files added or edited outside the app. iOS has no watcher: it warms once and
+refreshes only via the explicit mutation/settings paths.
+
+Each rebuild signals every WS client with a global `CatalogListChanged` (0x18)
+on channel 0 ([ws/dispatch.rs](../src-tauri/src/ws/dispatch.rs)
+`send_catalog_list_changed`). The frontend's
+[`useCatalogList`](../src/hooks/useCatalogList.ts) hook (Decoder, Dashboard,
+Query, Catalog Editor) treats the push as a re-sync trigger and reconciles via
+`list_catalogs` — fetching on mount, on each push, and on WS reconnect — exactly
+the `useOpenAppsSync` pattern, keeping Rust the single source of truth. (The
+modal pickers — `SaveFramesDialog`, `IoSourcePickerDialog` — still read
+imperatively on open; they get the warm-cache benefit but not live updates.)
 
 ### Dispatch path
 

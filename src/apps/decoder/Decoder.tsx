@@ -19,7 +19,7 @@ import { frameKey } from "../../utils/frameKey";
 import { buildCatalogPath } from "../../utils/catalogUtils";
 import { useSessionCatalog } from "../../hooks/useSessionCatalog";
 import { tlog } from "../../api/settings";
-import { listCatalogs, type CatalogMetadata } from "../../api/catalog";
+import { useCatalogList } from "../../hooks/useCatalogList";
 import { UI_UPDATE_INTERVAL_MS, COPY_FEEDBACK_TIMEOUT_MS, REALTIME_CLOCK_INTERVAL_MS } from "../../constants";
 import type { StreamEndedInfo, PlaybackPosition } from '../../api/io';
 import { setFraming, pauseSourcePolling, resumeSourcePolling } from '../../api/io';
@@ -48,7 +48,7 @@ function DecoderInner() {
   const { t } = useTranslation("decoder");
   const { settings } = useSettings();
   const [catalogNotification, setCatalogNotification] = useState<string | null>(null);
-  const [catalogs, setCatalogs] = useState<CatalogMetadata[]>([]);
+  const catalogs = useCatalogList();
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [showTimeRange, setShowTimeRange] = useState(false);
   // Modbus polling state — whether the source is actively polling (vs paused).
@@ -926,21 +926,6 @@ function DecoderInner() {
     };
   }, []);
 
-  // Load catalog list on mount (and refresh if the decoder dir changes). The
-  // directory is resolved in Rust, so this must NOT gate on decoderDir — gating
-  // left the list empty when settings resolved late at startup.
-  useEffect(() => {
-    const loadCatalogList = async () => {
-      try {
-        const list = await listCatalogs();
-        setCatalogs(list);
-      } catch (e) {
-        console.error("Failed to load catalog list:", e);
-      }
-    };
-    loadCatalogList();
-  }, [decoderDir]);
-
   // Listen for catalog-saved events for inter-window communication
   useEffect(() => {
     const setupListener = async () => {
@@ -949,14 +934,8 @@ function DecoderInner() {
         async (event) => {
           const { catalogPath: savedPath } = event.payload;
 
-          // Refresh catalog list
-          try {
-            const list = await listCatalogs();
-            setCatalogs(list);
-          } catch (e) {
-            console.error("Failed to refresh catalog list:", e);
-          }
-
+          // The list refreshes via useCatalogList (catalog:list-changed). Here we
+          // only reload the model when this decoder is using the saved catalog.
           // Only reload if this decoder is using that catalog. The path is
           // unchanged, so re-parse explicitly (re-attaching when bound to a session).
           if (catalogPath && savedPath === catalogPath) {

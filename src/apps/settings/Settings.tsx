@@ -171,6 +171,8 @@ export default function Settings() {
   // Privacy
   const telemetryEnabled = useSettingsStore((s) => s.general.telemetryEnabled);
   const setTelemetryEnabled = useSettingsStore((s) => s.setTelemetryEnabled);
+  const usageAnalyticsEnabled = useSettingsStore((s) => s.general.usageAnalyticsEnabled);
+  const setUsageAnalyticsEnabled = useSettingsStore((s) => s.setUsageAnalyticsEnabled);
 
   // IO Profiles
   const ioProfiles = useSettingsStore((s) => s.ioProfiles.profiles);
@@ -379,6 +381,8 @@ export default function Settings() {
             <PrivacyView
               telemetryEnabled={telemetryEnabled}
               onChangeTelemetryEnabled={setTelemetryEnabled}
+              usageAnalyticsEnabled={usageAnalyticsEnabled}
+              onChangeUsageAnalyticsEnabled={setUsageAnalyticsEnabled}
             />
           )}
 

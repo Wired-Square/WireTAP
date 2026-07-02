@@ -51,6 +51,10 @@ async-trait = "0.1"
 toml = "0.8"
 can-dbc = "8"
 reqwest = { version = "0.12", features = ["json"] }
+# Backend-side Sentry client for anonymous usage-analytics *logs* — sends over
+# native HTTPS (no webview CSP). Logs-only; crash reporting stays in the
+# frontend @sentry/react SDK. Needs >= 0.42 for structured logs.
+sentry = { version = "0.42", features = ["logs"] }
 rumqttc = "0.24"
 # MCP server — exposes live runtime state to an external Claude client over a
 # localhost streamable-HTTP transport (opt-in via settings). axum hosts the
@@ -88,6 +92,9 @@ dfu-nusb = "0.1"
 nusb_dfu = { package = "nusb", version = "0.1" }
 # Intel HEX parsing for the STM32 UART flasher.
 ihex = "3"
+# Filesystem watcher for the decoder directory — keeps the backend-owned
+# catalogue cache fresh when .toml files are added/edited outside the app.
+notify = "6"
 
 # MacOS
 [target.'cfg(target_os = "macos")'.dependencies]

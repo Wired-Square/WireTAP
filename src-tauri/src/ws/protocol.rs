@@ -36,6 +36,9 @@ pub enum MsgType {
     // Cross-window open-app roster snapshot (every open session-aware app instance,
     // across all windows). Opaque JSON; the frontend replaces its roster state.
     OpenAppsChanged  = 0x17,
+    // Global signal: the decoder-catalogue list changed (mutation, decoder-dir
+    // change, or filesystem watcher). The frontend reconciles via list_catalogs.
+    CatalogListChanged = 0x18,
     Command          = 0x20,
     CommandResponse  = 0x21,
     // Reverse RPC: server (Rust/MCP) → frontend request, frontend → server reply.
@@ -73,6 +76,7 @@ impl TryFrom<u8> for MsgType {
             0x15 => Ok(MsgType::AttachToPanel),
             0x16 => Ok(MsgType::FrameCounts),
             0x17 => Ok(MsgType::OpenAppsChanged),
+            0x18 => Ok(MsgType::CatalogListChanged),
             0x20 => Ok(MsgType::Command),
             0x21 => Ok(MsgType::CommandResponse),
             0x30 => Ok(MsgType::BridgeRequest),

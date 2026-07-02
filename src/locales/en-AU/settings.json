@@ -235,7 +235,11 @@
     "title": "Privacy",
     "telemetry": {
       "label": "Send anonymous crash reports",
-      "help": "Help improve WireTAP by sending anonymous crash and error reports via Sentry. No personal data, CAN bus data, or usage analytics are collected — only error stack traces."
+      "help": "Help improve WireTAP by sending anonymous crash and error reports via Sentry. This option collects no CAN bus data and no personal data — only error stack traces."
+    },
+    "usageAnalytics": {
+      "label": "Share anonymous usage analytics",
+      "help": "Help decide which features to keep by sharing anonymous usage events — which IO source types get started, which app panels are opened, and which operating system you're on. No CAN bus data, connection details, or personal data are collected."
     }
   },
   "catalogs": {
