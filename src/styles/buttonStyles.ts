@@ -412,10 +412,10 @@ export const resetButtonSmall =
   "text-xs px-2 py-1 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-90 transition-colors";
 
 /**
- * Compact icon-only reset button (↺) for per-row "reset to default" actions.
+ * Compact icon-only reset button (↺) for per-row "reset to default" actions —
+ * the compact hover icon button in a muted text colour.
  */
-export const resetButtonIcon =
-  "p-1 rounded text-[color:var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:brightness-90 transition-colors";
+export const resetButtonIcon = `${iconButtonHoverCompact} text-[color:var(--text-secondary)]`;
 
 /**
  * Dialog option button - for multi-choice dialog buttons

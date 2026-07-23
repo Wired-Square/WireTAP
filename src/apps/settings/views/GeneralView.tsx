@@ -1,14 +1,16 @@
 // ui/src/apps/settings/views/GeneralView.tsx
 
 import { useTranslation } from "react-i18next";
-import Input from "../../../components/forms/Input";
 import Select from "../../../components/forms/Select";
 import { h2 } from "../../../styles";
 import { SUPPORTED_LANGUAGES } from "../../../locales";
-import { SETTINGS_BOUNDS } from "../../../settings/bounds";
-import { SettingSection, SettingRow, SettingToggleRow } from "../components/rows";
-
-type DefaultFrameType = "can" | "modbus" | "serial";
+import type { DefaultFrameType } from "../../../settings/appSettings";
+import {
+  SettingSection,
+  SettingRow,
+  SettingToggleRow,
+  BoundedNumberInput,
+} from "../components/rows";
 
 type GeneralViewProps = {
   defaultFrameType: DefaultFrameType;
@@ -82,16 +84,10 @@ export default function GeneralView({
           label={t("general.modbus.maxRegisterErrors.label")}
           help={t("general.modbus.maxRegisterErrors.help")}
         >
-          <Input
-            type="number"
-            min={SETTINGS_BOUNDS.modbusMaxRegisterErrors.min}
-            max={SETTINGS_BOUNDS.modbusMaxRegisterErrors.max}
+          <BoundedNumberInput
+            boundKey="modbusMaxRegisterErrors"
             value={modbusMaxRegisterErrors}
-            onChange={(e) =>
-              onChangeModbusMaxRegisterErrors(
-                Math.max(SETTINGS_BOUNDS.modbusMaxRegisterErrors.min, parseInt(e.target.value) || 0),
-              )
-            }
+            onChange={onChangeModbusMaxRegisterErrors}
             className="w-32"
           />
         </SettingRow>
@@ -135,16 +131,10 @@ export default function GeneralView({
           label={t("general.networking.smpPort.label")}
           help={t("general.networking.smpPort.help")}
         >
-          <Input
-            type="number"
+          <BoundedNumberInput
+            boundKey="smpPort"
             value={smpPort}
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10);
-              const { min, max } = SETTINGS_BOUNDS.smpPort;
-              if (!isNaN(v) && v >= min && v <= max) onChangeSmpPort(v);
-            }}
-            min={SETTINGS_BOUNDS.smpPort.min}
-            max={SETTINGS_BOUNDS.smpPort.max}
+            onChange={onChangeSmpPort}
             className="w-32"
           />
         </SettingRow>

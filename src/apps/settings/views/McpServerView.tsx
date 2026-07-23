@@ -7,7 +7,7 @@
 // effect only when "Apply & restart server" is pressed (one restart, rather
 // than bouncing the server — and disconnecting any client — on every tick).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, RefreshCw, Check } from "lucide-react";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -25,7 +25,7 @@ import {
   textSecondary,
 } from "../../../styles";
 import { SETTINGS_BOUNDS } from "../../../settings/bounds";
-import { SettingToggleRow } from "../components/rows";
+import { SettingRow, SettingToggleRow } from "../components/rows";
 
 interface McpStatus {
   running: boolean;
@@ -147,6 +147,83 @@ export default function McpServerView() {
     applyMessage = "The MCP server is off — enable it above to start.";
   }
 
+  // Permission gates — each adds a group of write/control tools. Staged (applied
+  // on "Apply & restart server"), so each toggles via `staged(setter)`.
+  const permissionGates: {
+    label: string;
+    checked: boolean;
+    setter: (v: boolean) => void;
+    help: ReactNode;
+  }[] = [
+    {
+      label: "Allow control tools",
+      checked: allowControl,
+      setter: setAllowControl,
+      help: (
+        <>
+          Lets the client <strong>drive the app</strong> — transmit frames on the bus, write
+          Modbus registers and replay captures. Leave off for read-only introspection.
+        </>
+      ),
+    },
+    {
+      label: "Allow session open/stop",
+      checked: allowSessionControl,
+      setter: setAllowSessionControl,
+      help: (
+        <>
+          Lets the client <strong>open and stop sessions</strong> — e.g. start a Modbus session
+          polling from a profile's catalogue. Separate from the control gate above.
+        </>
+      ),
+    },
+    {
+      label: "Allow catalogue create (new files)",
+      checked: allowCatalogWrite,
+      setter: setAllowCatalogWrite,
+      help: (
+        <>
+          Lets the client <strong>create new decoder catalogues</strong> in the decoder
+          directory. Validated before writing; existing files are never overwritten.
+        </>
+      ),
+    },
+    {
+      label: "Allow catalogue modify (overwrite existing)",
+      checked: allowCatalogModify,
+      setter: setAllowCatalogModify,
+      help: (
+        <>
+          Lets the client <strong>overwrite existing decoder catalogues</strong>. Validated
+          before writing. Separate from the create gate above.
+        </>
+      ),
+    },
+    {
+      label: "Allow dashboard write",
+      checked: allowDashboardWrite,
+      setter: setAllowDashboardWrite,
+      help: (
+        <>
+          Lets the client <strong>create or overwrite dashboard files</strong> in the
+          dashboards directory. The JSON shape is validated; any embedded custom-widget code
+          is stored opaque and only ever runs later inside the sandboxed worker.
+        </>
+      ),
+    },
+    {
+      label: "Allow UI control (open panels)",
+      checked: allowUiControl,
+      setter: setAllowUiControl,
+      help: (
+        <>
+          Lets the client <strong>open or focus a panel</strong> in the running window — e.g.
+          show a dashboard it just authored. Requires the WireTAP window to be open.
+        </>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <h2 className={h2}>MCP Server</h2>
@@ -185,96 +262,20 @@ export default function McpServerView() {
         </p>
       </div>
 
-      <SettingToggleRow
-        label="Allow control tools"
-        checked={allowControl}
-        disabled={busy}
-        warn
-        onChange={staged(setAllowControl)}
-        help={
-          <>
-            Lets the client <strong>drive the app</strong> — transmit frames on the bus, write
-            Modbus registers and replay captures. Leave off for read-only introspection.
-          </>
-        }
-      />
-
-      <SettingToggleRow
-        label="Allow session open/stop"
-        checked={allowSessionControl}
-        disabled={busy}
-        warn
-        onChange={staged(setAllowSessionControl)}
-        help={
-          <>
-            Lets the client <strong>open and stop sessions</strong> — e.g. start a Modbus session
-            polling from a profile's catalogue. Separate from the control gate above.
-          </>
-        }
-      />
-
-      <SettingToggleRow
-        label="Allow catalogue create (new files)"
-        checked={allowCatalogWrite}
-        disabled={busy}
-        warn
-        onChange={staged(setAllowCatalogWrite)}
-        help={
-          <>
-            Lets the client <strong>create new decoder catalogues</strong> in the decoder
-            directory. Validated before writing; existing files are never overwritten.
-          </>
-        }
-      />
-
-      <SettingToggleRow
-        label="Allow catalogue modify (overwrite existing)"
-        checked={allowCatalogModify}
-        disabled={busy}
-        warn
-        onChange={staged(setAllowCatalogModify)}
-        help={
-          <>
-            Lets the client <strong>overwrite existing decoder catalogues</strong>. Validated
-            before writing. Separate from the create gate above.
-          </>
-        }
-      />
-
-      <SettingToggleRow
-        label="Allow dashboard write"
-        checked={allowDashboardWrite}
-        disabled={busy}
-        warn
-        onChange={staged(setAllowDashboardWrite)}
-        help={
-          <>
-            Lets the client <strong>create or overwrite dashboard files</strong> in the
-            dashboards directory. The JSON shape is validated; any embedded custom-widget code
-            is stored opaque and only ever runs later inside the sandboxed worker.
-          </>
-        }
-      />
-
-      <SettingToggleRow
-        label="Allow UI control (open panels)"
-        checked={allowUiControl}
-        disabled={busy}
-        warn
-        onChange={staged(setAllowUiControl)}
-        help={
-          <>
-            Lets the client <strong>open or focus a panel</strong> in the running window — e.g.
-            show a dashboard it just authored. Requires the WireTAP window to be open.
-          </>
-        }
-      />
+      {permissionGates.map((gate) => (
+        <SettingToggleRow
+          key={gate.label}
+          label={gate.label}
+          checked={gate.checked}
+          disabled={busy}
+          warn
+          onChange={staged(gate.setter)}
+          help={gate.help}
+        />
+      ))}
 
       {/* Port */}
-      <div className="space-y-2 max-w-xs">
-        <label className={labelDefault} htmlFor="mcp-port">
-          Port
-        </label>
+      <SettingRow label="Port" htmlFor="mcp-port" className="max-w-xs">
         <input
           id="mcp-port"
           type="number"
@@ -287,7 +288,7 @@ export default function McpServerView() {
           }}
           className={inputSimple}
         />
-      </div>
+      </SettingRow>
 
       {/* Token */}
       <div className="space-y-2 max-w-xl">

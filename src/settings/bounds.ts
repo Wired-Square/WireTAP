@@ -27,9 +27,3 @@ export const SETTINGS_BOUNDS = {
 } as const satisfies Record<string, NumericBound>;
 
 export type SettingsBoundKey = keyof typeof SETTINGS_BOUNDS;
-
-/** Clamp a value into a named bound's [min, max]. */
-export function clampSetting(key: SettingsBoundKey, value: number): number {
-  const { min, max } = SETTINGS_BOUNDS[key];
-  return Math.min(max, Math.max(min, value));
-}

@@ -532,94 +532,13 @@ impl AppSettings {
             .map_err(|e| format!("Failed to get document directory: {}", e))?
             .join("WireTAP");
 
-        let decoder_path = documents_dir.join("Decoders");
-        let dump_path = documents_dir.join("Dumps");
-        let report_path = documents_dir.join("Reports");
-
+        // Only the directory paths need Tauri's iOS-correct document dir; every
+        // other field matches `Default`, so pull those in via `..Self::default()`.
         Ok(Self {
-            config_path: "config/wiretap.toml".to_string(),
-            decoder_dir: decoder_path.to_string_lossy().to_string(),
-            dump_dir: dump_path.to_string_lossy().to_string(),
-            report_dir: report_path.to_string_lossy().to_string(),
-            io_profiles: Vec::new(),
-            default_read_profile: None,
-            default_write_profiles: Vec::new(),
-            display_frame_id_format: default_display_frame_id_format(),
-            save_frame_id_format: default_save_frame_id_format(),
-            display_time_format: default_display_time_format(),
-            default_frame_type: default_default_frame_type(),
-            signal_colour_none: default_signal_colour_none(),
-            signal_colour_low: default_signal_colour_low(),
-            signal_colour_medium: default_signal_colour_medium(),
-            signal_colour_high: default_signal_colour_high(),
-            binary_one_colour: default_binary_one_colour(),
-            binary_zero_colour: default_binary_zero_colour(),
-            binary_unused_colour: default_binary_unused_colour(),
-            frame_editor_colours: default_frame_editor_colours(),
-            display_timezone: default_display_timezone(),
-            session_manager_stats_interval: default_session_manager_stats_interval(),
-            graph_buffer_size: default_graph_buffer_size(),
-            discovery_history_buffer: default_discovery_history_buffer(),
-            query_result_limit: default_query_result_limit(),
-            // Theme settings
-            theme_mode: default_theme_mode(),
-            // Light mode
-            theme_bg_primary_light: default_theme_bg_primary_light(),
-            theme_bg_surface_light: default_theme_bg_surface_light(),
-            theme_text_primary_light: default_theme_text_primary_light(),
-            theme_text_secondary_light: default_theme_text_secondary_light(),
-            theme_border_default_light: default_theme_border_default_light(),
-            theme_data_bg_light: default_theme_data_bg_light(),
-            theme_data_text_primary_light: default_theme_data_text_primary_light(),
-            // Dark mode
-            theme_bg_primary_dark: default_theme_bg_primary_dark(),
-            theme_bg_surface_dark: default_theme_bg_surface_dark(),
-            theme_text_primary_dark: default_theme_text_primary_dark(),
-            theme_text_secondary_dark: default_theme_text_secondary_dark(),
-            theme_border_default_dark: default_theme_border_default_dark(),
-            theme_data_bg_dark: default_theme_data_bg_dark(),
-            theme_data_text_primary_dark: default_theme_data_text_primary_dark(),
-            // Accent colours
-            theme_accent_primary: default_theme_accent_primary(),
-            theme_accent_success: default_theme_accent_success(),
-            theme_accent_danger: default_theme_accent_danger(),
-            theme_accent_warning: default_theme_accent_warning(),
-            // Power management
-            prevent_idle_sleep: default_prevent_idle_sleep(),
-            keep_display_awake: default_keep_display_awake(),
-            // Diagnostics
-            log_level: default_log_level(),
-            enable_file_logging: default_enable_file_logging(),
-            // Privacy / telemetry
-            telemetry_enabled: default_telemetry_enabled(),
-            telemetry_consent_given: default_telemetry_consent_given(),
-            usage_analytics_enabled: default_usage_analytics_enabled(),
-            usage_analytics_consent_given: default_usage_analytics_consent_given(),
-            install_id: String::new(),
-            // Capture persistence
-            clear_captures_on_start: default_clear_captures_on_start(),
-            capture_storage: default_capture_storage(),
-            // Decoder buffer limits
-            decoder_max_unmatched_frames: default_decoder_max_unmatched_frames(),
-            decoder_max_filtered_frames: default_decoder_max_filtered_frames(),
-            decoder_max_decoded_frames: default_decoder_max_decoded_frames(),
-            decoder_max_decoded_per_source: default_decoder_max_decoded_per_source(),
-            // Transmit limits
-            transmit_max_history: default_transmit_max_history(),
-            // Modbus
-            modbus_max_register_errors: default_modbus_max_register_errors(),
-            smp_port: default_smp_port(),
-            language: default_language(),
-            // MCP server (both gates off by default)
-            mcp_server_enabled: default_mcp_server_enabled(),
-            mcp_allow_control: default_mcp_allow_control(),
-            mcp_allow_session_control: default_mcp_allow_control(),
-            mcp_allow_catalog_write: default_mcp_allow_control(),
-            mcp_allow_catalog_modify: default_mcp_allow_control(),
-            mcp_allow_dashboard_write: default_mcp_allow_control(),
-            mcp_allow_ui_control: default_mcp_allow_control(),
-            mcp_server_port: default_mcp_server_port(),
-            mcp_server_token: String::new(),
+            decoder_dir: documents_dir.join("Decoders").to_string_lossy().to_string(),
+            dump_dir: documents_dir.join("Dumps").to_string_lossy().to_string(),
+            report_dir: documents_dir.join("Reports").to_string_lossy().to_string(),
+            ..Self::default()
         })
     }
 }

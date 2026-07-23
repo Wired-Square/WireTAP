@@ -14,6 +14,25 @@ import {
 import { SettingRadioGroup } from "../components/rows";
 import type { ThemeMode, ThemeColours } from "../stores/settingsStore";
 
+// Theme-colour rows: one entry per swatch, paired light/dark keys. Keeps the two
+// mode columns from drifting apart.
+const THEME_ROWS: { label: string; light: keyof ThemeColours; dark: keyof ThemeColours }[] = [
+  { label: "background", light: "bgPrimaryLight", dark: "bgPrimaryDark" },
+  { label: "surface", light: "bgSurfaceLight", dark: "bgSurfaceDark" },
+  { label: "text", light: "textPrimaryLight", dark: "textPrimaryDark" },
+  { label: "secondaryText", light: "textSecondaryLight", dark: "textSecondaryDark" },
+  { label: "border", light: "borderDefaultLight", dark: "borderDefaultDark" },
+  { label: "dataBackground", light: "dataBgLight", dark: "dataBgDark" },
+  { label: "dataText", light: "dataTextPrimaryLight", dark: "dataTextPrimaryDark" },
+];
+
+const ACCENT_ROWS: { label: string; key: keyof ThemeColours }[] = [
+  { label: "primary", key: "accentPrimary" },
+  { label: "success", key: "accentSuccess" },
+  { label: "danger", key: "accentDanger" },
+  { label: "warning", key: "accentWarning" },
+];
+
 type DisplayViewProps = {
   displayFrameIdFormat: "hex" | "decimal";
   onChangeFormat: (format: "hex" | "decimal") => void;
@@ -114,41 +133,14 @@ export default function DisplayView({
           <div className="space-y-2">
             <h4 className={sectionHeader}>{t("display.themeColours.lightMode")}</h4>
             <div className="space-y-1.5">
-              <ColourPicker
-                label={t("display.themeColours.labels.background")}
-                value={themeColours.bgPrimaryLight}
-                onChange={(val) => onChangeThemeColour("bgPrimaryLight", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.surface")}
-                value={themeColours.bgSurfaceLight}
-                onChange={(val) => onChangeThemeColour("bgSurfaceLight", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.text")}
-                value={themeColours.textPrimaryLight}
-                onChange={(val) => onChangeThemeColour("textPrimaryLight", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.secondaryText")}
-                value={themeColours.textSecondaryLight}
-                onChange={(val) => onChangeThemeColour("textSecondaryLight", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.border")}
-                value={themeColours.borderDefaultLight}
-                onChange={(val) => onChangeThemeColour("borderDefaultLight", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.dataBackground")}
-                value={themeColours.dataBgLight}
-                onChange={(val) => onChangeThemeColour("dataBgLight", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.dataText")}
-                value={themeColours.dataTextPrimaryLight}
-                onChange={(val) => onChangeThemeColour("dataTextPrimaryLight", val)}
-              />
+              {THEME_ROWS.map((row) => (
+                <ColourPicker
+                  key={row.light}
+                  label={t(`display.themeColours.labels.${row.label}`)}
+                  value={themeColours[row.light]}
+                  onChange={(val) => onChangeThemeColour(row.light, val)}
+                />
+              ))}
             </div>
           </div>
 
@@ -156,41 +148,14 @@ export default function DisplayView({
           <div className="space-y-2">
             <h4 className={sectionHeader}>{t("display.themeColours.darkMode")}</h4>
             <div className="space-y-1.5">
-              <ColourPicker
-                label={t("display.themeColours.labels.background")}
-                value={themeColours.bgPrimaryDark}
-                onChange={(val) => onChangeThemeColour("bgPrimaryDark", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.surface")}
-                value={themeColours.bgSurfaceDark}
-                onChange={(val) => onChangeThemeColour("bgSurfaceDark", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.text")}
-                value={themeColours.textPrimaryDark}
-                onChange={(val) => onChangeThemeColour("textPrimaryDark", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.secondaryText")}
-                value={themeColours.textSecondaryDark}
-                onChange={(val) => onChangeThemeColour("textSecondaryDark", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.border")}
-                value={themeColours.borderDefaultDark}
-                onChange={(val) => onChangeThemeColour("borderDefaultDark", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.dataBackground")}
-                value={themeColours.dataBgDark}
-                onChange={(val) => onChangeThemeColour("dataBgDark", val)}
-              />
-              <ColourPicker
-                label={t("display.themeColours.labels.dataText")}
-                value={themeColours.dataTextPrimaryDark}
-                onChange={(val) => onChangeThemeColour("dataTextPrimaryDark", val)}
-              />
+              {THEME_ROWS.map((row) => (
+                <ColourPicker
+                  key={row.dark}
+                  label={t(`display.themeColours.labels.${row.label}`)}
+                  value={themeColours[row.dark]}
+                  onChange={(val) => onChangeThemeColour(row.dark, val)}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -199,26 +164,14 @@ export default function DisplayView({
         <div className="space-y-2 pt-2">
           <h4 className={sectionHeader}>{t("display.themeColours.accentTitle")}</h4>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-            <ColourPicker
-              label={t("display.themeColours.labels.primary")}
-              value={themeColours.accentPrimary}
-              onChange={(val) => onChangeThemeColour("accentPrimary", val)}
-            />
-            <ColourPicker
-              label={t("display.themeColours.labels.success")}
-              value={themeColours.accentSuccess}
-              onChange={(val) => onChangeThemeColour("accentSuccess", val)}
-            />
-            <ColourPicker
-              label={t("display.themeColours.labels.danger")}
-              value={themeColours.accentDanger}
-              onChange={(val) => onChangeThemeColour("accentDanger", val)}
-            />
-            <ColourPicker
-              label={t("display.themeColours.labels.warning")}
-              value={themeColours.accentWarning}
-              onChange={(val) => onChangeThemeColour("accentWarning", val)}
-            />
+            {ACCENT_ROWS.map((row) => (
+              <ColourPicker
+                key={row.key}
+                label={t(`display.themeColours.labels.${row.label}`)}
+                value={themeColours[row.key]}
+                onChange={(val) => onChangeThemeColour(row.key, val)}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -290,51 +243,38 @@ export default function DisplayView({
         <h3 className={`text-sm font-semibold ${textPrimary}`}>{t("display.binary.title")}</h3>
         <p className={`text-sm ${textTertiary}`}>{t("display.binary.help")}</p>
         <div className="space-y-2">
-          <div className={flexRowGap2}>
-            <ColourPicker
-              label={t("display.binary.oneLabel")}
-              value={binaryOneColour}
-              onChange={onChangeBinaryOneColour}
-            />
-            <button
-              type="button"
-              onClick={onResetBinaryOneColour}
-              className={resetButtonIcon}
-              title={resetTooltip}
-            >
-              ↺
-            </button>
-          </div>
-          <div className={flexRowGap2}>
-            <ColourPicker
-              label={t("display.binary.zeroLabel")}
-              value={binaryZeroColour}
-              onChange={onChangeBinaryZeroColour}
-            />
-            <button
-              type="button"
-              onClick={onResetBinaryZeroColour}
-              className={resetButtonIcon}
-              title={resetTooltip}
-            >
-              ↺
-            </button>
-          </div>
-          <div className={flexRowGap2}>
-            <ColourPicker
-              label={t("display.binary.unusedLabel")}
-              value={binaryUnusedColour}
-              onChange={onChangeBinaryUnusedColour}
-            />
-            <button
-              type="button"
-              onClick={onResetBinaryUnusedColour}
-              className={resetButtonIcon}
-              title={resetTooltip}
-            >
-              ↺
-            </button>
-          </div>
+          {[
+            {
+              label: t("display.binary.oneLabel"),
+              value: binaryOneColour,
+              onChange: onChangeBinaryOneColour,
+              onReset: onResetBinaryOneColour,
+            },
+            {
+              label: t("display.binary.zeroLabel"),
+              value: binaryZeroColour,
+              onChange: onChangeBinaryZeroColour,
+              onReset: onResetBinaryZeroColour,
+            },
+            {
+              label: t("display.binary.unusedLabel"),
+              value: binaryUnusedColour,
+              onChange: onChangeBinaryUnusedColour,
+              onReset: onResetBinaryUnusedColour,
+            },
+          ].map((row) => (
+            <div key={row.label} className={flexRowGap2}>
+              <ColourPicker label={row.label} value={row.value} onChange={row.onChange} />
+              <button
+                type="button"
+                onClick={row.onReset}
+                className={resetButtonIcon}
+                title={resetTooltip}
+              >
+                ↺
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 

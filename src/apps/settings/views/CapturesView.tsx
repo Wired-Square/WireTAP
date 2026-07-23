@@ -1,41 +1,14 @@
 // ui/src/apps/settings/views/CapturesView.tsx
 
 import { useTranslation } from "react-i18next";
-import Input from "../../../components/forms/Input";
 import Select from "../../../components/forms/Select";
 import { h2 } from "../../../styles";
-import { SETTINGS_BOUNDS, type SettingsBoundKey } from "../../../settings/bounds";
-import { SettingSection, SettingRow, SettingToggleRow } from "../components/rows";
-
-/**
- * A number input whose min/max/step come from the shared SETTINGS_BOUNDS. Values
- * outside the range are rejected here for immediate feedback; the Rust backend
- * clamps authoritatively on save.
- */
-function BoundedNumberInput({
-  boundKey,
-  value,
-  onChange,
-}: {
-  boundKey: SettingsBoundKey;
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  const { min, max, step } = SETTINGS_BOUNDS[boundKey];
-  return (
-    <Input
-      type="number"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => {
-        const v = Number(e.target.value);
-        if (v >= min && v <= max) onChange(v);
-      }}
-    />
-  );
-}
+import {
+  SettingSection,
+  SettingRow,
+  SettingToggleRow,
+  BoundedNumberInput,
+} from "../components/rows";
 
 type CapturesViewProps = {
   clearCapturesOnStart: boolean;
