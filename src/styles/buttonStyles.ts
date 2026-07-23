@@ -405,6 +405,19 @@ export const folderPickerButton =
   "px-4 py-2 bg-[var(--bg-surface)] rounded-lg hover:brightness-95 transition-all";
 
 /**
+ * Small text reset button — subtle grey pill for "Reset"/"Reset all" actions in
+ * settings sections.
+ */
+export const resetButtonSmall =
+  "text-xs px-2 py-1 rounded bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-90 transition-colors";
+
+/**
+ * Compact icon-only reset button (↺) for per-row "reset to default" actions.
+ */
+export const resetButtonIcon =
+  "p-1 rounded text-[color:var(--text-secondary)] hover:bg-[var(--bg-surface)] hover:brightness-90 transition-colors";
+
+/**
  * Dialog option button - for multi-choice dialog buttons
  * Use for: Option buttons in picker dialogs
  */

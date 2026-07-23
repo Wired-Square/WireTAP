@@ -83,6 +83,9 @@ export const spaceYLarge = "space-y-6";
 // Margins
 // =============================================================================
 
+/** Titled-section divider — top border + top padding separating settings sections */
+export const sectionDivider = "pt-4 border-t border-[color:var(--border-default)]";
+
 /** Section margin bottom */
 export const marginSection = "mb-6";
 

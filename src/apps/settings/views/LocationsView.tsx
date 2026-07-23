@@ -1,9 +1,8 @@
 // ui/src/apps/settings/views/LocationsView.tsx
-import { FolderOpen, AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { iconMd, iconLg } from "../../../styles/spacing";
-import { caption, textMedium, focusRing, folderPickerButton } from "../../../styles";
+import { h2, h3 } from "../../../styles";
 import type { DirectoryValidation } from "../stores/settingsStore";
+import { SettingDirectoryRow, SettingRadioGroup } from "../components/rows";
 
 type LocationsViewProps = {
   decoderDir: string;
@@ -45,139 +44,55 @@ export default function LocationsView({
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-4">
-          {t("locations.title")}
-        </h2>
+        <h2 className={`${h2} mb-4`}>{t("locations.title")}</h2>
 
-        {/* Decoder Directory */}
-        <div className="mb-6">
-          <label className={`block ${textMedium} mb-2`}>
-            {t("locations.decoderDir.label")}
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={decoderDir}
-              onChange={(e) => onChangeDecoderDir(e.target.value)}
-              className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-              placeholder={placeholder}
-            />
-            <button
-              onClick={onPickDecoderDir}
-              className={folderPickerButton}
-              title={browseTooltip}
-            >
-              <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
-            </button>
-          </div>
-          {decoderValidation?.error && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--text-amber)]">
-              <AlertCircle className={iconMd} />
-              <span>{decoderValidation.error}</span>
-            </div>
-          )}
-          <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-            {t("locations.decoderDir.help")}
-          </p>
-        </div>
+        <SettingDirectoryRow
+          label={t("locations.decoderDir.label")}
+          value={decoderDir}
+          onChange={onChangeDecoderDir}
+          onPick={onPickDecoderDir}
+          placeholder={placeholder}
+          browseTooltip={browseTooltip}
+          error={decoderValidation?.error}
+          help={t("locations.decoderDir.help")}
+        />
 
-        {/* Dump Directory */}
-        <div className="mb-6">
-          <label className={`block ${textMedium} mb-2`}>
-            {t("locations.dumpDir.label")}
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={dumpDir}
-              onChange={(e) => onChangeDumpDir(e.target.value)}
-              className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-              placeholder={placeholder}
-            />
-            <button
-              onClick={onPickDumpDir}
-              className={folderPickerButton}
-              title={browseTooltip}
-            >
-              <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
-            </button>
-          </div>
-          {dumpValidation?.error && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--text-amber)]">
-              <AlertCircle className={iconMd} />
-              <span>{dumpValidation.error}</span>
-            </div>
-          )}
-          <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-            {t("locations.dumpDir.help")}
-          </p>
-        </div>
+        <SettingDirectoryRow
+          label={t("locations.dumpDir.label")}
+          value={dumpDir}
+          onChange={onChangeDumpDir}
+          onPick={onPickDumpDir}
+          placeholder={placeholder}
+          browseTooltip={browseTooltip}
+          error={dumpValidation?.error}
+          help={t("locations.dumpDir.help")}
+        />
 
-        {/* Report Directory */}
-        <div className="mb-6">
-          <label className={`block ${textMedium} mb-2`}>
-            {t("locations.reportDir.label")}
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={reportDir}
-              onChange={(e) => onChangeReportDir(e.target.value)}
-              className={`flex-1 px-4 py-2 bg-[var(--bg-surface)] border border-[color:var(--border-default)] rounded-lg text-[color:var(--text-primary)] ${focusRing}`}
-              placeholder={placeholder}
-            />
-            <button
-              onClick={onPickReportDir}
-              className={folderPickerButton}
-              title={browseTooltip}
-            >
-              <FolderOpen className={`${iconLg} text-[color:var(--text-muted)]`} />
-            </button>
-          </div>
-          {reportValidation?.error && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--text-amber)]">
-              <AlertCircle className={iconMd} />
-              <span>{reportValidation.error}</span>
-            </div>
-          )}
-          <p className="mt-2 text-sm text-[color:var(--text-muted)]">
-            {t("locations.reportDir.help")}
-          </p>
-        </div>
+        <SettingDirectoryRow
+          label={t("locations.reportDir.label")}
+          value={reportDir}
+          onChange={onChangeReportDir}
+          onPick={onPickReportDir}
+          placeholder={placeholder}
+          browseTooltip={browseTooltip}
+          error={reportValidation?.error}
+          help={t("locations.reportDir.help")}
+        />
 
         {/* Files */}
         <div>
-          <h2 className="text-lg font-semibold text-[color:var(--text-primary)] mb-3">
-            {t("locations.filesTitle")}
-          </h2>
-          <div className="space-y-2">
-            <div className={textMedium}>{t("locations.saveFrameIdFormat.label")}</div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
-                <input
-                  type="radio"
-                  name="save-frame-id-format"
-                  value="hex"
-                  checked={saveFrameIdFormat === "hex"}
-                  onChange={() => onChangeSaveFrameIdFormat("hex")}
-                  className="accent-blue-600"
-                />
-                {t("locations.saveFrameIdFormat.options.hex")}
-              </label>
-              <label className="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
-                <input
-                  type="radio"
-                  name="save-frame-id-format"
-                  value="decimal"
-                  checked={saveFrameIdFormat === "decimal"}
-                  onChange={() => onChangeSaveFrameIdFormat("decimal")}
-                  className="accent-blue-600"
-                />
-                {t("locations.saveFrameIdFormat.options.decimal")}
-              </label>
-            </div>
-            <p className={caption}>{t("locations.saveFrameIdFormat.help")}</p>
-          </div>
+          <h3 className={`${h3} mb-3`}>{t("locations.filesTitle")}</h3>
+          <SettingRadioGroup
+            label={t("locations.saveFrameIdFormat.label")}
+            name="save-frame-id-format"
+            value={saveFrameIdFormat}
+            onChange={onChangeSaveFrameIdFormat}
+            options={[
+              { value: "hex", label: t("locations.saveFrameIdFormat.options.hex") },
+              { value: "decimal", label: t("locations.saveFrameIdFormat.options.decimal") },
+            ]}
+            help={t("locations.saveFrameIdFormat.help")}
+          />
         </div>
       </div>
     </div>

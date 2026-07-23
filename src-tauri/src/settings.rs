@@ -18,6 +18,11 @@ pub struct AppSettings {
     pub config_path: String,
     pub decoder_dir: String,
     pub dump_dir: String,
+    /// Directory analysis reports are written to. Optional in older settings
+    /// files (added later), so it defaults to empty and is filled from the
+    /// platform documents dir by `Default`/`with_defaults`.
+    #[serde(default)]
+    pub report_dir: String,
     #[serde(default)]
     pub io_profiles: Vec<IOProfile>,
     #[serde(default)]
@@ -30,6 +35,8 @@ pub struct AppSettings {
     pub save_frame_id_format: String, // "hex" | "decimal"
     #[serde(default = "default_display_time_format")]
     pub display_time_format: String, // "delta-last" | "delta-start" | "timestamp" | "human"
+    #[serde(default = "default_default_frame_type")]
+    pub default_frame_type: String, // "can" | "modbus" | "serial"
     #[serde(default = "default_signal_colour_none")]
     pub signal_colour_none: String,
     #[serde(default = "default_signal_colour_low")]
@@ -40,6 +47,10 @@ pub struct AppSettings {
     pub signal_colour_high: String,
     #[serde(default = "default_binary_one_colour")]
     pub binary_one_colour: String,
+    #[serde(default = "default_binary_zero_colour")]
+    pub binary_zero_colour: String,
+    #[serde(default = "default_binary_unused_colour")]
+    pub binary_unused_colour: String,
 
     // Frame editor signal colours (8 slots for the bit grid)
     #[serde(default = "default_frame_editor_colours")]
@@ -51,6 +62,10 @@ pub struct AppSettings {
     pub session_manager_stats_interval: u32, // seconds (0 = disabled)
     #[serde(default = "default_graph_buffer_size")]
     pub graph_buffer_size: u32, // samples per signal in graph ring buffers
+    #[serde(default = "default_discovery_history_buffer")]
+    pub discovery_history_buffer: u32, // frames retained in Discovery history
+    #[serde(default = "default_query_result_limit")]
+    pub query_result_limit: u32, // max rows returned by a Query
 
     // Theme settings
     #[serde(default = "default_theme_mode")]
@@ -130,8 +145,14 @@ pub struct AppSettings {
     #[serde(default = "default_clear_captures_on_start", alias = "clear_buffers_on_start")]
     pub clear_captures_on_start: bool,
 
-    /// Capture storage backend ("sqlite" is the only option for now)
-    #[serde(default = "default_capture_storage", alias = "buffer_storage")]
+    /// Capture storage backend ("sqlite" is the only option for now).
+    /// Serialised as `buffer_storage` to match the frontend payload key; the
+    /// `capture_storage` alias keeps older settings files loadable.
+    #[serde(
+        default = "default_capture_storage",
+        rename = "buffer_storage",
+        alias = "capture_storage"
+    )]
     pub capture_storage: String,
 
     // Decoder buffer limits
@@ -206,6 +227,9 @@ fn default_save_frame_id_format() -> String {
 fn default_display_time_format() -> String {
     "human".to_string()
 }
+fn default_default_frame_type() -> String {
+    "can".to_string()
+}
 fn default_signal_colour_none() -> String {
     "#94a3b8".to_string() // slate-400
 }
@@ -220,6 +244,12 @@ fn default_signal_colour_high() -> String {
 }
 fn default_binary_one_colour() -> String {
     "#14b8a6".to_string() // teal-500
+}
+fn default_binary_zero_colour() -> String {
+    "#94a3b8".to_string() // slate-400
+}
+fn default_binary_unused_colour() -> String {
+    "#64748b".to_string() // slate-500
 }
 fn default_frame_editor_colours() -> Vec<String> {
     vec![
@@ -241,6 +271,12 @@ fn default_session_manager_stats_interval() -> u32 {
 }
 fn default_graph_buffer_size() -> u32 {
     10_000 // samples per signal in graph ring buffers
+}
+fn default_discovery_history_buffer() -> u32 {
+    100_000 // frames retained in Discovery history
+}
+fn default_query_result_limit() -> u32 {
+    10_000 // max rows returned by a Query
 }
 
 // Theme defaults
@@ -396,26 +432,33 @@ impl Default for AppSettings {
 
         let decoder_path = documents_dir.join("Decoders");
         let dump_path = documents_dir.join("Dumps");
+        let report_path = documents_dir.join("Reports");
 
         Self {
             config_path: "config/wiretap.toml".to_string(),
             decoder_dir: decoder_path.to_string_lossy().to_string(),
             dump_dir: dump_path.to_string_lossy().to_string(),
+            report_dir: report_path.to_string_lossy().to_string(),
             io_profiles: Vec::new(),
             default_read_profile: None,
             default_write_profiles: Vec::new(),
             display_frame_id_format: default_display_frame_id_format(),
             save_frame_id_format: default_save_frame_id_format(),
             display_time_format: default_display_time_format(),
+            default_frame_type: default_default_frame_type(),
             signal_colour_none: default_signal_colour_none(),
             signal_colour_low: default_signal_colour_low(),
             signal_colour_medium: default_signal_colour_medium(),
             signal_colour_high: default_signal_colour_high(),
             binary_one_colour: default_binary_one_colour(),
+            binary_zero_colour: default_binary_zero_colour(),
+            binary_unused_colour: default_binary_unused_colour(),
             frame_editor_colours: default_frame_editor_colours(),
             display_timezone: default_display_timezone(),
             session_manager_stats_interval: default_session_manager_stats_interval(),
             graph_buffer_size: default_graph_buffer_size(),
+            discovery_history_buffer: default_discovery_history_buffer(),
+            query_result_limit: default_query_result_limit(),
             // Theme settings
             theme_mode: default_theme_mode(),
             // Light mode
@@ -491,26 +534,33 @@ impl AppSettings {
 
         let decoder_path = documents_dir.join("Decoders");
         let dump_path = documents_dir.join("Dumps");
+        let report_path = documents_dir.join("Reports");
 
         Ok(Self {
             config_path: "config/wiretap.toml".to_string(),
             decoder_dir: decoder_path.to_string_lossy().to_string(),
             dump_dir: dump_path.to_string_lossy().to_string(),
+            report_dir: report_path.to_string_lossy().to_string(),
             io_profiles: Vec::new(),
             default_read_profile: None,
             default_write_profiles: Vec::new(),
             display_frame_id_format: default_display_frame_id_format(),
             save_frame_id_format: default_save_frame_id_format(),
             display_time_format: default_display_time_format(),
+            default_frame_type: default_default_frame_type(),
             signal_colour_none: default_signal_colour_none(),
             signal_colour_low: default_signal_colour_low(),
             signal_colour_medium: default_signal_colour_medium(),
             signal_colour_high: default_signal_colour_high(),
             binary_one_colour: default_binary_one_colour(),
+            binary_zero_colour: default_binary_zero_colour(),
+            binary_unused_colour: default_binary_unused_colour(),
             frame_editor_colours: default_frame_editor_colours(),
             display_timezone: default_display_timezone(),
             session_manager_stats_interval: default_session_manager_stats_interval(),
             graph_buffer_size: default_graph_buffer_size(),
+            discovery_history_buffer: default_discovery_history_buffer(),
+            query_result_limit: default_query_result_limit(),
             // Theme settings
             theme_mode: default_theme_mode(),
             // Light mode
@@ -646,12 +696,20 @@ pub async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
         // Migrate persisted paths from CANdor → WireTAP (rebrand)
         migrate_persisted_paths(&mut settings);
 
+        // report_dir was added after decoder_dir/dump_dir; older settings files
+        // won't contain it. Fill from platform defaults so it's always populated.
+        if settings.report_dir.is_empty() {
+            let fresh_defaults = AppSettings::with_defaults(&app)?;
+            settings.report_dir = fresh_defaults.report_dir;
+        }
+
         // Check for stale paths (e.g., old iOS container UUIDs after reinstall)
         if paths_are_stale(&settings, &app) {
             tlog!("[settings] Regenerating stale directory paths");
             let fresh_defaults = AppSettings::with_defaults(&app)?;
             settings.decoder_dir = fresh_defaults.decoder_dir;
             settings.dump_dir = fresh_defaults.dump_dir;
+            settings.report_dir = fresh_defaults.report_dir;
             // Re-initialize directories and save updated settings
             initialize_directories(&settings)?;
             save_settings(app, settings.clone()).await?;
@@ -872,6 +930,9 @@ fn migrate_persisted_paths(settings: &mut AppSettings) {
     if settings.dump_dir.contains(&old_component) {
         settings.dump_dir = settings.dump_dir.replace(&old_component, &new_component);
     }
+    if settings.report_dir.contains(&old_component) {
+        settings.report_dir = settings.report_dir.replace(&old_component, &new_component);
+    }
     if settings.config_path.contains("candor.toml") {
         settings.config_path = settings.config_path.replace("candor.toml", "wiretap.toml");
     }
@@ -887,6 +948,13 @@ fn initialize_directories(settings: &AppSettings) -> Result<(), String> {
     let dump_path = PathBuf::from(&settings.dump_dir);
     std::fs::create_dir_all(&dump_path)
         .map_err(|e| format!("Failed to create dump directory: {}", e))?;
+
+    // Create report directory (skip if unset — filled by load_settings/frontend)
+    if !settings.report_dir.is_empty() {
+        let report_path = PathBuf::from(&settings.report_dir);
+        std::fs::create_dir_all(&report_path)
+            .map_err(|e| format!("Failed to create report directory: {}", e))?;
+    }
 
     Ok(())
 }
@@ -973,9 +1041,30 @@ pub fn install_example_decoders(app: &AppHandle, decoder_dir: &str) -> Result<u3
     Ok(installed_count)
 }
 
+/// Clamp numeric settings into the ranges the UI enforces (kept in step with
+/// `SETTINGS_BOUNDS` in src/settings/bounds.ts). Authoritative — applied on every
+/// save so an out-of-range value (from an older file or a hand edit) is corrected.
+fn clamp_settings(settings: &mut AppSettings) {
+    settings.discovery_history_buffer = settings.discovery_history_buffer.clamp(1_000, 10_000_000);
+    settings.query_result_limit = settings.query_result_limit.clamp(100, 100_000);
+    settings.graph_buffer_size = settings.graph_buffer_size.clamp(1_000, 100_000);
+    settings.decoder_max_unmatched_frames = settings.decoder_max_unmatched_frames.clamp(100, 10_000);
+    settings.decoder_max_filtered_frames = settings.decoder_max_filtered_frames.clamp(100, 10_000);
+    settings.decoder_max_decoded_frames = settings.decoder_max_decoded_frames.clamp(100, 5_000);
+    settings.decoder_max_decoded_per_source =
+        settings.decoder_max_decoded_per_source.clamp(500, 20_000);
+    settings.transmit_max_history = settings.transmit_max_history.clamp(100, 10_000);
+    settings.modbus_max_register_errors = settings.modbus_max_register_errors.clamp(0, 1_000);
+    settings.smp_port = settings.smp_port.clamp(1, 65_535);
+    settings.mcp_server_port = settings.mcp_server_port.clamp(1_024, 65_535);
+}
+
 #[tauri::command]
-pub async fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
+pub async fn save_settings(app: AppHandle, mut settings: AppSettings) -> Result<(), String> {
     let settings_path = get_settings_path(&app)?;
+
+    // Clamp numeric settings to their allowed ranges before persisting.
+    clamp_settings(&mut settings);
 
     // Ensure directories exist when saving
     initialize_directories(&settings)?;
@@ -1139,5 +1228,215 @@ pub fn migrate_data_directory(doc_dir: &Path) {
         } else {
             tlog!("[settings] Migrated data directory from CANdor to WireTAP");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every key the frontend sends in `buildAppSettings`
+    /// (src/apps/settings/stores/settingsStore.ts) MUST have a counterpart in
+    /// the `AppSettings` struct, otherwise serde silently drops it on
+    /// `save_settings` and the setting never persists. Keep this list in sync
+    /// with `buildAppSettings`; the `ts_payload_keys_subset_of_struct_fields`
+    /// test fails if a key here has no matching (serialised) struct field.
+    const TS_PAYLOAD_KEYS: &[&str] = &[
+        "config_path",
+        "decoder_dir",
+        "dump_dir",
+        "report_dir",
+        "io_profiles",
+        "default_read_profile",
+        "default_write_profiles",
+        "display_frame_id_format",
+        "save_frame_id_format",
+        "display_time_format",
+        "display_timezone",
+        "default_frame_type",
+        "signal_colour_none",
+        "signal_colour_low",
+        "signal_colour_medium",
+        "signal_colour_high",
+        "binary_one_colour",
+        "binary_zero_colour",
+        "binary_unused_colour",
+        "frame_editor_colours",
+        "clear_captures_on_start",
+        "buffer_storage",
+        "discovery_history_buffer",
+        "query_result_limit",
+        "graph_buffer_size",
+        "decoder_max_unmatched_frames",
+        "decoder_max_filtered_frames",
+        "decoder_max_decoded_frames",
+        "decoder_max_decoded_per_source",
+        "transmit_max_history",
+        "session_manager_stats_interval",
+        "prevent_idle_sleep",
+        "keep_display_awake",
+        "log_level",
+        "telemetry_enabled",
+        "telemetry_consent_given",
+        "usage_analytics_enabled",
+        "usage_analytics_consent_given",
+        "install_id",
+        "modbus_max_register_errors",
+        "theme_mode",
+        "theme_bg_primary_light",
+        "theme_bg_surface_light",
+        "theme_text_primary_light",
+        "theme_text_secondary_light",
+        "theme_border_default_light",
+        "theme_data_bg_light",
+        "theme_data_text_primary_light",
+        "theme_bg_primary_dark",
+        "theme_bg_surface_dark",
+        "theme_text_primary_dark",
+        "theme_text_secondary_dark",
+        "theme_border_default_dark",
+        "theme_data_bg_dark",
+        "theme_data_text_primary_dark",
+        "theme_accent_primary",
+        "theme_accent_success",
+        "theme_accent_danger",
+        "theme_accent_warning",
+        "smp_port",
+        "language",
+        "mcp_server_enabled",
+        "mcp_allow_control",
+        "mcp_allow_session_control",
+        "mcp_allow_catalog_write",
+        "mcp_allow_catalog_modify",
+        "mcp_allow_dashboard_write",
+        "mcp_allow_ui_control",
+        "mcp_server_port",
+        "mcp_server_token",
+    ];
+
+    /// Guard against the "field sent by the frontend but missing from the Rust
+    /// struct" class of bug (which silently dropped six settings on save).
+    #[test]
+    fn ts_payload_keys_subset_of_struct_fields() {
+        let value = serde_json::to_value(AppSettings::default()).unwrap();
+        let obj = value.as_object().expect("AppSettings serialises to an object");
+        let missing: Vec<&str> = TS_PAYLOAD_KEYS
+            .iter()
+            .copied()
+            .filter(|k| !obj.contains_key(*k))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "AppSettings is missing struct fields for keys emitted by buildAppSettings: {:?}",
+            missing
+        );
+    }
+
+    /// A save (serialise) → load (deserialise) → save round-trip must not drop
+    /// or alter any field.
+    #[test]
+    fn round_trip_preserves_all_fields() {
+        let mut settings = AppSettings::default();
+        // Exercise the formerly-dropped fields + the renamed one.
+        settings.report_dir = "/tmp/reports".to_string();
+        settings.default_frame_type = "modbus".to_string();
+        settings.discovery_history_buffer = 12_345;
+        settings.query_result_limit = 6_789;
+        settings.binary_zero_colour = "#111111".to_string();
+        settings.binary_unused_colour = "#222222".to_string();
+        settings.io_profiles.push(IOProfile {
+            id: "p1".to_string(),
+            name: "Test".to_string(),
+            kind: "mqtt".to_string(),
+            connection: HashMap::new(),
+            preferred_catalog: None,
+        });
+
+        let saved = serde_json::to_string(&settings).unwrap();
+        let loaded: AppSettings = serde_json::from_str(&saved).unwrap();
+        let re_saved = serde_json::to_string(&loaded).unwrap();
+        assert_eq!(saved, re_saved, "settings changed across a save/load round-trip");
+
+        // The capture-storage field must serialise under the frontend key.
+        let value = serde_json::to_value(&settings).unwrap();
+        assert!(value.get("buffer_storage").is_some(), "buffer_storage key missing");
+        assert!(value.get("capture_storage").is_none(), "capture_storage key leaked");
+        assert_eq!(value.get("report_dir").unwrap(), "/tmp/reports");
+        assert_eq!(value.get("discovery_history_buffer").unwrap(), 12_345);
+    }
+
+    /// Older settings files stored the field as `capture_storage`; that spelling
+    /// must still load via the serde alias.
+    #[test]
+    fn capture_storage_alias_still_loads() {
+        let mut value = serde_json::to_value(AppSettings::default()).unwrap();
+        let obj = value.as_object_mut().unwrap();
+        obj.remove("buffer_storage");
+        obj.insert("capture_storage".to_string(), serde_json::json!("sqlite"));
+        let json = serde_json::to_string(&value).unwrap();
+        let parsed: AppSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.capture_storage, "sqlite");
+    }
+
+    /// Settings files written before these fields existed must deserialise,
+    /// falling back to the documented defaults.
+    #[test]
+    fn missing_new_fields_use_defaults() {
+        let mut value = serde_json::to_value(AppSettings::default()).unwrap();
+        let obj = value.as_object_mut().unwrap();
+        for k in [
+            "report_dir",
+            "default_frame_type",
+            "discovery_history_buffer",
+            "query_result_limit",
+            "binary_zero_colour",
+            "binary_unused_colour",
+        ] {
+            obj.remove(k);
+        }
+        let json = serde_json::to_string(&value).unwrap();
+        let parsed: AppSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.default_frame_type, "can");
+        assert_eq!(parsed.discovery_history_buffer, 100_000);
+        assert_eq!(parsed.query_result_limit, 10_000);
+        assert_eq!(parsed.binary_zero_colour, "#94a3b8");
+        assert_eq!(parsed.binary_unused_colour, "#64748b");
+        // report_dir defaults to empty (filled by load_settings/frontend, not serde).
+        assert_eq!(parsed.report_dir, "");
+    }
+
+    /// Out-of-range numeric settings are clamped to their bounds on save.
+    #[test]
+    fn clamp_settings_bounds() {
+        let mut settings = AppSettings::default();
+        // Below the minimum.
+        settings.discovery_history_buffer = 1;
+        settings.query_result_limit = 1;
+        settings.decoder_max_decoded_per_source = 1;
+        settings.smp_port = 0;
+        settings.mcp_server_port = 1;
+        // Above the maximum.
+        settings.graph_buffer_size = 5_000_000;
+        settings.decoder_max_decoded_frames = 999_999;
+        settings.transmit_max_history = 999_999;
+        settings.modbus_max_register_errors = 999_999;
+
+        clamp_settings(&mut settings);
+
+        assert_eq!(settings.discovery_history_buffer, 1_000);
+        assert_eq!(settings.query_result_limit, 100);
+        assert_eq!(settings.decoder_max_decoded_per_source, 500);
+        assert_eq!(settings.smp_port, 1);
+        assert_eq!(settings.mcp_server_port, 1_024);
+        assert_eq!(settings.graph_buffer_size, 100_000);
+        assert_eq!(settings.decoder_max_decoded_frames, 5_000);
+        assert_eq!(settings.transmit_max_history, 10_000);
+        assert_eq!(settings.modbus_max_register_errors, 1_000);
+
+        // An in-range value is left untouched.
+        let mut ok = AppSettings::default();
+        ok.query_result_limit = 5_000;
+        clamp_settings(&mut ok);
+        assert_eq!(ok.query_result_limit, 5_000);
     }
 }

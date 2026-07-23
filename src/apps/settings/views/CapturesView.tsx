@@ -3,8 +3,39 @@
 import { useTranslation } from "react-i18next";
 import Input from "../../../components/forms/Input";
 import Select from "../../../components/forms/Select";
-import { labelDefault, helpText } from "../../../styles";
-import { textPrimary } from "../../../styles/colourTokens";
+import { h2 } from "../../../styles";
+import { SETTINGS_BOUNDS, type SettingsBoundKey } from "../../../settings/bounds";
+import { SettingSection, SettingRow, SettingToggleRow } from "../components/rows";
+
+/**
+ * A number input whose min/max/step come from the shared SETTINGS_BOUNDS. Values
+ * outside the range are rejected here for immediate feedback; the Rust backend
+ * clamps authoritatively on save.
+ */
+function BoundedNumberInput({
+  boundKey,
+  value,
+  onChange,
+}: {
+  boundKey: SettingsBoundKey;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const { min, max, step } = SETTINGS_BOUNDS[boundKey];
+  return (
+    <Input
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => {
+        const v = Number(e.target.value);
+        if (v >= min && v <= max) onChange(v);
+      }}
+    />
+  );
+}
 
 type CapturesViewProps = {
   clearCapturesOnStart: boolean;
@@ -55,200 +86,116 @@ export default function CapturesView({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
-        {t("captures.title")}
-      </h2>
+      <h2 className={h2}>{t("captures.title")}</h2>
 
-      {/* Storage Section */}
-      <div className="space-y-4">
-        <h3 className={`text-lg font-medium ${textPrimary}`}>{t("captures.storage.title")}</h3>
-
-        <div className="space-y-2">
-          <label className={labelDefault}>{t("captures.storage.label")}</label>
-          <p className={helpText}>{t("captures.storage.help")}</p>
-          <Select
-            value={captureStorage}
-            onChange={(e) => onChangeCaptureStorage(e.target.value)}
-          >
+      <SettingSection title={t("captures.storage.title")} divider={false}>
+        <SettingRow label={t("captures.storage.label")} help={t("captures.storage.help")}>
+          <Select value={captureStorage} onChange={(e) => onChangeCaptureStorage(e.target.value)}>
             <option value="sqlite">{t("captures.storage.options.sqlite")}</option>
           </Select>
-        </div>
+        </SettingRow>
 
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={clearCapturesOnStart}
-            onChange={(e) => onChangeClearCapturesOnStart(e.target.checked)}
-            className="mt-1"
+        <SettingToggleRow
+          label={t("captures.clearOnStart.label")}
+          help={t("captures.clearOnStart.help")}
+          checked={clearCapturesOnStart}
+          onChange={onChangeClearCapturesOnStart}
+        />
+      </SettingSection>
+
+      <SettingSection title={t("captures.buffers.title")}>
+        <SettingRow
+          label={t("captures.buffers.discoveryHistory.label")}
+          help={t("captures.buffers.discoveryHistory.help")}
+        >
+          <BoundedNumberInput
+            boundKey="discoveryHistorySize"
+            value={discoveryHistorySize}
+            onChange={onChangeDiscoveryHistorySize}
           />
-          <div>
-            <span className={labelDefault}>{t("captures.clearOnStart.label")}</span>
-            <p className={helpText}>{t("captures.clearOnStart.help")}</p>
-          </div>
-        </label>
-      </div>
+        </SettingRow>
 
-      {/* Buffer Sizes Section */}
-      <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>{t("captures.buffers.title")}</h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className={labelDefault}>{t("captures.buffers.discoveryHistory.label")}</label>
-            <p className={helpText}>{t("captures.buffers.discoveryHistory.help")}</p>
-            <Input
-              type="number"
-              min={1000}
-              max={10000000}
-              step={10000}
-              value={discoveryHistorySize}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 1000 && value <= 10000000) {
-                  onChangeDiscoveryHistorySize(value);
-                }
-              }}
-            />
-          </div>
+        <SettingRow
+          label={t("captures.buffers.queryResultLimit.label")}
+          help={t("captures.buffers.queryResultLimit.help")}
+        >
+          <BoundedNumberInput
+            boundKey="queryResultLimit"
+            value={queryResultLimit}
+            onChange={onChangeQueryResultLimit}
+          />
+        </SettingRow>
 
-          <div className="space-y-2">
-            <label className={labelDefault}>{t("captures.buffers.queryResultLimit.label")}</label>
-            <p className={helpText}>{t("captures.buffers.queryResultLimit.help")}</p>
-            <Input
-              type="number"
-              min={100}
-              max={100000}
-              step={1000}
-              value={queryResultLimit}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 100 && value <= 100000) {
-                  onChangeQueryResultLimit(value);
-                }
-              }}
-            />
-          </div>
+        <SettingRow
+          label={t("captures.buffers.graphBuffer.label")}
+          help={t("captures.buffers.graphBuffer.help")}
+        >
+          <BoundedNumberInput
+            boundKey="graphBufferSize"
+            value={graphBufferSize}
+            onChange={onChangeGraphBufferSize}
+          />
+        </SettingRow>
+      </SettingSection>
 
-          <div className="space-y-2">
-            <label className={labelDefault}>{t("captures.buffers.graphBuffer.label")}</label>
-            <p className={helpText}>{t("captures.buffers.graphBuffer.help")}</p>
-            <Input
-              type="number"
-              min={1000}
-              max={100000}
-              step={1000}
-              value={graphBufferSize}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 1000 && value <= 100000) {
-                  onChangeGraphBufferSize(value);
-                }
-              }}
-            />
-          </div>
-        </div>
-      </div>
+      <SettingSection title={t("captures.decoderLimits.title")}>
+        <SettingRow
+          label={t("captures.decoderLimits.maxUnmatched.label")}
+          help={t("captures.decoderLimits.maxUnmatched.help")}
+        >
+          <BoundedNumberInput
+            boundKey="decoderMaxUnmatchedFrames"
+            value={decoderMaxUnmatchedFrames}
+            onChange={onChangeDecoderMaxUnmatchedFrames}
+          />
+        </SettingRow>
 
-      {/* Decoder Limits Section */}
-      <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>{t("captures.decoderLimits.title")}</h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className={labelDefault}>{t("captures.decoderLimits.maxUnmatched.label")}</label>
-            <p className={helpText}>{t("captures.decoderLimits.maxUnmatched.help")}</p>
-            <Input
-              type="number"
-              min={100}
-              max={10000}
-              step={100}
-              value={decoderMaxUnmatchedFrames}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 100 && value <= 10000) {
-                  onChangeDecoderMaxUnmatchedFrames(value);
-                }
-              }}
-            />
-          </div>
+        <SettingRow
+          label={t("captures.decoderLimits.maxFiltered.label")}
+          help={t("captures.decoderLimits.maxFiltered.help")}
+        >
+          <BoundedNumberInput
+            boundKey="decoderMaxFilteredFrames"
+            value={decoderMaxFilteredFrames}
+            onChange={onChangeDecoderMaxFilteredFrames}
+          />
+        </SettingRow>
 
-          <div className="space-y-2">
-            <label className={labelDefault}>{t("captures.decoderLimits.maxFiltered.label")}</label>
-            <p className={helpText}>{t("captures.decoderLimits.maxFiltered.help")}</p>
-            <Input
-              type="number"
-              min={100}
-              max={10000}
-              step={100}
-              value={decoderMaxFilteredFrames}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 100 && value <= 10000) {
-                  onChangeDecoderMaxFilteredFrames(value);
-                }
-              }}
-            />
-          </div>
+        <SettingRow
+          label={t("captures.decoderLimits.maxDecoded.label")}
+          help={t("captures.decoderLimits.maxDecoded.help")}
+        >
+          <BoundedNumberInput
+            boundKey="decoderMaxDecodedFrames"
+            value={decoderMaxDecodedFrames}
+            onChange={onChangeDecoderMaxDecodedFrames}
+          />
+        </SettingRow>
 
-          <div className="space-y-2">
-            <label className={labelDefault}>{t("captures.decoderLimits.maxDecoded.label")}</label>
-            <p className={helpText}>{t("captures.decoderLimits.maxDecoded.help")}</p>
-            <Input
-              type="number"
-              min={100}
-              max={5000}
-              step={100}
-              value={decoderMaxDecodedFrames}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 100 && value <= 5000) {
-                  onChangeDecoderMaxDecodedFrames(value);
-                }
-              }}
-            />
-          </div>
+        <SettingRow
+          label={t("captures.decoderLimits.maxDecodedPerSource.label")}
+          help={t("captures.decoderLimits.maxDecodedPerSource.help")}
+        >
+          <BoundedNumberInput
+            boundKey="decoderMaxDecodedPerSource"
+            value={decoderMaxDecodedPerSource}
+            onChange={onChangeDecoderMaxDecodedPerSource}
+          />
+        </SettingRow>
+      </SettingSection>
 
-          <div className="space-y-2">
-            <label className={labelDefault}>{t("captures.decoderLimits.maxDecodedPerSource.label")}</label>
-            <p className={helpText}>{t("captures.decoderLimits.maxDecodedPerSource.help")}</p>
-            <Input
-              type="number"
-              min={500}
-              max={20000}
-              step={500}
-              value={decoderMaxDecodedPerSource}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 500 && value <= 20000) {
-                  onChangeDecoderMaxDecodedPerSource(value);
-                }
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Transmit Section */}
-      <div className="pt-4 border-t border-[color:var(--border-default)]">
-        <h3 className={`text-lg font-medium mb-4 ${textPrimary}`}>{t("captures.transmit.title")}</h3>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className={labelDefault}>{t("captures.transmit.maxHistory.label")}</label>
-            <p className={helpText}>{t("captures.transmit.maxHistory.help")}</p>
-            <Input
-              type="number"
-              min={100}
-              max={10000}
-              step={100}
-              value={transmitMaxHistory}
-              onChange={(e) => {
-                const value = Number(e.target.value);
-                if (value >= 100 && value <= 10000) {
-                  onChangeTransmitMaxHistory(value);
-                }
-              }}
-            />
-          </div>
-        </div>
-      </div>
+      <SettingSection title={t("captures.transmit.title")}>
+        <SettingRow
+          label={t("captures.transmit.maxHistory.label")}
+          help={t("captures.transmit.maxHistory.help")}
+        >
+          <BoundedNumberInput
+            boundKey="transmitMaxHistory"
+            value={transmitMaxHistory}
+            onChange={onChangeTransmitMaxHistory}
+          />
+        </SettingRow>
+      </SettingSection>
     </div>
   );
 }

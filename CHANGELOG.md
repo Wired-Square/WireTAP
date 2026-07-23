@@ -2,6 +2,16 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Six settings silently didn't survive a restart**: the frontend sent `report_dir`, `default_frame_type`, `discovery_history_buffer`, `query_result_limit`, `binary_zero_colour` and `binary_unused_colour` in the save payload, but the Rust `AppSettings` struct had no fields for them, so serde dropped them on `save_settings` (there's no `deny_unknown_fields`) and they reset to defaults on every load. The struct now carries all six (with defaults, and `report_dir` wired through directory creation/stale-path handling), and a `ts_payload_keys_subset_of_struct_fields` test guards against that class of bug recurring. Separately, the capture-storage field round-tripped under mismatched keys (frontend `buffer_storage` vs Rust-serialised `capture_storage`); the Rust field now serialises as `buffer_storage` with a `capture_storage` deserialise alias for older files. [src-tauri/src/settings.rs](src-tauri/src/settings.rs), [src/apps/settings/stores/settingsStore.ts](src/apps/settings/stores/settingsStore.ts).
+
+### Changed
+
+- **Settings app deduplicated and its types/defaults single-sourced**: the `AppSettings` type, the IO-profile union + connection types/guards, the default constants and the settings-normalisation routine were duplicated across the settings Zustand store and the `useSettings` hook — two `AppSettings` declarations, two normalise routines that had drifted ~12 fields apart, and defaults triplicated with Rust. They now live in one neutral `src/settings/appSettings.ts` module that both import from (and re-export for existing consumers), which also breaks the old store↔hook import cycle; dirty-tracking now baselines against `buildAppSettings` so a clean load can't be spuriously dirty. The settings views were rebuilt on a shared `SettingRow`/`SettingToggleRow`/`SettingSection`/`SettingRadioGroup`/`SettingDirectoryRow` component family using centralised style tokens (no more hand-rolled rows, hardcoded headings/dividers, or raw slate/amber colours), and numeric input bounds were unified into one `src/settings/bounds.ts` and are now clamped authoritatively in Rust on save. No user-visible behaviour change. [src/settings/appSettings.ts](src/settings/appSettings.ts), [src/settings/bounds.ts](src/settings/bounds.ts), [src/hooks/useSettings.ts](src/hooks/useSettings.ts), [src/apps/settings/stores/settingsStore.ts](src/apps/settings/stores/settingsStore.ts), [src/apps/settings/components/rows/](src/apps/settings/components/rows/), [src-tauri/src/settings.rs](src-tauri/src/settings.rs).
+
 ## [0.8.2] - 2026-07-02
 
 ### Changed

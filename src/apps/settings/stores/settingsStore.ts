@@ -27,20 +27,62 @@ import {
 import { setIOSScreenWake } from '../../../utils/platform';
 // Types
 export type SettingsSection = "general" | "privacy" | "locations" | "data-io" | "devices" | "captures" | "catalogs" | "bookmarks" | "selection-sets" | "dashboard-layouts" | "display" | "mcp";
-export type DefaultFrameType = 'can' | 'modbus' | 'serial';
 
-// Buffer setting defaults — single source of truth, referenced by settingsStore and useSettings
-export const DEFAULT_BUFFER_STORAGE = "sqlite";
-export const DEFAULT_CLEAR_BUFFERS_ON_START = true;
-export const DEFAULT_DISCOVERY_HISTORY_BUFFER = 100_000;
-export const DEFAULT_QUERY_RESULT_LIMIT = 10_000;
-export const DEFAULT_GRAPH_BUFFER_SIZE = 10_000;
-export const DEFAULT_DECODER_MAX_UNMATCHED_FRAMES = 1000;
-export const DEFAULT_DECODER_MAX_FILTERED_FRAMES = 1000;
-export const DEFAULT_DECODER_MAX_DECODED_FRAMES = 500;
-export const DEFAULT_DECODER_MAX_DECODED_PER_SOURCE = 2000;
-export const DEFAULT_TRANSMIT_MAX_HISTORY = 1000;
-export const DEFAULT_MODBUS_MAX_REGISTER_ERRORS = 3;
+// The settings shape, IO-profile union + connection types/guards, default
+// constants and normalisation live in the neutral settings/appSettings module.
+// Import what the store uses locally; re-export the pieces that existing store
+// consumers still import from here.
+import {
+  normalizeSettings,
+  isProfileKind,
+  defaultSignalColours,
+  defaultThemeColours,
+  defaultFrameEditorColours,
+  DEFAULT_BUFFER_STORAGE,
+  DEFAULT_CLEAR_BUFFERS_ON_START,
+  DEFAULT_DISCOVERY_HISTORY_BUFFER,
+  DEFAULT_QUERY_RESULT_LIMIT,
+  DEFAULT_GRAPH_BUFFER_SIZE,
+  DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
+  DEFAULT_DECODER_MAX_FILTERED_FRAMES,
+  DEFAULT_DECODER_MAX_DECODED_FRAMES,
+  DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+  DEFAULT_TRANSMIT_MAX_HISTORY,
+  DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
+} from '../../../settings/appSettings';
+import type {
+  AppSettings,
+  IOProfile,
+  FrameLinkConnection,
+  SignalColours,
+  ThemeMode,
+  ThemeColours,
+  DefaultFrameType,
+} from '../../../settings/appSettings';
+
+export {
+  defaultThemeColours,
+  defaultFrameEditorColours,
+  DEFAULT_BUFFER_STORAGE,
+  DEFAULT_CLEAR_BUFFERS_ON_START,
+  DEFAULT_DISCOVERY_HISTORY_BUFFER,
+  DEFAULT_QUERY_RESULT_LIMIT,
+  DEFAULT_GRAPH_BUFFER_SIZE,
+  DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
+  DEFAULT_DECODER_MAX_FILTERED_FRAMES,
+  DEFAULT_DECODER_MAX_DECODED_FRAMES,
+  DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
+  DEFAULT_TRANSMIT_MAX_HISTORY,
+  DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
+};
+export type {
+  AppSettings,
+  IOProfile,
+  SignalColours,
+  ThemeMode,
+  ThemeColours,
+  DefaultFrameType,
+};
 
 export interface DirectoryValidation {
   exists: boolean;
@@ -48,128 +90,10 @@ export interface DirectoryValidation {
   error?: string;
 }
 
-// IOProfile is the canonical type defined in useSettings.ts — import and re-export
-import type { IOProfile, FrameLinkConnection } from '../../../hooks/useSettings';
-import { isProfileKind } from '../../../hooks/useSettings';
-export type { IOProfile } from '../../../hooks/useSettings';
-
 export interface CatalogFile {
   name: string;
   filename: string;
   path: string;
-}
-
-export interface SignalColours {
-  none: string;
-  low: string;
-  medium: string;
-  high: string;
-}
-
-export type ThemeMode = 'dark' | 'light' | 'auto';
-
-export interface ThemeColours {
-  // Light mode
-  bgPrimaryLight: string;
-  bgSurfaceLight: string;
-  textPrimaryLight: string;
-  textSecondaryLight: string;
-  borderDefaultLight: string;
-  dataBgLight: string;
-  dataTextPrimaryLight: string;
-  // Dark mode
-  bgPrimaryDark: string;
-  bgSurfaceDark: string;
-  textPrimaryDark: string;
-  textSecondaryDark: string;
-  borderDefaultDark: string;
-  dataBgDark: string;
-  dataTextPrimaryDark: string;
-  // Accent colours (mode-independent)
-  accentPrimary: string;
-  accentSuccess: string;
-  accentDanger: string;
-  accentWarning: string;
-}
-
-interface AppSettings {
-  config_path: string;
-  decoder_dir: string;
-  dump_dir: string;
-  report_dir: string;
-  io_profiles: IOProfile[];
-  default_read_profile?: string | null;
-  default_write_profiles?: string[];
-  display_frame_id_format?: 'hex' | 'decimal';
-  save_frame_id_format?: 'hex' | 'decimal';
-  display_time_format?: 'delta-last' | 'delta-start' | 'timestamp' | 'human';
-  display_timezone?: 'local' | 'utc';
-  default_frame_type?: DefaultFrameType;
-  signal_colour_none?: string;
-  signal_colour_low?: string;
-  signal_colour_medium?: string;
-  signal_colour_high?: string;
-  binary_one_colour?: string;
-  binary_zero_colour?: string;
-  binary_unused_colour?: string;
-  frame_editor_colours?: string[];
-  discovery_history_buffer?: number;
-  query_result_limit?: number;
-  session_manager_stats_interval?: number;
-  graph_buffer_size?: number;
-  decoder_max_unmatched_frames?: number;
-  decoder_max_filtered_frames?: number;
-  decoder_max_decoded_frames?: number;
-  decoder_max_decoded_per_source?: number;
-  transmit_max_history?: number;
-  smp_port?: number;
-  language?: string;
-  // MCP server
-  mcp_server_enabled?: boolean;
-  mcp_allow_control?: boolean;
-  mcp_allow_session_control?: boolean;
-  mcp_allow_catalog_write?: boolean;
-  mcp_allow_catalog_modify?: boolean;
-  mcp_allow_dashboard_write?: boolean;
-  mcp_allow_ui_control?: boolean;
-  mcp_server_port?: number;
-  mcp_server_token?: string;
-  // Theme settings
-  theme_mode?: ThemeMode;
-  theme_bg_primary_light?: string;
-  theme_bg_surface_light?: string;
-  theme_text_primary_light?: string;
-  theme_text_secondary_light?: string;
-  theme_border_default_light?: string;
-  theme_data_bg_light?: string;
-  theme_data_text_primary_light?: string;
-  theme_bg_primary_dark?: string;
-  theme_bg_surface_dark?: string;
-  theme_text_primary_dark?: string;
-  theme_text_secondary_dark?: string;
-  theme_border_default_dark?: string;
-  theme_data_bg_dark?: string;
-  theme_data_text_primary_dark?: string;
-  theme_accent_primary?: string;
-  theme_accent_success?: string;
-  theme_accent_danger?: string;
-  theme_accent_warning?: string;
-  // Power management
-  prevent_idle_sleep?: boolean;
-  keep_display_awake?: boolean;
-  // Diagnostics
-  log_level?: string;
-  // Privacy / telemetry
-  telemetry_enabled?: boolean;
-  telemetry_consent_given?: boolean;
-  usage_analytics_enabled?: boolean;
-  usage_analytics_consent_given?: boolean;
-  install_id?: string;
-  // Buffer persistence
-  clear_captures_on_start?: boolean;
-  buffer_storage?: string;
-  // Modbus settings
-  modbus_max_register_errors?: number;
 }
 
 // Dialog types
@@ -230,41 +154,6 @@ const initialDialogPayload: DialogPayload = {
   selectionSetToDelete: null,
   dashboardLayoutToEdit: null,
   dashboardLayoutToDelete: null,
-};
-
-const defaultSignalColours: SignalColours = {
-  none: '#94a3b8',
-  low: '#f59e0b',
-  medium: '#3b82f6',
-  high: '#22c55e',
-};
-
-export function defaultFrameEditorColours(): string[] {
-  return ['#22d3ee', '#4ade80', '#facc15', '#c084fc', '#60a5fa', '#f87171', '#67e8f9', '#86efac'];
-}
-
-export const defaultThemeColours: ThemeColours = {
-  // Light mode
-  bgPrimaryLight: '#ffffff',      // white
-  bgSurfaceLight: '#f8fafc',      // slate-50
-  textPrimaryLight: '#0f172a',    // slate-900
-  textSecondaryLight: '#334155',  // slate-700
-  borderDefaultLight: '#e2e8f0',  // slate-200
-  dataBgLight: '#f8fafc',         // slate-50
-  dataTextPrimaryLight: '#0f172a', // slate-900
-  // Dark mode
-  bgPrimaryDark: '#0f172a',       // slate-900
-  bgSurfaceDark: '#1e293b',       // slate-800
-  textPrimaryDark: '#ffffff',     // white
-  textSecondaryDark: '#cbd5e1',   // slate-300
-  borderDefaultDark: '#334155',   // slate-700
-  dataBgDark: '#111827',          // gray-900
-  dataTextPrimaryDark: '#e5e7eb', // gray-200
-  // Accent colours (mode-independent)
-  accentPrimary: '#2563eb',       // blue-600
-  accentSuccess: '#16a34a',       // green-600
-  accentDanger: '#dc2626',        // red-600
-  accentWarning: '#d97706',       // amber-600
 };
 
 // Stable stringify helper for change detection
@@ -784,91 +673,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         defaultWrites = defaultWrites.filter((id: string) => !migration.removedIds.has(id));
       }
 
-      const frameEditorColours = (settings.frame_editor_colours?.length === 8
-        ? settings.frame_editor_colours
-        : defaultFrameEditorColours()) as string[];
-
-      const normalized: AppSettings = {
-        config_path: settings.config_path || '',
-        decoder_dir: decoderDir,
-        dump_dir: dumpDir,
-        report_dir: reportDir,
-        io_profiles: migration.profiles,
-        default_read_profile: defaultRead,
-        default_write_profiles: defaultWrites,
-        display_frame_id_format: settings.display_frame_id_format === 'decimal' ? 'decimal' : 'hex',
-        save_frame_id_format: settings.save_frame_id_format === 'decimal' ? 'decimal' : 'hex',
-        display_time_format: settings.display_time_format ?? 'human',
-        display_timezone: settings.display_timezone ?? 'local',
-        signal_colour_none: settings.signal_colour_none || defaultSignalColours.none,
-        signal_colour_low: settings.signal_colour_low || defaultSignalColours.low,
-        signal_colour_medium: settings.signal_colour_medium || defaultSignalColours.medium,
-        signal_colour_high: settings.signal_colour_high || defaultSignalColours.high,
-        binary_one_colour: settings.binary_one_colour || '#14b8a6',
-        binary_zero_colour: settings.binary_zero_colour || '#94a3b8',
-        binary_unused_colour: settings.binary_unused_colour || '#64748b',
-        frame_editor_colours: frameEditorColours,
-        discovery_history_buffer: settings.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
-        query_result_limit: settings.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
-        session_manager_stats_interval: settings.session_manager_stats_interval ?? 60,
-        graph_buffer_size: settings.graph_buffer_size ?? DEFAULT_GRAPH_BUFFER_SIZE,
-        decoder_max_unmatched_frames: settings.decoder_max_unmatched_frames ?? DEFAULT_DECODER_MAX_UNMATCHED_FRAMES,
-        decoder_max_filtered_frames: settings.decoder_max_filtered_frames ?? DEFAULT_DECODER_MAX_FILTERED_FRAMES,
-        decoder_max_decoded_frames: settings.decoder_max_decoded_frames ?? DEFAULT_DECODER_MAX_DECODED_FRAMES,
-        decoder_max_decoded_per_source: settings.decoder_max_decoded_per_source ?? DEFAULT_DECODER_MAX_DECODED_PER_SOURCE,
-        transmit_max_history: settings.transmit_max_history ?? DEFAULT_TRANSMIT_MAX_HISTORY,
-        default_frame_type: (settings.default_frame_type as DefaultFrameType) ?? 'can',
-        // Theme settings
-        theme_mode: (settings.theme_mode as ThemeMode) ?? 'auto',
-        theme_bg_primary_light: settings.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
-        theme_bg_surface_light: settings.theme_bg_surface_light || defaultThemeColours.bgSurfaceLight,
-        theme_text_primary_light: settings.theme_text_primary_light || defaultThemeColours.textPrimaryLight,
-        theme_text_secondary_light: settings.theme_text_secondary_light || defaultThemeColours.textSecondaryLight,
-        theme_border_default_light: settings.theme_border_default_light || defaultThemeColours.borderDefaultLight,
-        theme_data_bg_light: settings.theme_data_bg_light || defaultThemeColours.dataBgLight,
-        theme_data_text_primary_light: settings.theme_data_text_primary_light || defaultThemeColours.dataTextPrimaryLight,
-        theme_bg_primary_dark: settings.theme_bg_primary_dark || defaultThemeColours.bgPrimaryDark,
-        theme_bg_surface_dark: settings.theme_bg_surface_dark || defaultThemeColours.bgSurfaceDark,
-        theme_text_primary_dark: settings.theme_text_primary_dark || defaultThemeColours.textPrimaryDark,
-        theme_text_secondary_dark: settings.theme_text_secondary_dark || defaultThemeColours.textSecondaryDark,
-        theme_border_default_dark: settings.theme_border_default_dark || defaultThemeColours.borderDefaultDark,
-        theme_data_bg_dark: settings.theme_data_bg_dark || defaultThemeColours.dataBgDark,
-        theme_data_text_primary_dark: settings.theme_data_text_primary_dark || defaultThemeColours.dataTextPrimaryDark,
-        theme_accent_primary: settings.theme_accent_primary || defaultThemeColours.accentPrimary,
-        theme_accent_success: settings.theme_accent_success || defaultThemeColours.accentSuccess,
-        theme_accent_danger: settings.theme_accent_danger || defaultThemeColours.accentDanger,
-        theme_accent_warning: settings.theme_accent_warning || defaultThemeColours.accentWarning,
-        // Power management
-        prevent_idle_sleep: settings.prevent_idle_sleep ?? true,
-        keep_display_awake: settings.keep_display_awake ?? false,
-        // Diagnostics
-        log_level: settings.log_level ?? "off",
-        // Privacy / telemetry
-        telemetry_enabled: settings.telemetry_enabled ?? false,
-        telemetry_consent_given: settings.telemetry_consent_given ?? false,
-        usage_analytics_enabled: settings.usage_analytics_enabled ?? false,
-        usage_analytics_consent_given: settings.usage_analytics_consent_given ?? false,
-        install_id: settings.install_id ?? "",
-        // Buffer persistence
-        clear_captures_on_start: settings.clear_captures_on_start ?? DEFAULT_CLEAR_BUFFERS_ON_START,
-        buffer_storage: settings.buffer_storage ?? DEFAULT_BUFFER_STORAGE,
-        // Modbus
-        modbus_max_register_errors: settings.modbus_max_register_errors ?? DEFAULT_MODBUS_MAX_REGISTER_ERRORS,
-        // Networking
-        smp_port: settings.smp_port ?? 1337,
-        // Localisation
-        language: settings.language ?? "en-AU",
-        // MCP server
-        mcp_server_enabled: settings.mcp_server_enabled ?? false,
-        mcp_allow_control: settings.mcp_allow_control ?? false,
-        mcp_allow_session_control: settings.mcp_allow_session_control ?? false,
-        mcp_allow_catalog_write: settings.mcp_allow_catalog_write ?? false,
-        mcp_allow_catalog_modify: settings.mcp_allow_catalog_modify ?? false,
-        mcp_allow_dashboard_write: settings.mcp_allow_dashboard_write ?? false,
-        mcp_allow_ui_control: settings.mcp_allow_ui_control ?? false,
-        mcp_server_port: settings.mcp_server_port ?? 8787,
-        mcp_server_token: settings.mcp_server_token ?? "",
-      };
+      // One shared normalise routine (settings/appSettings) fills every missing
+      // field with its default, applied on top of the migrated profiles.
+      const normalized = normalizeSettings(
+        {
+          ...settings,
+          io_profiles: migration.profiles,
+          default_read_profile: defaultRead,
+          default_write_profiles: defaultWrites,
+        },
+        defaultDirs,
+      );
 
       set({
         locations: {
@@ -904,7 +719,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           binaryOneColour: normalized.binary_one_colour || '#14b8a6',
           binaryZeroColour: normalized.binary_zero_colour || '#94a3b8',
           binaryUnusedColour: normalized.binary_unused_colour || '#64748b',
-          frameEditorColours,
+          frameEditorColours: normalized.frame_editor_colours ?? defaultFrameEditorColours(),
           themeMode: normalized.theme_mode || 'auto',
           themeColours: {
             bgPrimaryLight: normalized.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
@@ -965,10 +780,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           serverPort: normalized.mcp_server_port ?? 8787,
           serverToken: normalized.mcp_server_token ?? "",
         },
-        // When migration occurred, use pre-migration profiles as original so hasUnsavedChanges() detects the diff
+      });
+
+      // Baseline for dirty-tracking. Build it from the just-applied slices via
+      // the same buildAppSettings the dirty check uses, so a clean load is never
+      // spuriously dirty. When a migration ran, seed the baseline with the
+      // pre-migration profiles so hasUnsavedChanges() fires and the migrated
+      // form is re-persisted below.
+      const baseline = buildAppSettings(get());
+      set({
         originalSettings: migration.removedIds.size > 0
-          ? { ...normalized, io_profiles: settings.io_profiles || [] }
-          : normalized,
+          ? { ...baseline, io_profiles: settings.io_profiles || [] }
+          : baseline,
       });
 
       // Persist migrated settings so old profiles are not re-migrated next load

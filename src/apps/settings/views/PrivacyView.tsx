@@ -1,7 +1,8 @@
 // ui/src/apps/settings/views/PrivacyView.tsx
 
 import { useTranslation } from "react-i18next";
-import { labelDefault, helpText } from "../../../styles";
+import { h2 } from "../../../styles";
+import { SettingToggleRow } from "../components/rows";
 
 type PrivacyViewProps = {
   telemetryEnabled: boolean;
@@ -20,41 +21,21 @@ export default function PrivacyView({
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
-        {t("privacy.title")}
-      </h2>
+      <h2 className={h2}>{t("privacy.title")}</h2>
 
-      {/* Crash reports */}
-      <div className="space-y-2">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={telemetryEnabled}
-            onChange={(e) => onChangeTelemetryEnabled(e.target.checked)}
-            className="mt-1"
-          />
-          <div>
-            <span className={labelDefault}>{t("privacy.telemetry.label")}</span>
-            <p className={helpText}>{t("privacy.telemetry.help")}</p>
-          </div>
-        </label>
-      </div>
+      <SettingToggleRow
+        label={t("privacy.telemetry.label")}
+        help={t("privacy.telemetry.help")}
+        checked={telemetryEnabled}
+        onChange={onChangeTelemetryEnabled}
+      />
 
-      {/* Usage analytics */}
-      <div className="space-y-2">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={usageAnalyticsEnabled}
-            onChange={(e) => onChangeUsageAnalyticsEnabled(e.target.checked)}
-            className="mt-1"
-          />
-          <div>
-            <span className={labelDefault}>{t("privacy.usageAnalytics.label")}</span>
-            <p className={helpText}>{t("privacy.usageAnalytics.help")}</p>
-          </div>
-        </label>
-      </div>
+      <SettingToggleRow
+        label={t("privacy.usageAnalytics.label")}
+        help={t("privacy.usageAnalytics.help")}
+        checked={usageAnalyticsEnabled}
+        onChange={onChangeUsageAnalyticsEnabled}
+      />
     </div>
   );
 }

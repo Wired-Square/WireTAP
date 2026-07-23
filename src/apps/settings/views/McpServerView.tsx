@@ -7,9 +7,9 @@
 // effect only when "Apply & restart server" is pressed (one restart, rather
 // than bouncing the server — and disconnecting any client — on every tick).
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Copy, RefreshCw, AlertTriangle, Check } from "lucide-react";
+import { Copy, RefreshCw, Check } from "lucide-react";
 import { useSettingsStore } from "../stores/settingsStore";
 import {
   labelDefault,
@@ -19,7 +19,13 @@ import {
   primaryButtonBase,
   secondaryButton,
   disabledState,
+  h2,
+  textPrimary,
+  textSuccess,
+  textSecondary,
 } from "../../../styles";
+import { SETTINGS_BOUNDS } from "../../../settings/bounds";
+import { SettingToggleRow } from "../components/rows";
 
 interface McpStatus {
   running: boolean;
@@ -31,44 +37,6 @@ interface McpStatus {
 }
 
 const STOPPED_STATUS: McpStatus = { running: false, port: null, restartPending: false };
-
-/** A checkbox row with a label and help/warning text. */
-function ToggleRow({
-  label,
-  checked,
-  disabled,
-  onChange,
-  warn,
-  children,
-}: {
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (value: boolean) => void;
-  warn?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="space-y-2">
-      <label className="flex items-start gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.checked)}
-          className="mt-1"
-        />
-        <div>
-          <span className={labelDefault}>{label}</span>
-          <p className={warn ? `${helpText} flex items-start gap-1` : helpText}>
-            {warn && <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />}
-            {warn ? <span>{children}</span> : children}
-          </p>
-        </div>
-      </label>
-    </div>
-  );
-}
 
 function generateToken(): string {
   const bytes = new Uint8Array(24);
@@ -181,7 +149,7 @@ export default function McpServerView() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">MCP Server</h2>
+      <h2 className={h2}>MCP Server</h2>
       <p className={helpText}>
         Exposes live WireTAP runtime state — sessions, captures, frame data, payload
         analysis and decoded signals — to an external MCP client such as Claude Code,
@@ -189,7 +157,7 @@ export default function McpServerView() {
         binds to 127.0.0.1 and stays read-only unless you grant control below.
       </p>
 
-      <ToggleRow
+      <SettingToggleRow
         label="Enable MCP server"
         checked={serverEnabled}
         disabled={busy}
@@ -197,16 +165,19 @@ export default function McpServerView() {
           setServerEnabled(v);
           apply(v);
         }}
-      >
-        Starts the server listening on the port below.{" "}
-        <span className={status.running ? "text-green-500" : "text-[color:var(--text-secondary)]"}>
-          {status.running ? `Running on 127.0.0.1:${status.port}` : "Stopped"}
-        </span>
-      </ToggleRow>
+        help={
+          <>
+            Starts the server listening on the port below.{" "}
+            <span className={status.running ? textSuccess : textSecondary}>
+              {status.running ? `Running on 127.0.0.1:${status.port}` : "Stopped"}
+            </span>
+          </>
+        }
+      />
 
       {/* Permissions — staged; applied on "Apply & restart server" */}
       <div className="space-y-1 pt-1">
-        <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Permissions</h3>
+        <h3 className={`text-sm font-semibold ${textPrimary}`}>Permissions</h3>
         <p className={helpText}>
           Grant only what the client needs. Read-only tools are always available; each
           gate below adds a group of write/control tools. Permission, port and token
@@ -214,72 +185,90 @@ export default function McpServerView() {
         </p>
       </div>
 
-      <ToggleRow
+      <SettingToggleRow
         label="Allow control tools"
         checked={allowControl}
         disabled={busy}
         warn
         onChange={staged(setAllowControl)}
-      >
-        Lets the client <strong>drive the app</strong> — transmit frames on the bus, write
-        Modbus registers and replay captures. Leave off for read-only introspection.
-      </ToggleRow>
+        help={
+          <>
+            Lets the client <strong>drive the app</strong> — transmit frames on the bus, write
+            Modbus registers and replay captures. Leave off for read-only introspection.
+          </>
+        }
+      />
 
-      <ToggleRow
+      <SettingToggleRow
         label="Allow session open/stop"
         checked={allowSessionControl}
         disabled={busy}
         warn
         onChange={staged(setAllowSessionControl)}
-      >
-        Lets the client <strong>open and stop sessions</strong> — e.g. start a Modbus session
-        polling from a profile's catalogue. Separate from the control gate above.
-      </ToggleRow>
+        help={
+          <>
+            Lets the client <strong>open and stop sessions</strong> — e.g. start a Modbus session
+            polling from a profile's catalogue. Separate from the control gate above.
+          </>
+        }
+      />
 
-      <ToggleRow
+      <SettingToggleRow
         label="Allow catalogue create (new files)"
         checked={allowCatalogWrite}
         disabled={busy}
         warn
         onChange={staged(setAllowCatalogWrite)}
-      >
-        Lets the client <strong>create new decoder catalogues</strong> in the decoder
-        directory. Validated before writing; existing files are never overwritten.
-      </ToggleRow>
+        help={
+          <>
+            Lets the client <strong>create new decoder catalogues</strong> in the decoder
+            directory. Validated before writing; existing files are never overwritten.
+          </>
+        }
+      />
 
-      <ToggleRow
+      <SettingToggleRow
         label="Allow catalogue modify (overwrite existing)"
         checked={allowCatalogModify}
         disabled={busy}
         warn
         onChange={staged(setAllowCatalogModify)}
-      >
-        Lets the client <strong>overwrite existing decoder catalogues</strong>. Validated
-        before writing. Separate from the create gate above.
-      </ToggleRow>
+        help={
+          <>
+            Lets the client <strong>overwrite existing decoder catalogues</strong>. Validated
+            before writing. Separate from the create gate above.
+          </>
+        }
+      />
 
-      <ToggleRow
+      <SettingToggleRow
         label="Allow dashboard write"
         checked={allowDashboardWrite}
         disabled={busy}
         warn
         onChange={staged(setAllowDashboardWrite)}
-      >
-        Lets the client <strong>create or overwrite dashboard files</strong> in the
-        dashboards directory. The JSON shape is validated; any embedded custom-widget code
-        is stored opaque and only ever runs later inside the sandboxed worker.
-      </ToggleRow>
+        help={
+          <>
+            Lets the client <strong>create or overwrite dashboard files</strong> in the
+            dashboards directory. The JSON shape is validated; any embedded custom-widget code
+            is stored opaque and only ever runs later inside the sandboxed worker.
+          </>
+        }
+      />
 
-      <ToggleRow
+      <SettingToggleRow
         label="Allow UI control (open panels)"
         checked={allowUiControl}
         disabled={busy}
         warn
         onChange={staged(setAllowUiControl)}
-      >
-        Lets the client <strong>open or focus a panel</strong> in the running window — e.g.
-        show a dashboard it just authored. Requires the WireTAP window to be open.
-      </ToggleRow>
+        help={
+          <>
+            Lets the client <strong>open or focus a panel</strong> in the running window — e.g.
+            show a dashboard it just authored. Requires the WireTAP window to be open.
+          </>
+        }
+      />
 
       {/* Port */}
       <div className="space-y-2 max-w-xs">
@@ -289,8 +278,8 @@ export default function McpServerView() {
         <input
           id="mcp-port"
           type="number"
-          min={1024}
-          max={65535}
+          min={SETTINGS_BOUNDS.mcpServerPort.min}
+          max={SETTINGS_BOUNDS.mcpServerPort.max}
           value={serverPort}
           onChange={(e) => {
             setServerPort(Number(e.target.value) || 8787);
