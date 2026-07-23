@@ -554,6 +554,98 @@ function migrateFrameLinkProfiles(profiles: IOProfile[]): { profiles: IOProfile[
   return { profiles: [...rest, ...merged], removedIds };
 }
 
+/**
+ * Build the persisted snake_case AppSettings payload from store state. The
+ * single source of truth for both `saveSettings` (what we write) and
+ * `hasUnsavedChanges` (what we diff against `originalSettings`) — the two must
+ * be byte-identical or dirty-tracking drifts, so keep this the only place the
+ * mapping lives.
+ */
+function buildAppSettings(s: SettingsState) {
+  const { locations, ioProfiles, display, buffers, general, mcp } = s;
+  return {
+    config_path: locations.configPath,
+    decoder_dir: locations.decoderDir,
+    dump_dir: locations.dumpDir,
+    report_dir: locations.reportDir,
+    io_profiles: ioProfiles.profiles,
+    default_read_profile: ioProfiles.defaultReadProfile,
+    default_write_profiles: ioProfiles.defaultWriteProfiles,
+    display_frame_id_format: display.frameIdFormat,
+    save_frame_id_format: display.saveFrameIdFormat,
+    display_time_format: display.timeFormat,
+    display_timezone: display.timezone,
+    default_frame_type: general.defaultFrameType,
+    signal_colour_none: display.signalColours.none,
+    signal_colour_low: display.signalColours.low,
+    signal_colour_medium: display.signalColours.medium,
+    signal_colour_high: display.signalColours.high,
+    binary_one_colour: display.binaryOneColour,
+    binary_zero_colour: display.binaryZeroColour,
+    binary_unused_colour: display.binaryUnusedColour,
+    frame_editor_colours: display.frameEditorColours,
+    // Buffers
+    clear_captures_on_start: buffers.clearCapturesOnStart,
+    buffer_storage: buffers.captureStorage,
+    discovery_history_buffer: buffers.discoveryHistorySize,
+    query_result_limit: buffers.queryResultLimit,
+    graph_buffer_size: buffers.graphBufferSize,
+    decoder_max_unmatched_frames: buffers.decoderMaxUnmatchedFrames,
+    decoder_max_filtered_frames: buffers.decoderMaxFilteredFrames,
+    decoder_max_decoded_frames: buffers.decoderMaxDecodedFrames,
+    decoder_max_decoded_per_source: buffers.decoderMaxDecodedPerSource,
+    transmit_max_history: buffers.transmitMaxHistory,
+    session_manager_stats_interval: general.sessionManagerStatsInterval,
+    // Power management
+    prevent_idle_sleep: general.preventIdleSleep,
+    keep_display_awake: general.keepDisplayAwake,
+    // Diagnostics
+    log_level: general.logLevel,
+    // Privacy / telemetry
+    telemetry_enabled: general.telemetryEnabled,
+    telemetry_consent_given: general.telemetryConsentGiven,
+    usage_analytics_enabled: general.usageAnalyticsEnabled,
+    usage_analytics_consent_given: general.usageAnalyticsConsentGiven,
+    install_id: general.installId,
+    // Modbus
+    modbus_max_register_errors: general.modbusMaxRegisterErrors,
+    // Theme settings
+    theme_mode: display.themeMode,
+    theme_bg_primary_light: display.themeColours.bgPrimaryLight,
+    theme_bg_surface_light: display.themeColours.bgSurfaceLight,
+    theme_text_primary_light: display.themeColours.textPrimaryLight,
+    theme_text_secondary_light: display.themeColours.textSecondaryLight,
+    theme_border_default_light: display.themeColours.borderDefaultLight,
+    theme_data_bg_light: display.themeColours.dataBgLight,
+    theme_data_text_primary_light: display.themeColours.dataTextPrimaryLight,
+    theme_bg_primary_dark: display.themeColours.bgPrimaryDark,
+    theme_bg_surface_dark: display.themeColours.bgSurfaceDark,
+    theme_text_primary_dark: display.themeColours.textPrimaryDark,
+    theme_text_secondary_dark: display.themeColours.textSecondaryDark,
+    theme_border_default_dark: display.themeColours.borderDefaultDark,
+    theme_data_bg_dark: display.themeColours.dataBgDark,
+    theme_data_text_primary_dark: display.themeColours.dataTextPrimaryDark,
+    theme_accent_primary: display.themeColours.accentPrimary,
+    theme_accent_success: display.themeColours.accentSuccess,
+    theme_accent_danger: display.themeColours.accentDanger,
+    theme_accent_warning: display.themeColours.accentWarning,
+    // Networking
+    smp_port: general.smpPort,
+    // Localisation
+    language: general.language,
+    // MCP server
+    mcp_server_enabled: mcp.serverEnabled,
+    mcp_allow_control: mcp.allowControl,
+    mcp_allow_session_control: mcp.allowSessionControl,
+    mcp_allow_catalog_write: mcp.allowCatalogWrite,
+    mcp_allow_catalog_modify: mcp.allowCatalogModify,
+    mcp_allow_dashboard_write: mcp.allowDashboardWrite,
+    mcp_allow_ui_control: mcp.allowUiControl,
+    mcp_server_port: mcp.serverPort,
+    mcp_server_token: mcp.serverToken,
+  };
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   // Initial state
   locations: {
@@ -692,6 +784,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         defaultWrites = defaultWrites.filter((id: string) => !migration.removedIds.has(id));
       }
 
+      const frameEditorColours = (settings.frame_editor_colours?.length === 8
+        ? settings.frame_editor_colours
+        : defaultFrameEditorColours()) as string[];
+
       const normalized: AppSettings = {
         config_path: settings.config_path || '',
         decoder_dir: decoderDir,
@@ -711,6 +807,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         binary_one_colour: settings.binary_one_colour || '#14b8a6',
         binary_zero_colour: settings.binary_zero_colour || '#94a3b8',
         binary_unused_colour: settings.binary_unused_colour || '#64748b',
+        frame_editor_colours: frameEditorColours,
         discovery_history_buffer: settings.discovery_history_buffer ?? DEFAULT_DISCOVERY_HISTORY_BUFFER,
         query_result_limit: settings.query_result_limit ?? DEFAULT_QUERY_RESULT_LIMIT,
         session_manager_stats_interval: settings.session_manager_stats_interval ?? 60,
@@ -807,9 +904,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           binaryOneColour: normalized.binary_one_colour || '#14b8a6',
           binaryZeroColour: normalized.binary_zero_colour || '#94a3b8',
           binaryUnusedColour: normalized.binary_unused_colour || '#64748b',
-          frameEditorColours: (normalized.frame_editor_colours?.length === 8
-            ? normalized.frame_editor_colours
-            : defaultFrameEditorColours()) as string[],
+          frameEditorColours,
           themeMode: normalized.theme_mode || 'auto',
           themeColours: {
             bgPrimaryLight: normalized.theme_bg_primary_light || defaultThemeColours.bgPrimaryLight,
@@ -943,89 +1038,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (!get().hasUnsavedChanges()) return;
 
     try {
-      const { locations, ioProfiles, display, buffers, general, mcp } = get();
-
-      const settings = {
-        config_path: locations.configPath,
-        decoder_dir: locations.decoderDir,
-        dump_dir: locations.dumpDir,
-        report_dir: locations.reportDir,
-        io_profiles: ioProfiles.profiles,
-        default_read_profile: ioProfiles.defaultReadProfile,
-        default_write_profiles: ioProfiles.defaultWriteProfiles,
-        display_frame_id_format: display.frameIdFormat,
-        save_frame_id_format: display.saveFrameIdFormat,
-        display_time_format: display.timeFormat,
-        display_timezone: display.timezone,
-        default_frame_type: general.defaultFrameType,
-        signal_colour_none: display.signalColours.none,
-        signal_colour_low: display.signalColours.low,
-        signal_colour_medium: display.signalColours.medium,
-        signal_colour_high: display.signalColours.high,
-        binary_one_colour: display.binaryOneColour,
-        binary_zero_colour: display.binaryZeroColour,
-        binary_unused_colour: display.binaryUnusedColour,
-        frame_editor_colours: display.frameEditorColours,
-        // Buffers
-        clear_captures_on_start: buffers.clearCapturesOnStart,
-        buffer_storage: buffers.captureStorage,
-        discovery_history_buffer: buffers.discoveryHistorySize,
-        query_result_limit: buffers.queryResultLimit,
-        graph_buffer_size: buffers.graphBufferSize,
-        decoder_max_unmatched_frames: buffers.decoderMaxUnmatchedFrames,
-        decoder_max_filtered_frames: buffers.decoderMaxFilteredFrames,
-        decoder_max_decoded_frames: buffers.decoderMaxDecodedFrames,
-        decoder_max_decoded_per_source: buffers.decoderMaxDecodedPerSource,
-        transmit_max_history: buffers.transmitMaxHistory,
-        session_manager_stats_interval: general.sessionManagerStatsInterval,
-        // Power management
-        prevent_idle_sleep: general.preventIdleSleep,
-        keep_display_awake: general.keepDisplayAwake,
-        // Diagnostics
-        log_level: general.logLevel,
-        // Privacy / telemetry
-        telemetry_enabled: general.telemetryEnabled,
-        telemetry_consent_given: general.telemetryConsentGiven,
-        usage_analytics_enabled: general.usageAnalyticsEnabled,
-        usage_analytics_consent_given: general.usageAnalyticsConsentGiven,
-        install_id: general.installId,
-        // Modbus
-        modbus_max_register_errors: general.modbusMaxRegisterErrors,
-        // Theme settings
-        theme_mode: display.themeMode,
-        theme_bg_primary_light: display.themeColours.bgPrimaryLight,
-        theme_bg_surface_light: display.themeColours.bgSurfaceLight,
-        theme_text_primary_light: display.themeColours.textPrimaryLight,
-        theme_text_secondary_light: display.themeColours.textSecondaryLight,
-        theme_border_default_light: display.themeColours.borderDefaultLight,
-        theme_data_bg_light: display.themeColours.dataBgLight,
-        theme_data_text_primary_light: display.themeColours.dataTextPrimaryLight,
-        theme_bg_primary_dark: display.themeColours.bgPrimaryDark,
-        theme_bg_surface_dark: display.themeColours.bgSurfaceDark,
-        theme_text_primary_dark: display.themeColours.textPrimaryDark,
-        theme_text_secondary_dark: display.themeColours.textSecondaryDark,
-        theme_border_default_dark: display.themeColours.borderDefaultDark,
-        theme_data_bg_dark: display.themeColours.dataBgDark,
-        theme_data_text_primary_dark: display.themeColours.dataTextPrimaryDark,
-        theme_accent_primary: display.themeColours.accentPrimary,
-        theme_accent_success: display.themeColours.accentSuccess,
-        theme_accent_danger: display.themeColours.accentDanger,
-        theme_accent_warning: display.themeColours.accentWarning,
-        // Networking
-        smp_port: general.smpPort,
-        // Localisation
-        language: general.language,
-        // MCP server
-        mcp_server_enabled: mcp.serverEnabled,
-        mcp_allow_control: mcp.allowControl,
-        mcp_allow_session_control: mcp.allowSessionControl,
-        mcp_allow_catalog_write: mcp.allowCatalogWrite,
-        mcp_allow_catalog_modify: mcp.allowCatalogModify,
-        mcp_allow_dashboard_write: mcp.allowDashboardWrite,
-        mcp_allow_ui_control: mcp.allowUiControl,
-        mcp_server_port: mcp.serverPort,
-        mcp_server_token: mcp.serverToken,
-      };
+      const settings = buildAppSettings(get());
 
       await saveSettingsApi(settings);
       set({ originalSettings: settings });
@@ -1041,86 +1054,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   hasUnsavedChanges: () => {
-    const { locations, ioProfiles, display, buffers, general, mcp, originalSettings } = get();
+    const { originalSettings } = get();
     if (!originalSettings) return false;
-
-    const currentSettings = {
-      config_path: locations.configPath,
-      decoder_dir: locations.decoderDir,
-      dump_dir: locations.dumpDir,
-      report_dir: locations.reportDir,
-      io_profiles: ioProfiles.profiles,
-      default_read_profile: ioProfiles.defaultReadProfile,
-      default_write_profiles: ioProfiles.defaultWriteProfiles,
-      display_frame_id_format: display.frameIdFormat,
-      save_frame_id_format: display.saveFrameIdFormat,
-      display_time_format: display.timeFormat,
-      display_timezone: display.timezone,
-      default_frame_type: general.defaultFrameType,
-      signal_colour_none: display.signalColours.none,
-      signal_colour_low: display.signalColours.low,
-      signal_colour_medium: display.signalColours.medium,
-      signal_colour_high: display.signalColours.high,
-      binary_one_colour: display.binaryOneColour,
-      binary_zero_colour: display.binaryZeroColour,
-      binary_unused_colour: display.binaryUnusedColour,
-      frame_editor_colours: display.frameEditorColours,
-      // Buffers
-      clear_captures_on_start: buffers.clearCapturesOnStart,
-      discovery_history_buffer: buffers.discoveryHistorySize,
-      query_result_limit: buffers.queryResultLimit,
-      graph_buffer_size: buffers.graphBufferSize,
-      decoder_max_unmatched_frames: buffers.decoderMaxUnmatchedFrames,
-      decoder_max_filtered_frames: buffers.decoderMaxFilteredFrames,
-      decoder_max_decoded_frames: buffers.decoderMaxDecodedFrames,
-      decoder_max_decoded_per_source: buffers.decoderMaxDecodedPerSource,
-      transmit_max_history: buffers.transmitMaxHistory,
-      session_manager_stats_interval: general.sessionManagerStatsInterval,
-      // Power management
-      prevent_idle_sleep: general.preventIdleSleep,
-      keep_display_awake: general.keepDisplayAwake,
-      // Diagnostics
-      log_level: general.logLevel,
-      // Privacy / telemetry
-      telemetry_enabled: general.telemetryEnabled,
-      telemetry_consent_given: general.telemetryConsentGiven,
-      usage_analytics_enabled: general.usageAnalyticsEnabled,
-      usage_analytics_consent_given: general.usageAnalyticsConsentGiven,
-      install_id: general.installId,
-      // Modbus
-      modbus_max_register_errors: general.modbusMaxRegisterErrors,
-      // Theme settings
-      theme_mode: display.themeMode,
-      theme_bg_primary_light: display.themeColours.bgPrimaryLight,
-      theme_bg_surface_light: display.themeColours.bgSurfaceLight,
-      theme_text_primary_light: display.themeColours.textPrimaryLight,
-      theme_text_secondary_light: display.themeColours.textSecondaryLight,
-      theme_border_default_light: display.themeColours.borderDefaultLight,
-      theme_data_bg_light: display.themeColours.dataBgLight,
-      theme_data_text_primary_light: display.themeColours.dataTextPrimaryLight,
-      theme_bg_primary_dark: display.themeColours.bgPrimaryDark,
-      theme_bg_surface_dark: display.themeColours.bgSurfaceDark,
-      theme_text_primary_dark: display.themeColours.textPrimaryDark,
-      theme_text_secondary_dark: display.themeColours.textSecondaryDark,
-      theme_border_default_dark: display.themeColours.borderDefaultDark,
-      theme_data_bg_dark: display.themeColours.dataBgDark,
-      theme_data_text_primary_dark: display.themeColours.dataTextPrimaryDark,
-      theme_accent_primary: display.themeColours.accentPrimary,
-      theme_accent_success: display.themeColours.accentSuccess,
-      theme_accent_danger: display.themeColours.accentDanger,
-      theme_accent_warning: display.themeColours.accentWarning,
-      // Networking
-      smp_port: general.smpPort,
-      // Localisation
-      language: general.language,
-      // MCP server
-      mcp_server_enabled: mcp.serverEnabled,
-      mcp_allow_control: mcp.allowControl,
-      mcp_allow_session_control: mcp.allowSessionControl,
-      mcp_server_port: mcp.serverPort,
-      mcp_server_token: mcp.serverToken,
-    };
-
+    const currentSettings = buildAppSettings(get());
     return stableStringify(currentSettings) !== stableStringify(originalSettings);
   },
 

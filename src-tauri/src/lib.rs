@@ -893,17 +893,47 @@ fn get_ws_config() -> Result<WsConfig, String> {
 // ============================================================================
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct McpStatus {
     pub running: bool,
     pub port: Option<u16>,
+    /// Whether applying the saved settings would change the running server
+    /// (start/stop it, or restart with different gates/port/token). Computed in
+    /// Rust, which owns both the running config and the saved settings, so the
+    /// UI needn't reconstruct it.
+    pub restart_pending: bool,
+}
+
+impl McpStatus {
+    /// Snapshot the live server state and whether a restart is pending vs the
+    /// saved settings.
+    fn current(app: &AppHandle) -> Self {
+        let restart_pending = settings::load_settings_sync(app)
+            .map(|s| {
+                let desired = crate::mcp::McpRunningConfig {
+                    port: s.mcp_server_port,
+                    control: s.mcp_allow_control,
+                    session_control: s.mcp_allow_session_control,
+                    catalog_write: s.mcp_allow_catalog_write,
+                    catalog_modify: s.mcp_allow_catalog_modify,
+                    dashboard_write: s.mcp_allow_dashboard_write,
+                    ui_control: s.mcp_allow_ui_control,
+                    token_set: !s.mcp_server_token.is_empty(),
+                };
+                crate::mcp::restart_pending(s.mcp_server_enabled, desired, &s.mcp_server_token)
+            })
+            .unwrap_or(false);
+        McpStatus {
+            running: crate::mcp::is_running(),
+            port: crate::mcp::running_port(),
+            restart_pending,
+        }
+    }
 }
 
 #[tauri::command]
-fn get_mcp_status() -> McpStatus {
-    McpStatus {
-        running: crate::mcp::is_running(),
-        port: crate::mcp::running_port(),
-    }
+fn get_mcp_status(app: AppHandle) -> McpStatus {
+    McpStatus::current(&app)
 }
 
 /// Start or stop the MCP server, applying the current saved settings. The
@@ -926,10 +956,7 @@ fn toggle_mcp_server(app: AppHandle, enabled: bool) -> Result<McpStatus, String>
             s.mcp_server_token.clone(),
         )?;
     }
-    Ok(McpStatus {
-        running: crate::mcp::is_running(),
-        port: crate::mcp::running_port(),
-    })
+    Ok(McpStatus::current(&app))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

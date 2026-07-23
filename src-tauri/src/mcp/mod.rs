@@ -27,9 +27,27 @@ use tokio_util::sync::CancellationToken;
 
 use tools::WireTapTools;
 
+/// The gates/port/token-presence the server was actually started with. Reported
+/// to the settings UI so it can tell when the running server differs from the
+/// saved settings and a restart is pending.
+/// The gates/port/token-presence the server was started with. `token_set` is a
+/// presence flag only; the raw token lives in [`McpHandle`] for value comparison.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct McpRunningConfig {
+    pub port: u16,
+    pub control: bool,
+    pub session_control: bool,
+    pub catalog_write: bool,
+    pub catalog_modify: bool,
+    pub dashboard_write: bool,
+    pub ui_control: bool,
+    pub token_set: bool,
+}
+
 struct McpHandle {
     cancel: CancellationToken,
-    port: u16,
+    config: McpRunningConfig,
+    token: String,
 }
 
 static HANDLE: Lazy<Mutex<Option<McpHandle>>> = Lazy::new(|| Mutex::new(None));
@@ -41,7 +59,18 @@ pub fn is_running() -> bool {
 
 /// The port the MCP server is listening on, if running.
 pub fn running_port() -> Option<u16> {
-    HANDLE.lock().ok().and_then(|h| h.as_ref().map(|x| x.port))
+    HANDLE.lock().ok().and_then(|h| h.as_ref().map(|x| x.config.port))
+}
+
+/// Whether applying the given desired settings would change the running server
+/// — the server should start/stop, or its live gates/port/token differ. The
+/// comparison lives here because Rust owns both the running config and the token
+/// value; the settings UI just reads the result instead of reconstructing it.
+pub fn restart_pending(enabled: bool, desired: McpRunningConfig, token: &str) -> bool {
+    match HANDLE.lock().ok().and_then(|g| g.as_ref().map(|h| (h.config, h.token.clone()))) {
+        None => enabled,
+        Some((config, running_token)) => !enabled || config != desired || running_token != token,
+    }
 }
 
 /// Start the MCP server on `127.0.0.1:port`.
@@ -65,8 +94,30 @@ pub fn start(
         return Err("MCP server already running".to_string());
     }
 
-    let std_listener = std::net::TcpListener::bind(("127.0.0.1", port))
-        .map_err(|e| format!("Failed to bind MCP server on 127.0.0.1:{port}: {e}"))?;
+    let token_set = !token.is_empty();
+    let token_value = token.clone();
+
+    // A restart (stop→start on the same port) can race: stop() cancels the old
+    // task but the OS may not have released the socket yet, so an immediate bind
+    // fails with EADDRINUSE. Retry briefly — the old listener is dropped within a
+    // few ms of cancellation. A genuine port conflict still surfaces as an error.
+    let std_listener = {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            match std::net::TcpListener::bind(("127.0.0.1", port)) {
+                Ok(l) => break l,
+                Err(e)
+                    if e.kind() == std::io::ErrorKind::AddrInUse
+                        && std::time::Instant::now() < deadline =>
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(25));
+                }
+                Err(e) => {
+                    return Err(format!("Failed to bind MCP server on 127.0.0.1:{port}: {e}"));
+                }
+            }
+        }
+    };
     std_listener
         .set_nonblocking(true)
         .map_err(|e| format!("Failed to set MCP listener non-blocking: {e}"))?;
@@ -113,8 +164,18 @@ pub fn start(
         tlog!("[mcp] Server task exited");
     });
 
+    let config = McpRunningConfig {
+        port,
+        control: allow_control,
+        session_control: allow_session_control,
+        catalog_write: allow_catalog_write,
+        catalog_modify: allow_catalog_modify,
+        dashboard_write: allow_dashboard_write,
+        ui_control: allow_ui_control,
+        token_set,
+    };
     if let Ok(mut guard) = HANDLE.lock() {
-        *guard = Some(McpHandle { cancel, port });
+        *guard = Some(McpHandle { cancel, config, token: token_value });
     }
     tlog!("[mcp] Server listening on 127.0.0.1:{port} (control={allow_control})");
     Ok(())
@@ -125,7 +186,7 @@ pub fn stop() {
     if let Ok(mut guard) = HANDLE.lock() {
         if let Some(handle) = guard.take() {
             handle.cancel.cancel();
-            tlog!("[mcp] Server stopping on port {}", handle.port);
+            tlog!("[mcp] Server stopping on port {}", handle.config.port);
         }
     }
 }

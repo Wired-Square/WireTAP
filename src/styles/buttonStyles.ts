@@ -3,25 +3,35 @@
 // Uses CSS variables for cross-platform dark mode support (Windows WebView).
 
 /**
+ * Tactile press feedback — a gentle scale-down while held that eases back on
+ * release. Backed by the unlayered `.btn-press` rule in WireTAP.css, which wins
+ * over (and folds in) a button's Tailwind `transition-*` classes so there's a
+ * single, smooth transition rather than a truncated keyframe pulse. Baked into
+ * the shared button bases below, so most buttons get it for free; append to any
+ * other button as well:  className={`${someButtonClass} ${buttonPress}`}
+ */
+export const buttonPress = "btn-press";
+
+/**
  * Base button with text - grey background, used for most toolbar buttons
  * Use for buttons that contain text and/or icons
  */
 export const buttonBase =
-  "flex items-center gap-1 px-2 py-1.5 text-sm rounded transition-all bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
+  `flex items-center gap-1 px-2 py-1.5 text-sm rounded transition-all bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${buttonPress}`;
 
 /**
  * Icon-only button - grey background, centered icon
  * Use for buttons that contain only an icon (no text)
  */
 export const iconButtonBase =
-  "flex items-center justify-center px-2 py-1.5 rounded transition-all bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0";
+  `flex items-center justify-center px-2 py-1.5 rounded transition-all bg-[var(--bg-surface)] text-[color:var(--text-secondary)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 ${buttonPress}`;
 
 /**
  * Danger/Stop button - red background, icon only
  * Use for stop/cancel actions
  */
 export const dangerButtonBase =
-  "flex items-center justify-center px-2 py-1.5 rounded transition-colors bg-red-600 hover:bg-red-700 text-white shrink-0";
+  `flex items-center justify-center px-2 py-1.5 rounded transition-colors bg-red-600 hover:bg-red-700 text-white shrink-0 ${buttonPress}`;
 
 /**
  * Warning/Detach button - amber background, icon only
@@ -151,14 +161,14 @@ export const indigoButtonCompact =
  * Use for: Primary actions in dialogs (Import, Watch, OK)
  */
 export const primaryButtonBase =
-  "flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed";
+  `flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed ${buttonPress}`;
 
 /**
  * Success action button - green background
  * Use for: Positive actions (Ingest, Confirm)
  */
 export const successButtonBase =
-  "flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700";
+  `flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 ${buttonPress}`;
 
 /**
  * Toggle card button for dark panels (e.g., framing options in dark dialogs)
@@ -385,7 +395,7 @@ export const iconButtonHoverSmall =
  * Use for: Dialog cancel buttons, reset buttons, secondary actions
  */
 export const secondaryButton =
-  "px-6 py-2 bg-[var(--bg-surface)] text-[color:var(--text-secondary)] rounded-lg hover:brightness-95 transition-all";
+  `px-6 py-2 bg-[var(--bg-surface)] text-[color:var(--text-secondary)] rounded-lg hover:brightness-95 transition-all ${buttonPress}`;
 
 /**
  * Folder picker button - for directory browse buttons

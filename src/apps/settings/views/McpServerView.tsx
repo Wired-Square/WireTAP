@@ -1,19 +1,36 @@
 // ui/src/apps/settings/views/McpServerView.tsx
 //
-// Settings view for the MCP server — lets an external MCP client query live
-// WireTAP runtime state. Three independent, off-by-default gates: enable the
-// server, allow control tools, and allow session open/stop.
+// Settings view for the MCP server — lets an external MCP client (e.g. Claude
+// Code) query live WireTAP runtime state. The server is off by default and
+// read-only unless control gates are granted. Enabling/disabling the server
+// applies immediately; permission, port and token changes are staged and take
+// effect only when "Apply & restart server" is pressed (one restart, rather
+// than bouncing the server — and disconnecting any client — on every tick).
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Copy, RefreshCw, AlertTriangle, Check } from "lucide-react";
 import { useSettingsStore } from "../stores/settingsStore";
-import { labelDefault, helpText, inputSimple, buttonBase } from "../../../styles";
+import {
+  labelDefault,
+  helpText,
+  inputSimple,
+  buttonBase,
+  primaryButtonBase,
+  secondaryButton,
+  disabledState,
+} from "../../../styles";
 
 interface McpStatus {
   running: boolean;
   port: number | null;
+  // Whether applying the saved settings would change the running server. Rust
+  // computes this (it owns both the running config and the saved settings), so
+  // the UI never reconstructs it.
+  restartPending: boolean;
 }
+
+const STOPPED_STATUS: McpStatus = { running: false, port: null, restartPending: false };
 
 /** A checkbox row with a label and help/warning text. */
 function ToggleRow({
@@ -79,7 +96,7 @@ export default function McpServerView() {
   const setServerPort = useSettingsStore((s) => s.setMcpServerPort);
   const setServerToken = useSettingsStore((s) => s.setMcpServerToken);
 
-  const [status, setStatus] = useState<McpStatus>({ running: false, port: null });
+  const [status, setStatus] = useState<McpStatus>(STOPPED_STATUS);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -96,9 +113,11 @@ export default function McpServerView() {
   }, [refreshStatus]);
 
   // Persist current settings then (re)start or stop the server so changes apply
-  // without an app restart.
+  // without an app restart. Re-entrant calls are ignored so an in-flight apply
+  // can't be interrupted and leave the panel wedged.
   const apply = useCallback(
     async (enabled: boolean) => {
+      if (busy) return;
       setBusy(true);
       try {
         await useSettingsStore.getState().saveSettings();
@@ -111,7 +130,7 @@ export default function McpServerView() {
         setBusy(false);
       }
     },
-    [refreshStatus],
+    [busy, refreshStatus],
   );
 
   const copy = useCallback((key: string, text: string) => {
@@ -121,16 +140,53 @@ export default function McpServerView() {
     });
   }, []);
 
+  // Permission/port/token edits are staged, not applied: persist them (debounced
+  // to coalesce keystrokes), then re-read status so Rust's restart-pending flag —
+  // and the Apply button's emphasis — updates without restarting the server.
+  const stageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stageChange = useCallback(() => {
+    if (stageTimer.current) clearTimeout(stageTimer.current);
+    stageTimer.current = setTimeout(async () => {
+      await useSettingsStore.getState().saveSettings();
+      await refreshStatus();
+    }, 250);
+  }, [refreshStatus]);
+
+  // Wrap a permission setter so ticking it stages the change (see stageChange).
+  const staged = useCallback(
+    (setter: (v: boolean) => void) => (v: boolean) => {
+      setter(v);
+      stageChange();
+    },
+    [stageChange],
+  );
+
   const authHeader = serverToken ? ` --header "Authorization: Bearer ${serverToken}"` : "";
   const addCommand = `claude mcp add --transport http wiretap http://127.0.0.1:${serverPort}/mcp${authHeader}`;
+
+  // Rust reports whether applying the saved settings would change the running
+  // server; the button is always clickable, this only drives its emphasis.
+  const pendingRestart = status.restartPending;
+
+  let applyMessage: string;
+  if (pendingRestart && status.running) {
+    applyMessage = "Unapplied changes — press Apply & restart server for them to take effect.";
+  } else if (pendingRestart) {
+    applyMessage = "Server is enabled but not running — press Apply to start it.";
+  } else if (status.running) {
+    applyMessage = "The running server matches these settings.";
+  } else {
+    applyMessage = "The MCP server is off — enable it above to start.";
+  }
 
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">MCP Server</h2>
       <p className={helpText}>
-        Exposes live WireTAP runtime state (sessions, captures, frame data, payload
-        analysis and decoded signals) to an external MCP client over a localhost
-        HTTP transport. Off by default. The server binds to 127.0.0.1 only.
+        Exposes live WireTAP runtime state — sessions, captures, frame data, payload
+        analysis and decoded signals — to an external MCP client such as Claude Code,
+        over a localhost-only HTTP transport. Everything is off by default; the server
+        binds to 127.0.0.1 and stays read-only unless you grant control below.
       </p>
 
       <ToggleRow
@@ -142,25 +198,31 @@ export default function McpServerView() {
           apply(v);
         }}
       >
-        When on, the server listens on the port below.{" "}
+        Starts the server listening on the port below.{" "}
         <span className={status.running ? "text-green-500" : "text-[color:var(--text-secondary)]"}>
           {status.running ? `Running on 127.0.0.1:${status.port}` : "Stopped"}
         </span>
       </ToggleRow>
+
+      {/* Permissions — staged; applied on "Apply & restart server" */}
+      <div className="space-y-1 pt-1">
+        <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">Permissions</h3>
+        <p className={helpText}>
+          Grant only what the client needs. Read-only tools are always available; each
+          gate below adds a group of write/control tools. Permission, port and token
+          changes take effect when you press <strong>Apply &amp; restart server</strong>.
+        </p>
+      </div>
 
       <ToggleRow
         label="Allow control tools"
         checked={allowControl}
         disabled={busy}
         warn
-        onChange={(v) => {
-          setAllowControl(v);
-          if (serverEnabled) apply(true);
-        }}
+        onChange={staged(setAllowControl)}
       >
-        Lets a connected MCP client <strong>drive</strong> the app — transmit frames on
-        the bus, write Modbus registers, and replay captures. Leave off for read-only
-        introspection.
+        Lets the client <strong>drive the app</strong> — transmit frames on the bus, write
+        Modbus registers and replay captures. Leave off for read-only introspection.
       </ToggleRow>
 
       <ToggleRow
@@ -168,41 +230,32 @@ export default function McpServerView() {
         checked={allowSessionControl}
         disabled={busy}
         warn
-        onChange={(v) => {
-          setAllowSessionControl(v);
-          if (serverEnabled) apply(true);
-        }}
+        onChange={staged(setAllowSessionControl)}
       >
-        Lets a connected MCP client <strong>open and stop sessions</strong> — e.g. start a
-        Modbus session polling from a profile's catalog. Separate from the control gate above.
+        Lets the client <strong>open and stop sessions</strong> — e.g. start a Modbus session
+        polling from a profile's catalogue. Separate from the control gate above.
       </ToggleRow>
 
       <ToggleRow
-        label="Allow catalog create (new files)"
+        label="Allow catalogue create (new files)"
         checked={allowCatalogWrite}
         disabled={busy}
         warn
-        onChange={(v) => {
-          setAllowCatalogWrite(v);
-          if (serverEnabled) apply(true);
-        }}
+        onChange={staged(setAllowCatalogWrite)}
       >
-        Lets a connected MCP client <strong>create new decoder catalogues</strong> in the
-        decoder directory. Validated before writing; cannot overwrite an existing file.
+        Lets the client <strong>create new decoder catalogues</strong> in the decoder
+        directory. Validated before writing; existing files are never overwritten.
       </ToggleRow>
 
       <ToggleRow
-        label="Allow catalog modify (overwrite existing)"
+        label="Allow catalogue modify (overwrite existing)"
         checked={allowCatalogModify}
         disabled={busy}
         warn
-        onChange={(v) => {
-          setAllowCatalogModify(v);
-          if (serverEnabled) apply(true);
-        }}
+        onChange={staged(setAllowCatalogModify)}
       >
-        Lets a connected MCP client <strong>overwrite existing decoder catalogues</strong>.
-        Validated before writing. Separate from the create gate above.
+        Lets the client <strong>overwrite existing decoder catalogues</strong>. Validated
+        before writing. Separate from the create gate above.
       </ToggleRow>
 
       <ToggleRow
@@ -210,14 +263,11 @@ export default function McpServerView() {
         checked={allowDashboardWrite}
         disabled={busy}
         warn
-        onChange={(v) => {
-          setAllowDashboardWrite(v);
-          if (serverEnabled) apply(true);
-        }}
+        onChange={staged(setAllowDashboardWrite)}
       >
-        Lets a connected MCP client <strong>create or overwrite dashboard files</strong>
-        (visualisers) in the dashboards directory. The JSON shape is validated; any embedded
-        custom-widget code is stored opaque and only ever runs later inside the sandboxed worker.
+        Lets the client <strong>create or overwrite dashboard files</strong> in the
+        dashboards directory. The JSON shape is validated; any embedded custom-widget code
+        is stored opaque and only ever runs later inside the sandboxed worker.
       </ToggleRow>
 
       <ToggleRow
@@ -225,13 +275,10 @@ export default function McpServerView() {
         checked={allowUiControl}
         disabled={busy}
         warn
-        onChange={(v) => {
-          setAllowUiControl(v);
-          if (serverEnabled) apply(true);
-        }}
+        onChange={staged(setAllowUiControl)}
       >
-        Lets a connected MCP client <strong>open or focus an app/panel</strong> in the running
-        window — e.g. open a dashboard it just authored. Requires the WireTAP window to be open.
+        Lets the client <strong>open or focus a panel</strong> in the running window — e.g.
+        show a dashboard it just authored. Requires the WireTAP window to be open.
       </ToggleRow>
 
       {/* Port */}
@@ -245,7 +292,10 @@ export default function McpServerView() {
           min={1024}
           max={65535}
           value={serverPort}
-          onChange={(e) => setServerPort(Number(e.target.value) || 8787)}
+          onChange={(e) => {
+            setServerPort(Number(e.target.value) || 8787);
+            stageChange();
+          }}
           className={inputSimple}
         />
       </div>
@@ -261,14 +311,20 @@ export default function McpServerView() {
             type="text"
             value={serverToken}
             placeholder="(no auth — leave blank for local-only)"
-            onChange={(e) => setServerToken(e.target.value)}
+            onChange={(e) => {
+              setServerToken(e.target.value);
+              stageChange();
+            }}
             className={`${inputSimple} font-mono text-xs`}
           />
           <button
             type="button"
             className={buttonBase}
             title="Generate a new token"
-            onClick={() => setServerToken(generateToken())}
+            onClick={() => {
+              setServerToken(generateToken());
+              stageChange();
+            }}
           >
             <RefreshCw size={14} /> Generate
           </button>
@@ -283,8 +339,8 @@ export default function McpServerView() {
           </button>
         </div>
         <p className={helpText}>
-          Clients must send this as a bearer token. Empty means no auth (relies on the
-          localhost-only bind).
+          Clients must send this as a bearer token. Leave blank for no auth — the
+          localhost-only bind is then the sole protection.
         </p>
       </div>
 
@@ -292,22 +348,19 @@ export default function McpServerView() {
       <div>
         <button
           type="button"
-          className={buttonBase}
-          disabled={busy}
+          className={`${pendingRestart ? primaryButtonBase : secondaryButton} ${disabledState}`}
+          disabled={busy || !pendingRestart}
           onClick={() => apply(serverEnabled)}
         >
-          {serverEnabled ? "Apply & restart server" : "Apply"}
+          {busy ? "Applying…" : serverEnabled ? "Apply & restart server" : "Apply"}
         </button>
-        <p className={`${helpText} mt-1`}>
-          Saves settings and restarts the server so the port, token and control changes
-          take effect.
-        </p>
+        <p className={`${helpText} mt-2`}>{applyMessage}</p>
       </div>
 
       {/* Connection snippet */}
       <div className="space-y-2 max-w-2xl">
-        <label className={labelDefault}>Connect an MCP client</label>
-        <p className={helpText}>Example for Claude Code:</p>
+        <label className={labelDefault}>Connect a client</label>
+        <p className={helpText}>For Claude Code, run:</p>
         <div className="flex items-start gap-2">
           <pre className="flex-1 text-xs font-mono whitespace-pre-wrap break-all bg-[var(--bg-primary)] border border-[color:var(--border-default)] rounded p-3 text-[color:var(--text-primary)]">
             {addCommand}
@@ -322,8 +375,8 @@ export default function McpServerView() {
           </button>
         </div>
         <p className={helpText}>
-          Tier 2 tools (discovery analysis, decoded signals, live frame map) require the
-          WireTAP window to be open on the relevant view.
+          Tier 2 tools (discovery analysis, decoded signals, live frame map) need the
+          WireTAP window open on the relevant view.
         </p>
       </div>
     </div>

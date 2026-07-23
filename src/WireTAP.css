@@ -269,6 +269,36 @@ form button {
   animation-iteration-count: infinite;
 }
 
+/* Tactile press feedback for buttons — a gentle scale-down while held that eases
+   smoothly back on release (or when the button disables on click, e.g. a submit
+   flipping to a busy state). A `transition`, not a keyframe animation, so it is
+   never truncated mid-scale — the earlier animation flickered because releasing
+   or disabling ended the `:active` state part-way through.
+
+   This rule is unlayered, so it wins over Tailwind's layered `transition-*`
+   utilities; the property list keeps the button's hover colour/filter
+   transitions smooth too. Reuse via the `buttonPress` token in
+   src/styles/buttonStyles.ts (or the `btn-press` class directly). Skipped for
+   disabled buttons and reduced motion. */
+.btn-press {
+  /* transform (the press) + the hover colour/filter set. Deliberately excludes
+     opacity so a button's disabled dim (opacity-50) snaps instead of fading —
+     the fade compounded the press flicker on buttons that toggle disabled. */
+  transition-property: transform, color, background-color, border-color, filter;
+  transition-duration: 130ms;
+  transition-timing-function: ease-out;
+}
+
+.btn-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-press:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 /* CSS variable defaults - light mode (applied to :root) */
 /* These are overridden by useTheme hook, but provide fallback */
 :root {

@@ -297,6 +297,7 @@ export interface AppSettings {
   binary_one_colour?: string;
   binary_zero_colour?: string;
   binary_unused_colour?: string;
+  frame_editor_colours?: string[];
   discovery_history_buffer?: number;
   query_result_limit?: number;
   session_manager_stats_interval?: number;
