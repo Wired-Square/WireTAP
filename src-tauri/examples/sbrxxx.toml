@@ -1,9 +1,10 @@
 [meta]
 name = "SBRXXX"
-version = 4
+version = 6
 
 [meta.can]
 default_byte_order = "little"
+default_extended = false
 
 [frame.can."0x000"]
 length = 8
@@ -32,6 +33,41 @@ mirror_of = "0x705"
 [frame.can."0x006"]
 length = 8
 mirror_of = "0x706"
+
+[frame.can."0x007"]
+length = 8
+notes = "Only transmitted on INIT"
+mirror_of = "0x707"
+
+[frame.can."0x008"]
+length = 8
+notes = "Only transmitted on INIT"
+mirror_of = "0x708"
+
+[frame.can."0x009"]
+length = 8
+notes = "Only transmitted on INIT"
+mirror_of = "0x709"
+
+[frame.can."0x00a"]
+length = 8
+notes = "Only transmitted on INIT"
+mirror_of = "0x70a"
+
+[frame.can."0x00b"]
+length = 8
+notes = "Only transmitted on INIT"
+mirror_of = "0x70b"
+
+[frame.can."0x00d"]
+length = 8
+notes = "Only transmitted on INIT"
+mirror_of = "0x70d"
+
+[frame.can."0x00e"]
+length = 8
+notes = "Only transmitted on INIT"
+mirror_of = "0x70e"
 
 [frame.can."0x013"]
 length = 8
@@ -287,6 +323,7 @@ bit_length = 16
 factor = 0.01
 unit = "%"
 signed = false
+confidence = "high"
 
 [[frame.can."0x400".signals]]
 name = "400_Unknown"
@@ -304,7 +341,8 @@ name = "401_Padding"
 start_bit = 0
 bit_length = 64
 signed = false
-endianness = "big"
+byte_order = "big"
+confidence = "high"
 
 [frame.can."0x500"]
 length = 8
@@ -383,6 +421,7 @@ name = "512_Padding"
 start_bit = 0
 bit_length = 64
 signed = false
+confidence = "high"
 
 [frame.can."0x700"]
 length = 8
@@ -393,6 +432,7 @@ name = "700_Padding"
 start_bit = 0
 bit_length = 64
 signed = false
+confidence = "high"
 
 [frame.can."0x701"]
 length = 8
@@ -445,6 +485,7 @@ bit_length = 16
 factor = 0.01
 unit = "%"
 signed = false
+confidence = "high"
 
 [[frame.can."0x702".signals]]
 name = "Status_Battery_SoH"
@@ -553,12 +594,14 @@ name = "705_Always_0"
 start_bit = 8
 bit_length = 8
 signed = false
+confidence = "low"
 
 [[frame.can."0x705".signals]]
 name = "705_Always_1"
 start_bit = 16
 bit_length = 8
 signed = false
+confidence = "low"
 
 [[frame.can."0x705".signals]]
 name = "Info_Battery_Type"
@@ -591,6 +634,7 @@ name = "705_Padding"
 start_bit = 56
 bit_length = 8
 signed = false
+confidence = "medium"
 
 [frame.can."0x706"]
 length = 8
@@ -634,18 +678,29 @@ confidence = "high"
 
 [frame.can."0x707"]
 length = 8
+transmitter = "BMS"
 
 [[frame.can."0x707".signals]]
-name = "707_Unknown_Bitfield__"
+name = "Info_BMS_Firmware_Patch"
 start_bit = 0
-bit_length = 16
+bit_length = 8
 signed = false
+confidence = "high"
+format = "hex"
 
 [[frame.can."0x707".signals]]
-name = "707_Unknown_Usually_1"
+bit_length = 16
+name = "707_All_Zero"
+signed = false
+start_bit = 8
+
+[[frame.can."0x707".signals]]
+name = "Info_BMS_Firmware_Minor"
 start_bit = 24
 bit_length = 8
 signed = false
+format = "hex"
+confidence = "high"
 
 [[frame.can."0x707".signals]]
 name = "Info_Battery_Nameplate_Capacity"
@@ -665,8 +720,6 @@ confidence = "high"
 [frame.can."0x708"]
 length = 8
 transmitter = "BMS"
-
-[frame.can."0x708".tx]
 interval_ms = 10000
 
 [frame.can."0x708".mux]
@@ -691,8 +744,6 @@ confidence = "high"
 [frame.can."0x709"]
 length = 8
 transmitter = "BMS"
-
-[frame.can."0x709".tx]
 interval_ms = 10000
 
 [[frame.can."0x709".signals]]
@@ -704,8 +755,6 @@ signed = false
 [frame.can."0x70A"]
 length = 8
 transmitter = "BMS"
-
-[frame.can."0x70A".tx]
 interval_ms = 10000
 
 [frame.can."0x70A".mux]
@@ -730,8 +779,6 @@ confidence = "medium"
 [frame.can."0x70B"]
 length = 8
 transmitter = "BMS"
-
-[frame.can."0x70B".tx]
 interval_ms = 10000
 
 [[frame.can."0x70B".signals]]
@@ -744,8 +791,6 @@ confidence = "medium"
 [frame.can."0x70D"]
 length = 8
 transmitter = "BMS"
-
-[frame.can."0x70D".tx]
 interval_ms = 10000
 
 [[frame.can."0x70D".signals]]
@@ -758,8 +803,6 @@ format = "hex"
 [frame.can."0x70E"]
 length = 8
 transmitter = "BMS"
-
-[frame.can."0x70E".tx]
 interval_ms = 10000
 
 [[frame.can."0x70E".signals]]
@@ -772,8 +815,6 @@ format = "hex"
 [frame.can."0x70F"]
 length = 8
 transmitter = "BMS"
-
-[frame.can."0x70F".tx]
 interval_ms = 10000
 
 [frame.can."0x70F".mux]
@@ -782,46 +823,108 @@ start_bit = 0
 bit_length = 8
 
 [[frame.can."0x70F".mux."0".signals]]
-name = "70F_Unknown_Mux_0"
-start_bit = 8
-bit_length = 56
+name = "70F_Mux0_Const"
+start_bit = 16
+bit_length = 16
 signed = false
-format = "hex"
+confidence = "low"
+
+[[frame.can."0x70F".mux."0".signals]]
+name = "70F_Mux0_PerModule_1"
+start_bit = 32
+bit_length = 16
+signed = false
+confidence = "low"
+
+[[frame.can."0x70F".mux."0".signals]]
+name = "70F_Mux0_PerModule_2"
+start_bit = 48
+bit_length = 16
+signed = false
+confidence = "low"
 
 [[frame.can."0x70F".mux."1".signals]]
-name = "70F_Unknown_Mux_1"
+name = "70F_Mux1_Padding"
 start_bit = 8
 bit_length = 56
 signed = false
 format = "hex"
+confidence = "low"
 
 [[frame.can."0x70F".mux."2".signals]]
-name = "70F_Unknown_Mux_2"
-start_bit = 8
-bit_length = 56
+name = "70F_Unknown_Mux_2_1"
+start_bit = 16
+bit_length = 16
 signed = false
-format = "hex"
+notes = "dynamic pack value, unmapped"
+
+[[frame.can."0x70F".mux."2".signals]]
+name = "70F_Mux2_Padding"
+start_bit = 32
+bit_length = 16
+signed = false
+confidence = "low"
+
+[[frame.can."0x70F".mux."2".signals]]
+name = "70F_Unknown_Mux_2_3"
+start_bit = 48
+bit_length = 16
+signed = false
+confidence = "none"
+notes = "dynamic, unmapped"
 
 [[frame.can."0x70F".mux."3".signals]]
-name = "70F_Unknown_Mux_3"
-start_bit = 8
-bit_length = 56
+name = "70F_Unknown_Mux_3_1"
+start_bit = 16
+bit_length = 16
 signed = false
-format = "hex"
+notes = "dynamic, unmapped"
+
+[[frame.can."0x70F".mux."3".signals]]
+name = "70F_Mux3_Padding"
+start_bit = 32
+bit_length = 16
+signed = false
+confidence = "low"
+
+[[frame.can."0x70F".mux."3".signals]]
+name = "70F_Unknown_Mux_3_3"
+start_bit = 48
+bit_length = 16
+signed = false
+factor = 0.01
+notes = "dynamic; ≈ SoC/SoH % (×0.01 candidate)"
+unit = "%"
 
 [[frame.can."0x70F".mux."4".signals]]
-name = "70F_Unknown_Mux_4"
-start_bit = 8
-bit_length = 48
+bit_length = 8
+confidence = "low"
+name = "70F_Mux4_Padding_0"
 signed = false
-format = "hex"
+start_bit = 8
 
 [[frame.can."0x70F".mux."4".signals]]
-name = "TODO_Charge_Enum"
+name = "70F_Mux4_Charge_Value"
+start_bit = 16
+bit_length = 8
+signed = false
+format = "hex"
+confidence = "low"
+
+[[frame.can."0x70F".mux."4".signals]]
+bit_length = 32
+confidence = "low"
+name = "70F_Mux4_Padding_1"
+signed = false
+start_bit = 24
+
+[[frame.can."0x70F".mux."4".signals]]
+name = "Status_Charge_State"
 start_bit = 56
 bit_length = 8
 signed = false
 format = "enum"
+confidence = "high"
 
 [frame.can."0x70F".mux."4".signals.enum]
 0 = "Normal"
@@ -834,7 +937,7 @@ bit_length = 16
 factor = 0.01
 unit = "%"
 signed = false
-confidence = "medium"
+confidence = "high"
 
 [[frame.can."0x70F".mux."5".signals]]
 name = "Status_Module_2_SoC"
@@ -843,7 +946,7 @@ bit_length = 16
 factor = 0.01
 unit = "%"
 signed = false
-confidence = "medium"
+confidence = "high"
 
 [[frame.can."0x70F".mux."5".signals]]
 name = "Status_Module_3_SoC"
@@ -852,7 +955,7 @@ bit_length = 16
 factor = 0.01
 unit = "%"
 signed = false
-confidence = "medium"
+confidence = "high"
 
 [[frame.can."0x70F".mux."6".signals]]
 name = "Status_Module_4_SoC"
@@ -862,7 +965,7 @@ factor = 0.01
 unit = "%"
 signed = false
 format = "number"
-confidence = "medium"
+confidence = "high"
 
 [[frame.can."0x70F".mux."6".signals]]
 name = "Status_Module_5_SoC"
@@ -871,7 +974,7 @@ bit_length = 16
 factor = 0.01
 unit = "%"
 signed = false
-confidence = "medium"
+confidence = "high"
 
 [[frame.can."0x70F".mux."6".signals]]
 name = "Status_Module_6_SoC"
@@ -880,7 +983,7 @@ bit_length = 16
 factor = 0.01
 unit = "%"
 signed = false
-confidence = "medium"
+confidence = "high"
 
 [[frame.can."0x70F".mux."7".signals]]
 name = "Status_Module_7_SoC"
@@ -889,7 +992,7 @@ bit_length = 16
 factor = 0.01
 unit = "%"
 signed = false
-confidence = "medium"
+confidence = "high"
 
 [[frame.can."0x70F".mux."7".signals]]
 name = "Status_Module_8_SoC"
@@ -901,11 +1004,12 @@ signed = false
 confidence = "medium"
 
 [[frame.can."0x70F".mux."7".signals]]
-name = "70F_Unknown_Mux_7"
+name = "70F_Mux7_Padding"
 start_bit = 48
 bit_length = 16
 signed = false
 format = "hex"
+confidence = "low"
 
 [frame.can."0x713"]
 length = 8
