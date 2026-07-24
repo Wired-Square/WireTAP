@@ -11,6 +11,9 @@ import {
   bgSurface,
   bgSuccess,
   bgDanger,
+  borderDefault,
+  borderSuccess,
+  borderDanger,
   textPrimary,
   textMuted,
   textSuccess,
@@ -21,11 +24,33 @@ export type DiffViewProps = {
   lines: DiffLine[];
 };
 
-const MARK: Record<DiffLine["kind"], string> = { context: " ", add: "+", remove: "-" };
+type Kind = DiffLine["kind"];
 
-function rowClasses(kind: DiffLine["kind"]): string {
-  if (kind === "add") return `${bgSuccess} ${textSuccess}`;
-  if (kind === "remove") return `${bgDanger} ${textDanger}`;
+const MARK: Record<Kind, string> = { context: " ", add: "+", remove: "-" };
+
+/** Change tint painted on the content side of a row (translucent over bgPrimary). */
+function rowTint(kind: Kind): string {
+  if (kind === "add") return bgSuccess;
+  if (kind === "remove") return bgDanger;
+  return "";
+}
+
+/** Coloured left accent so the change boundary reads even with an opaque gutter. */
+function accentBorder(kind: Kind): string {
+  if (kind === "add") return borderSuccess;
+  if (kind === "remove") return borderDanger;
+  return "border-transparent";
+}
+
+function markerColour(kind: Kind): string {
+  if (kind === "add") return textSuccess;
+  if (kind === "remove") return textDanger;
+  return textMuted;
+}
+
+function contentText(kind: Kind): string {
+  if (kind === "add") return textSuccess;
+  if (kind === "remove") return textDanger;
   return textPrimary;
 }
 
@@ -40,28 +65,32 @@ export default function DiffView({ lines }: DiffViewProps) {
     );
   }
 
-  const gutterWidth = `${Math.max(3, String(lines.length).length + 1)}ch`;
+  // Fixed gutter width so both number columns form clean, aligned columns.
+  const numColWidth = `${String(lines.length).length}ch`;
 
   return (
     <div className={`flex-1 min-h-0 overflow-auto font-mono text-sm ${bgPrimary}`}>
       {lines.map((line, i) => (
-        <div key={i} className={`flex leading-[1.5rem] ${rowClasses(line.kind)}`}>
+        <div
+          key={i}
+          className={`flex w-max min-w-full leading-[1.5rem] border-l-2 ${accentBorder(line.kind)} ${rowTint(line.kind)}`}
+        >
+          {/* Pinned gutter — opaque so content scrolling under it never bleeds through. */}
           <span
-            className={`flex-shrink-0 px-2 text-right ${bgSurface} ${textMuted} select-none`}
-            style={{ minWidth: gutterWidth }}
+            className={`sticky left-0 z-10 flex flex-shrink-0 items-center gap-2 px-2 border-r ${borderDefault} ${bgSurface} select-none`}
             aria-hidden="true"
           >
-            {line.oldLine ?? ""}
+            <span className={`text-right tabular-nums ${textMuted}`} style={{ width: numColWidth }}>
+              {line.oldLine ?? ""}
+            </span>
+            <span className={`text-right tabular-nums ${textMuted}`} style={{ width: numColWidth }}>
+              {line.newLine ?? ""}
+            </span>
+            <span className={`w-4 text-center ${markerColour(line.kind)}`}>{MARK[line.kind]}</span>
           </span>
-          <span
-            className={`flex-shrink-0 px-2 text-right ${bgSurface} ${textMuted} select-none`}
-            style={{ minWidth: gutterWidth }}
-            aria-hidden="true"
-          >
-            {line.newLine ?? ""}
+          <span className={`whitespace-pre pl-3 pr-4 [tab-size:4] ${contentText(line.kind)}`}>
+            {line.text}
           </span>
-          <span className="flex-shrink-0 w-4 text-center select-none">{MARK[line.kind]}</span>
-          <span className="whitespace-pre-wrap break-all pr-4">{line.text}</span>
         </div>
       ))}
     </div>
