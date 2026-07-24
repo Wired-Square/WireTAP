@@ -48,7 +48,10 @@ export function reconcileKnownSessions(
         existing.capture.count !== captureCount ||
         existing.frameCount !== frameCount ||
         existing.uniqueFrameCount !== uniqueFrameCount ||
-        existing.catalogPath !== catalogPath;
+        // `catalogPath` is normalised to null when the roster omits it, so
+        // normalise the existing side too — an absent (undefined) path must not
+        // read as a change against null and rebuild the entry every reconcile.
+        (existing.catalogPath ?? null) !== catalogPath;
       if (changed) {
         next[info.sessionId] = {
           ...existing,
