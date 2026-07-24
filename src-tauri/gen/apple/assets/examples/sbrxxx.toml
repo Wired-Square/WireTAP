@@ -1,6 +1,6 @@
 [meta]
 name = "SBRXXX"
-version = 7
+version = 8
 
 [meta.can]
 default_byte_order = "little"
@@ -296,7 +296,8 @@ format = "hex"
 
 [frame.can."0x1E0"]
 length = 8
-notes = "A note"
+transmitter = "Inverter"
+notes = "Modbus-over-CAN tunnel. The inverter initiates and the BMS replies on this same CAN id, so both nodes transmit it — transmitter records the initiator only. The 8 bytes carry a tunnelled Modbus RTU frame (function code, register address, data) rather than a fixed signal layout, so the single 64-bit signal is a placeholder for the raw payload. Distinct from the 0x1F0 firmware-service tunnel, which is catalogued in sbr_modbus.toml."
 
 [[frame.can."0x1E0".signals]]
 name = "Modbus_Over_CAN"
@@ -348,6 +349,7 @@ confidence = "high"
 [frame.can."0x402"]
 length = 8
 transmitter = "BMS"
+notes = "Appears on BMS firmware patch .30 and replaces 0x400, which is not emitted beyond patch 0x26 (see Info_BMS_Firmware_Patch at 0x707)."
 
 [[frame.can."0x402".signals]]
 name = "402_Unknown"
@@ -355,7 +357,8 @@ start_bit = 0
 bit_length = 64
 signed = false
 format = "hex"
-notes = "Newly observed; sample 00 00 55 00 00 00 00 00 (byte 2 = 0x55)"
+confidence = "high"
+notes = "Confirmed completely static on a real SBR224: 3,539,015 frames over ~41 days with zero byte changes, payload always 00 00 55 00 00 00 00 00. High confidence it is a constant; the meaning of byte 2 = 0x55 is still unknown."
 
 [frame.can."0x500"]
 length = 8
@@ -479,7 +482,7 @@ signed = false
 confidence = "high"
 
 [[frame.can."0x701".signals]]
-name = "Info_Battery_Max_Discharge_Curre"
+name = "Info_Battery_Max_Dischg_Current"
 start_bit = 48
 bit_length = 16
 factor = 0.1
@@ -568,13 +571,14 @@ signed = true
 confidence = "high"
 
 [[frame.can."0x704".signals]]
-name = "Status_Another_Battery_Voltage"
+name = "Status_Battery_Voltage_Alt_704"
 start_bit = 32
 bit_length = 16
 factor = 0.1
 unit = "V"
 signed = false
 confidence = "medium"
+notes = "A second voltage reading alongside Status_Battery_Voltage in this frame; relationship to the primary reading unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x705."
 
 [[frame.can."0x704".signals]]
 name = "Status_Battery_Temperature"
@@ -634,13 +638,14 @@ confidence = "high"
 8428 = "SBR256"
 
 [[frame.can."0x705".signals]]
-name = "Status_Another_Battery_Voltage"
+name = "Status_Battery_Voltage_Alt_705"
 start_bit = 40
 bit_length = 16
 factor = 0.1
 unit = "V"
 signed = false
 confidence = "medium"
+notes = "A voltage reading carried in the battery-identity frame; relationship to Status_Battery_Voltage at 0x704 unconfirmed. Named by frame id to keep it distinct from the equivalent signal at 0x704."
 
 [[frame.can."0x705".signals]]
 name = "705_Padding"
@@ -843,18 +848,22 @@ signed = false
 confidence = "low"
 
 [[frame.can."0x70F".mux."0".signals]]
-name = "70F_Mux0_PerModule_1"
+name = "Info_Battery_Max_Power"
 start_bit = 32
 bit_length = 16
+unit = "W"
 signed = false
-confidence = "low"
+confidence = "high"
+notes = "Static nameplate rating = 1920 W x module_count (64 V nominal per module x 30 A pack maximum continuous, per the Sungrow SBR datasheet). Matches every observed value: SBR096 5760, SBR128 7680, SBR160 9600, SBR224 13440. Not a live limit — in July this held ~13000 while Info_Battery_Max_Charge_Current at 0x701 fell to 0 A. Live limits are reported in 0x701. Shows small excursions in cold windows only; mechanism unconfirmed."
 
 [[frame.can."0x70F".mux."0".signals]]
-name = "70F_Mux0_PerModule_2"
+name = "Info_Battery_Max_Power_2"
 start_bit = 48
 bit_length = 16
+unit = "W"
 signed = false
-confidence = "low"
+confidence = "high"
+notes = "Second copy of the static 1920 W x module_count rating. Invariant across every sampled window (late-Jan, 5-20 Feb and 10-24 Jul 2026) — unlike bytes 4-5, it showed no cold-window excursions at all. Not a live limit; live limits are reported in 0x701."
 
 [[frame.can."0x70F".mux."1".signals]]
 name = "70F_Mux1_Padding"
@@ -869,7 +878,8 @@ name = "70F_Unknown_Mux_2_1"
 start_bit = 16
 bit_length = 16
 signed = false
-notes = "dynamic pack value, unmapped"
+confidence = "low"
+notes = "Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_3_1: ~9950 in warm windows, ~12800 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved."
 
 [[frame.can."0x70F".mux."2".signals]]
 name = "70F_Mux2_Padding"
@@ -891,7 +901,8 @@ name = "70F_Unknown_Mux_3_1"
 start_bit = 16
 bit_length = 16
 signed = false
-notes = "dynamic, unmapped"
+confidence = "low"
+notes = "Dynamic, unmapped. Drifts together with 70F_Unknown_Mux_2_1: ~9926 in warm windows, ~12940 in cold. Being higher in cold is the opposite of the charge/discharge power limits, which derate in cold, so this is neither SoC nor power. Temperature- or impedance-like; unresolved."
 
 [[frame.can."0x70F".mux."3".signals]]
 name = "70F_Mux3_Padding"
@@ -904,10 +915,11 @@ confidence = "low"
 name = "70F_Unknown_Mux_3_3"
 start_bit = 48
 bit_length = 16
-signed = false
 factor = 0.01
-notes = "dynamic; ≈ SoC/SoH % (×0.01 candidate)"
 unit = "%"
+signed = false
+confidence = "low"
+notes = "Narrow band 99.71-99.90 %, slowly rising; semantics unresolved. Not SoH: checked against the decoded Status_Battery_SoH at 0x702 over three windows (late Jan, Feb, Jul 2026) — real SoH falls monotonically (raw 9902, 9899, 9868) while this value rises (raw ~9977, ~9980, 9990), holding a persistent gap of ~70-120 raw units; the two never match. Not SoC: in July this held constant at 9990 while SoC cycled 25.6 % to 100 %."
 
 [[frame.can."0x70F".mux."4".signals]]
 bit_length = 8
@@ -919,17 +931,17 @@ start_bit = 8
 [[frame.can."0x70F".mux."4".signals]]
 name = "70F_Mux4_Charge_Value"
 start_bit = 16
-bit_length = 8
+bit_length = 16
 signed = false
-format = "hex"
 confidence = "low"
+notes = "Bytes 2-3 are one 16-bit field, not an 8-bit value plus padding: byte 3 changed from 7 to 10 between sampled windows. Drifts slowly (~1996 warm, ~2593 cold) and tracks with 70F_Unknown_Mux_2_1 and 70F_Unknown_Mux_3_1."
 
 [[frame.can."0x70F".mux."4".signals]]
-bit_length = 32
+bit_length = 24
 confidence = "low"
 name = "70F_Mux4_Padding_1"
 signed = false
-start_bit = 24
+start_bit = 32
 
 [[frame.can."0x70F".mux."4".signals]]
 name = "Status_Charge_State"
@@ -1050,7 +1062,7 @@ start_bit = 16
 bit_length = 16
 factor = 0.1
 unit = "°C"
-signed = false
+signed = true
 confidence = "high"
 
 [[frame.can."0x713".signals]]
@@ -1075,7 +1087,7 @@ start_bit = 48
 bit_length = 16
 factor = 0.1
 unit = "°C"
-signed = false
+signed = true
 confidence = "high"
 
 [frame.can."0x714"]
