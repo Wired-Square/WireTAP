@@ -433,7 +433,12 @@ re-decodes every frame. Two surfaces, both over this WebSocket:
 - **`DecodedSignals` push** (0x14): while a catalogue is attached,
   `send_new_frames` decodes the same batch via `decode_by_id` (applying
   `frame_id_mask`) and pushes a parallel JSON message
-  (`[{ frameId, bus, t, signals[], selectors[], headerFields[], sourceAddress }]`).
+  (`[{ frameId, bus, t, bytes[], signals[], selectors[], headerFields[], sourceAddress }]`).
+  Each entry carries `bytes` — the raw payload decode ran on — so the Decoder can
+  render a hex/ASCII byte row **per mux value** (stored as `rawBytesByMux`); the
+  frame-level `rawBytes` from the `FrameData` path is last-writer-wins, so a
+  multiplexed frame would otherwise show one mux occurrence's payload under every
+  group.
   `sessionStore` routes it to an `onDecoded` callback (threaded through
   `useIOSession`/`useIOSessionManager`); an app calls `catalog.attach` when it
   loads a catalogue. Because `send_new_frames` only decodes frames *past* a
