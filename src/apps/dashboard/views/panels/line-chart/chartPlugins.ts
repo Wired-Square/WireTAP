@@ -50,23 +50,43 @@ function positionTooltip(
   tooltip.style.top = `${tipY}px`;
 }
 
-/** Build HTML for a signal value row (colour dot + label + confidence + value + unit). */
-function signalRowHtml(
+// Signal labels and units come from decoded DBC/device metadata (untrusted), so
+// tooltip nodes use textContent and CSSOM colours — never an HTML string sink.
+function createEl(tag: string, css: string, text?: string): HTMLElement {
+  const node = document.createElement(tag);
+  if (css) node.style.cssText = css;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+/** Build one signal's value row for the cursor tooltip. */
+function signalRowNode(
   sig: SignalRef,
   value: number | null | undefined,
   confidenceColours?: ConfidenceColours,
-): string {
-  let html = `<div style="display: flex; align-items: center; gap: 6px;">`;
-  html += `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${sig.colour}; flex-shrink: 0;"></span>`;
-  html += `<span style="color: var(--text-secondary);">${getSignalLabel(sig)}</span>`;
+): HTMLElement {
+  const row = createEl("div", "display: flex; align-items: center; gap: 6px;");
+
+  const dot = createEl("span", "display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;");
+  dot.style.background = sig.colour;
+  row.appendChild(dot);
+
+  row.appendChild(createEl("span", "color: var(--text-secondary);", getSignalLabel(sig)));
+
   if (sig.confidence && confidenceColours) {
     const confCol = confidenceColours[sig.confidence] || confidenceColours.none;
-    html += `<span style="display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: ${confCol}; flex-shrink: 0;" title="Confidence: ${sig.confidence}"></span>`;
+    const confDot = createEl("span", "display: inline-block; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;");
+    confDot.style.background = confCol;
+    confDot.title = `Confidence: ${sig.confidence}`;
+    row.appendChild(confDot);
   }
-  html += `<span style="margin-left: auto; font-family: ui-monospace, monospace; font-weight: 500;">${formatValue(value)}</span>`;
-  if (sig.unit) html += `<span style="color: var(--text-muted); font-size: 10px;">${sig.unit}</span>`;
-  html += `</div>`;
-  return html;
+
+  row.appendChild(createEl("span", "margin-left: auto; font-family: ui-monospace, monospace; font-weight: 500;", formatValue(value)));
+
+  if (sig.unit) {
+    row.appendChild(createEl("span", "color: var(--text-muted); font-size: 10px;", sig.unit));
+  }
+  return row;
 }
 
 // ─────────────────────────────────────────
@@ -120,14 +140,13 @@ export function tooltipPlugin(
           return;
         }
 
-        // Build tooltip content
-        let html = `<div style="color: var(--text-muted); margin-bottom: 2px;">${formatTimestamp(ts)}</div>`;
+        tooltip.replaceChildren(
+          createEl("div", "color: var(--text-muted); margin-bottom: 2px;", formatTimestamp(ts)),
+        );
         for (let i = 0; i < signals.length; i++) {
           const val = u.data[i + 1]?.[idx];
-          html += signalRowHtml(signals[i], val as number | null, confidenceColours);
+          tooltip.appendChild(signalRowNode(signals[i], val as number | null, confidenceColours));
         }
-
-        tooltip.innerHTML = html;
         tooltip.style.display = "block";
 
         // Position near cursor
@@ -353,43 +372,44 @@ export function measurementPlugin(
     const t1 = timestamps[idx1];
     const t2 = timestamps[idx2];
 
-    let html = `<div style="display: flex; gap: 12px; margin-bottom: 4px; color: var(--text-muted); font-size: 10px;">`;
-    html += `<span>C1: ${formatTimestamp(t1)}</span>`;
-    html += `<span>C2: ${formatTimestamp(t2)}</span>`;
-    html += `<span style="font-weight: 600; color: var(--text-primary);">Δt: ${formatTimeDelta(t2 - t1)}</span>`;
-    html += `</div>`;
+    const head = createEl("div", "display: flex; gap: 12px; margin-bottom: 4px; color: var(--text-muted); font-size: 10px;");
+    head.appendChild(createEl("span", "", `C1: ${formatTimestamp(t1)}`));
+    head.appendChild(createEl("span", "", `C2: ${formatTimestamp(t2)}`));
+    head.appendChild(createEl("span", "font-weight: 600; color: var(--text-primary);", `Δt: ${formatTimeDelta(t2 - t1)}`));
 
-    // Header row
-    html += `<div style="display: grid; grid-template-columns: 1fr auto auto auto; gap: 4px 8px; align-items: center;">`;
-    html += `<span style="font-size: 10px; color: var(--text-muted);"></span>`;
-    html += `<span style="font-size: 10px; color: var(--text-muted); text-align: right;">C1</span>`;
-    html += `<span style="font-size: 10px; color: var(--text-muted); text-align: right;">C2</span>`;
-    html += `<span style="font-size: 10px; color: var(--text-muted); text-align: right;">Δ</span>`;
+    const HEADER_CELL_CSS = "font-size: 10px; color: var(--text-muted); text-align: right;";
+    const grid = createEl("div", "display: grid; grid-template-columns: 1fr auto auto auto; gap: 4px 8px; align-items: center;");
+    grid.appendChild(createEl("span", "font-size: 10px; color: var(--text-muted);"));
+    grid.appendChild(createEl("span", HEADER_CELL_CSS, "C1"));
+    grid.appendChild(createEl("span", HEADER_CELL_CSS, "C2"));
+    grid.appendChild(createEl("span", HEADER_CELL_CSS, "Δ"));
 
+    const monoStyle = "font-family: ui-monospace, monospace; font-weight: 500; text-align: right;";
     for (let i = 0; i < signals.length; i++) {
       const sig = signals[i];
       const v1 = u.data[i + 1]?.[idx1] as number | null | undefined;
       const v2 = u.data[i + 1]?.[idx2] as number | null | undefined;
       const delta = (v1 != null && v2 != null) ? v2 - v1 : null;
 
-      // Signal label with colour dot
-      html += `<div style="display: flex; align-items: center; gap: 4px;">`;
-      html += `<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${sig.colour}; flex-shrink: 0;"></span>`;
-      html += `<span style="color: var(--text-secondary);">${getSignalLabel(sig)}</span>`;
+      const labelCell = createEl("div", "display: flex; align-items: center; gap: 4px;");
+      const dot = createEl("span", "display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;");
+      dot.style.background = sig.colour;
+      labelCell.appendChild(dot);
+      labelCell.appendChild(createEl("span", "color: var(--text-secondary);", getSignalLabel(sig)));
       if (sig.confidence && confidenceColours) {
         const confCol = confidenceColours[sig.confidence] || confidenceColours.none;
-        html += `<span style="display: inline-block; width: 4px; height: 4px; border-radius: 50%; background: ${confCol}; flex-shrink: 0;"></span>`;
+        const confDot = createEl("span", "display: inline-block; width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0;");
+        confDot.style.background = confCol;
+        labelCell.appendChild(confDot);
       }
-      html += `</div>`;
+      grid.appendChild(labelCell);
 
-      const monoStyle = `font-family: ui-monospace, monospace; font-weight: 500; text-align: right;`;
-      html += `<span style="${monoStyle}">${formatValue(v1)}</span>`;
-      html += `<span style="${monoStyle}">${formatValue(v2)}</span>`;
-      html += `<span style="${monoStyle} color: var(--text-primary); font-weight: 600;">${formatValue(delta)}</span>`;
+      grid.appendChild(createEl("span", monoStyle, formatValue(v1)));
+      grid.appendChild(createEl("span", monoStyle, formatValue(v2)));
+      grid.appendChild(createEl("span", `${monoStyle} color: var(--text-primary); font-weight: 600;`, formatValue(delta)));
     }
-    html += `</div>`;
 
-    overlay.innerHTML = html;
+    overlay.replaceChildren(head, grid);
     overlay.style.display = "block";
 
     // Position overlay between the two cursor lines
