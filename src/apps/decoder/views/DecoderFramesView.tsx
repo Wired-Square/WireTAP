@@ -26,7 +26,7 @@ import { useSessionStore } from "../../../stores/sessionStore";
 import { useCatalogEditorStore } from "../../../stores/catalogEditorStore";
 import type { FrameDetail, SignalDef } from "../../../types/decoder";
 import { getAllFrameSignals } from "../../../utils/frameSignals";
-import { bytesToHex, byteToAscii } from "../../../utils/byteUtils";
+import { bytesToHex, byteToHex, byteToAscii, bytesToAscii } from "../../../utils/byteUtils";
 import type { SerialFrameConfig } from "../../../utils/frameExport";
 import type { TimeFormat } from "../../../hooks/useSettings";
 import type { TomlNode } from "../../catalog/types";
@@ -528,6 +528,35 @@ function FrameCard({
     });
   }, [rawBytes, byteColourMap, brightByteIndices, signalColours?.none]);
 
+  // Whether this frame carries mux signals — mux frames render a byte row per
+  // group instead of the single frame-level row.
+  const hasMux = decodedSignals.some(s => s.muxValue !== undefined);
+  const rawBytesByMux = decodedFrame?.rawBytesByMux;
+
+  // Hex + ASCII byte row. byteColourStyles is index-aligned; per-mux payloads
+  // share the frame's DLC so the same style array applies.
+  const renderRawBytesRow = (bytes: number[]) => (
+    <div className="font-mono text-xs bg-[var(--bg-surface)] px-2 py-0.5 rounded inline-flex gap-2">
+      <span>
+        {bytes.map((b, idx) => (
+          <span
+            key={idx}
+            className="transition-colors duration-200"
+            style={byteColourStyles[idx]}
+          >
+            {idx > 0 ? ' ' : ''}
+            {byteToHex(b)}
+          </span>
+        ))}
+      </span>
+      {showAsciiGutter && (
+        <span className={textDataYellow}>
+          {bytesToAscii(bytes)}
+        </span>
+      )}
+    </div>
+  );
+
   const headerFields = decodedFrame?.headerFields ?? [];
 
   // Async checksum validation state
@@ -670,28 +699,9 @@ function FrameCard({
           </span>
         )}
       </div>
-      {/* Raw bytes on separate line */}
-      {showRawBytes && rawBytes && (
-        <div className="font-mono text-xs bg-[var(--bg-surface)] px-2 py-0.5 rounded inline-flex gap-2">
-          <span>
-            {rawBytes.map((b, idx) => (
-              <span
-                key={idx}
-                className="transition-colors duration-200"
-                style={byteColourStyles[idx]}
-              >
-                {idx > 0 ? ' ' : ''}
-                {b.toString(16).toUpperCase().padStart(2, '0')}
-              </span>
-            ))}
-          </span>
-          {showAsciiGutter && (
-            <span className={textDataYellow}>
-              {rawBytes.map(byteToAscii).join('')}
-            </span>
-          )}
-        </div>
-      )}
+      {/* Raw bytes on separate line — only for non-mux frames; mux frames show
+          a byte row per group below (each mux value has its own payload). */}
+      {showRawBytes && rawBytes && !hasMux && renderRawBytesRow(rawBytes)}
       <div className="rounded border border-[color:var(--border-default)]">
         {(() => {
           // Separate plain signals (no muxValue) from mux signals
@@ -847,6 +857,13 @@ function FrameCard({
                         (0x{muxValueHex})
                       </span>
                     </div>
+                    {/* Payload byte row for this mux (falls back to the frame-level
+                        bytes until the decoded stream supplies per-mux bytes). */}
+                    {showRawBytes && (
+                      <div className="px-3 py-1">
+                        {renderRawBytesRow(rawBytesByMux?.get(muxValue) ?? rawBytes ?? [])}
+                      </div>
+                    )}
                     {/* Signals for this mux value */}
                     {signals.map((signal, idx) => renderSignalRow(signal, idx, rowOffset))}
                   </div>

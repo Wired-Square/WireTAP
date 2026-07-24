@@ -101,6 +101,9 @@ export type DecodedFrame = {
   sourceAddress?: number;
   /** Mux selector values (one per mux level, supports nested muxes) */
   muxSelectors?: MuxSelectorValue[];
+  /** Last raw payload seen per mux value, so each mux group can show its own
+   *  hex/ASCII byte row (frame-level rawBytes is last-writer-wins across muxes). */
+  rawBytesByMux?: Map<number, number[]>;
 };
 
 export type FrameMetadata = {
@@ -811,6 +814,12 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
       for (const signal of existing?.signals ?? []) {
         mergedSignals.set(signalKey(signal), signal);
       }
+      // Track the payload per mux value so each mux group can render its own
+      // byte row: carry inactive cases forward (shared map, mutated in place),
+      // refresh the ones present in this frame. Folded into the signal loop.
+      const frameBytes = msg.bytes && msg.bytes.length > 0 ? msg.bytes : null;
+      let rawBytesByMux = existing?.rawBytesByMux;
+
       for (const s of msg.signals) {
         const sig: DecodedSignal = {
           name: s.name,
@@ -822,6 +831,10 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
           timestamp: now,
         };
         mergedSignals.set(signalKey(sig), sig);
+        if (frameBytes && sig.muxValue !== undefined) {
+          if (!rawBytesByMux) rawBytesByMux = new Map();
+          rawBytesByMux.set(sig.muxValue, frameBytes);
+        }
       }
 
       const decodedFrame: DecodedFrame = {
@@ -830,6 +843,7 @@ export const useDecoderStore = create<DecoderState>((set, get) => ({
         headerFields,
         sourceAddress,
         muxSelectors: muxSelectors.length > 0 ? muxSelectors : undefined,
+        rawBytesByMux,
       };
       nextDecoded.set(maskedFrameId, decodedFrame);
 

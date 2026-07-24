@@ -127,6 +127,10 @@ fn encode_decoded_batch(frames: &[FrameMessage], catalog: &wiretap_catalog::Cata
             "selectors": selectors,
             "headerFields": header_fields,
             "sourceAddress": decoded.source_address,
+            // Raw payload this decode came from, so the frontend can show a
+            // hex/ASCII byte row per mux group (each mux occurrence has its own
+            // payload; a single per-frame rawBytes would be last-writer-wins).
+            "bytes": f.bytes,
         }));
     }
     if out.is_empty() {

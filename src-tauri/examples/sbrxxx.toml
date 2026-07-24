@@ -1,6 +1,6 @@
 [meta]
 name = "SBRXXX"
-version = 6
+version = 7
 
 [meta.can]
 default_byte_order = "little"
@@ -307,6 +307,7 @@ confidence = "high"
 
 [frame.can."0x400"]
 length = 8
+notes = "No longer emitted beyond BMS firmware patch 0x26 (see Info_BMS_Firmware_Patch at 0x707)."
 transmitter = "BMS"
 
 [[frame.can."0x400".signals]]
@@ -343,6 +344,18 @@ bit_length = 64
 signed = false
 byte_order = "big"
 confidence = "high"
+
+[frame.can."0x402"]
+length = 8
+transmitter = "BMS"
+
+[[frame.can."0x402".signals]]
+name = "402_Unknown"
+start_bit = 0
+bit_length = 64
+signed = false
+format = "hex"
+notes = "Newly observed; sample 00 00 55 00 00 00 00 00 (byte 2 = 0x55)"
 
 [frame.can."0x500"]
 length = 8
@@ -1070,7 +1083,7 @@ length = 8
 transmitter = "BMS"
 
 [[frame.can."0x714".signals]]
-name = "Status_Pos_Cell_Min_Voltage"
+name = "Status_Pos_Cell_Max_Voltage"
 start_bit = 0
 bit_length = 8
 unit = "Cell #"
@@ -1078,7 +1091,7 @@ signed = false
 confidence = "high"
 
 [[frame.can."0x714".signals]]
-name = "Status_Pos_Module_Min_Voltage"
+name = "Status_Pos_Module_Max_Voltage"
 start_bit = 8
 bit_length = 8
 unit = "Module #"
@@ -1086,7 +1099,7 @@ signed = false
 confidence = "high"
 
 [[frame.can."0x714".signals]]
-name = "Status_Cell_Min_Voltage_HP"
+name = "Status_Cell_Max_Voltage_HP"
 start_bit = 16
 bit_length = 16
 factor = 0.0001
@@ -1095,7 +1108,7 @@ signed = false
 confidence = "high"
 
 [[frame.can."0x714".signals]]
-name = "Status_Pos_Cell_Max_Voltage"
+name = "Status_Pos_Cell_Min_Voltage"
 start_bit = 32
 bit_length = 8
 unit = "Cell #"
@@ -1103,7 +1116,7 @@ signed = false
 confidence = "high"
 
 [[frame.can."0x714".signals]]
-name = "Status_Pos_Module_Max_Voltage"
+name = "Status_Pos_Module_Min_Voltage"
 start_bit = 40
 bit_length = 8
 unit = "Module #"
@@ -1111,7 +1124,7 @@ signed = false
 confidence = "high"
 
 [[frame.can."0x714".signals]]
-name = "Status_Cell_Max_Voltage_HP"
+name = "Status_Cell_Min_Voltage_HP"
 start_bit = 48
 bit_length = 16
 factor = 0.0001

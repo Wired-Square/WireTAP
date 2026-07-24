@@ -269,6 +269,8 @@ export interface DecodedFrameMsg {
   headerFields: DecodedHeaderField[];
   /** Source address resolved from a CAN header field, if any. */
   sourceAddress?: number | null;
+  /** Raw payload of the frame this decode came from (for per-mux byte rows). */
+  bytes?: number[];
 }
 
 const wsJsonDecoder = new TextDecoder();
