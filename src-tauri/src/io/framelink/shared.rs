@@ -244,7 +244,18 @@ async fn fetch_capabilities(
             );
             let ed = framelink::board::editable::EditableBoardDef::from_toml(&toml_str).ok();
             let bd = framelink::board::parse_board_def(&toml_str).ok();
-            (bd, ed)
+            if ed.is_none() && bd.is_none() {
+                // A poisoned/unparseable device TOML would otherwise leave no
+                // board def and no way to recover. Fall back to embedded so the
+                // next persist-save re-uploads clean TOML.
+                tlog!(
+                    "[framelink:{}] Device TOML unparseable; using embedded board def",
+                    key
+                );
+                embedded_board_def_fallback(&board_name, &board_revision)
+            } else {
+                (bd, ed)
+            }
         }
         Ok(None) => {
             tlog!(
@@ -474,35 +485,3 @@ where
     }
 }
 
-/// Serialise the EditableBoardDef to TOML and upload to the device.
-pub(crate) async fn upload_board_def(
-    device_id: &str,
-    timeout_sec: f64,
-) -> Result<(), String> {
-    let conn = get_connection(device_id, timeout_sec).await?;
-
-    let toml_string = {
-        let guard = conn
-            .editable_board_def
-            .lock()
-            .map_err(|e| format!("editable_board_def mutex poisoned: {}", e))?;
-        match guard.as_ref() {
-            Some(board_def) => board_def.to_toml(),
-            None => return Err("No board definition available for this device".to_string()),
-        }
-    };
-
-    tlog!(
-        "[framelink:{}] Uploading board def ({} bytes)",
-        device_id,
-        toml_string.len()
-    );
-
-    conn.session
-        .upload_board_def(&toml_string)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    tlog!("[framelink:{}] Board def upload complete", device_id);
-    Ok(())
-}

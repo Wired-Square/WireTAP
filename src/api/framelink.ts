@@ -37,8 +37,12 @@ export interface SignalDescriptor {
   name: string;
   group: string;
   unit: string;
-  /** "bool", "enum", "number", "temperature_0.1", etc. */
-  format: string;
+  /** Dataflow role (`ROLE_*`). */
+  role: number;
+  /** Quantity (`QTY_*`, bit 7 = per-second modifier). */
+  quantity: number;
+  /** Aspect (`ASPECT_*`). */
+  aspect: number;
   /** numeric_key → label (for enum signals) */
   enum_values: Record<string, string>;
   writable: boolean;

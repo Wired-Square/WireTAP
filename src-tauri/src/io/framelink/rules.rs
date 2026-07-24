@@ -147,7 +147,7 @@ fn resolve_signal_from_editable(
             }
         }
     }
-    resolve_signal_name(sig.signal_id, frame_def_id, sig.start_bit, sig.bit_length, board_def)
+    resolve_signal_name(frame_def_id, sig.start_bit, sig.bit_length, board_def)
 }
 
 fn frame_def_to_descriptor(
@@ -909,53 +909,42 @@ async fn cmd_user_signal_add(params: Value) -> Result<Value, String> {
     let signal_id = params["signal_id"]
         .as_u64()
         .ok_or("Missing 'signal_id'")? as u16;
+
+    // User signals have no tuple, so the label is keyed by signal_id in
+    // `user_signals` (display-only) and reaches the device TOML on persist-save.
     let payload = dsig::build_user_signal_add(signal_id);
     conn.session.request(MSG_USER_SIGNAL_ADD, FLAG_ACK_REQ, &payload).await.str_err()?;
 
-    // Insert signal metadata into the editable board definition
     let name = params["name"]
         .as_str()
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("User Signal 0x{:04X}", signal_id));
-    let group = params["group"]
-        .as_str()
-        .unwrap_or("User")
-        .to_string();
-    let format_str = params["format"]
-        .as_str()
-        .unwrap_or("number")
-        .to_string();
-    let unit = params["unit"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
+        .map(String::from)
+        .unwrap_or_else(|| format!("User Signal 0x{signal_id:04X}"));
+    let group = params["group"].as_str().unwrap_or("User").to_string();
+    let format_str = params["format"].as_str().unwrap_or("number").to_string();
+    let unit = params["unit"].as_str().unwrap_or("").to_string();
     let enum_values: BTreeMap<u32, String> = params["enum_values"]
         .as_object()
         .map(|obj| {
             obj.iter()
-                .filter_map(|(k, v)| {
-                    let key = k.parse::<u32>().ok()?;
-                    let val = v.as_str()?.to_string();
-                    Some((key, val))
-                })
+                .filter_map(|(k, v)| Some((k.parse::<u32>().ok()?, v.as_str()?.to_string())))
                 .collect()
         })
         .unwrap_or_default();
 
-    shared::with_editable_board_def(&device_id, timeout, |board_def| {
-        board_def.signals.insert(signal_id, EditableSignal {
+    // Best-effort: the signal is already created on-device. A missing board def
+    // must not fail the add — a retry would duplicate the signal.
+    let _ = shared::with_editable_board_def(&device_id, timeout, |ed| {
+        ed.user_signals.insert(signal_id, EditableSignal {
             name,
+            description: String::new(),
             group,
             unit,
             format: format_str,
             enum_values,
-            description: String::new(),
         });
-        board_def.dirty = true;
+        ed.dirty = true;
     })
-    .await?;
-
-    shared::upload_board_def(&device_id, timeout).await?;
+    .await;
 
     Ok(Value::Null)
 }
@@ -967,22 +956,16 @@ async fn cmd_user_signal_remove(params: Value) -> Result<Value, String> {
     let signal_id = params["signal_id"]
         .as_u64()
         .ok_or("Missing 'signal_id'")? as u16;
+
     let payload = dsig::build_user_signal_remove(signal_id);
     conn.session.request(MSG_USER_SIGNAL_REMOVE, FLAG_ACK_REQ, &payload).await.str_err()?;
 
-    // Remove the signal metadata from the editable board definition
-    let removed = shared::with_editable_board_def(&device_id, timeout, |board_def| {
-        let existed = board_def.signals.remove(&signal_id).is_some();
-        if existed {
-            board_def.dirty = true;
+    let _ = shared::with_editable_board_def(&device_id, timeout, |ed| {
+        if ed.user_signals.remove(&signal_id).is_some() {
+            ed.dirty = true;
         }
-        existed
     })
-    .await?;
-
-    if removed {
-        shared::upload_board_def(&device_id, timeout).await?;
-    }
+    .await;
 
     Ok(Value::Null)
 }
@@ -996,7 +979,10 @@ struct DeviceSignalDescriptor {
     signal_id: u16,
     target_type: u8,
     target_index: u8,
-    property_id: u8,
+    role: u8,
+    quantity: u8,
+    aspect: u8,
+    channel: u8,
     flags: u8,
 }
 
@@ -1012,7 +998,10 @@ async fn cmd_dsig_list(params: Value) -> Result<Value, String> {
             signal_id: s.signal_id,
             target_type: s.target_type,
             target_index: s.target_index,
-            property_id: s.property_id,
+            role: s.role,
+            quantity: s.quantity,
+            aspect: s.aspect,
+            channel: s.channel,
             flags: s.flags,
         })
         .collect();
@@ -1342,9 +1331,13 @@ async fn cmd_label_remove(params: Value) -> Result<Value, String> {
 async fn cmd_signals_selectable(params: Value) -> Result<Value, String> {
     let device_id = get_device_id(&params)?;
     let timeout = get_timeout(&params);
-    let _conn = shared::get_connection(&device_id, timeout).await?;
     let conn = shared::get_connection(&device_id, timeout).await?;
-    let board_def = shared::load_board_def(&device_id).await;
+    // The embedded def has no user-signal labels; source them from the device's
+    // downloaded TOML (held in the connection's editable def).
+    let board_def = match shared::clone_editable_board_def(&device_id).await {
+        Some(ed) => ed.to_board_def().ok().or(shared::load_board_def(&device_id).await),
+        None => shared::load_board_def(&device_id).await,
+    };
     let signals =
         framelink::board::selectable::list_selectable_signals(&conn.session, board_def.as_ref())
             .await

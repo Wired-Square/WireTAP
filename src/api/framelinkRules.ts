@@ -325,7 +325,10 @@ export interface DeviceSignalDescriptor {
   signal_id: number;
   target_type: number;
   target_index: number;
-  property_id: number;
+  role: number;
+  quantity: number;
+  aspect: number;
+  channel: number;
   flags: number;
 }
 

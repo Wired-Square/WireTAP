@@ -1,7 +1,5 @@
-// Per-signal control for FrameLink interface configuration.
-// Renders appropriate input based on signal format and interface type:
-// toggle (bool), bitrate select (CAN or UART), enum dropdown,
-// stop/data bits select, number input, or read-only display.
+// Per-signal control for FrameLink interface configuration. The input type is
+// chosen from the signal's identity tuple (quantity/aspect) and interface type.
 
 import { useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
@@ -9,6 +7,17 @@ import { iconXs } from "../../../styles/spacing";
 import { Input, Select, FormField } from "../../../components/forms";
 import { caption, textMuted } from "../../../styles";
 import type { SignalDescriptor } from "../../../api/framelink";
+import {
+  baseQuantity,
+  QTY_BOOL,
+  QTY_ENUM,
+  QTY_DATARATE,
+  ASPECT_PARITY,
+  ASPECT_STOP_BITS,
+  ASPECT_DATA_BITS,
+  IFACE_RS485,
+  IFACE_RS232,
+} from "../../../api/framelinkAxes";
 
 const CAN_BITRATES = [
   { value: 10000, label: "10 Kbit/s" },
@@ -52,22 +61,17 @@ const DATA_BITS = [
   { value: 3, label: "8" },
 ];
 
-// RS-485 (3) and RS-232 (4) use UART bitrates
+// RS-485 and RS-232 use UART bitrates
 function isSerialInterface(ifaceType: number): boolean {
-  return ifaceType === 3 || ifaceType === 4;
-}
-
-function nameContains(name: string, term: string): boolean {
-  return name.toLowerCase().includes(term.toLowerCase());
+  return ifaceType === IFACE_RS485 || ifaceType === IFACE_RS232;
 }
 
 /** Sort priority for UART-style signal ordering: bitrate, data bits, parity, stop bits. */
-export function signalSortKey(name: string): number {
-  const lower = name.toLowerCase();
-  if (lower.includes("bitrate")) return 0;
-  if (lower.includes("data bit")) return 1;
-  if (lower.includes("parity")) return 2;
-  if (lower.includes("stop bit")) return 3;
+export function signalSortKey(signal: SignalDescriptor): number {
+  if (baseQuantity(signal.quantity) === QTY_DATARATE) return 0;
+  if (signal.aspect === ASPECT_DATA_BITS) return 1;
+  if (signal.aspect === ASPECT_PARITY) return 2;
+  if (signal.aspect === ASPECT_STOP_BITS) return 3;
   return 10;
 }
 
@@ -113,7 +117,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
   }
 
   // Bool: toggle switch
-  if (signal.format === "bool") {
+  if (baseQuantity(signal.quantity) === QTY_BOOL) {
     const checked = signal.value !== 0;
     return (
       <FormField label={signal.name} variant="default">
@@ -143,7 +147,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
   }
 
   // Bitrate: CAN or UART depending on interface type
-  if (signal.unit === "bps") {
+  if (baseQuantity(signal.quantity) === QTY_DATARATE) {
     const bitrates = isSerialInterface(signal.iface_type) ? UART_BITRATES : CAN_BITRATES;
     return (
       <FormField label={signal.name} variant="default">
@@ -167,7 +171,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
   }
 
   // Stop Bits: select with standard values
-  if (nameContains(signal.name, "Stop Bit")) {
+  if (signal.aspect === ASPECT_STOP_BITS) {
     return (
       <FormField label={signal.name} variant="default">
         <div className="flex items-center gap-2 relative">
@@ -190,7 +194,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
   }
 
   // Data Bits: select with standard values
-  if (nameContains(signal.name, "Data Bit")) {
+  if (signal.aspect === ASPECT_DATA_BITS) {
     return (
       <FormField label={signal.name} variant="default">
         <div className="flex items-center gap-2 relative">
@@ -213,7 +217,7 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
   }
 
   // Enum: dropdown
-  if (signal.format === "enum" && Object.keys(signal.enum_values).length > 0) {
+  if (baseQuantity(signal.quantity) === QTY_ENUM && Object.keys(signal.enum_values).length > 0) {
     return (
       <FormField label={signal.name} variant="default">
         <div className="flex items-center gap-2 relative">
@@ -235,44 +239,33 @@ export default function FrameLinkSignalControl({ signal, isFetched, onWrite }: P
     );
   }
 
-  // Number: text input with commit on blur/Enter
-  if (signal.format === "number" || signal.format === "temperature_0.1" || !signal.format) {
-    return (
-      <FormField label={signal.name} variant="default">
-        <div className="flex items-center gap-2 relative">
-          <Input
-            variant="default"
-            type="number"
-            value={localValue}
-            disabled={disabled}
-            onChange={(e) => setLocalValue(e.target.value)}
-            onBlur={() => {
+  // Default: numeric text input with commit on blur/Enter
+  return (
+    <FormField label={signal.name} variant="default">
+      <div className="flex items-center gap-2 relative">
+        <Input
+          variant="default"
+          type="number"
+          value={localValue}
+          disabled={disabled}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={() => {
+            const v = Number(localValue);
+            if (!isNaN(v) && v !== signal.value) {
+              handleWrite(v);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
               const v = Number(localValue);
               if (!isNaN(v) && v !== signal.value) {
                 handleWrite(v);
               }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const v = Number(localValue);
-                if (!isNaN(v) && v !== signal.value) {
-                  handleWrite(v);
-                }
-              }
-            }}
-          />
-          {unitLabel && <span className={caption}>{unitLabel}</span>}
-          {spinner}
-        </div>
-      </FormField>
-    );
-  }
-
-  // Fallback: read-only display for unrecognised formats
-  return (
-    <FormField label={signal.name} variant="default">
-      <div className={`${caption} py-1.5`}>
-        {signal.formatted_value}{unitLabel}
+            }
+          }}
+        />
+        {unitLabel && <span className={caption}>{unitLabel}</span>}
+        {spinner}
       </div>
     </FormField>
   );

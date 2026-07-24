@@ -21,6 +21,7 @@ import {
   framelinkWriteSignal,
   type SignalDescriptor,
 } from "../../../api/framelink";
+import { baseQuantity, QTY_DATARATE } from "../../../api/framelinkAxes";
 import { DeviceBusConfig, type BusMappingWithProtocol } from "../../../dialogs/io-source-picker";
 import { Input, Select, FormField, PrimaryButton, SecondaryButton } from "../../../components/forms";
 import BaudRateSelect from "../../../components/forms/BaudRateSelect";
@@ -1234,7 +1235,7 @@ export default function IOProfileDialog({
                       {interfaces.map((iface) => {
                         const ifaceSignals = flSignalsByIface[iface.index] ?? [];
                         const expanded = !!flExpandedIface[iface.index];
-                        const bitrateSig = ifaceSignals.find((s) => s.unit === "bps");
+                        const bitrateSig = ifaceSignals.find((s) => baseQuantity(s.quantity) === QTY_DATARATE);
                         const bitrateText = bitrateSig
                           ? (bitrateSig.formatted_value || String(bitrateSig.value))
                           : null;
@@ -1278,7 +1279,7 @@ export default function IOProfileDialog({
                                       <div key={group}>
                                         <h4 className={`${caption} uppercase tracking-wide mb-2`}>{group}</h4>
                                         <div className={spaceYDefault}>
-                                          {[...signals].sort((a, b) => signalSortKey(a.name) - signalSortKey(b.name)).map((sig) => (
+                                          {[...signals].sort((a, b) => signalSortKey(a) - signalSortKey(b)).map((sig) => (
                                             <FrameLinkSignalControl
                                               key={sig.signal_id}
                                               signal={sig}

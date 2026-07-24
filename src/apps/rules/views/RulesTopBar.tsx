@@ -4,7 +4,7 @@
 // pattern (single AppTopBar row, custom identity picker, action buttons on
 // the right).
 
-import { Workflow, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Workflow, RefreshCw, Save, Trash2, Loader2, Check, AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AppTopBar from "../../../components/AppTopBar";
 // Title intentionally omitted to match the icon-only top-nav of Discovery /
@@ -22,6 +22,8 @@ import { iconMd } from "../../../styles/spacing";
 
 export type RulesActiveState = "connecting" | "connected" | "error" | null;
 
+export type PersistState = "idle" | "saving" | "saved" | "error";
+
 interface RulesTopBarProps {
   // Identity / picker
   devices: FramelinkDevice[];
@@ -37,6 +39,7 @@ interface RulesTopBarProps {
   isLoading: boolean;
   onRefresh: () => void;
   onPersist: () => void;
+  persistState: PersistState;
 
   // Two-step clear
   confirmClear: boolean;
@@ -55,6 +58,7 @@ export default function RulesTopBar({
   isLoading,
   onRefresh,
   onPersist,
+  persistState,
   confirmClear,
   onClearConfig,
 }: RulesTopBarProps) {
@@ -80,11 +84,26 @@ export default function RulesTopBar({
             <button
               type="button"
               onClick={onPersist}
-              className={actionChip("green")}
+              disabled={persistState === "saving"}
+              className={actionChip(persistState === "error" ? "red" : "green")}
               title={t("topBar.persistTooltip")}
             >
-              <Save className={iconMd} />
-              {t("topBar.makePermanent")}
+              {persistState === "saving" ? (
+                <Loader2 className={`${iconMd} animate-spin`} />
+              ) : persistState === "saved" ? (
+                <Check className={iconMd} />
+              ) : persistState === "error" ? (
+                <AlertCircle className={iconMd} />
+              ) : (
+                <Save className={iconMd} />
+              )}
+              {persistState === "saving"
+                ? t("topBar.saving")
+                : persistState === "saved"
+                  ? t("topBar.saved")
+                  : persistState === "error"
+                    ? t("topBar.saveFailed")
+                    : t("topBar.makePermanent")}
             </button>
 
             <button

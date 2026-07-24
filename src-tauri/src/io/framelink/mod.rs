@@ -175,8 +175,12 @@ pub struct SignalDescriptor {
     pub name: String,
     pub group: String,
     pub unit: String,
-    /// "bool", "enum", "number", "temperature_0.1", etc.
-    pub format: String,
+    /// Dataflow role (`types::ROLE_*`).
+    pub role: u8,
+    /// Quantity (`types::QTY_*`, bit 7 = per-second modifier).
+    pub quantity: u8,
+    /// Aspect (`types::ASPECT_*`).
+    pub aspect: u8,
     /// numeric_key → label (for enum signals)
     pub enum_values: HashMap<String, String>,
     pub writable: bool,
@@ -249,36 +253,33 @@ pub async fn framelink_get_interface_signals(
             Err(_) => 0,
         };
 
-        let (name, group, unit, format, enum_values, formatted_value) =
-            if let Some(ref bd) = board_def {
-                if let Some(info) = bd.signal_info(sig.signal_id) {
-                    let ev: HashMap<String, String> = info
-                        .enum_values
-                        .iter()
-                        .map(|(k, v)| (k.to_string(), v.clone()))
-                        .collect();
-                    let fv = bd.format_value(sig.signal_id, value);
-                    (
-                        info.name.clone(),
-                        info.group.clone(),
-                        info.unit.clone(),
-                        info.format.clone(),
-                        ev,
-                        fv,
-                    )
-                } else {
-                    default_signal_meta(sig, value)
-                }
-            } else {
-                default_signal_meta(sig, value)
-            };
+        let (name, group, unit, enum_values, formatted_value) = board_def
+            .as_ref()
+            .and_then(|bd| bd.signal_info(&sig.key()).map(|info| (bd, info)))
+            .map(|(bd, info)| {
+                let ev: HashMap<String, String> = info
+                    .enum_values
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.clone()))
+                    .collect();
+                (
+                    info.name.clone(),
+                    info.group.clone(),
+                    info.unit.clone(),
+                    ev,
+                    bd.format_value(&sig.key(), value),
+                )
+            })
+            .unwrap_or_else(|| default_signal_meta(sig, value, iface_type));
 
         descriptors.push(SignalDescriptor {
             signal_id: sig.signal_id,
             name,
             group,
             unit,
-            format,
+            role: sig.role,
+            quantity: sig.quantity,
+            aspect: sig.aspect,
             enum_values,
             writable: sig.is_writable(),
             persistable: sig.is_persistable(),
@@ -343,17 +344,18 @@ pub async fn framelink_read_signal(
     })
 }
 
+/// Fallback signal metadata derived from the tuple when no board def supplies
+/// an override.
 fn default_signal_meta(
     sig: &dsig::SignalInfo,
     value: u64,
-) -> (String, String, String, String, HashMap<String, String>, String) {
-    let name = framelink::protocol::types::property_name(sig.property_id).to_string();
+    iface_type: u8,
+) -> (String, String, String, HashMap<String, String>, String) {
     (
-        name,
+        sig.semantic_name(Some(iface_type)),
         "Interface".to_string(),
-        String::new(),
-        "number".to_string(),
+        framelink::protocol::types::quantity_unit(sig.quantity).to_string(),
         HashMap::new(),
-        value.to_string(),
+        framelink::board::display::format_iface_value(sig, value),
     )
 }

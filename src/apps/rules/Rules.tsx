@@ -18,7 +18,7 @@ import {
   dataViewContainer,
 } from "../../styles";
 import { dataViewTabClass, indigoButton } from "../../styles/buttonStyles";
-import RulesTopBar, { type RulesActiveState } from "./views/RulesTopBar";
+import RulesTopBar, { type RulesActiveState, type PersistState } from "./views/RulesTopBar";
 import {
   useFrameLinkDeviceLiveness,
 } from "../../hooks/useFrameLinkDeviceLiveness";
@@ -128,11 +128,17 @@ export default function Rules() {
     [probe],
   );
 
+  const [persistState, setPersistState] = useState<PersistState>("idle");
   const handlePersist = useCallback(async () => {
+    setPersistState("saving");
     try {
       await persistSave();
+      setPersistState("saved");
+      setTimeout(() => setPersistState("idle"), 2000);
     } catch {
-      // Inline statusBar / banner already reflect the failure.
+      // statusBar carries the detail; the button flags the failure.
+      setPersistState("error");
+      setTimeout(() => setPersistState("idle"), 3000);
     }
   }, [persistSave]);
 
@@ -174,6 +180,7 @@ export default function Rules() {
       isLoading={isAnyLoading}
       onRefresh={() => refreshTab()}
       onPersist={handlePersist}
+      persistState={persistState}
       confirmClear={confirmClear}
       onClearConfig={handleClearConfig}
     />
