@@ -75,6 +75,13 @@ with `multi_source: false` cannot be combined with others.
 
 ¹ Framed serial (SLIP, Modbus RTU, delimiter) emits frames, not raw bytes.
 
+**Host resolution.** TCP-based sources (GVRET TCP, MQTT, Modbus TCP, FrameLink)
+accept either a hostname or a literal IP for their host. The host is resolved
+through [`io/net.rs::resolve_host_port`](../src-tauri/src/io/net.rs), a thin
+wrapper over `tokio::net::lookup_host`. New TCP transports must resolve through
+that helper — parsing `"host:port"` straight into a `SocketAddr` accepts only
+numeric IPs and rejects any DNS name with "invalid socket address syntax".
+
 ---
 
 ## 2. Source selection
