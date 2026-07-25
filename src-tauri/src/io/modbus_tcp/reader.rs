@@ -139,9 +139,9 @@ impl IOSource for ModbusTcpSource {
         self.state = IOState::Starting;
         self.cancel_flag.store(false, Ordering::Relaxed);
 
-        // Resolve server address
-        let addr: SocketAddr = format!("{}:{}", self.config.host, self.config.port)
-            .parse()
+        // Resolve server address (accepts a hostname or an IP literal)
+        let addr: SocketAddr = crate::io::net::resolve_host_port(&self.config.host, self.config.port)
+            .await
             .map_err(|e| format!("Invalid server address: {}", e))?;
 
         // Connect to the Modbus TCP server

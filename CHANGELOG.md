@@ -2,6 +2,12 @@
 
 All notable changes to WireTAP will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Modbus TCP and FrameLink connections failed for any hostname — only literal IPs worked**: every TCP connect path built `"host:port"` and parsed it straight into a `SocketAddr`, which only accepts numeric IP literals, so a DNS name like `sungrow.gou.wiredsquare.com:502` was rejected up front with "invalid socket address syntax" and the session never started (surfaced in the field as "An error occurred while starting the session."). The seven affected sites — the multi-source Modbus client, the `ModbusTcpSource` reader, both Modbus scan passes, the MCP `modbus_read`/`modbus_write` path, and FrameLink's `connect_by_address` + `probe_framelink` — now resolve through a shared `crate::io::net::resolve_host_port` helper that wraps `tokio::net::lookup_host`, so hostnames and IPs are accepted identically. New TCP transports should call this helper rather than parsing addresses themselves. [src-tauri/src/io/net.rs](src-tauri/src/io/net.rs), [src-tauri/src/io/broker/spawner.rs](src-tauri/src/io/broker/spawner.rs), [src-tauri/src/io/modbus_tcp/reader.rs](src-tauri/src/io/modbus_tcp/reader.rs), [src-tauri/src/io/modbus_tcp/scanner.rs](src-tauri/src/io/modbus_tcp/scanner.rs), [src-tauri/src/io/framelink/shared.rs](src-tauri/src/io/framelink/shared.rs), [src-tauri/src/io/framelink/mod.rs](src-tauri/src/io/framelink/mod.rs), [src-tauri/src/mcp/tools.rs](src-tauri/src/mcp/tools.rs).
+
 ## [0.9.0] - 2026-07-24
 
 ### Fixed

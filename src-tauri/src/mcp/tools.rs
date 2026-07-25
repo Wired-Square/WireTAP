@@ -188,8 +188,8 @@ async fn connect_session_modbus(
         .get("unit_id")
         .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_i64().map(|n| n as u8)))
         .unwrap_or(1);
-    let addr: SocketAddr = format!("{host}:{port}")
-        .parse()
+    let addr: SocketAddr = crate::io::net::resolve_host_port(host, port)
+        .await
         .map_err(|e| err(format!("Invalid Modbus address {host}:{port}: {e}")))?;
     tcp::connect_slave(addr, Slave(unit_id))
         .await

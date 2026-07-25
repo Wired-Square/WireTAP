@@ -179,8 +179,8 @@ pub async fn modbus_scan_registers(
     );
 
     // Connect to the Modbus TCP server
-    let addr: SocketAddr = format!("{}:{}", config.host, config.port)
-        .parse()
+    let addr: SocketAddr = crate::io::net::resolve_host_port(&config.host, config.port)
+        .await
         .map_err(|e| format!("Invalid server address: {}", e))?;
 
     let slave = Slave(config.unit_id);
@@ -391,8 +391,8 @@ pub async fn modbus_scan_unit_ids(
     );
 
     // Resolve server address
-    let addr: SocketAddr = format!("{}:{}", config.host, config.port)
-        .parse()
+    let addr: SocketAddr = crate::io::net::resolve_host_port(&config.host, config.port)
+        .await
         .map_err(|e| format!("Invalid server address: {}", e))?;
 
     let mut found_count: u32 = 0;

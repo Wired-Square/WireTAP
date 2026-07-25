@@ -994,8 +994,8 @@ async fn run_modbus_tcp_client(
         return;
     }
 
-    // Resolve server address
-    let addr: SocketAddr = match format!("{}:{}", host, port).parse() {
+    // Resolve server address (accepts a hostname or an IP literal)
+    let addr: SocketAddr = match crate::io::net::resolve_host_port(&host, port).await {
         Ok(a) => a,
         Err(e) => {
             let _ = tx
