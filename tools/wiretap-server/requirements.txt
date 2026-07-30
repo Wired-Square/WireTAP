@@ -1,4 +1,4 @@
-# CANdor Server Dependencies
+# WireTAP Server Dependencies
 # Install with: pip install -r requirements.txt
 
 # PostgreSQL adapter (only needed if [postgres].enable = true)

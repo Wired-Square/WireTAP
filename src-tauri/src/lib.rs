@@ -1020,11 +1020,6 @@ pub fn run() {
                 }
             }
 
-            // Migrate data directory from CANdor to WireTAP (one-time rebrand migration)
-            if let Ok(doc_dir) = app.path().document_dir() {
-                settings::migrate_data_directory(&doc_dir);
-            }
-
             // Initialise the centralised store manager
             if let Err(e) = store_manager::initialise(app.handle()) {
                 tlog!("[setup] Failed to initialise store manager: {}", e);
@@ -1137,6 +1132,15 @@ pub fn run() {
                     if let Err(e) = settings::install_example_decoders(app.handle(), &app_settings.decoder_dir) {
                         tlog!("[setup] Failed to install example decoders: {}", e);
                     }
+
+                    // Drain pre-rebrand keyring entries into the current namespace.
+                    // Deliberately off this blocking path: keyring access is OS IPC
+                    // (and can prompt), while nothing needs it before first paint —
+                    // get_credential migrates any secret on its way to being used.
+                    let profiles = app_settings.io_profiles.clone();
+                    tauri::async_runtime::spawn_blocking(move || {
+                        credentials::migrate_legacy_io_profile_credentials(&profiles);
+                    });
                 }
                 Err(e) => tlog!("[setup] Failed to load settings for example decoder installation: {}", e),
             }
@@ -1191,9 +1195,6 @@ pub fn run() {
             settings::create_directory,
             settings::get_app_version,
             settings::check_for_updates,
-            settings::check_candor_migration,
-            settings::run_candor_migration,
-            settings::delete_candor_data,
             // Session-based reader API
             sessions::create_reader_session,
             sessions::get_reader_session_state,

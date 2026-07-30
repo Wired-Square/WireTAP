@@ -284,16 +284,6 @@
     "removeFromList": "Remove from list",
     "next": "Next: Map Columns"
   },
-  "candorMigration": {
-    "title": "CANdor Data Found",
-    "intro": "Configuration from the previous CANdor installation was found. Would you like to migrate it to WireTAP?",
-    "ioProfileCount_one": "{{count}} IO profile",
-    "ioProfileCount_other": "{{count}} IO profiles",
-    "uiState": "Includes saved layouts, selection sets, and favourites.",
-    "skip": "Skip",
-    "migrate": "Migrate",
-    "migrating": "Migrating…"
-  },
   "toolbox": {
     "titleAnalysis": "Analysis Tools",
     "titleAnalysisAndScanning": "Analysis & Scanning Tools",

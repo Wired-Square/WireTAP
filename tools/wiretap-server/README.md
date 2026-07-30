@@ -104,7 +104,7 @@ can_fd = false          # Set true for CAN FD interfaces
 
 [postgres]
 enable = false          # Set true to enable database logging
-dsn = "postgresql://candor:password@localhost:5432/candor"
+dsn = "postgresql://wiretap:password@localhost:5432/wiretap"
 ```
 
 ### 4. Run the Server
@@ -122,7 +122,7 @@ dsn = "postgresql://candor:password@localhost:5432/candor"
 ./wiretap-server.py -C my-config.toml --iface can0,can1
 
 # Use environment variable for PostgreSQL DSN (avoids storing password in config)
-export PG_DSN="postgresql://wiretap:secret@dbhost:5432/candor"
+export PG_DSN="postgresql://wiretap:secret@dbhost:5432/wiretap"
 ./wiretap-server.py -C my-config.toml
 ```
 
@@ -300,8 +300,8 @@ sudo -u postgres psql
 ```
 
 ```sql
-CREATE USER candor WITH PASSWORD 'your-secure-password';
-CREATE DATABASE candor OWNER candor;
+CREATE USER wiretap WITH PASSWORD 'your-secure-password';
+CREATE DATABASE wiretap OWNER wiretap;
 \q
 ```
 
@@ -322,7 +322,7 @@ sudo systemctl restart postgresql
 ### 4. Initialize the Schema
 
 ```bash
-sudo -u postgres psql -d candor -f init_schema.sql
+sudo -u postgres psql -d wiretap -f init_schema.sql
 ```
 
 ### 5. Configure the Server
@@ -332,7 +332,7 @@ Update your config file:
 ```toml
 [postgres]
 enable = true
-dsn = "postgresql://candor:your-secure-password@localhost:5432/candor"
+dsn = "postgresql://wiretap:your-secure-password@localhost:5432/wiretap"
 batch_size = 1000
 flush_interval = 0.25
 ```
@@ -340,8 +340,45 @@ flush_interval = 0.25
 Or use an environment variable:
 
 ```bash
-export PG_DSN="postgresql://candor:your-secure-password@localhost:5432/candor"
+export PG_DSN="postgresql://wiretap:your-secure-password@localhost:5432/wiretap"
 ```
+
+### Renaming a Pre-Rebrand `candor` Role or Database
+
+Deployments created before the CANdor → WireTAP rename use `candor` as the
+ingest role, and sometimes as the database name too. The schema and templates
+above target `wiretap`, so apply this once per cluster.
+
+**Do step 1 before deploying a `wiretap-backend` built from this revision.** Its
+bootstrap preamble creates the ingest role if absent, so a cluster still holding
+`candor` would gain a second, empty `wiretap` role and the grants would land on
+that instead of the role your existing databases grant to.
+
+```sql
+-- 1. Role. Grants, ownership and memberships follow the role's OID, so this one
+--    ALTER re-points every database in the cluster. No downtime for NOLOGIN.
+ALTER ROLE candor RENAME TO wiretap;
+
+--    The rename invalidates an md5-hashed password (it is salted with the role
+--    name); SCRAM-SHA-256 survives. Reset only if this returns 'md5':
+SELECT substring(rolpassword for 3) FROM pg_authid WHERE rolname = 'wiretap';
+ALTER ROLE wiretap WITH PASSWORD 'your-secure-password';
+```
+
+Step 2 applies only where a database is actually named `candor` — a WireTAP
+backend cluster uses per-site names (`sungrow_*`), so step 1 is all it needs.
+
+```sql
+-- 2. Database. Requires zero active connections, so stop wiretap-server /
+--    wiretap-backend first, then run this from another database (e.g. postgres):
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+ WHERE datname = 'candor' AND pid <> pg_backend_pid();
+ALTER DATABASE candor RENAME TO wiretap;
+```
+
+Then update the DSN in `wiretap-server.toml` (or `PG_DSN`) and restart. On the
+WireTAP desktop side, any saved PostgreSQL IO profile whose database or username
+was `candor` needs updating under Settings → IO Profiles.
 
 ### Migrating an Existing Archive into a TimescaleDB Backend
 
@@ -358,7 +395,7 @@ Switch new writes to the backend first (e.g. the Pi's `[forward]` mode) so the
 source archive is static during the move.
 
 ```bash
-SRC=postgresql://user:pass@old-host:5432/candor
+SRC=postgresql://user:pass@old-host:5432/legacy_archive
 TGT=postgresql://postgres:pass@127.0.0.1:5432/wiretap   # backend container
 
 ./migrate_to_timescale.py --source-dsn "$SRC" --target-dsn "$TGT"
@@ -464,7 +501,7 @@ flush_interval = 0.5
 
 ```bash
 # Check PostgreSQL connection
-psql -h localhost -U candor -d candor -c "SELECT COUNT(*) FROM can_frame;"
+psql -h localhost -U wiretap -d wiretap -c "SELECT COUNT(*) FROM can_frame;"
 
 # Check server logs for errors
 sudo journalctl -u wiretap-server.service -n 50

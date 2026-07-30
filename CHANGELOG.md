@@ -4,13 +4,30 @@ All notable changes to WireTAP will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+
+
+
+
+
+- **Stored IO-profile secrets move to the WireTAP keychain namespace, automatically**: saved passwords, tokens and API keys were still filed in the system keyring under the pre-rebrand service name `com.candor.io-profiles`, kept that way at the rename so existing entries survived. They now live under `com.wiredsquare.wiretap.io-profiles`, and existing entries are moved for you — **no action needed, and nothing has to be re-entered.** Each secret migrates the first time it is read, so it is moved on its way to being used, whatever reads it first; a background sweep at startup additionally drains entries that nothing ever reads, so the old namespace empties rather than lingering. The sweep runs off the pre-window startup path deliberately, since keyring access is OS IPC that can block or prompt and nothing needs it before first paint. A copy or delete that fails is logged and never breaks the read that triggered it, deleting a credential now clears both namespaces so a deleted secret cannot be resurrected by the fallback, and re-saving a profile clears its old entry. Catalogue-sharing tokens were already namespaced separately and are untouched. [src-tauri/src/credentials.rs](src-tauri/src/credentials.rs), [src-tauri/src/settings.rs](src-tauri/src/settings.rs).
+
 ### Fixed
 
 - **Serial/CAN device errors showed a raw OS error instead of anything actionable**: a mid-stream read failure surfaced as `Read error: Access is denied. (os error 5)` (Windows `ERROR_ACCESS_DENIED`) with no hint of what to do — the source of the two most common unresolved errors in the field. The serial-family read loops (serial, slcan, gvret_usb) now classify the failure through the `IoError` taxonomy and, by probing whether the port still enumerates, distinguish *in use / no permission* from *disconnected / reset* — producing a device-identified, actionable message (e.g. "COM5 is unavailable — it may be in use by another application (including another WireTAP window)… Close any program using it, then try again. (os error 5)" or "COM5 stopped responding — it may have been unplugged or reset. Reconnect the device, then try again."). The three read loops share one `send_serial_read_error` helper, and `is_permanent_error` now recognises the Windows `"Access is denied."` string (the embedded "is" defeated the old `"access denied"` needle). [src-tauri/src/io/error.rs](src-tauri/src/io/error.rs), [src-tauri/src/io/serial/utils.rs](src-tauri/src/io/serial/utils.rs), [src-tauri/src/io/serial/reader.rs](src-tauri/src/io/serial/reader.rs), [src-tauri/src/io/slcan/reader.rs](src-tauri/src/io/slcan/reader.rs), [src-tauri/src/io/gvret/usb.rs](src-tauri/src/io/gvret/usb.rs), [src-tauri/src/transmit.rs](src-tauri/src/transmit.rs).
 
 ### Changed
 
+
+
+- **The PostgreSQL ingest role and database are now named `wiretap`, not `candor`** ⚠️ **deployment step required**: `init_schema.sql`'s grants, the `wiretap-backend` bootstrap preamble, the DSN templates and the server documentation all used the pre-rebrand name. They now use `wiretap`. **This does not rename anything on an existing cluster** — apply it once per cluster with `ALTER ROLE candor RENAME TO wiretap`, which carries every grant, ownership and role membership in every database with it. **Do the role rename before deploying a backend built from this revision**, or its preamble will create a second, empty `wiretap` role and the grants will land on that instead of the role your existing databases grant to. Renaming a database named `candor` is a separate, optional step that needs zero active connections; a legacy archive slated for retirement is better dropped once migrated. Full runbook, including the md5-versus-SCRAM password caveat: [tools/wiretap-server/README.md](tools/wiretap-server/README.md). Any saved PostgreSQL IO profile referencing the old database or username needs updating under Settings → IO Profiles. [tools/wiretap-server/init_schema.sql](tools/wiretap-server/init_schema.sql), [tools/wiretap-backend/src/schema.rs](tools/wiretap-backend/src/schema.rs).
+
 - **Stream-error dialogs are now shown once, centrally**: the Discovery app was the last source still raising its own "Stream Error" dialog on top of the global one, which double-reported to Sentry (a distinct issue per app) and showed the generic "An error occurred while streaming." The global session-error handler is now the single authority — it shows the backend's actionable device message directly and tags a stable Sentry fingerprint so device-varying messages group as one issue; Discovery's handler is reduced to logging, matching the Decoder/Dashboard/Transmit pattern. [src/stores/sessionStore.ts](src/stores/sessionStore.ts), [src/apps/discovery/Discovery.tsx](src/apps/discovery/Discovery.tsx).
+
+### Removed
+
+- **The CANdor → WireTAP first-run migration**: the startup dialog that offered to migrate (or delete) configuration from a pre-rebrand install has been removed, along with its three backend commands, the `~/Documents/CANdor` → `~/Documents/WireTAP` directory rename and the settings path patching. The rename shipped in 0.5.0 five months and four releases ago, so the window has closed. If you are coming from 0.4.x or earlier, or from an install whose `~/Documents` directory was renamed for it back in 0.5.0 without its settings ever being re-saved, check Settings → Locations once — the decoder, dump and report directories are validated there and flagged if they no longer resolve. Keychain entries are the one thing that still migrates on its own (above). [src-tauri/src/settings.rs](src-tauri/src/settings.rs), [src/WireTAP.tsx](src/WireTAP.tsx).
 
 ## [0.9.1] - 2026-07-25
 

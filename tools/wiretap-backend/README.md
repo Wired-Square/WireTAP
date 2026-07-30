@@ -121,7 +121,7 @@ docker compose up -d
 #    not published by default — temporarily expose it:
 #      uncomment "127.0.0.1:5432:5432" under timescaledb in docker-compose.yml
 #      docker compose up -d
-SRC=postgresql://user:pass@old-host:5432/candor
+SRC=postgresql://user:pass@old-host:5432/legacy_archive
 TGT=postgresql://postgres:$POSTGRES_PASSWORD@127.0.0.1:5432/wiretap
 pip install psycopg2-binary    # one-off, for the migrator
 ../wiretap-server/migrate_to_timescale.py --source-dsn "$SRC" --target-dsn "$TGT"

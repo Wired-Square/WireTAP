@@ -270,13 +270,13 @@ CREATE INDEX IF NOT EXISTS events_key_idx
 -- ----------------------------------------
 -- Permissions for ingestion role
 -- ----------------------------------------
-GRANT USAGE ON SCHEMA public TO candor;
-GRANT INSERT, SELECT ON TABLE public.can_frame TO candor;
-GRANT SELECT ON public.can_frame_hourly TO candor;
+GRANT USAGE ON SCHEMA public TO wiretap;
+GRANT INSERT, SELECT ON TABLE public.can_frame TO wiretap;
+GRANT SELECT ON public.can_frame_hourly TO wiretap;
 GRANT EXECUTE ON FUNCTION public.ingest_can_frame(
   timestamptz, boolean, boolean, integer, text, smallint, bytea, integer, text
-) TO candor;
-GRANT EXECUTE ON FUNCTION public.hex_to_int(text) TO candor;
-GRANT EXECUTE ON FUNCTION public.get_byte_safe(bytea, int) TO candor;
-GRANT INSERT, SELECT ON TABLE public.events TO candor;
-GRANT USAGE ON SEQUENCE public.events_id_seq TO candor;
+) TO wiretap;
+GRANT EXECUTE ON FUNCTION public.hex_to_int(text) TO wiretap;
+GRANT EXECUTE ON FUNCTION public.get_byte_safe(bytea, int) TO wiretap;
+GRANT INSERT, SELECT ON TABLE public.events TO wiretap;
+GRANT USAGE ON SEQUENCE public.events_id_seq TO wiretap;

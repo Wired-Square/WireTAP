@@ -152,6 +152,37 @@ useIOSession              (wraps one sessionStore session for one subscriber)
 sessionStore.openSession
 ```
 
+### IO-profile secrets
+
+A profile's passwords and API keys are **not** in `settings.json` — the
+connection map holds only a `_{field}_stored: true` marker, and the value lives
+in the OS keyring under `IO_PROFILE_SERVICE`
+(`com.wiredsquare.wiretap.io-profiles`), account `{profile_id}:{field}`.
+Catalogue-sharing tokens are in a separate bucket (see
+[catalog-sharing.md § Auth](catalog-sharing.md#auth)).
+
+Resolve secrets through **`credentials::resolve_secret(profile, field)`** — never
+re-implement the marker check. It reads the keyring when the marker is set and
+falls back to a plaintext connection value for pre-keyring profiles, so both
+shapes work at every call site (`sessions.rs` Postgres/API/MQTT branches,
+`dbquery.rs`). `apiclient.rs` uses the `has_stored_marker` predicate directly
+because it distinguishes "marker set but no entry" from "keyring error" in the
+message it returns.
+
+Only the prefixed marker is recognised. Unprefixed variants (`password_stored`)
+were never written by any release and their read support has been removed.
+
+**Legacy namespace drain (transitional).** Entries written before the CANdor →
+WireTAP rename sit under `com.candor.io-profiles`. `get_credential` falls back to
+that namespace, copies the value into the live one and deletes the old entry, so
+a secret migrates on its way to being used; `migrate_legacy_io_profile_credentials`
+additionally sweeps entries nothing ever reads, called via `spawn_blocking` from
+`setup` — deliberately **off** the pre-first-paint path, because `setup` already
+`block_on`s `load_settings` and keyring access is OS IPC that can block or prompt.
+Deletes clear both namespaces, or the fallback would resurrect a deleted secret.
+`credentials.rs`'s module doc names the deletable unit; remove it once 0.10 is
+well established.
+
 ### Session ID prefixes
 
 Session IDs are independent of profile IDs. Format: `{prefix}_{6-hex}`. The
@@ -842,3 +873,4 @@ per-task interval can't express.
 | [src-tauri/src/ws/protocol.rs](../src-tauri/src/ws/protocol.rs) | Binary message format, `MsgType`, `encode_frame_batch` |
 | [src-tauri/src/ws/dispatch.rs](../src-tauri/src/ws/dispatch.rs) | `send_new_frames`, `send_session_state`, `send_stream_ended`, etc. |
 | [src-tauri/src/capture_store.rs](../src-tauri/src/capture_store.rs) | Session-scoped capture registry (see [capture-flow.md](capture-flow.md)) |
+| [src-tauri/src/credentials.rs](../src-tauri/src/credentials.rs) | Keyring namespaces, `resolve_secret`, legacy-namespace drain (see [IO-profile secrets](#io-profile-secrets)) |

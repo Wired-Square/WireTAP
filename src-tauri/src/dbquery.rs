@@ -10,7 +10,7 @@ use tauri::AppHandle;
 use tokio::sync::Mutex;
 use tokio_postgres::{CancelToken, NoTls};
 
-use crate::credentials::get_credential;
+use crate::credentials;
 use crate::settings::{load_settings, IOProfile};
 
 /// Information about a running query
@@ -513,37 +513,7 @@ fn find_profile(settings: &crate::settings::AppSettings, profile_id: &str) -> Op
 
 /// Get password for a PostgreSQL profile
 fn get_profile_password(profile: &IOProfile) -> Option<String> {
-    // Check if password is stored in credential storage
-    // Note: field is "_password_stored" with underscore prefix (metadata field)
-    let password_stored = profile.connection.get("_password_stored")
-        .or_else(|| profile.connection.get("password_stored"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    tlog!("[dbquery] get_profile_password: password_stored={}", password_stored);
-
-    if password_stored {
-        // Try to get from credential storage (field is "password")
-        match get_credential(&profile.id, "password") {
-            Ok(Some(pw)) => {
-                tlog!("[dbquery] get_profile_password: got password from credential storage");
-                Some(pw)
-            }
-            Ok(None) => {
-                tlog!("[dbquery] get_profile_password: no password in credential storage");
-                None
-            }
-            Err(e) => {
-                tlog!("[dbquery] get_profile_password: credential storage error: {}", e);
-                None
-            }
-        }
-    } else {
-        // Fall back to connection config
-        let pw = profile.connection.get("password").and_then(|v| v.as_str()).map(|s| s.to_string());
-        tlog!("[dbquery] get_profile_password: from config: {}", if pw.is_some() { "found" } else { "not found" });
-        pw
-    }
+    credentials::resolve_secret(profile, "password")
 }
 
 /// Return the profile if it is an API-backed "wiretap" profile, so callers

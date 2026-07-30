@@ -54,6 +54,8 @@ export async function deleteAllCredentials(profileId: string): Promise<void> {
 /**
  * Fields that should be stored securely in the keyring.
  * When saving a profile, these fields are extracted and stored separately.
+ * Mirrored by `SECURE_FIELDS` in `src-tauri/src/credentials.rs`, which sweeps
+ * this same list when deleting or migrating a profile's secrets.
  */
 export const SECURE_FIELDS = ["password", "token", "api_key", "secret"] as const;
 

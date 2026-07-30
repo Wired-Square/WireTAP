@@ -222,45 +222,6 @@ pub fn cleanup_session_profiles(session_id: &str) {
     }
 }
 
-/// Get a secure credential for a profile, checking keyring if marked as stored there.
-fn get_secure_credential(profile: &IOProfile, field: &str) -> Option<String> {
-    // Check if the credential is stored in keyring
-    let stored_key = format!("_{}_stored", field);
-    let is_stored_in_keyring = profile
-        .connection
-        .get(&stored_key)
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    if is_stored_in_keyring {
-        // Try to fetch from keyring
-        match credentials::get_credential(&profile.id, field) {
-            Ok(Some(value)) => Some(value),
-            Ok(None) => {
-                tlog!(
-                    "[get_secure_credential] No {} found in keyring for profile {}",
-                    field, profile.id
-                );
-                None
-            }
-            Err(e) => {
-                tlog!(
-                    "[get_secure_credential] Failed to get {} from keyring for profile {}: {}",
-                    field, profile.id, e
-                );
-                None
-            }
-        }
-    } else {
-        // Fall back to connection field (for backward compatibility with old profiles)
-        profile
-            .connection
-            .get(field)
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-    }
-}
-
 fn choose_profile_by_id(settings: &AppSettings, profile_id: Option<&str>) -> Option<IOProfile> {
     if let Some(id) = profile_id {
         settings.io_profiles.iter().find(|p| p.id == id).cloned()
@@ -622,7 +583,7 @@ pub async fn create_reader_session(
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| "PostgreSQL username is required".to_string())?
                     .to_string(),
-                password: get_secure_credential(&profile, "password"),
+                password: credentials::resolve_secret(&profile, "password"),
                 sslmode: profile
                     .connection
                     .get("sslmode")
@@ -693,7 +654,7 @@ pub async fn create_reader_session(
                     .ok_or_else(|| "WireTAP backend URL is required".to_string())?
                     .trim_end_matches('/')
                     .to_string(),
-                api_key: get_secure_credential(&profile, "api_key").unwrap_or_default(),
+                api_key: credentials::resolve_secret(&profile, "api_key").unwrap_or_default(),
                 database: profile
                     .connection
                     .get("database")
@@ -808,22 +769,7 @@ pub async fn create_reader_session(
                 .and_then(|v| v.as_str())
                 .map(String::from);
 
-            // Get password from keyring if stored, otherwise from profile
-            let password_stored = profile
-                .connection
-                .get("_password_stored")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            let password = if password_stored {
-                credentials::get_credential(&profile.id, "password").ok().flatten()
-            } else {
-                profile
-                    .connection
-                    .get("password")
-                    .and_then(|v| v.as_str())
-                    .map(String::from)
-            };
+            let password = credentials::resolve_secret(&profile, "password");
 
             // Get subscription topic from savvycan format config
             let topic = profile

@@ -13,7 +13,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
-use crate::credentials::get_credential;
+use crate::credentials::{self, get_credential};
 use crate::dbquery::{
     ByteChangeQueryResult, DatabaseActivityResult, DistributionQueryResult, FirstLastQueryResult,
     FrameChangeQueryResult, FrequencyQueryResult, GapAnalysisQueryResult,
@@ -69,13 +69,7 @@ pub fn resolve(profile: &IOProfile) -> Result<ApiProfile, String> {
 }
 
 fn resolve_api_key(profile: &IOProfile) -> Result<String, String> {
-    let stored = profile
-        .connection
-        .get("_api_key_stored")
-        .or_else(|| profile.connection.get("api_key_stored"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    if stored {
+    if credentials::has_stored_marker(profile, "api_key") {
         match get_credential(&profile.id, "api_key") {
             Ok(Some(key)) => return Ok(key),
             Ok(None) => return Err("wiretap profile API key not found in credential store".into()),

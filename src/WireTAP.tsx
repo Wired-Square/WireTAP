@@ -19,16 +19,14 @@ import { useTheme } from "./hooks/useTheme";
 import { useAppErrorDialog, useSessionStore } from "./stores/sessionStore";
 import { useSettingsStore } from "./apps/settings/stores/settingsStore";
 import { checkRecoveryOccurred } from "./api/io";
-import { checkCandorMigration, tlog } from "./api/settings";
+import { tlog } from "./api/settings";
 import { initTelemetry } from "./api/telemetry";
 import { initWsTransport } from "./services/wsTransport";
 import { initMcpBridge } from "./services/mcpBridge";
 import "./services/memoryDiag"; // Memory diagnostic counters
-import type { CandorMigrationInfo } from "./api/settings";
 import ErrorDialog from "./dialogs/ErrorDialog";
 import { Shield, BarChart3 } from "lucide-react";
 import ConsentDialog from "./dialogs/ConsentDialog";
-import CandorMigrationDialog from "./dialogs/CandorMigrationDialog";
 
 // Lazy load AboutDialog since it's rarely used
 const AboutDialog = lazy(() => import("./dialogs/AboutDialog"));
@@ -56,7 +54,6 @@ function setSentryEnabled(enabled: boolean) {
 export default function WireTAP() {
   const [showAbout, setShowAbout] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
-  const [migrationInfo, setMigrationInfo] = useState<CandorMigrationInfo | null>(null);
   const currentWindow = getCurrentWebviewWindow();
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
 
@@ -119,15 +116,6 @@ export default function WireTAP() {
       unlistenAbout.then((fn) => fn());
     };
   }, [currentWindow]);
-
-  // Check for old CANdor data on startup
-  useEffect(() => {
-    if (settingsLoaded) {
-      checkCandorMigration().then((info) => {
-        if (info) setMigrationInfo(info);
-      });
-    }
-  }, [settingsLoaded]);
 
   // Establish binary WebSocket transport once settings are ready
   useEffect(() => {
@@ -241,14 +229,6 @@ export default function WireTAP() {
         icon={BarChart3}
         i18nKey="usageAnalyticsConsent"
       />
-      {/* CANdor migration dialog - shown when old data is detected */}
-      {migrationInfo && (
-        <CandorMigrationDialog
-          open={!showConsentDialog && !showUsageConsent}
-          info={migrationInfo}
-          onComplete={() => setMigrationInfo(null)}
-        />
-      )}
     </>
   );
 }

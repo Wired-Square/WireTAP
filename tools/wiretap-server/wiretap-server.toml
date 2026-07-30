@@ -56,7 +56,7 @@ enable = false
 # PostgreSQL connection string. Supports all libpq parameters.
 # Format: postgresql://user:password@host:port/database?sslmode=prefer
 # TIP: Use environment variable PG_DSN instead to avoid storing credentials here.
-dsn = "postgresql://candor:SECRET_PASSWORD@HOST:5432/candor"
+dsn = "postgresql://wiretap:SECRET_PASSWORD@HOST:5432/wiretap"
 
 # Insert mechanism. "copy" (default) streams batches via PostgreSQL COPY —
 # the fastest bulk path. "function" is the legacy per-row ingest function

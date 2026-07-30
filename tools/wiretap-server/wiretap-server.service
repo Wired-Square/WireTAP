@@ -20,7 +20,7 @@ Restart=on-failure
 RestartSec=5
 
 # Environment variables (uncomment and set as needed)
-# Environment=PG_DSN=postgresql://candor:password@localhost:5432/candor
+# Environment=PG_DSN=postgresql://wiretap:password@localhost:5432/wiretap
 
 # Allow binding to privileged ports (< 1024) like port 23
 AmbientCapabilities=CAP_NET_BIND_SERVICE

@@ -11,12 +11,18 @@ use tokio_postgres::Client;
 
 const INIT_SCHEMA: &str = include_str!("../../wiretap-server/init_schema.sql");
 
-/// The grants in init_schema.sql target the `candor` ingest role; create it
-/// (NOLOGIN) so a pristine container database accepts the schema unchanged.
+/// Ingest role the grants in init_schema.sql target. Kept in step with that file
+/// by `preamble_role_matches_schema_grants`.
+const INGEST_ROLE: &str = "wiretap";
+
+/// Create the ingest role (NOLOGIN) so a pristine container database accepts the
+/// schema unchanged. A cluster predating the rename still holds it as `candor`;
+/// rename it *before* deploying this, or these grants land on a fresh, unused
+/// role. Runbook: tools/wiretap-server/README.md.
 const PREAMBLE: &str = r#"
 DO $$ BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'candor') THEN
-    CREATE ROLE candor NOLOGIN;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'wiretap') THEN
+    CREATE ROLE wiretap NOLOGIN;
   END IF;
 END $$;
 "#;
@@ -170,5 +176,29 @@ mod tests {
             .expect("ingest function present");
         assert!(f.contains("INSERT INTO public.can_frame"));
         assert!(f.contains("END $$"));
+    }
+
+    /// The preamble creates the role the grants target. If the two drift, a
+    /// pristine database gets a role nothing grants to and an ingest user with
+    /// no privileges — the exact failure a rename can cause, and one that only
+    /// shows up against a live cluster.
+    #[test]
+    fn preamble_role_matches_schema_grants() {
+        assert!(PREAMBLE.contains(&format!("CREATE ROLE {} NOLOGIN", INGEST_ROLE)));
+
+        // Statement-wise, not line-wise: one GRANT spans several lines.
+        let stmts = split_statements(INIT_SCHEMA);
+        let grants: Vec<&String> = stmts
+            .iter()
+            .filter(|s| s.trim_start().starts_with("GRANT "))
+            .collect();
+        assert!(!grants.is_empty(), "schema has no GRANT statements");
+        for grant in grants {
+            assert!(
+                grant.contains(&format!("TO {}", INGEST_ROLE)),
+                "grant does not target {}: {}",
+                INGEST_ROLE, grant
+            );
+        }
     }
 }
